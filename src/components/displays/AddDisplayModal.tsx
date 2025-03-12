@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { X, Search, RefreshCw, Monitor, Wifi, Server } from 'lucide-react';
+import { X, Monitor, Wifi } from 'lucide-react';
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
 import NetworkScanner from './NetworkScanner';
+import { Device } from '../../types/device';
 
 interface AddDisplayModalProps {
   isOpen: boolean;
@@ -22,20 +23,17 @@ interface AddDisplayModalProps {
 
 const AddDisplayModal: React.FC<AddDisplayModalProps> = ({ isOpen, onClose, onAddDisplay }) => {
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
-  const [discoveredDevices, setDiscoveredDevices] = useState<any[]>([]);
+  const [discoveredDevices, setDiscoveredDevices] = useState<Device[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [deviceName, setDeviceName] = useState('');
   const [deviceLocation, setDeviceLocation] = useState('');
 
-  const handleDevicesFound = (devices: any[]) => {
+  const handleDevicesFound = (devices: Device[]) => {
     setDiscoveredDevices(devices);
   };
 
-  const scanNetwork = () => {
-    setIsScanning(true);
-    setTimeout(() => {
-      setIsScanning(false);
-    }, 2000);
+  const handleScanComplete = () => {
+    setIsScanning(false);
   };
 
   const handleDeviceSelect = (deviceId: string) => {
@@ -54,10 +52,10 @@ const AddDisplayModal: React.FC<AddDisplayModalProps> = ({ isOpen, onClose, onAd
           id: Date.now(),
           name: deviceName || device.name,
           location: deviceLocation || 'New Location',
-          status: 'offline',
-          lastSeen: 'Never',
-          resolution: '1920x1080',
-          currentContent: 'None',
+          status: device.status,
+          lastSeen: new Date().toLocaleString(),
+          resolution: device.resolution || '1920x1080',
+          currentContent: device.currentContent || 'None',
           type: device.type,
           groups: []
         });
@@ -118,7 +116,7 @@ const AddDisplayModal: React.FC<AddDisplayModalProps> = ({ isOpen, onClose, onAd
                   
                   <NetworkScanner 
                     onDevicesFound={handleDevicesFound} 
-                    onScanComplete={() => setIsScanning(false)} 
+                    onScanComplete={handleScanComplete} 
                   />
 
                   <div className="mt-6">
