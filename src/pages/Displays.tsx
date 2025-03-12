@@ -56,6 +56,7 @@ const Displays = () => {
   // Handle adding a new display
   const handleAddDisplay = useCallback((newDisplay: Display) => {
     setDisplays(prev => [...prev, { ...newDisplay, id: prev.length + 1 }]);
+    setIsAddModalOpen(false);
   }, []);
 
   // Handle deleting a display
@@ -80,6 +81,12 @@ const Displays = () => {
     );
   }, []);
 
+  // Open modal handler
+  const openAddModal = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsAddModalOpen(true);
+  }, []);
+
   return (
     <div>
       {/* Header */}
@@ -90,7 +97,7 @@ const Displays = () => {
         </div>
         <button 
           className="btn btn-primary flex items-center mt-4 sm:mt-0" 
-          onClick={() => setIsAddModalOpen(true)}
+          onClick={openAddModal}
         >
           <Plus className="h-4 w-4 mr-2" /> Add Display
         </button>
@@ -271,7 +278,7 @@ const Displays = () => {
                     {!searchTerm && selectedStatus === 'all' && (
                       <button 
                         className="mt-4 btn btn-primary"
-                        onClick={() => setIsAddModalOpen(true)}
+                        onClick={openAddModal}
                       >
                         <Plus className="h-4 w-4 mr-2" /> Add Display
                       </button>
@@ -285,13 +292,11 @@ const Displays = () => {
       </div>
 
       {/* Add Display Modal */}
-      {isAddModalOpen && (
-        <AddDisplayModal 
-          isOpen={isAddModalOpen} 
-          onClose={() => setIsAddModalOpen(false)} 
-          onAddDisplay={handleAddDisplay} 
-        />
-      )}
+      <AddDisplayModal 
+        isOpen={isAddModalOpen} 
+        onClose={() => setIsAddModalOpen(false)} 
+        onAddDisplay={handleAddDisplay} 
+      />
     </div>
   );
 };
