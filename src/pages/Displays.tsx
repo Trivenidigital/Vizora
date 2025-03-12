@@ -88,21 +88,33 @@ const Displays = () => {
           <h1 className="text-2xl font-bold text-secondary-900">Displays</h1>
           <p className="text-secondary-500">Manage and monitor all your connected displays</p>
         </div>
-        <button className="btn btn-primary flex items-center mt-4 sm:mt-0" onClick={() => setIsAddModalOpen(true)}>
+        <button 
+          className="btn btn-primary flex items-center mt-4 sm:mt-0" 
+          onClick={() => setIsAddModalOpen(true)}
+        >
           <Plus className="h-4 w-4 mr-2" /> Add Display
         </button>
       </div>
 
       {/* Filters */}
       <div className="mb-6 flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
-        <input 
-          type="text" 
-          className="input pl-10" 
-          placeholder="Search displays..." 
-          value={searchTerm} 
-          onChange={(e) => setSearchTerm(e.target.value)} 
-        />
-        <select className="input sm:w-48" value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)}>
+        <div className="relative flex-1 max-w-md">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search className="h-5 w-5 text-secondary-400" />
+          </div>
+          <input 
+            type="text" 
+            className="input pl-10" 
+            placeholder="Search displays..." 
+            value={searchTerm} 
+            onChange={(e) => setSearchTerm(e.target.value)} 
+          />
+        </div>
+        <select 
+          className="input sm:w-48" 
+          value={selectedStatus} 
+          onChange={(e) => setSelectedStatus(e.target.value)}
+        >
           <option value="all">All Statuses</option>
           <option value="online">Online</option>
           <option value="offline">Offline</option>
@@ -127,23 +139,159 @@ const Displays = () => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-secondary-200">
-            {filteredDisplays.map(display => (
-              <tr key={display.id}>
-                <td className="px-6 py-4 text-sm font-medium text-secondary-900">{display.name}</td>
-                <td className="px-6 py-4 text-sm text-secondary-900">{display.location}</td>
-                <td className="px-6 py-4 text-sm text-secondary-900">{display.status}</td>
-                <td className="px-6 py-4 text-sm text-secondary-900">{display.currentContent}</td>
-                <td className="px-6 py-4 text-sm text-secondary-500">{display.lastSeen}</td>
-                <td className="px-6 py-4 text-right text-sm font-medium">
-                  <button onClick={() => handleDeleteDisplay(display.id)} className="text-red-600 hover:text-red-800">Delete</button>
+            {filteredDisplays.length > 0 ? (
+              filteredDisplays.map(display => (
+                <tr key={display.id}>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0 h-10 w-10 flex items-center justify-center rounded-md bg-primary-50 text-primary-600">
+                        <Monitor className="h-6 w-6" />
+                      </div>
+                      <div className="ml-4">
+                        <div className="text-sm font-medium text-secondary-900">{display.name}</div>
+                        <div className="text-sm text-secondary-500">{display.type}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-900">{display.location}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      display.status === 'online' ? 'bg-green-100 text-green-800' : 
+                      display.status === 'offline' ? 'bg-red-100 text-red-800' : 
+                      'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {display.status === 'online' ? (
+                        <>
+                          <span className="h-2 w-2 mr-1.5 rounded-full bg-green-400"></span>
+                          Online
+                        </>
+                      ) : display.status === 'offline' ? (
+                        <>
+                          <span className="h-2 w-2 mr-1.5 rounded-full bg-red-400"></span>
+                          Offline
+                        </>
+                      ) : (
+                        <>
+                          <span className="h-2 w-2 mr-1.5 rounded-full bg-yellow-400"></span>
+                          Scheduled
+                        </>
+                      )}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-900">{display.currentContent}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-500">{display.lastSeen}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <Menu as="div" className="relative inline-block text-left">
+                      <div>
+                        <Menu.Button className="bg-white rounded-full flex items-center text-secondary-400 hover:text-secondary-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+                          <span className="sr-only">Open options</span>
+                          <MoreVertical className="h-5 w-5" aria-hidden="true" />
+                        </Menu.Button>
+                      </div>
+
+                      <Transition
+                        as={Fragment}
+                        enter="transition ease-out duration-100"
+                        enterFrom="transform opacity-0 scale-95"
+                        enterTo="transform opacity-100 scale-100"
+                        leave="transition ease-in duration-75"
+                        leaveFrom="transform opacity-100 scale-100"
+                        leaveTo="transform opacity-0 scale-95"
+                      >
+                        <Menu.Items className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
+                          <div className="py-1">
+                            <Menu.Item>
+                              {({ active }) => (
+                                <button
+                                  onClick={() => handleTogglePower(display.id)}
+                                  className={`${
+                                    active ? 'bg-secondary-100 text-secondary-900' : 'text-secondary-700'
+                                  } flex items-center px-4 py-2 text-sm w-full text-left`}
+                                >
+                                  <Power className="mr-3 h-5 w-5 text-secondary-400" aria-hidden="true" />
+                                  {display.status === 'online' ? 'Turn Off' : 'Turn On'}
+                                </button>
+                              )}
+                            </Menu.Item>
+                            <Menu.Item>
+                              {({ active }) => (
+                                <button
+                                  className={`${
+                                    active ? 'bg-secondary-100 text-secondary-900' : 'text-secondary-700'
+                                  } flex items-center px-4 py-2 text-sm w-full text-left`}
+                                >
+                                  <RefreshCw className="mr-3 h-5 w-5 text-secondary-400" aria-hidden="true" />
+                                  Refresh
+                                </button>
+                              )}
+                            </Menu.Item>
+                            <Menu.Item>
+                              {({ active }) => (
+                                <button
+                                  className={`${
+                                    active ? 'bg-secondary-100 text-secondary-900' : 'text-secondary-700'
+                                  } flex items-center px-4 py-2 text-sm w-full text-left`}
+                                >
+                                  <Edit className="mr-3 h-5 w-5 text-secondary-400" aria-hidden="true" />
+                                  Edit
+                                </button>
+                              )}
+                            </Menu.Item>
+                            <Menu.Item>
+                              {({ active }) => (
+                                <button
+                                  onClick={() => handleDeleteDisplay(display.id)}
+                                  className={`${
+                                    active ? 'bg-secondary-100 text-red-600' : 'text-red-500'
+                                  } flex items-center px-4 py-2 text-sm w-full text-left`}
+                                >
+                                  <Trash2 className="mr-3 h-5 w-5 text-red-400" aria-hidden="true" />
+                                  Delete
+                                </button>
+                              )}
+                            </Menu.Item>
+                          </div>
+                        </Menu.Items>
+                      </Transition>
+                    </Menu>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={6} className="px-6 py-10 text-center text-sm text-secondary-500">
+                  <div className="flex flex-col items-center">
+                    <Monitor className="h-12 w-12 text-secondary-400 mb-4" />
+                    <p className="text-secondary-900 font-medium mb-1">No displays found</p>
+                    <p className="text-secondary-500 max-w-sm">
+                      {searchTerm || selectedStatus !== 'all' 
+                        ? 'Try adjusting your search or filter criteria.' 
+                        : 'Get started by adding your first display.'}
+                    </p>
+                    {!searchTerm && selectedStatus === 'all' && (
+                      <button 
+                        className="mt-4 btn btn-primary"
+                        onClick={() => setIsAddModalOpen(true)}
+                      >
+                        <Plus className="h-4 w-4 mr-2" /> Add Display
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>
 
-      <AddDisplayModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onAddDisplay={handleAddDisplay} />
+      {/* Add Display Modal */}
+      {isAddModalOpen && (
+        <AddDisplayModal 
+          isOpen={isAddModalOpen} 
+          onClose={() => setIsAddModalOpen(false)} 
+          onAddDisplay={handleAddDisplay} 
+        />
+      )}
     </div>
   );
 };

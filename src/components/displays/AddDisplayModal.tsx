@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Search, RefreshCw, Monitor, Wifi, Server } from 'lucide-react';
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
+import NetworkScanner from './NetworkScanner';
 
 interface AddDisplayModalProps {
   isOpen: boolean;
@@ -136,6 +137,16 @@ const AddDisplayModal: React.FC<AddDisplayModalProps> = ({ isOpen, onClose, onAd
     }
   };
 
+  // Handle scan completion
+  const handleScanComplete = () => {
+    setIsScanning(false);
+  };
+
+  // Handle devices found
+  const handleDevicesFound = (devices: any[]) => {
+    setDiscoveredDevices(devices);
+  };
+
   // Start scanning when modal opens
   useEffect(() => {
     if (isOpen && activeTab === 'scan') {
@@ -254,11 +265,10 @@ const AddDisplayModal: React.FC<AddDisplayModalProps> = ({ isOpen, onClose, onAd
                     </div>
 
                     {isScanning ? (
-                      <div className="py-12 flex flex-col items-center justify-center">
-                        <RefreshCw className="h-8 w-8 text-primary-500 animate-spin mb-4" />
-                        <p className="text-secondary-700 font-medium">Scanning network for displays...</p>
-                        <p className="text-secondary-500 text-sm mt-2">This may take a few moments</p>
-                      </div>
+                      <NetworkScanner 
+                        onDevicesFound={handleDevicesFound} 
+                        onScanComplete={handleScanComplete} 
+                      />
                     ) : (
                       <>
                         {filteredDevices.length > 0 ? (
@@ -370,6 +380,7 @@ const AddDisplayModal: React.FC<AddDisplayModalProps> = ({ isOpen, onClose, onAd
                       <select
                         id="type"
                         name="type"
+                        className="mt-1<ez1Action type="file" filePath="src/components/displays/AddDisplayModal.tsx">
                         className="mt-1 input"
                         value={manualForm.type}
                         onChange={handleManualFormChange}
