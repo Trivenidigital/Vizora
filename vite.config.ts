@@ -11,18 +11,21 @@ export default defineConfig({
     },
   },
   server: {
+    host: true,
     port: 3000,
+    strictPort: true,
+    // This is important for handling client-side routing
+    historyApiFallback: true,
   },
   build: {
     outDir: 'dist',
+    // Generate a 404.html that's a copy of index.html for client-side routing
     rollupOptions: {
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
-          ui: ['@headlessui/react', 'lucide-react'],
         },
       },
     },
   },
-  base: './',
 })
