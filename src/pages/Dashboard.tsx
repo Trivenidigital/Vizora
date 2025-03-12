@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
 import { 
   Monitor, 
   AlertTriangle, 
@@ -77,12 +76,7 @@ const Dashboard = () => {
       {/* Stats overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         {/* Display stats */}
-        <motion.div 
-          className="card p-6"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-        >
+        <div className="card p-6 opacity-100">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-medium text-secondary-800">Display Status</h2>
             <Link to="/displays" className="text-sm text-primary-600 hover:text-primary-700 flex items-center">
@@ -141,15 +135,10 @@ const Dashboard = () => {
               Add New Display
             </Link>
           </div>
-        </motion.div>
+        </div>
         
         {/* Content stats */}
-        <motion.div 
-          className="card p-6"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.1 }}
-        >
+        <div className="card p-6 opacity-100">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-medium text-secondary-800">Content Overview</h2>
             <Link to="/content" className="text-sm text-primary-600 hover:text-primary-700 flex items-center">
@@ -208,16 +197,11 @@ const Dashboard = () => {
               Create New Content
             </Link>
           </div>
-        </motion.div>
+        </div>
       </div>
       
       {/* Recent activity */}
-      <motion.div 
-        className="card p-6 mb-8"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0.2 }}
-      >
+      <div className="card p-6 mb-8 opacity-100">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-medium text-secondary-800">Recent Activity</h2>
           <Link to="/activity" className="text-sm text-primary-600 hover:text-primary-700 flex items-center">
@@ -247,15 +231,10 @@ const Dashboard = () => {
             </div>
           ))}
         </div>
-      </motion.div>
+      </div>
       
       {/* AI Insights */}
-      <motion.div 
-        className="card p-6 mb-8 bg-gradient-to-r from-primary-50 to-purple-50 border-primary-200"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0.3 }}
-      >
+      <div className="card p-6 mb-8 bg-gradient-to-r from-primary-50 to-purple-50 border-primary-200 opacity-100">
         <div className="flex items-center mb-4">
           <div className="p-2 rounded-full bg-primary-100 text-primary-600 mr-3">
             <Zap className="h-5 w-5" />
@@ -282,7 +261,7 @@ const Dashboard = () => {
             <ArrowUpRight className="ml-2 h-4 w-4" />
           </Link>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 };
