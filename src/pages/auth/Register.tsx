@@ -1,37 +1,58 @@
-import React, { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Cast, Mail, Lock, Eye, EyeOff, User, Check } from 'lucide-react';
+import { Cast, User, Mail, Lock, Eye, EyeOff, Building } from 'lucide-react';
 
 const Register = () => {
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    company: '',
+    password: '',
+    confirmPassword: '',
+  });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-	
-  const handleSubmit = (e: React.FormEvent) => {
+  // Handle input changes
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prevData => ({ ...prevData, [name]: value }));
+  }, []);
+
+  // Handle form submission
+  const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
+      alert('All fields are required.');
+      return;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      alert('Passwords do not match');
+      return;
+    }
+
     setIsLoading(true);
-    
-    // Simulate registration process
+
     setTimeout(() => {
       setIsLoading(false);
-      navigate('/app');
+      navigate('/app'); // Redirect after successful registration
     }, 1500);
-  };
+  }, [formData, navigate]);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex flex-col justify-center bg-gray-50 py-12 px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        {/* Logo */}
         <div className="flex justify-center">
           <Cast className="h-12 w-12 text-primary-600" />
         </div>
+
+        {/* Header */}
         <h2 className="mt-6 text-center text-3xl font-extrabold text-secondary-900">
           Create your account
         </h2>
@@ -43,129 +64,144 @@ const Register = () => {
         </p>
       </div>
 
+      {/* Form Section */}
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+        <div className="bg-white py-8 px-6 shadow rounded-lg">
           <form className="space-y-6" onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
-              <div>
-                <label htmlFor="first-name" className="block text-sm font-medium text-secondary-700">
-                  First name
-                </label>
-                <div className="mt-1 relative rounded-md shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <User className="h-5 w-5 text-secondary-400" />
-                  </div>
-                  <input
-                    id="first-name"
-                    name="first-name"
-                    type="text"
-                    autoComplete="given-name"
-                    required
-                    className="input pl-10"
-                    placeholder="John"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="last-name" className="block text-sm font-medium text-secondary-700">
-                  Last name
-                </label>
-                <div className="mt-1 relative rounded-md shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <User className="h-5 w-5 text-secondary-400" />
-                  </div>
-                  <input
-                    id="last-name"
-                    name="last-name"
-                    type="text"
-                    autoComplete="family-name"
-                    required
-                    className="input pl-10"
-                    placeholder="Doe"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                  />
-                </div>
+            {/* Full Name */}
+            <div>
+              <label htmlFor="name" className="label">Full name</label>
+              <div className="input-group">
+                <User className="icon" />
+                <input
+                  id="name"
+                  name="name"
+                  type="text"
+                  required
+                  placeholder="John Doe"
+                  value={formData.name}
+                  onChange={handleChange}
+                  className="input pl-10"
+                />
               </div>
             </div>
 
+            {/* Email Address */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-secondary-700">
-                Email address
-              </label>
-              <div className="mt-1 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-secondary-400" />
-                </div>
+              <label htmlFor="email" className="label">Email address</label>
+              <div className="input-group">
+                <Mail className="icon" />
                 <input
                   id="email"
                   name="email"
                   type="email"
-                  autoComplete="email"
                   required
-                  className="input pl-10"
                   placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  value={formData.email}
+                  onChange={handleChange}
+                  className="input pl-10"
                 />
               </div>
             </div>
 
+            {/* Company Name */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-secondary-700">
-                Password
-              </label>
-              <div className="mt-1 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-secondary-400" />
-                </div>
+              <label htmlFor="company" className="label">Company name</label>
+              <div className="input-group">
+                <Building className="icon" />
+                <input
+                  id="company"
+                  name="company"
+                  type="text"
+                  placeholder="Acme Inc."
+                  value={formData.company}
+                  onChange={handleChange}
+                  className="input pl-10"
+                />
+              </div>
+            </div>
+
+            {/* Password */}
+            <div>
+              <label htmlFor="password" className="label">Password</label>
+              <div className="input-group">
+                <Lock className="icon" />
                 <input
                   id="password"
                   name="password"
                   type={showPassword ? 'text' : 'password'}
-                  autoComplete="new-password"
                   required
+                  value={formData.password}
+                  onChange={handleChange}
                   className="input pl-10 pr-10"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
                 />
-                <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="text-secondary-400 hover:text-secondary-500 focus:outline-none"
-                  >
-                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="icon-button"
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
               </div>
             </div>
 
+            {/* Confirm Password */}
+            <div>
+              <label htmlFor="confirmPassword" className="label">Confirm password</label>
+              <div className="input-group">
+                <Lock className="icon" />
+                <input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  required
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  className="input pl-10 pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="icon-button"
+                >
+                  {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Terms & Conditions */}
             <div className="flex items-center">
               <input
-                id="agree-terms"
-                name="agree-terms"
+                id="agreeTerms"
+                name="agreeTerms"
                 type="checkbox"
-                className="h-4 w-4 text-primary-600 border-gray-300 rounded"
+                required
                 checked={agreeTerms}
                 onChange={(e) => setAgreeTerms(e.target.checked)}
+                className="checkbox"
               />
-              <label htmlFor="agree-terms" className="ml-2 block text-sm text-secondary-700">
-                I agree to the terms and conditions
+              <label htmlFor="agreeTerms" className="ml-2 text-sm text-secondary-900">
+                I agree to the{' '}
+                <a href="#" className="text-primary-600 hover:text-primary-500">Terms of Service</a>{' '}
+                and{' '}
+                <a href="#" className="text-primary-600 hover:text-primary-500">Privacy Policy</a>
               </label>
             </div>
 
+            {/* Submit Button */}
             <div>
               <button
                 type="submit"
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                className="btn btn-primary w-full"
                 disabled={isLoading}
               >
-                {isLoading ? 'Registering...' : 'Sign up'}
+                {isLoading && (
+                  <svg className="animate-spin h-5 w-5 mr-3 text-white" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                )}
+                Create account
               </button>
             </div>
           </form>
