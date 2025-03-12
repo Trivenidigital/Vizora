@@ -1,11 +1,20 @@
-import React from 'react';
+import { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 
-// Mock authentication state - in a real app, this would come from a context or state management
-const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+interface ProtectedRouteProps {
+  children: ReactNode;
+}
 
-const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
-  return isAuthenticated ? children : <Navigate to="/login" />;
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+  // This is a mock authentication check
+  // In a real app, you would check if the user is authenticated
+  const isAuthenticated = true; // For demo purposes, always authenticated
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  return <>{children}</>;
 };
 
 export default ProtectedRoute;

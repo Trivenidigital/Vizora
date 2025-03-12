@@ -41,10 +41,10 @@ const Dashboard = () => {
   ];
   
   const quickActions = [
-    { name: 'Add Display', icon: Monitor, href: '/app/displays/add' },
-    { name: 'Upload Content', icon: FolderOpen, href: '/app/content/upload' },
-    { name: 'Create Playlist', icon: PlaySquare, href: '/app/playlists/create' },
-    { name: 'Schedule Content', icon: Calendar, href: '/app/schedule/create' },
+    { name: 'Add Display', icon: Monitor, href: '/displays/add' },
+    { name: 'Upload Content', icon: FolderOpen, href: '/content/upload' },
+    { name: 'Create Playlist', icon: PlaySquare, href: '/playlists/create' },
+    { name: 'Schedule Content', icon: Calendar, href: '/schedule/create' },
   ];
 
   return (
@@ -73,6 +73,7 @@ const Dashboard = () => {
         </div>
       </div>
       
+      {/* Rest of the Dashboard component... */}
       {/* Stats overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         {/* Display stats */}
@@ -84,7 +85,7 @@ const Dashboard = () => {
         >
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-medium text-secondary-800">Display Status</h2>
-            <Link to="/app/displays" className="text-sm text-primary-600 hover:text-primary-700 flex items-center">
+            <Link to="/displays" className="text-sm text-primary-600 hover:text-primary-700 flex items-center">
               View all <ArrowUpRight className="ml-1 h-3 w-3" />
             </Link>
           </div>
@@ -135,10 +136,10 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="mt-4">
-            <button className="btn btn-secondary w-full">
+            <Link to="/displays/add" className="btn btn-secondary w-full flex items-center justify-center">
               <Plus className="h-4 w-4 mr-2" />
               Add New Display
-            </button>
+            </Link>
           </div>
         </motion.div>
         
@@ -151,7 +152,7 @@ const Dashboard = () => {
         >
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-medium text-secondary-800">Content Overview</h2>
-            <Link to="/app/content" className="text-sm text-primary-600 hover:text-primary-700 flex items-center">
+            <Link to="/content" className="text-sm text-primary-600 hover:text-primary-700 flex items-center">
               View library <ArrowUpRight className="ml-1 h-3 w-3" />
             </Link>
           </div>
@@ -202,10 +203,10 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="mt-4">
-            <button className="btn btn-secondary w-full">
+            <Link to="/content/create" className="btn btn-secondary w-full flex items-center justify-center">
               <Plus className="h-4 w-4 mr-2" />
               Create New Content
-            </button>
+            </Link>
           </div>
         </motion.div>
       </div>
@@ -219,7 +220,7 @@ const Dashboard = () => {
       >
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-medium text-secondary-800">Recent Activity</h2>
-          <Link to="/app/activity" className="text-sm text-primary-600 hover:text-primary-700 flex items-center">
+          <Link to="/activity" className="text-sm text-primary-600 hover:text-primary-700 flex items-center">
             View all <ArrowUpRight className="ml-1 h-3 w-3" />
           </Link>
         </div>
@@ -276,7 +277,7 @@ const Dashboard = () => {
           </div>
         </div>
         <div className="mt-4">
-          <Link to="/app/ai-insights" className="btn btn-primary w-full flex items-center justify-center">
+          <Link to="/ai-insights" className="btn btn-primary w-full flex items-center justify-center">
             View All AI Insights
             <ArrowUpRight className="ml-2 h-4 w-4" />
           </Link>

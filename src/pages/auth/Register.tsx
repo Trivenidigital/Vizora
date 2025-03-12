@@ -38,9 +38,11 @@ const Register = () => {
 
     setIsLoading(true);
 
+    // Simulate API call
     setTimeout(() => {
       setIsLoading(false);
-      navigate('/app'); // Redirect after successful registration
+      // Changed from '/app' to '/dashboard' to match the route defined in App.tsx
+      navigate('/dashboard');
     }, 1500);
   }, [formData, navigate]);
 

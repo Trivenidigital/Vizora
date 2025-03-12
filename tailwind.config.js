@@ -18,7 +18,6 @@ export default {
           700: '#4338ca',
           800: '#3730a3',
           900: '#312e81',
-          950: '#1e1b4b',
         },
         secondary: {
           50: '#f8fafc',
@@ -31,12 +30,8 @@ export default {
           700: '#334155',
           800: '#1e293b',
           900: '#0f172a',
-          950: '#020617',
-        },
-      },
-      fontFamily: {
-        sans: ['Inter', 'sans-serif'],
-      },
+        }
+      }
     },
   },
   plugins: [],

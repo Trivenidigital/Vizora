@@ -12,6 +12,7 @@ import Register from './pages/auth/Register';
 import Landing from './pages/Landing';
 import NotFound from './pages/NotFound';
 import ProtectedRoute from './components/ProtectedRoute';
+import AddDisplayModal from './components/displays/AddDisplayModal';
 
 function App() {
   return (
@@ -33,6 +34,15 @@ function App() {
         <ProtectedRoute>
           <Layout>
             <Displays />
+          </Layout>
+        </ProtectedRoute>
+      } />
+      
+      {/* Add the displays/add route */}
+      <Route path="/displays/add" element={
+        <ProtectedRoute>
+          <Layout>
+            <Displays initialAddModalOpen={true} />
           </Layout>
         </ProtectedRoute>
       } />
