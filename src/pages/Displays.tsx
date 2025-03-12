@@ -55,27 +55,34 @@ const Displays = () => {
 
   // Handle adding a new display
   const handleAddDisplay = useCallback((newDisplay: Display) => {
-    setDisplays(prevDisplays => [...prevDisplays, { ...newDisplay, id: prevDisplays.length + 1 }]);
+    setDisplays(prev => [...prev, { ...newDisplay, id: prev.length + 1 }]);
   }, []);
 
   // Handle deleting a display
   const handleDeleteDisplay = useCallback((id: number) => {
     if (window.confirm('Are you sure you want to delete this display?')) {
-      setDisplays(prevDisplays => prevDisplays.filter(display => display.id !== id));
+      setDisplays(prev => prev.filter(display => display.id !== id));
     }
   }, []);
 
   // Handle toggling display power
   const handleTogglePower = useCallback((id: number) => {
-    setDisplays(prevDisplays => prevDisplays.map(display => 
-      display.id === id 
-        ? { ...display, status: display.status === 'online' ? 'offline' : 'online', lastSeen: display.status === 'online' ? display.lastSeen : 'Just now' }
-        : display
-    ));
+    setDisplays(prev =>
+      prev.map(display =>
+        display.id === id
+          ? {
+              ...display,
+              status: display.status === 'online' ? 'offline' : 'online',
+              lastSeen: display.status === 'online' ? display.lastSeen : 'Just now',
+            }
+          : display
+      )
+    );
   }, []);
 
   return (
     <div>
+      {/* Header */}
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-secondary-900">Displays</h1>
@@ -88,7 +95,13 @@ const Displays = () => {
 
       {/* Filters */}
       <div className="mb-6 flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
-        <input type="text" className="input pl-10" placeholder="Search displays..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+        <input 
+          type="text" 
+          className="input pl-10" 
+          placeholder="Search displays..." 
+          value={searchTerm} 
+          onChange={(e) => setSearchTerm(e.target.value)} 
+        />
         <select className="input sm:w-48" value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)}>
           <option value="all">All Statuses</option>
           <option value="online">Online</option>
@@ -129,7 +142,6 @@ const Displays = () => {
           </tbody>
         </table>
       </div>
-			
 
       <AddDisplayModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onAddDisplay={handleAddDisplay} />
     </div>
