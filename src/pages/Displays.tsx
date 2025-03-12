@@ -16,31 +16,10 @@ import {
 } from 'lucide-react';
 import { Menu, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
-import { Link } from 'react-router-dom';
-
-// Mock data<ez1Action type="file" filePath="src/pages/Displays.tsx">
-import { useState } from 'react';
-import { 
-  Monitor, 
-  Plus, 
-  Search, 
-  Filter, 
-  MoreVertical, 
-  Zap, 
-  AlertTriangle, 
-  Clock, 
-  RefreshCw,
-  Power,
-  Edit,
-  Trash2,
-  Download
-} from 'lucide-react';
-import { Menu, Transition } from '@headlessui/react';
-import { Fragment } from 'react';
-import { Link } from 'react-router-dom';
+import AddDisplayModal from '../components/displays/AddDisplayModal';
 
 // Mock data
-const displays = [
+const initialDisplays = [
   { 
     id: 1, 
     name: 'Lobby Display', 
@@ -112,6 +91,8 @@ const displays = [
 const Displays = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
+  const [displays, setDisplays] = useState(initialDisplays);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   
   // Filter displays based on search and status
   const filteredDisplays = displays.filter(display => {
@@ -121,6 +102,33 @@ const Displays = () => {
     
     return matchesSearch && matchesStatus;
   });
+
+  // Handle adding a new display
+  const handleAddDisplay = (newDisplay: any) => {
+    setDisplays([...displays, { ...newDisplay, id: displays.length + 1 }]);
+  };
+
+  // Handle deleting a display
+  const handleDeleteDisplay = (id: number) => {
+    if (window.confirm('Are you sure you want to delete this display?')) {
+      setDisplays(displays.filter(display => display.id !== id));
+    }
+  };
+
+  // Handle toggling display power
+  const handleTogglePower = (id: number) => {
+    setDisplays(displays.map(display => {
+      if (display.id === id) {
+        const newStatus = display.status === 'online' ? 'offline' : 'online';
+        return { 
+          ...display, 
+          status: newStatus,
+          lastSeen: newStatus === 'online' ? 'Just now' : display.lastSeen
+        };
+      }
+      return display;
+    }));
+  };
   
   return (
     <div>
@@ -130,7 +138,10 @@ const Displays = () => {
           <p className="text-secondary-500">Manage and monitor all your connected displays</p>
         </div>
         <div className="mt-4 sm:mt-0">
-          <button className="btn btn-primary flex items-center">
+          <button 
+            className="btn btn-primary flex items-center"
+            onClick={() => setIsAddModalOpen(true)}
+          >
             <Plus className="h-4 w-4 mr-2" />
             Add Display
           </button>
@@ -276,6 +287,7 @@ const Displays = () => {
                       </div>
 
                       <Transition
+                <ez1Action type="file" filePath="src/pages/Displays.tsx">
                         as={Fragment}
                         enter="transition ease-out duration-100"
                         enterFrom="transform opacity-0 scale-95"
@@ -288,67 +300,64 @@ const Displays = () => {
                           <div className="py-1">
                             <Menu.Item>
                               {({ active }) => (
-                                <a
-                                  href="#"
+                                <button
                                   className={`${
                                     active ? 'bg-secondary-100 text-secondary-900' : 'text-secondary-700'
-                                  } flex items-center px-4 py-2 text-sm`}
+                                  } flex items-center px-4 py-2 text-sm w-full text-left`}
                                 >
                                   <RefreshCw className="mr-3 h-5 w-5 text-secondary-400" aria-hidden="true" />
                                   Refresh
-                                </a>
+                                </button>
                               )}
                             </Menu.Item>
                             <Menu.Item>
                               {({ active }) => (
-                                <a
-                                  href="#"
+                                <button
+                                  onClick={() => handleTogglePower(display.id)}
                                   className={`${
                                     active ? 'bg-secondary-100 text-secondary-900' : 'text-secondary-700'
-                                  } flex items-center px-4 py-2 text-sm`}
+                                  } flex items-center px-4 py-2 text-sm w-full text-left`}
                                 >
                                   <Power className="mr-3 h-5 w-5 text-secondary-400" aria-hidden="true" />
                                   {display.status === 'online' ? 'Turn Off' : 'Turn On'}
-                                </a>
+                                </button>
                               )}
                             </Menu.Item>
                             <Menu.Item>
                               {({ active }) => (
-                                <a
-                                  href="#"
+                                <button
                                   className={`${
                                     active ? 'bg-secondary-100 text-secondary-900' : 'text-secondary-700'
-                                  } flex items-center px-4 py-2 text-sm`}
+                                  } flex items-center px-4 py-2 text-sm w-full text-left`}
                                 >
                                   <Edit className="mr-3 h-5 w-5 text-secondary-400" aria-hidden="true" />
                                   Edit
-                                </a>
+                                </button>
                               )}
                             </Menu.Item>
                             <Menu.Item>
                               {({ active }) => (
-                                <a
-                                  href="#"
+                                <button
+                                  onClick={() => handleDeleteDisplay(display.id)}
                                   className={`${
                                     active ? 'bg-secondary-100 text-secondary-900' : 'text-secondary-700'
-                                  } flex items-center px-4 py-2 text-sm`}
+                                  } flex items-center px-4 py-2 text-sm w-full text-left`}
+                                >
+                                  <Trash2 className="mr-3 h-5 w-5 text-secondary-400" aria-hidden="true" />
+                                  Delete
+                                </button>
+                              )}
+                            </Menu.Item>
+                            <Menu.Item>
+                              {({ active }) => (
+                                <button
+                                  className={`${
+                                    active ? 'bg-secondary-100 text-secondary-900' : 'text-secondary-700'
+                                  } flex items-center px-4 py-2 text-sm w-full text-left`}
                                 >
                                   <Download className="mr-3 h-5 w-5 text-secondary-400" aria-hidden="true" />
                                   Download Logs
-                                </a>
-                              )}
-                            </Menu.Item>
-                            <Menu.Item>
-                              {({ active }) => (
-                                <a
-                                  href="#"
-                                  className={`${
-                                    active ? 'bg-red-50 text-red-700' : 'text-red-600'
-                                  } flex items-center px-4 py-2 text-sm`}
-                                >
-                                  <Trash2 className="mr-3 h-5 w-5 text-red-400" aria-hidden="true" />
-                                  Delete
-                                </a>
+                                </button>
                               )}
                             </Menu.Item>
                           </div>
@@ -361,70 +370,14 @@ const Displays = () => {
             </tbody>
           </table>
         </div>
-        
-        {filteredDisplays.length === 0 && (
-          <div className="px-6 py-10 text-center">
-            <Monitor className="mx-auto h-12 w-12 text-secondary-400" />
-            <h3 className="mt-2 text-sm font-medium text-secondary-900">No displays found</h3>
-            <p className="mt-1 text-sm text-secondary-500">
-              Try adjusting your search or filter to find what you're looking for.
-            </p>
-            <div className="mt-6">
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => {
-                  setSearchTerm('');
-                  setSelectedStatus('all');
-                }}
-              >
-                Clear filters
-              </button>
-            </div>
-          </div>
-        )}
       </div>
       
-      {/* Pagination */}
-      <div className="flex items-center justify-between mt-6">
-        <div className="flex-1 flex justify-between sm:hidden">
-          <button className="btn btn-secondary">Previous</button>
-          <button className="btn btn-secondary">Next</button>
-        </div>
-        <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm text-secondary-700">
-              Showing <span className="font-medium">1</span> to <span className="font-medium">{filteredDisplays.length}</span> of{' '}
-              <span className="font-medium">{filteredDisplays.length}</span> results
-            </p>
-          </div>
-          <div>
-            <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-              <button
-                className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-secondary-300 bg-white text-sm font-medium text-secondary-500 hover:bg-secondary-50"
-              >
-                <span className="sr-only">Previous</span>
-                <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-              </button>
-              <button
-                className="relative inline-flex items-center px-4 py-2 border border-secondary-300 bg-white text-sm font-medium text-secondary-900 hover:bg-secondary-50"
-              >
-                1
-              </button>
-              <button
-                className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-secondary-300 bg-white text-sm font-medium text-secondary-500 hover:bg-secondary-50"
-              >
-                <span className="sr-only">Next</span>
-                <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                </svg>
-              </button>
-            </nav>
-          </div>
-        </div>
-      </div>
+      {/* Add Display Modal */}
+      <AddDisplayModal 
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onAddDisplay={handleAddDisplay}
+      />
     </div>
   );
 };
