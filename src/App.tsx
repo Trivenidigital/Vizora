@@ -11,11 +11,9 @@ import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import Landing from './pages/Landing';
 import NotFound from './pages/NotFound';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
-  // Mock authentication state - in a real app, this would come from a context or state management
-  const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
-
   return (
     <Routes>
       <Route path="/" element={<Landing />} />
@@ -24,45 +22,59 @@ function App() {
       
       {/* Protected routes */}
       <Route path="/dashboard" element={
-        <Layout>
-          <Dashboard />
-        </Layout>
+        <ProtectedRoute>
+          <Layout>
+            <Dashboard />
+          </Layout>
+        </ProtectedRoute>
       } />
       
       <Route path="/displays" element={
-        <Layout>
-          <Displays />
-        </Layout>
+        <ProtectedRoute>
+          <Layout>
+            <Displays />
+          </Layout>
+        </ProtectedRoute>
       } />
       
       <Route path="/content" element={
-        <Layout>
-          <ContentLibrary />
-        </Layout>
+        <ProtectedRoute>
+          <Layout>
+            <ContentLibrary />
+          </Layout>
+        </ProtectedRoute>
       } />
       
       <Route path="/playlists" element={
-        <Layout>
-          <Playlists />
-        </Layout>
+        <ProtectedRoute>
+          <Layout>
+            <Playlists />
+          </Layout>
+        </ProtectedRoute>
       } />
       
       <Route path="/schedule" element={
-        <Layout>
-          <Schedule />
-        </Layout>
+        <ProtectedRoute>
+          <Layout>
+            <Schedule />
+          </Layout>
+        </ProtectedRoute>
       } />
       
       <Route path="/analytics" element={
-        <Layout>
-          <Analytics />
-        </Layout>
+        <ProtectedRoute>
+          <Layout>
+            <Analytics />
+          </Layout>
+        </ProtectedRoute>
       } />
       
       <Route path="/settings" element={
-        <Layout>
-          <Settings />
-        </Layout>
+        <ProtectedRoute>
+          <Layout>
+            <Settings />
+          </Layout>
+        </ProtectedRoute>
       } />
       
       {/* Catch all route for 404 */}
