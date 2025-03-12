@@ -137,6 +137,7 @@ const NetworkScanner: React.FC<NetworkScannerProps> = ({ onDevicesFound, onScanC
           <ul className="list-disc pl-4 space-y-1">
             <li>Make sure your device is on the same WiFi network as the displays you want to detect</li>
             <li>For Samsung Smart TVs, ensure they are powered on and connected to WiFi</li>
+            <li>For Amazon Fire Sticks, make sure they're not in sleep mode</li>
             <li>Try using Manual mode and enter your network subnet (e.g., 192.168.1.0)</li>
             <li>Some common network subnets are: 192.168.1.0, 192.168.0.0, 10.0.0.0</li>
             <li>Browser security restrictions may limit network scanning capabilities</li>

@@ -15,10 +15,23 @@ export class NetworkScanner {
 
   constructor(options: NetworkScannerOptions = {}) {
     this.options = {
-      // Samsung Smart TVs commonly use ports 8001, 8002 for their API
-      // Also include standard HTTP/HTTPS ports and DLNA/UPnP ports
-      ports: options.ports || [8001, 8002, 7676, 9197, 80, 443, 8080, 8000, 1900],
-      timeout: options.timeout || 2000,
+      // Include ports for various devices:
+      // - Samsung Smart TVs: 8001, 8002, 7676, 9197
+      // - Amazon Fire Stick: 8008, 8009, 9080, 9998, 9955
+      // - Standard HTTP/HTTPS: 80, 443
+      // - DLNA/UPnP: 1900, 5000
+      // - Other common media device ports: 8080, 8000, 7000
+      ports: options.ports || [
+        // Samsung TV ports
+        8001, 8002, 7676, 9197,
+        // Fire Stick ports
+        8008, 8009, 9080, 9998, 9955,
+        // Standard web ports
+        80, 443, 8080, 8000,
+        // DLNA/UPnP ports
+        1900, 5000, 7000
+      ],
+      timeout: options.timeout || 1500, // Reduced timeout for faster scanning
       subnetMask: options.subnetMask || '255.255.255.0',
       manualSubnet: options.manualSubnet || null
     };
@@ -91,19 +104,24 @@ export class NetworkScanner {
 
   /**
    * Check if a specific IP and port combination is reachable
-   * With special handling for Samsung TV detection
+   * With special handling for device detection
    */
-  private async checkHost(ip: string, port: number): Promise<{reachable: boolean, isSamsungTV: boolean}> {
+  private async checkHost(ip: string, port: number): Promise<{reachable: boolean, deviceType: string | null}> {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.options.timeout);
       
-      // For Samsung TV specific ports, try their API endpoint
+      // Determine URL based on port
       let url = `http://${ip}:${port}/`;
       
       // Samsung Smart TVs have a specific API endpoint
       if (port === 8001 || port === 8002) {
         url = `http://${ip}:${port}/api/v2/`;
+      }
+      
+      // Fire Stick specific endpoints
+      if (port === 8008 || port === 8009) {
+        url = `http://${ip}:${port}/ssdp/device-desc.xml`;
       }
       
       // Try to fetch from the IP:port
@@ -114,13 +132,26 @@ export class NetworkScanner {
       
       clearTimeout(timeoutId);
       
-      // Check if this might be a Samsung TV based on port
-      const isSamsungTV = port === 8001 || port === 8002 || port === 7676 || port === 9197;
+      // Determine device type based on port
+      let deviceType = null;
       
-      return { reachable: true, isSamsungTV };
+      // Samsung TV ports
+      if (port === 8001 || port === 8002 || port === 7676 || port === 9197) {
+        deviceType = 'Samsung Smart TV';
+      }
+      // Fire Stick ports
+      else if (port === 8008 || port === 8009 || port === 9080 || port === 9998 || port === 9955) {
+        deviceType = 'Amazon Fire Stick';
+      }
+      // DLNA/UPnP ports
+      else if (port === 1900 || port === 5000) {
+        deviceType = 'DLNA Device';
+      }
+      
+      return { reachable: true, deviceType };
     } catch (error) {
       // If aborted or network error, the host is likely not reachable
-      return { reachable: false, isSamsungTV: false };
+      return { reachable: false, deviceType: null };
     }
   }
 
@@ -214,31 +245,41 @@ export class NetworkScanner {
     const totalHosts = ipRange.length * this.options.ports!.length;
     let scannedHosts = 0;
     
-    // Scan each IP in the range
-    for (const ip of ipRange) {
+    // Use a more efficient scanning approach - scan multiple IPs in parallel
+    const batchSize = 10; // Number of IPs to scan in parallel
+    
+    for (let i = 0; i < ipRange.length; i += batchSize) {
       if (!this.isScanning) break;
       
-      for (const port of this.options.ports!) {
-        if (!this.isScanning) break;
+      const ipBatch = ipRange.slice(i, i + batchSize);
+      
+      // For each IP in the batch, scan all ports
+      await Promise.all(ipBatch.map(async (ip) => {
+        if (!this.isScanning) return;
         
-        const result = await this.checkHost(ip, port);
-        scannedHosts++;
-        
-        // Update progress
-        progressCallback(Math.floor((scannedHosts / totalHosts) * 100));
-        
-        if (result.reachable) {
-          // Try to get device info
-          const deviceInfo = await this.getDeviceInfo(ip, port, result.isSamsungTV);
+        // Try each port for this IP
+        for (const port of this.options.ports!) {
+          if (!this.isScanning) break;
           
-          // Check if we already found this device (by IP)
-          const existingDevice = devices.find(d => d.ip === ip);
-          if (!existingDevice) {
-            devices.push(deviceInfo);
-            deviceFoundCallback(deviceInfo);
+          const result = await this.checkHost(ip, port);
+          scannedHosts++;
+          
+          // Update progress
+          progressCallback(Math.floor((scannedHosts / totalHosts) * 100));
+          
+          if (result.reachable) {
+            // Try to get device info
+            const deviceInfo = await this.getDeviceInfo(ip, port, result.deviceType);
+            
+            // Check if we already found this device (by IP)
+            const existingDevice = devices.find(d => d.ip === ip);
+            if (!existingDevice) {
+              devices.push(deviceInfo);
+              deviceFoundCallback(deviceInfo);
+            }
           }
         }
-      }
+      }));
     }
     
     return devices;
@@ -247,14 +288,18 @@ export class NetworkScanner {
   /**
    * Try to get more information about a device
    */
-  private async getDeviceInfo(ip: string, port: number, isSamsungTV: boolean): Promise<Device> {
+  private async getDeviceInfo(ip: string, port: number, deviceType: string | null): Promise<Device> {
     let name = `Device at ${ip}:${port}`;
-    let type = this.guessDeviceType(port);
+    let type = deviceType || this.guessDeviceType(port);
+    let resolution = '1920x1080';
     
-    // If we think this is a Samsung TV, set appropriate info
-    if (isSamsungTV) {
+    // Set device-specific information
+    if (type === 'Samsung Smart TV') {
       name = `Samsung Smart TV (${ip})`;
-      type = 'Samsung Smart TV';
+      resolution = '3840x2160'; // Assume 4K for Samsung TVs
+    } else if (type === 'Amazon Fire Stick') {
+      name = `Amazon Fire Stick (${ip})`;
+      resolution = '1920x1080'; // Fire Sticks typically support 1080p
     }
     
     const id = `dev-${ip.replace(/\./g, '-')}`;
@@ -266,7 +311,7 @@ export class NetworkScanner {
       type,
       status: 'online',
       lastSeen: new Date().toISOString(),
-      resolution: isSamsungTV ? '3840x2160' : '1920x1080' // Assume 4K for Samsung TVs
+      resolution
     };
   }
 
@@ -286,12 +331,12 @@ export class NetworkScanner {
       },
       {
         id: 'dev-192-168-1-101',
-        name: 'Media Player (Simulated)',
+        name: 'Amazon Fire Stick (Simulated)',
         ip: '192.168.1.101',
-        type: 'Media Player',
+        type: 'Amazon Fire Stick',
         status: 'online',
         lastSeen: new Date().toISOString(),
-        resolution: '3840x2160'
+        resolution: '1920x1080'
       },
       {
         id: 'dev-192-168-1-102',
@@ -317,6 +362,12 @@ export class NetworkScanner {
       case 7676:
       case 9197:
         return 'Samsung Smart TV';
+      case 8008:
+      case 8009:
+      case 9080:
+      case 9998:
+      case 9955:
+        return 'Amazon Fire Stick';
       case 80:
       case 443:
         return 'Web-enabled Device';
@@ -325,6 +376,7 @@ export class NetworkScanner {
       case 8000:
         return 'Possible Smart Display';
       case 1900:
+      case 5000:
         return 'DLNA/UPnP Device';
       default:
         return 'Unknown Device';
