@@ -1,20 +1,52 @@
 import React, { useState } from 'react';
-import QRCodePairing from './QRCodePairing';
-import NetworkScanner from './NetworkScanner';
+import { pairingService } from '../../services/pairingService';
 
 interface AddDisplayModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onDisplayAdded: (display: { displayId: string; name: string; status: 'Connected' | 'Disconnected' }) => void;
 }
 
-const AddDisplayModal: React.FC<AddDisplayModalProps> = ({ isOpen, onClose }) => {
-  const [activeTab, setActiveTab] = useState('qrcode');
+const AddDisplayModal: React.FC<AddDisplayModalProps> = ({ isOpen, onClose, onDisplayAdded }) => {
+  const [pairingCode, setPairingCode] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [error, setError] = useState('');
+  const [isPairing, setIsPairing] = useState(false);
 
   if (!isOpen) return null;
 
+  const handlePairingSubmit = async () => {
+    if (!pairingCode || pairingCode.length !== 6) {
+      setError('Please enter a valid 6-digit pairing code');
+      return;
+    }
+
+    setIsPairing(true);
+    setError('');
+
+    try {
+      const response = await pairingService.pairWithDisplay(pairingCode);
+      
+      if (response.success && response.displayId) {
+        onDisplayAdded({
+          displayId: response.displayId,
+          name: displayName || `Display ${response.displayId}`,
+          status: 'Connected'
+        });
+        onClose();
+      } else {
+        setError(response.error || 'Failed to pair with display. Please try again.');
+      }
+    } catch (err) {
+      setError('Failed to pair with display. Please try again.');
+    } finally {
+      setIsPairing(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
         <div className="flex justify-between items-center border-b p-4">
           <h2 className="text-xl font-semibold">Add New Display</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
@@ -24,51 +56,42 @@ const AddDisplayModal: React.FC<AddDisplayModalProps> = ({ isOpen, onClose }) =>
           </button>
         </div>
         
-        <div className="p-4">
-          <div className="flex border-b mb-4">
-            <button
-              className={`py-2 px-4 ${activeTab === 'qrcode' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
-              onClick={() => setActiveTab('qrcode')}
-            >
-              QR Code Pairing
-            </button>
-            <button
-              className={`py-2 px-4 ${activeTab === 'network' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
-              onClick={() => setActiveTab('network')}
-            >
-              Network Discovery
-            </button>
-            <button
-              className={`py-2 px-4 ${activeTab === 'manual' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
-              onClick={() => setActiveTab('manual')}
-            >
-              Manual Setup
-            </button>
-          </div>
-          
-          <div className="py-4">
-            {activeTab === 'qrcode' && <QRCodePairing />}
-            {activeTab === 'network' && <NetworkScanner />}
-            {activeTab === 'manual' && (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Display Name</label>
-                  <input type="text" className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">IP Address</label>
-                  <input type="text" className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Device Type</label>
-                  <select className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
-                    <option>Android TV</option>
-                    <option>Raspberry Pi</option>
-                    <option>Chrome Device</option>
-                    <option>Windows PC</option>
-                    <option>Other</option>
-                  </select>
-                </div>
+        <div className="p-6">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Display Name (Optional)
+              </label>
+              <input
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3"
+                placeholder="Enter a name for this display"
+                disabled={isPairing}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Enter Pairing Code
+              </label>
+              <input
+                type="text"
+                maxLength={6}
+                value={pairingCode}
+                onChange={(e) => setPairingCode(e.target.value.replace(/\D/g, ''))}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 text-center text-2xl tracking-widest"
+                placeholder="000000"
+                disabled={isPairing}
+              />
+              <p className="mt-2 text-sm text-gray-500">
+                Enter the 6-digit code shown on your TV display
+              </p>
+            </div>
+
+            {error && (
+              <div className="text-red-600 text-sm mt-2">
+                {error}
               </div>
             )}
           </div>
@@ -79,14 +102,17 @@ const AddDisplayModal: React.FC<AddDisplayModalProps> = ({ isOpen, onClose }) =>
             type="button"
             className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 mr-2"
             onClick={onClose}
+            disabled={isPairing}
           >
             Cancel
           </button>
           <button
             type="button"
-            className="bg-blue-600 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-blue-700"
+            className="bg-blue-600 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handlePairingSubmit}
+            disabled={isPairing || pairingCode.length !== 6}
           >
-            Add Display
+            {isPairing ? 'Pairing...' : 'Pair Display'}
           </button>
         </div>
       </div>

@@ -1,140 +1,83 @@
 import { io, Socket } from 'socket.io-client';
-import QRCode from 'qrcode';
 
-export interface PairingSession {
-  id: string;
-  status: 'pending' | 'paired' | 'expired';
-  pairingCode: string;
-  deviceName?: string;
-  deviceIP?: string;
-  createdAt: Date;
-  expiresAt: Date;
-}
+const VIZORA_TV_URL = 'http://localhost:3003';
 
-export interface PairingOptions {
-  useQRCode?: boolean;
-  manualIP?: string;
+export interface PairingResponse {
+  success: boolean;
+  error?: string;
+  displayId?: string;
 }
 
 class PairingService {
   private socket: Socket | null = null;
-  private currentSession: PairingSession | null = null;
 
   constructor() {
-    this.connect();
-  }
+    this.socket = io(VIZORA_TV_URL, {
+      transports: ['websocket'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+    });
 
-  private connect() {
-    this.socket = io('http://localhost:3002');
-    
     this.socket.on('connect', () => {
-      console.log('Connected to pairing server');
+      console.log('Connected to VizoraTV server');
+    });
+
+    this.socket.on('connect_error', (error) => {
+      console.error('Connection error:', error);
     });
 
     this.socket.on('disconnect', () => {
-      console.log('Disconnected from pairing server');
-    });
-
-    this.socket.on('error', (error) => {
-      console.error('Socket error:', error);
+      console.log('Disconnected from VizoraTV server');
     });
   }
 
-  public async startPairing(options: PairingOptions = {}): Promise<{ qrCode: string | null; pairingCode: string }> {
-    if (!this.socket) {
-      throw new Error('Not connected to pairing server');
-    }
-
-    try {
-      const response = await fetch('http://localhost:3002/api/pairing/start', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(options),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to start pairing session');
-      }
-
-      const session = await response.json();
-      this.currentSession = session;
-
-      let qrCode: string | null = null;
-      if (options.useQRCode) {
-        const qrData = JSON.stringify({
-          ip: options.manualIP || 'auto-discover',
-          code: session.pairingCode,
+  async pairWithDisplay(pairingCode: string): Promise<PairingResponse> {
+    return new Promise((resolve) => {
+      if (!this.socket?.connected) {
+        resolve({
+          success: false,
+          error: 'Not connected to VizoraTV server'
         });
-        qrCode = await QRCode.toDataURL(qrData);
+        return;
       }
 
-      return { qrCode, pairingCode: session.pairingCode };
-    } catch (error) {
-      throw new Error('Failed to start pairing: ' + (error instanceof Error ? error.message : 'Unknown error'));
-    }
-  }
+      // Set up a one-time listener for the pairing response
+      const timeout = setTimeout(() => {
+        resolve({
+          success: false,
+          error: 'Pairing request timed out'
+        });
+      }, 10000); // 10 second timeout
 
-  public async checkPairingStatus(): Promise<PairingSession> {
-    if (!this.currentSession) {
-      throw new Error('No active pairing session');
-    }
-
-    try {
-      const response = await fetch(`http://localhost:3002/api/pairing/status/${this.currentSession.id}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to check pairing status');
-      }
-
-      const session = await response.json();
-      this.currentSession = session;
-      return session;
-    } catch (error) {
-      throw new Error('Failed to check pairing status: ' + (error instanceof Error ? error.message : 'Unknown error'));
-    }
-  }
-
-  public async pairDevice(code: string): Promise<PairingSession> {
-    if (!this.currentSession) {
-      throw new Error('No active pairing session');
-    }
-
-    try {
-      const response = await fetch('http://localhost:3002/api/pairing/pair', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          sessionId: this.currentSession.id,
-          code,
-        }),
+      this.socket.emit('pairing:request', { pairingCode }, (response: any) => {
+        clearTimeout(timeout);
+        
+        if (response.success) {
+          resolve({
+            success: true,
+            displayId: response.displayId
+          });
+        } else {
+          resolve({
+            success: false,
+            error: response.error || 'Pairing failed'
+          });
+        }
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to pair device');
-      }
-
-      const session = await response.json();
-      this.currentSession = session;
-      return session;
-    } catch (error) {
-      throw new Error('Failed to pair device: ' + (error instanceof Error ? error.message : 'Unknown error'));
-    }
+    });
   }
 
-  public disconnect() {
+  disconnect() {
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
     }
-    this.currentSession = null;
   }
 }
 
-export default new PairingService();
+export const pairingService = new PairingService();
+
 
 
 

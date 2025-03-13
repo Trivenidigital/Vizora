@@ -28,6 +28,10 @@ export default defineConfig({
       '/api/pairing': {
         target: 'http://localhost:3002',
         ws: true
+      },
+      '/api/content': {
+        target: 'http://localhost:3003',
+        ws: true
       }
     },
     headers: {
@@ -36,7 +40,7 @@ export default defineConfig({
         script-src 'self' 'unsafe-eval' 'unsafe-inline';
         style-src 'self' 'unsafe-inline';
         img-src 'self' data: blob:;
-        connect-src 'self' ws: wss: http://localhost:3002;
+        connect-src 'self' ws: wss: http://localhost:3002 http://localhost:3003;
         font-src 'self';
         object-src 'none';
         media-src 'self';
