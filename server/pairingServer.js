@@ -166,18 +166,10 @@ class PairingManager {
 
 /**
  * Initialize the pairing server
- * @param {Object} httpServer HTTP server to attach Socket.IO to
+ * @param {Object} io Socket.IO server instance
  * @returns {Object} The Socket.IO server instance
  */
-function initPairingServer(httpServer) {
-  const io = new Server(httpServer, {
-    cors: {
-      origin: '*',
-      methods: ['GET', 'POST']
-    },
-    path: '/pairing'
-  });
-  
+export function setupPairingServer(io) {
   const pairingManager = new PairingManager();
   
   // Override the notifySubscribers method to use Socket.IO
@@ -267,5 +259,3 @@ function initPairingServer(httpServer) {
   
   return io;
 }
-
-export { initPairingServer };

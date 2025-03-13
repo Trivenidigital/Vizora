@@ -1,14 +1,14 @@
-import { ReactNode } from 'react';
+import React from 'react';
 import { Navigate } from 'react-router-dom';
 
 interface ProtectedRouteProps {
-  children: ReactNode;
+  children: React.ReactNode;
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  // This is a mock authentication check
-  // In a real app, you would check if the user is authenticated
-  const isAuthenticated = true; // For demo purposes, always authenticated
+  // This is a simplified authentication check
+  // In a real app, you would check for a valid token or session
+  const isAuthenticated = true; // For development purposes, always authenticated
   
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;

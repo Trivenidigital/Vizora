@@ -1,19 +1,35 @@
-// Simple server for device pairing
-import http from 'http';
-import { initPairingServer } from './pairingServer.js';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
+import { setupPairingServer } from './pairingServer.js';
+
+const PORT = process.env.PORT || 3001;
 
 // Create HTTP server
-const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('Vizora Device Management Server');
+const httpServer = createServer((req, res) => {
+  // Basic route handling
+  if (req.url === '/health') {
+    res.writeHead(200);
+    res.end('Server is running');
+    return;
+  }
+  
+  res.writeHead(404);
+  res.end('Not found');
 });
 
-// Initialize pairing server
-const pairingIo = initPairingServer(server);
+// Create Socket.IO server
+const io = new Server(httpServer, {
+  cors: {
+    origin: ["http://localhost:3000", "https://vizora.vercel.app"],
+    methods: ["GET", "POST"],
+    credentials: true
+  }
+});
 
-// Start the server
-const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
-  console.log(`Vizora device management server running on port ${PORT}`);
-  console.log(`- Device pairing endpoint: http://localhost:${PORT}/pairing`);
+// Setup pairing functionality
+setupPairingServer(io);
+
+// Start server
+httpServer.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
