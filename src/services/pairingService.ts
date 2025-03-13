@@ -16,19 +16,31 @@ interface PairingResponse {
 class PairingService {
   private pollingIntervals: Map<string, NodeJS.Timeout> = new Map();
   private listeners: Map<string, Set<(session: PairingSession) => void>> = new Map();
+  private apiBaseUrl: string;
+
+  constructor() {
+    // Determine the API base URL based on environment
+    this.apiBaseUrl = import.meta.env.PROD 
+      ? window.location.origin 
+      : '';
+  }
 
   /**
    * Create a new pairing session
    */
   async createPairingSession(): Promise<PairingSession> {
     try {
-      const response = await fetch('/api/pairing', {
+      const response = await fetch(`${this.apiBaseUrl}/api/pairing`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ action: 'createSession' }),
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       
       const data: PairingResponse = await response.json();
       
@@ -48,13 +60,17 @@ class PairingService {
    */
   async checkPairingStatus(code: string): Promise<PairingSession> {
     try {
-      const response = await fetch('/api/pairing', {
+      const response = await fetch(`${this.apiBaseUrl}/api/pairing`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ action: 'checkStatus', code }),
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       
       const data: PairingResponse = await response.json();
       
@@ -142,13 +158,17 @@ class PairingService {
    */
   async pairDevice(code: string, deviceInfo: any): Promise<PairingSession> {
     try {
-      const response = await fetch('/api/pairing', {
+      const response = await fetch(`${this.apiBaseUrl}/api/pairing`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ action: 'pairDevice', code, deviceInfo }),
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       
       const data: PairingResponse = await response.json();
       

@@ -4,11 +4,16 @@ import pairingService from '../../services/pairingService';
 import { X } from 'lucide-react';
 
 interface QRCodePairingProps {
-  onClose: () => void;
-  onPaired?: (deviceInfo: any) => void;
+  onManualAdd?: (displayData: any) => void;
+  onPairingComplete?: (deviceInfo: any) => void;
+  onClose?: () => void;
 }
 
-const QRCodePairing: React.FC<QRCodePairingProps> = ({ onClose, onPaired }) => {
+const QRCodePairing: React.FC<QRCodePairingProps> = ({ 
+  onManualAdd, 
+  onPairingComplete, 
+  onClose 
+}) => {
   const [pairingCode, setPairingCode] = useState<string>('');
   const [pairingStatus, setPairingStatus] = useState<'generating' | 'ready' | 'paired' | 'expired' | 'error'>('generating');
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +39,7 @@ const QRCodePairing: React.FC<QRCodePairingProps> = ({ onClose, onPaired }) => {
         unsubscribe = pairingService.subscribeToPairing(session.code, (updatedSession) => {
           if (updatedSession.status === 'paired') {
             setPairingStatus('paired');
-            onPaired?.(updatedSession.deviceInfo);
+            onPairingComplete?.(updatedSession.deviceInfo);
           } else if (updatedSession.status === 'expired') {
             setPairingStatus('expired');
           }
@@ -54,7 +59,7 @@ const QRCodePairing: React.FC<QRCodePairingProps> = ({ onClose, onPaired }) => {
         unsubscribe();
       }
     };
-  }, [onPaired]);
+  }, [onPairingComplete]);
 
   // Update countdown timer
   useEffect(() => {
@@ -93,16 +98,22 @@ const QRCodePairing: React.FC<QRCodePairingProps> = ({ onClose, onPaired }) => {
     setTimeLeft('');
   };
 
+  const handleClose = () => {
+    onClose?.();
+  };
+
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 max-w-md mx-auto">
+    <div className="bg-white rounded-lg p-6 max-w-md mx-auto">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-semibold text-gray-800">Pair New Display</h2>
-        <button 
-          onClick={onClose}
-          className="text-gray-500 hover:text-gray-700 transition-colors"
-        >
-          <X size={20} />
-        </button>
+        {onClose && (
+          <button 
+            onClick={handleClose}
+            className="text-gray-500 hover:text-gray-700 transition-colors"
+          >
+            <X size={20} />
+          </button>
+        )}
       </div>
       
       <div className="flex flex-col items-center">
@@ -142,7 +153,7 @@ const QRCodePairing: React.FC<QRCodePairingProps> = ({ onClose, onPaired }) => {
             <h3 className="text-xl font-medium text-gray-900 mb-2">Successfully Paired!</h3>
             <p className="text-gray-600">Your display has been successfully paired and is now ready to use.</p>
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="mt-6 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
             >
               Done

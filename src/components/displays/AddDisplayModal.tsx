@@ -52,6 +52,7 @@ const AddDisplayModal: React.FC<AddDisplayModalProps> = ({ isOpen, onClose, onAd
           <QRCodePairing 
             onManualAdd={handleManualAdd} 
             onPairingComplete={handlePairingComplete}
+            onClose={onClose}
           />
         </div>
       </div>

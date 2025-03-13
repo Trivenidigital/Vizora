@@ -1,5 +1,4 @@
 // Serverless function for pairing
-import { Server } from 'socket.io';
 import crypto from 'crypto';
 
 // In-memory storage for pairing sessions (will reset on cold starts)
@@ -70,44 +69,59 @@ const pairDevice = (code, deviceInfo) => {
 };
 
 export default function handler(req, res) {
+  // Set CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  
+  // Handle OPTIONS request (preflight)
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
   // Run cleanup on each request
   cleanupExpiredSessions();
   
   // Handle different HTTP methods
   if (req.method === 'POST') {
-    const { action, code, deviceInfo } = req.body || {};
-    
-    switch (action) {
-      case 'createSession':
-        const session = createSession();
-        return res.status(200).json({ success: true, session });
-        
-      case 'checkStatus':
-        if (!code) {
-          return res.status(400).json({ success: false, error: 'No code provided' });
-        }
-        
-        const existingSession = getSession(code);
-        if (existingSession) {
-          return res.status(200).json({ success: true, session: existingSession });
-        } else {
-          return res.status(404).json({ success: false, error: 'Invalid or expired code' });
-        }
-        
-      case 'pairDevice':
-        if (!code || !deviceInfo) {
-          return res.status(400).json({ success: false, error: 'Missing code or device info' });
-        }
-        
-        const updatedSession = pairDevice(code, deviceInfo);
-        if (updatedSession) {
-          return res.status(200).json({ success: true, session: updatedSession });
-        } else {
-          return res.status(404).json({ success: false, error: 'Invalid or expired code' });
-        }
-        
-      default:
-        return res.status(400).json({ success: false, error: 'Invalid action' });
+    try {
+      const { action, code, deviceInfo } = req.body || {};
+      
+      switch (action) {
+        case 'createSession':
+          const session = createSession();
+          return res.status(200).json({ success: true, session });
+          
+        case 'checkStatus':
+          if (!code) {
+            return res.status(400).json({ success: false, error: 'No code provided' });
+          }
+          
+          const existingSession = getSession(code);
+          if (existingSession) {
+            return res.status(200).json({ success: true, session: existingSession });
+          } else {
+            return res.status(404).json({ success: false, error: 'Invalid or expired code' });
+          }
+          
+        case 'pairDevice':
+          if (!code || !deviceInfo) {
+            return res.status(400).json({ success: false, error: 'Missing code or device info' });
+          }
+          
+          const updatedSession = pairDevice(code, deviceInfo);
+          if (updatedSession) {
+            return res.status(200).json({ success: true, session: updatedSession });
+          } else {
+            return res.status(404).json({ success: false, error: 'Invalid or expired code' });
+          }
+          
+        default:
+          return res.status(400).json({ success: false, error: 'Invalid action' });
+      }
+    } catch (error) {
+      console.error('Error processing request:', error);
+      return res.status(500).json({ success: false, error: 'Internal server error' });
     }
   } else {
     // Handle GET requests (for status checks)
