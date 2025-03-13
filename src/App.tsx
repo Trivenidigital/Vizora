@@ -13,6 +13,7 @@ import Landing from './pages/Landing';
 import NotFound from './pages/NotFound';
 import ProtectedRoute from './components/ProtectedRoute';
 import AddDisplayModal from './components/displays/AddDisplayModal';
+import NetworkScannerTest from './components/displays/NetworkScannerTest';
 
 function App() {
   return (

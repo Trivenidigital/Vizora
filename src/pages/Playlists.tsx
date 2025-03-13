@@ -16,30 +16,40 @@ import {
 } from 'lucide-react';
 import { Menu, Transition } from '@headlessui/react';
 import { Link } from 'react-router-dom';
+import PlaceholderImage from '../components/ui/PlaceholderImage';
+
+interface Playlist {
+  id: number;
+  name: string;
+  description: string;
+  thumbnail: React.ReactNode;
+  itemCount: number;
+  status: 'active' | 'inactive';
+  duration: string;
+  items: number;
+}
 
 // Mock Data
-const playlists = [
-  { 
-    id: 1, 
-    name: 'Welcome Sequence', 
-    items: 5, 
-    duration: '2:30', 
-    lastModified: '2 days ago', 
+const playlists: Playlist[] = [
+  {
+    id: 1,
+    name: 'Favorites',
+    description: 'Your favorite content',
+    thumbnail: <PlaceholderImage width={300} height={200} text="Favorites" />,
+    itemCount: 12,
     status: 'active',
-    displays: 3,
-    schedule: 'Daily',
-    thumbnail: 'https://images.unsplash.com/photo-1596526131083-e8c633c948d2?crop&w=300&q=80',
+    duration: '2:30',
+    items: 5
   },
-  { 
-    id: 2, 
-    name: 'Product Showcase', 
-    items: 8, 
-    duration: '5:45', 
-    lastModified: '1 week ago', 
+  {
+    id: 2,
+    name: 'Recently Added',
+    description: 'Recently added content',
+    thumbnail: <PlaceholderImage width={300} height={200} text="Recent" />,
+    itemCount: 8,
     status: 'active',
-    displays: 2,
-    schedule: 'Weekdays',
-    thumbnail: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?crop&w=300&q=80',
+    duration: '5:45',
+    items: 8
   }
 ];
 
@@ -105,11 +115,7 @@ const Playlists = () => {
           {filteredPlaylists.map((playlist) => (
             <div key={playlist.id} className="bg-white rounded-lg border border-secondary-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
               <div className="relative h-40 bg-secondary-100">
-                <img 
-                  src={playlist.thumbnail} 
-                  alt={playlist.name}
-                  className="w-full h-full object-cover"
-                />
+                {playlist.thumbnail}
               </div>
               <div className="p-4">
                 <h3 className="text-sm font-medium text-secondary-900 truncate">{playlist.name}</h3>

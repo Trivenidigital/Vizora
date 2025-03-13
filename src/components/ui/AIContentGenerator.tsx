@@ -1,17 +1,19 @@
+import React from 'react';
 import { useState } from 'react';
 import { Zap, Image, Video, FileText, Check, X, Loader2 } from 'lucide-react';
+import PlaceholderImage from './PlaceholderImage';
 
 interface AIContentGeneratorProps {
   onGenerate: (content: any) => void;
   onClose: () => void;
 }
 
-const AIContentGenerator = ({ onGenerate, onClose }: AIContentGeneratorProps) => {
+const AIContentGenerator: React.FC<AIContentGeneratorProps> = ({ onGenerate, onClose }) => {
   const [step, setStep] = useState(1);
   const [contentType, setContentType] = useState<string | null>(null);
   const [prompt, setPrompt] = useState('');
   const [generating, setGenerating] = useState(false);
-  const [generatedPreview, setGeneratedPreview] = useState<string | null>(null);
+  const [generatedPreview, setGeneratedPreview] = useState<React.ReactNode | null>(null);
   
   const contentTypes = [
     { id: 'image', name: 'Image', icon: Image, description: 'Generate static images for displays' },
@@ -19,23 +21,21 @@ const AIContentGenerator = ({ onGenerate, onClose }: AIContentGeneratorProps) =>
     { id: 'presentation', name: 'Presentation', icon: FileText, description: 'Multi-slide content with transitions' },
   ];
   
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     setGenerating(true);
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 2000));
     
-    // Simulate AI generation with a timeout
-    setTimeout(() => {
-      // Mock generated content preview
-      if (contentType === 'image') {
-        setGeneratedPreview('https://images.unsplash.com/photo-1579546929518-9e396f3cc809?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=600&q=80');
-      } else if (contentType === 'video') {
-        setGeneratedPreview('https://images.unsplash.com/photo-1611162616475-46b635cb6868?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=600&q=80');
-      } else {
-        setGeneratedPreview('https://images.unsplash.com/photo-1588681664899-f142ff2dc9b1?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=600&q=80');
-      }
-      
-      setGenerating(false);
-      setStep(3);
-    }, 2000);
+    // Set different placeholders based on content type
+    if (prompt.toLowerCase().includes('video')) {
+      setGeneratedPreview(<PlaceholderImage width={600} height={400} text="Generated Video" />);
+    } else if (prompt.toLowerCase().includes('image')) {
+      setGeneratedPreview(<PlaceholderImage width={600} height={400} text="Generated Image" />);
+    } else {
+      setGeneratedPreview(<PlaceholderImage width={600} height={400} text="Generated Content" />);
+    }
+    
+    setGenerating(false);
   };
   
   const handleAccept = () => {
@@ -104,8 +104,6 @@ const AIContentGenerator = ({ onGenerate, onClose }: AIContentGeneratorProps) =>
                 >
                   <div className="flex items-center">
                     <div className={`p-2 rounded-full ${
-                      contentType === type.<ez1Action type="file" filePath="src/components/ui/AIContentGenerator.tsx">
-                    <div className={`p-2 rounded-full ${
                       contentType === type.id 
                         ? 'bg-primary-100 text-primary-600' 
                         : 'bg-secondary-100 text-secondary-600'
@@ -172,11 +170,9 @@ const AIContentGenerator = ({ onGenerate, onClose }: AIContentGeneratorProps) =>
               <div className="border border-secondary-200 rounded-lg overflow-hidden">
                 <div className="aspect-video bg-secondary-100 flex items-center justify-center">
                   {generatedPreview ? (
-                    <img 
-                      src={generatedPreview} 
-                      alt="Generated content preview" 
-                      className="w-full h-full object-cover"
-                    />
+                    <div className="w-full h-full">
+                      {generatedPreview}
+                    </div>
                   ) : (
                     <div className="text-secondary-400">Preview not available</div>
                   )}

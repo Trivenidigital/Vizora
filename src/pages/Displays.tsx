@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Plus } from 'lucide-react';
 import AddDisplayModal from '../components/displays/AddDisplayModal';
+import NetworkScannerTest from '../components/displays/NetworkScannerTest';
 
 interface DisplaysProps {
   initialAddModalOpen?: boolean;
@@ -15,16 +16,21 @@ const Displays: React.FC<DisplaysProps> = ({ initialAddModalOpen = false }) => {
   ]);
 
   return (
-    <div className="p-6">
+    <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Display Management</h1>
-        <button 
+        <h1 className="text-2xl font-bold">Displays</h1>
+        <button
           onClick={() => setIsAddModalOpen(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center"
+          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
         >
-          <Plus size={20} className="mr-2" />
           Add Display
         </button>
+      </div>
+
+      {/* Network Scanner Test Component */}
+      <div className="mb-8">
+        <h2 className="text-xl font-semibold mb-4">Network Scanner Test</h2>
+        <NetworkScannerTest />
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -80,7 +86,10 @@ const Displays: React.FC<DisplaysProps> = ({ initialAddModalOpen = false }) => {
         </table>
       </div>
 
-      <AddDisplayModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
+      <AddDisplayModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+      />
     </div>
   );
 };
