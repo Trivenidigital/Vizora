@@ -1,5 +1,3 @@
-import { io, Socket } from 'socket.io-client';
-
 interface PairingSession {
   id: string;
   code: string;
@@ -16,133 +14,153 @@ interface PairingResponse {
 }
 
 class PairingService {
-  private socket: Socket | null = null;
+  private pollingIntervals: Map<string, NodeJS.Timeout> = new Map();
   private listeners: Map<string, Set<(session: PairingSession) => void>> = new Map();
-
-  constructor() {
-    this.connect();
-  }
-
-  private connect() {
-    // Connect to the pairing server
-    this.socket = io({
-      path: '/pairing',
-      autoConnect: true,
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000
-    });
-
-    this.socket.on('connect', () => {
-      console.log('Connected to pairing server');
-    });
-
-    this.socket.on('disconnect', () => {
-      console.log('Disconnected from pairing server');
-    });
-
-    this.socket.on('pairingUpdate', (session: PairingSession) => {
-      this.notifyListeners(session);
-    });
-
-    this.socket.on('connect_error', (error) => {
-      console.error('Connection error:', error);
-    });
-  }
 
   /**
    * Create a new pairing session
    */
   async createPairingSession(): Promise<PairingSession> {
-    return new Promise((resolve, reject) => {
-      if (!this.socket || !this.socket.connected) {
-        reject(new Error('Not connected to pairing server'));
-        return;
-      }
-
-      this.socket.emit('createPairingSession', {}, (response: PairingResponse) => {
-        if (response.success && response.session) {
-          resolve(response.session);
-        } else {
-          reject(new Error(response.error || 'Failed to create pairing session'));
-        }
+    try {
+      const response = await fetch('/api/pairing', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'createSession' }),
       });
-    });
+      
+      const data: PairingResponse = await response.json();
+      
+      if (data.success && data.session) {
+        return data.session;
+      } else {
+        throw new Error(data.error || 'Failed to create pairing session');
+      }
+    } catch (error) {
+      console.error('Error creating pairing session:', error);
+      throw new Error('Failed to create pairing session. Please try again.');
+    }
   }
 
   /**
    * Check the status of a pairing session
    */
   async checkPairingStatus(code: string): Promise<PairingSession> {
-    return new Promise((resolve, reject) => {
-      if (!this.socket || !this.socket.connected) {
-        reject(new Error('Not connected to pairing server'));
-        return;
-      }
-
-      this.socket.emit('checkPairingStatus', { code }, (response: PairingResponse) => {
-        if (response.success && response.session) {
-          resolve(response.session);
-        } else {
-          reject(new Error(response.error || 'Invalid or expired code'));
-        }
+    try {
+      const response = await fetch('/api/pairing', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'checkStatus', code }),
       });
-    });
+      
+      const data: PairingResponse = await response.json();
+      
+      if (data.success && data.session) {
+        return data.session;
+      } else {
+        throw new Error(data.error || 'Invalid or expired code');
+      }
+    } catch (error) {
+      console.error('Error checking pairing status:', error);
+      throw new Error('Failed to check pairing status. Please try again.');
+    }
   }
 
   /**
    * Subscribe to updates for a pairing session
+   * Uses polling since WebSockets aren't available in serverless
    */
   subscribeToPairing(code: string, callback: (session: PairingSession) => void): () => void {
-    if (!this.socket || !this.socket.connected) {
-      console.error('Not connected to pairing server');
-      return () => {};
-    }
-
     // Add the listener
     if (!this.listeners.has(code)) {
       this.listeners.set(code, new Set());
       
-      // Tell the server we're subscribing
-      this.socket.emit('subscribeToPairing', { code });
+      // Start polling for updates
+      const interval = setInterval(async () => {
+        try {
+          const session = await this.checkPairingStatus(code);
+          this.notifyListeners(session);
+          
+          // If session is paired or expired, stop polling
+          if (session.status === 'paired' || session.status === 'expired') {
+            this.unsubscribeFromPairing(code);
+          }
+        } catch (error) {
+          console.error('Error polling pairing status:', error);
+        }
+      }, 3000); // Poll every 3 seconds
+      
+      this.pollingIntervals.set(code, interval);
     }
     
     this.listeners.get(code)?.add(callback);
 
     // Return unsubscribe function
     return () => {
+      this.unsubscribeFromPairing(code, callback);
+    };
+  }
+
+  /**
+   * Unsubscribe from pairing updates
+   */
+  private unsubscribeFromPairing(code: string, callback?: (session: PairingSession) => void) {
+    if (callback) {
+      // Remove specific callback
       const codeListeners = this.listeners.get(code);
       if (codeListeners) {
         codeListeners.delete(callback);
         
         if (codeListeners.size === 0) {
           this.listeners.delete(code);
-          
-          // Tell the server we're unsubscribing
-          this.socket?.emit('unsubscribeFromPairing', { code });
+          this.stopPolling(code);
         }
       }
-    };
+    } else {
+      // Remove all callbacks for this code
+      this.listeners.delete(code);
+      this.stopPolling(code);
+    }
+  }
+
+  /**
+   * Stop polling for a specific code
+   */
+  private stopPolling(code: string) {
+    const interval = this.pollingIntervals.get(code);
+    if (interval) {
+      clearInterval(interval);
+      this.pollingIntervals.delete(code);
+    }
   }
 
   /**
    * Pair a device with a session code
    */
   async pairDevice(code: string, deviceInfo: any): Promise<PairingSession> {
-    return new Promise((resolve, reject) => {
-      if (!this.socket || !this.socket.connected) {
-        reject(new Error('Not connected to pairing server'));
-        return;
-      }
-
-      this.socket.emit('pairDevice', { code, deviceInfo }, (response: PairingResponse) => {
-        if (response.success && response.session) {
-          resolve(response.session);
-        } else {
-          reject(new Error(response.error || 'Failed to pair device'));
-        }
+    try {
+      const response = await fetch('/api/pairing', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'pairDevice', code, deviceInfo }),
       });
-    });
+      
+      const data: PairingResponse = await response.json();
+      
+      if (data.success && data.session) {
+        return data.session;
+      } else {
+        throw new Error(data.error || 'Failed to pair device');
+      }
+    } catch (error) {
+      console.error('Error pairing device:', error);
+      throw new Error('Failed to pair device. Please try again.');
+    }
   }
 
   private notifyListeners(session: PairingSession) {
@@ -162,10 +180,9 @@ class PairingService {
    * Clean up resources
    */
   cleanup() {
-    if (this.socket) {
-      this.socket.disconnect();
-      this.socket = null;
-    }
+    // Clear all polling intervals
+    this.pollingIntervals.forEach(interval => clearInterval(interval));
+    this.pollingIntervals.clear();
     this.listeners.clear();
   }
 }
