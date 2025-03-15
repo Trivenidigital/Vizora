@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { pairingService, PairingSession } from '../services/pairingService';
+import { getPairingService, PairingSession, PairingOptions } from '../services/pairingService';
 
 interface QRCodePairingProps {
   onPairingComplete: (session: PairingSession) => void;
@@ -15,6 +15,7 @@ export const QRCodePairing: React.FC<QRCodePairingProps> = ({ onPairingComplete,
   useEffect(() => {
     startPairing();
     return () => {
+      const pairingService = getPairingService();
       pairingService.disconnect();
     };
   }, []);
@@ -22,6 +23,7 @@ export const QRCodePairing: React.FC<QRCodePairingProps> = ({ onPairingComplete,
   const startPairing = async () => {
     try {
       setStatus('scanning');
+      const pairingService = getPairingService();
       const { qrCode, pairingCode } = await pairingService.startPairing({
         useQRCode: true,
         manualIP: manualIP || undefined
@@ -36,6 +38,7 @@ export const QRCodePairing: React.FC<QRCodePairingProps> = ({ onPairingComplete,
 
   const checkStatus = async () => {
     try {
+      const pairingService = getPairingService();
       const session = await pairingService.checkPairingStatus();
       if (session.status === 'paired') {
         setStatus('paired');
