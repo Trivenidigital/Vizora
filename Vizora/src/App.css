@@ -1,0 +1,136 @@
+.app-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.content {
+  width: 100%;
+  max-width: 600px;
+  margin-top: 2rem;
+}
+
+.button-group {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-bottom: 2rem;
+}
+
+.addButton {
+  padding: 0.75rem 1.5rem;
+  font-size: 1.2rem;
+  background-color: #0066cc;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  min-width: 150px;
+}
+
+.addButton:hover {
+  background-color: #0052a3;
+}
+
+.displays {
+  margin-top: 3rem;
+  text-align: left;
+}
+
+.displays h2 {
+  color: #333;
+  margin-bottom: 1rem;
+  font-size: 1.5rem;
+}
+
+.displays ul {
+  list-style: none;
+  padding: 0;
+}
+
+.displays li {
+  padding: 1rem;
+  margin-bottom: 0.5rem;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+h1 {
+  color: #333;
+  margin-bottom: 1rem;
+  font-size: 2.5rem;
+}
+
+.pairing-section {
+  margin-top: 2rem;
+  padding: 2rem;
+  border-radius: 12px;
+  background-color: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 400px;
+}
+
+/* Remove global input styles */
+.pairing-section input {
+  padding: 0.75rem;
+  margin: 1rem 0;
+  font-size: 1.2rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  width: 100%;
+  text-align: center;
+  transition: border-color 0.2s;
+}
+
+.pairing-section input:focus {
+  outline: none;
+  border-color: #0066cc;
+}
+
+.pairing-section button {
+  padding: 0.75rem 1.5rem;
+  font-size: 1.2rem;
+  background-color: #0066cc;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  width: 100%;
+  margin-top: 1rem;
+}
+
+.pairing-section button:hover:not(:disabled) {
+  background-color: #0052a3;
+}
+
+.pairing-section button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+h2 {
+  color: #666;
+  margin-bottom: 1.5rem;
+  font-size: 1.5rem;
+}
+
+.error-message {
+  color: #dc3545;
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background-color: #ffeaea;
+  border-radius: 6px;
+  font-size: 0.9rem;
+} 

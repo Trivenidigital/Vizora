@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Image as ImageIcon } from 'lucide-react';
 import AddDisplayModal from '../components/displays/AddDisplayModal';
-import { contentService, ContentUpdate } from "../services/contentService";
+import { getContentService, ContentUpdate } from "../services/contentService";
 
 interface Display {
   displayId: string;
@@ -117,6 +117,7 @@ const Displays: React.FC<DisplaysProps> = ({ initialAddModalOpen = false }) => {
       }
 
       console.log('Pushing content to display:', selectedDisplay.displayId);
+      const contentService = getContentService();
       const success = await contentService.pushContent(selectedDisplay.displayId, contentUpdate);
       
       if (success) {

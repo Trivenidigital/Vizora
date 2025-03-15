@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7.2-alpine
+    container_name: vizora_redis
+    command: redis-server /usr/local/etc/redis/redis.conf
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+    networks:
+      - vizora_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 768M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: vizora_redis_commander
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+      - HTTP_USER=${REDIS_COMMANDER_USER:-admin}
+      - HTTP_PASSWORD=${REDIS_COMMANDER_PASSWORD:-admin}
+    ports:
+      - "8081:8081"
+    networks:
+      - vizora_network
+    depends_on:
+      - redis
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 256M
+    restart: unless-stopped
+
+networks:
+  vizora_network:
+    name: vizora_network
+    driver: bridge
+
+volumes:
+  redis_data:
+    name: vizora_redis_data 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { pairingService } from '../../services/pairingService';
+import { getPairingService } from '../../services/pairingService';
 
 interface AddDisplayModalProps {
   isOpen: boolean;
@@ -25,6 +25,7 @@ const AddDisplayModal: React.FC<AddDisplayModalProps> = ({ isOpen, onClose, onDi
     setError('');
 
     try {
+      const pairingService = getPairingService();
       const response = await pairingService.pairWithDisplay(pairingCode);
       
       if (response.success && response.displayId) {
