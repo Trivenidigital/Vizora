@@ -2,29 +2,54 @@ import React, { useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { websocketService } from '../services/websocketService';
 import styles from './PairingDisplay.module.css';
+import { ConnectionStatus } from '../types';
 
-const PairingDisplay: React.FC = () => {
-  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
-  const [displayInfo, setDisplayInfo] = useState<{ displayId: string; pairingCode: string } | null>(null);
+interface PairingDisplayProps {
+  connectionStatus: ConnectionStatus;
+  displayId: string | null;
+  pairingCode: string | null;
+}
 
+const PairingDisplay: React.FC<PairingDisplayProps> = ({ 
+  connectionStatus, 
+  displayId, 
+  pairingCode 
+}) => {
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Log props for debugging
   useEffect(() => {
-    // Set up connection status listener
-    websocketService.onConnectionChange((status) => {
-      console.log('Connection status changed:', status);
-      setConnectionStatus(status);
-    });
+    console.log('PairingDisplay: Props updated', { connectionStatus, displayId, pairingCode });
+    
+    // If we have both displayId and pairingCode, we're no longer loading
+    if (displayId && pairingCode) {
+      setIsLoading(false);
+    }
+  }, [connectionStatus, displayId, pairingCode]);
 
-    // Set up registration listener
-    websocketService.onRegistration((data) => {
-      console.log('Registration data received:', data);
-      setDisplayInfo(data);
-    });
+  // Handle connection status changes
+  useEffect(() => {
+    console.log('PairingDisplay: Connection status changed to', connectionStatus);
+    
+    if (connectionStatus === 'error') {
+      setError('Failed to connect to the middleware server. Please check your network connection and try again.');
+    } else {
+      setError(null);
+    }
+  }, [connectionStatus]);
 
-    // Cleanup
-    return () => {
-      console.log('PairingDisplay unmounting');
-    };
-  }, []);
+  // Debug function to manually trigger the paired event
+  const handleDebugPair = () => {
+    console.log('PairingDisplay: Debug button clicked, manually triggering paired event');
+    if (displayId) {
+      console.log('PairingDisplay: Using websocketService.debugTriggerPaired()');
+      websocketService.debugTriggerPaired();
+    } else {
+      console.error('PairingDisplay: Cannot trigger pairing, no displayId available');
+      setError('Cannot trigger pairing, no displayId available');
+    }
+  };
 
   const renderContent = () => {
     switch (connectionStatus) {
@@ -32,39 +57,57 @@ const PairingDisplay: React.FC = () => {
         return (
           <div className={styles.status}>
             <div className={styles.spinner}></div>
-            <p>Connecting to server...</p>
+            <p>Connecting to middleware server...</p>
           </div>
         );
 
       case 'connected':
-        if (!displayInfo) {
+        if (!displayId || !pairingCode) {
           return (
             <div className={styles.status}>
               <div className={styles.spinner}></div>
-              <p>Registering display...</p>
+              <p>Registering Display...</p>
             </div>
           );
         }
+
         return (
           <div className={styles.pairingInfo}>
-            <h2>Your Display ID</h2>
-            <p className={styles.displayId}>{displayInfo.displayId}</p>
-            <h2>Pairing Code</h2>
-            <p className={styles.pairingCode}>{displayInfo.pairingCode}</p>
-            <div className={styles.qrCode}>
+            <div className={styles.qrCodeContainer}>
               <QRCodeSVG
                 value={JSON.stringify({
-                  displayId: displayInfo.displayId,
-                  pairingCode: displayInfo.pairingCode
+                  displayId: displayId,
+                  pairingCode: pairingCode
                 })}
-                size={200}
+                size={300}
                 level="H"
                 includeMargin={true}
+                bgColor="#ffffff"
+                fgColor="#000000"
               />
             </div>
-            <p className={styles.instructions}>
-              Scan this QR code or enter the pairing code manually in the Vizora web app
-            </p>
+            <div className={styles.pairingDetails}>
+              <h2>Pairing Code</h2>
+              <p className={styles.pairingCode}>{pairingCode}</p>
+              <p className={styles.instructions}>
+                Scan this QR code or enter the pairing code
+              </p>
+              <div className={styles.statusIndicator}>
+                <span className={`${styles.statusDot} ${styles.connected}`}></span>
+                <span>Connected</span>
+              </div>
+              
+              {/* Debug button */}
+              <div className={styles.debugSection}>
+                <button 
+                  className={styles.debugButton}
+                  onClick={handleDebugPair}
+                >
+                  Debug: Force Pair
+                </button>
+                <p className={styles.debugInfo}>Display ID: {displayId}</p>
+              </div>
+            </div>
           </div>
         );
 
@@ -72,13 +115,15 @@ const PairingDisplay: React.FC = () => {
         return (
           <div className={styles.error}>
             <p>Disconnected from server. Attempting to reconnect...</p>
+            <div className={styles.spinner}></div>
           </div>
         );
 
       case 'error':
         return (
           <div className={styles.error}>
-            <p>Failed to connect to server. Please refresh the page to try again.</p>
+            <p>{error || 'Failed to connect to server. Please refresh the page to try again.'}</p>
+            <div className={styles.spinner}></div>
           </div>
         );
 
@@ -89,7 +134,7 @@ const PairingDisplay: React.FC = () => {
 
   return (
     <div className={styles.container}>
-      <h1>VizoraTV Display</h1>
+      <h1>VizoraTV</h1>
       {renderContent()}
     </div>
   );

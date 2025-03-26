@@ -46,8 +46,12 @@ case "$1" in
     "monitor")
         redis_monitor
         ;;
+    "version")
+        docker --version
+        wsl --version
+        ;;
     *)
-        echo "Usage: $0 {start|stop|status|logs|monitor}"
+        echo "Usage: $0 {start|stop|status|logs|monitor|version}"
         exit 1
         ;;
 esac 

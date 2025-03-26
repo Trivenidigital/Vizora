@@ -1,13 +1,146 @@
 .content-display {
-  width: 100vw;
-  height: 100vh;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
   align-items: center;
-  background-color: #000;
-  color: #fff;
-  overflow: hidden;
+  justify-content: center;
+  height: 100vh;
+  width: 100vw;
+  background-color: #121212;
+  color: white;
   position: relative;
+  overflow: hidden;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 90vw;
+  padding: 20px;
+  text-align: center;
+}
+
+.content h2 {
+  font-size: 2.5rem;
+  margin-bottom: 20px;
+  color: #ffffff;
+}
+
+.content-image {
+  max-width: 80vw;
+  max-height: 60vh;
+  object-fit: contain;
+  margin: 20px 0;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.content-description {
+  font-size: 1.2rem;
+  line-height: 1.6;
+  max-width: 800px;
+  margin: 20px auto;
+}
+
+.waiting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 20px;
+}
+
+.waiting h2 {
+  font-size: 2rem;
+  margin-bottom: 20px;
+  color: #4CAF50;
+}
+
+.waiting p {
+  font-size: 1.2rem;
+  color: #e0e0e0;
+  max-width: 600px;
+}
+
+.status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 20px;
+}
+
+.status h2 {
+  font-size: 2rem;
+  margin-bottom: 20px;
+  color: #f44336;
+}
+
+.error-message {
+  font-size: 1.2rem;
+  color: #ff8a80;
+  margin: 20px 0;
+  max-width: 600px;
+}
+
+.actions {
+  display: flex;
+  gap: 15px;
+  margin-top: 30px;
+}
+
+.action-button {
+  background-color: #2196F3;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.action-button:hover {
+  background-color: #1976D2;
+}
+
+.debug-toggle {
+  opacity: 0.7;
+  transition: opacity 0.3s;
+}
+
+.debug-toggle:hover {
+  opacity: 1;
+}
+
+.debug-panel {
+  text-align: left;
+}
+
+.debug-panel h4 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: #64B5F6;
+}
+
+.debug-panel p {
+  margin: 5px 0;
+  font-family: monospace;
+}
+
+/* Animation for connecting state */
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+.status h2:first-child {
+  animation: pulse 2s infinite ease-in-out;
 }
 
 .content-container {

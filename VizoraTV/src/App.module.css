@@ -19,9 +19,23 @@
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #1a1a1a;
+  background-color: #000000;
+  overflow: hidden;
 }
 
 :global(*) {
   box-sizing: border-box;
+}
+
+/* Hide cursor after inactivity for TV displays */
+:global(body.inactive-cursor) {
+  cursor: none;
+}
+
+/* Prevent text selection */
+:global(body) {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
 } 

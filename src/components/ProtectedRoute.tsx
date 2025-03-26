@@ -1,19 +1,26 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  // This is a simplified authentication check
-  // In a real app, you would check for a valid token or session
-  const isAuthenticated = true; // For development purposes, always authenticated
+  const location = useLocation();
   
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+  // Check if user is authenticated by looking for a token in localStorage
+  const isAuthenticated = () => {
+    const token = localStorage.getItem('token');
+    return !!token;
+  };
+  
+  // If not authenticated, redirect to login page
+  if (!isAuthenticated()) {
+    // Save the location they were trying to access for redirecting after login
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
   
+  // If authenticated, render the protected component
   return <>{children}</>;
 };
 

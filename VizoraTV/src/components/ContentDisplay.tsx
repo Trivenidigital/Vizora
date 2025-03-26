@@ -1,121 +1,94 @@
-import React, { useEffect, useState } from 'react';
-import { getPairingService } from '../services/pairingService';
-import styles from './ContentDisplay.module.css';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { websocketService } from '../services/websocketService';
 
-interface ContentDisplayProps {
-  displayId: string;
-}
-
-interface Content {
-  id: string;
-  type: 'image' | 'video' | 'text' | 'html';
-  content: string;
-  metadata?: {
-    duration?: number;
-    transition?: 'fade' | 'slide' | 'none';
-  };
-}
-
-export const ContentDisplay: React.FC<ContentDisplayProps> = ({ displayId }) => {
-  const [currentContent, setCurrentContent] = useState<Content | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
+const ContentDisplay: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const displayId = searchParams.get('displayId');
+  const [status, setStatus] = useState<string>('Waiting for content...');
+  const [lastUpdated, setLastUpdated] = useState<string>(new Date().toISOString());
+  const [isConnected, setIsConnected] = useState<boolean>(false);
 
   useEffect(() => {
-    const pairingService = getPairingService();
+    if (!displayId) {
+      setStatus('Error: No display ID provided');
+      return;
+    }
 
-    // Listen for content updates
-    pairingService.onContentUpdate((content: Content) => {
-      setCurrentContent(content);
-      setError(null);
-    });
+    // Set up connection status listener
+    const handleStatusChange = (status: string) => {
+      setIsConnected(status === 'connected' || status === 'paired');
+      setLastUpdated(new Date().toISOString());
+    };
 
-    // Listen for connection status
-    pairingService.onConnectionStatus((status: boolean) => {
-      setIsConnected(status);
-      if (!status) {
-        setError('Connection lost. Attempting to reconnect...');
-      } else {
-        setError(null);
+    // Set up content update listener
+    const handleMessage = (message: any) => {
+      console.log('ContentDisplay: Received message:', message);
+      
+      if (message.type === 'content_update' || message.type === 'content_updated') {
+        setStatus('Content updated!');
+        setLastUpdated(new Date().toISOString());
+        // Here you would handle the actual content display logic
+      } else if (message.type === 'display_paired' || message.type === 'paired') {
+        setStatus('Display paired successfully! Waiting for content...');
+        setLastUpdated(new Date().toISOString());
       }
-    });
+    };
 
-    // Listen for errors
-    pairingService.onError((err: Error) => {
-      setError(err.message);
-    });
+    // Subscribe to events
+    websocketService.onStatusChange(handleStatusChange);
+    const unsubscribe = websocketService.subscribeToMessage(handleMessage);
+
+    // Check initial connection status
+    const socket = websocketService.getSocket();
+    if (socket && socket.connected) {
+      setIsConnected(true);
+      setStatus('Connected and ready to receive content');
+    }
 
     return () => {
-      pairingService.disconnect();
+      // Clean up listeners
+      websocketService.offStatusChange(handleStatusChange);
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
     };
   }, [displayId]);
 
-  const renderContent = () => {
-    if (!currentContent) {
-      return (
-        <div className={styles.placeholder}>
-          <h2>Waiting for content...</h2>
-          <p>Display ID: {displayId}</p>
-          {isConnected ? (
-            <p className={styles.status}>Connected</p>
-          ) : (
-            <p className={styles.statusError}>Disconnected</p>
-          )}
-        </div>
-      );
-    }
-
-    switch (currentContent.type) {
-      case 'image':
-        return (
-          <img
-            src={currentContent.content}
-            alt="Display content"
-            className={styles.image}
-          />
-        );
-      case 'video':
-        return (
-          <video
-            src={currentContent.content}
-            autoPlay
-            loop
-            muted
-            playsInline
-            className={styles.video}
-          />
-        );
-      case 'text':
-        return (
-          <div className={styles.text}>
-            {currentContent.content}
-          </div>
-        );
-      case 'html':
-        return (
-          <div
-            className={styles.html}
-            dangerouslySetInnerHTML={{ __html: currentContent.content }}
-          />
-        );
-      default:
-        return (
-          <div className={styles.error}>
-            Unsupported content type: {currentContent.type}
-          </div>
-        );
-    }
-  };
-
   return (
-    <div className={styles.container}>
-      {error ? (
-        <div className={styles.error}>
-          <p>{error}</p>
+    <div className="content-display">
+      <div className="content-container">
+        <div className="content-waiting">
+          <h2>Display ID: {displayId}</h2>
+          <div className={`connection-indicator ${isConnected ? 'connected' : 'disconnected'}`}>
+            {isConnected ? 'Connected' : 'Disconnected'}
+          </div>
+          <p>This display is ready to receive content from a paired controller.</p>
+          <div className="content-status">{status}</div>
+          <div className="content-last-updated">
+            Last Updated: {new Date(lastUpdated).toLocaleTimeString()}
+          </div>
         </div>
-      ) : (
-        renderContent()
-      )}
+        
+        {/* TV-friendly animated waiting indicator */}
+        <div className="tv-waiting-animation">
+          <div className="pulse-circle"></div>
+          <div className="pulse-circle delay-1"></div>
+          <div className="pulse-circle delay-2"></div>
+        </div>
+        
+        {/* This is where content would be rendered when received */}
+        <div className="content-placeholder">
+          {/* Content will appear here when pushed from the web app */}
+        </div>
+        
+        <div className="tv-footer">
+          <div className="tv-logo">VIZORA</div>
+          <div className="tv-device-id">{displayId}</div>
+        </div>
+      </div>
     </div>
   );
-}; 
+};
+
+export default ContentDisplay; 

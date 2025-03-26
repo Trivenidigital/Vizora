@@ -1,121 +1,216 @@
-# VizoraTV - Standalone Mode
+# VizoraTV Display Application
 
-VizoraTV is a digital signage display application that can run independently or integrated with the Vizora web app. This document describes how to run VizoraTV in standalone mode.
+This application serves as the display client for the Vizora platform. It connects to the Vizora middleware server, registers as a display, and shows a QR code for pairing with the Vizora web application.
 
 ## Features
 
-- Real-time content display
-- Support for multiple content types:
-  - Images
-  - Videos
-  - Text
-  - HTML content
-- QR code pairing
-- Automatic content preloading
-- Error handling and recovery
-- Responsive design
-- WebSocket-based communication
+- Automatic connection to middleware server
+- Display registration and pairing
+- QR code generation for easy pairing
+- Persistent registration data across page reloads
+- Fallback standalone QR code page
 
-## Prerequisites
+## Deployment Instructions
 
-- Node.js v16 or higher
-- npm v7 or higher
+### Prerequisites
 
-## Installation
+- Node.js 16+ and npm
+- Vizora Middleware server running and accessible
 
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+### Configuration
 
-## Running in Standalone Mode
-
-1. Start the development server and WebSocket server:
-   ```bash
-   npm start
-   ```
-   This will start both the Vite development server and the WebSocket server concurrently.
-
-2. Open your browser to `http://localhost:5173`
-
-3. The display will show a QR code and pairing code that can be used to connect from the Vizora web app.
-
-## Configuration
-
-The application can be configured through environment variables:
-
-- `PORT`: WebSocket server port (default: 3003)
-- `VITE_WS_URL`: WebSocket server URL (default: http://localhost:3003)
-
-Create a `.env` file in the root directory to set these variables:
-
-```env
-PORT=3003
-VITE_WS_URL=http://localhost:3003
-```
-
-## Project Structure
+1. Create a `.env` file in the root directory with the following variables:
 
 ```
-VizoraTV/
-├── src/
-│   ├── components/         # React components
-│   │   ├── PairingDisplay.tsx
-│   │   └── ContentDisplay.tsx
-│   ├── services/          # Service classes
-│   │   └── pairingService.ts
-│   ├── server/           # Standalone server
-│   │   └── server.ts
-│   └── App.tsx           # Main application component
-├── public/              # Static assets
-└── package.json        # Project dependencies
+VITE_WEBSOCKET_URL=http://your-middleware-server:3003
 ```
 
-## Available Scripts
+Replace `your-middleware-server` with the IP address or hostname of your middleware server.
 
-- `npm run dev`: Start the Vite development server
-- `npm run build`: Build the application for production
-- `npm run preview`: Preview the production build
-- `npm run server`: Start the WebSocket server
-- `npm start`: Start both the development server and WebSocket server
+### Quick Deployment (Recommended)
 
-## Testing
+We've added simplified deployment scripts to make the process easier:
 
-To test the standalone mode:
+1. Install dependencies:
 
-1. Start the application using `npm start`
-2. Open the application in your browser
-3. Use the QR code or pairing code to connect from the Vizora web app
-4. Send content to the display using the Vizora web app interface
+```bash
+npm install
+```
 
-## Troubleshooting
+2. Run the deployment script:
 
-Common issues and solutions:
+```bash
+npm run deploy
+```
 
-1. WebSocket Connection Failed
-   - Ensure the WebSocket server is running on port 3003
-   - Check if the port is not being used by another application
-   - Verify the WebSocket URL in the environment variables
+This will:
+- Build the application (bypassing TypeScript errors)
+- Serve the built files locally for testing
+- Provide instructions for deploying to your production server
 
-2. Content Not Displaying
-   - Check the browser console for errors
-   - Verify that the content format is supported
-   - Ensure the content URLs are accessible
+### Manual Building for Production
 
-3. Pairing Issues
-   - Clear the browser cache and reload
-   - Check if the QR code is readable
-   - Verify the network connection between the display and the web app
+If you prefer to build manually:
 
-## Contributing
+1. For a quick build that bypasses TypeScript errors (recommended for deployment):
 
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+```bash
+npm run quick-build
+```
+
+2. For a full build with type checking (may fail due to test files):
+
+```bash
+npm run build
+```
+
+3. The built application will be in the `dist` directory.
+
+### Deployment Options
+
+#### Option 1: Serve with a static file server
+
+You can serve the built application with any static file server:
+
+```bash
+# Using serve (install globally first: npm install -g serve)
+serve -s dist
+```
+
+#### Option 2: Deploy to a web server
+
+Copy the contents of the `dist` directory to your web server's document root.
+
+#### Option 3: Deploy to a CDN
+
+Upload the contents of the `dist` directory to your CDN.
+
+### Troubleshooting
+
+If you encounter issues with the display registration:
+
+1. Check the browser console for error messages
+2. Verify that the middleware server is running and accessible
+3. Try the debug page at `/debug-registration.html`
+4. Try the standalone QR page at `/standalone-qr.html`
+5. Clear browser cache and local storage
+
+## Development
+
+### Running Locally
+
+1. Install dependencies:
+
+```bash
+npm install
+```
+
+2. Start the development server:
+
+```bash
+npm run dev
+```
+
+3. Open your browser to `http://localhost:5173`
+
+### Available Scripts
+
+- `npm run dev` - Start the development server
+- `npm run build` - Build for production with type checking
+- `npm run quick-build` - Build for production bypassing type checking
+- `npm run deploy` - Build and serve for deployment
+- `npm run preview` - Preview the production build locally
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+Proprietary - All rights reserved
+
+## Production Deployment and Server URL Configuration
+
+When deploying the Vizora TV application to production, you need to properly configure the WebSocket server URLs to ensure connectivity between the TV app and the middleware server.
+
+### Environment Variables
+
+The following environment variables can be set to control how the TV app connects to the middleware:
+
+- `VITE_WEBSOCKET_URL`: Explicitly set the middleware server URL (e.g., `https://middleware.example.com`)
+- `VITE_MIDDLEWARE_PORT`: Set the port for the middleware server (default: `3003`)
+- `VITE_ENVIRONMENT`: Set to `production` for production deployments
+
+### Automatic URL Resolution
+
+If `VITE_WEBSOCKET_URL` is not explicitly set, the application will automatically determine the server URL based on:
+
+1. The current hostname (same domain deployment)
+2. The environment settings
+3. The configured port
+
+This automatic resolution works well when:
+- Both the TV app and middleware are deployed behind the same domain or subdomain
+- The middleware is accessible via the configured port
+
+### Deployment Scenarios
+
+#### 1. Same Domain Deployment
+
+If both the TV app and middleware server are deployed on the same domain:
+
+```
+TV App: https://vizora.example.com
+Middleware: https://vizora.example.com:3003
+```
+
+The app will automatically connect to the middleware on the same domain.
+
+#### 2. Subdomain Deployment
+
+If using separate subdomains:
+
+```
+TV App: https://display.example.com
+Middleware: https://middleware.example.com
+```
+
+Set `VITE_WEBSOCKET_URL=https://middleware.example.com` in your deployment.
+
+#### 3. Different Domain Deployment
+
+If deploying on completely different domains:
+
+```
+TV App: https://display.example.org
+Middleware: https://middleware.example.com
+```
+
+Set `VITE_WEBSOCKET_URL=https://middleware.example.com` in your deployment.
+
+### CORS Configuration
+
+For cross-origin deployments, ensure the middleware CORS settings include all domains where the TV app is hosted:
+
+1. Set the `ALLOWED_ORIGINS` environment variable in the middleware server:
+
+```
+ALLOWED_ORIGINS=https://display.example.com,https://vizora.example.org
+```
+
+2. For debugging CORS issues, temporarily enable CORS debugging:
+
+```
+DEBUG_CORS=true
+```
+
+### Production Build
+
+To build the application for production:
+
+```bash
+# Set environment variables in .env file
+echo "VITE_ENVIRONMENT=production" > .env
+echo "VITE_WEBSOCKET_URL=https://middleware.example.com" >> .env
+
+# Build the application
+npm run build
+```
+
+The built files will be in the `dist` directory, ready for deployment. 

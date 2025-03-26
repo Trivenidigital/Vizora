@@ -56,6 +56,15 @@ function App() {
         </ProtectedRoute>
       } />
       
+      {/* Add the content/upload route */}
+      <Route path="/content/upload" element={
+        <ProtectedRoute>
+          <Layout>
+            <ContentLibrary upload={true} />
+          </Layout>
+        </ProtectedRoute>
+      } />
+      
       <Route path="/playlists" element={
         <ProtectedRoute>
           <Layout>
