@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    networks:
+      - vizora-network
+
+  # Mock API service for development
+  api:
+    image: node:18-alpine
+    working_dir: /app
+    volumes:
+      - ./mock-api:/app
+    command: sh -c "npm install && npm start"
+    ports:
+      - "3000:3000"
+    networks:
+      - vizora-network
+    container_name: api-service
+
+networks:
+  vizora-network:
+    driver: bridge 

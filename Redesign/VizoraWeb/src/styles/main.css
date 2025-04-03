@@ -1,0 +1,90 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Global styles */
+html {
+  @apply h-full bg-neutral-50;
+}
+
+body {
+  @apply h-full text-neutral-900 antialiased;
+}
+
+#root {
+  @apply h-full;
+}
+
+/* Focus styles */
+:focus {
+  @apply outline-none ring-2 ring-primary-500 ring-offset-2 ring-offset-white;
+}
+
+/* Utility classes */
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
+}
+
+.transition-default {
+  @apply transition-all duration-200;
+}
+
+/* Container classes */
+.content-container {
+  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+/* Form styles */
+.form-input {
+  @apply block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm;
+}
+
+.form-checkbox {
+  @apply h-4 w-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500;
+}
+
+.form-label {
+  @apply block text-sm font-medium text-neutral-700;
+}
+
+.form-help {
+  @apply mt-1 text-sm text-neutral-500;
+}
+
+.form-error {
+  @apply mt-1 text-sm text-red-600;
+}
+
+/* Button variants */
+.btn {
+  @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all duration-200;
+}
+
+.btn-primary {
+  @apply btn bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
+}
+
+.btn-secondary {
+  @apply btn bg-white text-neutral-700 border border-neutral-300 hover:bg-neutral-50 focus:ring-primary-500;
+}
+
+.btn-danger {
+  @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
+}
+
+/* Card styles */
+.card {
+  @apply bg-white shadow rounded-lg overflow-hidden;
+}
+
+.card-header {
+  @apply px-4 py-5 sm:px-6 border-b border-neutral-200;
+}
+
+.card-body {
+  @apply px-4 py-5 sm:p-6;
+}
+
+.card-footer {
+  @apply px-4 py-4 sm:px-6 bg-neutral-50 border-t border-neutral-200;
+} 
