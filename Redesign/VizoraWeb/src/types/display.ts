@@ -15,6 +15,10 @@ export const PLAYBACK_MODES = [
   { value: 'loop', label: 'Loop' }
 ] as const;
 
+// Extract values for enum validation
+export const RESOLUTION_VALUES = RESOLUTION_OPTIONS.map(option => option.value);
+export const PLAYBACK_MODE_VALUES = PLAYBACK_MODES.map(option => option.value);
+
 // Display settings schema
 export const DisplaySettingsSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100, 'Name cannot exceed 100 characters'),
@@ -25,8 +29,8 @@ export const DisplaySettingsSchema = z.object({
     room: z.string().optional(),
     notes: z.string().optional()
   }),
-  resolution: z.enum([RESOLUTION_OPTIONS[number]['value']]),
-  playbackMode: z.enum([PLAYBACK_MODES[number]['value']]),
+  resolution: z.enum(RESOLUTION_VALUES),
+  playbackMode: z.enum(PLAYBACK_MODE_VALUES),
   groupId: z.string().optional(),
   settings: z.object({
     brightness: z.number().min(0).max(100),
