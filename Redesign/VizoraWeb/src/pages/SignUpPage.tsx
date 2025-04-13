@@ -1,14 +1,13 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
+import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import { authService } from '@/services/authService';
 import '@/styles/pages/SignUpPage.css';
 
 interface SignUpFormData {
   firstName: string;
   lastName: string;
   email: string;
-  companyName: string;
   password: string;
   confirmPassword: string;
   agreeToTerms: boolean;
@@ -18,19 +17,17 @@ interface ValidationErrors {
   firstName?: string;
   lastName?: string;
   email?: string;
-  companyName?: string;
   password?: string;
   confirmPassword?: string;
   agreeToTerms?: string;
 }
 
 export const SignUpPage = () => {
-  const navigate = useNavigate();
+  const { register } = useAuth();
   const [formData, setFormData] = useState<SignUpFormData>({
     firstName: '',
     lastName: '',
     email: '',
-    companyName: '',
     password: '',
     confirmPassword: '',
     agreeToTerms: false,
@@ -54,16 +51,12 @@ export const SignUpPage = () => {
     if (!/[0-9]/.test(password)) {
       errors.push('Password must contain at least one number');
     }
-    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
-      errors.push('Password must contain at least one special character');
-    }
     return errors;
   };
 
   const validateForm = (): boolean => {
     const newErrors: ValidationErrors = {};
     const maxLength = 255;
-    const companyNameRegex = /^[a-zA-Z0-9\s-]+$/;
 
     if (!formData.firstName) {
       newErrors.firstName = 'First name is required';
@@ -83,14 +76,6 @@ export const SignUpPage = () => {
       newErrors.email = 'Invalid email format';
     } else if (formData.email.length > maxLength) {
       newErrors.email = 'Email must be less than 255 characters';
-    }
-
-    if (!formData.companyName) {
-      newErrors.companyName = 'Company name is required';
-    } else if (!companyNameRegex.test(formData.companyName)) {
-      newErrors.companyName = 'Company name can only contain letters, numbers, spaces, and hyphens';
-    } else if (formData.companyName.length > maxLength) {
-      newErrors.companyName = 'Company name must be less than 255 characters';
     }
 
     if (!formData.password) {
@@ -125,16 +110,15 @@ export const SignUpPage = () => {
 
     setIsSubmitting(true);
     try {
-      const response = await authService.register({
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        companyName: formData.companyName,
-        password: formData.password,
-      });
-
+      await register(
+        formData.email,
+        formData.password,
+        formData.firstName,
+        formData.lastName
+      );
+      
       toast.success('Account created successfully!');
-      navigate('/dashboard');
+      // Navigation is handled in the register function in AuthContext
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Registration failed');
     } finally {
@@ -219,24 +203,6 @@ export const SignUpPage = () => {
               />
               {errors.email && (
                 <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-              )}
-            </div>
-            <div>
-              <label htmlFor="companyName" className="sr-only">
-                Company Name
-              </label>
-              <input
-                id="companyName"
-                name="companyName"
-                type="text"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Company Name"
-                value={formData.companyName}
-                onChange={handleChange}
-              />
-              {errors.companyName && (
-                <p className="mt-1 text-sm text-red-600">{errors.companyName}</p>
               )}
             </div>
             <div>

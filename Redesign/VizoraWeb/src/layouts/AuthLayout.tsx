@@ -3,28 +3,18 @@ import Logo from '../components/ui/Logo';
 
 const AuthLayout = () => {
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      <div className="flex flex-1 flex-col justify-center py-12 px-4 sm:px-6 lg:flex-none lg:px-20 xl:px-24">
-        <div className="mx-auto w-full max-w-sm lg:w-96">
-          <div>
-            <Logo className="h-12 w-auto" />
-            <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
-              Vizora Dashboard
-            </h2>
-          </div>
-
-          <div className="mt-8">
-            <Outlet />
-          </div>
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center">
+      <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-lg">
+        <div className="flex flex-col items-center mb-6">
+          <Logo className="h-12 w-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900">
+            Vizora Dashboard
+          </h2>
         </div>
-      </div>
-      
-      <div className="hidden lg:block relative w-0 flex-1">
-        <img
-          className="absolute inset-0 h-full w-full object-cover"
-          src="/images/auth-splash.jpg"
-          alt="Vizora Digital Signage"
-        />
+
+        <div>
+          <Outlet />
+        </div>
       </div>
     </div>
   );

@@ -1,65 +1,64 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
+import React from 'react';
+import { describe, it, expect, vi } from 'vitest';
+import { screen } from '@testing-library/react';
 import LandingPage from '../../src/components/LandingPage';
+import { renderWithRouter } from '../utils/test-utils';
 
-describe('LandingPage', () => {
-  const renderWithRouter = (component: React.ReactNode) => {
-    return render(
-      <BrowserRouter>
-        {component}
-      </BrowserRouter>
-    );
-  };
-
-  it('renders the landing page with all sections', () => {
+describe('LandingPage Component', () => {
+  it('renders hero section with title and CTA buttons', () => {
     renderWithRouter(<LandingPage />);
     
-    // Check header
-    expect(screen.getByText('Vizora')).toBeInTheDocument();
-    expect(screen.getByText('Login')).toBeInTheDocument();
-    expect(screen.getByText('Sign Up')).toBeInTheDocument();
-
-    // Check main content
-    expect(screen.getByText('Smart Digital Signage for Modern Businesses')).toBeInTheDocument();
-    expect(screen.getByText('Get Started')).toBeInTheDocument();
-    expect(screen.getByText('Learn More')).toBeInTheDocument();
-
-    // Check features section
-    expect(screen.getByText('Why Choose Vizora?')).toBeInTheDocument();
-    expect(screen.getByText('Easy to Use')).toBeInTheDocument();
-    expect(screen.getByText('Fully Customizable')).toBeInTheDocument();
-    expect(screen.getByText('Real-time Updates')).toBeInTheDocument();
-
-    // Check footer
-    expect(screen.getByText('Platform')).toBeInTheDocument();
+    expect(screen.getByText('Welcome to Vizora')).toBeInTheDocument();
+    expect(screen.getByText('Digital Signage Management Made Simple')).toBeInTheDocument();
+    
+    const startButton = screen.getByRole('link', { name: /get started/i });
+    expect(startButton).toBeInTheDocument();
+    expect(startButton).toHaveAttribute('href', '/signup');
+    
+    const loginButton = screen.getByRole('link', { name: /log in/i });
+    expect(loginButton).toBeInTheDocument();
+    expect(loginButton).toHaveAttribute('href', '/login');
+  });
+  
+  it('renders features section with feature cards', () => {
+    renderWithRouter(<LandingPage />);
+    
+    expect(screen.getByText('Key Features')).toBeInTheDocument();
+    expect(screen.getByText('Centralized Dashboard')).toBeInTheDocument();
+    expect(screen.getByText('Smart Scheduling')).toBeInTheDocument();
+    expect(screen.getByText('Content Management')).toBeInTheDocument();
+    expect(screen.getByText('Analytics & Reporting')).toBeInTheDocument();
+  });
+  
+  it('renders testimonials section', () => {
+    renderWithRouter(<LandingPage />);
+    
+    expect(screen.getByText('Trusted by Businesses Worldwide')).toBeInTheDocument();
+    expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+    expect(screen.getByText('John Davis')).toBeInTheDocument();
+  });
+  
+  it('renders call-to-action section', () => {
+    renderWithRouter(<LandingPage />);
+    
+    expect(screen.getByText('Ready to Transform Your Digital Displays?')).toBeInTheDocument();
+    
+    const ctaButton = screen.getByRole('link', { name: /start your free trial/i });
+    expect(ctaButton).toBeInTheDocument();
+    expect(ctaButton).toHaveAttribute('href', '/signup');
+  });
+  
+  it('renders footer with navigation links', () => {
+    renderWithRouter(<LandingPage />);
+    
+    // Check for footer sections
+    expect(screen.getByText('Product')).toBeInTheDocument();
     expect(screen.getByText('Company')).toBeInTheDocument();
     expect(screen.getByText('Resources')).toBeInTheDocument();
-  });
-
-  it('renders all navigation links correctly', () => {
-    renderWithRouter(<LandingPage />);
     
-    const links = screen.getAllByRole('link');
-    expect(links).toHaveLength(8); // Login, Sign Up, Get Started, Learn More, and footer links
-
-    // Check if login and signup links are present
-    expect(screen.getByText('Login')).toHaveAttribute('href', '/login');
-    expect(screen.getByText('Sign Up')).toHaveAttribute('href', '/signup');
-  });
-
-  it('renders the platform preview image', () => {
-    renderWithRouter(<LandingPage />);
-    
-    const previewImage = screen.getByAltText('Vizora Platform Preview');
-    expect(previewImage).toBeInTheDocument();
-    expect(previewImage).toHaveAttribute('src', 'https://via.placeholder.com/600x400?text=Vizora+Dashboard');
-  });
-
-  it('renders social media links in footer', () => {
-    renderWithRouter(<LandingPage />);
-    
-    const socialLinks = screen.getAllByRole('link', { name: /Facebook|Twitter|LinkedIn/i });
-    expect(socialLinks).toHaveLength(3);
+    // Check for legal section
+    expect(screen.getByText(/all rights reserved/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /privacy policy/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /terms of service/i })).toBeInTheDocument();
   });
 }); 

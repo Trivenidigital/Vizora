@@ -2,10 +2,10 @@ import { Link } from 'react-router-dom';
 
 export const LandingPage = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 overflow-x-hidden">
       <div className="container mx-auto px-4 py-8">
-        <header className="flex justify-between items-center mb-16">
-          <div className="flex items-center">
+        <header className="flex flex-wrap justify-between items-center mb-16">
+          <div className="flex items-center mb-4 sm:mb-0">
             <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-500 bg-clip-text text-transparent">Vizora</h1>
           </div>
           <div className="flex items-center space-x-4">
@@ -14,29 +14,29 @@ export const LandingPage = () => {
           </div>
         </header>
 
-        <main className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center py-12">
+        <main className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center py-8 lg:py-12">
           <div>
-            <h2 className="text-5xl font-bold text-gray-900 mb-6 leading-tight">Smart Digital Signage for Modern Businesses</h2>
-            <p className="text-xl text-gray-600 mb-8">Control all your displays remotely with our easy-to-use platform. Schedule content, manage displays, and deliver the right message at the right time.</p>
+            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-6 leading-tight">Smart Digital Signage for Modern Businesses</h2>
+            <p className="text-lg md:text-xl text-gray-600 mb-8">Control all your displays remotely with our easy-to-use platform. Schedule content, manage displays, and deliver the right message at the right time.</p>
             <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
               <Link to="/signup" className="px-8 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-medium rounded-lg shadow-md text-center">Get Started</Link>
               <Link to="/login" className="px-8 py-3 bg-white text-purple-700 border border-purple-200 hover:border-purple-300 font-medium rounded-lg shadow-sm text-center">Learn More</Link>
             </div>
           </div>
-          <div className="flex justify-center">
-            <div className="relative">
-              <div className="absolute -top-4 -left-4 w-72 h-72 bg-purple-200 rounded-lg transform rotate-6"></div>
-              <div className="absolute -bottom-4 -right-4 w-72 h-72 bg-blue-200 rounded-lg transform -rotate-6"></div>
-              <div className="relative z-10 w-full max-w-lg rounded-xl shadow-2xl overflow-hidden border-8 border-white">
-                <img src="https://via.placeholder.com/600x400?text=Vizora+Dashboard" alt="Vizora Platform Preview" className="w-full" />
+          <div className="flex justify-center mt-8 lg:mt-0">
+            <div className="relative max-w-full">
+              <div className="absolute -top-4 -left-4 w-48 md:w-72 h-48 md:h-72 bg-purple-200 rounded-lg transform rotate-6"></div>
+              <div className="absolute -bottom-4 -right-4 w-48 md:w-72 h-48 md:h-72 bg-blue-200 rounded-lg transform -rotate-6"></div>
+              <div className="relative z-10 max-w-full rounded-xl shadow-2xl overflow-hidden border-8 border-white">
+                <img src="/assets/dashboard-preview.svg" alt="Vizora Platform Preview" className="w-full max-w-full" />
               </div>
             </div>
           </div>
         </main>
 
-        <div className="py-16">
-          <h3 className="text-2xl font-bold text-center text-gray-900 mb-12">Why Choose Vizora?</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="py-12 lg:py-16">
+          <h3 className="text-2xl font-bold text-center text-gray-900 mb-8 lg:mb-12">Why Choose Vizora?</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 md:gap-8">
             <div className="bg-white p-6 rounded-xl shadow-md">
               <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mb-4">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">

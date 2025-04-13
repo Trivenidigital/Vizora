@@ -1,7 +1,7 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import DisplayList from '../../components/DisplayList';
 import { displayService } from '../../services/displayService';
+import { renderWithProviders } from '../../test/test-utils';
 
 // Mock the display service
 vi.mock('../../services/displayService', () => ({
@@ -65,11 +65,7 @@ describe('DisplayList', () => {
   });
 
   it('renders display list', async () => {
-    render(
-      <BrowserRouter>
-        <DisplayList />
-      </BrowserRouter>
-    );
+    renderWithProviders(<DisplayList />);
 
     await waitFor(() => {
       expect(screen.getByText('Main Lobby Display')).toBeInTheDocument();
@@ -84,11 +80,7 @@ describe('DisplayList', () => {
       status: 'offline',
     });
 
-    render(
-      <BrowserRouter>
-        <DisplayList />
-      </BrowserRouter>
-    );
+    renderWithProviders(<DisplayList />);
 
     await waitFor(() => {
       expect(screen.getByText('Main Lobby Display')).toBeInTheDocument();
@@ -106,11 +98,7 @@ describe('DisplayList', () => {
   it('handles display deletion', async () => {
     vi.mocked(displayService.deleteDisplay).mockResolvedValueOnce(true);
 
-    render(
-      <BrowserRouter>
-        <DisplayList />
-      </BrowserRouter>
-    );
+    renderWithProviders(<DisplayList />);
 
     await waitFor(() => {
       expect(screen.getByText('Main Lobby Display')).toBeInTheDocument();
@@ -128,11 +116,7 @@ describe('DisplayList', () => {
   it('shows error message on service failure', async () => {
     vi.mocked(displayService.getDisplays).mockRejectedValueOnce(new Error('Failed to fetch displays'));
 
-    render(
-      <BrowserRouter>
-        <DisplayList />
-      </BrowserRouter>
-    );
+    renderWithProviders(<DisplayList />);
 
     await waitFor(() => {
       expect(screen.getByText(/failed to fetch displays/i)).toBeInTheDocument();

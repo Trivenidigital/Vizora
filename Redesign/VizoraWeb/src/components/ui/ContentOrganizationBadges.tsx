@@ -1,41 +1,56 @@
 import React from 'react';
 
+interface Tag {
+  id: string;
+  name: string;
+  color: string;
+}
+
 interface ContentOrganizationBadgesProps {
   folder?: string;
-  tags?: Array<{
-    id: string;
-    name: string;
-    color: string;
-  }>;
+  tags?: Tag[];
+  onClickFolder?: (folder: string) => void;
+  onClickTag?: (tag: Tag) => void;
 }
 
 export const ContentOrganizationBadges: React.FC<ContentOrganizationBadgesProps> = ({
   folder,
-  tags = []
+  tags,
+  onClickFolder,
+  onClickTag
 }) => {
-  if (!folder && tags.length === 0) {
+  if (!folder && (!tags || tags.length === 0)) {
     return null;
   }
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="organization-badges">
       {folder && (
-        <span className="folder-badge inline-flex items-center px-2 py-1 rounded-md text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200">
-          {folder}
-        </span>
-      )}
-      {tags.map((tag) => (
-        <span
-          key={tag.id}
-          className="tag-badge inline-flex items-center px-2 py-1 rounded-md text-sm font-medium"
-          style={{
-            backgroundColor: tag.color,
-            color: '#ffffff'
-          }}
+        <div 
+          className="folder-badge"
+          style={{ backgroundColor: '#f3f4f6', color: '#374151' }}
+          onClick={() => onClickFolder && onClickFolder(folder)}
         >
-          {tag.name}
-        </span>
-      ))}
+          <span className="icon">📁</span>
+          {folder}
+        </div>
+      )}
+      
+      {tags && tags.length > 0 && (
+        <div className="tag-badges">
+          {tags.map(tag => (
+            <div 
+              key={tag.id} 
+              className="tag-badge"
+              onClick={() => onClickTag && onClickTag(tag)}
+              style={{ backgroundColor: tag.color, color: '#ffffff' }}
+            >
+              <span className="icon">#</span>
+              {tag.name}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }; 

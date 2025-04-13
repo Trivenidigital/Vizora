@@ -1,59 +1,70 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
+import { FiUser, FiBell, FiLock, FiDatabase, FiLink, FiCreditCard, FiActivity } from 'react-icons/fi';
+import { authService } from '@/services/authService';
+import { SystemDiagnosticsPage } from './SettingsPages/SystemDiagnosticsPage';
 
-const Settings = () => {
+// Lazy load the cache settings page to improve initial loading performance
+const CacheSettingsPage = lazy(() => import('./SettingsPages/CacheSettingsPage'));
+
+export function Settings() {
   const [activeTab, setActiveTab] = useState('account');
+  const isAdmin = authService.isAdmin();
 
   const tabs = [
-    { id: 'account', name: 'Account' },
-    { id: 'notifications', name: 'Notifications' },
-    { id: 'security', name: 'Security' },
-    { id: 'integration', name: 'Integrations' },
-    { id: 'billing', name: 'Billing' },
+    { id: 'account', label: 'Account', icon: FiUser },
+    { id: 'notifications', label: 'Notifications', icon: FiBell },
+    { id: 'security', label: 'Security', icon: FiLock },
+    { id: 'cache', label: 'Cache', icon: FiDatabase },
+    { id: 'integrations', label: 'Integrations', icon: FiLink },
+    { id: 'billing', label: 'Billing', icon: FiCreditCard },
   ];
 
+  // Add System Diagnostics tab for admins
+  if (isAdmin) {
+    tabs.push({ id: 'diagnostics', label: 'System Diagnostics', icon: FiActivity });
+  }
+
   return (
-    <div>
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Settings</h2>
-        <p className="mt-1 text-sm text-gray-500">
-          Manage your account settings and preferences
-        </p>
-      </div>
-
-      <div className="bg-white shadow rounded-lg">
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8 px-6" aria-label="Tabs">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`
-                  whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm
-                  ${
-                    activeTab === tab.id
-                      ? 'border-purple-500 text-purple-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }
-                `}
-                aria-current={activeTab === tab.id ? 'page' : undefined}
-              >
-                {tab.name}
-              </button>
-            ))}
-          </nav>
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-2xl font-bold mb-6">Settings</h1>
+      
+      <div className="flex flex-wrap md:flex-nowrap gap-8">
+        {/* Sidebar */}
+        <div className="w-full md:w-64 space-y-1">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              className={`flex items-center w-full px-4 py-2 rounded-md transition-colors ${
+                activeTab === tab.id
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              <tab.icon className="mr-2 h-5 w-5" />
+              {tab.label}
+            </button>
+          ))}
         </div>
-
-        <div className="px-6 py-6">
+        
+        {/* Content */}
+        <div className="flex-1 bg-white rounded-lg shadow p-6">
           {activeTab === 'account' && <AccountSettings />}
           {activeTab === 'notifications' && <NotificationSettings />}
           {activeTab === 'security' && <SecuritySettings />}
-          {activeTab === 'integration' && <IntegrationSettings />}
+          {activeTab === 'cache' && (
+            <Suspense fallback={<div className="py-10 text-center">Loading cache settings...</div>}>
+              <CacheSettingsPage />
+            </Suspense>
+          )}
+          {activeTab === 'integrations' && <IntegrationSettings />}
           {activeTab === 'billing' && <BillingSettings />}
+          {activeTab === 'diagnostics' && <SystemDiagnosticsPage />}
         </div>
       </div>
     </div>
   );
-};
+}
 
 // Account Settings component
 const AccountSettings = () => {
@@ -172,6 +183,4 @@ const BillingSettings = () => (
   <div className="text-center py-10">
     <p className="text-gray-500">Billing information will appear here</p>
   </div>
-);
-
-export default Settings; 
+); 

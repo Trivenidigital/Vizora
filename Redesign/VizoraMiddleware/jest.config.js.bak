@@ -1,0 +1,49 @@
+/**
+ * Jest configuration
+ */
+
+// This file may be causing a conflict with package.json jest config.
+// Temporarily rename this file to resolve the conflict.
+
+// For CI/CD readiness, this file should be merged with the package.json config
+// or one should be chosen as the primary configuration.
+
+module.exports = {
+  // Automatically clear mock calls and instances between every test
+  clearMocks: true,
+
+  // Indicates whether the coverage information should be collected while executing the test
+  collectCoverage: true,
+
+  // The directory where Jest should output its coverage files
+  coverageDirectory: 'coverage',
+
+  // Indicates which provider should be used to instrument code for coverage
+  coverageProvider: 'v8',
+
+  // A list of paths to directories that Jest should use to search for files in
+  roots: ['<rootDir>/tests', '<rootDir>/src'],
+
+  // The test environment that will be used for testing
+  testEnvironment: 'node',
+
+  // Setup file
+  setupFilesAfterEnv: ['./tests/setup.js'],
+
+  // The glob patterns Jest uses to detect test files
+  testMatch: [
+    '**/__tests__/**/*.js?(x)',
+    '**/?(*.)+(spec|test).js?(x)'
+  ],
+
+  // An array of regexp pattern strings that are matched against all test paths, matched tests are skipped
+  testPathIgnorePatterns: [
+    '/node_modules/'
+  ],
+
+  // Indicates whether each individual test should be reported during the run
+  verbose: true,
+
+  // Add any additional configuration needed
+  coveragePathIgnorePatterns: ['/node_modules/'],
+}; 

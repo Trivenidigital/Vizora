@@ -1,88 +1,103 @@
-# Vizora - Digital Signage Management System
+![Architecture Locked](https://img.shields.io/badge/Architecture-Locked-4CAF50?style=for-the-badge&logo=checkmarx)
 
-Vizora is a modern digital signage management system that allows users to manage and control displays remotely.
+📐 [View Architecture Manifest](docs/architecture-manifest.md)
 
-## Project Structure
+# Vizora - Digital Signage Management
 
-```
-Vizora/
-├── VizoraWeb/          # Frontend React application
-└── VizoraMiddleware/   # Backend Node.js server
-```
-
-## Prerequisites
-
-- Node.js (v14 or higher)
-- MongoDB
-- Redis (optional)
-
-## Setup Instructions
-
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/vizora.git
-cd vizora
-```
-
-2. Set up the backend:
-```bash
-cd VizoraMiddleware
-npm install
-cp .env.example .env  # Create and configure your environment variables
-```
-
-3. Set up the frontend:
-```bash
-cd ../VizoraWeb
-npm install
-cp .env.example .env  # Create and configure your environment variables
-```
-
-4. Start the development servers:
-
-For backend:
-```bash
-cd VizoraMiddleware
-npm start
-```
-
-For frontend:
-```bash
-cd VizoraWeb
-npm run dev
-```
-
-## Environment Variables
-
-### Backend (.env)
-```
-PORT=3003
-MONGODB_URI=your_mongodb_uri
-JWT_SECRET=your_jwt_secret
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=your_redis_password
-ALLOWED_ORIGINS=http://localhost:5174
-```
-
-### Frontend (.env)
-```
-VITE_API_URL=http://localhost:3003/api
-```
+Vizora is a modern web application for managing digital signage displays. It provides real-time monitoring, content management, and system diagnostics for digital displays.
 
 ## Features
 
-- User authentication and authorization
-- Display management
-- Real-time communication using Socket.IO
-- QR code-based display pairing
-- Responsive web interface
+- Real-time display status monitoring
+- System metrics tracking (CPU, memory, storage, network)
+- Content management and scheduling
+- Diagnostic tools and error reporting
+- WebSocket-based live updates
+- Responsive and modern UI
+
+## Tech Stack
+
+- React 18 with TypeScript
+- Vite for build tooling
+- Tailwind CSS for styling
+- Socket.IO for real-time communication
+- React Query for data fetching
+- React Router for navigation
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 16 or higher
+- npm or yarn
+
+### Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/Trivenidigital/Vizora.git
+cd vizora
+```
+
+2. Install dependencies:
+```bash
+npm install
+# or
+yarn install
+```
+
+3. Start the development server:
+```bash
+npm run dev
+# or
+yarn dev
+```
+
+4. Open your browser and navigate to `http://localhost:3000`
+
+### Building for Production
+
+```bash
+npm run build
+# or
+yarn build
+```
+
+The built files will be in the `dist` directory.
 
 ## Development
 
-- Frontend runs on: http://localhost:5174
-- Backend runs on: http://localhost:3003
+### Project Structure
+
+```
+src/
+  ├── components/         # React components
+  │   ├── ui/            # Reusable UI components
+  │   └── DisplayMonitoring/  # Display-specific components
+  ├── services/          # API and WebSocket services
+  ├── types/             # TypeScript type definitions
+  ├── lib/               # Utility functions
+  ├── App.tsx           # Main application component
+  └── main.tsx          # Application entry point
+```
+
+### Available Scripts
+
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build
+- `npm run lint` - Run ESLint
+- `npm test` - Run tests
+- `npm run test:coverage` - Run tests with coverage report
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## License
 
-MIT License - see LICENSE file for details
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

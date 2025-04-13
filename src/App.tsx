@@ -1,106 +1,102 @@
-import { Routes, Route } from 'react-router-dom';
-import Layout from './components/Layout';
-import Dashboard from './pages/Dashboard';
-import Displays from './pages/Displays';
-import ContentLibrary from './pages/ContentLibrary';
-import Playlists from './pages/Playlists';
-import Schedule from './pages/Schedule';
-import Analytics from './pages/Analytics';
-import Settings from './pages/Settings';
-import Login from './pages/auth/Login';
-import Register from './pages/auth/Register';
-import Landing from './pages/Landing';
+import React, { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { DisplayProvider, useDisplay } from './contexts/DisplayContext';
+import PairingScreen from './pages/PairingScreen';
+import RegisterDisplay from './pages/RegisterDisplay';
+import DisplayScreen from './pages/DisplayScreen';
 import NotFound from './pages/NotFound';
-import ProtectedRoute from './components/ProtectedRoute';
-import AddDisplayModal from './components/displays/AddDisplayModal';
-import NetworkScannerTest from './components/displays/NetworkScannerTest';
+import './App.css';
 
-function App() {
+// Router component that conditionally renders routes based on display state
+const AppRoutes: React.FC = () => {
+  const { 
+    isLoading, 
+    needsRegistration, 
+    needsPairing, 
+    isPaired, 
+    isRegistered, 
+    error, 
+    resetError 
+  } = useDisplay();
+
+  // Log current app state (useful for debugging)
+  useEffect(() => {
+    console.log('🧭 App Routing State:', {
+      isLoading,
+      needsRegistration,
+      needsPairing,
+      isPaired,
+      isRegistered,
+      hasError: !!error
+    });
+  }, [isLoading, needsRegistration, needsPairing, isPaired, isRegistered, error]);
+
+  // Show global error if it exists
+  if (error) {
+    return (
+      <div className="global-error">
+        <div className="error-content">
+          <strong>Error:</strong> {error}
+        </div>
+        <button onClick={resetError} className="dismiss-button">
+          Dismiss
+        </button>
+      </div>
+    );
+  }
+
   return (
     <Routes>
-      <Route path="/" element={<Landing />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
+      {/* Home route - conditionally redirect based on state */}
+      <Route 
+        path="/" 
+        element={
+          isLoading ? (
+            <div className="loading-screen">
+              <h1>Vizora TV</h1>
+              <div className="loader"></div>
+              <p>Initializing display...</p>
+            </div>
+          ) : needsPairing ? (
+            <PairingScreen />
+          ) : needsRegistration ? (
+            <Navigate to="/register" replace />
+          ) : isRegistered || isPaired ? (
+            <DisplayScreen />
+          ) : (
+            <PairingScreen />
+          )
+        } 
+      />
+
+      {/* Registration route - only accessible when needed */}
+      <Route 
+        path="/register" 
+        element={
+          needsRegistration ? <RegisterDisplay /> : <Navigate to="/" replace />
+        } 
+      />
+
+      {/* Explicit routes for these screens */}
+      <Route path="/pairing" element={<PairingScreen />} />
+      <Route path="/display" element={<DisplayScreen />} />
       
-      {/* Protected routes */}
-      <Route path="/dashboard" element={
-        <ProtectedRoute>
-          <Layout>
-            <Dashboard />
-          </Layout>
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/displays" element={
-        <ProtectedRoute>
-          <Layout>
-            <Displays />
-          </Layout>
-        </ProtectedRoute>
-      } />
-      
-      {/* Add the displays/add route */}
-      <Route path="/displays/add" element={
-        <ProtectedRoute>
-          <Layout>
-            <Displays initialAddModalOpen={true} />
-          </Layout>
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/content" element={
-        <ProtectedRoute>
-          <Layout>
-            <ContentLibrary />
-          </Layout>
-        </ProtectedRoute>
-      } />
-      
-      {/* Add the content/upload route */}
-      <Route path="/content/upload" element={
-        <ProtectedRoute>
-          <Layout>
-            <ContentLibrary upload={true} />
-          </Layout>
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/playlists" element={
-        <ProtectedRoute>
-          <Layout>
-            <Playlists />
-          </Layout>
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/schedule" element={
-        <ProtectedRoute>
-          <Layout>
-            <Schedule />
-          </Layout>
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/analytics" element={
-        <ProtectedRoute>
-          <Layout>
-            <Analytics />
-          </Layout>
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/settings" element={
-        <ProtectedRoute>
-          <Layout>
-            <Settings />
-          </Layout>
-        </ProtectedRoute>
-      } />
-      
-      {/* Catch all route for 404 */}
+      {/* Fallback route */}
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
+};
+
+function App() {
+  return (
+    <div className="app">
+      <DisplayProvider>
+        <Router>
+          <AppRoutes />
+        </Router>
+      </DisplayProvider>
+    </div>
+  );
 }
 
-export default App;
+export default App; 

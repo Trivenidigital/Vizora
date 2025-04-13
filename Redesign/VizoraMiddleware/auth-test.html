@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vizora Auth Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        h1 {
+            color: #4a5568;
+            margin-top: 0;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #edf2f7;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #cbd5e0;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #4299e1;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #3182ce;
+        }
+        button.secondary {
+            background-color: #a0aec0;
+        }
+        button.secondary:hover {
+            background-color: #718096;
+        }
+        .result {
+            margin-top: 20px;
+            border-top: 1px solid #edf2f7;
+            padding-top: 20px;
+        }
+        pre {
+            background-color: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            padding: 15px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .info {
+            background-color: #ebf8ff;
+            border-left: 4px solid #4299e1;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+        }
+        .error {
+            background-color: #fff5f5;
+            border-left: 4px solid #f56565;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+        }
+        .success {
+            background-color: #f0fff4;
+            border-left: 4px solid #48bb78;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+        }
+        .endpoint-url {
+            font-family: monospace;
+            background-color: #edf2f7;
+            padding: 3px 6px;
+            border-radius: 4px;
+        }
+        .request-info, .response-info {
+            margin-bottom: 20px;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+        .tab.active {
+            border-bottom: 2px solid #4299e1;
+            color: #4299e1;
+            font-weight: 500;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Vizora Auth API Test</h1>
+        
+        <div class="info">
+            This page helps test authentication API endpoints. Make sure both servers are running:
+            <ul>
+                <li>Auth server: <code>node auth-server.js</code> (Port 3001)</li>
+                <li>API server: <code>node direct-fix.js</code> (Port 3000)</li>
+            </ul>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" data-tab="login">Login</div>
+            <div class="tab" data-tab="register">Register</div>
+            <div class="tab" data-tab="me">Get Current User</div>
+            <div class="tab" data-tab="logout">Logout</div>
+        </div>
+
+        <!-- Login Tab -->
+        <div class="tab-content active" id="login-tab">
+            <h2>Test Login API</h2>
+            <div class="form-group">
+                <label for="login-email">Email:</label>
+                <input type="email" id="login-email" value="demo@vizora.ai">
+            </div>
+            <div class="form-group">
+                <label for="login-password">Password:</label>
+                <input type="password" id="login-password" value="password">
+            </div>
+            <div class="button-group">
+                <button id="login-button">Login</button>
+            </div>
+            <div class="result" id="login-result"></div>
+        </div>
+
+        <!-- Register Tab -->
+        <div class="tab-content" id="register-tab">
+            <h2>Test Register API</h2>
+            <div class="form-group">
+                <label for="register-email">Email:</label>
+                <input type="email" id="register-email" value="newuser@vizora.ai">
+            </div>
+            <div class="form-group">
+                <label for="register-password">Password:</label>
+                <input type="password" id="register-password" value="password">
+            </div>
+            <div class="form-group">
+                <label for="register-firstName">First Name:</label>
+                <input type="text" id="register-firstName" value="New">
+            </div>
+            <div class="form-group">
+                <label for="register-lastName">Last Name:</label>
+                <input type="text" id="register-lastName" value="User">
+            </div>
+            <div class="button-group">
+                <button id="register-button">Register</button>
+            </div>
+            <div class="result" id="register-result"></div>
+        </div>
+
+        <!-- Get Current User Tab -->
+        <div class="tab-content" id="me-tab">
+            <h2>Test Get Current User API</h2>
+            <div class="button-group">
+                <button id="me-button">Get Current User</button>
+            </div>
+            <div class="result" id="me-result"></div>
+        </div>
+
+        <!-- Logout Tab -->
+        <div class="tab-content" id="logout-tab">
+            <h2>Test Logout API</h2>
+            <div class="button-group">
+                <button id="logout-button">Logout</button>
+            </div>
+            <div class="result" id="logout-result"></div>
+        </div>
+    </div>
+
+    <script>
+        // Base URL for the auth server
+        const API_URL = 'http://localhost:3001/api';
+        
+        // Utility to format JSON
+        function formatJson(json) {
+            return JSON.stringify(json, null, 2);
+        }
+        
+        // Display results in the specified container
+        function displayResult(containerId, data) {
+            const container = document.getElementById(containerId);
+            
+            // Create request info section
+            const requestInfo = document.createElement('div');
+            requestInfo.className = 'request-info';
+            requestInfo.innerHTML = `
+                <h3>Request Details</h3>
+                <div>
+                    <p><strong>URL:</strong> <span class="endpoint-url">${data.url}</span></p>
+                    <p><strong>Method:</strong> ${data.method}</p>
+                    ${data.requestBody ? `<p><strong>Request Body:</strong></p><pre>${formatJson(data.requestBody)}</pre>` : ''}
+                </div>
+            `;
+            
+            // Create response info section
+            const responseInfo = document.createElement('div');
+            responseInfo.className = 'response-info';
+            
+            if (data.error) {
+                responseInfo.innerHTML = `
+                    <h3>Response Error</h3>
+                    <div class="error">
+                        <p>${data.error}</p>
+                    </div>
+                `;
+            } else {
+                const statusClass = data.response.status >= 200 && data.response.status < 300 ? 'success' : 'error';
+                responseInfo.innerHTML = `
+                    <h3>Response Details</h3>
+                    <div class="${statusClass}">
+                        <p><strong>Status:</strong> ${data.response.status} ${data.response.statusText}</p>
+                    </div>
+                    ${data.responseData ? `<p><strong>Response Body:</strong></p><pre>${formatJson(data.responseData)}</pre>` : ''}
+                `;
+            }
+            
+            // Clear previous results and append new ones
+            container.innerHTML = '';
+            container.appendChild(requestInfo);
+            container.appendChild(responseInfo);
+        }
+        
+        // Make API request with credentials
+        async function makeRequest(url, method, body = null) {
+            const options = {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include', // Important for CORS with cookies
+            };
+            
+            if (body) {
+                options.body = JSON.stringify(body);
+            }
+            
+            try {
+                const response = await fetch(url, options);
+                let responseData;
+                
+                try {
+                    responseData = await response.json();
+                } catch (e) {
+                    responseData = { error: 'Could not parse response as JSON' };
+                }
+                
+                return {
+                    url,
+                    method,
+                    requestBody: body,
+                    response: {
+                        status: response.status,
+                        statusText: response.statusText,
+                    },
+                    responseData
+                };
+            } catch (error) {
+                return {
+                    url,
+                    method,
+                    requestBody: body,
+                    error: error.message
+                };
+            }
+        }
+        
+        // Login handler
+        document.getElementById('login-button').addEventListener('click', async () => {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            
+            if (!email || !password) {
+                alert('Please enter both email and password');
+                return;
+            }
+            
+            const result = await makeRequest(`${API_URL}/auth/login`, 'POST', { email, password });
+            displayResult('login-result', result);
+            
+            // Save token if successful
+            if (result.responseData && result.responseData.token) {
+                localStorage.setItem('token', result.responseData.token);
+            }
+        });
+        
+        // Register handler
+        document.getElementById('register-button').addEventListener('click', async () => {
+            const email = document.getElementById('register-email').value;
+            const password = document.getElementById('register-password').value;
+            const firstName = document.getElementById('register-firstName').value;
+            const lastName = document.getElementById('register-lastName').value;
+            
+            if (!email || !password || !firstName || !lastName) {
+                alert('Please fill in all registration fields');
+                return;
+            }
+            
+            const result = await makeRequest(`${API_URL}/auth/register`, 'POST', { 
+                email, password, firstName, lastName 
+            });
+            displayResult('register-result', result);
+            
+            // Save token if successful
+            if (result.responseData && result.responseData.token) {
+                localStorage.setItem('token', result.responseData.token);
+            }
+        });
+        
+        // Get Current User handler
+        document.getElementById('me-button').addEventListener('click', async () => {
+            const result = await makeRequest(`${API_URL}/auth/me`, 'GET');
+            displayResult('me-result', result);
+        });
+        
+        // Logout handler
+        document.getElementById('logout-button').addEventListener('click', async () => {
+            const result = await makeRequest(`${API_URL}/auth/logout`, 'POST');
+            displayResult('logout-result', result);
+            
+            // Remove token if successful
+            if (result.responseData && result.responseData.success) {
+                localStorage.removeItem('token');
+            }
+        });
+        
+        // Tab navigation
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabId = tab.getAttribute('data-tab');
+                
+                // Update active tab
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                // Show corresponding content
+                document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                document.getElementById(`${tabId}-tab`).classList.add('active');
+            });
+        });
+    </script>
+</body>
+</html> 

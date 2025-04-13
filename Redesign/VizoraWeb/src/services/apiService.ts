@@ -1,5 +1,6 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { authService } from './authService';
+import { TokenManager } from '@vizora/common';
 
 interface ApiResponse<T> {
   data: T;
@@ -12,10 +13,11 @@ class ApiService {
 
   constructor() {
     this.api = axios.create({
-      baseURL: process.env.REACT_APP_API_URL || 'http://localhost:3001/api',
+      baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3003/api',
       headers: {
         'Content-Type': 'application/json',
       },
+      withCredentials: true,
     });
 
     this.setupInterceptors();
@@ -23,8 +25,8 @@ class ApiService {
 
   private setupInterceptors(): void {
     this.api.interceptors.request.use(
-      (config: AxiosRequestConfig) => {
-        const token = authService.getToken();
+      (config: InternalAxiosRequestConfig) => {
+        const token = TokenManager.getToken();
         if (token && config.headers) {
           config.headers.Authorization = `Bearer ${token}`;
         }
@@ -39,7 +41,7 @@ class ApiService {
       (response) => response,
       async (error) => {
         if (error.response?.status === 401) {
-          await authService.logout();
+          localStorage.removeItem('token');
           window.location.href = '/login';
         }
         return Promise.reject(error);

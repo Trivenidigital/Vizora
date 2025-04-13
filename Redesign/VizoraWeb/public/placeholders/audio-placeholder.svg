@@ -1,0 +1,9 @@
+<svg width="800" height="600" viewBox="0 0 800 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="800" height="600" fill="#F5F5F5"/>
+  <rect x="1" y="1" width="798" height="598" stroke="#E0E0E0" stroke-width="2"/>
+  <circle cx="400" cy="250" r="100" fill="#E0E0E0"/>
+  <path d="M380 250 L380 200 L440 200 L440 250 L450 250 L450 300 L440 300 L440 350 L380 350 L380 300 L370 300 L370 250 Z" fill="#A0A0A0"/>
+  <rect x="200" y="380" width="400" height="20" rx="4" fill="#E0E0E0"/>
+  <rect x="250" y="420" width="300" height="20" rx="4" fill="#E0E0E0"/>
+  <text x="400" y="480" font-family="Arial" font-size="24" text-anchor="middle" fill="#A0A0A0">Audio Placeholder</text>
+</svg> 

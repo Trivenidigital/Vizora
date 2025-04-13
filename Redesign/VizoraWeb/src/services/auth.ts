@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_URL } from '@/config/constants';
+import { TokenManager } from '@vizora/common';
 
 export interface User {
   id: string;
@@ -43,11 +44,11 @@ class AuthService {
   }
 
   setAuthToken(token: string): void {
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    axios.defaults.headers.common['Authorization'] = `Bearer ${TokenManager.getToken()}`;
   }
 
   removeAuthToken(): void {
-    delete axios.defaults.headers.common['Authorization'];
+    TokenManager.removeToken();
   }
 }
 

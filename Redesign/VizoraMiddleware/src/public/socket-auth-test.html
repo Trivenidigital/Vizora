@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Socket.IO Authentication Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    button {
+      padding: 8px 16px;
+      margin: 5px;
+      cursor: pointer;
+    }
+    #log {
+      height: 400px;
+      overflow-y: scroll;
+      border: 1px solid #ccc;
+      padding: 10px;
+      margin-top: 20px;
+      font-family: monospace;
+      background-color: #f9f9f9;
+    }
+    .success { color: green; }
+    .error { color: red; }
+    .info { color: blue; }
+    .warn { color: orange; }
+    input, select {
+      padding: 8px;
+      margin: 5px;
+      width: 300px;
+    }
+    fieldset {
+      margin-bottom: 20px;
+      padding: 15px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Vizora Socket.IO Authentication Test</h1>
+  <p>This tool tests the Socket.IO authentication flow for the Vizora TV app.</p>
+
+  <fieldset>
+    <legend>Connection Settings</legend>
+    <div>
+      <label for="server-url">Server URL:</label>
+      <input type="text" id="server-url" value="http://localhost:3003" placeholder="Socket.IO Server URL">
+    </div>
+    <div>
+      <label for="token">Authentication Token:</label>
+      <input type="text" id="token" placeholder="JWT or TokenStore token">
+      <button id="generate-token">Generate Test Token</button>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Device Info</legend>
+    <div>
+      <label for="device-id">Device ID:</label>
+      <input type="text" id="device-id" value="test-device-id" placeholder="Device ID for registration">
+    </div>
+  </fieldset>
+
+  <div>
+    <button id="connect">Connect</button>
+    <button id="disconnect">Disconnect</button>
+  </div>
+  
+  <div>
+    <button id="register-device">Register Device</button>
+    <button id="get-pairing-code">Get Pairing Code</button>
+  </div>
+  
+  <div id="log"></div>
+
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  <script>
+    // DOM elements
+    const serverUrlInput = document.getElementById('server-url');
+    const tokenInput = document.getElementById('token');
+    const deviceIdInput = document.getElementById('device-id');
+    const connectButton = document.getElementById('connect');
+    const disconnectButton = document.getElementById('disconnect');
+    const registerDeviceButton = document.getElementById('register-device');
+    const getPairingCodeButton = document.getElementById('get-pairing-code');
+    const generateTokenButton = document.getElementById('generate-token');
+    const logContainer = document.getElementById('log');
+    
+    // Socket.IO client
+    let socket = null;
+    
+    // Helper function to log messages
+    function log(message, type = 'info') {
+      const entry = document.createElement('div');
+      entry.className = type;
+      entry.textContent = `[${new Date().toISOString()}] ${message}`;
+      logContainer.appendChild(entry);
+      logContainer.scrollTop = logContainer.scrollHeight;
+      console.log(`[${type}] ${message}`);
+    }
+    
+    // Connect to Socket.IO server
+    connectButton.addEventListener('click', () => {
+      if (socket) {
+        log('Disconnecting existing socket first...', 'warn');
+        socket.disconnect();
+        socket = null;
+      }
+      
+      const serverUrl = serverUrlInput.value.trim();
+      const token = tokenInput.value.trim();
+      
+      if (!serverUrl) {
+        log('Please enter a server URL', 'error');
+        return;
+      }
+      
+      log(`Connecting to ${serverUrl}...`);
+      
+      try {
+        // Connection options
+        const options = {
+          transports: ['websocket'],
+          reconnection: true,
+          reconnectionAttempts: 3,
+          reconnectionDelay: 1000,
+          timeout: 10000,
+        };
+        
+        // Add authentication if token provided
+        if (token) {
+          options.auth = { token };
+          log(`Using authentication token: ${token.substring(0, 10)}...`);
+        } else {
+          log('No authentication token provided', 'warn');
+        }
+        
+        // Create socket connection
+        socket = io(serverUrl, options);
+        
+        // Connection events
+        socket.on('connect', () => {
+          log(`Connected successfully! Socket ID: ${socket.id}`, 'success');
+        });
+        
+        socket.on('connect_error', (error) => {
+          log(`Connection error: ${error.message}`, 'error');
+        });
+        
+        socket.on('disconnect', (reason) => {
+          log(`Disconnected: ${reason}`);
+        });
+        
+        socket.on('error', (error) => {
+          log(`Socket error: ${typeof error === 'string' ? error : error.message}`, 'error');
+        });
+        
+        // Server events
+        socket.onAny((event, ...args) => {
+          if (!['ping', 'pong'].includes(event)) {
+            log(`Received event: ${event}`, 'info');
+            log(`Event data: ${JSON.stringify(args)}`, 'info');
+          }
+        });
+      } catch (error) {
+        log(`Error initializing socket: ${error.message}`, 'error');
+      }
+    });
+    
+    // Disconnect from Socket.IO server
+    disconnectButton.addEventListener('click', () => {
+      if (socket) {
+        log('Disconnecting...');
+        socket.disconnect();
+        socket = null;
+      } else {
+        log('Not connected', 'warn');
+      }
+    });
+    
+    // Register device
+    registerDeviceButton.addEventListener('click', () => {
+      if (!socket || !socket.connected) {
+        log('Not connected to socket server', 'error');
+        return;
+      }
+      
+      const deviceId = deviceIdInput.value.trim();
+      
+      if (!deviceId) {
+        log('Please enter a device ID', 'error');
+        return;
+      }
+      
+      log(`Registering device with ID: ${deviceId}...`);
+      
+      socket.emit('register:display', {
+        deviceId,
+        deviceInfo: {
+          type: 'VizoraTV',
+          platform: navigator.platform,
+          userAgent: navigator.userAgent
+        }
+      });
+    });
+    
+    // Get pairing code
+    getPairingCodeButton.addEventListener('click', () => {
+      if (!socket || !socket.connected) {
+        log('Not connected to socket server', 'error');
+        return;
+      }
+      
+      const deviceId = deviceIdInput.value.trim();
+      
+      if (!deviceId) {
+        log('Please enter a device ID', 'error');
+        return;
+      }
+      
+      log(`Requesting pairing code for device: ${deviceId}...`);
+      
+      socket.emit('pairing:request', { deviceId });
+    });
+    
+    // Generate test token
+    generateTokenButton.addEventListener('click', async () => {
+      const deviceId = deviceIdInput.value.trim();
+      const serverUrl = serverUrlInput.value.trim();
+      
+      if (!deviceId || !serverUrl) {
+        log('Please enter device ID and server URL', 'error');
+        return;
+      }
+      
+      try {
+        log(`Requesting token for device ${deviceId}...`);
+        
+        // Make API request to register device and get token
+        const response = await fetch(`${serverUrl}/api/devices/register`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            deviceId,
+            deviceInfo: {
+              name: `Test Device ${deviceId}`,
+              type: 'Test',
+              platform: navigator.platform,
+              userAgent: navigator.userAgent
+            }
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Server returned ${response.status} ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.token) {
+          tokenInput.value = data.token;
+          log(`Token generated for device ${deviceId}:`, 'success');
+          log(`${data.token.substring(0, 15)}...`, 'success');
+        } else {
+          log(`Failed to generate token: ${data.message || 'Unknown error'}`, 'error');
+        }
+      } catch (error) {
+        log(`Error generating token: ${error.message}`, 'error');
+      }
+    });
+    
+    // Initial log
+    log('Socket.IO Authentication Test initialized');
+  </script>
+</body>
+</html> 

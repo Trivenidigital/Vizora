@@ -1,46 +1,83 @@
-import React from 'react';
-import { render as rtlRender } from '@testing-library/react';
+import React, { ReactElement } from 'react';
+import { render, RenderOptions } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
-import { AuthProvider } from '../../src/contexts/AuthContext';
-import { Toaster } from 'react-hot-toast';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 
-// Mock react-router-dom
-vi.mock('react-router-dom', () => ({
-  ...vi.importActual('react-router-dom'),
-  BrowserRouter: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  useNavigate: () => vi.fn(),
-  useLocation: () => ({ pathname: '/', search: '', hash: '', state: null }),
-  useParams: () => ({}),
-}));
-
-// Mock react-hot-toast
-vi.mock('react-hot-toast', () => ({
-  ...vi.importActual('react-hot-toast'),
-  Toaster: () => null,
-  toast: {
-    success: vi.fn(),
-    error: vi.fn(),
+// Create a new QueryClient for each test
+const createTestQueryClient = () => new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: false,
+      cacheTime: 0,
+      staleTime: 0,
+      refetchOnWindowFocus: false,
+    },
   },
-}));
+});
 
-function render(ui: React.ReactElement, { route = '/' } = {}) {
+// Mock toast functions
+export const mockToast = {
+  success: vi.fn(),
+  error: vi.fn(),
+  loading: vi.fn(),
+  dismiss: vi.fn()
+};
+
+// Auth mock for authentication tests
+export const authMock = {
+  login: vi.fn().mockResolvedValue(undefined),
+  logout: vi.fn().mockResolvedValue(undefined),
+  signup: vi.fn().mockResolvedValue(undefined),
+  user: null,
+  isLoading: false,
+  isAuthenticated: false
+};
+
+// Custom render function with all providers
+export function renderWithProviders(
+  ui: ReactElement,
+  options?: Omit<RenderOptions, 'wrapper'>,
+  route = '/'
+) {
+  const testQueryClient = createTestQueryClient();
   window.history.pushState({}, 'Test page', route);
 
-  return rtlRender(
-    <React.StrictMode>
-      <BrowserRouter>
-        <AuthProvider>
-          {ui}
-          <Toaster />
-        </AuthProvider>
-      </BrowserRouter>
-    </React.StrictMode>
-  );
+  function Wrapper({ children }: { children: React.ReactNode }) {
+    return (
+      <QueryClientProvider client={testQueryClient}>
+        <BrowserRouter>{children}</BrowserRouter>
+      </QueryClientProvider>
+    );
+  }
+
+  return {
+    ...render(ui, { wrapper: Wrapper, ...options }),
+    user: userEvent.setup(),
+    queryClient: testQueryClient,
+  };
 }
 
-// Re-export everything
-export * from '@testing-library/react';
+// Helper for rendering with just the router
+export function renderWithRouter(
+  ui: ReactElement,
+  options?: Omit<RenderOptions, 'wrapper'>,
+  route = '/'
+) {
+  window.history.pushState({}, 'Test page', route);
 
-// Override render method
-export { render }; 
+  function Wrapper({ children }: { children: React.ReactNode }) {
+    return <BrowserRouter>{children}</BrowserRouter>;
+  }
+
+  return {
+    ...render(ui, { wrapper: Wrapper, ...options }),
+    user: userEvent.setup(),
+  };
+}
+
+// Re-export all testing library functions
+export * from '@testing-library/react';
+export { userEvent };
+export { renderWithProviders as render }; 

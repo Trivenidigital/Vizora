@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import api from '../services/api';
 import { toast } from 'react-hot-toast';
+import { TokenManager } from '@vizora/common';
 
 // Get API base URL for logging
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3003/api';
@@ -71,7 +72,8 @@ export const useAuthStore = create<AuthState>()(
                 
                 if (data.success && data.token) {
                   // Store token in localStorage for API requests
-                  localStorage.setItem('vizora_auth_token', data.token);
+                  // localStorage.setItem('token', data.token);
+                  TokenManager.setToken(data.token);
                   console.log('Token stored in localStorage');
                   
                   set({
@@ -103,7 +105,8 @@ export const useAuthStore = create<AuthState>()(
               const { token, user } = response.data;
               
               // Store token in localStorage for API requests
-              localStorage.setItem('vizora_auth_token', token);
+              // localStorage.setItem('token', token);
+              TokenManager.setToken(token);
               console.log('Token stored in localStorage');
               
               set({
@@ -148,7 +151,7 @@ export const useAuthStore = create<AuthState>()(
         // Logout function
         logout: () => {
           // Remove token from localStorage
-          localStorage.removeItem('vizora_auth_token');
+          // localStorage.removeItem('token');
           
           set({
             user: null,
@@ -166,9 +169,29 @@ export const useAuthStore = create<AuthState>()(
             const response = await api.post('/auth/register', userData);
             
             if (response.data && response.data.success) {
-              set({ isLoading: false });
-              toast.success('Registration successful! Please log in.');
-              return true;
+              // Extract the token and user data from registration response
+              const { token, user } = response.data;
+              
+              if (token) {
+                // Automatically log in the user by storing the token and user data
+                // localStorage.setItem('token', token);
+                TokenManager.setToken(token);
+                
+                set({
+                  user: user,
+                  token: token,
+                  isAuthenticated: true,
+                  isLoading: false
+                });
+                
+                toast.success('Registration successful! You are now logged in.');
+                return true;
+              } else {
+                // If token is not provided, still count registration as successful
+                set({ isLoading: false });
+                toast.success('Registration successful! Please log in.');
+                return true;
+              }
             }
             
             set({ isLoading: false });
@@ -191,7 +214,8 @@ export const useAuthStore = create<AuthState>()(
         checkAuth: async () => {
           set({ isLoading: true });
           
-          const token = localStorage.getItem('vizora_auth_token');
+          // const token = localStorage.getItem('token');
+          const token = TokenManager.getToken();
           
           if (!token) {
             set({ 
@@ -218,7 +242,8 @@ export const useAuthStore = create<AuthState>()(
             }
             
             // If response isn't valid, clear auth state
-            localStorage.removeItem('vizora_auth_token');
+            // localStorage.removeItem('token');
+            
             set({ 
               user: null, 
               token: null,
@@ -230,7 +255,8 @@ export const useAuthStore = create<AuthState>()(
             console.error('Auth check error:', error);
             
             // Clear token on auth error
-            localStorage.removeItem('vizora_auth_token');
+            // localStorage.removeItem('token');
+            
             set({ 
               user: null, 
               token: null,

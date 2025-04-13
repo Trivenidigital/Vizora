@@ -3,11 +3,13 @@ import React from 'react';
 interface SpinnerProps {
   size?: 'sm' | 'md' | 'lg';
   color?: 'blue' | 'gray' | 'white';
+  className?: string;
 }
 
 export const Spinner: React.FC<SpinnerProps> = ({ 
   size = 'md', 
-  color = 'blue'
+  color = 'blue',
+  className = ''
 }) => {
   const sizeClasses = {
     sm: 'h-4 w-4',
@@ -23,10 +25,11 @@ export const Spinner: React.FC<SpinnerProps> = ({
   
   return (
     <svg 
-      className={`animate-spin ${sizeClasses[size]} ${colorClasses[color]}`} 
+      className={`animate-spin ${sizeClasses[size]} ${colorClasses[color]} ${className}`} 
       xmlns="http://www.w3.org/2000/svg" 
       fill="none" 
       viewBox="0 0 24 24"
+      aria-hidden="true"
     >
       <circle 
         className="opacity-25" 
@@ -43,4 +46,6 @@ export const Spinner: React.FC<SpinnerProps> = ({
       />
     </svg>
   );
-}; 
+};
+
+export default Spinner; 

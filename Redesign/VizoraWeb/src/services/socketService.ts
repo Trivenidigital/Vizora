@@ -1,235 +1,133 @@
-import { io, Socket } from 'socket.io-client';
-import { API_BASE_URL } from '../config';
-import { authService } from './authService';
+import { ConnectionManager } from '@vizora/common';
+import { tokenManager } from './authService';
 
-interface SocketEvent {
-  type: string;
-  payload: unknown;
-}
+// Event listener type
+type SocketListener = (data: any) => void;
 
-interface SocketMessage {
-  type: string;
-  data: unknown;
-}
+// Create singleton connection manager instance
+const connectionManager = new ConnectionManager(
+  {
+    baseUrl: import.meta.env.VITE_API_URL || '/api',
+    socketPath: import.meta.env.VITE_SOCKET_PATH || '/socket.io',
+    tokenManager,
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    timeout: 20000,
+    autoConnect: false,
+    debug: import.meta.env.DEV,
+  },
+  'VizoraWeb'
+);
 
-interface SocketError {
-  message: string;
-  code?: string;
-  details?: unknown;
-}
-
-export interface DisplayEvent {
-  displayId: string;
-  event: string;
-  data: any;
-}
-
-export interface ContentEvent {
-  contentId: string;
-  event: string;
-  data: any;
-}
-
-export interface SystemEvent {
-  event: string;
-  data: any;
-}
-
+/**
+ * Socket service for managing WebSocket connections
+ */
 class SocketService {
-  private socket: Socket | null = null;
-  private eventHandlers: Map<string, Set<(data: unknown) => void>> = new Map();
-  private messageHandlers: Map<string, Set<(data: unknown) => void>> = new Map();
-  private errorHandlers: Set<(error: SocketError) => void> = new Set();
-  private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
-  private reconnectTimeout = 1000;
-
-  connect(): void {
-    if (this.socket?.connected) {
-      return;
+  private listeners: Map<string, Set<SocketListener>> = new Map();
+  
+  /**
+   * Connect to the WebSocket server
+   */
+  async connect(): Promise<void> {
+    await connectionManager.connect();
+    
+    // Log successful connection in development
+    if (import.meta.env.DEV) {
+      console.log('Socket connected with ID:', connectionManager.getSocketId());
     }
-
-    const token = authService.getToken();
-    if (!token) {
-      console.error('No authentication token available');
-      return;
-    }
-
-    this.socket = io(API_BASE_URL, {
-      auth: { token },
-      reconnection: true,
-      reconnectionAttempts: this.maxReconnectAttempts,
-      reconnectionDelay: this.reconnectTimeout,
-    });
-
-    this.setupEventListeners();
   }
-
+  
+  /**
+   * Disconnect from the WebSocket server
+   */
   disconnect(): void {
-    if (this.socket) {
-      this.socket.disconnect();
-      this.socket = null;
-    }
-  }
-
-  private setupEventListeners(): void {
-    if (!this.socket) return;
-
-    this.socket.on('connect', () => {
-      console.log('Socket connected');
-      this.reconnectAttempts = 0;
-    });
-
-    this.socket.on('disconnect', () => {
+    connectionManager.disconnect();
+    
+    // Log disconnection in development
+    if (import.meta.env.DEV) {
       console.log('Socket disconnected');
-    });
-
-    this.socket.on('connect_error', (error) => {
-      console.error('Socket connection error:', error);
-      this.handleReconnect();
-    });
-
-    this.socket.on('error', (error: SocketError) => {
-      console.error('Socket error:', error);
-      this.errorHandlers.forEach(handler => handler(error));
-    });
-
-    this.socket.on('display:update', (data: DisplayEvent) => {
-      this.emitEvent('display:update', data);
-    });
-
-    this.socket.on('display:status', (data: DisplayEvent) => {
-      this.emitEvent('display:status', data);
-    });
-
-    this.socket.on('display:alert', (data: DisplayEvent) => {
-      this.emitEvent('display:alert', data);
-    });
-
-    this.socket.on('content:update', (data: ContentEvent) => {
-      this.emitEvent('content:update', data);
-    });
-
-    this.socket.on('content:status', (data: ContentEvent) => {
-      this.emitEvent('content:status', data);
-    });
-
-    this.socket.on('system:notification', (data: SystemEvent) => {
-      this.emitEvent('system:notification', data);
-    });
-
-    this.socket.on('system:maintenance', (data: SystemEvent) => {
-      this.emitEvent('system:maintenance', data);
-    });
-
-    this.socket.on('event', (event: SocketEvent) => {
-      const handlers = this.eventHandlers.get(event.type);
-      if (handlers) {
-        handlers.forEach(handler => handler(event.payload));
-      }
-    });
-
-    this.socket.on('message', (message: SocketMessage) => {
-      const handlers = this.messageHandlers.get(message.type);
-      if (handlers) {
-        handlers.forEach(handler => handler(message.data));
-      }
-    });
-  }
-
-  private handleReconnect(): void {
-    if (this.reconnectAttempts < this.maxReconnectAttempts) {
-      this.reconnectAttempts++;
-      setTimeout(() => {
-        this.connect();
-      }, this.reconnectTimeout * this.reconnectAttempts);
-    } else {
-      console.error('Max reconnection attempts reached');
-      this.disconnect();
     }
   }
-
-  onEvent(type: string, handler: (data: unknown) => void): void {
-    if (!this.eventHandlers.has(type)) {
-      this.eventHandlers.set(type, new Set());
-    }
-    this.eventHandlers.get(type)?.add(handler);
-  }
-
-  onMessage(type: string, handler: (data: unknown) => void): void {
-    if (!this.messageHandlers.has(type)) {
-      this.messageHandlers.set(type, new Set());
-    }
-    this.messageHandlers.get(type)?.add(handler);
-  }
-
-  onError(handler: (error: SocketError) => void): void {
-    this.errorHandlers.add(handler);
-  }
-
-  emitEvent(type: string, payload: unknown): void {
-    if (this.socket) {
-      this.socket.emit('event', { type, payload });
-    }
-  }
-
-  emitMessage(type: string, data: unknown): void {
-    if (this.socket) {
-      this.socket.emit('message', { type, data });
-    }
-  }
-
-  removeEventHandlers(type: string): void {
-    this.eventHandlers.delete(type);
-  }
-
-  removeMessageHandlers(type: string): void {
-    this.messageHandlers.delete(type);
-  }
-
-  removeErrorHandler(handler: (error: SocketError) => void): void {
-    this.errorHandlers.delete(handler);
-  }
-
-  subscribeToDisplay(displayId: string): void {
-    this.socket?.emit('display:subscribe', { displayId });
-  }
-
-  unsubscribeFromDisplay(displayId: string): void {
-    this.socket?.emit('display:unsubscribe', { displayId });
-  }
-
-  subscribeToContent(contentId: string): void {
-    this.socket?.emit('content:subscribe', { contentId });
-  }
-
-  unsubscribeFromContent(contentId: string): void {
-    this.socket?.emit('content:unsubscribe', { contentId });
-  }
-
-  subscribeToSystem(): void {
-    this.socket?.emit('system:subscribe');
-  }
-
-  unsubscribeFromSystem(): void {
-    this.socket?.emit('system:unsubscribe');
-  }
-
-  sendDisplayCommand(displayId: string, command: string, data: any): void {
-    this.socket?.emit('display:command', { displayId, command, data });
-  }
-
-  sendContentCommand(contentId: string, command: string, data: any): void {
-    this.socket?.emit('content:command', { contentId, command, data });
-  }
-
-  sendSystemCommand(command: string, data: any): void {
-    this.socket?.emit('system:command', { command, data });
-  }
-
+  
+  /**
+   * Check if the socket is connected
+   * @returns Whether the socket is connected
+   */
   isConnected(): boolean {
-    return this.socket?.connected || false;
+    return connectionManager.isConnected();
+  }
+  
+  /**
+   * Add event listener
+   * @param event Event name
+   * @param callback Event callback
+   */
+  on(event: string, callback: SocketListener): void {
+    // Initialize listener set if needed
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, new Set());
+      
+      // Register the listener with connection manager
+      connectionManager.on(event, (data: any) => {
+        const eventListeners = this.listeners.get(event);
+        if (eventListeners) {
+          eventListeners.forEach(listener => listener(data));
+        }
+      });
+    }
+    
+    // Add the callback to our listeners set
+    const eventListeners = this.listeners.get(event);
+    if (eventListeners) {
+      eventListeners.add(callback);
+    }
+  }
+  
+  /**
+   * Remove event listener
+   * @param event Event name
+   * @param callback Event callback
+   */
+  off(event: string, callback: SocketListener): void {
+    const eventListeners = this.listeners.get(event);
+    if (eventListeners) {
+      eventListeners.delete(callback);
+      
+      // If no listeners left for this event, remove from connection manager
+      if (eventListeners.size === 0) {
+        this.listeners.delete(event);
+        connectionManager.off(event);
+      }
+    }
+  }
+  
+  /**
+   * Emit event to server
+   * @param event Event name
+   * @param data Event data
+   */
+  emit(event: string, data: any): void {
+    connectionManager.emit(event, data);
+  }
+  
+  /**
+   * Get the socket ID
+   * @returns Socket ID or null if not connected
+   */
+  getSocketId(): string | null {
+    return connectionManager.getSocketId();
+  }
+  
+  /**
+   * Get connection latency (ping)
+   * @returns Promise resolving to latency in milliseconds
+   */
+  async getLatency(): Promise<number> {
+    return connectionManager.getLatency();
   }
 }
 
+// Create and export singleton instance
 export const socketService = new SocketService(); 

@@ -1,192 +1,191 @@
+/**
+ * Content Service
+ * Extends the common content service with VizoraWeb-specific functionality
+ */
+
 import { apiService } from './apiService';
+import { 
+  contentService as commonContentService, 
+  Content,
+  ContentMetadata, 
+  UploadProgress 
+} from '@vizora/common/services/contentService';
 
-interface Content {
-  id: string;
-  name: string;
-  type: 'image' | 'video' | 'html' | 'text' | 'playlist';
-  description?: string;
-  duration: number;
-  url: string;
-  thumbnail?: string;
-  metadata: {
-    width?: number;
-    height?: number;
-    format?: string;
-    size?: number;
-    duration?: number;
-    fps?: number;
-    bitrate?: number;
-    codec?: string;
-  };
-  tags: string[];
-  createdAt: string;
-  updatedAt: string;
-  createdBy: {
-    id: string;
-    name: string;
-  };
-  status: 'draft' | 'published' | 'archived';
-  version: number;
-  schedule?: {
-    startTime: string;
-    endTime: string;
-    timezone: string;
-    repeat: 'none' | 'daily' | 'weekly' | 'monthly';
-    daysOfWeek?: number[];
-  };
-}
+// Re-export types from the common content service
+export type { Content, ContentMetadata, UploadProgress } from '@vizora/common/services/contentService';
 
-interface ContentFilters {
-  type?: Content['type'];
-  status?: Content['status'];
-  tags?: string[];
-  search?: string;
-  page?: number;
-  limit?: number;
-}
-
-interface ContentStats {
+/**
+ * Get content with pagination and filtering
+ */
+const getContent = async ({ page = 1, limit = 20, folder = null, search = '', sort = 'createdAt', order = 'desc' }): Promise<{
+  content: Content[];
   total: number;
-  byType: {
-    type: Content['type'];
-    count: number;
-  }[];
-  byStatus: {
-    status: Content['status'];
-    count: number;
-  }[];
-  recent: Content[];
-}
-
-class ContentService {
-  async getContents(filters?: ContentFilters): Promise<{ contents: Content[]; total: number }> {
-    try {
-      const response = await apiService.get<{ contents: Content[]; total: number }>('/contents', {
-        params: filters,
-      });
-      return response;
-    } catch (error) {
-      throw this.handleError(error);
+  page: number;
+  limit: number;
+}> => {
+  try {
+    console.log('[VizoraWeb] Getting content with pagination', { page, limit, folder, search, sort, order });
+    
+    // Build query string
+    const queryParams = new URLSearchParams();
+    queryParams.append('page', page.toString());
+    queryParams.append('limit', limit.toString());
+    if (search) queryParams.append('search', search);
+    if (folder) queryParams.append('folder', folder);
+    queryParams.append('sort', sort);
+    queryParams.append('order', order);
+    
+    const response = await apiService.get(`/content?${queryParams.toString()}`);
+    
+    if (!response || !response.content) {
+      throw new Error('Invalid response from content API');
     }
+    
+    return {
+      content: response.content,
+      total: response.total || response.content.length,
+      page: response.page || page,
+      limit: response.limit || limit
+    };
+  } catch (error) {
+    console.error('[VizoraWeb] ❌ Error getting content:', error);
+    // Return empty array to avoid breaking the UI
+    return {
+      content: [],
+      total: 0,
+      page,
+      limit
+    };
   }
+};
 
-  async getContent(id: string): Promise<Content> {
-    try {
-      const response = await apiService.get<{ content: Content }>(`/contents/${id}`);
-      return response.content;
-    } catch (error) {
-      throw this.handleError(error);
+/**
+ * Get a single content item by ID
+ */
+const getContentById = async (id: string): Promise<Content> => {
+  try {
+    console.log('[VizoraWeb] Getting content by ID', id);
+    
+    const response = await apiService.get(`/content/${id}`);
+    
+    if (!response) {
+      throw new Error('Invalid response from content API');
     }
+    
+    return response;
+  } catch (error) {
+    console.error('[VizoraWeb] ❌ Error getting content by ID:', error);
+    throw error;
   }
+};
 
-  async createContent(data: Omit<Content, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'version'>): Promise<Content> {
-    try {
-      const response = await apiService.post<{ content: Content }>('/contents', data);
-      return response.content;
-    } catch (error) {
-      throw this.handleError(error);
+/**
+ * Get all content (simplified version without pagination)
+ */
+const getContentList = async (): Promise<Content[]> => {
+  try {
+    console.log('[VizoraWeb] Getting content list');
+    
+    const response = await getContent({ limit: 100 });
+    return response.content;
+  } catch (error) {
+    console.error('[VizoraWeb] ❌ Error getting content list:', error);
+    return [];
+  }
+};
+
+/**
+ * Create new content 
+ */
+const createContent = async (contentData: Partial<Content>): Promise<Content> => {
+  try {
+    console.log('[VizoraWeb] Creating content', contentData);
+    
+    const response = await apiService.post('/content', contentData);
+    
+    if (!response) {
+      throw new Error('Invalid response from content API');
     }
+    
+    return response;
+  } catch (error) {
+    console.error('[VizoraWeb] ❌ Error creating content:', error);
+    throw error;
   }
+};
 
-  async updateContent(id: string, data: Partial<Content>): Promise<Content> {
-    try {
-      const response = await apiService.put<{ content: Content }>(`/contents/${id}`, data);
-      return response.content;
-    } catch (error) {
-      throw this.handleError(error);
+/**
+ * Update content
+ */
+const updateContent = async (id: string, contentData: Partial<Content>): Promise<Content> => {
+  try {
+    console.log('[VizoraWeb] Updating content', { id, contentData });
+    
+    const response = await apiService.put(`/content/${id}`, contentData);
+    
+    if (!response) {
+      throw new Error('Invalid response from content API');
     }
+    
+    return response;
+  } catch (error) {
+    console.error('[VizoraWeb] ❌ Error updating content:', error);
+    throw error;
   }
+};
 
-  async deleteContent(id: string): Promise<void> {
-    try {
-      await apiService.delete(`/contents/${id}`);
-    } catch (error) {
-      throw this.handleError(error);
+/**
+ * Delete content
+ */
+const deleteContent = async (id: string): Promise<{ success: boolean }> => {
+  try {
+    console.log('[VizoraWeb] Deleting content', id);
+    
+    const response = await apiService.delete(`/content/${id}`);
+    
+    return { success: true };
+  } catch (error) {
+    console.error('[VizoraWeb] ❌ Error deleting content:', error);
+    throw error;
+  }
+};
+
+/**
+ * Push content to a display
+ */
+const pushContentToDisplay = async (contentId: string, displayId: string, schedulePayload?: any): Promise<any> => {
+  try {
+    console.log('[VizoraWeb] Pushing content to display', { contentId, displayId, schedulePayload });
+    
+    // Use the proper API endpoint for pushing content
+    const response = await apiService.post(`/displays/${displayId}/content`, { 
+      contentId, 
+      schedule: schedulePayload 
+    });
+    
+    if (!response) {
+      throw new Error('Invalid response from display API');
     }
+    
+    console.log('[VizoraWeb] ✅ Content pushed successfully');
+    return response;
+  } catch (error) {
+    console.error('[VizoraWeb] ❌ Error pushing content to display:', error);
+    throw error;
   }
+};
 
-  async getContentStats(): Promise<ContentStats> {
-    try {
-      const response = await apiService.get<{ stats: ContentStats }>('/contents/stats');
-      return response.stats;
-    } catch (error) {
-      throw this.handleError(error);
-    }
-  }
+// Combine the common content service with our web-specific functions
+export const contentService = {
+  ...commonContentService,
+  getContent,
+  getContentById,
+  getContentList,
+  createContent,
+  updateContent,
+  deleteContent,
+  pushContentToDisplay
+};
 
-  async uploadContent(file: File, onProgress?: (progress: number) => void): Promise<Content> {
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const response = await apiService.post<{ content: Content }>('/contents/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-        onUploadProgress: (progressEvent) => {
-          if (onProgress && progressEvent.total) {
-            const progress = (progressEvent.loaded / progressEvent.total) * 100;
-            onProgress(progress);
-          }
-        },
-      });
-      return response.content;
-    } catch (error) {
-      throw this.handleError(error);
-    }
-  }
-
-  async publishContent(id: string): Promise<Content> {
-    try {
-      const response = await apiService.post<{ content: Content }>(`/contents/${id}/publish`);
-      return response.content;
-    } catch (error) {
-      throw this.handleError(error);
-    }
-  }
-
-  async archiveContent(id: string): Promise<Content> {
-    try {
-      const response = await apiService.post<{ content: Content }>(`/contents/${id}/archive`);
-      return response.content;
-    } catch (error) {
-      throw this.handleError(error);
-    }
-  }
-
-  async duplicateContent(id: string): Promise<Content> {
-    try {
-      const response = await apiService.post<{ content: Content }>(`/contents/${id}/duplicate`);
-      return response.content;
-    } catch (error) {
-      throw this.handleError(error);
-    }
-  }
-
-  async getContentVersions(id: string): Promise<Content[]> {
-    try {
-      const response = await apiService.get<{ versions: Content[] }>(`/contents/${id}/versions`);
-      return response.versions;
-    } catch (error) {
-      throw this.handleError(error);
-    }
-  }
-
-  async restoreContentVersion(id: string, version: number): Promise<Content> {
-    try {
-      const response = await apiService.post<{ content: Content }>(`/contents/${id}/versions/${version}/restore`);
-      return response.content;
-    } catch (error) {
-      throw this.handleError(error);
-    }
-  }
-
-  private handleError(error: unknown): Error {
-    if (error instanceof Error) {
-      return error;
-    }
-    return new Error('An unexpected error occurred');
-  }
-}
-
-export default new ContentService(); 
+// Log success
+console.log('[VizoraWeb] ✅ Initialized contentService correctly'); 

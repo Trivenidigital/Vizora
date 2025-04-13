@@ -1,0 +1,172 @@
+
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Vizora Socket Diagnostic</title>
+      <script src="/socket.io/socket.io.js"></script>
+      <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .log { background: #f5f5f5; padding: 10px; margin: 10px 0; border: 1px solid #ddd; height: 300px; overflow-y: auto; font-family: monospace; }
+        button { padding: 10px; margin: 5px; background: #4CAF50; color: white; border: none; cursor: pointer; }
+        button:disabled { background: #cccccc; cursor: not-allowed; }
+        .input-group { margin: 10px 0; }
+        .token-input { width: 100%; padding: 10px; margin: 5px 0; }
+        .status { font-weight: bold; margin: 10px 0; }
+        .status.connected { color: green; }
+        .status.disconnected { color: red; }
+        .status.error { color: orange; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1>Vizora Socket.IO Diagnostic Tool</h1>
+        <div class="status disconnected" id="status">Disconnected</div>
+        
+        <div class="input-group">
+          <label>Authentication Token:</label>
+          <input type="text" id="authToken" class="token-input" placeholder="Enter token or leave empty for anonymous">
+        </div>
+        
+        <button id="connectBtn">Connect</button>
+        <button id="disconnectBtn" disabled>Disconnect</button>
+        
+        <h3>Event Log</h3>
+        <div class="log" id="log"></div>
+        
+        <h3>Diagnostics</h3>
+        <div>
+          <button id="checkApi">Check API Status</button>
+          <button id="getTokenBtn">Get Demo Token</button>
+          <button id="testEvent">Send Test Event</button>
+        </div>
+      </div>
+      
+      <script>
+        const logEl = document.getElementById('log');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const authTokenEl = document.getElementById('authToken');
+        const statusEl = document.getElementById('status');
+        const checkApiBtn = document.getElementById('checkApi');
+        const testEventBtn = document.getElementById('testEvent');
+        const getTokenBtn = document.getElementById('getTokenBtn');
+        
+        let socket = null;
+        
+        function log(message, type = 'info') {
+          const now = new Date().toISOString();
+          const entry = document.createElement('div');
+          entry.className = `log-entry ${type}`;
+          entry.innerHTML = `[${now}] <strong>${type.toUpperCase()}</strong>: ${message}`;
+          logEl.appendChild(entry);
+          logEl.scrollTop = logEl.scrollHeight;
+        }
+        
+        function updateStatus(status, cssClass) {
+          statusEl.textContent = status;
+          statusEl.className = `status ${cssClass}`;
+        }
+        
+        connectBtn.addEventListener('click', () => {
+          try {
+            const token = authTokenEl.value.trim();
+            const options = {
+              transports: ['websocket', 'polling'],
+              reconnection: true,
+              reconnectionDelay: 1000,
+              reconnectionAttempts: 5,
+              timeout: 10000
+            };
+            
+            if (token) {
+              options.auth = { token };
+              log(`Connecting with token: ${token.substring(0, 10)}...`);
+            } else {
+              log('Connecting without authentication token');
+            }
+            
+            socket = io('', options);
+            
+            socket.on('connect', () => {
+              log(`Connected with ID: ${socket.id}`, 'success');
+              updateStatus('Connected', 'connected');
+              connectBtn.disabled = true;
+              disconnectBtn.disabled = false;
+              testEventBtn.disabled = false;
+            });
+            
+            socket.on('disconnect', (reason) => {
+              log(`Disconnected: ${reason}`, 'warning');
+              updateStatus(`Disconnected: ${reason}`, 'disconnected');
+              connectBtn.disabled = false;
+              disconnectBtn.disabled = true;
+              testEventBtn.disabled = true;
+            });
+            
+            socket.on('connect_error', (error) => {
+              log(`Connection error: ${error.message}`, 'error');
+              updateStatus(`Error: ${error.message}`, 'error');
+            });
+            
+            socket.onAny((event, ...args) => {
+              log(`Event received: ${event} - ${JSON.stringify(args)}`);
+            });
+          } catch (error) {
+            log(`Error initializing socket: ${error.message}`, 'error');
+          }
+        });
+        
+        disconnectBtn.addEventListener('click', () => {
+          if (socket) {
+            socket.disconnect();
+            log('Manually disconnected', 'info');
+            connectBtn.disabled = false;
+            disconnectBtn.disabled = true;
+            testEventBtn.disabled = true;
+          }
+        });
+        
+        testEventBtn.addEventListener('click', () => {
+          if (socket && socket.connected) {
+            socket.emit('ping', { timestamp: Date.now() });
+            log('Sent ping event', 'info');
+          } else {
+            log('Cannot send event: Socket not connected', 'error');
+          }
+        });
+        
+        checkApiBtn.addEventListener('click', async () => {
+          try {
+            log('Checking API status...', 'info');
+            const response = await fetch('/api/health');
+            const data = await response.json();
+            log(`API Status: ${JSON.stringify(data)}`, 'success');
+          } catch (error) {
+            log(`API Error: ${error.message}`, 'error');
+          }
+        });
+        
+        getTokenBtn.addEventListener('click', async () => {
+          try {
+            log('Requesting demo token...', 'info');
+            const response = await fetch('/api/auth/demo-token');
+            if (response.ok) {
+              const data = await response.json();
+              authTokenEl.value = data.token;
+              log(`Demo token received: ${data.token.substring(0, 10)}...`, 'success');
+            } else {
+              log(`Failed to get demo token: ${response.status} ${response.statusText}`, 'error');
+            }
+          } catch (error) {
+            log(`Error getting demo token: ${error.message}`, 'error');
+          }
+        });
+        
+        // Initialize
+        log('Socket diagnostic tool loaded', 'info');
+        log('Click "Connect" to establish a socket connection', 'info');
+      </script>
+    </body>
+    </html>
+  

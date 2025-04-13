@@ -1,134 +1,185 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { toast } from 'react-hot-toast';
-import { useAuth } from '../../contexts/AuthContext';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { 
+  Box, Button, Checkbox, Container, Divider, FormControl, 
+  FormLabel, Heading, HStack, Input, InputGroup, InputRightElement, 
+  Stack, Text, useColorModeValue, Link, Alert, AlertIcon, AlertTitle, AlertDescription,
+  useToast, Flex
+} from '@chakra-ui/react';
+import { ViewIcon, ViewOffIcon } from '@chakra-ui/icons';
+import { useAuth } from '@/contexts/AuthContext';
+import Logo from '@/components/ui/Logo';
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
-  const { login, loading: isLoading, isAuthenticated } = useAuth();
+  const [showPassword, setShowPassword] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [isServiceUnavailable, setIsServiceUnavailable] = useState(false);
+  
+  const { login, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
-
-  // Redirect if already authenticated
+  const toast = useToast();
+  
   useEffect(() => {
     if (isAuthenticated) {
       navigate('/dashboard');
     }
   }, [isAuthenticated, navigate]);
-
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email || !password) {
-      toast.error('Please enter both email and password');
+    // Reset any previous errors
+    setLoginError(null);
+    setIsServiceUnavailable(false);
+    
+    if (!email.trim() || !password.trim()) {
+      setLoginError('Please enter both email and password');
       return;
     }
     
     try {
+      // Login with timeout handling built into the AuthContext
       await login(email, password);
-      // No need to navigate here as the login function will handle it
+      // If successful, useEffect will handle redirect
     } catch (error) {
-      // The login function in AuthContext will handle errors
-      console.error('Login error:', error);
+      console.error('Login error caught in page component:', error);
+      
+      // Display a user-friendly error message
+      if (error instanceof Error) {
+        const errorMessage = error.message;
+        setLoginError(errorMessage);
+        
+        // Check if this is a service unavailable error
+        if (errorMessage.includes('unavailable') || errorMessage.includes('service')) {
+          setIsServiceUnavailable(true);
+          
+          // Show a toast notification as well
+          toast({
+            title: 'Authentication Service Unavailable',
+            description: 'Our authentication service is temporarily down. Please try again later.',
+            status: 'error',
+            duration: 5000,
+            isClosable: true,
+            position: 'top'
+          });
+        }
+      } else {
+        setLoginError('Login failed. Please try again later.');
+      }
     }
   };
-
+  
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Sign in to Vizora
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Access your digital signage management dashboard
-          </p>
-        </div>
+    <Flex direction="column" width="100%">
+      <Stack spacing="6">
+        {isServiceUnavailable ? (
+          <Alert 
+            status="error" 
+            variant="subtle"
+            flexDirection="column"
+            alignItems="center"
+            justifyContent="center"
+            textAlign="center"
+            borderRadius="md"
+            p={4}
+          >
+            <AlertIcon boxSize="40px" mr={0} />
+            <AlertTitle mt={4} mb={1} fontSize="lg">
+              Authentication Service Unavailable
+            </AlertTitle>
+            <AlertDescription maxWidth="sm">
+              Our system is currently experiencing technical difficulties.
+              Please try again later or contact support if the issue persists.
+            </AlertDescription>
+          </Alert>
+        ) : loginError ? (
+          <Alert status="error" borderRadius="md">
+            <AlertIcon />
+            <AlertDescription>{loginError}</AlertDescription>
+          </Alert>
+        ) : null}
         
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm -space-y-px">
-            <div>
-              <label htmlFor="email-address" className="sr-only">
-                Email address
-              </label>
-              <input
-                id="email-address"
-                name="email"
+        <form onSubmit={handleSubmit}>
+          <Stack spacing="5">
+            <FormControl isRequired>
+              <FormLabel htmlFor="email">Email</FormLabel>
+              <Input
+                id="email"
                 type="email"
-                autoComplete="email"
-                required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="Email address"
-                data-testid="email-input"
+                disabled={isLoading || isServiceUnavailable}
               />
-            </div>
-            <div>
-              <label htmlFor="password" className="sr-only">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="Password"
-                data-testid="password-input"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <input
-                id="remember-me"
-                name="remember-me"
-                type="checkbox"
-                checked={rememberMe}
+            </FormControl>
+            <FormControl isRequired>
+              <FormLabel htmlFor="password">Password</FormLabel>
+              <InputGroup>
+                <Input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={isLoading || isServiceUnavailable}
+                />
+                <InputRightElement h={'full'}>
+                  <Button
+                    variant={'ghost'}
+                    onClick={() => setShowPassword(!showPassword)}
+                    disabled={isServiceUnavailable}
+                  >
+                    {showPassword ? <ViewIcon /> : <ViewOffIcon />}
+                  </Button>
+                </InputRightElement>
+              </InputGroup>
+            </FormControl>
+            
+            <HStack justify="space-between">
+              <Checkbox
+                isChecked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                data-testid="remember-checkbox"
-              />
-              <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
+                disabled={isLoading || isServiceUnavailable}
+              >
                 Remember me
-              </label>
-            </div>
-
-            <div className="text-sm">
-              <Link to="/forgot-password" className="font-medium text-blue-600 hover:text-blue-500">
-                Forgot your password?
+              </Checkbox>
+              <Link as={RouterLink} to="/forgot-password" color="blue.500" fontSize="sm">
+                Forgot password?
               </Link>
-            </div>
-          </div>
-
-          <div>
-            <button
+            </HStack>
+            
+            <Button
               type="submit"
-              disabled={isLoading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-              data-testid="login-button"
+              colorScheme="blue"
+              isLoading={isLoading}
+              loadingText="Signing in..."
+              size="lg"
+              w="100%"
+              mt={4}
+              disabled={isLoading || isServiceUnavailable || !email.trim() || !password.trim()}
             >
-              {isLoading ? 'Signing in...' : 'Sign in'}
-            </button>
-          </div>
-          
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
-              Don't have an account?{' '}
-              <Link to="/signup" className="font-medium text-blue-600 hover:text-blue-500">
-                Sign up now
-              </Link>
-            </p>
-          </div>
+              Sign in
+            </Button>
+          </Stack>
         </form>
-      </div>
-    </div>
+        
+        <HStack my={4}>
+          <Divider />
+          <Text color="gray.500" fontSize="sm" whiteSpace="nowrap">
+            OR
+          </Text>
+          <Divider />
+        </HStack>
+        
+        <Text textAlign="center">
+          Don't have an account?{' '}
+          <Link as={RouterLink} to="/register" color="blue.500">
+            Sign up
+          </Link>
+        </Text>
+      </Stack>
+    </Flex>
   );
 };
 

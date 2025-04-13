@@ -1,0 +1,3 @@
+#!/bin/bash
+TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3ZjE5ZTM4ODZjZTFiZTYxYTY3YzgyOSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc0Mzg4ODA2NywiZXhwIjoxNzQ0NDkyODY3fQ.uuJr9eWFSg3jG4eoNBWoSPQOxnblro7za44B8dfWrYI"
+curl -H "Authorization: Bearer $TOKEN" http://localhost:3003/api/protected-route

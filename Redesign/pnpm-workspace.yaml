@@ -1,0 +1,6 @@
+packages:
+  - 'common'
+  - 'VizoraTV'
+  - 'VizoraDisplay'
+  - 'VizoraWeb'
+  - 'VizoraMiddleware' 

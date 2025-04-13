@@ -3,9 +3,9 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'react-hot-toast';
 import { DisplaySettings, DisplaySettingsSchema, RESOLUTION_OPTIONS, PLAYBACK_MODES } from '@/types/display';
-import { useSocket } from '@/hooks/useSocket';
 import { useAuth } from '@/hooks/useAuth';
 import '@/components/DeviceSettingsForm.css';
+import { useConnectionState } from '@vizora/common';
 
 interface DeviceSettingsFormProps {
   displayId: string;
@@ -20,7 +20,6 @@ export const DeviceSettingsForm: React.FC<DeviceSettingsFormProps> = ({
 }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [health, setHealth] = useState<DisplayHealth | null>(null);
-  const { socket } = useSocket();
   const { user } = useAuth();
 
   const {
@@ -39,43 +38,15 @@ export const DeviceSettingsForm: React.FC<DeviceSettingsFormProps> = ({
 
   // Listen for real-time updates
   useEffect(() => {
-    if (!socket) return;
-
-    const handleSettingsUpdate = (data: { displayId: string; settings: DisplaySettings }) => {
-      if (data.displayId === displayId) {
-        // Update form with new settings
-        Object.entries(data.settings).forEach(([key, value]) => {
-          setValue(key as keyof DisplaySettings, value, { shouldDirty: false });
-        });
-        toast.success('Settings updated in real-time');
-      }
-    };
-
-    const handleHealthUpdate = (data: { displayId: string; health: DisplayHealth }) => {
-      if (data.displayId === displayId) {
-        setHealth(data.health);
-      }
-    };
-
-    socket.on('display:settings:update', handleSettingsUpdate);
-    socket.on('display:health:update', handleHealthUpdate);
-
-    return () => {
-      socket.off('display:settings:update', handleSettingsUpdate);
-      socket.off('display:health:update', handleHealthUpdate);
-    };
-  }, [socket, displayId, setValue]);
+    // Remove direct socket.io calls
+    // socket.on('display:settings:update', handleSettingsUpdate);
+    // socket.on('display:health:update', handleHealthUpdate);
+  }, [setValue]);
 
   const onSubmit = async (data: DisplaySettings) => {
     try {
       setIsSaving(true);
       
-      // Emit settings update via socket
-      socket?.emit('display:settings:update', {
-        displayId,
-        settings: data
-      });
-
       // Call API to persist settings
       const response = await fetch(`/api/displays/${displayId}/settings`, {
         method: 'PUT',

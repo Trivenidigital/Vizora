@@ -1,10 +1,47 @@
-// API Configuration
-export const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001';
+/**
+ * Application Configuration
+ * 
+ * This file centralizes all configuration variables from environment.
+ * Always use this config object instead of accessing import.meta.env directly.
+ * 
+ * IMPORTANT ARCHITECTURE NOTE:
+ * - The frontend NEVER connects directly to MongoDB Atlas
+ * - All database access MUST go through VizoraMiddleware
+ * - Data flow: VizoraWeb → VizoraMiddleware → MongoDB Atlas
+ */
 
-// Authentication Configuration
-export const AUTH_TOKEN_KEY = 'vizora_auth_token';
-export const AUTH_USER_KEY = 'vizora_user';
-export const AUTH_REFRESH_TOKEN_KEY = 'vizora_refresh_token';
+// API Configuration
+export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3003/api';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3003';
+export const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3003';
+
+// Authentication
+export const AUTH_TOKEN_KEY = import.meta.env.VITE_AUTH_TOKEN_KEY || 'token';
+export const AUTH_USER_KEY = import.meta.env.VITE_AUTH_USER_KEY || 'vizora_user';
+export const AUTH_EXPIRE_DAYS = Number(import.meta.env.VITE_AUTH_EXPIRE_DAYS || 7);
+
+// Database (Documentation only - frontend doesn't connect directly)
+export const DB_PROVIDER = import.meta.env.VITE_DB_PROVIDER || 'atlas';
+export const IS_USING_ATLAS = DB_PROVIDER === 'atlas';
+
+// Feature Flags
+export const ENABLE_ANALYTICS = import.meta.env.VITE_ENABLE_ANALYTICS === 'true';
+export const ENABLE_NOTIFICATIONS = import.meta.env.VITE_ENABLE_NOTIFICATIONS === 'true';
+
+// Branding
+export const APP_NAME = import.meta.env.VITE_APP_NAME || 'Vizora';
+export const COMPANY_NAME = import.meta.env.VITE_COMPANY_NAME || 'Vizora, Inc.';
+export const CONTACT_EMAIL = import.meta.env.VITE_CONTACT_EMAIL || 'support@vizora.com';
+
+// Environment Detection
+export const IS_PRODUCTION = import.meta.env.PROD;
+export const IS_DEVELOPMENT = import.meta.env.DEV;
+
+// Version
+export const APP_VERSION = import.meta.env.VITE_APP_VERSION || '1.0.0';
+
+// Error Reporting
+export const ENABLE_ERROR_REPORTING = IS_PRODUCTION;
 
 // Display Configuration
 export const DISPLAY_REFRESH_INTERVAL = 30000; // 30 seconds
@@ -43,4 +80,37 @@ export const FEATURES = {
   API_ACCESS: true,
   BACKUP_RESTORE: true,
   SYSTEM_HEALTH: true,
-} as const; 
+} as const;
+
+// Default export for convenience
+export default {
+  api: {
+    url: API_URL,
+    baseUrl: API_BASE_URL,
+    socketUrl: SOCKET_URL,
+  },
+  auth: {
+    tokenKey: AUTH_TOKEN_KEY,
+    userKey: AUTH_USER_KEY,
+    expireDays: AUTH_EXPIRE_DAYS,
+  },
+  db: {
+    provider: DB_PROVIDER,
+    isUsingAtlas: IS_USING_ATLAS,
+  },
+  features: {
+    enableAnalytics: ENABLE_ANALYTICS,
+    enableNotifications: ENABLE_NOTIFICATIONS,
+  },
+  branding: {
+    appName: APP_NAME,
+    companyName: COMPANY_NAME,
+    contactEmail: CONTACT_EMAIL,
+  },
+  environment: {
+    isProduction: IS_PRODUCTION,
+    isDevelopment: IS_DEVELOPMENT,
+  },
+  version: APP_VERSION,
+  enableErrorReporting: ENABLE_ERROR_REPORTING,
+}; 

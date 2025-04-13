@@ -163,7 +163,7 @@ export const FeaturesPage: FC = () => {
             <div className="md:w-1/2 mt-8 md:mt-0">
               <div className="relative bg-white p-3 rounded-2xl shadow-lg border border-neutral-200">
                 <img
-                  src="https://via.placeholder.com/800x500/F3F4F6/A3A3A3?text=Dashboard+Screenshot"
+                  src="/assets/dashboard-screenshot.png"
                   alt="Vizora Dashboard"
                   className="rounded-lg w-full"
                 />

@@ -5,7 +5,7 @@ interface LogoProps {
   variant?: 'default' | 'white';
 }
 
-export const Logo: FC<LogoProps> = ({ className = '', variant = 'default' }) => {
+const Logo: FC<LogoProps> = ({ className = '', variant = 'default' }) => {
   const colorClass = variant === 'white' ? 'text-white' : 'text-purple-600';
 
   return (
@@ -36,4 +36,6 @@ export const Logo: FC<LogoProps> = ({ className = '', variant = 'default' }) => 
       </span>
     </div>
   );
-}; 
+};
+
+export default Logo; 

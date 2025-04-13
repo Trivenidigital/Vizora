@@ -1,20 +1,23 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import '@/styles/pages/LoginPage.css';
 
 export const LoginPage = () => {
-  const { login, loading, error } = useAuth();
-  const navigate = useNavigate();
+  const { login, isLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const success = await login(email, password);
-    if (success) {
-      navigate('/dashboard');
+    setError(null);
+    try {
+      await login(email, password);
+      // Navigation is handled inside login method in AuthContext
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to login');
     }
   };
 
@@ -76,12 +79,12 @@ export const LoginPage = () => {
             
             <button
               type="submit"
-              disabled={loading}
+              disabled={isLoading}
               className={`w-full py-2 px-4 border border-transparent rounded-lg shadow-sm text-white bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 ${
-                loading ? 'opacity-50 cursor-not-allowed' : ''
+                isLoading ? 'opacity-50 cursor-not-allowed' : ''
               }`}
             >
-              {loading ? 'Signing in...' : 'Sign in'}
+              {isLoading ? 'Signing in...' : 'Sign in'}
             </button>
           </form>
           

@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TV App Debug Tool</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: #f7f9fc;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        h1, h2, h3 {
+            color: #333;
+        }
+        pre {
+            background-color: #f1f1f1;
+            padding: 10px;
+            border-radius: 5px;
+            overflow: auto;
+            max-height: 300px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        input, select {
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            width: 100%;
+        }
+        .log-item {
+            margin-bottom: 5px;
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .warning { color: orange; }
+        .info { color: blue; }
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        .connected { background-color: green; }
+        .disconnected { background-color: red; }
+        .registered { background-color: blue; }
+        .paired { background-color: purple; }
+    </style>
+</head>
+<body>
+    <h1>TV App Debug Tool</h1>
+    
+    <div class="card">
+        <h2>Connection Status: <span id="connection-status">Disconnected</span> <span class="status-indicator disconnected" id="status-dot"></span></h2>
+        <div>
+            <input type="text" id="server-url" value="http://localhost:3003" placeholder="Socket.IO Server URL">
+            <button id="connect-btn">Connect</button>
+            <button id="disconnect-btn" disabled>Disconnect</button>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="card">
+            <h2>Registration</h2>
+            <div>
+                <label for="display-id">Display ID/QR Code:</label>
+                <input type="text" id="display-id" placeholder="Leave empty for auto-generated">
+                
+                <label for="display-name">Display Name:</label>
+                <input type="text" id="display-name" value="Debug TV">
+                
+                <label for="location">Location:</label>
+                <input type="text" id="location" value="Debug Location">
+                
+                <button id="register-btn" disabled>Register Display</button>
+            </div>
+            
+            <div style="margin-top: 20px;">
+                <h3>Current Status:</h3>
+                <pre id="registration-status">Not registered</pre>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>Pairing</h2>
+            <div>
+                <p>Pairing Status: <span id="pairing-status">Not paired</span></p>
+                
+                <h3>Received Pairing Data:</h3>
+                <pre id="pairing-data">No pairing data received</pre>
+                
+                <button id="test-pairing-btn" disabled>Trigger Test Pairing</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Add Content Push Section -->
+    <div class="card">
+        <h2>Content Push</h2>
+        <div>
+            <h3>Push Test Content</h3>
+            <div>
+                <label for="content-type">Content Type:</label>
+                <select id="content-type">
+                    <option value="image">Image</option>
+                    <option value="video">Video</option>
+                    <option value="webpage">Webpage</option>
+                    <option value="stream">Stream</option>
+                </select>
+                
+                <button id="push-content-btn" disabled>Push Test Content</button>
+            </div>
+            
+            <h3>Custom Content URL</h3>
+            <div>
+                <label for="custom-content-type">Content Type:</label>
+                <select id="custom-content-type">
+                    <option value="image">Image</option>
+                    <option value="video">Video</option>
+                    <option value="webpage">Webpage</option>
+                    <option value="stream">Stream</option>
+                </select>
+                
+                <label for="custom-content-url">URL:</label>
+                <input type="text" id="custom-content-url" placeholder="Enter content URL">
+                
+                <label for="custom-content-title">Title:</label>
+                <input type="text" id="custom-content-title" placeholder="Enter content title">
+                
+                <button id="push-custom-content-btn" disabled>Push Custom Content</button>
+            </div>
+            
+            <h3>Current Content:</h3>
+            <pre id="current-content">No content pushed yet</pre>
+        </div>
+    </div>
+    
+    <div class="card">
+        <h2>Event Log</h2>
+        <button id="clear-log-btn">Clear Log</button>
+        <div id="event-log" style="max-height: 300px; overflow-y: auto;"></div>
+    </div>
+    
+    <div class="card">
+        <h2>Advanced Debug Options</h2>
+        <div>
+            <button id="emit-test-event">Emit Test Event</button>
+            <button id="join-room">Join Custom Room</button>
+            <button id="get-rooms">Get Joined Rooms</button>
+        </div>
+        
+        <div style="margin-top: 20px;">
+            <h3>Custom Event Listener:</h3>
+            <input type="text" id="custom-event" placeholder="Enter event name to listen for">
+            <button id="add-listener">Add Listener</button>
+            <div>
+                <p>Active Listeners:</p>
+                <ul id="active-listeners"></ul>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // DOM Elements
+        const connectBtn = document.getElementById('connect-btn');
+        const disconnectBtn = document.getElementById('disconnect-btn');
+        const registerBtn = document.getElementById('register-btn');
+        const testPairingBtn = document.getElementById('test-pairing-btn');
+        const clearLogBtn = document.getElementById('clear-log-btn');
+        const emitTestEventBtn = document.getElementById('emit-test-event');
+        const joinRoomBtn = document.getElementById('join-room');
+        const getRoomsBtn = document.getElementById('get-rooms');
+        const addListenerBtn = document.getElementById('add-listener');
+        
+        const serverUrlInput = document.getElementById('server-url');
+        const displayIdInput = document.getElementById('display-id');
+        const displayNameInput = document.getElementById('display-name');
+        const locationInput = document.getElementById('location');
+        const customEventInput = document.getElementById('custom-event');
+        
+        const connectionStatusEl = document.getElementById('connection-status');
+        const statusDotEl = document.getElementById('status-dot');
+        const pairingStatusEl = document.getElementById('pairing-status');
+        const registrationStatusEl = document.getElementById('registration-status');
+        const pairingDataEl = document.getElementById('pairing-data');
+        const eventLogEl = document.getElementById('event-log');
+        const activeListenersEl = document.getElementById('active-listeners');
+        
+        const contentTypeSelect = document.getElementById('content-type');
+        const pushContentBtn = document.getElementById('push-content-btn');
+        const customContentTypeSelect = document.getElementById('custom-content-type');
+        const customContentUrlInput = document.getElementById('custom-content-url');
+        const customContentTitleInput = document.getElementById('custom-content-title');
+        const pushCustomContentBtn = document.getElementById('push-custom-content-btn');
+        const currentContentEl = document.getElementById('current-content');
+        
+        // State
+        let socket = null;
+        let displayId = '';
+        let registrationData = null;
+        let pairingData = null;
+        let activeListeners = [];
+        
+        let currentContent = null;
+        
+        // Helper functions
+        function log(message, type = 'info') {
+            const logItem = document.createElement('div');
+            logItem.classList.add('log-item');
+            logItem.classList.add(type);
+            
+            const timestamp = new Date().toISOString();
+            logItem.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+            
+            eventLogEl.prepend(logItem);
+        }
+        
+        function updateConnectionStatus(status) {
+            connectionStatusEl.textContent = status;
+            statusDotEl.className = 'status-indicator ' + status.toLowerCase();
+            
+            // Update button states
+            if (status === 'Connected' || status === 'Registered' || status === 'Paired') {
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                registerBtn.disabled = false;
+                testPairingBtn.disabled = false;
+            } else {
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                registerBtn.disabled = true;
+                testPairingBtn.disabled = true;
+            }
+            
+            // Update content push buttons
+            if (status === 'Connected' || status === 'Registered' || status === 'Paired') {
+                pushContentBtn.disabled = false;
+                pushCustomContentBtn.disabled = false;
+            } else {
+                pushContentBtn.disabled = true;
+                pushCustomContentBtn.disabled = true;
+            }
+        }
+        
+        function updateRegistrationStatus(data) {
+            registrationData = data;
+            registrationStatusEl.textContent = JSON.stringify(data, null, 2);
+            
+            if (data && data.displayId) {
+                updateConnectionStatus('Registered');
+                displayId = data.displayId;
+            }
+        }
+        
+        function updatePairingStatus(data) {
+            pairingData = data;
+            pairingDataEl.textContent = JSON.stringify(data, null, 2);
+            
+            if (data && (data.userId || (data.user && data.user.id))) {
+                pairingStatusEl.textContent = 'Paired';
+                updateConnectionStatus('Paired');
+            }
+        }
+        
+        function setupSocket(url) {
+            if (socket) {
+                socket.disconnect();
+            }
+            
+            try {
+                socket = io(url, {
+                    reconnection: true,
+                    reconnectionAttempts: 5,
+                    reconnectionDelay: 1000,
+                    reconnectionDelayMax: 5000,
+                    timeout: 10000,
+                    transports: ['websocket', 'polling']
+                });
+                
+                // Core socket events
+                socket.on('connect', () => {
+                    log(`Connected to server with socket ID: ${socket.id}`, 'success');
+                    updateConnectionStatus('Connected');
+                });
+                
+                socket.on('disconnect', (reason) => {
+                    log(`Disconnected from server: ${reason}`, 'warning');
+                    updateConnectionStatus('Disconnected');
+                });
+                
+                socket.on('connect_error', (error) => {
+                    log(`Connection error: ${error.message}`, 'error');
+                    updateConnectionStatus('Error');
+                });
+                
+                socket.on('error', (error) => {
+                    log(`Socket error: ${error.message}`, 'error');
+                });
+                
+                // Business events
+                socket.on('welcome', (data) => {
+                    log(`Received welcome message: ${JSON.stringify(data)}`, 'info');
+                });
+                
+                // Registration events - multiple formats
+                socket.on('display:registered', (data) => {
+                    log(`Received display:registered event: ${JSON.stringify(data)}`, 'success');
+                    updateRegistrationStatus(data);
+                });
+                
+                socket.on('display_registered', (data) => {
+                    log(`Received display_registered event: ${JSON.stringify(data)}`, 'success');
+                    updateRegistrationStatus(data);
+                });
+                
+                socket.on('registered', (data) => {
+                    log(`Received registered event: ${JSON.stringify(data)}`, 'success');
+                    updateRegistrationStatus(data);
+                });
+                
+                // Pairing events - multiple formats
+                socket.on('display:paired', (data) => {
+                    log(`Received display:paired event: ${JSON.stringify(data)}`, 'success');
+                    updatePairingStatus(data);
+                });
+                
+                socket.on('display_paired', (data) => {
+                    log(`Received display_paired event: ${JSON.stringify(data)}`, 'success');
+                    updatePairingStatus(data);
+                });
+                
+                socket.on('paired', (data) => {
+                    log(`Received paired event: ${JSON.stringify(data)}`, 'success');
+                    updatePairingStatus(data);
+                });
+                
+                socket.on('display:paired:broadcast', (data) => {
+                    log(`Received display:paired:broadcast event: ${JSON.stringify(data)}`, 'success');
+                    updatePairingStatus(data);
+                });
+                
+                // Catch all events
+                socket.onAny((eventName, ...args) => {
+                    log(`Received event: ${eventName} with data: ${JSON.stringify(args)}`, 'info');
+                });
+                
+                return true;
+            } catch (error) {
+                log(`Error creating socket: ${error.message}`, 'error');
+                return false;
+            }
+        }
+        
+        // Event Handlers
+        connectBtn.addEventListener('click', () => {
+            const url = serverUrlInput.value;
+            log(`Connecting to server: ${url}`);
+            
+            if (setupSocket(url)) {
+                log('Socket setup successful', 'info');
+            } else {
+                log('Socket setup failed', 'error');
+            }
+        });
+        
+        disconnectBtn.addEventListener('click', () => {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+                log('Manually disconnected from server', 'info');
+                updateConnectionStatus('Disconnected');
+            }
+        });
+        
+        registerBtn.addEventListener('click', () => {
+            if (!socket || !socket.connected) {
+                log('Cannot register - socket not connected', 'error');
+                return;
+            }
+            
+            // Generate random ID if not provided
+            let deviceId = displayIdInput.value;
+            if (!deviceId) {
+                deviceId = 'DEBUG_' + Math.random().toString(36).substring(2, 8).toUpperCase();
+                displayIdInput.value = deviceId;
+            }
+            
+            const data = {
+                deviceId,
+                name: displayNameInput.value,
+                location: locationInput.value,
+                qrCode: deviceId,
+                status: 'active'
+            };
+            
+            log(`Registering display with data: ${JSON.stringify(data)}`, 'info');
+            socket.emit('register:display', data);
+        });
+        
+        testPairingBtn.addEventListener('click', () => {
+            if (!socket || !socket.connected) {
+                log('Cannot test pairing - socket not connected', 'error');
+                return;
+            }
+            
+            if (!displayId) {
+                log('Cannot test pairing - display not registered', 'error');
+                return;
+            }
+            
+            // Use our debug endpoint to trigger a pairing notification
+            fetch(`${serverUrlInput.value}/api/displays/debug/test-pairing-notification`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ qrCode: displayId })
+            })
+            .then(response => response.json())
+            .then(data => {
+                log(`Triggered pairing test: ${JSON.stringify(data)}`, 'info');
+            })
+            .catch(error => {
+                log(`Error triggering pairing test: ${error.message}`, 'error');
+            });
+        });
+        
+        clearLogBtn.addEventListener('click', () => {
+            eventLogEl.innerHTML = '';
+            log('Event log cleared', 'info');
+        });
+        
+        emitTestEventBtn.addEventListener('click', () => {
+            if (!socket || !socket.connected) {
+                log('Cannot emit test event - socket not connected', 'error');
+                return;
+            }
+            
+            socket.emit('test:echo', { message: 'Hello from debug tool', timestamp: new Date().toISOString() });
+            log('Emitted test:echo event', 'info');
+        });
+        
+        joinRoomBtn.addEventListener('click', () => {
+            const room = prompt('Enter room name to join:');
+            if (!room) return;
+            
+            if (!socket || !socket.connected) {
+                log('Cannot join room - socket not connected', 'error');
+                return;
+            }
+            
+            socket.emit('join', { room });
+            log(`Requested to join room: ${room}`, 'info');
+        });
+        
+        getRoomsBtn.addEventListener('click', () => {
+            if (!socket || !socket.connected) {
+                log('Cannot get rooms - socket not connected', 'error');
+                return;
+            }
+            
+            socket.emit('getRooms', (rooms) => {
+                log(`Currently joined rooms: ${JSON.stringify(rooms)}`, 'info');
+            });
+        });
+        
+        addListenerBtn.addEventListener('click', () => {
+            const eventName = customEventInput.value.trim();
+            if (!eventName) {
+                alert('Please enter an event name');
+                return;
+            }
+            
+            if (!socket) {
+                log('Cannot add listener - socket not initialized', 'error');
+                return;
+            }
+            
+            // Check if already listening
+            if (activeListeners.includes(eventName)) {
+                log(`Already listening for event: ${eventName}`, 'warning');
+                return;
+            }
+            
+            socket.on(eventName, (data) => {
+                log(`Custom event ${eventName} received: ${JSON.stringify(data)}`, 'info');
+            });
+            
+            activeListeners.push(eventName);
+            
+            // Update UI
+            const listItem = document.createElement('li');
+            listItem.textContent = eventName;
+            activeListenersEl.appendChild(listItem);
+            
+            log(`Now listening for event: ${eventName}`, 'success');
+            customEventInput.value = '';
+        });
+        
+        // Content push event handler
+        pushContentBtn.addEventListener('click', () => {
+            if (!socket || !socket.connected) {
+                log('Cannot push content - socket not connected', 'error');
+                return;
+            }
+            
+            if (!displayId) {
+                log('Cannot push content - display not registered', 'error');
+                return;
+            }
+            
+            const contentType = contentTypeSelect.value;
+            
+            log(`Pushing test ${contentType} content to display ${displayId}`, 'info');
+            
+            // Call debug endpoint
+            fetch(`${serverUrlInput.value}/api/displays/debug/push-test-content`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ 
+                    displayId: displayId,
+                    contentType: contentType
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                log(`Test content pushed: ${JSON.stringify(data)}`, 'success');
+                currentContent = data.content;
+                currentContentEl.textContent = JSON.stringify(currentContent, null, 2);
+            })
+            .catch(error => {
+                log(`Error pushing test content: ${error.message}`, 'error');
+            });
+        });
+        
+        // Custom content push
+        pushCustomContentBtn.addEventListener('click', () => {
+            if (!socket || !socket.connected) {
+                log('Cannot push content - socket not connected', 'error');
+                return;
+            }
+            
+            if (!displayId) {
+                log('Cannot push content - display not registered', 'error');
+                return;
+            }
+            
+            const contentType = customContentTypeSelect.value;
+            const contentUrl = customContentUrlInput.value.trim();
+            const contentTitle = customContentTitleInput.value.trim() || `Custom ${contentType}`;
+            
+            if (!contentUrl) {
+                log('Content URL is required', 'error');
+                return;
+            }
+            
+            log(`Pushing custom ${contentType} content to display ${displayId}`, 'info');
+            
+            // Prepare content data
+            const contentData = {
+                contentId: `custom-content-${Date.now()}`,
+                type: contentType,
+                title: contentTitle,
+                url: contentUrl,
+                timestamp: new Date().toISOString(),
+                pushId: `push_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`,
+                displaySettings: {
+                    aspectRatio: '16:9',
+                    autoplay: true
+                }
+            };
+            
+            // Get socket instance from server
+            socket.emit('content:push', {
+                displayId: displayId,
+                content: contentData
+            });
+            
+            log(`Custom content push initiated for display ${displayId}`, 'info');
+            currentContent = contentData;
+            currentContentEl.textContent = JSON.stringify(currentContent, null, 2);
+        });
+        
+        // Listen for content push events
+        socket.on('content:push', (data) => {
+            log(`Received content:push event: ${JSON.stringify(data)}`, 'success');
+            
+            // Check if for this display
+            if (data.displayId && data.displayId !== displayId) {
+                log(`Content push for different display: ${data.displayId}`, 'warning');
+                return;
+            }
+            
+            if (data.content) {
+                currentContent = data.content;
+                currentContentEl.textContent = JSON.stringify(currentContent, null, 2);
+                log(`Content updated: ${data.content.title}`, 'success');
+            }
+        });
+        
+        // Initialize
+        window.addEventListener('load', () => {
+            log('Debug tool initialized', 'info');
+            
+            // Generate random ID
+            if (!displayIdInput.value) {
+                displayIdInput.value = 'DEBUG_' + Math.random().toString(36).substring(2, 8).toUpperCase();
+            }
+        });
+    </script>
+</body>
+</html> 

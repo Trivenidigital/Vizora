@@ -56,7 +56,7 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
               leaveFrom="translate-x-0"
               leaveTo="-translate-x-full"
             >
-              <Dialog.Panel className="relative flex w-full max-w-xs flex-1 flex-col bg-white pt-5 pb-4">
+              <Dialog.Panel className="relative flex w-full max-w-xs flex-1 flex-col bg-gradient-to-b from-[#1D2671] to-[#C33764] pt-5 pb-4">
                 <Transition.Child
                   as={Fragment}
                   enter="ease-in-out duration-300"
@@ -77,8 +77,8 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
                     </button>
                   </div>
                 </Transition.Child>
-                <div className="flex flex-shrink-0 items-center px-4">
-                  <Logo className="h-8 w-auto" />
+                <div className="flex flex-shrink-0 items-center pl-4 pt-4">
+                  <Logo className="h-10 w-auto text-white" />
                 </div>
                 <div className="mt-5 h-0 flex-1 overflow-y-auto">
                   <nav className="space-y-1 px-2">
@@ -87,18 +87,18 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
                         key={item.name}
                         to={item.href}
                         className={({ isActive }) =>
-                          `group flex items-center px-2 py-2 text-base font-medium rounded-md ${
+                          `group flex items-center px-2 py-2 text-base font-medium rounded-lg ${
                             isActive
-                              ? 'bg-purple-100 text-purple-600'
-                              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                              ? 'bg-white/10 text-white'
+                              : 'text-slate-200 hover:bg-white/10 hover:text-white'
                           }`
                         }
                       >
                         {({ isActive }) => (
                           <>
                             <item.icon
-                              className={`mr-4 h-6 w-6 flex-shrink-0 ${
-                                isActive ? 'text-purple-600' : 'text-gray-400 group-hover:text-gray-500'
+                              className={`mr-4 h-6 w-6 flex-shrink-0 stroke-2 ${
+                                isActive ? 'text-white' : 'text-slate-200 group-hover:text-white'
                               }`}
                               aria-hidden="true"
                             />
@@ -120,9 +120,9 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
 
       {/* Desktop sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:z-40 lg:flex lg:w-64 lg:flex-col">
-        <div className="flex min-h-0 flex-1 flex-col border-r border-gray-200 bg-white">
-          <div className="flex h-16 flex-shrink-0 items-center px-4">
-            <Logo className="h-8 w-auto" />
+        <div className="flex min-h-0 flex-1 flex-col bg-gradient-to-b from-[#1D2671] to-[#C33764]">
+          <div className="flex h-16 flex-shrink-0 items-center pl-4 pt-4">
+            <Logo className="h-10 w-auto text-white" />
           </div>
           <div className="flex flex-1 flex-col overflow-y-auto">
             <nav className="flex-1 space-y-1 px-2 py-4">
@@ -131,18 +131,18 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
                   key={item.name}
                   to={item.href}
                   className={({ isActive }) =>
-                    `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
+                    `group flex items-center px-2 py-2 text-sm font-medium rounded-lg ${
                       isActive
-                        ? 'bg-purple-100 text-purple-600'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                        ? 'bg-white/10 text-white'
+                        : 'text-slate-200 hover:bg-white/10 hover:text-white'
                     }`
                   }
                 >
                   {({ isActive }) => (
                     <>
                       <item.icon
-                        className={`mr-3 h-5 w-5 flex-shrink-0 ${
-                          isActive ? 'text-purple-600' : 'text-gray-400 group-hover:text-gray-500'
+                        className={`mr-3 h-5 w-5 flex-shrink-0 stroke-2 ${
+                          isActive ? 'text-white' : 'text-slate-200 group-hover:text-white'
                         }`}
                         aria-hidden="true"
                       />

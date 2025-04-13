@@ -5,13 +5,14 @@ import {
   PhotoIcon, FilmIcon, GlobeAltIcon, DocumentTextIcon, 
   FolderIcon, Square3Stack3DIcon, ArrowPathIcon,
   PlusIcon, FunnelIcon, ArrowUpTrayIcon, CheckIcon,
-  EllipsisHorizontalIcon, MagnifyingGlassIcon
+  EllipsisHorizontalIcon, MagnifyingGlassIcon, ListBulletIcon, Squares2X2Icon, ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
-import contentService from '../../services/contentService';
+import { contentService } from '@vizora/common';
 import { ContentUploadModal } from './ContentUploadModal';
 import { ContentDetailsPanel } from './ContentDetailsPanel';
 import { ContentFilterBar } from './ContentFilterBar';
 import { Spinner } from '../../components/ui/Spinner';
+import { Card, CardBody, CardFooter } from '@/components/ui/Card';
 
 // Define content types
 export type ContentType = 'image' | 'video' | 'webpage' | 'document' | 'app' | 'playlist' | 'stream';
@@ -225,28 +226,26 @@ const ContentPageContent: React.FC = () => {
   
   // Create view options (cards list or table)
   const renderGridView = () => (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-      {filteredItems.map(item => {
+    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+      {filteredItems.map((item) => {
         const IconComponent = contentTypeIcons[item.type] || DocumentTextIcon;
         const isSelected = selectedItems.has(item.id);
         
         return (
-          <div
+          <Card
             key={item.id}
-            className={`relative overflow-hidden rounded-lg border ${
-              isSelected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200'
-            } bg-white shadow transition-all hover:shadow-md`}
+            selected={isSelected}
+            interactive={true}
             onClick={(e) => handleItemSelect(item.id, e.ctrlKey || e.metaKey)}
+            className="group relative flex flex-col"
             data-testid="content-item"
           >
             {/* Selection indicator */}
-            <div className="absolute top-2 left-2 z-10">
-              <div className={`rounded-full w-5 h-5 flex items-center justify-center ${
-                isSelected ? 'bg-blue-500' : 'bg-gray-200 bg-opacity-70'
-              }`}>
-                {isSelected && <CheckIcon className="h-3 w-3 text-white" />}
+            {isSelected && (
+              <div className="absolute top-2 left-2 z-10 rounded-full bg-violet-500 p-1 shadow-sm">
+                <CheckIcon className="h-4 w-4 text-white" />
               </div>
-            </div>
+            )}
             
             {/* Thumbnail or placeholder */}
             <div className="aspect-video w-full bg-gray-100 relative">
@@ -258,221 +257,250 @@ const ContentPageContent: React.FC = () => {
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center">
-                  <IconComponent className="h-12 w-12 text-gray-400" />
+                  <IconComponent className="h-14 w-14 text-gray-400" />
                 </div>
               )}
               
               {/* Type badge */}
-              <span className="absolute bottom-2 right-2 rounded-full bg-gray-800 bg-opacity-70 px-2 py-0.5 text-xs text-white">
+              <span className="absolute bottom-2 right-2 rounded-full bg-gray-800/70 backdrop-blur-sm px-2.5 py-1 text-xs font-medium text-white">
                 {item.type}
               </span>
             </div>
             
             {/* Content info */}
-            <div className="p-4">
+            <CardBody className="flex flex-col flex-grow p-4">
               <h3 className="truncate text-sm font-medium text-gray-900">{item.title}</h3>
               <div className="mt-1 flex items-center text-xs text-gray-500">
                 <span>{formatFileSize(item.size)}</span>
                 <span className="mx-1.5">•</span>
                 <span>{new Date(item.updatedAt).toLocaleDateString()}</span>
               </div>
-              
-              {/* Action buttons */}
-              <div className="mt-4 flex justify-between">
+            </CardBody>
+            
+            {/* Action buttons */}
+            <CardFooter className="flex justify-between items-center bg-gray-50 py-3">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePushToDisplays(item.id);
+                }}
+                className="text-xs font-medium text-violet-600 hover:text-violet-800 transition-colors"
+              >
+                Push to Displays
+              </button>
+              <div className="relative group">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    handlePushToDisplays(item.id);
+                    // Toggle dropdown menu
                   }}
-                  className="text-xs text-blue-600 hover:text-blue-800"
+                  className="rounded-full p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
                 >
-                  Push to Displays
+                  <EllipsisHorizontalIcon className="h-5 w-5" />
                 </button>
-                <div className="relative group">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      // Toggle dropdown menu
-                    }}
-                    className="text-gray-500 hover:text-gray-700"
-                  >
-                    <EllipsisHorizontalIcon className="h-5 w-5" />
-                  </button>
-                  {/* Dropdown menu would be here */}
-                </div>
+                {/* Dropdown menu would be here */}
               </div>
-            </div>
-          </div>
+            </CardFooter>
+          </Card>
         );
       })}
       
       {/* Add content card */}
-      <div
+      <Card
+        interactive={true}
         onClick={() => setIsUploadModalOpen(true)}
-        className="flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 p-6 text-center hover:border-gray-400 hover:bg-gray-50"
+        className="flex aspect-[4/3] flex-col items-center justify-center gap-3 border-2 border-dashed border-gray-300 hover:border-violet-400 hover:bg-violet-50 transition-colors"
       >
-        <ArrowUpTrayIcon className="h-10 w-10 text-gray-400" />
-        <span className="text-sm font-medium text-gray-900">Add New Content</span>
-        <span className="text-xs text-gray-500">Upload files or create content</span>
-      </div>
+        <div className="rounded-full bg-violet-100 p-3">
+          <ArrowUpTrayIcon className="h-8 w-8 text-violet-600" />
+        </div>
+        <div>
+          <span className="block text-sm font-medium text-gray-900">Add New Content</span>
+          <span className="text-xs text-gray-500">Upload files or create content</span>
+        </div>
+      </Card>
     </div>
   );
   
   const renderListView = () => (
-    <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow">
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
-          <tr>
-            <th scope="col" className="w-10 px-3 py-3.5">
-              {/* Bulk selection checkbox would go here */}
-            </th>
-            <th
-              scope="col"
-              className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 cursor-pointer"
-              onClick={() => handleSortChange('name')}
-            >
-              Name
-              {sortBy === 'name' && (
-                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-              )}
-            </th>
-            <th
-              scope="col"
-              className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 cursor-pointer"
-              onClick={() => handleSortChange('type')}
-            >
-              Type
-              {sortBy === 'type' && (
-                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-              )}
-            </th>
-            <th
-              scope="col"
-              className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 cursor-pointer"
-              onClick={() => handleSortChange('size')}
-            >
-              Size
-              {sortBy === 'size' && (
-                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-              )}
-            </th>
-            <th
-              scope="col"
-              className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 cursor-pointer"
-              onClick={() => handleSortChange('date')}
-            >
-              Last Modified
-              {sortBy === 'date' && (
-                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-              )}
-            </th>
-            <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
-              <span className="sr-only">Actions</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-200 bg-white">
-          {filteredItems.map((item) => {
-            const IconComponent = contentTypeIcons[item.type] || DocumentTextIcon;
-            const isSelected = selectedItems.has(item.id);
-            
-            return (
-              <tr 
-                key={item.id} 
-                className={`${isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
-                onClick={(e) => handleItemSelect(item.id, e.ctrlKey || e.metaKey)}
-                data-testid="content-item"
+    <Card>
+      <div className="overflow-hidden">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th scope="col" className="w-10 pl-6 pr-3 py-3.5">
+                {/* Bulk selection checkbox would go here */}
+              </th>
+              <th
+                scope="col"
+                className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 cursor-pointer hover:text-violet-700 transition-colors"
+                onClick={() => handleSortChange('name')}
               >
-                <td className="w-10 px-3 py-4">
-                  <div className={`h-4 w-4 rounded-sm ${isSelected ? 'bg-blue-500' : 'border border-gray-300'}`}>
-                    {isSelected && <CheckIcon className="h-3 w-3 text-white" />}
-                  </div>
-                </td>
-                <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm">
-                  <div className="flex items-center">
-                    <div className="h-8 w-8 flex-shrink-0 mr-3">
-                      {item.thumbnail ? (
-                        <img 
-                          src={item.thumbnail} 
-                          alt={item.title}
-                          className="h-8 w-8 rounded object-cover" 
-                        />
-                      ) : (
-                        <IconComponent className="h-6 w-6 text-gray-400" />
-                      )}
+                <div className="flex items-center">
+                  Name
+                  {sortBy === 'name' && (
+                    <span className="ml-1 text-violet-600">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                  )}
+                </div>
+              </th>
+              <th
+                scope="col"
+                className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 cursor-pointer hover:text-violet-700 transition-colors"
+                onClick={() => handleSortChange('type')}
+              >
+                <div className="flex items-center">
+                  Type
+                  {sortBy === 'type' && (
+                    <span className="ml-1 text-violet-600">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                  )}
+                </div>
+              </th>
+              <th
+                scope="col"
+                className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 cursor-pointer hover:text-violet-700 transition-colors"
+                onClick={() => handleSortChange('size')}
+              >
+                <div className="flex items-center">
+                  Size
+                  {sortBy === 'size' && (
+                    <span className="ml-1 text-violet-600">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                  )}
+                </div>
+              </th>
+              <th
+                scope="col"
+                className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 cursor-pointer hover:text-violet-700 transition-colors"
+                onClick={() => handleSortChange('date')}
+              >
+                <div className="flex items-center">
+                  Last Modified
+                  {sortBy === 'date' && (
+                    <span className="ml-1 text-violet-600">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                  )}
+                </div>
+              </th>
+              <th scope="col" className="relative py-3.5 pl-3 pr-6">
+                <span className="sr-only">Actions</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200 bg-white">
+            {filteredItems.map((item) => {
+              const IconComponent = contentTypeIcons[item.type] || DocumentTextIcon;
+              const isSelected = selectedItems.has(item.id);
+              
+              return (
+                <tr 
+                  key={item.id} 
+                  className={`${isSelected ? 'bg-violet-50' : 'hover:bg-gray-50'} transition-colors cursor-pointer`}
+                  onClick={(e) => handleItemSelect(item.id, e.ctrlKey || e.metaKey)}
+                  data-testid="content-item"
+                >
+                  <td className="w-10 pl-6 pr-3 py-4">
+                    <div className={`h-4 w-4 rounded-sm ${isSelected ? 'bg-violet-500' : 'border border-gray-300'}`}>
+                      {isSelected && <CheckIcon className="h-3 w-3 text-white" />}
                     </div>
-                    <div className="font-medium text-gray-900">{item.title}</div>
-                  </div>
-                </td>
-                <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500 capitalize">
-                  {item.type}
-                </td>
-                <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                  {formatFileSize(item.size)}
-                </td>
-                <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                  {new Date(item.updatedAt).toLocaleDateString()}
-                </td>
-                <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handlePushToDisplays(item.id);
-                    }}
-                    className="text-blue-600 hover:text-blue-900 mr-3"
-                  >
-                    Push
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      // Preview action
-                    }}
-                    className="text-blue-600 hover:text-blue-900 mr-3"
-                  >
-                    Preview
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      // Delete action
-                    }}
-                    className="text-red-600 hover:text-red-900"
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+                  </td>
+                  <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm">
+                    <div className="flex items-center">
+                      <div className="h-10 w-10 flex-shrink-0 mr-3 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden">
+                        {item.thumbnail ? (
+                          <img 
+                            src={item.thumbnail} 
+                            alt={item.title}
+                            className="h-10 w-10 object-cover" 
+                          />
+                        ) : (
+                          <IconComponent className="h-6 w-6 text-gray-400" />
+                        )}
+                      </div>
+                      <div className="font-medium text-gray-900">{item.title}</div>
+                    </div>
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                    <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">
+                      {item.type}
+                    </span>
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                    {formatFileSize(item.size)}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                    {new Date(item.updatedAt).toLocaleDateString()}
+                  </td>
+                  <td className="relative whitespace-nowrap py-4 pl-3 pr-6 text-right text-sm font-medium">
+                    <div className="flex justify-end space-x-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePushToDisplays(item.id);
+                        }}
+                        className="inline-flex items-center rounded-md bg-white px-2.5 py-1.5 text-sm font-medium text-violet-600 hover:bg-violet-50 hover:text-violet-700 border border-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-1"
+                      >
+                        Push
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // Preview action
+                        }}
+                        className="inline-flex items-center rounded-md bg-white px-2.5 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 border border-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-1"
+                      >
+                        Preview
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // Delete action
+                        }}
+                        className="inline-flex items-center rounded-md bg-white px-2.5 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 border border-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Card>
   );
   
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* Page header */}
-      <div className="flex items-center justify-between border-b border-gray-200 px-4 py-4 sm:px-6 lg:px-8">
+      <div className="flex items-center justify-between border-b border-gray-200 px-6 py-6 sm:px-8 lg:px-10">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Content Library</h1>
           <p className="mt-1 text-sm text-gray-500">
             Manage all your digital signage content in one place
           </p>
         </div>
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-4">
           <button
             type="button"
             onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-            className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+            className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 transition-colors"
             data-testid="view-toggle-button"
           >
-            {viewMode === 'grid' ? 'List View' : 'Grid View'}
+            {viewMode === 'grid' ? (
+              <>
+                <ListBulletIcon className="h-5 w-5 mr-2" />
+                List View
+              </>
+            ) : (
+              <>
+                <Squares2X2Icon className="h-5 w-5 mr-2" />
+                Grid View
+              </>
+            )}
           </button>
           <button
             type="button"
             onClick={() => setIsUploadModalOpen(true)}
-            className="inline-flex items-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
+            className="inline-flex items-center rounded-lg border border-transparent bg-violet-600 px-5 py-2 text-sm font-medium text-white shadow-sm hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 transition-colors"
             data-testid="upload-button"
           >
             <PlusIcon className="-ml-1 mr-2 h-5 w-5" />
@@ -482,7 +510,7 @@ const ContentPageContent: React.FC = () => {
       </div>
       
       {/* Search and filters bar */}
-      <div className="flex items-center space-x-4 border-b border-gray-200 px-4 py-3 sm:px-6 lg:px-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 px-6 py-4 sm:px-8 lg:px-10 bg-gray-50">
         <div className="flex flex-1 items-center max-w-md">
           <div className="relative w-full">
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
@@ -492,58 +520,60 @@ const ContentPageContent: React.FC = () => {
               type="text"
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
-              className="block w-full rounded-md border-gray-300 pl-10 focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              className="block w-full rounded-lg border-gray-300 pl-10 focus:border-violet-500 focus:ring-violet-500 shadow-sm text-sm"
               placeholder="Search content..."
               data-testid="search-input"
             />
           </div>
         </div>
         
-        <div className="flex items-center space-x-2">
-          <span className="text-sm text-gray-500">Filter:</span>
-          <select
-            value={activeFilter}
-            onChange={(e) => handleFilterChange(e.target.value as ContentType | 'all')}
-            className="rounded-md border-gray-300 py-1.5 pl-3 pr-10 text-sm focus:border-blue-500 focus:ring-blue-500"
-          >
-            <option value="all">All Types</option>
-            <option value="image">Images</option>
-            <option value="video">Videos</option>
-            <option value="webpage">Webpages</option>
-            <option value="document">Documents</option>
-            <option value="app">Apps</option>
-            <option value="playlist">Playlists</option>
-            <option value="stream">Streams</option>
-          </select>
-        </div>
-        
-        <div className="flex items-center space-x-2">
-          <span className="text-sm text-gray-500">Sort:</span>
-          <select
-            value={`${sortBy}-${sortDirection}`}
-            onChange={(e) => {
-              const [sort, direction] = e.target.value.split('-');
-              setSortBy(sort as 'date' | 'name' | 'type' | 'size');
-              setSortDirection(direction as 'asc' | 'desc');
-            }}
-            className="rounded-md border-gray-300 py-1.5 pl-3 pr-10 text-sm focus:border-blue-500 focus:ring-blue-500"
-          >
-            <option value="date-desc">Newest First</option>
-            <option value="date-asc">Oldest First</option>
-            <option value="name-asc">Name (A-Z)</option>
-            <option value="name-desc">Name (Z-A)</option>
-            <option value="type-asc">Type (A-Z)</option>
-            <option value="size-desc">Size (Largest)</option>
-            <option value="size-asc">Size (Smallest)</option>
-          </select>
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center">
+            <span className="text-sm font-medium text-gray-700 mr-2">Filter:</span>
+            <select
+              value={activeFilter}
+              onChange={(e) => handleFilterChange(e.target.value as ContentType | 'all')}
+              className="rounded-lg border-gray-300 py-2 pl-3 pr-10 text-sm focus:border-violet-500 focus:ring-violet-500 shadow-sm"
+            >
+              <option value="all">All Types</option>
+              <option value="image">Images</option>
+              <option value="video">Videos</option>
+              <option value="webpage">Webpages</option>
+              <option value="document">Documents</option>
+              <option value="app">Apps</option>
+              <option value="playlist">Playlists</option>
+              <option value="stream">Streams</option>
+            </select>
+          </div>
+          
+          <div className="flex items-center">
+            <span className="text-sm font-medium text-gray-700 mr-2">Sort:</span>
+            <select
+              value={`${sortBy}-${sortDirection}`}
+              onChange={(e) => {
+                const [sort, direction] = e.target.value.split('-');
+                setSortBy(sort as 'date' | 'name' | 'type' | 'size');
+                setSortDirection(direction as 'asc' | 'desc');
+              }}
+              className="rounded-lg border-gray-300 py-2 pl-3 pr-10 text-sm focus:border-violet-500 focus:ring-violet-500 shadow-sm"
+            >
+              <option value="date-desc">Newest First</option>
+              <option value="date-asc">Oldest First</option>
+              <option value="name-asc">Name (A-Z)</option>
+              <option value="name-desc">Name (Z-A)</option>
+              <option value="type-asc">Type (A-Z)</option>
+              <option value="size-desc">Size (Largest)</option>
+              <option value="size-asc">Size (Smallest)</option>
+            </select>
+          </div>
         </div>
         
         {selectedItems.size > 0 && (
-          <div className="flex items-center space-x-2 ml-auto bg-blue-50 px-3 py-1.5 rounded-md">
-            <span className="text-sm text-blue-700">{selectedItems.size} selected</span>
+          <div className="flex items-center space-x-2 bg-violet-50 px-4 py-2 rounded-lg border border-violet-100">
+            <span className="text-sm font-medium text-violet-700">{selectedItems.size} selected</span>
             <button
               onClick={handleBulkDelete}
-              className="text-sm text-red-600 hover:text-red-800"
+              className="text-sm font-medium text-red-600 hover:text-red-800 transition-colors ml-3"
               data-testid="delete-button"
             >
               Delete
@@ -553,59 +583,63 @@ const ContentPageContent: React.FC = () => {
       </div>
       
       {/* Main content area */}
-      <div className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
+      <div className="flex-1 overflow-auto p-6 sm:p-8 lg:p-10 bg-gray-50">
         {isLoading ? (
           <div className="flex h-full items-center justify-center">
             <div className="text-center">
-              <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600"></div>
-              <p className="mt-3 text-sm text-gray-500">Loading content...</p>
+              <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-gray-200 border-t-violet-600"></div>
+              <p className="mt-3 text-sm text-gray-600">Loading content...</p>
             </div>
           </div>
         ) : error ? (
-          <div className="rounded-md bg-red-50 p-4">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                {/* Error icon would go here */}
-              </div>
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800">Error loading content</h3>
-                <div className="mt-2 text-sm text-red-700">
-                  <p>{error.message}</p>
+          <Card className="bg-red-50 border-red-100">
+            <CardBody>
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <ExclamationTriangleIcon className="h-5 w-5 text-red-400" />
                 </div>
-                <div className="mt-4">
-                  <button
-                    type="button"
-                    onClick={() => queryClient.invalidateQueries(['content'])}
-                    className="rounded-md bg-red-50 px-2 py-1.5 text-sm font-medium text-red-800 hover:bg-red-100"
-                  >
-                    Try again
-                  </button>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">Error loading content</h3>
+                  <div className="mt-2 text-sm text-red-700">
+                    <p>{error.message}</p>
+                  </div>
+                  <div className="mt-4">
+                    <button
+                      type="button"
+                      onClick={() => queryClient.invalidateQueries(['content'])}
+                      className="rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-800 hover:bg-red-100 transition-colors"
+                    >
+                      Try again
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
+            </CardBody>
+          </Card>
         ) : filteredItems.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="mx-auto h-12 w-12 text-gray-400">
-              <DocumentTextIcon className="h-12 w-12" />
-            </div>
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No content</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              {searchQuery || activeFilter !== 'all'
-                ? 'No content matches your filters. Try different search terms or filters.'
-                : 'Get started by creating or uploading new content.'}
-            </p>
-            <div className="mt-6">
-              <button
-                type="button"
-                onClick={() => setIsUploadModalOpen(true)}
-                className="inline-flex items-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
-              >
-                <PlusIcon className="-ml-1 mr-2 h-5 w-5" />
-                Add Content
-              </button>
-            </div>
-          </div>
+          <Card>
+            <CardBody className="text-center py-12">
+              <div className="mx-auto h-16 w-16 text-gray-400">
+                <DocumentTextIcon className="h-16 w-16" />
+              </div>
+              <h3 className="mt-4 text-lg font-medium text-gray-900">No content</h3>
+              <p className="mt-2 text-sm text-gray-500 max-w-md mx-auto">
+                {searchQuery || activeFilter !== 'all'
+                  ? 'No content matches your filters. Try different search terms or filters.'
+                  : 'Get started by creating or uploading new content.'}
+              </p>
+              <div className="mt-6">
+                <button
+                  type="button"
+                  onClick={() => setIsUploadModalOpen(true)}
+                  className="inline-flex items-center rounded-lg border border-transparent bg-violet-600 px-5 py-2 text-sm font-medium text-white shadow-sm hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 transition-colors"
+                >
+                  <PlusIcon className="-ml-1 mr-2 h-5 w-5" />
+                  Add Content
+                </button>
+              </div>
+            </CardBody>
+          </Card>
         ) : (
           <div className="min-h-full">
             {viewMode === 'grid' ? renderGridView() : renderListView()}

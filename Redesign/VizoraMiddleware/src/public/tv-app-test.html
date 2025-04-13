@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vizora TV App - Test Page</title>
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      margin: 0;
+      padding: 0;
+      color: #333;
+      background-color: #1a1a1a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      text-align: center;
+    }
+    
+    h1, h2, h3 {
+      color: #fff;
+    }
+    
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+    
+    .branding {
+      margin-bottom: 20px;
+    }
+    
+    .logo {
+      width: 150px;
+      height: 150px;
+      margin: 0 auto;
+      background-color: #4a56e2;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 2rem;
+      font-weight: bold;
+    }
+    
+    .subtitle {
+      color: #aaa;
+      margin-top: 10px;
+    }
+    
+    .content {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      justify-content: center;
+      margin-top: 30px;
+    }
+    
+    .panel {
+      background-color: #2a2a2a;
+      border-radius: 12px;
+      padding: 20px;
+      width: 100%;
+      max-width: 500px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      margin-bottom: 20px;
+      color: #ddd;
+      text-align: left;
+    }
+    
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #444;
+    }
+    
+    .panel-title {
+      margin: 0;
+      font-size: 1.5rem;
+    }
+    
+    .status-indicator {
+      padding: 8px 12px;
+      border-radius: 30px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    
+    .disconnected {
+      background-color: #4f2226;
+      color: #f88;
+    }
+    
+    .connected {
+      background-color: #1b4332;
+      color: #8f8;
+    }
+    
+    .paired {
+      background-color: #1a365d;
+      color: #8df;
+    }
+    
+    #qrCode {
+      margin: 20px auto;
+      background-color: white;
+      padding: 15px;
+      border-radius: 8px;
+      width: fit-content;
+    }
+    
+    #deviceInfo {
+      margin-top: 20px;
+      font-family: monospace;
+      background-color: #333;
+      padding: 15px;
+      border-radius: 8px;
+      overflow-wrap: break-word;
+    }
+    
+    .log-container {
+      max-height: 300px;
+      overflow-y: auto;
+      background-color: #333;
+      padding: 10px;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 0.9rem;
+      margin-top: 15px;
+    }
+    
+    .log-entry {
+      margin-bottom: 5px;
+      padding-bottom: 5px;
+      border-bottom: 1px solid #444;
+    }
+    
+    .timestamp {
+      color: #888;
+      margin-right: 10px;
+    }
+    
+    .success { color: #8f8; }
+    .warning { color: #ff8; }
+    .error { color: #f88; }
+    .info { color: #8cf; }
+    
+    button {
+      background-color: #4a56e2;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background-color 0.2s;
+      margin: 5px;
+    }
+    
+    button:hover {
+      background-color: #3a46c2;
+    }
+    
+    button:disabled {
+      background-color: #555;
+      cursor: not-allowed;
+    }
+    
+    .instructions {
+      background-color: #2a2a2a;
+      padding: 20px;
+      border-radius: 12px;
+      margin-top: 30px;
+      text-align: left;
+      max-width: 800px;
+    }
+    
+    .instructions h2 {
+      margin-top: 0;
+    }
+    
+    .instructions ol {
+      padding-left: 25px;
+    }
+    
+    .instructions li {
+      margin-bottom: 15px;
+      color: #ddd;
+    }
+    
+    .notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 15px 25px;
+      border-radius: 8px;
+      background-color: #1b4332;
+      color: white;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      transition: transform 0.3s, opacity 0.3s;
+      transform: translateY(-100px);
+      opacity: 0;
+      z-index: 1000;
+    }
+    
+    .notification.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+    
+    @media (max-width: 768px) {
+      .content {
+        flex-direction: column;
+      }
+      
+      .panel {
+        max-width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="branding">
+      <div class="logo">V</div>
+      <h1>Vizora TV App</h1>
+      <p class="subtitle">Test Environment for Display Pairing</p>
+    </div>
+    
+    <div class="content">
+      <div class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">Display Status</h2>
+          <div id="status" class="status-indicator disconnected">Disconnected</div>
+        </div>
+        
+        <div>
+          <button id="connectBtn">Connect to Server</button>
+          <button id="disconnectBtn" disabled>Disconnect</button>
+        </div>
+        
+        <div id="deviceInfo">
+          Waiting for connection...
+        </div>
+        
+        <div id="qrCode"></div>
+      </div>
+      
+      <div class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">Event Log</h2>
+          <button id="clearLogBtn">Clear</button>
+        </div>
+        
+        <div id="log" class="log-container"></div>
+      </div>
+    </div>
+    
+    <div class="instructions">
+      <h2>Test Instructions</h2>
+      <ol>
+        <li>Click "Connect to Server" to establish a Socket.IO connection with the Vizora middleware.</li>
+        <li>Once connected, a unique device ID and QR code will be generated and displayed above.</li>
+        <li>Open the Vizora Web App and navigate to the "Add Display" page.</li>
+        <li>Enter the device ID shown above or scan the QR code.</li>
+        <li>The pairing event will be logged in the Event Log panel when successful.</li>
+        <li>The connection status will change to "Paired" once a successful pairing occurs.</li>
+      </ol>
+      <p>For debugging, check the browser console for additional information.</p>
+    </div>
+  </div>
+  
+  <div id="notification" class="notification">Notification message</div>
+  
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Elements
+      const statusElement = document.getElementById('status');
+      const deviceInfoElement = document.getElementById('deviceInfo');
+      const qrCodeElement = document.getElementById('qrCode');
+      const logElement = document.getElementById('log');
+      const connectBtn = document.getElementById('connectBtn');
+      const disconnectBtn = document.getElementById('disconnectBtn');
+      const clearLogBtn = document.getElementById('clearLogBtn');
+      const notificationElement = document.getElementById('notification');
+      
+      // Variables
+      let socket = null;
+      let deviceId = null;
+      let socketId = null;
+      let connected = false;
+      let paired = false;
+      
+      // Generate a unique device ID
+      deviceId = 'TV_' + Math.random().toString(36).substring(2, 10).toUpperCase();
+      
+      // Show notification
+      function showNotification(message, type = 'success') {
+        notificationElement.textContent = message;
+        notificationElement.className = `notification ${type}`;
+        notificationElement.classList.add('show');
+        
+        setTimeout(() => {
+          notificationElement.classList.remove('show');
+        }, 5000);
+      }
+      
+      // Log function
+      function log(message, type = 'info') {
+        const now = new Date();
+        const timestamp = now.toLocaleTimeString();
+        
+        const entry = document.createElement('div');
+        entry.className = 'log-entry';
+        
+        const timestampSpan = document.createElement('span');
+        timestampSpan.className = 'timestamp';
+        timestampSpan.textContent = timestamp;
+        
+        const messageSpan = document.createElement('span');
+        messageSpan.className = type;
+        messageSpan.textContent = message;
+        
+        entry.appendChild(timestampSpan);
+        entry.appendChild(messageSpan);
+        
+        logElement.appendChild(entry);
+        logElement.scrollTop = logElement.scrollHeight;
+        
+        // Also log to console for debugging
+        console.log(`[${timestamp}] ${message}`);
+      }
+      
+      // Update device info
+      function updateDeviceInfo() {
+        const info = {
+          'Device ID': deviceId,
+          'Socket ID': socketId || 'Not connected',
+          'Connected': connected ? 'Yes' : 'No',
+          'Paired': paired ? 'Yes' : 'No',
+          'URL': window.location.href,
+          'Time': new Date().toLocaleString()
+        };
+        
+        let html = '';
+        Object.entries(info).forEach(([key, value]) => {
+          html += `<div><strong>${key}:</strong> ${value}</div>`;
+        });
+        
+        deviceInfoElement.innerHTML = html;
+      }
+      
+      // Generate QR code
+      function generateQRCode(text) {
+        qrCodeElement.innerHTML = '';
+        QRCode.toCanvas(qrCodeElement, text, {
+          width: 200,
+          margin: 2,
+          color: {
+            dark: '#000',
+            light: '#FFF'
+          }
+        }, (error) => {
+          if (error) {
+            console.error('Error generating QR code:', error);
+          }
+        });
+      }
+      
+      // Connect to server
+      function connectToServer() {
+        if (connected) {
+          log('Already connected to server', 'warning');
+          return;
+        }
+        
+        // Get the server URL from the current location
+        const serverUrl = window.location.origin;
+        log(`Connecting to ${serverUrl}...`);
+        
+        // Initialize Socket.IO connection
+        socket = io(serverUrl, {
+          path: '/socket.io',
+          transports: ['websocket', 'polling'],
+          reconnection: true,
+          reconnectionAttempts: 5
+        });
+        
+        // Connection events
+        socket.on('connect', () => {
+          connected = true;
+          socketId = socket.id;
+          
+          statusElement.textContent = 'Connected';
+          statusElement.className = 'status-indicator connected';
+          
+          connectBtn.disabled = true;
+          disconnectBtn.disabled = false;
+          
+          log(`Connected with socket ID: ${socketId}`, 'success');
+          updateDeviceInfo();
+          
+          // Register the display
+          registerDisplay();
+        });
+        
+        socket.on('disconnect', (reason) => {
+          connected = false;
+          paired = false;
+          
+          statusElement.textContent = 'Disconnected';
+          statusElement.className = 'status-indicator disconnected';
+          
+          connectBtn.disabled = false;
+          disconnectBtn.disabled = true;
+          
+          log(`Disconnected: ${reason}`, 'warning');
+          updateDeviceInfo();
+        });
+        
+        socket.on('connect_error', (error) => {
+          log(`Connection error: ${error.message}`, 'error');
+        });
+        
+        // Display events
+        socket.on('display:registered', (data) => {
+          log(`Display registered successfully`, 'success');
+          log(`Registration data: ${JSON.stringify(data)}`, 'info');
+          
+          // Generate QR code with the device ID
+          generateQRCode(deviceId);
+          
+          // Show notification
+          showNotification('Display registered successfully!');
+        });
+        
+        socket.on('display:paired', (data) => {
+          paired = true;
+          
+          statusElement.textContent = 'Paired';
+          statusElement.className = 'status-indicator paired';
+          
+          log(`Display paired with user: ${data.user?.name || 'Unknown'}`, 'success');
+          log(`Pairing data: ${JSON.stringify(data)}`, 'info');
+          
+          updateDeviceInfo();
+          
+          // Show notification
+          showNotification('Display paired successfully!');
+        });
+        
+        socket.on('display:paired:broadcast', (data) => {
+          log(`Received broadcast pairing notification`, 'info');
+          log(`Broadcast data: ${JSON.stringify(data)}`, 'info');
+        });
+        
+        // Test events
+        socket.on('test:echo:response', (data) => {
+          log(`Echo response received: ${JSON.stringify(data)}`, 'info');
+        });
+        
+        // Listen for all events
+        socket.onAny((event, ...args) => {
+          if (!['connect', 'disconnect'].includes(event)) {
+            console.log(`Event received: ${event}`, args);
+          }
+        });
+      }
+      
+      // Register display
+      function registerDisplay() {
+        if (!connected) {
+          log('Not connected to server', 'error');
+          return;
+        }
+        
+        log(`Registering device with ID: ${deviceId}`);
+        
+        socket.emit('register:display', {
+          deviceId: deviceId,
+          name: `TV Test App - ${deviceId}`,
+          model: 'Web Browser Test Display'
+        });
+      }
+      
+      // Disconnect from server
+      function disconnectFromServer() {
+        if (!connected) {
+          log('Not connected to server', 'warning');
+          return;
+        }
+        
+        log('Disconnecting from server...');
+        socket.disconnect();
+      }
+      
+      // Clear log
+      function clearLog() {
+        logElement.innerHTML = '';
+        log('Log cleared', 'info');
+      }
+      
+      // Event listeners
+      connectBtn.addEventListener('click', connectToServer);
+      disconnectBtn.addEventListener('click', disconnectFromServer);
+      clearLogBtn.addEventListener('click', clearLog);
+      
+      // Initial setup
+      updateDeviceInfo();
+      log('TV App Test initialized', 'info');
+      log(`Device ID generated: ${deviceId}`, 'info');
+      
+      // Auto-connect if URL contains autoconnect parameter
+      if (window.location.search.includes('autoconnect')) {
+        setTimeout(() => {
+          connectToServer();
+        }, 1000);
+      }
+    });
+  </script>
+</body>
+</html> 

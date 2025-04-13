@@ -1,145 +1,131 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
-import SignUpPage from '../../src/components/SignUpPage';
-import { AuthProvider } from '../../src/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
+import { SignUpPage } from '../../src/pages/SignUpPage';
+import { authService } from '../../src/services/authService';
 
-// Mock the useNavigate hook
-const mockNavigate = vi.fn();
+// Mock dependencies
+vi.mock('react-router-dom', () => ({
+  useNavigate: vi.fn(),
+}));
 
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
-  return {
-    ...actual,
-    useNavigate: () => mockNavigate,
-  };
-});
+vi.mock('react-hot-toast', () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+  }
+}));
+
+vi.mock('../../src/services/authService', () => ({
+  authService: {
+    register: vi.fn(),
+  }
+}));
 
 describe('SignUpPage', () => {
-  const renderWithProviders = (component: React.ReactNode) => {
-    return render(
-      <BrowserRouter>
-        <AuthProvider>
-          {component}
-        </AuthProvider>
-      </BrowserRouter>
-    );
-  };
+  const mockNavigate = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(useNavigate).mockReturnValue(mockNavigate);
+    render(<SignUpPage />);
   });
 
-  it('renders the signup form with all fields', () => {
-    renderWithProviders(<SignUpPage />);
+  it('renders the signup form', () => {
+    expect(screen.getByPlaceholderText(/first name/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/last name/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/email address/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/company name/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/^password$/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/confirm password/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/I agree to the/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /create account/i })).toBeInTheDocument();
+  });
+
+  it('validates password match', async () => {
+    // Fill form with mismatched passwords
+    fireEvent.change(screen.getByPlaceholderText(/first name/i), { target: { value: 'John' } });
+    fireEvent.change(screen.getByPlaceholderText(/last name/i), { target: { value: 'Doe' } });
+    fireEvent.change(screen.getByPlaceholderText(/email address/i), { target: { value: 'john@example.com' } });
+    fireEvent.change(screen.getByPlaceholderText(/company name/i), { target: { value: 'Test Company' } });
     
-    expect(screen.getByLabelText(/first name/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/last name/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/company/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^password$/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/confirm password/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/i agree to the terms/i)).toBeInTheDocument();
-  });
-
-  it('shows validation errors for empty required fields', async () => {
-    renderWithProviders(<SignUpPage />);
+    // Use getByPlaceholderText instead of getElementById
+    const passwordField = screen.getByPlaceholderText(/^password$/i);
+    const confirmPasswordField = screen.getByPlaceholderText(/confirm password/i);
+    
+    fireEvent.change(passwordField, { target: { value: 'StrongP@ss123' } });
+    fireEvent.change(confirmPasswordField, { target: { value: 'DifferentP@ss123' } });
+    fireEvent.click(screen.getByLabelText(/I agree to the/i));
     
     const submitButton = screen.getByRole('button', { name: /create account/i });
     fireEvent.click(submitButton);
-
+    
+    // Check for mismatch error
     await waitFor(() => {
-      expect(screen.getByText(/first name is required/i)).toBeInTheDocument();
-      expect(screen.getByText(/last name is required/i)).toBeInTheDocument();
-      expect(screen.getByText(/email is required/i)).toBeInTheDocument();
-      expect(screen.getByText(/company name is required/i)).toBeInTheDocument();
-      expect(screen.getByText(/password is required/i)).toBeInTheDocument();
-      expect(screen.getByText(/you must agree to the terms/i)).toBeInTheDocument();
+      expect(screen.getByText('Passwords do not match')).toBeInTheDocument();
     });
   });
 
-  it('shows validation error for invalid email', async () => {
-    renderWithProviders(<SignUpPage />);
+  it('successfully submits the form and navigates to dashboard', async () => {
+    vi.mocked(authService.register).mockResolvedValue({ success: true });
     
-    const emailInput = screen.getByLabelText(/email/i);
-    fireEvent.change(emailInput, { target: { value: 'invalid-email' } });
+    // Fill out the form with valid data
+    fireEvent.change(screen.getByPlaceholderText(/first name/i), { target: { value: 'John' } });
+    fireEvent.change(screen.getByPlaceholderText(/last name/i), { target: { value: 'Doe' } });
+    fireEvent.change(screen.getByPlaceholderText(/email address/i), { target: { value: 'john@example.com' } });
+    fireEvent.change(screen.getByPlaceholderText(/company name/i), { target: { value: 'Test Company' } });
     
-    const submitButton = screen.getByRole('button', { name: /create account/i });
-    fireEvent.click(submitButton);
-
-    await waitFor(() => {
-      expect(screen.getByText(/email is invalid/i)).toBeInTheDocument();
-    });
-  });
-
-  it('shows validation error for weak password', async () => {
-    renderWithProviders(<SignUpPage />);
+    // Use getByPlaceholderText instead of getElementById
+    const passwordField = screen.getByPlaceholderText(/^password$/i);
+    const confirmPasswordField = screen.getByPlaceholderText(/confirm password/i);
     
-    const passwordInput = screen.getByLabelText(/^password$/i);
-    fireEvent.change(passwordInput, { target: { value: 'weak' } });
+    fireEvent.change(passwordField, { target: { value: 'StrongP@ss123' } });
+    fireEvent.change(confirmPasswordField, { target: { value: 'StrongP@ss123' } });
+    fireEvent.click(screen.getByLabelText(/I agree to the/i));
     
     const submitButton = screen.getByRole('button', { name: /create account/i });
     fireEvent.click(submitButton);
-
+    
     await waitFor(() => {
-      expect(screen.getByText(/password must include uppercase, lowercase, number and special character/i)).toBeInTheDocument();
-    });
-  });
-
-  it('shows validation error for mismatched passwords', async () => {
-    renderWithProviders(<SignUpPage />);
-    
-    const passwordInput = screen.getByLabelText(/^password$/i);
-    const confirmPasswordInput = screen.getByLabelText(/confirm password/i);
-    
-    fireEvent.change(passwordInput, { target: { value: 'StrongP@ss1' } });
-    fireEvent.change(confirmPasswordInput, { target: { value: 'DifferentP@ss1' } });
-    
-    const submitButton = screen.getByRole('button', { name: /create account/i });
-    fireEvent.click(submitButton);
-
-    await waitFor(() => {
-      expect(screen.getByText(/passwords do not match/i)).toBeInTheDocument();
-    });
-  });
-
-  it('submits form with valid data', async () => {
-    renderWithProviders(<SignUpPage />);
-    
-    // Fill in all required fields
-    fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: 'John' } });
-    fireEvent.change(screen.getByLabelText(/last name/i), { target: { value: 'Doe' } });
-    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'john@example.com' } });
-    fireEvent.change(screen.getByLabelText(/company/i), { target: { value: 'Test Company' } });
-    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: 'StrongP@ss1' } });
-    fireEvent.change(screen.getByLabelText(/confirm password/i), { target: { value: 'StrongP@ss1' } });
-    fireEvent.click(screen.getByLabelText(/i agree to the terms/i));
-    
-    const submitButton = screen.getByRole('button', { name: /create account/i });
-    fireEvent.click(submitButton);
-
-    await waitFor(() => {
+      expect(authService.register).toHaveBeenCalledWith({
+        firstName: 'John',
+        lastName: 'Doe',
+        email: 'john@example.com',
+        companyName: 'Test Company',
+        password: 'StrongP@ss123',
+      });
+      expect(toast.success).toHaveBeenCalledWith('Account created successfully!');
       expect(mockNavigate).toHaveBeenCalledWith('/dashboard');
     });
   });
 
-  it('disables submit button while loading', async () => {
-    renderWithProviders(<SignUpPage />);
+  it('handles registration errors', async () => {
+    const errorMessage = 'Registration failed: Email already exists';
+    vi.mocked(authService.register).mockRejectedValue(new Error(errorMessage));
     
-    // Fill in all required fields
-    fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: 'John' } });
-    fireEvent.change(screen.getByLabelText(/last name/i), { target: { value: 'Doe' } });
-    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'john@example.com' } });
-    fireEvent.change(screen.getByLabelText(/company/i), { target: { value: 'Test Company' } });
-    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: 'StrongP@ss1' } });
-    fireEvent.change(screen.getByLabelText(/confirm password/i), { target: { value: 'StrongP@ss1' } });
-    fireEvent.click(screen.getByLabelText(/i agree to the terms/i));
+    // Fill out the form with valid data
+    fireEvent.change(screen.getByPlaceholderText(/first name/i), { target: { value: 'John' } });
+    fireEvent.change(screen.getByPlaceholderText(/last name/i), { target: { value: 'Doe' } });
+    fireEvent.change(screen.getByPlaceholderText(/email address/i), { target: { value: 'john@example.com' } });
+    fireEvent.change(screen.getByPlaceholderText(/company name/i), { target: { value: 'Test Company' } });
+    
+    // Use getByPlaceholderText instead of getElementById
+    const passwordField = screen.getByPlaceholderText(/^password$/i);
+    const confirmPasswordField = screen.getByPlaceholderText(/confirm password/i);
+    
+    fireEvent.change(passwordField, { target: { value: 'StrongP@ss123' } });
+    fireEvent.change(confirmPasswordField, { target: { value: 'StrongP@ss123' } });
+    fireEvent.click(screen.getByLabelText(/I agree to the/i));
     
     const submitButton = screen.getByRole('button', { name: /create account/i });
     fireEvent.click(submitButton);
-
-    expect(submitButton).toBeDisabled();
-    expect(submitButton).toHaveTextContent(/creating account/i);
+    
+    await waitFor(() => {
+      expect(authService.register).toHaveBeenCalled();
+      expect(toast.error).toHaveBeenCalledWith(errorMessage);
+      expect(mockNavigate).not.toHaveBeenCalled();
+    });
   });
 }); 

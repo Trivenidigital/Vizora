@@ -1,0 +1,34 @@
+name: Lint
+
+on: [push, pull_request]
+
+jobs:
+  eslint-check:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18]
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Run Lint (Web)
+        working-directory: Redesign/VizoraWeb
+        run: npm run lint
+
+      - name: Run Lint (TV)
+        working-directory: Redesign/VizoraTV
+        run: npm run lint
+
+      - name: Run Lint (Display)
+        working-directory: Redesign/VizoraDisplay
+        run: npm run lint 

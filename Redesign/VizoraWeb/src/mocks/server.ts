@@ -1,5 +1,5 @@
 import { setupServer } from 'msw/node';
-import { rest } from 'msw';
+import { http, HttpResponse } from 'msw';
 import { API_BASE_URL } from '../config';
 
 // Mock data
@@ -69,128 +69,145 @@ const mockContent = [
 // API handlers
 export const handlers = [
   // Auth endpoints
-  rest.post(`${API_BASE_URL}/api/auth/login`, (req, res, ctx) => {
-    return res(
-      ctx.status(200),
-      ctx.json({
-        user: mockUser,
-        token: 'mock-token',
-      })
-    );
+  http.post(`${API_BASE_URL}/auth/login`, () => {
+    return HttpResponse.json({
+      success: true,
+      user: mockUser,
+      token: 'mock-token',
+    }, { status: 200 });
   }),
 
-  rest.post(`${API_BASE_URL}/api/auth/register`, (req, res, ctx) => {
-    return res(
-      ctx.status(201),
-      ctx.json({
-        user: mockUser,
-        token: 'mock-token',
-      })
-    );
+  http.post(`${API_BASE_URL}/auth/register`, () => {
+    return HttpResponse.json({
+      success: true,
+      user: mockUser,
+      token: 'mock-token',
+    }, { status: 201 });
   }),
 
-  rest.post(`${API_BASE_URL}/api/auth/logout`, (req, res, ctx) => {
-    return res(ctx.status(200));
+  http.post(`${API_BASE_URL}/auth/logout`, () => {
+    return HttpResponse.json({
+      success: true,
+      message: 'Logged out successfully'
+    }, { status: 200 });
   }),
 
-  rest.get(`${API_BASE_URL}/api/auth/me`, (req, res, ctx) => {
-    return res(
-      ctx.status(200),
-      ctx.json(mockUser)
-    );
+  http.get(`${API_BASE_URL}/auth/me`, () => {
+    return HttpResponse.json({
+      success: true,
+      data: mockUser
+    }, { status: 200 });
   }),
 
   // Display endpoints
-  rest.get(`${API_BASE_URL}/api/displays`, (req, res, ctx) => {
-    return res(
-      ctx.status(200),
-      ctx.json(mockDisplays)
-    );
+  http.get(`${API_BASE_URL}/displays`, () => {
+    return HttpResponse.json({
+      success: true,
+      data: mockDisplays
+    }, { status: 200 });
   }),
 
-  rest.get(`${API_BASE_URL}/api/displays/:id`, (req, res, ctx) => {
-    const { id } = req.params;
+  http.get(`${API_BASE_URL}/displays/:id`, ({ params }) => {
+    const { id } = params;
     const display = mockDisplays.find(d => d.id === id);
     if (!display) {
-      return res(ctx.status(404));
+      return HttpResponse.json({
+        success: false,
+        message: 'Display not found'
+      }, { status: 404 });
     }
-    return res(
-      ctx.status(200),
-      ctx.json(display)
-    );
+    return HttpResponse.json({
+      success: true,
+      data: display
+    }, { status: 200 });
   }),
 
-  rest.put(`${API_BASE_URL}/api/displays/:id`, (req, res, ctx) => {
-    const { id } = req.params;
+  http.put(`${API_BASE_URL}/displays/:id`, ({ params }) => {
+    const { id } = params;
     const display = mockDisplays.find(d => d.id === id);
     if (!display) {
-      return res(ctx.status(404));
+      return HttpResponse.json({
+        success: false,
+        message: 'Display not found'
+      }, { status: 404 });
     }
-    return res(
-      ctx.status(200),
-      ctx.json({ ...display, ...req.body })
-    );
+    return HttpResponse.json({
+      success: true,
+      data: { ...display, ...params.body }
+    }, { status: 200 });
   }),
 
   // Content endpoints
-  rest.get(`${API_BASE_URL}/api/content`, (req, res, ctx) => {
-    return res(
-      ctx.status(200),
-      ctx.json(mockContent)
-    );
+  http.get(`${API_BASE_URL}/content`, () => {
+    return HttpResponse.json({
+      success: true,
+      data: mockContent
+    }, { status: 200 });
   }),
 
-  rest.get(`${API_BASE_URL}/api/content/:id`, (req, res, ctx) => {
-    const { id } = req.params;
+  http.get(`${API_BASE_URL}/content/:id`, ({ params }) => {
+    const { id } = params;
     const content = mockContent.find(c => c.id === id);
     if (!content) {
-      return res(ctx.status(404));
+      return HttpResponse.json({
+        success: false,
+        message: 'Content not found'
+      }, { status: 404 });
     }
-    return res(
-      ctx.status(200),
-      ctx.json(content)
-    );
+    return HttpResponse.json({
+      success: true,
+      data: content
+    }, { status: 200 });
   }),
 
-  rest.post(`${API_BASE_URL}/api/content`, (req, res, ctx) => {
+  http.post(`${API_BASE_URL}/content`, ({ request }) => {
     const newContent = {
       id: String(mockContent.length + 1),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      ...req.body,
+      ...request.body,
     };
-    return res(
-      ctx.status(201),
-      ctx.json(newContent)
-    );
+    return HttpResponse.json({
+      success: true,
+      data: newContent
+    }, { status: 201 });
   }),
 
-  rest.put(`${API_BASE_URL}/api/content/:id`, (req, res, ctx) => {
-    const { id } = req.params;
+  http.put(`${API_BASE_URL}/content/:id`, ({ params }) => {
+    const { id } = params;
     const content = mockContent.find(c => c.id === id);
     if (!content) {
-      return res(ctx.status(404));
+      return HttpResponse.json({
+        success: false,
+        message: 'Content not found'
+      }, { status: 404 });
     }
-    return res(
-      ctx.status(200),
-      ctx.json({ ...content, ...req.body, updatedAt: new Date().toISOString() })
-    );
+    return HttpResponse.json({
+      success: true,
+      data: { ...content, ...params.body, updatedAt: new Date().toISOString() }
+    }, { status: 200 });
   }),
 
-  rest.delete(`${API_BASE_URL}/api/content/:id`, (req, res, ctx) => {
-    const { id } = req.params;
+  http.delete(`${API_BASE_URL}/content/:id`, ({ params }) => {
+    const { id } = params;
     const contentIndex = mockContent.findIndex(c => c.id === id);
     if (contentIndex === -1) {
-      return res(ctx.status(404));
+      return HttpResponse.json({
+        success: false,
+        message: 'Content not found'
+      }, { status: 404 });
     }
-    return res(ctx.status(204));
+    return HttpResponse.json({
+      success: true,
+      message: 'Content deleted successfully'
+    }, { status: 204 });
   }),
 
   // System endpoints
-  rest.get(`${API_BASE_URL}/api/system/settings`, (req, res, ctx) => {
-    return res(
-      ctx.status(200),
-      ctx.json({
+  http.get(`${API_BASE_URL}/system/settings`, () => {
+    return HttpResponse.json({
+      success: true,
+      data: {
         systemName: 'Vizora Display System',
         timezone: 'UTC',
         dateFormat: 'yyyy-MM-dd HH:mm:ss',
@@ -213,14 +230,14 @@ export const handlers = [
           sessionTimeout: 3600,
           twoFactorAuth: false,
         },
-      })
-    );
+      }
+    }, { status: 200 });
   }),
 
-  rest.get(`${API_BASE_URL}/api/system/status`, (req, res, ctx) => {
-    return res(
-      ctx.status(200),
-      ctx.json({
+  http.get(`${API_BASE_URL}/system/status`, () => {
+    return HttpResponse.json({
+      success: true,
+      data: {
         version: '1.0.0',
         uptime: 86400,
         memory: {
@@ -242,21 +259,28 @@ export const handlers = [
           bytesIn: 1024,
           bytesOut: 1024,
         },
-      })
-    );
+      }
+    }, { status: 200 });
   }),
 
-  rest.get(`${API_BASE_URL}/api/system/logs`, (req, res, ctx) => {
-    return res(
-      ctx.status(200),
-      ctx.json([
+  http.get(`${API_BASE_URL}/system/logs`, () => {
+    return HttpResponse.json({
+      success: true,
+      data: [
         {
           timestamp: new Date().toISOString(),
           level: 'info',
           message: 'System started successfully',
         },
-      ])
-    );
+      ]
+    }, { status: 200 });
+  }),
+
+  // Health endpoint
+  http.get(`${API_BASE_URL}/health`, () => {
+    return HttpResponse.json({
+      status: 'ok'
+    }, { status: 200 });
   }),
 ];
 

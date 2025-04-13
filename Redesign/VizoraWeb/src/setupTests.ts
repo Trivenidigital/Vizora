@@ -3,6 +3,9 @@ import { vi } from 'vitest';
 import { server } from './mocks/server';
 import type { ReactNode } from 'react';
 
+// Import ConnectionManager mocks
+import { mockSocket, mockWebSocketClient } from '@vizora/common';
+
 // Mock react-router-dom
 vi.mock('react-router-dom', () => ({
   ...vi.importActual('react-router-dom'),
@@ -17,26 +20,23 @@ vi.mock('react-router-dom', () => ({
 }));
 
 // Mock react-hot-toast
-vi.mock('react-hot-toast', () => ({
-  default: {
+vi.mock('react-hot-toast', () => {
+  const mockToast = {
     success: vi.fn(),
     error: vi.fn(),
-    loading: vi.fn(),
+    loading: vi.fn(() => 'mock-toast-id'),
     dismiss: vi.fn(),
     promise: vi.fn(),
-  },
-}));
-
-// Mock socket.io-client
-vi.mock('socket.io-client', () => ({
-  io: () => ({
-    on: vi.fn(),
-    emit: vi.fn(),
-    off: vi.fn(),
-    connect: vi.fn(),
-    disconnect: vi.fn(),
-  }),
-}));
+    custom: vi.fn(),
+    remove: vi.fn(),
+    clear: vi.fn()
+  };
+  return {
+    default: mockToast,
+    ...mockToast,
+    Toaster: () => null
+  };
+});
 
 // Mock axios
 vi.mock('axios', () => ({
@@ -90,7 +90,7 @@ vi.mock('react-select', () => ({
     onChange: (option: { value: string; label: string }) => void;
     value?: { value: string; label: string };
   }) => (
-    <select onChange={(e) => {
+    <select onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
       const option = options.find(opt => opt.value === e.target.value);
       if (option) onChange(option);
     }}>
@@ -146,6 +146,25 @@ vi.mock('react-icons/fi', () => ({
   FiTrendingDown: () => 'Trending Down Icon',
   FiActivity: () => 'Activity Icon',
   FiTarget: () => 'Target Icon',
+}));
+
+// Mock ConnectionManager
+vi.mock('@vizora/common', () => ({
+  useConnectionState: vi.fn(() => ({
+    isConnected: true,
+    isReconnecting: false,
+  })),
+  VizoraSocketClient: vi.fn().mockImplementation(() => mockWebSocketClient),
+}));
+
+// Mock TokenManager
+vi.mock('@vizora/common', () => ({
+  TokenManager: {
+    getToken: vi.fn(() => 'mock-token'),
+    setToken: vi.fn(),
+    removeToken: vi.fn(),
+    refreshToken: vi.fn(),
+  },
 }));
 
 // Setup MSW

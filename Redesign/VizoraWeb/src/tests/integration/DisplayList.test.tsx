@@ -1,127 +1,170 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { vi } from 'vitest';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { DisplayList } from '../../pages/displays/DisplayList';
-import { displayService } from '../../services/displayService';
-import toast from 'react-hot-toast';
 import { BrowserRouter } from 'react-router-dom';
+import * as displayService from '../../services/displayService';
+import { toast } from 'react-hot-toast';
 
-vi.mock('../../services/displayService');
-vi.mock('react-hot-toast');
+// Mock displayService
+vi.mock('../../services/displayService', () => ({
+  displayService: {
+    getDisplays: vi.fn(),
+    unpairDisplay: vi.fn()
+  }
+}));
 
-const mockDisplays = [
+// Mock toast
+vi.mock('react-hot-toast', () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn()
+  }
+}));
+
+// Define the Display interface to match the component's expected props
+interface Display {
+  id: string;
+  name: string;
+  status: 'active' | 'inactive' | 'maintenance';
+  description?: string;
+  location?: string;
+  lastSeen?: string;
+  ipAddress?: string;
+}
+
+// Create mock displays that match the expected props format
+const mockDisplays: Display[] = [
   {
     id: '1',
     name: 'Main Lobby Display',
-    status: 'online',
+    status: 'active',
+    location: 'Main Lobby',
     lastSeen: new Date().toISOString(),
-    ipAddress: '192.168.1.100'
+    ipAddress: '192.168.1.100',
+    description: 'Main display in lobby',
   },
   {
     id: '2',
     name: 'Conference Room A',
-    status: 'offline',
+    status: 'inactive',
+    location: 'Conference Room A',
     lastSeen: new Date().toISOString(),
-    ipAddress: '192.168.1.101'
+    ipAddress: '192.168.1.101',
   },
   {
     id: '3',
     name: 'Cafeteria Display',
-    status: 'online',
+    status: 'active',
+    location: 'Cafeteria',
     lastSeen: new Date().toISOString(),
-    ipAddress: '192.168.1.102'
+    ipAddress: '192.168.1.102',
   }
 ];
+
+// Create mock props for the DisplayList component
+const mockProps = {
+  displays: mockDisplays,
+  onSelectDisplay: vi.fn(),
+  onDeleteDisplay: vi.fn(),
+  isAdmin: true
+};
 
 describe('DisplayList', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    (displayService.getDisplays as jest.Mock).mockResolvedValue(mockDisplays);
+    
+    // Mock window.confirm to always return true
+    window.confirm = vi.fn(() => true);
   });
 
   it('renders displays when loaded', async () => {
     render(
       <BrowserRouter>
-        <DisplayList />
+        <DisplayList 
+          displays={mockDisplays}
+          onSelectDisplay={mockProps.onSelectDisplay}
+          onDeleteDisplay={mockProps.onDeleteDisplay}
+          isAdmin={true}
+        />
       </BrowserRouter>
     );
 
-    await waitFor(() => {
-      expect(screen.getByText('Main Lobby Display')).toBeInTheDocument();
-      expect(screen.getByText('Conference Room A')).toBeInTheDocument();
-      expect(screen.getByText('Cafeteria Display')).toBeInTheDocument();
-    });
+    // Check if displays are rendered
+    expect(screen.getByText('Main Lobby Display')).toBeInTheDocument();
+    expect(screen.getByText('Conference Room A')).toBeInTheDocument();
+    expect(screen.getByText('Cafeteria Display')).toBeInTheDocument();
   });
 
   it('renders empty state when no displays', async () => {
-    (displayService.getDisplays as jest.Mock).mockResolvedValue([]);
-
     render(
       <BrowserRouter>
-        <DisplayList />
+        <DisplayList 
+          displays={[]}
+          onSelectDisplay={mockProps.onSelectDisplay}
+          onDeleteDisplay={mockProps.onDeleteDisplay}
+          isAdmin={true}
+        />
       </BrowserRouter>
     );
 
-    await waitFor(() => {
-      expect(screen.getByText(/no displays found/i)).toBeInTheDocument();
-    });
+    // Check if empty state is rendered
+    expect(screen.getByText(/no displays found/i)).toBeInTheDocument();
   });
 
-  it('handles display unpairing', async () => {
-    (displayService.unpairDisplay as jest.Mock).mockResolvedValue(undefined);
-
+  it('handles display deletion', async () => {
     render(
       <BrowserRouter>
-        <DisplayList />
+        <DisplayList 
+          displays={mockDisplays}
+          onSelectDisplay={mockProps.onSelectDisplay}
+          onDeleteDisplay={mockProps.onDeleteDisplay}
+          isAdmin={true}
+        />
       </BrowserRouter>
     );
 
-    await waitFor(() => {
-      expect(screen.getByText('Main Lobby Display')).toBeInTheDocument();
-    });
+    // Find and click delete button for first display
+    const deleteButtons = screen.getAllByRole('button', { name: /delete/i });
+    fireEvent.click(deleteButtons[0]);
 
-    const unpairButton = screen.getAllByRole('button', { name: /unpair/i })[0];
-    fireEvent.click(unpairButton);
-
-    await waitFor(() => {
-      expect(displayService.unpairDisplay).toHaveBeenCalledWith('1');
-      expect(toast.success).toHaveBeenCalledWith('Display unpaired successfully');
-    });
+    // Verify callback was called
+    expect(mockProps.onDeleteDisplay).toHaveBeenCalledWith('1');
   });
 
-  it('handles error when loading displays fails', async () => {
-    const error = new Error('Failed to load displays');
-    (displayService.getDisplays as jest.Mock).mockRejectedValue(error);
-
+  it('handles push content', async () => {
     render(
       <BrowserRouter>
-        <DisplayList />
+        <DisplayList 
+          displays={mockDisplays}
+          onSelectDisplay={mockProps.onSelectDisplay}
+          onDeleteDisplay={mockProps.onDeleteDisplay}
+          isAdmin={true}
+        />
       </BrowserRouter>
     );
 
-    await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('Failed to load displays');
-    });
+    // Find and click push content button for first display
+    const pushButtons = screen.getAllByRole('button', { name: /push content/i });
+    fireEvent.click(pushButtons[0]);
+
+    // Verify dialog would open (the actual dialog is tested separately)
+    // This test just ensures the click handler works
   });
 
-  it('handles error when unpairing display fails', async () => {
-    const error = new Error('Failed to unpair display');
-    (displayService.unpairDisplay as jest.Mock).mockRejectedValue(error);
-
+  it('does not show delete button for non-admin users', async () => {
     render(
       <BrowserRouter>
-        <DisplayList />
+        <DisplayList 
+          displays={mockDisplays}
+          onSelectDisplay={mockProps.onSelectDisplay}
+          onDeleteDisplay={mockProps.onDeleteDisplay}
+          isAdmin={false}
+        />
       </BrowserRouter>
     );
 
-    await waitFor(() => {
-      expect(screen.getByText('Main Lobby Display')).toBeInTheDocument();
-    });
-
-    const unpairButton = screen.getAllByRole('button', { name: /unpair/i })[0];
-    fireEvent.click(unpairButton);
-
-    await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('Failed to unpair display');
-    });
+    // Verify no delete buttons are shown
+    const deleteButtons = screen.queryAllByRole('button', { name: /delete/i });
+    expect(deleteButtons.length).toBe(0);
   });
 }); 

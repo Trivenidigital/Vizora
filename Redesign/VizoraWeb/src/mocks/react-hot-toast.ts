@@ -49,7 +49,7 @@ export const toast = {
   }
 };
 
-export const Toaster = () => <div data-testid="toaster" />;
+export const Toaster = (): JSX.Element => <div data-testid="toaster" />;
 
 export const useToast = () => ({
   toast,
@@ -58,4 +58,6 @@ export const useToast = () => ({
   custom: vi.fn(),
   remove: vi.fn(),
   clear: vi.fn()
-}); 
+});
+
+export default toast; 

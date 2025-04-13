@@ -7,6 +7,7 @@ import { GroupList } from '@/components/groups/GroupList';
 import { GroupForm } from '@/components/groups/GroupForm';
 import { GroupStats } from '@/components/groups/GroupStats';
 import '@/styles/pages/GroupManagement.css';
+import { useConnectionState } from '@vizora/common';
 
 export const GroupManagement: React.FC = () => {
   const [groups, setGroups] = useState<DisplayGroup[]>([]);
@@ -39,12 +40,14 @@ export const GroupManagement: React.FC = () => {
       setGroups(prev => prev.filter(g => g.id !== data.groupId));
     };
 
-    socket.on('display:group:update', handleGroupUpdate);
-    socket.on('display:group:delete', handleGroupDelete);
+    // Remove direct socket.io calls
+    // socket.on('display:group:update', handleGroupUpdate);
+    // socket.on('display:group:delete', handleGroupDelete);
 
     return () => {
-      socket.off('display:group:update', handleGroupUpdate);
-      socket.off('display:group:delete', handleGroupDelete);
+      // Remove direct socket.io calls
+      // socket.off('display:group:update', handleGroupUpdate);
+      // socket.off('display:group:delete', handleGroupDelete);
     };
   }, [socket]);
 

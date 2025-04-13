@@ -71,15 +71,15 @@ const recentActivity = [
 
 const Dashboard: FC = () => {
   return (
-    <div className="py-6">
-      <div className="mx-auto px-4 sm:px-6 md:px-8">
-        <h1 className="text-2xl font-semibold text-neutral-900">Dashboard</h1>
+    <div className="py-6 max-w-full overflow-x-hidden">
+      <div className="mx-auto sm:px-6 md:px-8">
+        <h1 className="text-2xl font-semibold text-neutral-900 px-4 sm:px-0">Dashboard</h1>
       </div>
       
-      <div className="mx-auto px-4 sm:px-6 md:px-8">
+      <div className="mx-auto sm:px-6 md:px-8">
         <div className="py-4">
           {/* Stats cards */}
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 px-4 sm:px-0">
             {stats.map((stat, index) => (
               <motion.div
                 key={stat.name}
@@ -124,7 +124,7 @@ const Dashboard: FC = () => {
           </div>
 
           {/* Recent activity */}
-          <div className="mt-8">
+          <div className="mt-8 px-4 sm:px-0">
             <div className="bg-white shadow rounded-lg">
               <div className="px-4 py-5 sm:px-6 border-b border-neutral-200">
                 <h3 className="text-lg leading-6 font-medium text-neutral-900">Recent Activity</h3>
@@ -161,7 +161,7 @@ const Dashboard: FC = () => {
           </div>
 
           {/* Content performance preview */}
-          <div className="mt-8 bg-white shadow rounded-lg">
+          <div className="mt-8 bg-white shadow rounded-lg px-4 sm:px-0">
             <div className="px-4 py-5 sm:px-6 border-b border-neutral-200">
               <h3 className="text-lg leading-6 font-medium text-neutral-900">Content Performance</h3>
               <p className="mt-1 text-sm text-neutral-500">
