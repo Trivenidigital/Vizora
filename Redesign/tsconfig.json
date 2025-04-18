@@ -1,0 +1,12 @@
+{
+  "files": [],
+  "include": [],
+  "references": [
+    { "path": "./common" },
+    { "path": "./VizoraTV" },
+    { "path": "./VizoraDisplay" },
+    { "path": "./VizoraMiddleware" },
+    { "path": "./VizoraWeb" }
+    // Add other packages if they exist and use TypeScript
+  ]
+} 

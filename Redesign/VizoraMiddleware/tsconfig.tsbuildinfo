@@ -1,0 +1,1 @@
+{"root":["./src/app.d.ts","./src/index.ts","./src/server.ts","./src/setuptests.ts","./src/socketserver.ts","./src/config/database.ts","./src/middleware/socketauth.ts","./src/mocks/server.ts","./src/routes/diagnosticroutes.ts","./src/services/deviceauthservice.ts","./src/types/global.d.ts","./src/types/socket.d.ts","./src/utils/logger.d.ts"],"errors":true,"version":"5.8.3"}

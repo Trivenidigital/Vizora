@@ -21,6 +21,7 @@ export * from './utils/scheduler';
 export * from './utils/index';
 export * from './utils/jwt';
 export * from './utils/socketUtils';  // Export getSocketId from socketUtils
+export * from './utils/offlineQueue';
 
 // AI Tools
 export * from './aiTools/index';
@@ -28,11 +29,17 @@ export { aiTools } from './aiTools/index';
 
 // Connection management factory
 export { 
-  getConnectionManager, 
+  getConnectionManager as getConnectionManager_Factory,
   createConnectionManager,
   resetConnectionManager,
   setConnectionManager
 } from './services/ConnectionManagerFactory';
+
+// <<< ADD EXPORTS for new ConnectionManager singleton functions >>>
+export { 
+  initializeConnectionManager, 
+  getConnectionManager
+} from './services/ConnectionManager';
 
 // Connection health monitoring
 export {
@@ -116,14 +123,21 @@ export * from './types';
 // Hooks - use the factory implementation now 
 export { 
   useConnectionStatus, 
-  useConnectionState, 
-  ConnectionState
+  // <<< REMOVE ConnectionState export from here >>>
+  // ConnectionState 
 } from './hooks/useConnectionStatus';
+
+// <<< ADD EXPORT for the new hook >>>
+export { 
+  useConnectionState, 
+  useConnectionStatusDebug 
+} from './hooks/useConnectionState';
 
 // Explicitly export ConnectionManager values (Class, Enum)
 export { 
   ConnectionManager, 
-  ConnectionState as ConnectionManagerState 
+  // <<< ENSURE ConnectionState is exported here (and only here) >>>
+  ConnectionState // Remove alias if not needed: as ConnectionManagerState 
 } from './services/ConnectionManager';
 
 // Export ConnectionManager types/interfaces
@@ -140,6 +154,8 @@ export type {
 
 // Export other services
 export * from './services/TokenManager';
+// Add the default export for the singleton instance
+export { default as tokenManager } from './services/TokenManager';
 export * from './services/DeviceManager';
 export { LocalStorageStateService } from './services/LocalStorageStateService';
 export { ErrorReportingService } from './services/ErrorReportingService';

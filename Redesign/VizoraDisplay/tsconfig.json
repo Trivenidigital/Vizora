@@ -1,15 +1,18 @@
 {
   "compilerOptions": {
+    "composite": true,
+    "preserveSymlinks": true,
+    "declaration": true,
+    "declarationMap": true,
+    "outDir": "dist",
     "target": "ES2020",
     "useDefineForClassFields": true,
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
     "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true,
     "jsx": "react-jsx",
     "strict": true,
     "noUnusedLocals": false,
@@ -22,10 +25,7 @@
     }
   },
   "include": [
-    "src/App.tsx", 
-    "src/main.tsx",
-    "src/components/**/*.tsx",
-    "src/services/**/*.ts"
+    "src/**/*"
   ],
   "exclude": [
     "**/__tests__/**",
@@ -35,10 +35,10 @@
     "**/test/**",
     "src/services/__tests__/**",
     "src/test/**",
-    "src/DisplayApp.tsx",
-    "src/reportWebVitals.ts",
     "node_modules",
     "dist"
   ],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "references": [
+    { "path": "../common" }
+  ]
 } 

@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { connectionManager } from '../../services/connectionService';
-import { ConnectionState } from '@vizora/common';
+import { ConnectionState, ConnectionManager, ConnectionConfig } from "@vizora/common";
+
+// Provide a dummy config to satisfy constructor
+const dummyConfig: Partial<ConnectionConfig> = { // Use Partial<> if not all fields are needed
+  baseUrl: 'ws://localhost:3000', // Example
+};
+const connectionManager = new ConnectionManager(dummyConfig as ConnectionConfig); // Pass config
 
 const styles = {
   container: {
@@ -94,7 +99,13 @@ const styles = {
   },
   polling: {
     backgroundColor: '#FFC107',
-  }
+  },
+  window: (minimized: boolean) => ({
+    ...(minimized ? styles.toggle : styles.container),
+  }),
+  content: {
+    // Add any additional styles for the content section if needed
+  },
 };
 
 interface SocketHealth {
@@ -108,8 +119,11 @@ interface SocketHealth {
   };
 }
 
+// Determine if in production environment using process.env.NODE_ENV
+const isProduction = process.env.NODE_ENV === 'production'; 
+
 const SocketDebug: React.FC = () => {
-  const [health, setHealth] = useState<SocketHealth | null>(null);
+  const [health, setHealth] = useState<any>(connectionManager.getDiagnostics() || {}); // Use any for now
   const [expanded, setExpanded] = useState(false);
   const [minimized, setMinimized] = useState(true);
   const [transport, setTransport] = useState<string>('unknown');
@@ -136,8 +150,8 @@ const SocketDebug: React.FC = () => {
     return () => clearInterval(intervalId);
   }, [minimized]);
 
-  // Only show in development
-  if (import.meta.env.PROD) {
+  // Don't render in production
+  if (isProduction) { 
     return null;
   }
 
@@ -166,18 +180,17 @@ const SocketDebug: React.FC = () => {
     );
   }
 
-  const getStatusColor = () => {
-    if (!health) return styles.disconnected;
-    if (health.connected) return styles.connected;
-    if (health.reconnecting) return styles.reconnecting;
+  const getStatusColor = (connectionState: ConnectionState | undefined | null): object => {
+    if (connectionState === ConnectionState.CONNECTED) return styles.connected;
+    if (connectionState === ConnectionState.CONNECTING || connectionState === ConnectionState.RECONNECTING) return styles.reconnecting;
+    if (connectionState === ConnectionState.ERROR) return styles.error;
     return styles.disconnected;
   };
 
-  const getStatusText = () => {
-    if (!health) return 'Unknown';
-    if (health.connected) return 'Connected';
-    if (health.reconnecting) return 'Reconnecting';
-    if (health.connectionState === ConnectionState.ERROR) return 'Error';
+  const getStatusText = (connectionState: ConnectionState | undefined | null): string => {
+    if (connectionState === ConnectionState.CONNECTED) return 'Connected';
+    if (connectionState === ConnectionState.CONNECTING || connectionState === ConnectionState.RECONNECTING) return 'Reconnecting';
+    if (connectionState === ConnectionState.ERROR) return 'Error';
     return 'Disconnected';
   };
 
@@ -187,28 +200,29 @@ const SocketDebug: React.FC = () => {
     return {};
   };
 
+  const statusColor = getStatusColor(health?.connectionState);
+
   return (
-    <div style={styles.container}>
+    <div style={styles.window(minimized)}>
       <div style={styles.header}>
         <h4 style={styles.title}>Socket Status</h4>
         <button style={styles.closeButton} onClick={() => setMinimized(true)}>×</button>
       </div>
       
       <div style={styles.status}>
-        <div style={{...styles.indicator, ...getStatusColor()}}></div>
-        <span>{getStatusText()}</span>
+        <div style={{...styles.indicator, ...statusColor}}></div>
+        <span>{getStatusText(health?.connectionState)}</span>
         <span style={{...styles.badge, ...getTransportStyle()}}>{transport}</span>
       </div>
       
-      {health && (
-        <>
-          <div style={styles.property}>Socket: {health.socketConnected ? 'Created' : 'Not Created'}</div>
-          <div style={styles.property}>Connected: {health.connected ? 'Yes' : 'No'}</div>
-          <div style={styles.property}>Reconnecting: {health.reconnecting ? 'Yes' : 'No'}</div>
+      {!minimized && (
+        <div style={styles.content}>
+          <div style={styles.property}>Socket: {health?.socketConnected ? 'Created' : 'Not Created'}</div>
+          <div style={styles.property}>Connected: {health?.connected ? 'Yes' : 'No'}</div>
+          <div style={styles.property}>Reconnecting: {health?.reconnecting ? 'Yes' : 'No'}</div>
           <div style={styles.property}>Transport: {transport}</div>
-          <div style={styles.property}>State: {ConnectionState[health.connectionState]}</div>
           
-          {expanded && health.lastError.error && (
+          {expanded && health?.lastError.error && (
             <>
               <div style={styles.property}>
                 Last Error: 
@@ -239,7 +253,7 @@ const SocketDebug: React.FC = () => {
           >
             {expanded ? 'Less Details' : 'More Details'}
           </button>
-        </>
+        </div>
       )}
     </div>
   );

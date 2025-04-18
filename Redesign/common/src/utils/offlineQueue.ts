@@ -42,7 +42,7 @@ const QueueConfigSchema = z.object({
 
 type QueueConfig = z.infer<typeof QueueConfigSchema>;
 
-interface QueueStatus {
+export interface QueueStatus {
   total: number;
   byType: Record<QueueActionType, number>;
   byPriority: Record<QueuePriority, number>;

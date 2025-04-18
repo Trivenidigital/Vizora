@@ -1,304 +1,147 @@
-import React, { createContext, useState, useEffect, useCallback } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import authService, { tokenManager } from '@/services/authService';
-import toast from 'react-hot-toast';
-import { apiClient } from '@/lib/apiClient';
-import axios from 'axios';
+import React, { createContext, useContext, useState, useMemo, ReactNode, useEffect } from 'react';
+import { toast } from 'react-hot-toast';
 
-export interface User {
+// Define the shape of the user object (adjust as needed based on your API)
+interface User {
   id: string;
   email: string;
-  firstName: string;
-  lastName: string;
-  role: string;
+  // Removed firstName, lastName - replace with businessName if applicable
+  businessName?: string; 
+  // Add other relevant user fields: role, etc.
 }
 
+// Define the shape of the context
 interface AuthContextType {
-  user: User | null;
   isAuthenticated: boolean;
-  isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
-  register: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
+  user: User | null;
+  loading: boolean;
+  login: () => Promise<boolean>; // Mock login for now
+  logout: () => void;
+  // Update signup function signature to accept new data shape
+  signup: (data: SignUpData) => Promise<{ success: boolean; message?: string }>; 
 }
 
-export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// Define the updated shape of the signup data for businesses
+interface SignUpData {
+  businessName: string; // Renamed from company, made required
+  email: string;
+  password: string;
+  // Removed firstName, lastName
+}
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+// Create the context
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Create the provider component
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const navigate = useNavigate();
-  const location = useLocation();
+  const [loading, setLoading] = useState<boolean>(true);
 
-  // Debug log in development
+  // Check authentication status on mount
   useEffect(() => {
-    if (import.meta.env.DEV) {
-      console.log('[AuthContext] AuthProvider initialized');
-    }
-  }, []);
-
-  // Check if we have a return URL from a login redirect
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const returnUrl = params.get('returnUrl');
-    
-    // Store return URL in localStorage if present
-    if (returnUrl && location.pathname === '/login') {
-      localStorage.setItem('returnUrl', returnUrl);
-      
-      if (import.meta.env.DEV) {
-        console.log('[AuthContext] Return URL stored:', returnUrl);
+    const checkAuth = () => {
+      const token = localStorage.getItem('authToken');
+      if (token) {
+        console.log('✅ Auth token found, setting authenticated');
+        setIsAuthenticated(true);
+        // Mock User - adjust if needed for business context
+        setUser({ id: '1', email: 'business@example.com', businessName: 'Test Business' }); 
+      } else {
+        console.log('🛑 No auth token found');
+        setIsAuthenticated(false);
+        setUser(null);
       }
-    }
-  }, [location]);
-
-  // Initial auth check on mount
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const token = tokenManager.getToken();
-        if (token) {
-          if (import.meta.env.DEV) {
-            console.log('[AuthContext] Token found, checking authentication');
-          }
-          
-          setIsLoading(true);
-          
-          try {
-            // Add a small delay to ensure any pending auth operations have completed
-            // This helps prevent race conditions where the token might be available but not fully processed
-            await new Promise(resolve => setTimeout(resolve, 100));
-            
-            // Try to get the current user with the token
-            const userData = await authService.getCurrentUser();
-            setUser(userData);
-            
-            if (import.meta.env.DEV) {
-              console.log('[AuthContext] User authenticated:', userData);
-            }
-          } catch (error) {
-            console.error('[AuthContext] ❌ Failed to get current user:', error);
-            
-            // Show a user-friendly error message
-            if (axios.isAxiosError(error) && error.response) {
-              if (error.response.status === 401) {
-                toast.error('Your session has expired. Please log in again.');
-              } else if (error.response.status === 404) {
-                toast.error('Authentication service is unavailable.');
-              } else {
-                toast.error('Authentication failed. Please log in again.');
-              }
-            }
-            
-            // Clear token if it's invalid
-            tokenManager.removeToken();
-          }
-        } else {
-          if (import.meta.env.DEV) {
-            console.log('[AuthContext] No token found, user not authenticated');
-          }
-        }
-      } catch (error) {
-        console.error('[AuthContext] ❌ Auth check failed:', error);
-        tokenManager.removeToken();
-      } finally {
-        setIsLoading(false);
-      }
+      setLoading(false);
     };
-
     checkAuth();
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
-    setIsLoading(true);
-    
-    // Create a toast ID for loading notification
-    const loadingToast = toast.loading('Signing in...');
-    
-    try {
-      if (import.meta.env.DEV) {
-        console.log('[AuthContext] Attempting login with email:', email);
-      }
-      
-      // Call login API
-      const response = await authService.login({ email, password });
-      
-      if (response && response.token) {
-        // Store token in localStorage
-        tokenManager.setToken(response.token);
-        
-        // Update user state
-        setUser(response.user);
-        
-        // Verify token by testing the auth/me endpoint
-        try {
-          // Brief delay to ensure token is properly stored
-          await new Promise(resolve => setTimeout(resolve, 100));
-          
-          // Test the auth/me endpoint
-          if (import.meta.env.DEV) {
-            console.log('[AuthContext] Verifying token with auth/me endpoint');
-          }
-          
-          const verifyUser = await authService.getCurrentUser();
-          
-          if (import.meta.env.DEV) {
-            console.log('[AuthContext] Token verification successful:', verifyUser);
-          }
-        } catch (verifyError) {
-          console.error('[AuthContext] ❌ Token verification failed:', verifyError);
-          // Continue the login flow anyway, as we already have user data from login
-        }
-        
-        toast.dismiss(loadingToast);
-        toast.success('Signed in successfully');
-        
-        // Check if we have a return URL from a previous redirect
-        const returnUrl = localStorage.getItem('returnUrl');
-        if (returnUrl) {
-          localStorage.removeItem('returnUrl');
-          navigate(returnUrl);
-        } else {
-          navigate('/dashboard');
-        }
-      } else {
-        throw new Error('Invalid login response');
-      }
-    } catch (error) {
-      console.error('[AuthContext] ❌ Login failed:', error);
-      
-      // Dismiss loading toast
-      toast.dismiss(loadingToast);
-      
-      // Show appropriate error message based on error type
-      let errorMessage = 'Login failed';
-      
-      if (axios.isAxiosError(error)) {
-        if (error.response) {
-          if (error.response.status === 404) {
-            errorMessage = 'Login service is unavailable. Please try again later.';
-          } else if (error.response.status === 401) {
-            errorMessage = 'Invalid email or password.';
-          } else if (error.response.data?.message) {
-            errorMessage = error.response.data.message;
-          }
-        } else if (error.request) {
-          errorMessage = 'Network error. Please check your connection.';
-        }
-      } else if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      
-      // Show error toast
-      toast.error(errorMessage);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [navigate]);
+  // Mock Login Function
+  const login = async (): Promise<boolean> => {
+    setLoading(true);
+    console.log('🔌 Attempting mock login...');
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const mockToken = 'mock-auth-token-' + Date.now();
+    localStorage.setItem('authToken', mockToken);
+    setIsAuthenticated(true);
+    // Update mock user if needed
+    setUser({ id: '1', email: 'business@example.com', businessName: 'Test Business' }); 
+    setLoading(false);
+    console.log('✅ Mock login successful');
+    return true;
+  };
 
-  const logout = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      if (import.meta.env.DEV) {
-        console.log('[AuthContext] Logging out user');
-      }
-      
-      // Call the authService logout method which handles the API call
-      await authService.logout();
-      
-      // Clear the token from localStorage
-      tokenManager.removeToken();
-      
-      // Reset user state
-      setUser(null);
-      
-      // Show success message
-      toast.success('Logged out successfully');
-      
-      // Navigate to login page
-      navigate('/login');
-    } catch (error) {
-      // This should rarely happen with our improved authService.logout
-      console.error('[AuthContext] ❌ Logout encountered an unexpected error:', error);
-      
-      // Still clear the token and navigate to login for a consistent experience
-      tokenManager.removeToken();
-      setUser(null);
-      toast.success('Logged out successfully');
-      navigate('/login');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [navigate]);
+  // Logout Function
+  const logout = () => {
+    setLoading(true);
+    console.log('🔌 Logging out...');
+    localStorage.removeItem('authToken');
+    setIsAuthenticated(false);
+    setUser(null);
+    setLoading(false);
+    toast.success('Logged out successfully');
+    console.log('✅ Logged out');
+    // Navigate to login or home page might happen here or in the component calling logout
+  };
 
-  const register = useCallback(async (email: string, password: string, firstName: string, lastName: string) => {
-    setIsLoading(true);
+  // Signup Function
+  const signup = async (data: SignUpData): Promise<{ success: boolean; message?: string }> => {
+    setLoading(true);
+    console.log('🔌 Attempting business signup...', data);
+    const apiUrl = import.meta.env.VITE_API_URL || '/api';
+
     try {
-      const loadingToast = toast.loading('Creating your account...');
-      
-      if (import.meta.env.DEV) {
-        console.log('[AuthContext] Registering new user with email:', email);
-      }
-      
-      const response = await authService.register({ email, password, firstName, lastName });
-      
-      if (response && response.token) {
-        // Store token in localStorage
-        tokenManager.setToken(response.token);
-        
-        // Update user state
-        setUser(response.user);
-        
-        toast.dismiss(loadingToast);
-        toast.success('Account created successfully');
-        
-        navigate('/dashboard');
+      const response = await fetch(`${apiUrl}/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data), // Sends { businessName, email, password }
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        console.log('✅ Signup successful:', result);
+        setLoading(false);
+        return { success: true };
       } else {
-        throw new Error('Invalid registration response');
+        console.error('❌ Signup failed:', result);
+        setLoading(false);
+        return { success: false, message: result.message || 'Signup failed' };
       }
     } catch (error) {
-      console.error('[AuthContext] ❌ Registration failed:', error);
-      
-      // Show appropriate error message
-      let errorMessage = 'Registration failed';
-      
-      if (axios.isAxiosError(error) && error.response) {
-        if (error.response.data?.message) {
-          errorMessage = error.response.data.message;
-        } else if (error.response.status === 409) {
-          errorMessage = 'An account with this email already exists.';
-        }
-      } else if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      
-      toast.error(errorMessage);
-      throw error;
-    } finally {
-      setIsLoading(false);
+      console.error('❌ Signup network/fetch error:', error);
+      setLoading(false);
+      return { success: false, message: 'Network error during signup. Please try again.' };
     }
-  }, [navigate]);
+  };
+
+  // Memoize the context value to prevent unnecessary re-renders
+  const value = useMemo(() => ({
+    isAuthenticated,
+    user,
+    loading,
+    login,
+    logout,
+    signup,
+  }), [isAuthenticated, user, loading]); // Removed login, logout, signup from deps as they are stable
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isAuthenticated: !!user,
-        isLoading,
-        login,
-        logout,
-        register
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-// Custom hook to access the auth context
+// Create a custom hook to use the AuthContext
 export const useAuth = () => {
-  const context = React.useContext(AuthContext);
+  const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }

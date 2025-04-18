@@ -1,5 +1,6 @@
 import { DisplayMetadata, DisplayRegistration, DisplayToken, DisplayStatus } from '../types/display';
 import { ContentSchedule, ContentPlaybackStatus, Content } from '../types/content';
+import { ContentType, RepeatMode, ScheduleEntry } from '../types';
 
 export const mockDisplayMetadata: DisplayMetadata = {
   id: 'test-display-1',
@@ -71,14 +72,20 @@ export const mockContentSchedule: ContentSchedule = {
     {
       contentId: 'test-content-1',
       startTime: new Date(),
-      endTime: new Date(Date.now() + 30000), // 30 seconds from now
-      priority: 1
+      endTime: new Date(Date.now() + 30000),
+      priority: 1,
+      repeat: 'none',
+      active: true,
+      createdAt: new Date(Date.now() - 60000),
     },
     {
       contentId: 'test-content-2',
       startTime: new Date(Date.now() + 30000),
-      endTime: new Date(Date.now() + 60000), // 60 seconds from now
-      priority: 2
+      endTime: new Date(Date.now() + 60000),
+      priority: 2,
+      repeat: 'daily',
+      active: true,
+      createdAt: new Date(Date.now() - 50000),
     }
   ],
   isActive: true,
@@ -92,4 +99,25 @@ export const mockContentPlaybackStatus: ContentPlaybackStatus = {
   status: 'playing',
   currentTime: 15,
   lastUpdated: new Date()
-}; 
+};
+
+export const mockScheduleEntries: ScheduleEntry[] = [
+  {
+    contentId: 'test-content-1',
+    startTime: new Date('2024-01-01T09:00:00Z'),
+    endTime: new Date('2024-01-01T10:00:00Z'),
+    priority: 1,
+    repeat: 'none',
+    active: true,
+    createdAt: new Date('2024-01-01T08:00:00Z'),
+  },
+  {
+    contentId: 'test-content-2',
+    startTime: new Date('2024-01-01T10:00:00Z'),
+    endTime: new Date('2024-01-01T11:00:00Z'),
+    priority: 2,
+    repeat: 'daily',
+    active: true,
+    createdAt: new Date('2024-01-01T08:05:00Z'),
+  }
+]; 

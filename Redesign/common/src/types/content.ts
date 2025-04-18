@@ -1,4 +1,4 @@
-import { Schedule, ScheduleInfo } from './schedule';
+import { Schedule, ScheduleInfo, ScheduleEntry } from './schedule';
 
 export interface ContentItem {
   id: string;
@@ -13,7 +13,7 @@ export interface ContentItem {
   _id?: string; // MongoDB ID for backward compatibility
 }
 
-export type ContentType = 'image' | 'video' | 'webpage' | 'text' | 'html';
+export type ContentType = 'image' | 'video' | 'webpage' | 'text' | 'html' | 'stream' | 'widget';
 
 export interface ContentMetadata {
   width?: number;
@@ -35,12 +35,7 @@ export interface ContentSchedule {
   id: string;
   name: string;
   displayId: string;
-  items: Array<{
-    contentId: string;
-    startTime: Date | string;
-    endTime: Date | string;
-    priority: number;
-  }>;
+  items: Array<ScheduleEntry>;
   isActive: boolean;
   createdAt: Date | string;
   updatedAt?: Date | string;
@@ -60,6 +55,8 @@ export interface Content {
   title: string;
   type: ContentType;
   url: string;
+  duration?: number; // in seconds
+  settings?: ContentDisplaySettings;
   metadata?: ContentMetadata;
   tags?: string[];
   folder?: string;
@@ -78,6 +75,8 @@ export interface ContentDisplaySettings {
   loop?: boolean;
   mute?: boolean;
   fit?: 'contain' | 'cover' | 'fill' | 'none';
+  position?: string;
+  sound?: { enabled?: boolean };
 }
 
 export interface ContentPushOptions {

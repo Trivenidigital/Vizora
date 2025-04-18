@@ -12,7 +12,7 @@
 - Authentication system with JWT tokens
 
 ## What's Left to Build
-- Complete QR-based pairing flow
+- Complete QR-based pairing flow **(Auto-start on TV deferred)**
 - Enhanced content scheduling interface
 - Content playback with transitions
 - Comprehensive error handling and recovery
@@ -24,7 +24,7 @@
 
 ## Current Status
 - **VizoraWeb**: Basic admin interface functional, needs enhancement for content scheduling
-- **VizoraTV**: Display and QR generation works, content playback needs completion
+- **VizoraTV**: Display and QR generation works, **requires manual "Start Pairing" button click for now (auto-start deferred)**, content playback needs completion
 - **VizoraMiddleware**: Core API endpoints functional, socket handling in progress
 - **VizoraDisplay**: Initial structure created, content orchestration in development
 - **common**: ConnectionManager and shared types established, ongoing refinements
@@ -35,6 +35,7 @@
 - Content scheduling UI requires enhanced user experience
 - Error handling for network failures needs standardization
 - Performance optimization for content delivery not implemented
+- **VizoraTV pairing doesn't reliably auto-start on load (requires button click); issue deferred.**
 
 ## Evolution of Project Decisions
 

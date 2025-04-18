@@ -1,11 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Content } from '@vizora/common/types';
-import { contentService } from '../services';
+import { ContentService } from '../services/contentService';
+import { ScheduleService } from '../services/scheduleService';
+import { PlaybackEngine, PlaybackState } from '../services/PlaybackEngine';
+import { DisplayStatus } from '@vizora/common/types';
 
 interface ContentPlayerProps {
-  content: Content | null;
-  onError?: (error: Error) => void;
-  onContentEnd?: () => void;
+  contentItem: Content | null;
+  scheduleService: ScheduleService;
+  contentService: ContentService;
+  displayStatus: DisplayStatus | null;
+  onComplete?: () => void;
   autoAdvance?: boolean;
 }
 
@@ -13,9 +18,11 @@ interface ContentPlayerProps {
  * Enhanced Content Player with offline support and fallbacks
  */
 const ContentPlayer: React.FC<ContentPlayerProps> = ({
-  content,
-  onError,
-  onContentEnd,
+  contentItem,
+  scheduleService,
+  contentService,
+  displayStatus,
+  onComplete,
   autoAdvance = true
 }) => {
   const [loading, setLoading] = useState<boolean>(true);
@@ -36,8 +43,8 @@ const ContentPlayer: React.FC<ContentPlayerProps> = ({
     setContentReady(false);
     setFallbackMode(false);
     
-    if (content) {
-      loadContent(content);
+    if (contentItem) {
+      loadContent(contentItem);
     }
     
     return () => {
@@ -52,7 +59,7 @@ const ContentPlayer: React.FC<ContentPlayerProps> = ({
         setBinaryAssetUrl(null);
       }
     };
-  }, [content?.id]);
+  }, [contentItem?.id]);
 
   /**
    * Load content with offline fallbacks
@@ -85,8 +92,8 @@ const ContentPlayer: React.FC<ContentPlayerProps> = ({
         
         // Add 500ms buffer to ensure smooth transitions
         timerRef.current = setTimeout(() => {
-          if (onContentEnd) {
-            onContentEnd();
+          if (onComplete) {
+            onComplete();
           }
         }, contentItem.duration + 500);
       }
@@ -98,8 +105,8 @@ const ContentPlayer: React.FC<ContentPlayerProps> = ({
       setError(`Failed to load content: ${error.message}`);
       setLoading(false);
       
-      if (onError) {
-        onError(error);
+      if (onComplete) {
+        onComplete();
       }
     }
   };
@@ -119,7 +126,7 @@ const ContentPlayer: React.FC<ContentPlayerProps> = ({
     console.error('Content load error:', e);
     
     // If using binary asset and it failed, try falling back to original URL
-    if (binaryAssetUrl && !fallbackMode && content) {
+    if (binaryAssetUrl && !fallbackMode && contentItem) {
       console.log('Falling back to original content URL');
       URL.revokeObjectURL(binaryAssetUrl);
       setBinaryAssetUrl(null);
@@ -130,8 +137,8 @@ const ContentPlayer: React.FC<ContentPlayerProps> = ({
     // Otherwise, report the error
     setError('Failed to load content');
     
-    if (onError) {
-      onError(new Error('Content load failed'));
+    if (onComplete) {
+      onComplete();
     }
   };
 
@@ -139,7 +146,7 @@ const ContentPlayer: React.FC<ContentPlayerProps> = ({
    * Render content based on type
    */
   const renderContent = () => {
-    if (!content) {
+    if (!contentItem) {
       return <div className="no-content">No content available</div>;
     }
     
@@ -158,27 +165,27 @@ const ContentPlayer: React.FC<ContentPlayerProps> = ({
       return (
         <div className="content-error">
           <p>{error}</p>
-          <button onClick={() => loadContent(content)}>Retry</button>
+          <button onClick={() => loadContent(contentItem)}>Retry</button>
         </div>
       );
     }
     
     // Get effective URL (either cached binary or original)
-    const effectiveUrl = binaryAssetUrl || content.url;
+    const effectiveUrl = binaryAssetUrl || contentItem.url;
     
-    switch (content.type) {
+    switch (contentItem.type) {
       case 'image':
         return (
           <img
             ref={imageRef}
             src={effectiveUrl}
-            alt={content.title || 'Image content'}
+            alt={contentItem.title || 'Image content'}
             className={`content-image ${contentReady ? 'ready' : 'loading'}`}
             onLoad={handleContentLoaded}
             onError={handleContentError}
             style={{
-              objectFit: content.settings?.fit || 'contain',
-              objectPosition: content.settings?.position || 'center'
+              objectFit: contentItem.settings?.fit || 'contain',
+              objectPosition: contentItem.settings?.position || 'center'
             }}
           />
         );
@@ -190,15 +197,15 @@ const ContentPlayer: React.FC<ContentPlayerProps> = ({
             src={effectiveUrl}
             className={`content-video ${contentReady ? 'ready' : 'loading'}`}
             autoPlay
-            muted={!content.settings?.sound?.enabled}
-            loop={content.settings?.loop || false}
+            muted={!contentItem.settings?.sound?.enabled}
+            loop={contentItem.settings?.loop || false}
             playsInline
             controls={false}
             onCanPlay={handleContentLoaded}
             onError={handleContentError}
             style={{
-              objectFit: content.settings?.fit || 'contain',
-              objectPosition: content.settings?.position || 'center'
+              objectFit: contentItem.settings?.fit || 'contain',
+              objectPosition: contentItem.settings?.position || 'center'
             }}
           />
         );
@@ -208,12 +215,12 @@ const ContentPlayer: React.FC<ContentPlayerProps> = ({
           <div className="iframe-container">
             <iframe
               ref={iframeRef}
-              src={content.url}
+              src={contentItem.url}
               className={`content-iframe ${contentReady ? 'ready' : 'loading'}`}
               onLoad={handleContentLoaded}
               onError={handleContentError}
               sandbox="allow-scripts allow-same-origin"
-              title={content.title || 'Web content'}
+              title={contentItem.title || 'Web content'}
             />
             {!contentReady && (
               <div className="iframe-loading">
@@ -229,10 +236,10 @@ const ContentPlayer: React.FC<ContentPlayerProps> = ({
           <div className="stream-container">
             <video
               ref={videoRef}
-              src={content.url}
+              src={contentItem.url}
               className={`content-stream ${contentReady ? 'ready' : 'loading'}`}
               autoPlay
-              muted={!content.settings?.sound?.enabled}
+              muted={!contentItem.settings?.sound?.enabled}
               playsInline
               controls={false}
               onCanPlay={handleContentLoaded}
@@ -252,14 +259,14 @@ const ContentPlayer: React.FC<ContentPlayerProps> = ({
         return (
           <div 
             className="widget-container"
-            dangerouslySetInnerHTML={{ __html: content.url }}
+            dangerouslySetInnerHTML={{ __html: contentItem.url }}
           />
         );
         
       default:
         return (
           <div className="unsupported-content">
-            <p>Unsupported content type: {content.type}</p>
+            <p>Unsupported content type: {contentItem.type}</p>
           </div>
         );
     }

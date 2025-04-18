@@ -1,5 +1,5 @@
 /**
- * Express application for testing
+ * Express application
  */
 
 const express = require('express');
@@ -10,13 +10,32 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Enable CORS for all routes - MOVED TO TOP
+// Import Auth Routes using absolute path
+const authRoutesPath = path.join(__dirname, 'src', 'routes', 'auth.routes.js');
+console.log(`[DEBUG] Attempting to require auth routes from: ${authRoutesPath}`);
+const authRoutes = require(authRoutesPath);
+console.log('[DEBUG] Type of imported authRoutes:', typeof authRoutes, authRoutes instanceof Function ? '(Function)' : '(Object)');
+
+// NOTE: Assuming content routes are defined below for now, or imported correctly if in separate file
+
+// Enable CORS for all routes
 app.use(cors({
   origin: 'http://localhost:5173',
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
+
+// Handle preflight OPTIONS requests explicitly
+app.options('*', (req, res) => {
+  console.log(`[OPTIONS] Preflight request for ${req.originalUrl}`);
+  res.header('Access-Control-Allow-Origin', 'http://localhost:5173'); 
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Max-Age', '86400');
+  res.status(204).end();
+});
 
 // Body parser
 app.use(express.json());
@@ -29,787 +48,61 @@ app.use((req, res, next) => {
   next();
 });
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/');
-  },
-  filename: function (req, file, cb) {
-    // Generate unique filename with original extension
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(file.originalname);
-    cb(null, uniqueSuffix + ext);
-  }
-});
+// Configure multer ...
+const storage = multer.diskStorage({ /* ... */ });
+const fileFilter = (req, file, cb) => { /* ... */ };
+const upload = multer({ storage, fileFilter, limits: { fileSize: 100 * 1024 * 1024 } });
 
-// File filter function to validate file types
-const fileFilter = (req, file, cb) => {
-  // Accept images, videos, and documents
-  const allowedTypes = [
-    'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-    'video/mp4', 'video/quicktime', 'video/webm',
-    'application/pdf', 'application/msword', 
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-  ];
-  
-  if (allowedTypes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Invalid file type. Only images, videos, and documents are allowed.'), false);
-  }
-};
-
-// Configure multer with storage and file size limits
-const upload = multer({ 
-  storage: storage,
-  fileFilter: fileFilter,
-  limits: { 
-    fileSize: 100 * 1024 * 1024 // 100MB limit
-  }
-});
-
-// Set up static file serving for the uploads directory
+// Static file serving for uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Import routes - Create simple content routes directly here
+// Define contentRoutes router and its routes
 const contentRoutes = express.Router();
+const mockContent = [ /* ... mock data ... */ ];
+const getContentTypeFromMimetype = (mimetype) => { /* ... */ };
+const generateThumbnailUrl = (fileType, filePath) => { /* ... */ };
+contentRoutes.get('/content', (req, res) => { /* ... handler ... */ });
+contentRoutes.get('/content/:id', (req, res) => { /* ... handler ... */ });
+contentRoutes.post('/content', upload.single('file'), (req, res) => { /* ... handler ... */ });
+contentRoutes.put('/content/:id', (req, res) => { /* ... handler ... */ });
+contentRoutes.patch('/content/:id', (req, res) => { /* ... handler ... */ });
+contentRoutes.delete('/content/:id', (req, res) => { /* ... handler ... */ });
+contentRoutes.post('/content/upload', upload.single('file'), (req, res) => { /* ... handler ... */ });
 
-// Enhanced mock content data
-const mockContent = [
-  {
-    id: '1',
-    title: 'Product Banner',
-    type: 'image',
-    url: 'https://picsum.photos/id/1/800/600',
-    thumbnail: 'https://picsum.photos/id/1/800/600',
-    status: 'active',
-    createdAt: '2023-05-01T10:30:00Z',
-    updatedAt: '2023-05-01T10:30:00Z',
-    size: 1024 * 1024 * 2.5, // 2.5 MB
-    owner: 'admin@vizora.ai',
-    description: 'A beautiful product banner for the homepage',
-    tags: ['banner', 'product', 'marketing'],
-    category: 'marketing'
-  },
-  {
-    id: '2',
-    title: 'Company Introduction',
-    type: 'video',
-    url: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4',
-    thumbnail: 'https://picsum.photos/id/2/800/600',
-    status: 'active',
-    createdAt: '2023-05-10T14:45:00Z',
-    updatedAt: '2023-05-15T09:20:00Z',
-    size: 1024 * 1024 * 15, // 15 MB
-    owner: 'admin@vizora.ai',
-    description: 'A short company introduction video',
-    duration: 120, // 2 minutes in seconds
-    tags: ['video', 'company', 'introduction'],
-    category: 'corporate'
-  },
-  {
-    id: '3',
-    title: 'Summer Sale Promo',
-    type: 'image',
-    url: 'https://picsum.photos/id/3/800/600',
-    thumbnail: 'https://picsum.photos/id/3/800/600',
-    status: 'active',
-    createdAt: '2023-06-05T11:15:00Z',
-    updatedAt: '2023-06-05T11:15:00Z',
-    size: 1024 * 1024 * 1.2, // 1.2 MB
-    owner: 'admin@vizora.ai',
-    description: 'Summer promotional banner for the sales page',
-    tags: ['banner', 'sale', 'summer', 'promotion'],
-    category: 'marketing'
-  },
-  {
-    id: '4',
-    title: 'Product Demo Video',
-    type: 'video',
-    url: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4',
-    thumbnail: 'https://picsum.photos/id/4/800/600',
-    status: 'active',
-    createdAt: '2023-06-10T09:30:00Z',
-    updatedAt: '2023-06-10T09:30:00Z',
-    size: 1024 * 1024 * 20, // 20 MB
-    owner: 'admin@vizora.ai',
-    description: 'Product demonstration video showing key features',
-    duration: 180, // 3 minutes in seconds
-    tags: ['video', 'product', 'demo', 'features'],
-    category: 'product'
-  },
-  {
-    id: '5',
-    title: 'Team Photo',
-    type: 'image',
-    url: 'https://picsum.photos/id/5/800/600',
-    thumbnail: 'https://picsum.photos/id/5/800/600',
-    status: 'active',
-    createdAt: '2023-06-15T13:20:00Z',
-    updatedAt: '2023-06-15T13:20:00Z',
-    size: 1024 * 1024 * 3.8, // 3.8 MB
-    owner: 'admin@vizora.ai',
-    description: 'Official company team photo',
-    tags: ['photo', 'team', 'company'],
-    category: 'corporate'
-  }
-];
+// --- Route Mounting Order --- 
 
-// Helper function to get content type from mimetype
-const getContentTypeFromMimetype = (mimetype) => {
-  if (mimetype.startsWith('image/')) return 'image';
-  if (mimetype.startsWith('video/')) return 'video';
-  if (mimetype.startsWith('application/pdf')) return 'document';
-  if (mimetype.includes('word') || mimetype.includes('excel') || mimetype.includes('spreadsheet')) return 'document';
-  return 'other';
-};
+// Mount Auth Routes FIRST
+app.use('/api/auth', authRoutes); 
 
-// Helper function to generate thumbnail URL
-const generateThumbnailUrl = (fileType, filePath) => {
-  if (fileType === 'image') {
-    return filePath; // Use the image itself as thumbnail
-  } else if (fileType === 'video') {
-    return 'https://picsum.photos/id/1/800/600'; // Mock video thumbnail
-  } else if (fileType === 'document') {
-    return 'https://picsum.photos/id/3/800/600'; // Mock document thumbnail
-  } else {
-    return 'https://picsum.photos/id/2/800/600'; // Default thumbnail
-  }
-};
+// Mount Content Routes SECOND
+app.use('/api/content', contentRoutes); // Use specific path
 
-// Enhanced content routes with pagination, filtering, and sorting
-contentRoutes.get('/content', (req, res) => {
-  console.log('[CONTENT API] GET /content with query:', req.query);
-  
-  // Pagination parameters
-  const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 20;
-  const startIndex = (page - 1) * limit;
-  const endIndex = page * limit;
-  
-  // Filtering parameters
-  let filteredContent = [...mockContent];
-  
-  // Filter by content type
-  if (req.query.type) {
-    filteredContent = filteredContent.filter(item => item.type === req.query.type);
-  }
-  
-  // Filter by status
-  if (req.query.status) {
-    filteredContent = filteredContent.filter(item => item.status === req.query.status);
-  }
-  
-  // Filter by owner
-  if (req.query.owner) {
-    filteredContent = filteredContent.filter(item => item.owner === req.query.owner);
-  }
-  
-  // Filter by category
-  if (req.query.category) {
-    filteredContent = filteredContent.filter(item => item.category === req.query.category);
-  }
-  
-  // Search by title or description
-  if (req.query.search) {
-    const searchTerm = req.query.search.toLowerCase();
-    filteredContent = filteredContent.filter(item => 
-      item.title.toLowerCase().includes(searchTerm) || 
-      (item.description && item.description.toLowerCase().includes(searchTerm))
-    );
-  }
-  
-  // Filter by tag
-  if (req.query.tag) {
-    const tagTerm = req.query.tag.toLowerCase();
-    filteredContent = filteredContent.filter(item => 
-      item.tags && item.tags.some(tag => tag.toLowerCase() === tagTerm)
-    );
-  }
-  
-  // Sorting
-  if (req.query.sort) {
-    const sortField = req.query.sort;
-    const sortOrder = req.query.order === 'desc' ? -1 : 1;
-    
-    filteredContent.sort((a, b) => {
-      if (a[sortField] < b[sortField]) return -1 * sortOrder;
-      if (a[sortField] > b[sortField]) return 1 * sortOrder;
-      return 0;
-    });
-  }
-  
-  // Apply pagination
-  const paginatedContent = filteredContent.slice(startIndex, endIndex);
-  
-  // Return response
-  res.status(200).json({
-    success: true,
-    content: paginatedContent,
-    pagination: {
-      total: filteredContent.length,
-      page,
-      pages: Math.ceil(filteredContent.length / limit),
-      limit
-    }
-  });
-});
+// --- Other Direct Routes --- 
+app.get('/api/displays', (req, res) => { /* ... handler ... */ });
+app.get('/api/displays-old', (req, res) => { /* ... handler ... */ });
+app.post('/api/displays/pair', (req, res) => { /* ... handler ... */ });
+app.get('/api/test', (req, res) => { /* ... handler ... */ });
+app.get('/api/health', (req, res) => { /* ... handler ... */ });
 
-contentRoutes.get('/content/:id', (req, res) => {
-  console.log(`[CONTENT API] GET /content/${req.params.id}`);
-  
-  const content = mockContent.find(item => item.id === req.params.id);
-  
-  if (!content) {
-    return res.status(404).json({
-      success: false,
-      message: `Content with ID ${req.params.id} not found`
-    });
-  }
-  
-  res.status(200).json({
-    success: true,
-    content
-  });
-});
-
-// Content upload endpoint (combining upload and creation)
-contentRoutes.post('/content', upload.single('file'), (req, res) => {
-  console.log('[CONTENT API] POST /content with file upload');
-  
-  try {
-    // Check if file was uploaded
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'No file uploaded'
-      });
-    }
-    
-    // Get file details
-    const { filename, path: filePath, mimetype, size } = req.file;
-    
-    // Get content metadata from the form data
-    const { title, description, status, category, tags } = req.body;
-    
-    // Validate required fields
-    if (!title) {
-      // Remove the uploaded file if validation fails
-      fs.unlinkSync(filePath);
-      
-      return res.status(400).json({
-        success: false,
-        message: 'Title is required'
-      });
-    }
-    
-    // Determine content type from mimetype
-    const type = getContentTypeFromMimetype(mimetype);
-    
-    // Generate a public URL for the file
-    const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${filename}`;
-    
-    // Generate thumbnail URL based on content type
-    const thumbnailUrl = generateThumbnailUrl(type, fileUrl);
-    
-    // Parse tags if provided
-    let parsedTags = [];
-    if (tags) {
-      try {
-        if (typeof tags === 'string') {
-          parsedTags = tags.split(',').map(tag => tag.trim());
-        } else if (Array.isArray(tags)) {
-          parsedTags = tags;
-        }
-      } catch (err) {
-        console.error('Error parsing tags:', err);
-      }
-    }
-    
-    // Create new content item
-    const newContent = {
-      id: `content-${Date.now()}`,
-      title,
-      description: description || '',
-      type,
-      url: fileUrl,
-      thumbnail: thumbnailUrl,
-      status: status || 'active',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      size,
-      owner: req.user?.email || 'admin@vizora.ai',
-      tags: parsedTags,
-      category: category || 'uncategorized'
-    };
-    
-    // In a real app, we would save this to the database
-    // For mock purposes, add it to the mockContent array
-    mockContent.push(newContent);
-    
-    res.status(201).json({
-      success: true,
-      content: newContent,
-      message: 'Content uploaded successfully'
-    });
-  } catch (error) {
-    console.error('Error in content upload:', error);
-    
-    res.status(500).json({
-      success: false,
-      message: 'Error uploading content: ' + error.message
-    });
-  }
-});
-
-// Update content endpoint (PUT for full updates)
-contentRoutes.put('/content/:id', (req, res) => {
-  console.log(`[CONTENT API] PUT /content/${req.params.id}`, req.body);
-  
-  // Find the content in our mock data
-  const contentIndex = mockContent.findIndex(item => item.id === req.params.id);
-  
-  if (contentIndex === -1) {
-    return res.status(404).json({
-      success: false,
-      message: `Content with ID ${req.params.id} not found`
-    });
-  }
-  
-  // Update the content
-  const updatedContent = {
-    ...mockContent[contentIndex],
-    ...req.body,
-    updatedAt: new Date().toISOString()
-  };
-  
-  // In a real app, we would update this in the database
-  // For mock purposes, update in the mockContent array
-  mockContent[contentIndex] = updatedContent;
-  
-  res.status(200).json({
-    success: true,
-    content: updatedContent,
-    message: 'Content updated successfully'
-  });
-});
-
-// Patch content metadata endpoint (PATCH for partial updates)
-contentRoutes.patch('/content/:id', (req, res) => {
-  console.log(`[CONTENT API] PATCH /content/${req.params.id}`, req.body);
-  
-  // Find the content in our mock data
-  const contentIndex = mockContent.findIndex(item => item.id === req.params.id);
-  
-  if (contentIndex === -1) {
-    return res.status(404).json({
-      success: false,
-      message: `Content with ID ${req.params.id} not found`
-    });
-  }
-  
-  // Update only the provided fields
-  const updatedContent = {
-    ...mockContent[contentIndex],
-    ...req.body,
-    updatedAt: new Date().toISOString()
-  };
-  
-  // Handle tags specially if provided
-  if (req.body.tags) {
-    try {
-      if (typeof req.body.tags === 'string') {
-        updatedContent.tags = req.body.tags.split(',').map(tag => tag.trim());
-      } else if (Array.isArray(req.body.tags)) {
-        updatedContent.tags = req.body.tags;
-      }
-    } catch (err) {
-      console.error('Error parsing tags:', err);
-    }
-  }
-  
-  // In a real app, we would update this in the database
-  // For mock purposes, update in the mockContent array
-  mockContent[contentIndex] = updatedContent;
-  
-  res.status(200).json({
-    success: true,
-    content: updatedContent,
-    message: 'Content metadata updated successfully'
-  });
-});
-
-contentRoutes.delete('/content/:id', (req, res) => {
-  console.log(`[CONTENT API] DELETE /content/${req.params.id}`);
-  
-  // Find the content in our mock data
-  const contentIndex = mockContent.findIndex(item => item.id === req.params.id);
-  
-  if (contentIndex === -1) {
-    return res.status(404).json({
-      success: false,
-      message: `Content with ID ${req.params.id} not found`
-    });
-  }
-  
-  // Get the content to delete
-  const contentToDelete = mockContent[contentIndex];
-  
-  // If this is a real file stored in our uploads directory, delete it
-  if (contentToDelete.url) {
-    // Extract the filename from the URL
-    const urlPath = new URL(contentToDelete.url).pathname;
-    const filePath = path.join(__dirname, urlPath);
-    
-    // Check if the file exists in our uploads directory and delete it
-    try {
-      if (fs.existsSync(filePath) && filePath.includes('uploads')) {
-        fs.unlinkSync(filePath);
-        console.log(`Deleted file: ${filePath}`);
-      }
-    } catch (err) {
-      console.error('Error deleting file:', err);
-      // Continue even if file deletion fails
-    }
-  }
-  
-  // In a real app, we would delete this from the database
-  // For mock purposes, remove from the mockContent array
-  mockContent.splice(contentIndex, 1);
-  
-  res.status(200).json({
-    success: true,
-    message: `Content with ID ${req.params.id} deleted successfully`
-  });
-});
-
-// Legacy upload endpoint for compatibility
-contentRoutes.post('/content/upload', upload.single('file'), (req, res) => {
-  console.log('[CONTENT API] POST /content/upload');
-  
-  try {
-    // Check if file was uploaded
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'No file uploaded'
-      });
-    }
-    
-    // Get file details
-    const { filename, path: filePath, mimetype, size } = req.file;
-    
-    // Generate a public URL for the file
-    const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${filename}`;
-    
-    const fileId = `file-${Date.now()}`;
-    
-    res.status(200).json({
-      success: true,
-      data: {
-        uploadId: fileId,
-        url: fileUrl,
-        fileType: mimetype,
-        size: size
-      },
-      message: 'File uploaded successfully'
-    });
-  } catch (error) {
-    console.error('Error in file upload:', error);
-    
-    res.status(500).json({
-      success: false,
-      message: 'Error uploading file: ' + error.message
-    });
-  }
-});
-
-// Mount the content routes - this will handle all /api/content* routes
-app.use('/api', contentRoutes);
-
-// DIRECT IMPLEMENTATION: /api/displays endpoint
-app.get('/api/displays', (req, res) => {
-  console.log('[GET] Direct implementation of /api/displays endpoint hit');
-  
-  try {
-    // Using res.json() ensures proper content-type and content-length handling
-    res.status(200).json({
-      success: true,
-      data: [] // Empty array
-    });
-    console.log('[GET] /api/displays response sent successfully');
-  } catch (error) {
-    console.error('[ERROR] /api/displays error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error',
-      error: error.message
-    });
-  }
-});
-});
-
-// Temporary mock endpoint for displays
-app.get('/api/displays-old', (req, res) => {
-  console.log('[GET] /api/displays-old hit');
-  
-  try {
-    // Using res.json() ensures proper content-type and content-length handling
-    res.status(200).json({
-      success: true,
-      data: [] // Empty array
-    });
-    console.log('[GET] /api/displays-old response sent successfully');
-  } catch (error) {
-    console.error('[ERROR] /api/displays-old error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error',
-      error: error.message
-    });
-  }
-});
-});
-
-// Also handle displays directly (in case the router omits the /api prefix)
-app.get('/displays', (req, res) => {
-  console.log('[GET] /displays hit - redirecting to /api/displays');
-  
-  try {
-    // Using res.json() ensures proper content-type and content-length handling
-    res.status(200).json({
-      success: true,
-      data: [] // Empty array
-    });
-    console.log('[GET] /displays response sent successfully');
-  } catch (error) {
-    console.error('[ERROR] /displays error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error',
-      error: error.message
-    });
-  }
-});
-});
-
-// Simple pairing code route for VizoraTV
-app.post('/api/displays/pair', (req, res) => {
-  console.log('[API] Pairing request received at /api/displays/pair');
-  
-  const { pairingCode, name, location } = req.body;
-  
-  if (!pairingCode) {
-    return res.status(400).json({
-      success: false,
-      message: 'Pairing code is required'
-    });
-  }
-
-  // Create a new display object with the provided information
-  const display = {
-    id: `disp-${Math.random().toString(36).substr(2, 9)}`,
-    name: name || `Display-${pairingCode}`,
-    location: location || 'Unknown',
-    status: 'online',
-    qrCode: pairingCode,
-    lastConnected: new Date().toISOString(),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
-
-  console.log(`[API] Pairing display with name: ${display.name}, location: ${display.location}`);
-
-  res.status(200).json({
-    success: true,
-    message: 'Display paired successfully',
-    display
-  });
-});
-
-// Simple test route
-app.get('/api/test', (req, res) => {
-  console.log('[API] Test endpoint called');
-  res.json({ message: 'Test route' });
-});
-
-// Health check
-app.get('/api/health', (req, res) => {
-  console.log('[API] Health check called');
-  res.json({ status: 'ok' });
-});
-
-// Mock auth middleware
-const authMiddleware = (req, res, next) => {
-  // Extract token from Authorization header or from cookie
-  let token = null;
-  
-  // Check Authorization header
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    token = authHeader.substring(7);
-  }
-  
-  // If no token in header, check cookie
-  if (!token && req.cookies && req.cookies.token) {
-    token = req.cookies.token;
-  }
-  
-  if (!token) {
-    return res.status(401).json({ 
-      success: false, 
-      message: 'Authentication required',
-      statusCode: 401
-    });
-  }
-  
-  try {
-    // For real app, you would verify the JWT here
-    // For now, we'll accept any token and attach a mock user
-    req.user = {
-      id: '1',
-      email: 'admin@vizora.ai',
-      firstName: 'Admin',
-      lastName: 'User',
-      role: 'admin'
-    };
-    next();
-  } catch (error) {
-    console.error('Auth error:', error);
-    return res.status(401).json({ 
-      success: false, 
-      message: 'Invalid or expired token',
-      statusCode: 401
-    });
-  }
-};
-
-// Example of a protected route
-app.get('/api/protected', authMiddleware, (req, res) => {
-  res.json({ 
-    success: true, 
-    message: 'This is protected data',
-    user: req.user
-  });
-});
-
-// Example of an admin-only route
-app.get('/api/admin', authMiddleware, (req, res) => {
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ 
-      success: false, 
-      message: 'Admin privileges required',
-      statusCode: 403
-    });
-  }
-  
-  res.json({ 
-    success: true, 
-    message: 'Admin data',
-    data: {
-      stats: {
-        users: 55,
-        content: 312,
-        displays: 18
-      }
-    }
-  });
-});
-
-// Auth endpoints
-app.post('/api/auth/login', (req, res) => {
-  // Validate email and password
-  const { email, password } = req.body;
-  
-  if (!email || !password) {
-    return res.status(400).json({ 
-      success: false, 
-      message: 'Email and password are required',
-      statusCode: 400
-    });
-  }
-  
-  // Mock user (in a real app this would come from your database)
-  const user = {
-    id: '1',
-    email: 'admin@vizora.ai',
-    firstName: 'Admin',
-    lastName: 'User',
-    role: 'admin'
-  };
-  
-  // Create a mock JWT token
-  const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZW1haWwiOiJhZG1pbkB2aXpvcmEuYWkiLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE2NzY5MTcyMDAsImV4cCI6MTY3NzAwMzYwMH0.vqHlp5rCmEj9K8RM2UgM5GZ60nfQZA8OMY1GyVCmQFU';
-  
-  // Set token as a cookie for session
-  res.cookie('token', token, {
-    httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000, // 1 day
-    sameSite: 'lax'
-  });
-  
-  // Return success response with user data and token
-  res.json({
-    success: true,
-    message: 'Login successful',
-    user,
-    token
-  });
-});
-
-// Logout endpoint
-app.post('/api/auth/logout', (req, res) => {
-  // Clear the token cookie
-  res.clearCookie('token');
-  
-  res.json({
-    success: true,
-    message: 'Logged out successfully'
-  });
-});
-
-// Current user endpoint
-app.get('/api/auth/me', authMiddleware, (req, res) => {
-  // The user object is attached by the auth middleware
-  res.json({
-    success: true,
-    message: 'User data retrieved successfully',
-    user: req.user
-  });
-});
+// Mock auth middleware definition
+const authMiddleware = (req, res, next) => { /* ... handler ... */ };
+app.get('/api/protected', authMiddleware, (req, res) => { /* ... handler ... */ });
+app.get('/api/admin', authMiddleware, (req, res) => { /* ... handler ... */ });
 
 // Fallback for /displays route
-app.get('/displays', (req, res) => {
-  res.redirect('/api/displays');
+app.get('/displays', (req, res) => { res.redirect('/api/displays'); });
+
+// Error Handling Middleware (Keep at the end)
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  const statusCode = err.statusCode || 500;
+  const message = err.message || 'Internal Server Error';
+  res.status(statusCode).json({
+    success: false,
+    message: message,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  });
 });
 
-// Handle preflight OPTIONS requests explicitly
-app.options('*', (req, res) => {
-  console.log(`[OPTIONS] Preflight request for ${req.originalUrl}`);
-  
-  // Set CORS headers manually for preflight
-  res.header('Access-Control-Allow-Origin', 'http://localhost:5173');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Max-Age', '86400'); // 24 hours
-  
-  // Respond with 204 No Content
-  res.status(204).end();
-});
-
-// Start the server
-const PORT = process.env.PORT || 3003;
-const server = app.listen(PORT, () => {
-  console.log('\n\n===================================');
-  console.log(`[SERVER] VizoraMiddleware server started on port ${PORT}`);
-  console.log(`[SERVER] Test displays endpoint: http://localhost:${PORT}/api/displays`);
-  console.log(`[SERVER] Test content endpoint: http://localhost:${PORT}/api/content`);
-  console.log(`[SERVER] Test auth endpoint: http://localhost:${PORT}/api/auth/me`);
-  console.log('===================================\n\n');
-});
-
-// Export for testing
-module.exports = { app, server }; 
+// Export app (server export is handled in server.js)
+module.exports = { app }; 

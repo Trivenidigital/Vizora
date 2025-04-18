@@ -27,6 +27,10 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import EventEmitter from 'eventemitter3';
 import io, { Socket, ManagerOptions, SocketOptions } from 'socket.io-client';
+import { TokenManager } from './TokenManager'; // Assuming TokenManager is in the same directory or adjust path
+
+// Define the missing constant
+const DEFAULT_SOCKET_PATH = '/socket.io'; 
 
 export enum ConnectionState {
   CONNECTING = 'connecting',
@@ -96,6 +100,7 @@ const MAX_LISTENERS = 50;
 
 export interface ConnectionConfig {
   baseUrl: string;
+  tokenManager?: TokenManager;
   socketPath?: string;
   tokenProvider?: () => Promise<string | null> | string | null;
   tokenHeader?: string;
@@ -190,38 +195,38 @@ export class ConnectionManager extends EventEmitter {
   constructor(config: ConnectionConfig) {
     super();
     
-    this.config = {
-      // Default config
-      tokenHeader: 'Authorization',
-      reconnection: true,
-      reconnectionAttempts: config.reconnectionAttempts,
-      reconnectionDelay: MIN_RECONNECT_DELAY, // Use minimum reconnect delay as default
-      reconnectionDelayMax: MAX_RECONNECT_DELAY,
-      timeout: CONNECT_TIMEOUT,
-      autoConnect: true,
-      debug: false,
-      withCredentials: true,
-      ...config
-    };
+    console.log('[ConnectionManager Constructor] Received config:', JSON.stringify(config));
+
+    const defaults: Partial<ConnectionConfig> = { /* ... defaults ... */ };
     
-    this.serviceName = config.serviceName || 'ConnectionManager';
+    // Step A: Initial merge using spread
+    this.config = {
+      ...defaults,
+      ...config 
+    };
+    console.log(`[ConnectionManager Constructor] After initial spread, this.config.baseUrl: "${this.config.baseUrl}"`);
+    
+    // Step B: Explicitly check and assign baseUrl if needed
+    const incomingBaseUrl = config?.baseUrl;
+    if (incomingBaseUrl && this.config.baseUrl !== incomingBaseUrl) {
+      console.log(`[ConnectionManager Constructor] BaseUrl mismatch after spread. Explicitly setting to: "${incomingBaseUrl}"`);
+      this.config.baseUrl = incomingBaseUrl;
+    } else if (!this.config.baseUrl) {
+        console.log(`[ConnectionManager Constructor] BaseUrl is still empty after spread/check. Setting to default empty string.`);
+        this.config.baseUrl = ''; // Ensure it's at least an empty string
+    }
+
+    this.serviceName = this.config.serviceName || 'ConnectionManager';
+    console.log(`[ConnectionManager Constructor] Final assigned this.config.baseUrl: "${this.config.baseUrl}"`);
     
     // Initialize HTTP client
     this.http = this.setupHttpClient();
     
-    // Auto-connect if configured
+    // Auto-connect logic
     if (this.config.autoConnect) {
-      // Verify HTTP connection first
-      // this.testHttpConnection()
-      //   .then(() => {
-          // Then try to establish socket connection if needed
-          if (this.config.socketPath) {
-            this.connect();
-          }
-      //   })
-      //   .catch(error => {
-      //     this.log('Failed to establish initial HTTP connection:', error);
-      //   });
+      if (this.config.socketPath) {
+          this.connect();
+      }
     }
   }
   
@@ -379,6 +384,8 @@ export class ConnectionManager extends EventEmitter {
    */
   private async setupSocket(token?: string | null): Promise<void> {
     try {
+      // Log the baseUrl value *immediately* before using it
+      this.log(`[setupSocket] Value of this.config.baseUrl: "${this.config.baseUrl}"`);
       const apiUrl = this.config.baseUrl || '';
       
       // Parse the URL to ensure it's a valid socket.io server URL
@@ -1021,21 +1028,20 @@ export class ConnectionManager extends EventEmitter {
     this.connectionInProgress = true;
     this.lastReconnectAttempt = now;
     
-    // Check connection state first
     if (this.socketConnectionState === ConnectionState.CONNECTED) {
       this.log('Socket already connected, skipping connect');
       this.connectionInProgress = false;
       return;
     }
     
-    // Update state
     this.updateState(ConnectionState.CONNECTING, 'socket');
     
     try {
-      // Get token for authentication
       const token = await this.getToken();
       
-      // Setup socket parameters
+      // Log baseUrl *before* calling setupSocket
+      this.log(`[connect] Value of this.config.baseUrl before setupSocket: "${this.config.baseUrl}"`);
+      
       await this.setupSocket(token)
         .then(() => {
           if (!this.socket) {
@@ -1655,4 +1661,80 @@ export class ConnectionManager extends EventEmitter {
     
     return remaining > 0 ? remaining : null;
   }
-} 
+
+  // <<< NEW METHOD: subscribe >>>
+  /**
+   * Subscribe to connection state changes for use with useSyncExternalStore.
+   * @param listener - The callback function to execute when the state changes.
+   * @returns An unsubscribe function.
+   */
+  public subscribe(listener: () => void): () => void {
+    // We need to adapt the existing onConnectionStateChange which expects ConnectionDiagnostics
+    const adaptedListener: ConnectionStateChangeListener = () => {
+      listener(); // Just notify React that the state *might* have changed
+    };
+    return this.onConnectionStateChange(adaptedListener);
+  }
+
+  // <<< MODIFIED METHOD: getConnectionState (for useSyncExternalStore snapshot) >>>
+  /**
+   * Get the current overall connection state (socket preferred).
+   * This version is simplified for useSyncExternalStore snapshot.
+   * For detailed diagnostics, use getDiagnostics().
+   * @returns The current ConnectionState.
+   */
+  public getConnectionStateSnapshot(): ConnectionState {
+    // Prefer socket state if socket exists, otherwise use http state as fallback
+    if (this.socket) {
+      return this.socketConnectionState;
+    }
+    return this.httpConnectionState; // Fallback if no socket
+  }
+}
+
+// --- Singleton Instance --- 
+// Initialize with a default base URL or read from env if possible server-side
+// Client-side code (like DisplayContext) will need to *configure* this instance.
+// This approach is problematic if baseUrl isn't known immediately.
+
+// Problem: We need the baseUrl from the environment *before* creating the singleton.
+// Solution: Export a function to get/create the singleton, or configure it after creation.
+
+let connectionManagerInstance: ConnectionManager | null = null;
+
+/**
+ * Initializes the singleton ConnectionManager instance.
+ * MUST be called once, typically in the application's entry point or main context.
+ * 
+ * @param config - The connection configuration.
+ * @returns The initialized ConnectionManager instance.
+ */
+export function initializeConnectionManager(config: ConnectionConfig): ConnectionManager {
+  if (connectionManagerInstance) {
+    console.warn('[ConnectionManager] Singleton already initialized. Returning existing instance.');
+    // Optionally, update config if needed: connectionManagerInstance.updateConfig(config);
+    return connectionManagerInstance;
+  }
+  console.log('[ConnectionManager] Initializing singleton instance with config:', config);
+  connectionManagerInstance = new ConnectionManager(config);
+  return connectionManagerInstance;
+}
+
+/**
+ * Gets the singleton ConnectionManager instance.
+ * Throws an error if the manager hasn't been initialized yet.
+ * 
+ * @returns The singleton ConnectionManager instance.
+ */
+export function getConnectionManager(): ConnectionManager {
+  if (!connectionManagerInstance) {
+    const errorMsg = '[ConnectionManager] Singleton accessed before initialization. Call initializeConnectionManager() first, likely in your main App or Context setup.';
+    console.error(errorMsg);
+    throw new Error(errorMsg); 
+  }
+  return connectionManagerInstance;
+}
+
+// Export the ConnectionState enum and other necessary types directly
+// <<< REMOVE REDUNDANT EXPORT >>>
+// export { ConnectionState, ConnectionDiagnostics }; 

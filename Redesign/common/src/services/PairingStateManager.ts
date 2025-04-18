@@ -14,7 +14,7 @@
 
 import EventEmitter from 'eventemitter3';
 import { Socket } from 'socket.io-client';
-import { ConnectionManager, ConnectionState, ConnectionDiagnostics } from './ConnectionManager';
+import { ConnectionManager, ConnectionState, ConnectionDiagnostics, DiagnosticConnectionState } from './ConnectionManager';
 import { DeviceManager, DeviceInfo } from './DeviceManager';
 
 // State transition constants (replacing enums)
@@ -117,7 +117,7 @@ export interface PairingManagerState {
  * Centralizes device registration, verification, and pairing state transitions
  * across VizoraTV and Middleware applications.
  */
-class PairingStateManager extends EventEmitter {
+export class PairingStateManager extends EventEmitter {
   // Default configuration values
   private static readonly DEFAULT_RETRY_DELAY_MS = 5000;
   private static readonly DEFAULT_MAX_RETRY_ATTEMPTS = 5;
@@ -192,6 +192,12 @@ class PairingStateManager extends EventEmitter {
    */
   private setupEventListeners(): void {
     this.log('info', 'Attaching event listeners...');
+    // Ensure the connectionManager instance actually has the method before calling
+    if (typeof this.connectionManager?.onConnectionStateChange !== 'function') {
+      this.log('error', 'ConnectionManager instance is missing onConnectionStateChange method!', this.connectionManager);
+      // Optionally throw or handle this critical error
+      return; 
+    }
     this.connectionManager.onConnectionStateChange(this.handleConnectionStateChange);
     this.connectionManager.on('error', this.handleConnectionError);
     this.deviceManager.on('device:registered', this.handleDeviceRegistered);
@@ -279,10 +285,21 @@ class PairingStateManager extends EventEmitter {
     // 6. Set Up Listeners (Uses the bound handler properties)
     this.log('info', 'Initializing with options:', this.options);
     this.log('info', 'Initial state:', { ...this.state });
-    this.setupListeners(); // Ensure this call exists
+    // this.setupEventListeners(); // Do not call here anymore
 
     // 7. Initial Sync/Checks
     this.checkInitialState();
+  }
+  
+  /**
+   * Initializes the event listeners. Should be called after instantiation
+   * when the real dependencies are confirmed to be available.
+   */
+  public initializeListeners(): void {
+    this.log('info', 'Explicitly initializing event listeners...');
+    this.setupEventListeners();
+    // Potentially call checkInitialState here if it depends on listeners being active
+    // this.checkInitialState(); 
   }
   
   /**
@@ -334,7 +351,7 @@ class PairingStateManager extends EventEmitter {
   /**
    * Clear the current error
    */
-  private clearError(): void {
+  public clearError(): void {
     this.state.error = null;
     this.state.lastError = null;
     this.emit(PairingEvent.STATE_CHANGE, this.getState());
@@ -949,384 +966,250 @@ class PairingStateManager extends EventEmitter {
       
       step = 2; this.log('info', `🚀 Coord Step ${step}: Verifying registration status...`);
       const isRegistered = await this.verifyDeviceRegistration(); 
-      this.log('info', `🚀 Coord Step ${step}: Verification result: isRegistered = ${isRegistered}`);
-
-      step = 3; this.log('info', `🚀 Coord Step ${step}: Initializing device ID (passing isRegistered=${isRegistered})...`);
-      const deviceId = await this.initializeDeviceId(isRegistered);
-      this.log('info', `🚀 Coord Step ${step}: Device ID initialized: ${deviceId}`);
+      this.log('info', `🚀 Coord Step ${step}: Registration status verified: ${isRegistered}`);
       
-      step = 4; this.log('info', `🚀 Coord Step ${step}: Checking if registration needed (isRegistered=${isRegistered})...`);
-      if (!isRegistered) {
-        this.log('info', `🚀 Coord Step ${step}: Registering device (as isRegistered was false)...`);
-        await this.registerDevice(); 
-        this.log('info', `🚀 Coord Step ${step}: Device registration attempt finished.`);
-      } else {
-        this.log('info', `🚀 Coord Step ${step}: Skipping registration (as isRegistered was true).`);
-      }
-      
-      step = 5; this.log('info', `🚀 Coord Step ${step}: Requesting pairing code...`);
+      step = 3; this.log('info', `🚀 Coord Step ${step}: Requesting pairing code...`);
       const pairingCode = await this.requestPairingCode();
       this.log('info', `🚀 Coord Step ${step}: Pairing code received: ${pairingCode}`);
-      this.log('info', '✅ Coordination complete, QR Code can now be displayed.');
       
       return pairingCode;
     } catch (error: any) {
-      this.log('error', `❌ Error during coordination flow at Step ${step}:`, error);
-      if (!this.state.error) {
-          this.setError(PairingErrorCode.COORDINATION_FAILED, error.message || `Coordination failed at step ${step}`, error);
-      }
+      this.log('error', 'Error during coordinateRegistrationAndPairing:', error);
+      this.updateRegistrationState(RegistrationState.REGISTRATION_ERROR);
+      this.setError(
+        PairingErrorCode.COORDINATION_FAILED,
+        error.message || 'Failed to coordinate registration and pairing',
+        error
+      );
       throw error;
     }
   }
-  
+
+  // <<< ADD Definitions for the private handler methods >>>
   /**
-   * Reset the pairing code and request a new one
-   * @returns Promise resolving to the new pairing code or rejecting with an error
+   * Private handler for connection state changes.
+   * Updates the internal socketId and potentially triggers registration/verification checks.
    */
-  public async refreshPairingCode(): Promise<string> {
-    // Clear existing pairing code and cancel timer
-    this.state.pairingCode = null;
-    this.state.pairingCodeExpiry = null;
-    
-    if (this.pairingCodeExpiryTimer !== null) {
-      clearTimeout(this.pairingCodeExpiryTimer as any);
-      this.pairingCodeExpiryTimer = null;
+  private _handleConnectionStateChange(diagnostics: ConnectionDiagnostics): void {
+    this.log('info', `[Handler] Connection state changed: ${diagnostics.connectionState}`);
+    this.state.socketId = diagnostics.socketId; // Update socketId
+
+    // Example logic: If disconnected, maybe log it or update pairing state?
+    if (diagnostics.connectionState === DiagnosticConnectionState.DISCONNECTED) {
+      this.log('warn', 'Connection lost (via state change)');
+      // Potentially reset pairing state if needed when disconnected
+    } else if (diagnostics.connectionState === DiagnosticConnectionState.CONNECTED) {
+      // If we connect and were previously trying to verify, retry verification
+      if (this.state.registrationState === RegistrationState.VERIFYING) {
+        this.log('info', 'Reconnected, retrying verification...');
+        this.verifyDeviceRegistration(); // Retry verification on reconnect
+      } else if (this.state.pairingState === PairingState.REQUESTING) {
+        this.log('info', 'Reconnected, retrying pairing code request...');
+        this.requestPairingCode(); // Retry pairing code request
+      }
     }
-    
-    return this.requestPairingCode();
-  }
-  
-  /**
-   * Reset error state
-   */
-  public resetError(): void {
-    this.log('info', 'Resetting error state');
-    this.clearError();
-    
-    // If we were in an error state for pairing, reset to IDLE
-    if (this.state.pairingState === PairingState.ERROR) {
-      this.updatePairingState(PairingState.IDLE);
-    }
-    
-    // If we were in a failed registration state, try again from VERIFYING
-    if (this.state.registrationState === RegistrationState.REGISTRATION_ERROR) {
-      this.updateRegistrationState(RegistrationState.VERIFYING);
-    }
-  }
-  
-  /**
-   * Reset circuit breaker to allow retries again
-   */
-  public resetCircuitBreaker(): void {
-    this.log('info', 'Resetting circuit breaker');
-    this.state.circuitBreakerTripped = false;
-    this.state.retryCount = 0;
-    this.state.throttledUntil = null;
-    this.clearError();
-    
-    this.emit(PairingEvent.STATE_CHANGE, this.getState());
-  }
-  
-  /**
-   * Clean up resources and listeners
-   */
-  public cleanup(): void {
-    this.log('info', 'Cleaning up PairingStateManager resources');
-    // Clear timers
-    if (this.pairingCodeExpiryTimer) {
-      clearTimeout(this.pairingCodeExpiryTimer as any);
-      this.pairingCodeExpiryTimer = null;
-    }
-    if (this.retryTimer) {
-      clearTimeout(this.retryTimer as any);
-      this.retryTimer = null;
-    }
-    // Abort any ongoing operations
-    this.abortController.abort();
-    // Remove all event listeners from this emitter
-    this.removeAllListeners();
-    
-    // Explicitly remove listeners from dependencies using the handler properties
-    if (this.connectionManager) {
-        // Assuming offConnectionStateChange exists or needs a direct off call
-        if (typeof (this.connectionManager as any).offConnectionStateChange === 'function') {
-             (this.connectionManager as any).offConnectionStateChange(this.handleConnectionStateChange);
-        } else {
-             // Fallback if using standard .off()
-             this.connectionManager.off('connectionStateChange', this.handleConnectionStateChange);
-        }
-        this.connectionManager.off('error', this.handleConnectionError);
-        this.connectionManager.off('connect', this.handleConnect);
-    }
-    if (this.deviceManager) {
-        this.deviceManager.off('device:registered', this.handleDeviceRegistered);
-        this.deviceManager.off('device:registration:failed', this.handleDeviceRegistrationFailed);
-    }
-    this.log('info', 'Removed direct socket event listeners.');
-  }
-  
-  /**
-   * Reset the entire manager state
-   */
-  public reset(): void {
-    this.log('info', 'Resetting manager state');
-    
-    // Clean up resources
-    this.cleanup();
-    
-    // Reset state to initial values
-    this.state = {
-      deviceId: null,
-      socketId: null,
-      registrationState: RegistrationState.UNREGISTERED,
-      pairingState: PairingState.IDLE,
-      pairingCode: null,
-      pairingCodeExpiry: null,
-      pairingUrl: null,
-      retryCount: 0,
-      throttledUntil: null,
-      error: null,
-      deviceRegistrationVerified: false,
-      circuitBreakerTripped: false,
-      lastServerVerification: 0
-    };
-    
-    // Set up event listeners again
-    this.setupEventListeners();
-    
+    // Always emit the overall state change
     this.emit(PairingEvent.STATE_CHANGE, this.getState());
   }
 
-  // Utility method to get the URL for the pairing QR code
+  /**
+   * Private handler for connection errors.
+   */
+  private _handleConnectionError(error: Error): void {
+    this.log('error', '[Handler] Connection error occurred:', error.message);
+    // Potentially set a specific error state if the connection error is critical
+    this.setError(PairingErrorCode.SOCKET_NOT_CONNECTED, `Connection error: ${error.message}`, error);
+  }
+
+  /**
+   * Private handler for successful device registration events from DeviceManager.
+   */
+  private _handleDeviceRegistered(data: { deviceInfo: DeviceInfo }): void {
+    this.log('info', '[Handler] Device registered event received:', data.deviceInfo);
+    if (data.deviceInfo.deviceId && this.isValidDeviceId(data.deviceInfo.deviceId)) {
+      this.state.deviceId = data.deviceInfo.deviceId;
+      this.state.deviceRegistrationVerified = true;
+      this.updateRegistrationState(RegistrationState.REGISTERED);
+      this.emit(PairingEvent.DEVICE_ID_CHANGED, this.state.deviceId);
+    } else {
+      this.log('error', '[Handler] Invalid device ID received in registration event', data.deviceInfo);
+      this.setError(PairingErrorCode.REGISTRATION_FAILED, 'Invalid device ID received after registration');
+    }
+  }
+
+  /**
+   * Private handler for failed device registration events from DeviceManager.
+   */
+  private _handleDeviceRegistrationFailed(data: { reason: string }): void {
+    this.log('error', '[Handler] Device registration failed event received:', data.reason);
+    this.updateRegistrationState(RegistrationState.REGISTRATION_ERROR);
+    this.setError(PairingErrorCode.REGISTRATION_FAILED, `Registration failed: ${data.reason}`);
+    // Potentially schedule a retry for registration
+    // this.scheduleRetry(() => this.registerDevice());
+  }
+
+  /**
+   * Private handler for the socket 'connect' event.
+   */
+  private _handleConnect(): void {
+    this.log('info', '[Handler] Socket connected event received.');
+    this.state.socketId = this.connectionManager.getSocketId(); // Ensure socket ID is updated
+    // If we were waiting to verify registration, do it now
+    if (this.state.registrationState === RegistrationState.VERIFYING) {
+      this.verifyDeviceRegistration();
+    }
+    this.emit(PairingEvent.STATE_CHANGE, this.getState());
+  }
+
+  /**
+   * Constructs the pairing URL based on configuration and current state.
+   * @returns The full pairing URL or null if not available.
+   */
   public getPairingUrl(): string | null {
+    // Example implementation: Replace with actual logic
+    const baseUrl = (this.options.apiService as any)?.getBaseUrl?.() || 'https://app.vizora.io'; // Or get from config
     if (!this.state.pairingCode) {
       return null;
     }
-    
-    // Construct URL based on the device ID and pairing code
-    const baseUrl = `https://vizora.app/pair`;
-    return `${baseUrl}?code=${this.state.pairingCode}&device=${this.state.deviceId}`;
+    // Construct the URL, e.g., https://app.vizora.io/pair?code=ABCDEF
+    return `${baseUrl}/pair?code=${this.state.pairingCode}`;
   }
 
-  // --- ADDED BACK: generatePairingCode method ---
   /**
-   * Generate a pairing code for the device
-   *
-   * @param deviceId The device ID to generate a pairing code for, defaults to the class instance's deviceId
-   * @param socket An optional socket instance to use for the request, defaults to the class instance's socket
-   * @returns Promise resolving to the pairing code response
+   * Generates a pairing code, likely by emitting a socket event or calling an API.
+   * This is a placeholder and needs the actual implementation.
+   * @param deviceId The device ID requesting the code.
+   * @param socket The socket instance to use (optional).
+   * @returns A promise resolving with the pairing code and its expiry time.
    */
   async generatePairingCode(
     deviceId?: string,
     socket?: Socket
   ): Promise<{ pairingCode: string; expiresAt: number }> {
-    this.log('info', '🔄 [PairingStateManager] Class method generatePairingCode called');
+    this.log('info', 'generatePairingCode called (Placeholder Implementation)');
+    const currentDeviceId = deviceId || this.state.deviceId;
+    const currentSocket = socket || this.connectionManager.getSocket();
 
-    // Use the provided deviceId or fall back to the instance's deviceId
-    const deviceIdToUse = deviceId || this.state.deviceId;
-
-    if (!deviceIdToUse) {
-      console.error('❌ [PairingStateManager] Device ID is required for pairing code generation');
-      this.setError(PairingErrorCode.INVALID_DEVICE_ID, 'Device ID is required to generate a pairing code');
-      throw new Error('Device ID is required to generate a pairing code');
+    if (!currentDeviceId) {
+      throw new Error('Device ID is required to generate a pairing code.');
+    }
+    if (!currentSocket) {
+      throw new Error('Socket connection is required to generate a pairing code.');
     }
 
-    // Use the provided socket or fall back to the instance's socket
-    const socketToUse = socket || this.connectionManager.getSocket();
-    const socketId = socketToUse?.id;
+    // <<< UPDATE STATE to REQUESTING before starting >>>
+    this.updatePairingState(PairingState.REQUESTING);
 
-    if (!socketId) {
-      console.warn('⚠️ [PairingStateManager] No socket ID available for pairing code generation');
-      this.setError(PairingErrorCode.SOCKET_NOT_CONNECTED, 'Socket ID is required to generate a pairing code');
-      throw new Error('Socket ID is required to generate a pairing code');
-    }
-
+    // Simulate async operation (e.g., emitting to server and waiting for response)
     try {
-      console.log('🔄 [PairingStateManager] Generating pairing code for device:', deviceIdToUse, 'with socket ID:', socketId);
-
-      // Get API URL from environment or configuration
-      const API_BASE_URL =
-        (typeof process !== 'undefined' && process.env?.API_URL) ||
-        (typeof window !== 'undefined' && (window as any)?.VITE_API_URL) ||
-        'http://localhost:3003'; // Base URL only
-
-      console.log('🔗 [PairingStateManager] Using API URL:', API_BASE_URL);
-
-      const PAIRING_CODE_LIFETIME = 10 * 60 * 1000; // 10 minutes default
-
-      // Try the new endpoint format first (preferred)
-      const devicePairingEndpoint = `${API_BASE_URL}/api/devices/pair/code`;
-      const backupEndpoint = `${API_BASE_URL}/api/displays/${deviceIdToUse}/pair`;
-
-      console.log(`🔌 [PairingStateManager] Trying primary endpoint: ${devicePairingEndpoint}`);
-
-      // Try primary endpoint first
-      let response: Response;
-      try {
-        response = await fetch(devicePairingEndpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Socket-ID': socketId
-          },
-          body: JSON.stringify({
-            deviceId: deviceIdToUse,
-            socketId,
-            timestamp: new Date().toISOString()
-          })
+        const { pairingCode, expiresAt } = await new Promise<{ pairingCode: string; expiresAt: number }>((resolve) => {
+          setTimeout(() => {
+            const generatedCode = Math.random().toString(36).substring(2, 8).toUpperCase(); // Example code
+            const expiryTimestamp = Date.now() + this.options.pairingCodeExpiryMs;
+            this.log('info', `Generated placeholder pairing code: ${generatedCode}`);
+            resolve({ pairingCode: generatedCode, expiresAt: expiryTimestamp });
+          }, 500); // Simulate network delay
         });
 
-        // If response is 404, try backup endpoint
-        if (response.status === 404) {
-          console.log(`⚠️ [PairingStateManager] Primary endpoint not found, trying backup: ${backupEndpoint}`);
+        // <<< UPDATE STATE on success >>>
+        this.state.pairingCode = pairingCode;
+        this.state.pairingCodeExpiry = expiresAt;
+        this.state.pairingUrl = this.getPairingUrl(); // Generate URL after getting code
+        this.updatePairingState(PairingState.ACTIVE);
+        this.setupPairingCodeExpiryTimer(); // Start expiry timer
 
-          response = await fetch(backupEndpoint, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Socket-ID': socketId
-            },
-            body: JSON.stringify({ socketId })
-          });
-        }
-      } catch (fetchError) {
-        console.error('🚨 [PairingStateManager] Network error with primary endpoint:', fetchError);
+        // Emit event with code and expiry
+        this.emit(PairingEvent.PAIRING_CODE_GENERATED, { pairingCode, expiry: expiresAt });
 
-        // Try backup endpoint
-        console.log(`⚠️ [PairingStateManager] Network error, trying backup endpoint: ${backupEndpoint}`);
-        response = await fetch(backupEndpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Socket-ID': socketId
-          },
-          body: JSON.stringify({ socketId })
-        });
-      }
+        return { pairingCode, expiresAt };
 
-      // Debugging response status
-      console.log(`🔍 [PairingStateManager] API response status: ${response.status} ${response.statusText}`);
-
-      if (!response.ok) {
-        if (response.status === 429) {
-          console.warn('🛑 [PairingStateManager] Rate limited when generating pairing code');
-          throw new Error('Rate limited: Too many pairing attempts');
-        }
-
-        console.error('❌ [PairingStateManager] Failed to generate pairing code:', response.status, response.statusText);
-
-        // For development/debugging, try to read the error message from response
-        let errorData = { message: response.statusText };
-        try { errorData = await response.json(); } catch (e) { }
-        throw new Error(`Failed to generate pairing code: ${errorData.message || response.statusText}`);
-      }
-
-      // Parse the response
-      const data = await response.json();
-      console.log("[pairingManager] 🎯 generatePairingCode hitting endpoint for:", deviceIdToUse, "Response data:", data);
-
-      if (!data.pairingCode) {
-        // If we have a success field but no pairing code, check if it's in a nested structure
-        if (data.success && data.data && data.data.pairingCode) {
-          console.log('✅ [PairingStateManager] Found pairing code in nested data structure');
-          return {
-            pairingCode: data.data.pairingCode,
-            expiresAt: data.data.expiresAt || Date.now() + PAIRING_CODE_LIFETIME
-          };
-        }
-
-        console.error('❌ [PairingStateManager] Invalid response: Missing pairing code', data);
-        throw new Error('Invalid response: Missing pairing code');
-      }
-
-      console.log('✅ [PairingStateManager] Pairing code generated successfully:', data.pairingCode);
-
-      const pairingCode = data.pairingCode;
-      const expiresAt = data.expiresAt || Date.now() + PAIRING_CODE_LIFETIME;
-
-      this.state.pairingCode = pairingCode;
-      this.state.pairingCodeExpiry = expiresAt;
-      this.state.pairingUrl = this.getPairingUrl(); // Update URL as well
-      this.updatePairingState(PairingState.ACTIVE);
-      this.state.retryCount = 0; // Reset retry count on success
-      this.setupPairingCodeExpiryTimer();
-
-      this.emit(PairingEvent.PAIRING_CODE_GENERATED, {
-        pairingCode,
-        expiry: expiresAt
-      });
-
-      return {
-        pairingCode: pairingCode, // Return the fetched code
-        expiresAt: expiresAt
-      };
-    } catch (error: any) {
-      console.error('❌ [PairingStateManager] Error generating pairing code:', error);
-
-      // Check if it's a rate limit error and emit the appropriate event
-      if (error instanceof Error && (error.message.includes('rate limit') || error.message.includes('Rate limited'))) {
-        this.updatePairingState(PairingState.THROTTLED);
-        this.applyThrottle();
-        this.setError(
-          PairingErrorCode.RATE_LIMITED,
-          error.message
-        );
-      } else {
+    } catch (error) {
+        this.log('error', 'Error during pairing code generation simulation:', error);
+        // <<< UPDATE STATE on error >>>
         this.updatePairingState(PairingState.ERROR);
         this.setError(
-          PairingErrorCode.PAIRING_CODE_GENERATION_FAILED,
-          error instanceof Error ? error.message : 'Unknown error'
+            PairingErrorCode.PAIRING_CODE_GENERATION_FAILED,
+            error instanceof Error ? error.message : 'Failed to generate pairing code'
         );
-      }
-
-      throw error;
+        throw error; // Re-throw the error
     }
   }
-  // --- END ADDED BACK ---
 
-  private _handleConnectionStateChange(diagnostics: ConnectionDiagnostics): void {
-    this.log('info', `[Handler] Connection state changed: ${diagnostics.connectionState}`);
-    this.state.socketId = diagnostics.socketId;
+  /**
+   * Resets the PairingStateManager to its initial state.
+   * Clears pairing code, timers, errors, and resets states.
+   */
+  public reset(): void {
+    this.log('info', 'Resetting PairingStateManager...');
+
+    // Clear timers
+    if (this.pairingCodeExpiryTimer !== null) {
+      clearTimeout(this.pairingCodeExpiryTimer as any);
+      this.pairingCodeExpiryTimer = null;
+    }
+    if (this.retryTimer !== null) {
+      clearTimeout(this.retryTimer as any);
+      this.retryTimer = null;
+    }
+
+    // Reset state fields (keep deviceId and potentially socketId)
+    this.state.pairingState = PairingState.IDLE;
+    this.state.pairingCode = null;
+    this.state.pairingCodeExpiry = null;
+    this.state.pairingUrl = null;
+    this.state.retryCount = 0;
+    this.state.throttledUntil = null;
+    this.state.error = null;
+    this.state.lastError = null;
+    // Keep deviceRegistrationVerified as is unless full reset intended
+    // this.state.deviceRegistrationVerified = false;
+    this.state.qrCodeUrl = null;
+    this.state.circuitBreakerTripped = false;
+    this.state.lastServerVerification = 0;
+    // Reset registration state? Or keep it?
+    // Decide based on desired reset behavior.
+    // If keeping deviceId, maybe reset to VERIFYING? 
+    this.state.registrationState = this.state.deviceId ? RegistrationState.VERIFYING : RegistrationState.UNREGISTERED;
+
+    // Re-initialize listeners if needed (might be redundant if cleanup isn't called)
+    // this.initializeListeners();
+
+    // Emit final state
     this.emit(PairingEvent.STATE_CHANGE, this.getState());
-    if (diagnostics.connectionState === 'disconnected') {
-        this.log('warn', 'Connection lost (via state change)');
+    this.log('info', 'PairingStateManager reset complete.');
+  }
+
+  /**
+   * Cleans up resources used by the PairingStateManager, such as timers and listeners.
+   * Should be called when the component using the manager is unmounted.
+   */
+  public cleanup(): void {
+    this.log('info', 'Cleaning up PairingStateManager...');
+
+    // Clear timers
+    if (this.pairingCodeExpiryTimer !== null) {
+      clearTimeout(this.pairingCodeExpiryTimer as any);
+      this.pairingCodeExpiryTimer = null;
     }
-  }
-
-  private _handleConnectionError(error: Error): void {
-      this.log('error', '[Handler] Connection error', error);
-      this.setError(PairingErrorCode.SOCKET_NOT_CONNECTED, error.message || 'Socket connection error', error);
-  }
-
-  private _handleDeviceRegistered(data: { deviceInfo: DeviceInfo }): void {
-    this.log('info', '[Handler] Received device:registered event', data);
-    this.updateRegistrationState(RegistrationState.REGISTERED);
-    this.emit(PairingEvent.REGISTRATION_STATE_CHANGED, RegistrationState.REGISTERED);
-    if (!this.state.deviceId && data?.deviceInfo?.deviceId) {
-      this.state.deviceId = data.deviceInfo.deviceId;
-      this.emit(PairingEvent.DEVICE_ID_CHANGED, this.state.deviceId);
+    if (this.retryTimer !== null) {
+      clearTimeout(this.retryTimer as any);
+      this.retryTimer = null;
     }
-  }
 
-  private _handleDeviceRegistrationFailed(data: { reason: string }): void {
-    this.log('error', '[Handler] Received device:registration:failed event', data);
-    this.updateRegistrationState(RegistrationState.REGISTRATION_ERROR);
-    this.setError(PairingErrorCode.REGISTRATION_FAILED, data?.reason || 'Registration failed');
-  }
+    // Abort ongoing operations
+    this.abortController.abort();
 
-  private _handleConnect(): void {
-     this.log('info', '[Handler] handleConnect listener triggered.');
-     if (this.state.error?.code === PairingErrorCode.SOCKET_NOT_CONNECTED) {
-       this.clearError();
-     }
-     if (this.state.registrationState === RegistrationState.VERIFYING) {
-         this.log('info', '[Handler] Triggering verification on connect...');
-         this.verifyDeviceRegistration();
-     }
+    // Remove listeners from dependencies
+    // Ensure handlers are correctly bound and stored if needed for removal
+    this.connectionManager.off('connectionStateChange', this.handleConnectionStateChange);
+    this.connectionManager.off('error', this.handleConnectionError);
+    this.deviceManager.off('device:registered', this.handleDeviceRegistered);
+    this.deviceManager.off('device:registration:failed', this.handleDeviceRegistrationFailed);
+    this.connectionManager.off('connect', this.handleConnect);
+
+    // Remove own listeners
+    this.removeAllListeners();
+
+    this.log('info', 'PairingStateManager cleanup complete.');
   }
 }
-
-// Export the PairingStateManager class and helper functions
-export {
-  PairingStateManager
-}; 

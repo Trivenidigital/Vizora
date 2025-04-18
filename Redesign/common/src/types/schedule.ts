@@ -52,6 +52,8 @@ export interface ScheduledContent {
   id: string;
   contentId: string;
   schedule: Schedule;
+  startTime?: Date | string | undefined;
+  endTime?: Date | string | undefined;
   content?: any; // Content details when populated
 }
 

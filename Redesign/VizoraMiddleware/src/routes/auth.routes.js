@@ -9,25 +9,32 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { protect } = require('../middleware/authMiddleware');
 
+// ADD DEBUG LOG HERE
+console.log('[DEBUG] auth.routes.js file loaded, setting up router...');
+
 /**
  * @route   POST /api/auth/register
- * @desc    Register a new user
+ * @desc    Register a new business user
  * @access  Public
  */
 router.post('/register', async (req, res) => {
+  // ADD DEBUG LOG HERE
+  console.log('[DEBUG] POST /register route handler reached'); 
   try {
     console.log('Register request body:', req.body);
     
-    const { email, password, firstName, lastName, company } = req.body;
+    // Expect businessName, email, password
+    const { businessName, email, password } = req.body;
     
-    if (!email || !password || !firstName || !lastName) {
+    // Updated validation
+    if (!email || !password || !businessName) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide all required fields: email, password, firstName, lastName'
+        message: 'Please provide all required fields: email, password, businessName'
       });
     }
     
-    // Check if user exists
+    // Check if user exists by email
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({
@@ -36,38 +43,36 @@ router.post('/register', async (req, res) => {
       });
     }
     
-    // Create user
+    // Create user with businessName
     const user = new User({
       email,
-      password, // will be hashed in the model's pre-save hook
-      firstName,
-      lastName,
-      company: company || '',
-      role: 'user',
-      isActive: true
+      password, // Hashed in pre-save hook
+      businessName, // Use businessName
+      role: 'business_user', // Assign a role, e.g., 'business_user'
+      isActive: true,
+      // Removed firstName, lastName, company
     });
     
     console.log('User object to save:', {
       email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      company: user.company
+      businessName: user.businessName,
+      role: user.role
     });
     
     await user.save();
     
-    console.log(`New user registered: ${email}`);
+    console.log(`New business user registered: ${email}`);
     
+    // Updated success response
     res.status(201).json({
       success: true,
       message: 'User registered successfully',
       data: {
         id: user._id,
         email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        company: user.company,
+        businessName: user.businessName,
         role: user.role
+        // Removed firstName, lastName, company
       }
     });
   } catch (error) {

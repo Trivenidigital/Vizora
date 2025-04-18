@@ -15,6 +15,7 @@ import { Redis } from 'ioredis';
 import logger from './utils/logger';
 import socketAuth from './middleware/socketAuth';
 import type { Server as HttpServer } from 'http';
+import { ExtendedSocket } from './types/socket';
 
 // Connection limits to prevent memory leaks
 const MAX_CONNECTIONS = 1000; // Maximum number of concurrent connections
@@ -179,7 +180,7 @@ export async function setupSocketIO(server: HttpServer): Promise<Server> {
   global.io = io;
 
   // Debug middleware for logging connection attempts
-  io.use((socket, next) => {
+  io.use((socket: ExtendedSocket, next) => {
     const clientInfo = {
       id: socket.id,
       transport: socket.conn.transport.name,
@@ -190,11 +191,14 @@ export async function setupSocketIO(server: HttpServer): Promise<Server> {
     };
 
     logger.debug(`Socket connection attempt:`, clientInfo);
+    socket.authenticated = false;
+    socket.deviceId = socket.handshake.query.deviceId as string || undefined;
+    logger.info('Socket middleware processing', { socketId: socket.id, deviceId: socket.deviceId });
     next();
   });
 
   // Middleware for managing concurrent connections
-  io.use((socket, next) => {
+  io.use((socket: ExtendedSocket, next) => {
     // Check if we've reached the maximum number of connections
     if (activeConnections.size >= MAX_CONNECTIONS) {
       logger.warn(`Maximum socket connections (${MAX_CONNECTIONS}) reached. Rejecting new connection.`);
@@ -207,7 +211,7 @@ export async function setupSocketIO(server: HttpServer): Promise<Server> {
   io.use(socketAuth);
 
   // Connection handler
-  io.on('connection', async (socket) => {
+  io.on('connection', async (socket: ExtendedSocket) => {
     logger.info(`Socket connected: ${socket.id}`, {
       deviceId: socket.deviceId || 'unknown',
       userType: socket.deviceType || (socket.user ? 'user' : 'unknown'),
@@ -274,8 +278,18 @@ export async function setupSocketIO(server: HttpServer): Promise<Server> {
       logger.error(`Socket error for ${socket.id}:`, error);
     });
 
-    // Add additional socket event handlers here
-    // ...
+    // Handle device registration
+    socket.on('registerDevice', (data: { deviceId: string; type: 'display' | 'admin' }) => {
+      socket.deviceId = data.deviceId;
+      socket.deviceType = data.type;
+      socket.authenticated = true;
+      socket.join(`device:${data.deviceId}`);
+      logger.info(`📱 Device registered/joined room: ${data.deviceId}`, { type: data.type, socketId: socket.id });
+      socket.emit('registrationSuccess', { message: 'Device registered successfully' });
+    });
+
+    // Add other event handlers using the extended socket type
+    // e.g., socket.on('someEvent', (payload) => { ... });
   });
 
   // Add engine error logging

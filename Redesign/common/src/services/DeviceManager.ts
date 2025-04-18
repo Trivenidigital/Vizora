@@ -3,6 +3,23 @@ import { ConnectionManager, ConnectionDiagnostics, DiagnosticConnectionState } f
 import { TokenManager } from './TokenManager';
 import type { Socket } from 'socket.io-client';
 
+// Define the missing options interface
+export interface DeviceManagerOptions {
+  serviceName?: string;
+  storage?: Storage; // Allow custom storage implementation
+  autoRegister?: boolean;
+  cacheDeviceInfo?: boolean;
+  generateIdIfNotExist?: boolean;
+  deviceNamePrefix?: string;
+  apiEndpoints?: {
+    register?: string;
+    verify?: string;
+  };
+  deviceInfoStorageKey?: string;
+  deviceTokenStorageKey?: string;
+  // Add other potential options if needed
+}
+
 export interface DeviceInfo {
   deviceId: string;
   deviceName?: string;
@@ -22,6 +39,7 @@ export interface DeviceInfo {
   pairingCode?: string;
   status?: string;
   pairedUserId?: string;
+  [key: string]: any; // Allow flexible properties
 }
 
 export interface DeviceRegistrationOptions {
@@ -68,7 +86,7 @@ export class DeviceManager extends EventEmitter {
   private connectionManager: ConnectionManager;
   private tokenManager: TokenManager;
   private deviceInfo: DeviceInfo | null = null;
-  private options: DeviceRegistrationOptions;
+  private options: Required<DeviceManagerOptions>;
   private storage: Storage;
   private readonly serviceName: string;
   private registrationInProgress = false;
@@ -82,24 +100,32 @@ export class DeviceManager extends EventEmitter {
   constructor(
     connectionManager: ConnectionManager,
     tokenManager: TokenManager,
-    options: DeviceRegistrationOptions = {},
-    serviceName = 'DeviceManager'
+    options: Partial<DeviceManagerOptions> = {}
   ) {
     super();
+    this.serviceName = options.serviceName || 'DeviceManager';
     this.connectionManager = connectionManager;
     this.tokenManager = tokenManager;
-    this.serviceName = serviceName;
-    
-    // Set default options
-    this.options = {
-      autoRegister: true,
+
+    // Resolve options, providing defaults
+    const defaults: Partial<DeviceManagerOptions> = {
+      deviceNamePrefix: 'VizoraDevice',
       cacheDeviceInfo: true,
+      autoRegister: true,
       generateIdIfNotExist: true,
-      deviceStorageKey: 'device_info',
-      deviceIdPrefix: 'vizora-device-',
+      apiEndpoints: {
+        register: '/api/devices/register',
+        verify: '/api/devices/verify'
+      },
+      deviceInfoStorageKey: 'device_info',
       deviceTokenStorageKey: 'device_token',
-      ...options
     };
+
+    // Type assertion needed because defaults are Partial but this.options is Required
+    this.options = { 
+        ...defaults, 
+        ...options 
+    } as Required<DeviceManagerOptions>; 
     
     // Use provided storage or fall back to localStorage if available
     if (options.storage) {
@@ -121,12 +147,31 @@ export class DeviceManager extends EventEmitter {
     // Initialize device info from storage if available
     this.loadDeviceInfo();
     
-    // Set up connection event listeners
-    this.setupConnectionListeners();
-    
     // Auto-register if enabled and device info not found
-    if (this.options.autoRegister && !this.deviceInfo) {
-      this.register();
+    // Defer this until listeners are initialized
+    // if (this.options.autoRegister && !this.deviceInfo) {
+    //   this.register();
+    // }
+  }
+  
+  /**
+   * Sets up event listeners and performs initial actions like auto-registration.
+   * Should be called after the instance is created and dependencies are ready.
+   */
+  public initializeListeners(): void {
+    this.log('Initializing listeners...');
+    this.setupConnectionListeners();
+
+    // Now perform auto-registration if needed
+    if (this.options.autoRegister && !this.deviceInfo && !this.registrationInProgress) {
+      this.log('Auto-registering device as no device info was found...');
+      this.register().catch(err => {
+        this.log('Auto-registration failed', err);
+      });
+    } else if (this.deviceInfo) {
+        this.log('Device info already loaded, skipping auto-register.');
+    } else if (this.registrationInProgress) {
+        this.log('Registration already in progress, skipping auto-register.');
     }
   }
   
@@ -528,10 +573,13 @@ export class DeviceManager extends EventEmitter {
    * @returns Generated device ID
    */
   private generateDeviceId(): string {
-    const prefix = this.options.deviceIdPrefix || 'vizora-device-';
+    // Simpler generation - remove dependency on non-existent prefix option
+    // Consider using UUID library if stronger uniqueness is needed
     const random = Math.random().toString(36).substring(2, 10);
     const timestamp = Date.now().toString(36);
-    return `${prefix}${random}-${timestamp}`;
+    const deviceId = `vtv-${random}-${timestamp}`; // Example format
+    this.log(`Generated new device ID: ${deviceId}`);
+    return deviceId;
   }
   
   /**
@@ -543,8 +591,9 @@ export class DeviceManager extends EventEmitter {
     }
     
     try {
+      // Use correct option key
       this.storage.setItem(
-        this.options.deviceStorageKey!,
+        this.options.deviceInfoStorageKey!,
         JSON.stringify(this.deviceInfo)
       );
     } catch (error) {
@@ -557,7 +606,8 @@ export class DeviceManager extends EventEmitter {
    */
   private loadDeviceInfo(): void {
     try {
-      const storedInfo = this.storage.getItem(this.options.deviceStorageKey!);
+      // Use correct option key
+      const storedInfo = this.storage.getItem(this.options.deviceInfoStorageKey!);
       
       if (storedInfo) {
         this.deviceInfo = JSON.parse(storedInfo);
@@ -587,36 +637,42 @@ export class DeviceManager extends EventEmitter {
   private setupConnectionListeners(): void {
     this.log('Setting up connection listeners...');
 
-    // Define the single listener for connection state changes
-    const handleConnectionStateChange = (diagnostics: ConnectionDiagnostics): void => {
+    // Define the handler function
+    const handleConnectionStateChange = (diagnostics: ConnectionDiagnostics) => {
       const newState = diagnostics.connectionState;
-      // Only log if state actually changes
+
+      // Compare with the previous state
       if (newState !== this.previousConnectionState) {
           this.log(`Connection state changed: ${this.previousConnectionState} -> ${newState}`);
-
           // Handle state transitions
           if (newState === DiagnosticConnectionState.CONNECTED) { // Use Enum member
             this.handleConnect();
           }
           if (newState === DiagnosticConnectionState.DISCONNECTED) { // Use Enum member
-            // Pass a generic reason or try to infer from diagnostics if possible
             this.handleDisconnect('State changed to disconnected');
           }
-          // Remove the incorrect 'reconnecting' check
-          // if (newState === 'reconnecting' && this.previousConnectionState !== 'reconnecting') {
-          //   // Maybe trigger some UI indication
-          //   this.log('Connection manager is attempting to reconnect...');
-          // }
-
           this.previousConnectionState = newState; // Update previous state
       }
     };
 
+    // DEFENSIVE CHECK:
+    if (!this.connectionManager) {
+        this.log('ERROR: this.connectionManager is undefined/null when trying to attach listener!');
+        return; // Exit if connectionManager is not available
+    }
+    if (typeof this.connectionManager.onConnectionStateChange !== 'function') {
+        this.log('ERROR: this.connectionManager.onConnectionStateChange is not a function!');
+        // Log the connectionManager object itself for inspection
+        console.error('ConnectionManager object is:', this.connectionManager);
+        return; // Exit if method is not available
+    }
+    
     // Attach the listener and store the unsubscribe function
     if (this.connectionStateUnsubscribeFn) {
         this.log('Warning: Unsubscribing existing connection state listener before attaching new one.');
-        this.connectionStateUnsubscribeFn(); // Ensure no duplicates if called multiple times
+        this.connectionStateUnsubscribeFn();
     }
+    
     this.connectionStateUnsubscribeFn = this.connectionManager.onConnectionStateChange(handleConnectionStateChange);
     this.log('Attached ConnectionStateChange listener and stored unsubscribe function.');
 
@@ -624,8 +680,8 @@ export class DeviceManager extends EventEmitter {
     const initialDiagnostics = this.connectionManager.getDiagnostics();
     this.previousConnectionState = initialDiagnostics.connectionState;
     this.log(`Initial connection state: ${this.previousConnectionState}`);
-    if (this.previousConnectionState === 'connected') {
-        this.handleConnect(); // Handle initial connected state
+    if (this.previousConnectionState === 'connected') { // Check against string literal if enum causing issues
+        this.handleConnect(); 
     }
 
     // Get socket and set up event listeners

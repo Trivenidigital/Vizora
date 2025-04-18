@@ -1,32 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import { DisplayStatus } from '@vizora/common/types';
-import { VizoraSocketClient } from '@vizora/common/sockets';
+import { VizoraSocketClient, TokenManager, DeviceManager, DeviceInfo } from '@vizora/common';
+import { getConnectionManager } from '@vizora/common';
 import { DisplayService } from './services/displayService';
 import { ContentService } from './services/contentService';
 import { ScheduleService } from './services/scheduleService';
 import { DeviceAuthService } from './services/deviceAuthService';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { LoadingScreen } from './components/LoadingScreen';
-import { ErrorScreen } from './components/ErrorScreen';
-import { ContentPlayer } from './components/ContentPlayer';
+// import { ErrorScreen } from './components/ErrorScreen'; // <<< Commented out
+import ContentPlayer from './components/ContentPlayer';
 import { RegistrationScreen } from './components/RegistrationScreen';
+import { SocketDebug } from './components/dev';
 
 // TODO: Phase 4 - Implement more sophisticated error handling and recovery strategies:
 // 1. Add automatic reconnection with exponential backoff
 // 2. Implement crash analytics and remote logging
 // 3. Develop fallback content for disconnected states
 // 4. Add self-healing mechanisms for common failure scenarios
-
-interface DisplayMetadata {
-  name: string;
-  location: string;
-  resolution: {
-    width: number;
-    height: number;
-  };
-  model: string;
-  os: string;
-}
 
 export const DisplayApp: React.FC = () => {
   const [status, setStatus] = useState<DisplayStatus | null>(null);
@@ -36,21 +27,30 @@ export const DisplayApp: React.FC = () => {
   const [needsRegistration, setNeedsRegistration] = useState(false);
 
   const socket = new VizoraSocketClient();
-  const deviceAuthService = new DeviceAuthService(socket);
+  const tokenManager = new TokenManager({ storageKey: 'display_token' });
+  const connectionManager = getConnectionManager();
+  if (!connectionManager) {
+    console.error("ConnectionManager not initialized!");
+    return <LoadingScreen message="Initializing Connection..." />;
+  }
+  const deviceManager = new DeviceManager(connectionManager, tokenManager);
+  const deviceAuthService = new DeviceAuthService(socket, deviceManager, tokenManager);
   const displayService = new DisplayService(socket);
   const contentService = new ContentService();
   const scheduleService = new ScheduleService(contentService);
 
-  const getDisplayMetadata = (): DisplayMetadata => ({
-    name: 'Vizora Display',
-    location: 'Default Location',
-    resolution: {
-      width: window.screen.width,
-      height: window.screen.height,
-    },
-    model: 'Web Browser',
-    os: navigator.platform,
-  });
+  const getDisplayMetadata = (): Partial<DeviceInfo> => {
+    return {
+       name: 'Vizora Display', 
+       location: 'Default Location',
+       resolution: `${window.screen.width}x${window.screen.height}`, 
+       model: 'Web Browser',
+       os: navigator.platform,
+       deviceType: 'display',
+       userAgent: navigator.userAgent,
+       platform: navigator.platform
+    };
+  };
 
   const initializeDisplay = async () => {
     try {
@@ -83,8 +83,8 @@ export const DisplayApp: React.FC = () => {
   const handleRegistration = async (pairingCode: string) => {
     try {
       setIsLoading(true);
-      const metadata = getDisplayMetadata();
-      await deviceAuthService.registerWithPairingCode(pairingCode, metadata);
+      const deviceInfoPayload = getDisplayMetadata();
+      await deviceAuthService.registerWithPairingCode(pairingCode, deviceInfoPayload);
       
       const displayId = deviceAuthService.getDisplayId();
       if (!displayId) {
@@ -103,6 +103,11 @@ export const DisplayApp: React.FC = () => {
     }
   };
 
+  const handleContentComplete = () => {
+    console.log('Content playback completed/ended.');
+    scheduleService.advanceToNextContent();
+  };
+
   useEffect(() => {
     initializeDisplay();
 
@@ -117,7 +122,7 @@ export const DisplayApp: React.FC = () => {
   }
 
   if (error) {
-    return <ErrorScreen error={error} onRetry={() => window.location.reload()} />;
+    return <div>Error: {error.message}</div>;
   }
 
   if (needsRegistration) {
@@ -125,7 +130,7 @@ export const DisplayApp: React.FC = () => {
   }
 
   if (!isAuthenticated) {
-    return <ErrorScreen error={new Error('Device not authenticated')} onRetry={() => window.location.reload()} />;
+    return <div>Error: Device not authenticated</div>;
   }
 
   return (
@@ -134,6 +139,8 @@ export const DisplayApp: React.FC = () => {
         scheduleService={scheduleService}
         contentService={contentService}
         displayStatus={status}
+        contentItem={scheduleService.getCurrentContent()}
+        onComplete={handleContentComplete}
       />
     </ErrorBoundary>
   );

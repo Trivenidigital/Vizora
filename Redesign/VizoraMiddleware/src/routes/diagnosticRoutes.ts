@@ -4,7 +4,11 @@
  */
 
 import { Router } from 'express';
-import { getSocketStatus } from '../socketServer';
+import express from 'express';
+import os from 'os';
+import mongoose from 'mongoose';
+import { ExtendedSocket } from '../types/socket';
+import { Server } from 'socket.io';
 import logger from '../utils/logger';
 
 const router = Router();
@@ -34,11 +38,11 @@ router.get('/diagnostics', (req, res) => {
     });
   } catch (error) {
     logger.error('Error generating diagnostics:', error);
-    
+    const typedError = error as Error;
     return res.status(500).json({
       success: false,
       message: 'Error generating diagnostics',
-      error: error.message,
+      error: typedError.message,
     });
   }
 });
@@ -117,13 +121,99 @@ router.get('/socket-diagnostic', (req, res) => {
     });
   } catch (error) {
     logger.error('Error generating socket diagnostic:', error);
-    
+    const typedError = error as Error;
     return res.status(500).json({
       success: false,
       message: 'Error generating socket diagnostic',
-      error: error.message,
+      error: typedError.message,
     });
   }
 });
+
+// Route to get system diagnostics
+router.get('/system', async (req, res) => {
+  // ... existing code ...
+});
+
+// Route to get socket diagnostics
+router.get('/sockets', async (req, res) => {
+  const io = (req.app.get('io') as Server); // Get io instance from app settings
+  if (!io) {
+    return res.status(500).json({ success: false, message: 'Socket.IO server not available' });
+  }
+  try {
+    const sockets = await io.fetchSockets();
+    const socketDetails = sockets.map((socket: ExtendedSocket) => { // Use ExtendedSocket
+      const clientIp = socket.handshake.address;
+      return {
+        id: socket.id,
+        ip: clientIp,
+        connectedAt: socket.handshake.time, // Or use a connection timestamp if stored elsewhere
+        transport: socket.conn.transport.name,
+        secure: socket.handshake.secure,
+        // Add any custom properties if available and needed
+        deviceId: socket.deviceId,
+        deviceType: socket.deviceType,
+        authenticated: socket.authenticated,
+        user: socket.user ? { 
+          id: typeof socket.user === 'object' && socket.user && 'id' in socket.user ? socket.user.id : 'N/A',
+          role: typeof socket.user === 'object' && socket.user && 'role' in socket.user ? socket.user.role : 'N/A',
+        } : null,
+      };
+    });
+
+    res.json({ success: true, sockets: socketDetails });
+  } catch (error) {
+    // ... existing code ...
+  });
+
+// Route to get specific socket details
+router.get('/sockets/:socketId', async (req, res) => {
+  const { socketId } = req.params;
+  const io = (req.app.get('io') as Server); // Get io instance from app settings
+  if (!io) {
+    return res.status(500).json({ success: false, message: 'Socket.IO server not available' });
+  }
+
+  try {
+    // Fetch the specific socket using its ID
+    const remoteSockets = await io.in(socketId).fetchSockets();
+    const socket = remoteSockets.length > 0 ? (remoteSockets[0] as ExtendedSocket) : undefined; // Cast to ExtendedSocket
+
+    if (!socket) {
+      return res.status(404).json({ success: false, message: 'Socket not found' });
+    }
+
+    const socketInfo: any = {
+      id: socket.id,
+      ip: socket.handshake.address,
+      connectedAt: socket.handshake.time,
+      transport: socket.conn.transport.name,
+      secure: socket.handshake.secure,
+      rooms: Array.from(socket.rooms),
+    };
+
+    // Add custom properties safely
+    if (socket.authenticated) {
+      socketInfo.isAuthenticated = socket.authenticated;
+    }
+    if (socket.user) {
+      socketInfo.user = {
+        id: typeof socket.user === 'object' && socket.user && 'id' in socket.user ? socket.user.id : 'N/A',
+        role: typeof socket.user === 'object' && socket.user && 'role' in socket.user ? socket.user.role : 'N/A',
+      };
+    }
+    if (socket.deviceId) {
+      socketInfo.deviceId = socket.deviceId;
+    }
+    if (socket.deviceType) {
+      socketInfo.deviceType = socket.deviceType;
+    }
+
+    res.json({ success: true, socketInfo });
+
+  } catch (error) {
+    // ... existing code ...
+  });
 
 export default router; 

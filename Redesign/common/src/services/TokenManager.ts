@@ -611,3 +611,7 @@ export class TokenManager extends EventEmitter {
     }
   }
 } 
+
+// Create and export a singleton instance
+const tokenManager = new TokenManager();
+export default tokenManager;

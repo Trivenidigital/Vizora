@@ -59,13 +59,14 @@ function App() {
         }
         
         // Subscribe to network status changes
-        networkStatus.on('statusChange', (info) => {
-          console.log('Network status changed:', info.online ? 'Online' : 'Offline');
+        const handleStatusChange = (info: any) => {
+          console.log('Network status changed:', info);
           setConfig(prevConfig => ({
             ...prevConfig,
             offlineMode: !info.online,
           }));
-        });
+        };
+        networkStatus.on('statusChange', handleStatusChange);
         
         // Load settings from URL parameters if available
         const params = new URLSearchParams(window.location.search);

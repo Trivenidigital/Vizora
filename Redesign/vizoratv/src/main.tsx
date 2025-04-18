@@ -1,10 +1,18 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App'
+import DisplayProvider from './context/DisplayContext'
+// Removed common index.css import, rely on local one
 import './index.css'
-import App from './App.tsx'
+// import '../common/src/index.css'
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
+// Removed process shim
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  // Temporarily disable StrictMode
+  // <React.StrictMode>
+    <DisplayProvider>
+      <App />
+    </DisplayProvider>
+  // </React.StrictMode>,
 )

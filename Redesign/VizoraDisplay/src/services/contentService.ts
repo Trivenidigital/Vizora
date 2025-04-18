@@ -1,8 +1,8 @@
 // import { EventEmitter } from 'events';
 import { EventEmitter } from '../utils/EventEmitter';
-import type { Content, Schedule } from '@vizora/common/types';
+import type { Content, ContentSchedule as Schedule } from '@vizora/common/types';
 import { indexedDBStorage } from './storage/indexedDBStorage';
-import { NetworkStatus } from './networkStatus';
+import { networkStatus } from './networkStatus';
 
 const CACHE_PREFIX = 'vizora_content_';
 const CACHE_VERSION = '2';
@@ -20,7 +20,7 @@ export class ContentService extends EventEmitter {
   private preloadTimeout: NodeJS.Timeout | null = null;
   private isLoading: boolean = false;
   private useIndexedDB: boolean = true; // Set to false to force localStorage
-  private networkStatus: NetworkStatus;
+  private networkStatus: typeof networkStatus;
   private prefetchQueue: string[] = [];
   private isPrefetching: boolean = false;
   private maxConcurrentDownloads: number = 2;
@@ -32,8 +32,8 @@ export class ContentService extends EventEmitter {
   constructor() {
     super();
     
-    // Initialize network monitoring
-    this.networkStatus = new NetworkStatus();
+    // Use the imported instance
+    this.networkStatus = networkStatus;
     this.networkStatus.on('statusChange', this.handleNetworkStatusChange.bind(this));
     
     // Initialize storage system
@@ -213,7 +213,7 @@ export class ContentService extends EventEmitter {
     if (schedule.items.length > 1) {
       const upcomingContentIds = schedule.items
         .slice(0, Math.min(DEFAULT_PREFETCH_COUNT, schedule.items.length))
-        .map(item => item.contentId);
+        .map((item: any) => item.contentId);
       
       this.queueContentForPrefetch(upcomingContentIds);
     }
@@ -252,7 +252,7 @@ export class ContentService extends EventEmitter {
     if (schedule.items.length > 1) {
       const upcomingContentIds = schedule.items
         .slice(0, Math.min(DEFAULT_PREFETCH_COUNT, schedule.items.length))
-        .map(item => item.contentId);
+        .map((item: any) => item.contentId);
       
       this.queueContentForPrefetch(upcomingContentIds);
     }
@@ -280,7 +280,6 @@ export class ContentService extends EventEmitter {
           this.logDiagnostic(`Loaded content ${nextItem.contentId} from cache in offline mode`);
           this.currentContent = content;
           this.emit('content:change', content);
-          this.scheduleNextContent();
           return;
         }
         
@@ -301,7 +300,6 @@ export class ContentService extends EventEmitter {
           console.warn(`Background refresh failed for ${nextItem.contentId}:`, err);
         });
         
-        this.scheduleNextContent();
         return;
       }
 
@@ -322,9 +320,10 @@ export class ContentService extends EventEmitter {
         await this.cacheContent(content);
         
         // Fetch and cache binary assets if applicable
-        if (content.type === 'image' || content.type === 'video') {
+        if (content && (content.type === 'image' || content.type === 'video')) {
           this.fetchAndCacheBinaryAsset(content).catch(err => {
-            console.warn(`Failed to cache binary asset for ${content.id}:`, err);
+            const errorMsg = content ? `Failed to cache binary asset for ${content.id}:` : 'Failed to cache binary asset (content was null):';
+            console.warn(errorMsg, err);
           });
         }
 
@@ -333,8 +332,6 @@ export class ContentService extends EventEmitter {
       this.emit('content:change', content);
         this.logDiagnostic(`Successfully loaded content ${nextItem.contentId} from server`);
 
-      // Schedule preload of next content
-      this.scheduleNextContent();
       } catch (fetchError) {
         console.error(`Failed to fetch content ${nextItem.contentId}:`, fetchError);
         
@@ -344,11 +341,39 @@ export class ContentService extends EventEmitter {
           this.logDiagnostic(`Falling back to cached content ${nextItem.contentId} after fetch failure`);
           this.currentContent = content;
           this.emit('content:change', content);
-          this.scheduleNextContent();
           return;
         }
         
         throw fetchError;
+      }
+
+      if (nextItem?.startTime) {
+        try {
+          const nextStart = new Date(nextItem.startTime); // Attempt date creation
+          if (isNaN(nextStart.getTime())) { // Check if valid
+            throw new Error("Invalid start date for next item"); 
+          }
+          // <<< Proceed only if date is valid >>>
+          const now = Date.now(); 
+          const delay = nextStart.getTime() - now;
+          
+          if (delay > 0) {
+            this.playbackTimer = setTimeout(() => this.startPlayback(), delay); 
+            const preloadDelay = Math.max(0, delay - 30000);
+            this.clearPreloadTimeout(); 
+            this.preloadTimeout = setTimeout(() => {
+              if (nextItem?.contentId) { 
+                this.preloadContent([nextItem.contentId]);
+              }
+            }, preloadDelay);
+          } else {
+            if (nextItem?.contentId) {
+              this.preloadContent([nextItem.contentId]);
+            }
+          }
+        } catch (e) {
+           console.error('Error processing nextItem.startTime:', nextItem.startTime, e);
+        }
       }
     } catch (error) {
       console.error('Failed to load content:', error);
@@ -588,34 +613,6 @@ export class ContentService extends EventEmitter {
     return null;
   }
 
-  private scheduleNextContent(): void {
-    if (!this.schedule || this.schedule.items.length <= 1) return;
-
-    const nextItem = this.schedule.items[1];
-    const now = new Date();
-    const nextStart = new Date(nextItem.startTime);
-    const preloadTime = new Date(nextStart.getTime() - 30000); // 30 seconds before
-
-    if (this.preloadTimeout) {
-      clearTimeout(this.preloadTimeout);
-      this.preloadTimeout = null;
-    }
-
-    if (preloadTime > now) {
-      this.logDiagnostic(`Scheduling next content ${nextItem.contentId} to preload at ${preloadTime.toISOString()}`);
-      
-      this.preloadTimeout = setTimeout(async () => {
-        try {
-          const content = await this.getContent(nextItem.contentId);
-          this.nextContent = content;
-          this.emit('content:preloaded', content);
-        } catch (error) {
-          console.error('Failed to preload next content:', error);
-        }
-      }, preloadTime.getTime() - now.getTime());
-    }
-  }
-
   private handleError(error: Error): void {
     if (this.retryTimeout) {
       clearTimeout(this.retryTimeout);
@@ -687,9 +684,10 @@ export class ContentService extends EventEmitter {
         await this.cacheContent(content);
         
         // Fetch and cache binary assets if applicable
-        if (content.type === 'image' || content.type === 'video') {
+        if (content && (content.type === 'image' || content.type === 'video')) {
           this.fetchAndCacheBinaryAsset(content).catch(err => {
-            console.warn(`Failed to cache binary asset for ${content.id}:`, err);
+            const errorMsg = content ? `Failed to cache binary asset for ${content.id}:` : 'Failed to cache binary asset (content was null):';
+            console.warn(errorMsg, err);
           });
         }
         
@@ -874,5 +872,12 @@ export class ContentService extends EventEmitter {
       totalSize,
       binaryAssets
     };
+  }
+
+  private clearPreloadTimeout(): void {
+     if (this.preloadTimeout) {
+        clearTimeout(this.preloadTimeout);
+        this.preloadTimeout = null;
+     }
   }
 } 

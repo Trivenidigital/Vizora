@@ -1,55 +1,18 @@
-import { useState, useEffect } from 'react';
-import { Outlet, useLocation, Navigate } from 'react-router-dom';
-import Sidebar from '../components/navigation/Sidebar';
-import Header from '../components/navigation/Header';
-import Footer from '../components/navigation/Footer';
-import { useAuth } from '@/contexts/AuthContext';
+import React from 'react';
+import { Sidebar } from './Sidebar';
+import { Navbar } from './Navbar';
+import { Outlet } from 'react-router-dom';
 
-const AppLayout = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const location = useLocation();
-  const { isAuthenticated, isLoading } = useAuth();
-
-  // Close sidebar on route change (for mobile)
-  useEffect(() => {
-    setSidebarOpen(false);
-  }, [location.pathname]);
-
-  // If checking authentication, show nothing temporarily to avoid flash
-  if (isLoading) {
-    return <div className="flex items-center justify-center h-screen">Loading...</div>;
-  }
-
-  // If not authenticated, redirect to login
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-
+export const AppLayout: React.FC = () => {
   return (
-    <div className="flex h-screen bg-gray-50">
-      {/* Sidebar */}
-      <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
-
-      {/* Main content */}
-      <div className="flex flex-col flex-1 overflow-hidden">
-        {/* Header */}
-        <Header sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-
-        {/* Content */}
-        <main className="flex-1 overflow-y-auto p-6 lg:pl-8">
-          <div className="mx-auto max-w-7xl pb-6">
-            {/* Add padding to account for the sidebar */}
-            <div className="lg:pl-64 pt-1">
-              <Outlet />
-            </div>
-          </div>
+    <div className="flex min-h-screen bg-slate-100 dark:bg-slate-900">
+      <Sidebar />
+      <div className="flex flex-col flex-grow ml-64"> {/* Offset by sidebar width */}
+        <Navbar />
+        <main className="flex-grow p-6 mt-16"> {/* Offset by navbar height */}
+          <Outlet />
         </main>
-
-        {/* Footer */}
-        <Footer />
       </div>
     </div>
   );
-};
-
-export default AppLayout; 
+}; 

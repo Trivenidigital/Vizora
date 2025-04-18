@@ -70,6 +70,9 @@ We're implementing real-time diagnostic capabilities across the Vizora ecosystem
    - Implement stress tests for socket connection reliability
    - Add validation for diagnostic data accuracy
 
+4. **(Deferred) Debug VizoraTV Auto-Start Pairing**:
+   - Revisit the automatic pairing initiation on the TV app load.
+
 ### Medium-term Goals
 
 1. **Offline Mode Implementation**:
@@ -139,6 +142,7 @@ We're implementing real-time diagnostic capabilities across the Vizora ecosystem
 - Optimizing content delivery for various display types and resolutions
 - Handling reconnection scenarios without disrupting user experience
 - Scaling socket connections for large numbers of concurrent displays
+- **VizoraTV auto-start pairing on load not consistently working (debugging deferred, possibly related to Strict Mode or initialization timing).**
 
 ## Technical Decisions
 - Using centralized ConnectionManager for all Socket.IO interactions

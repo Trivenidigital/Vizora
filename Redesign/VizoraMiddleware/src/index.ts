@@ -5,6 +5,8 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import cookieParser from 'cookie-parser';
+import { Socket } from 'socket.io';
+import { Request, Response, NextFunction } from 'express';
 
 // Load environment variables
 import dotenv from 'dotenv';
@@ -26,7 +28,7 @@ const httpServer = createServer(app);
 // Configure Socket.IO with CORS
 const io = new Server(httpServer, {
   cors: {
-    origin: function(origin, callback) {
+    origin: function(origin: any, callback: any) {
       // Allow any localhost origin and null origins (like Postman)
       if (!origin || origin.match(/^https?:\/\/localhost:\d+$/)) {
         callback(null, true);
@@ -46,7 +48,7 @@ const io = new Server(httpServer, {
 
 // Configure CORS for Express
 const corsOptions = {
-  origin: function(origin, callback) {
+  origin: function(origin: any, callback: any) {
     // Allow any localhost origin and null origins (like Postman)
     if (!origin || origin.match(/^https?:\/\/localhost:\d+$/)) {
       callback(null, true);
@@ -152,12 +154,13 @@ const connectDB = async () => {
     }
   } catch (error) {
     logger.error('MongoDB Atlas connection error:', { error });
-    
-    if (error.name === 'MongoNetworkError') {
+    const typedError = error as Error;
+
+    if (typedError.name === 'MongoNetworkError') {
       logger.error('Network error occurred. Check your internet connection and MongoDB Atlas network settings.');
-    } else if (error.name === 'MongoServerSelectionError') {
+    } else if (typedError.name === 'MongoServerSelectionError') {
       logger.error('Server selection timed out. Verify your MongoDB Atlas connection string and network configuration.');
-    } else if (error.message.includes('Invalid MongoDB Atlas connection string')) {
+    } else if (typedError.message.includes('Invalid MongoDB Atlas connection string')) {
       logger.error('CONNECTION STRING ERROR: Make sure you have configured a valid MongoDB Atlas connection string in your .env file.');
       logger.error('Required format: mongodb+srv://username:password@cluster.mongodb.net/database?retryWrites=true&w=majority');
     }
@@ -234,10 +237,11 @@ app.get('/api/auth/me', async (req, res) => {
     });
   } catch (error) {
     logger.error('Error in /api/auth/me:', { error });
+    const typedError = error as Error;
     return res.status(500).json({
       success: false,
       message: 'Error retrieving user',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === 'development' ? typedError.message : undefined
     });
   }
 });
@@ -320,10 +324,11 @@ app.post('/api/auth/login', async (req, res) => {
     });
   } catch (error) {
     logger.error('Login error:', { error });
+    const typedError = error as Error;
     return res.status(500).json({
       success: false,
       message: 'Server error during login',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === 'development' ? typedError.message : undefined
     });
   }
 });
@@ -395,10 +400,11 @@ app.post('/api/auth/register', async (req, res) => {
     });
   } catch (error) {
     logger.error('Register error:', { error });
+    const typedError = error as Error;
     return res.status(500).json({
       success: false,
       message: 'Server error during registration',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === 'development' ? typedError.message : undefined
     });
   }
 });
@@ -409,14 +415,10 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
-// Error handling middleware
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  logger.error('Global error handler:', { error: err });
-  res.status(err.status || 500).json({
-    success: false,
-    message: err.message || 'Internal Server Error',
-    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
-  });
+// Default Error Handler
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  logger.error('Unhandled Error:', err);
+  res.status(500).json({ error: 'Internal Server Error' });
 });
 
 // 404 handler

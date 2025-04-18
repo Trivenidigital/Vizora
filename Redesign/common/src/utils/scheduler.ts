@@ -18,46 +18,80 @@ export class ContentScheduler {
     this.updateContent();
   }
 
+  private createScheduledContent(item: any): ScheduledContent | null {
+    if (!item?.startTime || !item.endTime) return null;
+    try {
+        const startTime = new Date(item.startTime);
+        const endTime = new Date(item.endTime);
+        // Check if dates are valid after creation
+        if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) return null; 
+        return {
+          ...item, 
+          startTime: startTime, 
+          endTime: endTime, 
+          content: {} as any 
+        };
+    } catch { return null; }
+  }
+
   private updateContent(): void {
     const now = new Date();
-    const items = this.schedule.items;
+    const nowTime = now.getTime();
+    const items = this.schedule?.items || [];
 
-    // Find current content
-    const currentItem = items.find((item: any) => {
-      const startTime = item.startTime instanceof Date ? item.startTime : new Date(item.startTime);
-      const endTime = item.endTime instanceof Date ? item.endTime : new Date(item.endTime);
-      return isBefore(startTime, now) && isAfter(endTime, now);
-    });
+    const findItemLogic = (item: any): boolean => {
+      if (!item) return false;
+      try {
+        let startTime: number | null = null;
+        let endTime: number | null = null;
+        if (item.startTime instanceof Date) startTime = item.startTime.getTime();
+        else if (typeof item.startTime === 'string' && item.startTime) startTime = new Date(item.startTime).getTime();
+        
+        if (item.endTime instanceof Date) endTime = item.endTime.getTime();
+        else if (typeof item.endTime === 'string' && item.endTime) endTime = new Date(item.endTime).getTime();
+        
+        return startTime !== null && endTime !== null && !isNaN(startTime) && !isNaN(endTime) && 
+               startTime <= nowTime && endTime > nowTime;
+      } catch { return false; }
+    };
 
-    if (currentItem) {
-      // Convert to ScheduledContent
-      this.currentContent = {
-        ...currentItem,
-        startTime: currentItem.startTime instanceof Date ? currentItem.startTime : new Date(currentItem.startTime),
-        endTime: currentItem.endTime instanceof Date ? currentItem.endTime : new Date(currentItem.endTime),
-        content: {} as any // This would need to be fetched or provided
-      };
-    } else {
-      this.currentContent = null;
-    }
+    const findNextItemLogic = (item: any): boolean => {
+      if (!item) return false;
+      try {
+        let startTime: number | null = null;
+        if (item.startTime instanceof Date) startTime = item.startTime.getTime();
+        else if (typeof item.startTime === 'string' && item.startTime) startTime = new Date(item.startTime).getTime();
+        
+        return startTime !== null && !isNaN(startTime) && startTime > nowTime;
+      } catch { return false; }
+    };
+    
+    const createScheduledContent = (item: any): ScheduledContent | null => {
+       if (!item?.startTime || !item.endTime) return null;
+       try {
+          let startTime: Date | undefined = undefined;
+          let endTime: Date | undefined = undefined;
+          if(item.startTime instanceof Date) startTime = item.startTime;
+          else if(typeof item.startTime === 'string' && item.startTime) startTime = new Date(item.startTime);
 
-    // Find next content
-    const nextItem = items.find((item: any) => {
-      const startTime = item.startTime instanceof Date ? item.startTime : new Date(item.startTime);
-      return isAfter(startTime, now);
-    });
+          if(item.endTime instanceof Date) endTime = item.endTime;
+          else if(typeof item.endTime === 'string' && item.endTime) endTime = new Date(item.endTime);
+          
+          if (!startTime || !endTime || isNaN(startTime.getTime()) || isNaN(endTime.getTime())) return null; 
+          return {
+            ...item, 
+            startTime: startTime, 
+            endTime: endTime, 
+            content: {} as any 
+          };
+       } catch { return null; }
+    };
 
-    if (nextItem) {
-      // Convert to ScheduledContent
-      this.nextContent = {
-        ...nextItem,
-        startTime: nextItem.startTime instanceof Date ? nextItem.startTime : new Date(nextItem.startTime),
-        endTime: nextItem.endTime instanceof Date ? nextItem.endTime : new Date(nextItem.endTime),
-        content: {} as any // This would need to be fetched or provided
-      };
-    } else {
-      this.nextContent = null;
-    }
+    const currentItemData = items.find(findItemLogic);
+    this.currentContent = currentItemData ? createScheduledContent(currentItemData) : null;
+    
+    const nextItemData = items.find(findNextItemLogic);
+    this.nextContent = nextItemData ? createScheduledContent(nextItemData) : null;
   }
 
   public getCurrentContent(): ScheduledContent | null {
@@ -81,21 +115,33 @@ export class ContentScheduler {
   }
 
   getTimeUntilNext(): number | null {
-    if (!this.nextContent) return null;
-    // Ensure we have a Date object before calling getTime()
-    const startTime = this.nextContent.startTime instanceof Date 
-      ? this.nextContent.startTime 
-      : new Date(this.nextContent.startTime);
-    return startTime.getTime() - new Date().getTime();
+    const nextStartTimeValue = this.nextContent?.startTime;
+    if (!nextStartTimeValue) return null;
+    try {
+      let startTimeMs: number | null = null;
+      if (nextStartTimeValue instanceof Date) {
+        startTimeMs = nextStartTimeValue.getTime();
+      } else if (typeof nextStartTimeValue === 'string' && nextStartTimeValue.length > 0) {
+        startTimeMs = new Date(nextStartTimeValue).getTime();
+      }
+      if (startTimeMs === null || isNaN(startTimeMs)) return null;
+      return startTimeMs - Date.now();
+    } catch { return null; }
   }
 
   getRemainingTime(): number | null {
-    if (!this.currentContent) return null;
-    // Ensure we have a Date object before calling getTime()
-    const endTime = this.currentContent.endTime instanceof Date 
-      ? this.currentContent.endTime 
-      : new Date(this.currentContent.endTime);
-    return endTime.getTime() - new Date().getTime();
+    const currentEndTimeValue = this.currentContent?.endTime;
+    if (!currentEndTimeValue) return null;
+    try {
+      let endTimeMs: number | null = null;
+      if (currentEndTimeValue instanceof Date) {
+        endTimeMs = currentEndTimeValue.getTime();
+      } else if (typeof currentEndTimeValue === 'string' && currentEndTimeValue.length > 0) {
+        endTimeMs = new Date(currentEndTimeValue).getTime();
+      }
+      if (endTimeMs === null || isNaN(endTimeMs)) return null;
+      return endTimeMs - Date.now();
+    } catch { return null; }
   }
 
   isContentScheduled(contentId: string): boolean {
@@ -103,14 +149,8 @@ export class ContentScheduler {
   }
 
   getContentSchedule(contentId: string): ScheduledContent | null {
-    const item = this.schedule.items.find((item: any) => item.contentId === contentId);
+    const item = this.schedule?.items?.find((item: any) => item.contentId === contentId);
     if (!item) return null;
-
-    return {
-      ...item,
-      startTime: item.startTime instanceof Date ? item.startTime : new Date(item.startTime),
-      endTime: item.endTime instanceof Date ? item.endTime : new Date(item.endTime),
-      content: {} as any // This would need to be fetched or provided
-    };
+    return this.createScheduledContent(item); 
   }
 } 

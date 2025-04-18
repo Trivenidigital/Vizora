@@ -1,4 +1,4 @@
-import { OfflineQueue, QueueActionType } from '@vizora/common';
+import { OfflineQueue, QueueActionType, QueueStatus } from '@vizora/common';
 import { VizoraSocketClient } from '@vizora/common';
 import { toast } from 'react-hot-toast';
 
@@ -6,10 +6,10 @@ import { toast } from 'react-hot-toast';
 // implement proper synchronization protocol with server-side validation.
 export class OfflineQueueService {
   private queue: OfflineQueue;
-  private socket: VizoraSocketClient;
+  private socket: any;
   private isProcessing: boolean = false;
 
-  constructor(socket: VizoraSocketClient) {
+  constructor(socket: any) {
     this.socket = socket;
     this.queue = new OfflineQueue(localStorage, 'vizora_display_queue', {
       maxQueueSize: 100,
@@ -18,14 +18,9 @@ export class OfflineQueueService {
       deduplicationWindow: 60000,
     });
 
-    // Listen for socket connection status
-    this.socket.on('connect', () => {
-      this.processQueue();
-    });
-
-    this.socket.on('disconnect', () => {
-      toast.error('Connection lost. Changes will be queued for retry.');
-    });
+    // Add listeners back
+    this.socket.on('connect');
+    this.socket.on('disconnect');
   }
 
   async enqueueContentUpdate(contentId: string): Promise<void> {
@@ -54,7 +49,7 @@ export class OfflineQueueService {
   }
 
   private async processQueue(): Promise<void> {
-    if (this.isProcessing || !this.socket.connected) {
+    if (this.isProcessing || !this.socket.isConnected?.()) {
       return;
     }
 
@@ -63,21 +58,11 @@ export class OfflineQueueService {
     try {
       await this.queue.processQueue(async (action) => {
         switch (action.type) {
-          case QueueActionType.CONTENT_UPDATE:
-            await this.socket.emit('content:update', action.payload);
-            break;
-          case QueueActionType.SCHEDULE_UPDATE:
-            await this.socket.emit('schedule:update', action.payload);
-            break;
-          case QueueActionType.STATUS_REPORT:
-            await this.socket.emit('status:report', action.payload);
-            break;
-          case QueueActionType.HEALTH_UPDATE:
-            await this.socket.emit('health:update', action.payload);
-            break;
-          case QueueActionType.SETTINGS_UPDATE:
-            await this.socket.emit('settings:update', action.payload);
-            break;
+          case QueueActionType.CONTENT_UPDATE: await this.socket.emit('content:update'); break;
+          case QueueActionType.SCHEDULE_UPDATE: await this.socket.emit('schedule:update'); break;
+          case QueueActionType.STATUS_REPORT: await this.socket.emit('status:report'); break;
+          case QueueActionType.HEALTH_UPDATE: await this.socket.emit('health:update'); break;
+          case QueueActionType.SETTINGS_UPDATE: await this.socket.emit('settings:update'); break;
         }
       });
     } catch (error) {
@@ -88,7 +73,7 @@ export class OfflineQueueService {
     }
   }
 
-  getQueueStatus() {
+  getQueueStatus(): QueueStatus {
     return this.queue.getQueueStatus();
   }
 

@@ -1,44 +1,24 @@
-import * as React from "react";
-import { cva, type VariantProps } from "class-variance-authority";
-// Remove the Slot import and replace with our own implementation
-// import { Slot } from '@radix-ui/react-slot';
+import * as React from "react"
+import { Slot } from "@radix-ui/react-slot"
+import { cva, type VariantProps } from "class-variance-authority"
 
-// Simple classname utility function
-function cn(...classes: (string | undefined)[]) {
-  return classes.filter(Boolean).join(" ")
-}
-
-// Create a simple Slot implementation
-const Slot = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ children, ...props }, ref) => {
-    // A simple implementation that passes props to the first child
-    const child = React.Children.only(children) as React.ReactElement;
-    return React.cloneElement(child, { ...props, ref });
-  }
-);
-Slot.displayName = 'Slot';
+import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 cursor-pointer transition duration-150 ease-in-out",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
         default:
-          "bg-blue-600 text-white shadow hover:bg-blue-700 rounded-md",
-        primary:
-          "bg-violet-600 text-white shadow hover:bg-violet-700 rounded-xl font-semibold",
+          "bg-primary text-primary-foreground shadow hover:bg-primary/90",
         destructive:
-          "bg-red-500 text-white shadow-sm hover:bg-red-600 rounded-md",
-        danger: 
-          "bg-red-600 text-white shadow-sm hover:bg-red-700 rounded-xl font-semibold",
+          "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
         outline:
-          "border border-gray-300 bg-transparent shadow-sm hover:bg-gray-100 hover:text-gray-900 rounded-md",
+          "border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground",
         secondary:
-          "bg-gray-100 text-gray-900 shadow-sm hover:bg-gray-200 rounded-md",
-        ghost:
-          "hover:bg-gray-100 hover:text-gray-900",
-        link:
-          "text-blue-600 underline-offset-4 hover:underline",
+          "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
+        ghost: "hover:bg-accent hover:text-accent-foreground",
+        link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
         default: "h-9 px-4 py-2",
@@ -52,41 +32,26 @@ const buttonVariants = cva(
       size: "default",
     },
   }
-);
+)
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
-  asChild?: boolean;
-  isLoading?: boolean;
+  asChild?: boolean
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, isLoading = false, children, disabled, ...props }, ref) => {
-    const Comp = asChild ? Slot : "button";
+  ({ className, variant, size, asChild = false, ...props }, ref) => {
+    const Comp = asChild ? Slot : "button"
     return (
       <Comp
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
-        disabled={isLoading || disabled}
         {...props}
-      >
-        {isLoading ? (
-          <>
-            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            {children}
-          </>
-        ) : (
-          children
-        )}
-      </Comp>
-    );
+      />
+    )
   }
-);
+)
+Button.displayName = "Button"
 
-Button.displayName = "Button";
-
-export { Button, buttonVariants }; 
+export { Button, buttonVariants }

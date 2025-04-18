@@ -1,0 +1,20 @@
+{
+  "name": "vizora-redesign-root",
+  "version": "1.0.0",
+  "description": "Root for Vizora Redesign Monorepo",
+  "private": true,
+  "workspaces": [
+    "common",
+    "VizoraTV",
+    "VizoraDisplay",
+    "VizoraMiddleware",
+    "VizoraWeb"
+  ],
+  "scripts": {},
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}

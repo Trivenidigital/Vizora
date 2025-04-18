@@ -1,25 +1,7 @@
 import { apiClient } from './apiClient';
+import { Content } from '../types/content';
 
 // Export Content interface to ensure consistent type usage across application
-export interface Content {
-  id: string;
-  title: string;
-  description?: string;
-  type: 'image' | 'video' | 'document' | 'audio' | 'html' | 'url' | 'text' | 'webpage' | 'stream' | 'playlist';
-  url?: string;
-  thumbnail?: string;
-  status: 'active' | 'inactive' | 'processing';
-  tags?: string[];
-  folder?: string | null;
-  createdAt: string;
-  updatedAt: string;
-  size?: number;
-  duration?: number | null;
-  width?: number;
-  height?: number;
-  metadata?: Record<string, any>;
-}
-
 export interface ContentMetadata {
   title?: string;
   description?: string;

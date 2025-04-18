@@ -30,4 +30,7 @@ root.render(
   <React.StrictMode>
     <App />
   </React.StrictMode>
-); 
+);
+
+export { VizoraDisplay } from './components/VizoraDisplay';
+// Add any other necessary exports from VizoraDisplay here 

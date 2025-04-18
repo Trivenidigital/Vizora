@@ -1,5 +1,7 @@
 import { EventEmitter } from '../utils/EventEmitter';
 import { Content } from '../types';
+import { indexedDBStorage } from './storage/indexedDBStorage';
+import React from 'react'; // Import React for RefObject
 
 export interface AssetLoadStatus {
   contentId: string;
@@ -26,6 +28,7 @@ export class PreloadManager extends EventEmitter {
   private activePreloads: number = 0;
   private abortControllers: Map<string, AbortController> = new Map();
   private options: Required<PreloadOptions>;
+  private videoContainerRef: React.RefObject<HTMLDivElement>;
   
   constructor(options: PreloadOptions = {}) {
     super();
@@ -36,6 +39,8 @@ export class PreloadManager extends EventEmitter {
       imagePreload: options.imagePreload ?? true,
       videoPreload: options.videoPreload ?? true
     };
+    
+    this.videoContainerRef = React.createRef();
   }
   
   /**
@@ -253,7 +258,7 @@ export class PreloadManager extends EventEmitter {
         
         // Pause the video if it's playing
         if (!video.paused) {
-          video.pause().catch(() => {});
+          video.pause();
         }
         
         resolve({ element: video });
@@ -280,10 +285,21 @@ export class PreloadManager extends EventEmitter {
       // This helps with some video formats that don't buffer well with just .load()
       video.currentTime = 0;
       
-      // Not all browsers allow autoplay, so we need to catch the error
-      video.play().catch(() => {
-        // Ignore autoplay errors
-      });
+      // Add to DOM and start playing
+      if (this.videoContainerRef.current && video.parentNode !== this.videoContainerRef.current) {
+        this.videoContainerRef.current.appendChild(video);
+      }
+      video.play();
+      
+      // Cleanup logic
+      if (this.videoContainerRef.current && video && video.parentNode === this.videoContainerRef.current) {
+        // Pause and remove video
+        video.pause();
+        if (this.videoContainerRef.current) {
+          this.videoContainerRef.current.removeChild(video);
+        }
+      }
+      resolve({ element: video });
     });
   }
   

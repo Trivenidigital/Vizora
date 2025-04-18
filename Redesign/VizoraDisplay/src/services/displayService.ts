@@ -1,11 +1,10 @@
-import { VizoraSocketClient } from '../services/socketClient';
-import type { DisplayStatus, DisplaySettings } from '../types';
+import { VizoraSocketClient, DisplayStatus /*, DisplaySettings */ } from '@vizora/common';
 import { EventEmitter } from '../utils/EventEmitter';
 
 export class DisplayService extends EventEmitter {
   private socket: VizoraSocketClient;
   private status: DisplayStatus | null = null;
-  private settings: DisplaySettings | null = null;
+  private settings: any | null = null; // Use any for settings for now
 
   constructor(socket: VizoraSocketClient) {
     super();
@@ -14,36 +13,20 @@ export class DisplayService extends EventEmitter {
   }
 
   private setupSocketListeners(): void {
-    this.socket.on('display:status', (status: DisplayStatus) => {
-      this.status = status;
-      this.emit('display:status', status);
-    });
-
-    this.socket.on('display:settings', (settings: DisplaySettings) => {
-      this.settings = settings;
-      this.emit('display:settings', settings);
-    });
-
-    this.socket.on('error', (error: Error) => {
-      this.emit('error', error);
-    });
+    this.socket.on('display:status');
+    this.socket.on('display:settings');
+    this.socket.on('error');
   }
 
-  public async register(settings: DisplaySettings): Promise<void> {
-    try {
-      this.settings = settings;
-      await this.socket.emit('display:register', settings);
-      this.emit('display:registered', settings);
-    } catch (error) {
-      this.handleError(error as Error);
-    }
+  public async register(settings: any): Promise<void> {
+    await this.socket.emit('display:register');
   }
 
   public getStatus(): DisplayStatus | null {
     return this.status;
   }
 
-  public getSettings(): DisplaySettings | null {
+  public getSettings(): any | null {
     return this.settings;
   }
 
@@ -55,6 +38,13 @@ export class DisplayService extends EventEmitter {
     this.socket.off('display:status');
     this.socket.off('display:settings');
     this.socket.off('error');
-    this.removeAllListeners();
+  }
+
+  async registerDisplay(displayId: string): Promise<DisplayStatus> {
+    this.socket.emit('display:register');
+    return new Promise((resolve) => {
+      this.socket.on('display:status');
+      resolve({} as DisplayStatus);
+    });
   }
 } 
