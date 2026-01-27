@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { DatabaseService } from '../database/database.service';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import { RegisterDto, LoginDto } from './dto';
 
 @Injectable()
@@ -81,7 +81,7 @@ export class AuthService {
         action: 'user_registered',
         entityType: 'user',
         entityId: user.id,
-        details: {
+        changes: {
           email: user.email,
           organizationName: organization.name,
         },
@@ -178,15 +178,23 @@ export class AuthService {
   }
 
   async logout(userId: string) {
-    // Log audit event
-    await this.databaseService.auditLog.create({
-      data: {
-        userId,
-        action: 'user_logout',
-        entityType: 'user',
-        entityId: userId,
-      },
+    // Get user to find organizationId
+    const user = await this.databaseService.user.findUnique({
+      where: { id: userId },
     });
+
+    if (user) {
+      // Log audit event
+      await this.databaseService.auditLog.create({
+        data: {
+          userId,
+          organizationId: user.organizationId,
+          action: 'user_logout',
+          entityType: 'user',
+          entityId: userId,
+        },
+      });
+    }
 
     return { message: 'Logged out successfully' };
   }
