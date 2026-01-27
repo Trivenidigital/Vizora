@@ -49,19 +49,22 @@
 
 ## 🔴 REMAINING CRITICAL ISSUES
 
-### 3. No Test Coverage
-**Severity:** CRITICAL  
+### 3. Test Coverage - IN PROGRESS ⚠️
+**Severity:** HIGH (was CRITICAL)  
 **Impact:** Cannot verify functionality, regressions go undetected
 
-**Current State:**
-- Unit tests: **0 files** in middleware
-- E2E tests: **1 file** (minimal)
-- Test coverage: **~0%**
+**Current State (Jan 27, 2026):**
+- Unit tests: **2 test suites**, 29 tests passing
+- Test coverage: **~10% overall**
+- **auth.service.ts: 100% coverage** ✅
+- **health.service.ts: 96% coverage** ✅
+- Jest + ts-jest configured
 
-**Required:**
-- Unit tests for all services (target: >80% coverage)
-- Integration tests for all API endpoints
+**Remaining:**
+- More service tests (displays, content, playlists, schedules)
+- Controller tests
 - E2E tests for critical user flows
+- Target: >80% coverage on services
 
 ---
 
@@ -120,6 +123,13 @@
 | 🟡 Medium | 5 | 2 | **3** |
 | 🟢 Suggestions | 5 | 1 | **4** |
 | **Total** | **18** | **9** | **9** |
+
+---
+
+### 19. Displays Service Schema Mismatch ✅ FIXED
+**Fixed by:** Updated displays.service.ts to use correct Prisma field names
+- DTO `deviceId` → Prisma `deviceIdentifier`
+- DTO `name` → Prisma `nickname`
 
 ---
 
