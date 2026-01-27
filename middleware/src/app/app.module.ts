@@ -3,6 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { ConfigModule } from '../modules/config/config.module';
 import { DatabaseModule } from '../modules/database/database.module';
 import { AuthModule } from '../modules/auth/auth.module';
 import { OrganizationsModule } from '../modules/organizations/organizations.module';
@@ -14,6 +15,8 @@ import { HealthModule } from '../modules/health/health.module';
 
 @Module({
   imports: [
+    // Environment configuration - validates on startup
+    ConfigModule,
     // Rate limiting - 100 requests per minute per IP
     ThrottlerModule.forRoot([
       {
