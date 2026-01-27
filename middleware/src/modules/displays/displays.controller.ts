@@ -12,6 +12,8 @@ import { DisplaysService } from './displays.service';
 import { CreateDisplayDto } from './dto/create-display.dto';
 import { UpdateDisplayDto } from './dto/update-display.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 
 @Controller('displays')
 export class DisplaysController {
@@ -19,7 +21,7 @@ export class DisplaysController {
 
   @Post()
   create(
-    @Body('organizationId') organizationId: string,
+    @CurrentUser('organizationId') organizationId: string,
     @Body() createDisplayDto: CreateDisplayDto,
   ) {
     return this.displaysService.create(organizationId, createDisplayDto);
@@ -27,7 +29,7 @@ export class DisplaysController {
 
   @Get()
   findAll(
-    @Query('organizationId') organizationId: string,
+    @CurrentUser('organizationId') organizationId: string,
     @Query() pagination: PaginationDto,
   ) {
     return this.displaysService.findAll(organizationId, pagination);
@@ -35,7 +37,7 @@ export class DisplaysController {
 
   @Get(':id')
   findOne(
-    @Query('organizationId') organizationId: string,
+    @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
   ) {
     return this.displaysService.findOne(organizationId, id);
@@ -43,7 +45,7 @@ export class DisplaysController {
 
   @Patch(':id')
   update(
-    @Query('organizationId') organizationId: string,
+    @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
     @Body() updateDisplayDto: UpdateDisplayDto,
   ) {
@@ -51,13 +53,14 @@ export class DisplaysController {
   }
 
   @Post(':deviceId/heartbeat')
+  @Public()
   heartbeat(@Param('deviceId') deviceId: string) {
     return this.displaysService.updateHeartbeat(deviceId);
   }
 
   @Delete(':id')
   remove(
-    @Query('organizationId') organizationId: string,
+    @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
   ) {
     return this.displaysService.remove(organizationId, id);

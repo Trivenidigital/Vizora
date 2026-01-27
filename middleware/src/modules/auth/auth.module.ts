@@ -13,10 +13,20 @@ import { APP_GUARD } from '@nestjs/core';
   imports: [
     DatabaseModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
-      signOptions: {
-        expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+    JwtModule.registerAsync({
+      useFactory: () => {
+        const secret = process.env.JWT_SECRET;
+        if (!secret || secret.length < 32) {
+          throw new Error(
+            'JWT_SECRET environment variable is required and must be at least 32 characters',
+          );
+        }
+        return {
+          secret,
+          signOptions: {
+            expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+          },
+        };
       },
     }),
   ],

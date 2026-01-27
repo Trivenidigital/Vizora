@@ -12,6 +12,7 @@ import { ContentService } from './content.service';
 import { CreateContentDto } from './dto/create-content.dto';
 import { UpdateContentDto } from './dto/update-content.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @Controller('content')
 export class ContentController {
@@ -19,7 +20,7 @@ export class ContentController {
 
   @Post()
   create(
-    @Body('organizationId') organizationId: string,
+    @CurrentUser('organizationId') organizationId: string,
     @Body() createContentDto: CreateContentDto,
   ) {
     return this.contentService.create(organizationId, createContentDto);
@@ -27,7 +28,7 @@ export class ContentController {
 
   @Get()
   findAll(
-    @Query('organizationId') organizationId: string,
+    @CurrentUser('organizationId') organizationId: string,
     @Query() pagination: PaginationDto,
     @Query('type') type?: string,
     @Query('status') status?: string,
@@ -37,7 +38,7 @@ export class ContentController {
 
   @Get(':id')
   findOne(
-    @Query('organizationId') organizationId: string,
+    @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
   ) {
     return this.contentService.findOne(organizationId, id);
@@ -45,7 +46,7 @@ export class ContentController {
 
   @Patch(':id')
   update(
-    @Query('organizationId') organizationId: string,
+    @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
     @Body() updateContentDto: UpdateContentDto,
   ) {
@@ -54,7 +55,7 @@ export class ContentController {
 
   @Post(':id/archive')
   archive(
-    @Query('organizationId') organizationId: string,
+    @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
   ) {
     return this.contentService.archive(organizationId, id);
@@ -62,7 +63,7 @@ export class ContentController {
 
   @Delete(':id')
   remove(
-    @Query('organizationId') organizationId: string,
+    @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
   ) {
     return this.contentService.remove(organizationId, id);
