@@ -12,6 +12,7 @@ import { PlaylistsService } from './playlists.service';
 import { CreatePlaylistDto } from './dto/create-playlist.dto';
 import { UpdatePlaylistDto } from './dto/update-playlist.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @Controller('playlists')
 export class PlaylistsController {
@@ -19,7 +20,7 @@ export class PlaylistsController {
 
   @Post()
   create(
-    @Body('organizationId') organizationId: string,
+    @CurrentUser('organizationId') organizationId: string,
     @Body() createPlaylistDto: CreatePlaylistDto,
   ) {
     return this.playlistsService.create(organizationId, createPlaylistDto);
@@ -27,7 +28,7 @@ export class PlaylistsController {
 
   @Get()
   findAll(
-    @Query('organizationId') organizationId: string,
+    @CurrentUser('organizationId') organizationId: string,
     @Query() pagination: PaginationDto,
   ) {
     return this.playlistsService.findAll(organizationId, pagination);
@@ -35,7 +36,7 @@ export class PlaylistsController {
 
   @Get(':id')
   findOne(
-    @Query('organizationId') organizationId: string,
+    @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
   ) {
     return this.playlistsService.findOne(organizationId, id);
@@ -43,7 +44,7 @@ export class PlaylistsController {
 
   @Patch(':id')
   update(
-    @Query('organizationId') organizationId: string,
+    @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
     @Body() updatePlaylistDto: UpdatePlaylistDto,
   ) {
@@ -52,7 +53,7 @@ export class PlaylistsController {
 
   @Post(':id/items')
   addItem(
-    @Query('organizationId') organizationId: string,
+    @CurrentUser('organizationId') organizationId: string,
     @Param('id') playlistId: string,
     @Body('contentId') contentId: string,
     @Body('duration') duration?: number,
@@ -62,7 +63,7 @@ export class PlaylistsController {
 
   @Delete(':id/items/:itemId')
   removeItem(
-    @Query('organizationId') organizationId: string,
+    @CurrentUser('organizationId') organizationId: string,
     @Param('id') playlistId: string,
     @Param('itemId') itemId: string,
   ) {
@@ -71,7 +72,7 @@ export class PlaylistsController {
 
   @Delete(':id')
   remove(
-    @Query('organizationId') organizationId: string,
+    @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
   ) {
     return this.playlistsService.remove(organizationId, id);
