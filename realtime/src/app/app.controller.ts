@@ -1,12 +1,24 @@
 import { Controller, Get } from '@nestjs/common';
-import { AppService } from './app.service';
 
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
+  @Get('health')
+  getHealth() {
+    return {
+      status: 'ok',
+      service: 'realtime-gateway',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+    };
+  }
 
-  @Get()
-  getData() {
-    return this.appService.getData();
+  @Get('status')
+  getStatus() {
+    return {
+      status: 'running',
+      service: 'Vizora Realtime Gateway',
+      version: '1.0.0',
+      websocket: 'active',
+    };
   }
 }
