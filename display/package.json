@@ -1,5 +1,19 @@
 {
   "name": "@vizora/display",
   "version": "0.0.1",
-  "private": true
+  "private": true,
+  "main": "dist/electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "webpack-dev-server --mode development",
+    "build": "webpack --mode production && tsc -p tsconfig.electron.json"
+  },
+  "dependencies": {
+    "electron-store": "^8.1.0",
+    "socket.io-client": "^4.7.0"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.0"
+  }
 }

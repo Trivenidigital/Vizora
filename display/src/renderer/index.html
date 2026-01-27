@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vizora Display Client</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+          Oxygen, Ubuntu, Cantarell, sans-serif;
+        background: #000;
+        color: #fff;
+        overflow: hidden;
+      }
+
+      #app {
+        width: 100vw;
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      /* Pairing Screen */
+      #pairing-screen {
+        text-align: center;
+        max-width: 800px;
+        padding: 40px;
+      }
+
+      #pairing-screen h1 {
+        font-size: 48px;
+        margin-bottom: 20px;
+        font-weight: 600;
+      }
+
+      #pairing-screen p {
+        font-size: 24px;
+        color: #999;
+        margin-bottom: 40px;
+      }
+
+      #qr-code {
+        margin: 40px auto;
+        padding: 20px;
+        background: white;
+        border-radius: 12px;
+        width: fit-content;
+      }
+
+      #qr-code img {
+        display: block;
+      }
+
+      #pairing-code {
+        font-size: 72px;
+        font-weight: bold;
+        letter-spacing: 12px;
+        margin: 40px 0;
+        font-family: 'Courier New', monospace;
+      }
+
+      .loading {
+        margin: 20px 0;
+      }
+
+      .spinner {
+        border: 4px solid #333;
+        border-top: 4px solid #fff;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* Content Screen */
+      #content-screen {
+        width: 100%;
+        height: 100%;
+        position: relative;
+      }
+
+      #content-container {
+        width: 100%;
+        height: 100%;
+        position: relative;
+        background: #000;
+      }
+
+      .content-item {
+        width: 100%;
+        height: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity 0.5s ease-in-out;
+      }
+
+      .content-item.active {
+        opacity: 1;
+        z-index: 1;
+      }
+
+      .content-item img,
+      .content-item video {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+      }
+
+      .content-item iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+      }
+
+      /* Error Screen */
+      #error-screen {
+        text-align: center;
+        padding: 40px;
+      }
+
+      #error-screen h1 {
+        font-size: 48px;
+        color: #f44336;
+        margin-bottom: 20px;
+      }
+
+      #error-screen p {
+        font-size: 24px;
+        color: #999;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <!-- Pairing Screen -->
+      <div id="pairing-screen" class="hidden">
+        <h1>Welcome to Vizora</h1>
+        <p>Pair this device with your Vizora account</p>
+
+        <div id="qr-code" class="hidden"></div>
+
+        <div id="pairing-code"></div>
+
+        <p>
+          Enter this code at
+          <strong>app.vizora.com/devices/pair</strong>
+        </p>
+
+        <div class="loading">
+          <div class="spinner"></div>
+          <p style="margin-top: 20px">Waiting for pairing...</p>
+        </div>
+      </div>
+
+      <!-- Content Screen -->
+      <div id="content-screen" class="hidden">
+        <div id="content-container"></div>
+      </div>
+
+      <!-- Error Screen -->
+      <div id="error-screen" class="hidden">
+        <h1>Connection Error</h1>
+        <p id="error-message">Unable to connect to Vizora servers</p>
+        <p style="margin-top: 20px; font-size: 18px">
+          Retrying automatically...
+        </p>
+      </div>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
