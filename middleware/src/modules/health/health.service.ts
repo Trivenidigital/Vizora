@@ -75,8 +75,8 @@ export class HealthService {
     const heapTotalMB = Math.round(used.heapTotal / 1024 / 1024);
     const heapUsagePercent = (used.heapUsed / used.heapTotal) * 100;
 
-    // Consider unhealthy if heap usage > 90%
-    const status = heapUsagePercent > 90 ? 'unhealthy' : 'healthy';
+    // Consider unhealthy if heap usage > 95%
+    const status = heapUsagePercent > 95 ? 'unhealthy' : 'healthy';
 
     return {
       status,

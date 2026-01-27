@@ -25,28 +25,28 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/22</span>
+                <span class='fraction'>0/7</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>0/4</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
-                <span class="quiet">Branches</span>
+                <span class="quiet">Functions</span>
                 <span class='fraction'>0/0</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
-                <span class="quiet">Functions</span>
-                <span class='fraction'>0/10</span>
-            </div>
-        
-            
-            <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/12</span>
+                <span class='fraction'>0/7</span>
             </div>
         
             
@@ -87,44 +87,44 @@
 <a name='L22'></a><a href='#L22'>22</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" >import { IsString, IsOptional, IsObject, IsEnum } from 'class-validator';</span>
 &nbsp;
-export class <span class="cstat-no" title="statement not covered" >CreateOrganizationDto </span>{
-  @<span class="cstat-no" title="statement not covered" >IsString()</span>
-<span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >  name<span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >!</span></span>: string;</span></span></span>
-&nbsp;
-  @<span class="cstat-no" title="statement not covered" >IsString()</span>
-<span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >  slug<span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >!</span></span>: string;</span></span></span>
-&nbsp;
-  @<span class="cstat-no" title="statement not covered" >IsOptional()</span>
+<span class="cstat-no" title="statement not covered" >export class C</span>reateOrganizationDto {
   @IsString()
-<span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >  logoUrl<span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >?</span></span>: string;</span></span></span>
+<span class="cstat-no" title="statement not covered" >  name!: string;</span>
 &nbsp;
-  @<span class="cstat-no" title="statement not covered" >IsOptional()</span>
+  @IsString()
+<span class="cstat-no" title="statement not covered" >  slug!: string;</span>
+&nbsp;
+  @IsOptional()
+  @IsString()
+<span class="cstat-no" title="statement not covered" >  logoUrl?: string;</span>
+&nbsp;
+  @IsOptional()
   @IsEnum(['free', 'pro', 'enterprise'])
-<span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >  plan<span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >?</span></span>: string;</span></span></span>
+<span class="cstat-no" title="statement not covered" >  plan?: string;</span>
 &nbsp;
-  @<span class="cstat-no" title="statement not covered" >IsOptional()</span>
+  @IsOptional()
   @IsObject()
-<span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >  settings<span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >?</span></span>: Record&lt;string, any&gt;;</span></span></span>
+<span class="cstat-no" title="statement not covered" >  settings?: Record&lt;string, any&gt;;</span>
 }
 &nbsp;</pre></td></tr></table></pre>
 
@@ -133,7 +133,7 @@ export class <span class="cstat-no" title="statement not covered" >CreateOrganiz
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-01-27T13:40:31.010Z
+                at 2026-01-27T13:53:33.049Z
             </div>
         <script src="../../../../prettify.js"></script>
         <script>
