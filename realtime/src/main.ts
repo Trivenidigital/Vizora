@@ -2,6 +2,10 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app/app.module';
 import { IoAdapter } from '@nestjs/platform-socket.io';
+import { initializeSentry } from './config/sentry.config';
+
+// Initialize Sentry before app starts
+initializeSentry();
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -36,6 +40,7 @@ async function bootstrap() {
     `🚀 Realtime Gateway running on: http://localhost:${port}/${globalPrefix}`,
   );
   Logger.log(`🔌 WebSocket server ready on: ws://localhost:${port}`);
+  Logger.log(`📊 Metrics available at: http://localhost:${port}/metrics`);
 }
 
 bootstrap();

@@ -13,6 +13,8 @@ import { JwtService } from '@nestjs/jwt';
 import { RedisService } from '../services/redis.service';
 import { HeartbeatService } from '../services/heartbeat.service';
 import { PlaylistService } from '../services/playlist.service';
+import { MetricsService } from '../metrics/metrics.service';
+import * as Sentry from '@sentry/nestjs';
 
 interface DevicePayload {
   sub: string; // device ID
@@ -41,6 +43,7 @@ export class DeviceGateway
     private redisService: RedisService,
     private heartbeatService: HeartbeatService,
     private playlistService: PlaylistService,
+    private metricsService: MetricsService,
   ) {}
 
   async handleConnection(client: Socket) {
@@ -86,6 +89,10 @@ export class DeviceGateway
 
       this.logger.log(`Device connected: ${deviceId} (${client.id})`);
 
+      // Record metrics
+      this.metricsService.recordConnection(payload.organizationId, 'connected');
+      this.metricsService.updateDeviceStatus(deviceId, 'online');
+
       // Notify dashboard about device online status
       this.server.to(`org:${payload.organizationId}`).emit('device:status', {
         deviceId,
@@ -119,6 +126,10 @@ export class DeviceGateway
 
       this.logger.log(`Device disconnected: ${deviceId} (${client.id})`);
 
+      // Record metrics
+      this.metricsService.recordConnection(client.data.organizationId, 'disconnected');
+      this.metricsService.updateDeviceStatus(deviceId, 'offline');
+
       // Notify dashboard
       this.server
         .to(`org:${client.data.organizationId}`)
@@ -136,6 +147,7 @@ export class DeviceGateway
     @MessageBody() data: any,
   ) {
     const deviceId = client.data.deviceId;
+    const startTime = Date.now();
 
     try {
       // Update heartbeat in Redis
@@ -151,8 +163,21 @@ export class DeviceGateway
       // Process heartbeat (store in ClickHouse, etc.)
       await this.heartbeatService.processHeartbeat(deviceId, data);
 
+      // Update device metrics if available
+      if (data.metrics) {
+        this.metricsService.updateDeviceMetrics(
+          deviceId,
+          data.metrics.cpuUsage || 0,
+          data.metrics.memoryUsage || 0,
+        );
+      }
+
       // Check for pending commands
       const commands = await this.redisService.getDeviceCommands(deviceId);
+
+      // Record successful heartbeat with duration
+      const duration = (Date.now() - startTime) / 1000;
+      this.metricsService.recordHeartbeat(deviceId, true, duration);
 
       return {
         success: true,
@@ -162,6 +187,16 @@ export class DeviceGateway
       };
     } catch (error) {
       this.logger.error(`Heartbeat error for ${deviceId}:`, error.message);
+      
+      // Record failed heartbeat
+      const duration = (Date.now() - startTime) / 1000;
+      this.metricsService.recordHeartbeat(deviceId, false, duration);
+      
+      // Report to Sentry
+      Sentry.captureException(error, {
+        tags: { deviceId, event: 'heartbeat' },
+      });
+
       return {
         success: false,
         error: 'Failed to process heartbeat',
@@ -180,12 +215,18 @@ export class DeviceGateway
       // Log impression for analytics
       await this.heartbeatService.logImpression(deviceId, data);
 
+      // Record metrics
+      this.metricsService.recordImpression(deviceId, data.contentId);
+
       return {
         success: true,
         timestamp: new Date().toISOString(),
       };
     } catch (error) {
       this.logger.error(`Impression error for ${deviceId}:`, error.message);
+      Sentry.captureException(error, {
+        tags: { deviceId, event: 'content:impression' },
+      });
       return {
         success: false,
         error: 'Failed to log impression',
@@ -206,11 +247,28 @@ export class DeviceGateway
       // Log error for analytics
       await this.heartbeatService.logError(deviceId, data);
 
+      // Record metrics
+      this.metricsService.recordContentError(deviceId, data.errorType);
+
+      // Report content errors to Sentry
+      Sentry.captureMessage(`Content error on device ${deviceId}`, {
+        level: 'warning',
+        tags: {
+          deviceId,
+          errorType: data.errorType,
+          contentId: data.contentId,
+        },
+        extra: data,
+      });
+
       return {
         success: true,
       };
     } catch (error) {
       this.logger.error(`Error logging failed for ${deviceId}:`, error.message);
+      Sentry.captureException(error, {
+        tags: { deviceId, event: 'content:error' },
+      });
       return {
         success: false,
       };

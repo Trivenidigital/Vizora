@@ -207,4 +207,14 @@ export class RedisService implements OnModuleDestroy {
     const result = await this.redis.exists(key);
     return result === 1;
   }
+
+  /**
+   * Delete keys matching pattern
+   */
+  async deletePattern(pattern: string): Promise<void> {
+    const keys = await this.redis.keys(pattern);
+    if (keys.length > 0) {
+      await this.redis.del(...keys);
+    }
+  }
 }

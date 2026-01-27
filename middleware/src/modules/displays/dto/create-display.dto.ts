@@ -1,7 +1,9 @@
-import { IsString, IsOptional, IsEnum, IsObject } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsObject, MaxLength, MinLength } from 'class-validator';
 
 export class CreateDisplayDto {
   @IsString()
+  @MinLength(1)
+  @MaxLength(100)
   name!: string;
 
   @IsOptional()
