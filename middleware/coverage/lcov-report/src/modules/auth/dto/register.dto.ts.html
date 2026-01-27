@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/26</span>
+                <span class='fraction'>0/8</span>
             </div>
         
             
@@ -37,16 +37,16 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/12</span>
+                <span class='fraction'>0/0</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/14</span>
+                <span class='fraction'>0/8</span>
             </div>
         
             
@@ -104,8 +104,6 @@
 <a name='L39'></a><a href='#L39'>39</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -113,24 +111,26 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -141,41 +141,41 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" >import { IsEmail, IsString, MinLength, MaxLength, Matches, IsOptional } from 'class-validator';</span>
 &nbsp;
-export class <span class="cstat-no" title="statement not covered" >RegisterDto </span>{
-  @<span class="cstat-no" title="statement not covered" >IsEmail()</span>
-<span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >  email<span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >:</span></span> string;</span></span></span>
+<span class="cstat-no" title="statement not covered" >export class R</span>egisterDto {
+  @IsEmail()
+<span class="cstat-no" title="statement not covered" >  email: string;</span>
 &nbsp;
-  @<span class="cstat-no" title="statement not covered" >IsString()</span>
+  @IsString()
   @MinLength(8)
   @MaxLength(100)
   @Matches(/((?=.*\d)|(?=.*\W+))(?![.\n])(?=.*[A-Z])(?=.*[a-z]).*$/, {
     message: 'Password must contain at least 1 uppercase letter, 1 lowercase letter, and 1 number or special character',
   })
-<span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >  password<span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >:</span></span> string;</span></span></span>
+<span class="cstat-no" title="statement not covered" >  password: string;</span>
 &nbsp;
-  @<span class="cstat-no" title="statement not covered" >IsString()</span>
+  @IsString()
   @MinLength(2)
   @MaxLength(100)
-<span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >  firstName<span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >:</span></span> string;</span></span></span>
+<span class="cstat-no" title="statement not covered" >  firstName: string;</span>
 &nbsp;
-  @<span class="cstat-no" title="statement not covered" >IsString()</span>
+  @IsString()
   @MinLength(2)
   @MaxLength(100)
-<span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >  lastName<span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >:</span></span> string;</span></span></span>
+<span class="cstat-no" title="statement not covered" >  lastName: string;</span>
 &nbsp;
-  @<span class="cstat-no" title="statement not covered" >IsString()</span>
+  @IsString()
   @MinLength(2)
   @MaxLength(255)
-<span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >  organizationName<span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >:</span></span> string;</span></span></span>
+<span class="cstat-no" title="statement not covered" >  organizationName: string;</span>
 &nbsp;
-  @<span class="cstat-no" title="statement not covered" >IsOptional()</span>
+  @IsOptional()
   @IsString()
   @MinLength(2)
   @MaxLength(255)
   @Matches(/^[a-z0-9-]+$/, {
     message: 'Organization slug can only contain lowercase letters, numbers, and hyphens',
   })
-<span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >  organizationSlug<span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >?</span></span>: string;</span></span></span>
+<span class="cstat-no" title="statement not covered" >  organizationSlug?: string;</span>
 }
 &nbsp;</pre></td></tr></table></pre>
 
@@ -184,7 +184,7 @@ export class <span class="cstat-no" title="statement not covered" >RegisterDto <
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-01-27T13:40:31.010Z
+                at 2026-01-27T13:53:33.049Z
             </div>
         <script src="../../../../prettify.js"></script>
         <script>
