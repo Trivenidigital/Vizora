@@ -1,0 +1,42 @@
+# Dockerfile for Web Dashboard
+FROM node:22-alpine AS builder
+
+WORKDIR /app
+
+# Install pnpm
+RUN npm install -g pnpm@9
+
+# Copy package files
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY web/package.json ./web/
+COPY packages/shared/package.json ./packages/shared/
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy source code
+COPY web ./web
+COPY packages/shared ./packages/shared
+COPY tsconfig.base.json ./
+COPY nx.json ./
+
+# Build the application
+RUN cd web && pnpm build
+
+# Production image
+FROM node:22-alpine
+
+WORKDIR /app
+
+# Copy built application
+COPY --from=builder /app/web/.next ./.next
+COPY --from=builder /app/web/public ./public
+COPY --from=builder /app/web/package.json ./
+COPY --from=builder /app/web/next.config.js ./
+
+# Install production dependencies
+RUN npm install next react react-dom --omit=dev
+
+EXPOSE 3000
+
+CMD ["npm", "start"]
