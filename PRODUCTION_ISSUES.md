@@ -92,9 +92,11 @@
 **Severity:** MEDIUM  
 **Status:** AuditLog model exists, verify consistent usage.
 
-### 13. Environment Variables Not Validated
-**Severity:** MEDIUM  
-**Fix:** Add `@nestjs/config` with Joi/Zod schema.
+### ~~13. Environment Variables Not Validated~~ ✅ FIXED
+**Fixed by:** 
+- Added `@nestjs/config` with Zod validation schema
+- All required env vars validated on startup with clear error messages
+- Type-safe configuration access via ConfigService
 
 ---
 
@@ -118,11 +120,11 @@
 
 | Category | Original | Fixed | Remaining |
 |----------|----------|-------|-----------|
-| 🔴 Critical | 3 | 2 | **1** (tests) |
-| 🟠 High | 5 | 4 | **1** |
-| 🟡 Medium | 5 | 2 | **3** |
+| 🔴 Critical | 3 | 2 | **1** (more tests needed) |
+| 🟠 High | 5 | 4 | **1** (device JWT rotation) |
+| 🟡 Medium | 5 | 3 | **2** (DB pooling, audit consistency) |
 | 🟢 Suggestions | 5 | 1 | **4** |
-| **Total** | **18** | **9** | **9** |
+| **Total** | **18** | **10** | **8** |
 
 ---
 
@@ -157,8 +159,9 @@
 
 ## 🎯 Production Readiness Score
 
-**Before:** ~60% (Critical security issues)  
-**After:** ~85% (Missing tests, minor improvements)
+**Initial:** ~60% (Critical security issues)  
+**After Security Fixes:** ~85% (Missing tests, minor improvements)  
+**Current:** ~90% (Tests added, env validation, verified working)
 
 ### Blocking for Production:
 1. ⚠️ Unit/E2E tests (can deploy without, but risky)
