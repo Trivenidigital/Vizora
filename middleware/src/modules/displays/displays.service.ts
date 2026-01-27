@@ -9,8 +9,10 @@ export class DisplaysService {
   constructor(private readonly db: DatabaseService) {}
 
   async create(organizationId: string, createDisplayDto: CreateDisplayDto) {
+    const { deviceId, name, ...rest } = createDisplayDto;
+    
     const existing = await this.db.display.findUnique({
-      where: { deviceId: createDisplayDto.deviceId },
+      where: { deviceIdentifier: deviceId },
     });
 
     if (existing) {
@@ -19,7 +21,9 @@ export class DisplaysService {
 
     return this.db.display.create({
       data: {
-        ...createDisplayDto,
+        ...rest,
+        deviceIdentifier: deviceId,
+        nickname: name,
         organizationId,
       },
     });
@@ -82,10 +86,12 @@ export class DisplaysService {
   async update(organizationId: string, id: string, updateDisplayDto: UpdateDisplayDto) {
     await this.findOne(organizationId, id);
 
-    if (updateDisplayDto.deviceId) {
+    const { deviceId, name, ...rest } = updateDisplayDto;
+
+    if (deviceId) {
       const existing = await this.db.display.findFirst({
         where: {
-          deviceId: updateDisplayDto.deviceId,
+          deviceIdentifier: deviceId,
           NOT: { id },
         },
       });
@@ -97,13 +103,17 @@ export class DisplaysService {
 
     return this.db.display.update({
       where: { id },
-      data: updateDisplayDto,
+      data: {
+        ...rest,
+        ...(deviceId && { deviceIdentifier: deviceId }),
+        ...(name && { nickname: name }),
+      },
     });
   }
 
-  async updateHeartbeat(deviceId: string) {
+  async updateHeartbeat(deviceIdentifier: string) {
     return this.db.display.update({
-      where: { deviceId },
+      where: { deviceIdentifier },
       data: {
         lastHeartbeat: new Date(),
         status: 'online',
