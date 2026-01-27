@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vizora - Transform Your Space with Dynamic Digital Signage</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #fff;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 80px 20px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" fill="rgba(255,255,255,0.03)"/><circle cx="50" cy="50" r="30" fill="rgba(255,255,255,0.05)"/></svg>');
+            animation: float 20s infinite linear;
+        }
+
+        @keyframes float {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(100px, 100px); }
+        }
+
+        .logo-container {
+            position: relative;
+            z-index: 1;
+            margin-bottom: 30px;
+        }
+
+        .logo {
+            width: 200px;
+            height: auto;
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));
+            animation: logoFadeIn 1s ease-out;
+        }
+
+        @keyframes logoFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .hero h1 {
+            font-size: 3.5em;
+            margin-bottom: 20px;
+            font-weight: 700;
+            position: relative;
+            z-index: 1;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .hero .tagline {
+            font-size: 1.5em;
+            margin-bottom: 30px;
+            opacity: 0.95;
+            position: relative;
+            z-index: 1;
+        }
+
+        .cta-button {
+            display: inline-block;
+            background: white;
+            color: #667eea;
+            padding: 18px 40px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 1.2em;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            position: relative;
+            z-index: 1;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+
+        /* Features Section */
+        .features {
+            padding: 80px 20px;
+            background: #f8f9fa;
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 2.5em;
+            margin-bottom: 20px;
+            color: #667eea;
+        }
+
+        .section-subtitle {
+            text-align: center;
+            font-size: 1.2em;
+            color: #666;
+            margin-bottom: 60px;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
+            margin-top: 40px;
+        }
+
+        .feature-card {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            text-align: center;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .feature-icon {
+            font-size: 3em;
+            margin-bottom: 20px;
+        }
+
+        .feature-card h3 {
+            color: #667eea;
+            font-size: 1.5em;
+            margin-bottom: 15px;
+        }
+
+        .feature-card p {
+            color: #666;
+            line-height: 1.8;
+        }
+
+        /* Benefits Section */
+        .benefits {
+            padding: 80px 20px;
+            background: white;
+        }
+
+        .benefit-item {
+            display: flex;
+            align-items: center;
+            gap: 40px;
+            margin: 60px 0;
+        }
+
+        .benefit-item:nth-child(even) {
+            flex-direction: row-reverse;
+        }
+
+        .benefit-icon {
+            flex-shrink: 0;
+            width: 100px;
+            height: 100px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3em;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .benefit-content h3 {
+            color: #667eea;
+            font-size: 1.8em;
+            margin-bottom: 15px;
+        }
+
+        .benefit-content p {
+            color: #666;
+            font-size: 1.1em;
+            line-height: 1.8;
+        }
+
+        /* Use Cases */
+        .use-cases {
+            padding: 80px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .use-case-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+            margin-top: 40px;
+        }
+
+        .use-case-card {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            padding: 30px;
+            border-radius: 15px;
+            border: 1px solid rgba(255,255,255,0.2);
+            transition: all 0.3s ease;
+        }
+
+        .use-case-card:hover {
+            background: rgba(255,255,255,0.2);
+            transform: scale(1.05);
+        }
+
+        .use-case-card h3 {
+            font-size: 1.3em;
+            margin-bottom: 15px;
+        }
+
+        .use-case-card p {
+            opacity: 0.9;
+            line-height: 1.6;
+        }
+
+        /* Pricing Section */
+        .pricing {
+            padding: 80px 20px;
+            background: #f8f9fa;
+        }
+
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
+            margin-top: 40px;
+        }
+
+        .pricing-card {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: all 0.3s ease;
+            border: 3px solid transparent;
+        }
+
+        .pricing-card.featured {
+            border-color: #667eea;
+            transform: scale(1.05);
+        }
+
+        .pricing-card:hover {
+            transform: translateY(-10px) scale(1.02);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .pricing-badge {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+
+        .pricing-card h3 {
+            font-size: 2em;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .price {
+            font-size: 3em;
+            font-weight: bold;
+            color: #333;
+            margin: 20px 0;
+        }
+
+        .price-period {
+            font-size: 0.4em;
+            color: #666;
+        }
+
+        .pricing-features {
+            list-style: none;
+            padding: 0;
+            margin: 30px 0;
+            text-align: left;
+        }
+
+        .pricing-features li {
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .pricing-features li:before {
+            content: "✓ ";
+            color: #28a745;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        /* CTA Section */
+        .final-cta {
+            padding: 80px 20px;
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+            color: white;
+            text-align: center;
+        }
+
+        .final-cta h2 {
+            font-size: 2.5em;
+            margin-bottom: 20px;
+        }
+
+        .final-cta p {
+            font-size: 1.3em;
+            margin-bottom: 40px;
+            opacity: 0.9;
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .cta-secondary {
+            background: transparent;
+            border: 2px solid white;
+            color: white;
+        }
+
+        .cta-secondary:hover {
+            background: white;
+            color: #667eea;
+        }
+
+        /* Footer */
+        .footer {
+            background: #2c3e50;
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+        }
+
+        .footer-logo {
+            width: 120px;
+            margin-bottom: 20px;
+            filter: brightness(0) invert(1);
+        }
+
+        .footer p {
+            opacity: 0.8;
+            margin: 10px 0;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2em;
+            }
+
+            .hero .tagline {
+                font-size: 1.2em;
+            }
+
+            .benefit-item {
+                flex-direction: column !important;
+                text-align: center;
+            }
+
+            .pricing-card.featured {
+                transform: scale(1);
+            }
+        }
+
+        /* Stats Section */
+        .stats {
+            background: #2c3e50;
+            color: white;
+            padding: 60px 20px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 40px;
+            text-align: center;
+        }
+
+        .stat-item {
+            padding: 20px;
+        }
+
+        .stat-number {
+            font-size: 3em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .stat-label {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <div class="logo-container">
+                <!-- Vizora Logo SVG -->
+                <svg class="logo" viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Modern Display Frame -->
+                    <rect x="10" y="20" width="80" height="50" rx="5" fill="white" opacity="0.2"/>
+                    <rect x="15" y="25" width="70" height="40" rx="3" fill="white" opacity="0.9"/>
+                    
+                    <!-- Play Symbol Inside -->
+                    <polygon points="35,38 35,52 55,45" fill="#667eea"/>
+                    
+                    <!-- Signal Waves -->
+                    <path d="M 70 45 Q 75 40, 80 45" stroke="white" stroke-width="2" fill="none" opacity="0.8"/>
+                    <path d="M 75 45 Q 77.5 42.5, 80 45" stroke="white" stroke-width="2" fill="none" opacity="0.6"/>
+                    
+                    <!-- VIZORA Text -->
+                    <text x="100" y="60" font-family="Arial, sans-serif" font-size="42" font-weight="bold" fill="white">
+                        VIZORA
+                    </text>
+                    
+                    <!-- Tagline -->
+                    <text x="102" y="80" font-family="Arial, sans-serif" font-size="12" fill="white" opacity="0.9">
+                        Digital Signage Made Simple
+                    </text>
+                </svg>
+            </div>
+            <h1>Transform Your Space with Dynamic Digital Signage</h1>
+            <p class="tagline">Engage, Inform, and Inspire with Vizora's Cloud-Based Digital Signage Platform</p>
+            <a href="#contact" class="cta-button">Get Started Free →</a>
+        </div>
+    </section>
+
+    <!-- Stats Section -->
+    <section class="stats">
+        <div class="container">
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-number">100+</div>
+                    <div class="stat-label">Displays Supported</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">41ms</div>
+                    <div class="stat-label">Lightning-Fast Response</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">99.5%</div>
+                    <div class="stat-label">Uptime Reliability</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">24/7</div>
+                    <div class="stat-label">Cloud Monitoring</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features">
+        <div class="container">
+            <h2 class="section-title">Why Choose Vizora?</h2>
+            <p class="section-subtitle">Everything you need to create stunning digital experiences</p>
+            
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">☁️</div>
+                    <h3>Cloud-Based Control</h3>
+                    <p>Manage all your displays from anywhere, anytime. No hardware to maintain, automatic updates, and enterprise-grade security.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Real-Time Updates</h3>
+                    <p>Push content instantly to any display. Changes appear in seconds, not minutes. Perfect for time-sensitive information.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">🎨</div>
+                    <h3>Easy Content Creation</h3>
+                    <p>Drag-and-drop interface makes creating beautiful playlists effortless. Support for images, videos, web pages, and HTML.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">📅</div>
+                    <h3>Smart Scheduling</h3>
+                    <p>Set it and forget it. Schedule content by time, day, or event. Perfect for breakfast menus, happy hours, or special promotions.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <h3>Analytics & Insights</h3>
+                    <p>Know what's working. Track impressions, engagement, and display health. Make data-driven content decisions.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">🔒</div>
+                    <h3>Enterprise Security</h3>
+                    <p>Bank-level encryption, multi-tenant isolation, and role-based access control. Your content stays safe.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Benefits Section -->
+    <section class="benefits">
+        <div class="container">
+            <h2 class="section-title">Transform Your Business</h2>
+            <p class="section-subtitle">See the impact Vizora can make</p>
+            
+            <div class="benefit-item">
+                <div class="benefit-icon">💰</div>
+                <div class="benefit-content">
+                    <h3>Reduce Printing Costs by 90%</h3>
+                    <p>No more expensive poster printing, shipping, or installation. Update menus, promotions, and announcements instantly from your desk. One customer saved $15,000/year in printing costs alone.</p>
+                </div>
+            </div>
+            
+            <div class="benefit-item">
+                <div class="benefit-icon">📈</div>
+                <div class="benefit-content">
+                    <h3>Increase Sales by 30%</h3>
+                    <p>Dynamic content grabs attention. Promote specials, upsells, and seasonal items when they matter most. Studies show digital menus increase average order size by 30%.</p>
+                </div>
+            </div>
+            
+            <div class="benefit-item">
+                <div class="benefit-icon">⏱️</div>
+                <div class="benefit-content">
+                    <h3>Save 10 Hours Per Week</h3>
+                    <p>Update all locations in minutes, not days. No more calling each store, printing materials, or coordinating installations. Spend time on what matters—growing your business.</p>
+                </div>
+            </div>
+            
+            <div class="benefit-item">
+                <div class="benefit-icon">🎯</div>
+                <div class="benefit-content">
+                    <h3>Perfect Customer Experiences</h3>
+                    <p>Show the right message at the right time. Breakfast menu in the morning, lunch specials at noon, happy hour deals in the evening—all automated.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Use Cases -->
+    <section class="use-cases">
+        <div class="container">
+            <h2 class="section-title" style="color: white;">Perfect For Every Industry</h2>
+            <p class="section-subtitle" style="color: rgba(255,255,255,0.9);">Trusted by businesses across all sectors</p>
+            
+            <div class="use-case-grid">
+                <div class="use-case-card">
+                    <h3>🍔 Restaurants & Cafes</h3>
+                    <p>Digital menu boards, daily specials, nutritional info, and social media feeds. Update menus instantly across all locations.</p>
+                </div>
+                
+                <div class="use-case-card">
+                    <h3>🏢 Corporate Offices</h3>
+                    <p>Internal communications, KPI dashboards, meeting room schedules, and company announcements. Keep teams informed.</p>
+                </div>
+                
+                <div class="use-case-card">
+                    <h3>🛍️ Retail Stores</h3>
+                    <p>Promotions, product showcases, brand storytelling, and queue management. Drive impulse purchases at checkout.</p>
+                </div>
+                
+                <div class="use-case-card">
+                    <h3>🏥 Healthcare</h3>
+                    <p>Wayfinding, wait times, health tips, and emergency alerts. Improve patient experience and reduce perceived wait times.</p>
+                </div>
+                
+                <div class="use-case-card">
+                    <h3>🎓 Education</h3>
+                    <p>Campus news, event calendars, emergency notifications, and wayfinding. Keep students and staff informed.</p>
+                </div>
+                
+                <div class="use-case-card">
+                    <h3>🏨 Hospitality</h3>
+                    <p>Welcome messages, event schedules, local attractions, and promotional offers. Enhance guest experiences.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing Section -->
+    <section class="pricing">
+        <div class="container">
+            <h2 class="section-title">Simple, Transparent Pricing</h2>
+            <p class="section-subtitle">Choose the plan that fits your needs. No hidden fees.</p>
+            
+            <div class="pricing-grid">
+                <div class="pricing-card">
+                    <h3>Starter</h3>
+                    <div class="price">$29<span class="price-period">/mo</span></div>
+                    <p style="color: #666; margin-bottom: 20px;">Perfect for small businesses</p>
+                    <ul class="pricing-features">
+                        <li>Up to 3 displays</li>
+                        <li>Unlimited content</li>
+                        <li>Basic scheduling</li>
+                        <li>Email support</li>
+                        <li>HD quality playback</li>
+                        <li>Cloud storage (10GB)</li>
+                    </ul>
+                    <a href="#contact" class="cta-button">Start Free Trial</a>
+                </div>
+                
+                <div class="pricing-card featured">
+                    <span class="pricing-badge">MOST POPULAR</span>
+                    <h3>Professional</h3>
+                    <div class="price">$99<span class="price-period">/mo</span></div>
+                    <p style="color: #666; margin-bottom: 20px;">Ideal for growing businesses</p>
+                    <ul class="pricing-features">
+                        <li>Up to 15 displays</li>
+                        <li>Unlimited content</li>
+                        <li>Advanced scheduling</li>
+                        <li>Priority support</li>
+                        <li>4K quality playback</li>
+                        <li>Cloud storage (100GB)</li>
+                        <li>Analytics & reporting</li>
+                        <li>Multi-user access</li>
+                    </ul>
+                    <a href="#contact" class="cta-button">Start Free Trial</a>
+                </div>
+                
+                <div class="pricing-card">
+                    <h3>Enterprise</h3>
+                    <div class="price">Custom</div>
+                    <p style="color: #666; margin-bottom: 20px;">For large organizations</p>
+                    <ul class="pricing-features">
+                        <li>Unlimited displays</li>
+                        <li>Unlimited content</li>
+                        <li>Advanced scheduling</li>
+                        <li>24/7 phone support</li>
+                        <li>4K quality playback</li>
+                        <li>Unlimited cloud storage</li>
+                        <li>Advanced analytics</li>
+                        <li>Dedicated account manager</li>
+                        <li>Custom integrations</li>
+                        <li>SLA guarantee</li>
+                    </ul>
+                    <a href="#contact" class="cta-button">Contact Sales</a>
+                </div>
+            </div>
+            
+            <p style="text-align: center; margin-top: 40px; color: #666;">
+                All plans include: Free updates • 30-day money-back guarantee • No long-term contracts
+            </p>
+        </div>
+    </section>
+
+    <!-- Final CTA -->
+    <section class="final-cta" id="contact">
+        <div class="container">
+            <h2>Ready to Transform Your Space?</h2>
+            <p>Start your 14-day free trial today. No credit card required.</p>
+            <div class="cta-buttons">
+                <a href="mailto:sales@vizora.com?subject=Vizora Free Trial Request" class="cta-button">Start Free Trial</a>
+                <a href="mailto:sales@vizora.com?subject=Vizora Demo Request" class="cta-button cta-secondary">Schedule a Demo</a>
+            </div>
+            <p style="margin-top: 30px; font-size: 0.9em; opacity: 0.8;">
+                Questions? Email us at sales@vizora.com or call 1-800-VIZORA-1
+            </p>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <svg class="footer-logo" viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg">
+                <rect x="10" y="20" width="80" height="50" rx="5" fill="white" opacity="0.2"/>
+                <rect x="15" y="25" width="70" height="40" rx="3" fill="white" opacity="0.9"/>
+                <polygon points="35,38 35,52 55,45" fill="#667eea"/>
+                <path d="M 70 45 Q 75 40, 80 45" stroke="white" stroke-width="2" fill="none" opacity="0.8"/>
+                <path d="M 75 45 Q 77.5 42.5, 80 45" stroke="white" stroke-width="2" fill="none" opacity="0.6"/>
+                <text x="100" y="60" font-family="Arial, sans-serif" font-size="42" font-weight="bold" fill="white">VIZORA</text>
+                <text x="102" y="80" font-family="Arial, sans-serif" font-size="12" fill="white" opacity="0.9">Digital Signage Made Simple</text>
+            </svg>
+            <p>&copy; 2026 Vizora. All rights reserved.</p>
+            <p>Making digital signage accessible for businesses of all sizes.</p>
+            <p style="margin-top: 20px;">
+                <a href="#" style="color: white; text-decoration: none; margin: 0 15px;">Privacy Policy</a>
+                <a href="#" style="color: white; text-decoration: none; margin: 0 15px;">Terms of Service</a>
+                <a href="#" style="color: white; text-decoration: none; margin: 0 15px;">Contact</a>
+            </p>
+        </div>
+    </footer>
+</body>
+</html>

@@ -6,7 +6,10 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
-    "test:debug": "node --inspect-brk -r ts-node/register node_modules/.bin/jest --runInBand"
+    "test:debug": "node --inspect-brk -r ts-node/register node_modules/.bin/jest --runInBand",
+    "test:e2e": "jest --config=jest.e2e.config.js --runInBand",
+    "test:e2e:cov": "jest --config=jest.e2e.config.js --coverage --runInBand",
+    "test:all": "pnpm test:cov && pnpm test:e2e:cov"
   },
   "nx": {
     "targets": {

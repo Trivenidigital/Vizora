@@ -1,0 +1,7 @@
+# Load test results
+load-test-results-*.json
+load-test-report-*.html
+
+# Temporary test data
+*.tmp
+*.log

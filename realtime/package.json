@@ -85,13 +85,35 @@
     "@nestjs/platform-express": "^11.0.0",
     "@nestjs/platform-socket.io": "^11.1.12",
     "@nestjs/websockets": "^11.1.12",
+    "@sentry/nestjs": "^10.37.0",
+    "@sentry/node": "^10.37.0",
+    "@willsoto/nestjs-prometheus": "^6.0.2",
     "ioredis": "^5.3.0",
+    "prom-client": "^15.1.3",
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.8.0",
     "socket.io": "^4.8.3",
     "tslib": "^2.3.0"
   },
   "devDependencies": {
-    "@nestjs/testing": "^11.0.0"
+    "@nestjs/testing": "^11.0.0",
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "axios": "^1.13.3",
+    "dotenv": "^16.0.0",
+    "jest": "^29.5.0",
+    "socket.io-client": "^4.8.3",
+    "ts-jest": "^29.1.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.0.0"
+  },
+  "scripts": {
+    "test:e2e": "jest --config jest.e2e.config.js",
+    "test:e2e:watch": "jest --config jest.e2e.config.js --watch",
+    "test:e2e:cov": "jest --config jest.e2e.config.js --coverage",
+    "test:smoke": "ts-node -r dotenv/config test/smoke-test.ts dotenv_config_path=.env.load-test",
+    "test:load": "ts-node -r dotenv/config test/load-test.ts dotenv_config_path=.env.load-test",
+    "test:load:api": "ts-node -r dotenv/config test/api-load-test.ts dotenv_config_path=.env.load-test",
+    "test:load:combined": "ts-node -r dotenv/config test/combined-load-test.ts dotenv_config_path=.env.load-test"
   }
 }

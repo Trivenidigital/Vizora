@@ -1,0 +1,242 @@
+# Prometheus Alert Rules for Vizora Realtime Service
+
+groups:
+  - name: vizora_realtime_alerts
+    interval: 30s
+    rules:
+      # ===== Error Alerts =====
+      
+      - alert: HighErrorRate
+        expr: |
+          rate(vizora_realtime_http_requests_total{status=~"5.."}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          service: realtime
+        annotations:
+          summary: "High HTTP error rate detected"
+          description: "Error rate is {{ $value | humanize }} errors/sec for {{ $labels.path }}"
+          runbook: "Check application logs and Sentry for error details"
+
+      - alert: CriticalErrorRate
+        expr: |
+          rate(vizora_realtime_http_requests_total{status=~"5.."}[5m]) > 0.2
+        for: 2m
+        labels:
+          severity: critical
+          service: realtime
+        annotations:
+          summary: "Critical HTTP error rate detected"
+          description: "Error rate is {{ $value | humanize }} errors/sec - immediate action required"
+
+      # ===== Latency Alerts =====
+
+      - alert: HighP95Latency
+        expr: |
+          histogram_quantile(0.95, 
+            rate(vizora_realtime_http_request_duration_seconds_bucket[5m])
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: realtime
+        annotations:
+          summary: "P95 latency above 500ms"
+          description: "95th percentile latency is {{ $value | humanize }}s for {{ $labels.path }}"
+
+      - alert: HighP99Latency
+        expr: |
+          histogram_quantile(0.99, 
+            rate(vizora_realtime_http_request_duration_seconds_bucket[5m])
+          ) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+          service: realtime
+        annotations:
+          summary: "P99 latency above 1s"
+          description: "99th percentile latency is {{ $value | humanize }}s"
+
+      # ===== WebSocket Alerts =====
+
+      - alert: HighConnectionDropRate
+        expr: |
+          rate(vizora_realtime_ws_connections_total{status="disconnected"}[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: realtime
+        annotations:
+          summary: "High WebSocket connection drop rate"
+          description: "{{ $value | humanize }} connections dropping per second"
+
+      - alert: LowActiveConnections
+        expr: |
+          vizora_realtime_ws_connections_active < 10
+        for: 10m
+        labels:
+          severity: info
+          service: realtime
+        annotations:
+          summary: "Low number of active WebSocket connections"
+          description: "Only {{ $value }} active connections - expected more"
+
+      # ===== Heartbeat Alerts =====
+
+      - alert: HeartbeatFailures
+        expr: |
+          rate(vizora_realtime_heartbeat_errors_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: realtime
+        annotations:
+          summary: "High heartbeat failure rate"
+          description: "{{ $value | humanize }} heartbeat failures/sec for device {{ $labels.device_id }}"
+
+      - alert: HeartbeatLatency
+        expr: |
+          histogram_quantile(0.95,
+            rate(vizora_realtime_heartbeat_duration_seconds_bucket[5m])
+          ) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: realtime
+        annotations:
+          summary: "High heartbeat processing latency"
+          description: "P95 heartbeat latency is {{ $value | humanize }}s"
+
+      # ===== Content Alerts =====
+
+      - alert: HighContentErrorRate
+        expr: |
+          rate(vizora_realtime_content_errors_total[5m]) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: realtime
+        annotations:
+          summary: "High content error rate"
+          description: "{{ $value | humanize }} content errors/sec - {{ $labels.error_type }}"
+
+      # ===== System Resource Alerts =====
+
+      - alert: HighMemoryUsage
+        expr: |
+          process_resident_memory_bytes > 1073741824
+        for: 10m
+        labels:
+          severity: warning
+          service: realtime
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value | humanizeBytes }} (>1GB)"
+          runbook: "Check for memory leaks, restart if necessary"
+
+      - alert: CriticalMemoryUsage
+        expr: |
+          process_resident_memory_bytes > 2147483648
+        for: 5m
+        labels:
+          severity: critical
+          service: realtime
+        annotations:
+          summary: "Critical memory usage"
+          description: "Memory usage is {{ $value | humanizeBytes }} (>2GB) - restart required"
+
+      - alert: HighCPUUsage
+        expr: |
+          rate(process_cpu_user_seconds_total[5m]) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+          service: realtime
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value | humanizePercentage }} - consider scaling"
+
+      - alert: EventLoopLag
+        expr: |
+          nodejs_eventloop_lag_seconds > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: realtime
+        annotations:
+          summary: "High event loop lag"
+          description: "Event loop lag is {{ $value | humanize }}s - application may be overloaded"
+
+      # ===== Service Availability =====
+
+      - alert: ServiceDown
+        expr: |
+          up{job="vizora-realtime"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: realtime
+        annotations:
+          summary: "Vizora Realtime service is down"
+          description: "Service has been down for {{ $value | humanizeDuration }}"
+          runbook: "Check service logs, restart service if needed"
+
+      - alert: ServiceRestarted
+        expr: |
+          changes(process_start_time_seconds[5m]) > 0
+        labels:
+          severity: info
+          service: realtime
+        annotations:
+          summary: "Service was restarted"
+          description: "Service restarted {{ $value }} times in the last 5 minutes"
+
+      # ===== Redis Alerts =====
+
+      - alert: HighRedisLatency
+        expr: |
+          histogram_quantile(0.95,
+            rate(vizora_realtime_redis_operation_duration_seconds_bucket[5m])
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          service: realtime
+        annotations:
+          summary: "High Redis operation latency"
+          description: "P95 Redis latency is {{ $value | humanize }}s for {{ $labels.operation }}"
+
+      - alert: RedisConnectionIssues
+        expr: |
+          increase(vizora_realtime_redis_operations_total{operation=~".*error.*"}[5m]) > 10
+        for: 2m
+        labels:
+          severity: critical
+          service: realtime
+        annotations:
+          summary: "Redis connection issues detected"
+          description: "{{ $value }} Redis errors in the last 5 minutes"
+
+      # ===== Device Alerts =====
+
+      - alert: DevicesOffline
+        expr: |
+          sum(vizora_realtime_device_status == 0) > 10
+        for: 10m
+        labels:
+          severity: warning
+          service: realtime
+        annotations:
+          summary: "Multiple devices offline"
+          description: "{{ $value }} devices are offline"
+
+      - alert: NoDevicesOnline
+        expr: |
+          sum(vizora_realtime_device_status == 1) == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: realtime
+        annotations:
+          summary: "No devices online"
+          description: "All devices are offline - check connectivity"
