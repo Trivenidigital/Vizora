@@ -1,0 +1,184 @@
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { DatabaseService } from '../database/database.service';
+import { CreateScheduleDto } from './dto/create-schedule.dto';
+import { UpdateScheduleDto } from './dto/update-schedule.dto';
+import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
+
+@Injectable()
+export class SchedulesService {
+  constructor(private readonly db: DatabaseService) {}
+
+  async create(organizationId: string, createScheduleDto: CreateScheduleDto) {
+    if (!createScheduleDto.displayId && !createScheduleDto.displayGroupId) {
+      throw new BadRequestException('Either displayId or displayGroupId must be provided');
+    }
+
+    if (createScheduleDto.displayId && createScheduleDto.displayGroupId) {
+      throw new BadRequestException('Cannot specify both displayId and displayGroupId');
+    }
+
+    return this.db.schedule.create({
+      data: {
+        ...createScheduleDto,
+        startDate: new Date(createScheduleDto.startDate),
+        endDate: createScheduleDto.endDate ? new Date(createScheduleDto.endDate) : null,
+        organizationId,
+      },
+      include: {
+        playlist: true,
+        display: true,
+        displayGroup: true,
+      },
+    });
+  }
+
+  async findAll(
+    organizationId: string,
+    pagination: PaginationDto,
+    filters?: { displayId?: string; displayGroupId?: string; isActive?: boolean },
+  ) {
+    const { page = 1, limit = 10 } = pagination;
+    const skip = (page - 1) * limit;
+
+    const where: any = { organizationId };
+    if (filters?.displayId) where.displayId = filters.displayId;
+    if (filters?.displayGroupId) where.displayGroupId = filters.displayGroupId;
+    if (filters?.isActive !== undefined) where.isActive = filters.isActive;
+
+    const [data, total] = await Promise.all([
+      this.db.schedule.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
+        include: {
+          playlist: {
+            include: {
+              _count: {
+                select: { items: true },
+              },
+            },
+          },
+          display: true,
+          displayGroup: true,
+        },
+      }),
+      this.db.schedule.count({ where }),
+    ]);
+
+    return new PaginatedResponse(data, total, page, limit);
+  }
+
+  async findOne(organizationId: string, id: string) {
+    const schedule = await this.db.schedule.findFirst({
+      where: { id, organizationId },
+      include: {
+        playlist: {
+          include: {
+            items: {
+              include: {
+                content: true,
+              },
+              orderBy: {
+                order: 'asc',
+              },
+            },
+          },
+        },
+        display: true,
+        displayGroup: {
+          include: {
+            displays: {
+              include: {
+                display: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!schedule) {
+      throw new NotFoundException('Schedule not found');
+    }
+
+    return schedule;
+  }
+
+  async findActiveSchedules(displayId: string) {
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+    return this.db.schedule.findMany({
+      where: {
+        isActive: true,
+        startDate: { lte: now },
+        daysOfWeek: { has: dayOfWeek },
+        AND: [
+          {
+            OR: [{ endDate: null }, { endDate: { gte: now } }],
+          },
+          {
+            OR: [
+              { startTime: null, endTime: null },
+              {
+                AND: [
+                  { startTime: { lte: currentTime } },
+                  { endTime: { gte: currentTime } },
+                ],
+              },
+            ],
+          },
+          {
+            OR: [{ displayId }, { displayGroup: { displays: { some: { displayId } } } }],
+          },
+        ],
+      },
+      orderBy: { priority: 'desc' },
+      include: {
+        playlist: {
+          include: {
+            items: {
+              include: {
+                content: true,
+              },
+              orderBy: {
+                order: 'asc',
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  async update(organizationId: string, id: string, updateScheduleDto: UpdateScheduleDto) {
+    await this.findOne(organizationId, id);
+
+    if (updateScheduleDto.displayId && updateScheduleDto.displayGroupId) {
+      throw new BadRequestException('Cannot specify both displayId and displayGroupId');
+    }
+
+    return this.db.schedule.update({
+      where: { id },
+      data: {
+        ...updateScheduleDto,
+        startDate: updateScheduleDto.startDate ? new Date(updateScheduleDto.startDate) : undefined,
+        endDate: updateScheduleDto.endDate ? new Date(updateScheduleDto.endDate) : undefined,
+      },
+      include: {
+        playlist: true,
+        display: true,
+        displayGroup: true,
+      },
+    });
+  }
+
+  async remove(organizationId: string, id: string) {
+    await this.findOne(organizationId, id);
+    return this.db.schedule.delete({
+      where: { id },
+    });
+  }
+}

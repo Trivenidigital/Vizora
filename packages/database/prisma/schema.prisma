@@ -1,0 +1,322 @@
+// Vizora Digital Signage System - Prisma Schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("POSTGRES_URL")
+}
+
+// ============================================================================
+// ORGANIZATION & USER MANAGEMENT
+// ============================================================================
+
+model Organization {
+  id                   String   @id @default(uuid())
+  name                 String
+  slug                 String   @unique
+  logoUrl              String?
+  subscriptionTier     String   @default("free") // free, basic, pro, enterprise
+  screenQuota          Int      @default(5)
+  stripeCustomerId     String?  @unique
+  stripeSubscriptionId String?
+  billingEmail         String?
+  trialEndsAt          DateTime?
+  subscriptionStatus   String   @default("trial") // trial, active, past_due, canceled
+  settings             Json?    @db.JsonB
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  users         User[]
+  displays      Display[]
+  content       Content[]
+  playlists     Playlist[]
+  schedules     Schedule[]
+  tags          Tag[]
+  displayGroups DisplayGroup[]
+  auditLogs     AuditLog[]
+
+  @@index([slug])
+  @@index([stripeCustomerId])
+  @@map("organizations")
+}
+
+model User {
+  id             String   @id @default(uuid())
+  email          String   @unique
+  passwordHash   String?  // nullable if using Clerk
+  clerkUserId    String?  @unique
+  firstName      String
+  lastName       String
+  role           String   @default("viewer") // admin, manager, viewer
+  avatar         String?
+  isActive       Boolean  @default(true)
+  lastLoginAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  auditLogs      AuditLog[]
+
+  @@index([organizationId])
+  @@index([email])
+  @@index([clerkUserId])
+  @@map("users")
+}
+
+// ============================================================================
+// DISPLAY MANAGEMENT
+// ============================================================================
+
+model Display {
+  id                    String   @id @default(uuid())
+  organizationId        String
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  deviceIdentifier      String   @unique // MAC address or unique hardware ID
+  nickname              String?
+  description           String?
+  location              String?
+  pairingCode           String?
+  pairingCodeExpiresAt  DateTime?
+  jwtToken              String?  @db.Text
+  socketId              String?
+  status                String   @default("offline") // online, offline, pairing, error
+  orientation           String   @default("landscape") // landscape, portrait
+  resolution            String?  // e.g., "1920x1080"
+  lastHeartbeat         DateTime?
+  metadata              Json?    @db.JsonB // OS, model, version, etc.
+  timezone              String   @default("UTC")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  pairedAt              DateTime?
+  unpairedAt            DateTime?
+
+  schedules             Schedule[]
+  tags                  DisplayTag[]
+  groups                DisplayGroupMember[]
+  auditLogs             AuditLog[]
+
+  @@index([organizationId])
+  @@index([deviceIdentifier])
+  @@index([status])
+  @@index([pairingCode])
+  @@index([lastHeartbeat])
+  @@map("devices")
+}
+
+model DisplayGroup {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  displays    DisplayGroupMember[]
+  schedules   Schedule[]
+
+  @@index([organizationId])
+}
+
+model DisplayGroupMember {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  displayId      String
+  display        Display @relation(fields: [displayId], references: [id], onDelete: Cascade)
+
+  displayGroupId String
+  displayGroup   DisplayGroup @relation(fields: [displayGroupId], references: [id], onDelete: Cascade)
+
+  @@unique([displayId, displayGroupId])
+  @@index([displayId])
+  @@index([displayGroupId])
+}
+
+// ============================================================================
+// CONTENT MANAGEMENT
+// ============================================================================
+
+model Content {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  type        String   // image, video, url, html
+  url         String   // URL to the content or embed URL
+  thumbnail   String?
+  duration    Int      @default(10) // Duration in seconds
+  fileSize    Int?     // Size in bytes
+  mimeType    String?
+  metadata    Json?    @db.JsonB
+  status      String   @default("active") // active, archived
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  playlistItems  PlaylistItem[]
+  tags           ContentTag[]
+
+  @@index([organizationId])
+  @@index([type])
+  @@index([status])
+}
+
+model Playlist {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  items       PlaylistItem[]
+  schedules   Schedule[]
+
+  @@index([organizationId])
+}
+
+model PlaylistItem {
+  id        String   @id @default(cuid())
+  order     Int      @default(0)
+  duration  Int?     // Override content duration if needed
+  createdAt DateTime @default(now())
+
+  playlistId String
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+
+  contentId  String
+  content    Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([playlistId, order])
+  @@index([playlistId])
+  @@index([contentId])
+}
+
+// ============================================================================
+// SCHEDULING
+// ============================================================================
+
+model Schedule {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  startDate   DateTime
+  endDate     DateTime?
+  startTime   String?  // HH:MM format for daily schedules
+  endTime     String?  // HH:MM format for daily schedules
+  daysOfWeek  Int[]    // 0-6 (Sunday-Saturday)
+  priority    Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  playlistId String
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+
+  displayId      String?
+  display        Display? @relation(fields: [displayId], references: [id], onDelete: Cascade)
+
+  displayGroupId String?
+  displayGroup   DisplayGroup? @relation(fields: [displayGroupId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([playlistId])
+  @@index([displayId])
+  @@index([displayGroupId])
+  @@index([startDate, endDate])
+  @@index([isActive])
+}
+
+// ============================================================================
+// TAGGING SYSTEM
+// ============================================================================
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String
+  color     String?
+  createdAt DateTime @default(now())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  content   ContentTag[]
+  displays  DisplayTag[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}
+
+model ContentTag {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  contentId String
+  content   Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  tagId     String
+  tag       Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([contentId, tagId])
+  @@index([contentId])
+  @@index([tagId])
+}
+
+model DisplayTag {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  displayId String
+  display   Display @relation(fields: [displayId], references: [id], onDelete: Cascade)
+
+  tagId     String
+  tag       Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([displayId, tagId])
+  @@index([displayId])
+  @@index([tagId])
+}
+
+// ============================================================================
+// AUDIT LOGS
+// ============================================================================
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  action      String   // create, update, delete, etc.
+  entityType  String   // display, content, schedule, etc.
+  entityId    String
+  changes     Json?    @db.JsonB
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  userId         String?
+  user           User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  displayId      String?
+  display        Display? @relation(fields: [displayId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}

@@ -1,0 +1,31 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compileOnSave": false,
+  "files": [],
+  "references": [
+    {
+      "path": "./middleware-e2e"
+    },
+    {
+      "path": "./middleware"
+    },
+    {
+      "path": "./realtime-e2e"
+    },
+    {
+      "path": "./realtime"
+    },
+    {
+      "path": "./web"
+    },
+    {
+      "path": "./display"
+    },
+    {
+      "path": "./packages/shared"
+    },
+    {
+      "path": "./packages/database"
+    }
+  ]
+}
