@@ -13,6 +13,7 @@ export default function PlaylistsPage() {
   const toast = useToast();
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [content, setContent] = useState<Content[]>([]);
+  const [devices, setDevices] = useState<Display[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -27,6 +28,7 @@ export default function PlaylistsPage() {
   useEffect(() => {
     loadPlaylists();
     loadContent();
+    loadDevices();
   }, []);
 
   const loadPlaylists = async () => {
@@ -48,6 +50,19 @@ export default function PlaylistsPage() {
     } catch (error) {
       // Silent fail
     }
+  };
+
+  const loadDevices = async () => {
+    try {
+      const response = await apiClient.getDisplays();
+      setDevices(response.data || response || []);
+    } catch (error) {
+      // Silent fail
+    }
+  };
+
+  const getDeviceCount = (playlistId: string) => {
+    return devices.filter(d => d.currentPlaylistId === playlistId).length;
   };
 
   const handleCreate = async () => {
@@ -229,11 +244,19 @@ export default function PlaylistsPage() {
                     </div>
                   </div>
                 </div>
-                {playlist.isActive && (
-                  <span className="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                    Active
-                  </span>
-                )}
+                <div className="flex flex-col items-end gap-2">
+                  {playlist.isActive && (
+                    <span className="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                      Active
+                    </span>
+                  )}
+                  {getDeviceCount(playlist.id) > 0 && (
+                    <span className="px-3 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 flex items-center gap-1">
+                      <span>📺</span>
+                      <span>{getDeviceCount(playlist.id)} {getDeviceCount(playlist.id) === 1 ? 'device' : 'devices'}</span>
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Preview of items */}
