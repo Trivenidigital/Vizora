@@ -21,6 +21,7 @@ export default function ContentPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isPushModalOpen, setIsPushModalOpen] = useState(false);
   const [isAddToPlaylistModalOpen, setIsAddToPlaylistModalOpen] = useState(false);
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [devices, setDevices] = useState<Display[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
@@ -47,6 +48,18 @@ export default function ContentPage() {
     loadDevices();
     loadPlaylists();
   }, []);
+
+  // ESC key handler for preview modal
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isPreviewModalOpen) {
+        setIsPreviewModalOpen(false);
+      }
+    };
+    
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isPreviewModalOpen]);
 
   const loadContent = async () => {
     try {
@@ -161,6 +174,11 @@ export default function ContentPage() {
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const handlePreview = (item: Content) => {
+    setSelectedContent(item);
+    setIsPreviewModalOpen(true);
   };
 
   const handleEdit = (item: Content) => {
@@ -459,7 +477,11 @@ export default function ContentPage() {
               key={item.id}
               className="bg-white rounded-lg shadow overflow-hidden hover:shadow-xl transition-all transform hover:-translate-y-1"
             >
-              <div className="h-48 bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center relative overflow-hidden">
+              <div 
+                className="h-48 bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center relative overflow-hidden cursor-pointer"
+                onClick={() => handlePreview(item)}
+                title="Click to preview"
+              >
                 {item.thumbnailUrl ? (
                   <img
                     src={item.thumbnailUrl}
@@ -903,6 +925,89 @@ export default function ContentPage() {
               Add to Playlist
             </button>
           </div>
+        </div>
+      </Modal>
+
+      {/* Preview Modal */}
+      <Modal
+        isOpen={isPreviewModalOpen}
+        onClose={() => setIsPreviewModalOpen(false)}
+        title={selectedContent?.title || 'Preview'}
+        size="lg"
+      >
+        <div className="space-y-4">
+          {selectedContent && (
+            <>
+              {selectedContent.type === 'image' && (
+                <div className="flex justify-center bg-gray-100 rounded-lg p-4">
+                  <img
+                    src={selectedContent.url}
+                    alt={selectedContent.title}
+                    className="max-w-full max-h-[70vh] object-contain rounded"
+                  />
+                </div>
+              )}
+              
+              {selectedContent.type === 'video' && (
+                <div className="bg-black rounded-lg overflow-hidden">
+                  <video
+                    src={selectedContent.url}
+                    controls
+                    className="w-full max-h-[70vh]"
+                    autoPlay
+                  >
+                    Your browser does not support video playback.
+                  </video>
+                </div>
+              )}
+              
+              {selectedContent.type === 'pdf' && (
+                <div className="bg-gray-100 rounded-lg overflow-hidden" style={{ height: '70vh' }}>
+                  <iframe
+                    src={selectedContent.url}
+                    className="w-full h-full"
+                    title={selectedContent.title}
+                  />
+                </div>
+              )}
+              
+              {selectedContent.type === 'url' && (
+                <div className="space-y-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p className="text-sm text-blue-800 mb-2">
+                      <strong>URL Content:</strong>
+                    </p>
+                    <a
+                      href={selectedContent.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800 underline break-all"
+                    >
+                      {selectedContent.url}
+                    </a>
+                  </div>
+                  <div className="bg-gray-100 rounded-lg overflow-hidden" style={{ height: '60vh' }}>
+                    <iframe
+                      src={selectedContent.url}
+                      className="w-full h-full"
+                      title={selectedContent.title}
+                      sandbox="allow-same-origin allow-scripts"
+                    />
+                  </div>
+                </div>
+              )}
+              
+              <div className="text-sm text-gray-600 space-y-1">
+                <p><strong>Type:</strong> {selectedContent.type.toUpperCase()}</p>
+                {selectedContent.duration && (
+                  <p><strong>Duration:</strong> {selectedContent.duration}s</p>
+                )}
+                {selectedContent.createdAt && (
+                  <p><strong>Uploaded:</strong> {new Date(selectedContent.createdAt).toLocaleDateString()}</p>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </Modal>
 
