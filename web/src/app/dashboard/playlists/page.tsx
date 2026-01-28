@@ -364,6 +364,11 @@ export default function PlaylistsPage() {
                       </span>
                       <span>⏱️ {getTotalDuration(playlist)}</span>
                     </div>
+                    {playlist.updatedAt && (
+                      <div className="text-xs text-gray-400 mt-2">
+                        Updated {new Date(playlist.updatedAt).toLocaleDateString()}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-2">
