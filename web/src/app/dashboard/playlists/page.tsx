@@ -27,10 +27,11 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 
 // Sortable playlist item component
-function SortablePlaylistItem({ item, idx, onRemove }: {
+function SortablePlaylistItem({ item, idx, onRemove, onDurationChange }: {
   item: any;
   idx: number;
   onRemove: () => void;
+  onDurationChange: (newDuration: number) => void;
 }) {
   const {
     attributes,
@@ -66,8 +67,23 @@ function SortablePlaylistItem({ item, idx, onRemove }: {
           <div className="text-sm font-medium text-gray-900">
             {item.content?.title || `Content ${item.contentId}`}
           </div>
-          <div className="text-xs text-gray-500">
-            Duration: {item.duration || 30}s
+          <div className="text-xs text-gray-500 flex items-center gap-2">
+            <span>Duration:</span>
+            <input
+              type="number"
+              min="1"
+              max="300"
+              value={item.duration || 30}
+              onChange={(e) => {
+                const val = parseInt(e.target.value);
+                if (val > 0 && val <= 300) {
+                  onDurationChange(val);
+                }
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-16 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+            />
+            <span>s</span>
           </div>
         </div>
       </div>
@@ -552,6 +568,15 @@ export default function PlaylistsPage() {
                               loadPlaylists();
                             } catch (error: any) {
                               toast.error(error.message || 'Failed to remove item');
+                            }
+                          }}
+                          onDurationChange={async (newDuration: number) => {
+                            try {
+                              await apiClient.updatePlaylistItem(selectedPlaylist.id, item.id, { duration: newDuration });
+                              toast.success('Duration updated');
+                              loadPlaylists();
+                            } catch (error: any) {
+                              toast.error(error.message || 'Failed to update duration');
                             }
                           }}
                         />
