@@ -14,6 +14,7 @@ export default function DevicesPage() {
   const router = useRouter();
   const toast = useToast();
   const [devices, setDevices] = useState<Display[]>([]);
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDevice, setSelectedDevice] = useState<Display | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -31,6 +32,7 @@ export default function DevicesPage() {
 
   useEffect(() => {
     loadDevices();
+    loadPlaylists();
   }, []);
 
   const loadDevices = async () => {
@@ -43,6 +45,21 @@ export default function DevicesPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadPlaylists = async () => {
+    try {
+      const response = await apiClient.getPlaylists();
+      setPlaylists(response.data || response || []);
+    } catch (error) {
+      // Silent fail
+    }
+  };
+
+  const getCurrentPlaylistName = (playlistId?: string) => {
+    if (!playlistId) return null;
+    const playlist = playlists.find(p => p.id === playlistId);
+    return playlist?.name || null;
   };
 
   const handleEdit = (device: Display) => {
@@ -275,6 +292,9 @@ export default function DevicesPage() {
                   >
                     Location{getSortIcon('location')}
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Currently Playing
+                  </th>
                   <th 
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
                     onClick={() => handleSort('lastHeartbeat')}
@@ -314,6 +334,16 @@ export default function DevicesPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                     {device.location || '—'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    {getCurrentPlaylistName(device.currentPlaylistId) ? (
+                      <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-semibold flex items-center gap-1 w-fit">
+                        <span>📋</span>
+                        <span>{getCurrentPlaylistName(device.currentPlaylistId)}</span>
+                      </span>
+                    ) : (
+                      <span className="text-gray-400 italic">No playlist</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {device.lastSeen
