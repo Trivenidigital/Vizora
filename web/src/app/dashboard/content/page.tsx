@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useDropzone } from 'react-dropzone';
 import { apiClient } from '@/lib/api';
 import { Content, Display, Playlist } from '@/lib/types';
 import Modal from '@/components/Modal';
@@ -239,6 +240,33 @@ export default function ContentPage() {
     }
   };
 
+  // Dropzone configuration
+  const getAcceptedFileTypes = () => {
+    if (uploadForm.type === 'image') return { 'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp'] };
+    if (uploadForm.type === 'video') return { 'video/*': ['.mp4', '.mov', '.avi', '.webm'] };
+    if (uploadForm.type === 'pdf') return { 'application/pdf': ['.pdf'] };
+    return {};
+  };
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    accept: getAcceptedFileTypes(),
+    multiple: false,
+    disabled: uploadForm.type === 'url',
+    onDrop: (acceptedFiles) => {
+      const file = acceptedFiles[0];
+      if (file) {
+        const url = URL.createObjectURL(file);
+        setUploadForm({ ...uploadForm, url });
+        if (!uploadForm.title) {
+          setUploadForm(prev => ({ 
+            ...prev, 
+            title: file.name.replace(/\.[^/.]+$/, '') 
+          }));
+        }
+      }
+    },
+  });
+
   // Filter by type and search query
   const filteredContent = content.filter((c) => {
     const matchesType = filterType === 'all' || c.type === filterType;
@@ -468,61 +496,50 @@ export default function ContentPage() {
             </select>
           </div>
           
-          {/* File Upload Section */}
+          {/* File Upload Section - Drag and Drop */}
           {uploadForm.type !== 'url' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Upload File
               </label>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition">
-                <input
-                  type="file"
-                  id="file-upload"
-                  accept={
-                    uploadForm.type === 'image' ? 'image/*' :
-                    uploadForm.type === 'video' ? 'video/*' :
-                    uploadForm.type === 'pdf' ? '.pdf' : '*'
-                  }
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      // Create object URL for preview
-                      const url = URL.createObjectURL(file);
-                      setUploadForm({ ...uploadForm, url });
-                      // Set title from filename if not set
-                      if (!uploadForm.title) {
-                        setUploadForm(prev => ({ ...prev, title: file.name.replace(/\.[^/.]+$/, '') }));
-                      }
-                    }
-                  }}
-                  className="hidden"
-                />
-                <label
-                  htmlFor="file-upload"
-                  className="cursor-pointer inline-flex flex-col items-center"
+              <div
+                {...getRootProps()}
+                className={`border-2 border-dashed rounded-lg p-6 text-center transition-all cursor-pointer ${
+                  isDragActive
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'
+                }`}
+              >
+                <input {...getInputProps()} />
+                <svg
+                  className="w-12 h-12 text-gray-400 mb-3 mx-auto"
+                  stroke="currentColor"
+                  fill="none"
+                  viewBox="0 0 48 48"
                 >
-                  <svg
-                    className="w-12 h-12 text-gray-400 mb-3"
-                    stroke="currentColor"
-                    fill="none"
-                    viewBox="0 0 48 48"
-                  >
-                    <path
-                      d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  <span className="text-sm font-medium text-blue-600 hover:text-blue-700">
-                    Click to browse
-                  </span>
-                  <span className="text-xs text-gray-500 mt-1">
-                    {uploadForm.type === 'image' && 'PNG, JPG, GIF up to 10MB'}
-                    {uploadForm.type === 'video' && 'MP4, MOV, AVI up to 100MB'}
-                    {uploadForm.type === 'pdf' && 'PDF up to 50MB'}
-                  </span>
-                </label>
+                  <path
+                    d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                {isDragActive ? (
+                  <p className="text-sm font-medium text-blue-600">
+                    Drop the file here...
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-sm font-medium text-blue-600 hover:text-blue-700 mb-1">
+                      Drag & drop file here, or click to browse
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {uploadForm.type === 'image' && 'PNG, JPG, GIF up to 10MB'}
+                      {uploadForm.type === 'video' && 'MP4, MOV, AVI up to 100MB'}
+                      {uploadForm.type === 'pdf' && 'PDF up to 50MB'}
+                    </p>
+                  </>
+                )}
               </div>
               {uploadForm.url && (
                 <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between">
@@ -531,7 +548,10 @@ export default function ContentPage() {
                     <span className="text-sm text-green-800">File selected</span>
                   </div>
                   <button
-                    onClick={() => setUploadForm({ ...uploadForm, url: '' })}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setUploadForm({ ...uploadForm, url: '' });
+                    }}
                     className="text-red-600 hover:text-red-700 text-sm font-medium"
                   >
                     Remove
