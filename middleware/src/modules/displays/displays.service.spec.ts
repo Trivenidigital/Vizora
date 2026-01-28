@@ -1,4 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { JwtService } from '@nestjs/jwt';
+import { HttpService } from '@nestjs/axios';
 import { DisplaysService } from './displays.service';
 import { DatabaseService } from '../database/database.service';
 import { NotFoundException, ConflictException } from '@nestjs/common';
@@ -41,12 +43,30 @@ describe('DisplaysService', () => {
       },
     };
 
+    const mockJwtService = {
+      sign: jest.fn(),
+      verify: jest.fn(),
+    };
+
+    const mockHttpService = {
+      post: jest.fn(),
+      get: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DisplaysService,
         {
           provide: DatabaseService,
           useValue: mockDatabaseService,
+        },
+        {
+          provide: JwtService,
+          useValue: mockJwtService,
+        },
+        {
+          provide: HttpService,
+          useValue: mockHttpService,
         },
       ],
     }).compile();

@@ -42,6 +42,9 @@ describe('PlaylistsService', () => {
         delete: jest.fn(),
         deleteMany: jest.fn(),
       },
+      content: {
+        findMany: jest.fn(),
+      },
     };
 
     service = new PlaylistsService(mockDatabaseService as DatabaseService);
@@ -81,6 +84,11 @@ describe('PlaylistsService', () => {
         ...createDto,
         items: [{ contentId: 'content-123', order: 0 }],
       };
+
+      // Mock content validation
+      mockDatabaseService.content.findMany.mockResolvedValue([
+        { id: 'content-123' },
+      ]);
 
       mockDatabaseService.playlist.create.mockResolvedValue({
         ...mockPlaylist,
