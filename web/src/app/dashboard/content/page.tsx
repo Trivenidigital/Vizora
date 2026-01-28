@@ -35,6 +35,7 @@ export default function ContentPage() {
   const [filterType, setFilterType] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 300);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [uploadQueue, setUploadQueue] = useState<Array<{
     file: File;
@@ -379,13 +380,37 @@ export default function ContentPage() {
             Manage your media assets ({content.length} items)
           </p>
         </div>
-        <button
-          onClick={() => setIsUploadModalOpen(true)}
-          className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
-        >
-          <span className="text-xl">+</span>
-          <span>Upload Content</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="flex bg-white border border-gray-300 rounded-lg overflow-hidden">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`px-4 py-2 text-sm font-medium transition ${
+                viewMode === 'grid'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              <span className="text-lg">⊞</span>
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`px-4 py-2 text-sm font-medium transition ${
+                viewMode === 'list'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              <span className="text-lg">☰</span>
+            </button>
+          </div>
+          <button
+            onClick={() => setIsUploadModalOpen(true)}
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
+          >
+            <span className="text-xl">+</span>
+            <span>Upload Content</span>
+          </button>
+        </div>
       </div>
 
       {/* Search Bar */}
