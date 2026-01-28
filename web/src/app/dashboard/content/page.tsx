@@ -36,6 +36,7 @@ export default function ContentPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 300);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [uploadQueue, setUploadQueue] = useState<Array<{
     file: File;
@@ -297,6 +298,43 @@ export default function ContentPage() {
     }
   };
 
+  // Bulk selection handlers
+  const toggleSelectItem = (id: string) => {
+    const newSelected = new Set(selectedItems);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedItems(newSelected);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedItems.size === filteredContent.length) {
+      setSelectedItems(new Set());
+    } else {
+      setSelectedItems(new Set(filteredContent.map(item => item.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedItems.size === 0) return;
+    
+    try {
+      setActionLoading(true);
+      await Promise.all(
+        Array.from(selectedItems).map(id => apiClient.deleteContent(id))
+      );
+      toast.success(`${selectedItems.size} items deleted`);
+      setSelectedItems(new Set());
+      loadContent();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to delete some items');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const getTypeIcon = (type: string) => {
     switch (type) {
       case 'image':
@@ -478,6 +516,33 @@ export default function ContentPage() {
         ))}
       </div>
 
+      {/* Bulk Actions Toolbar */}
+      {selectedItems.size > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <span className="text-sm font-medium text-blue-900">
+              {selectedItems.size} item{selectedItems.size > 1 ? 's' : ''} selected
+            </span>
+            <button
+              onClick={() => setSelectedItems(new Set())}
+              className="text-sm text-blue-600 hover:text-blue-800 underline"
+            >
+              Clear selection
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleBulkDelete}
+              disabled={actionLoading}
+              className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium disabled:opacity-50 flex items-center gap-2"
+            >
+              {actionLoading && <LoadingSpinner size="sm" />}
+              🗑️ Delete Selected
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Content Grid */}
       {loading ? (
         <div className="bg-white rounded-lg shadow p-12">
@@ -500,6 +565,14 @@ export default function ContentPage() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-6 py-3 text-left">
+                  <input
+                    type="checkbox"
+                    checked={selectedItems.size === filteredContent.length && filteredContent.length > 0}
+                    onChange={toggleSelectAll}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Content</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
@@ -510,6 +583,15 @@ export default function ContentPage() {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredContent.map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50 transition">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <input
+                      type="checkbox"
+                      checked={selectedItems.has(item.id)}
+                      onChange={() => toggleSelectItem(item.id)}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-3 cursor-pointer" onClick={() => handlePreview(item)}>
                       <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-purple-500 rounded flex items-center justify-center flex-shrink-0 overflow-hidden">
@@ -604,6 +686,15 @@ export default function ContentPage() {
                   />
                 ) : null}
                 <span className={`text-6xl ${item.thumbnailUrl ? 'hidden' : ''}`}>{getTypeIcon(item.type)}</span>
+                <div className="absolute top-3 left-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedItems.has(item.id)}
+                    onChange={() => toggleSelectItem(item.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 bg-white shadow-sm"
+                  />
+                </div>
                 <span
                   className={`absolute top-3 right-3 px-3 py-1 text-xs rounded-full font-semibold ${getStatusColor(
                     item.status
