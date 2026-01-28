@@ -16,6 +16,7 @@ export default function ContentPage() {
   const [loading, setLoading] = useState(true);
   const [selectedContent, setSelectedContent] = useState<Content | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isPushModalOpen, setIsPushModalOpen] = useState(false);
   const [isAddToPlaylistModalOpen, setIsAddToPlaylistModalOpen] = useState(false);
@@ -90,6 +91,46 @@ export default function ContentPage() {
       loadContent();
     } catch (error: any) {
       toast.error(error.message || 'Failed to upload content');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleEdit = (item: Content) => {
+    setSelectedContent(item);
+    setUploadForm({
+      title: item.title,
+      type: item.type as 'image' | 'video' | 'pdf' | 'url',
+      url: item.url || '',
+    });
+    setFormErrors({});
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedContent) return;
+
+    // Validate form
+    const errors = validateForm(contentUploadSchema, uploadForm);
+    setFormErrors(errors);
+    
+    if (Object.keys(errors).length > 0) {
+      toast.error('Please fix the errors before saving');
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      await apiClient.updateContent(selectedContent.id, {
+        title: uploadForm.title,
+        // Note: type and url typically can't be changed after upload
+        // but we include them for completeness
+      });
+      toast.success('Content updated successfully');
+      setIsEditModalOpen(false);
+      loadContent();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update content');
     } finally {
       setActionLoading(false);
     }
@@ -351,7 +392,10 @@ export default function ContentPage() {
                   >
                     ➕ Playlist
                   </button>
-                  <button className="text-sm bg-blue-50 text-blue-600 py-2 rounded hover:bg-blue-100 transition font-medium">
+                  <button 
+                    onClick={() => handleEdit(item)}
+                    className="text-sm bg-blue-50 text-blue-600 py-2 rounded hover:bg-blue-100 transition font-medium"
+                  >
                     ✏️ Edit
                   </button>
                   <button
@@ -544,6 +588,77 @@ export default function ContentPage() {
             >
               {actionLoading && <LoadingSpinner size="sm" />}
               Upload Content
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Edit Content Modal */}
+      <Modal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setFormErrors({});
+        }}
+        title="Edit Content"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Content Title
+            </label>
+            <input
+              type="text"
+              value={uploadForm.title}
+              onChange={(e) => {
+                setUploadForm({ ...uploadForm, title: e.target.value });
+                if (formErrors.title) {
+                  setFormErrors({ ...formErrors, title: '' });
+                }
+              }}
+              onBlur={() => {
+                const errors = validateForm(contentUploadSchema, uploadForm);
+                if (errors.title) {
+                  setFormErrors({ ...formErrors, title: errors.title });
+                }
+              }}
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 ${
+                formErrors.title ? 'border-red-500' : 'border-gray-300'
+              }`}
+              placeholder="e.g., Summer Sale Banner"
+              autoComplete="off"
+            />
+            {formErrors.title && (
+              <p className="mt-1 text-sm text-red-600">{formErrors.title}</p>
+            )}
+          </div>
+          
+          <div className="bg-gray-50 p-3 rounded-lg">
+            <p className="text-sm text-gray-600">
+              <strong>Type:</strong> {uploadForm.type}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              Content type cannot be changed after upload
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4">
+            <button
+              onClick={() => {
+                setIsEditModalOpen(false);
+                setFormErrors({});
+              }}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveEdit}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition disabled:opacity-50 flex items-center gap-2"
+              disabled={actionLoading || !uploadForm.title}
+            >
+              {actionLoading && <LoadingSpinner size="sm" />}
+              Save Changes
             </button>
           </div>
         </div>
