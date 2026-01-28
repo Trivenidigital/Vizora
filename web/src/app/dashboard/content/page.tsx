@@ -8,6 +8,7 @@ import ConfirmDialog from '@/components/ConfirmDialog';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { useToast } from '@/lib/hooks/useToast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
+import { contentUploadSchema, validateForm } from '@/lib/validation';
 
 export default function ContentPage() {
   const toast = useToast();
@@ -31,6 +32,7 @@ export default function ContentPage() {
   const [filterType, setFilterType] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 300);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadContent();
@@ -69,12 +71,22 @@ export default function ContentPage() {
   };
 
   const handleUpload = async () => {
+    // Validate form
+    const errors = validateForm(contentUploadSchema, uploadForm);
+    setFormErrors(errors);
+    
+    if (Object.keys(errors).length > 0) {
+      toast.error('Please fix the errors before submitting');
+      return;
+    }
+
     try {
       setActionLoading(true);
       await apiClient.createContent(uploadForm);
       toast.success('Content uploaded successfully');
       setIsUploadModalOpen(false);
       setUploadForm({ title: '', type: 'image', url: '' });
+      setFormErrors({});
       loadContent();
     } catch (error: any) {
       toast.error(error.message || 'Failed to upload content');
@@ -365,11 +377,29 @@ export default function ContentPage() {
             <input
               type="text"
               value={uploadForm.title}
-              onChange={(e) => setUploadForm({ ...uploadForm, title: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+              onChange={(e) => {
+                setUploadForm({ ...uploadForm, title: e.target.value });
+                // Clear error on change
+                if (formErrors.title) {
+                  setFormErrors({ ...formErrors, title: '' });
+                }
+              }}
+              onBlur={() => {
+                // Validate on blur
+                const errors = validateForm(contentUploadSchema, uploadForm);
+                if (errors.title) {
+                  setFormErrors({ ...formErrors, title: errors.title });
+                }
+              }}
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 ${
+                formErrors.title ? 'border-red-500' : 'border-gray-300'
+              }`}
               placeholder="e.g., Summer Sale Banner"
               autoComplete="off"
             />
+            {formErrors.title && (
+              <p className="mt-1 text-sm text-red-600">{formErrors.title}</p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -471,11 +501,27 @@ export default function ContentPage() {
               <input
                 type="url"
                 value={uploadForm.url}
-                onChange={(e) => setUploadForm({ ...uploadForm, url: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                onChange={(e) => {
+                  setUploadForm({ ...uploadForm, url: e.target.value });
+                  if (formErrors.url) {
+                    setFormErrors({ ...formErrors, url: '' });
+                  }
+                }}
+                onBlur={() => {
+                  const errors = validateForm(contentUploadSchema, uploadForm);
+                  if (errors.url) {
+                    setFormErrors({ ...formErrors, url: errors.url });
+                  }
+                }}
+                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 ${
+                  formErrors.url ? 'border-red-500' : 'border-gray-300'
+                }`}
                 placeholder="https://example.com/page"
                 autoComplete="off"
               />
+              {formErrors.url && (
+                <p className="mt-1 text-sm text-red-600">{formErrors.url}</p>
+              )}
             </div>
           )}
           
