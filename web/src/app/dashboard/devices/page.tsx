@@ -285,10 +285,9 @@ export default function DevicesPage() {
                   </td>
                 </tr>
               ))}
-              ))}
             </tbody>
           </table>
-        </div>
+          </div>
         </>
       )}
 
