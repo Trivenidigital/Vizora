@@ -495,6 +495,90 @@ export default function ContentPage() {
             Upload Content
           </button>
         </div>
+      ) : viewMode === 'list' ? (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Content</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Uploaded</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredContent.map((item) => (
+                <tr key={item.id} className="hover:bg-gray-50 transition">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center gap-3 cursor-pointer" onClick={() => handlePreview(item)}>
+                      <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-purple-500 rounded flex items-center justify-center flex-shrink-0 overflow-hidden">
+                        {item.thumbnailUrl ? (
+                          <img src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-2xl">{getTypeIcon(item.type)}</span>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-gray-900 truncate" title={item.title}>
+                          {item.title}
+                        </div>
+                        {item.duration && (
+                          <div className="text-xs text-gray-500">{item.duration}s</div>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="px-2 py-1 text-xs font-medium uppercase text-gray-600 bg-gray-100 rounded">
+                      {item.type}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`px-2 py-1 text-xs font-semibold rounded ${getStatusColor(item.status)}`}>
+                      {item.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '—'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => handlePushToDevice(item)}
+                        className="text-green-600 hover:text-green-800 hover:bg-green-50 px-2 py-1 rounded transition"
+                        title="Push to device"
+                      >
+                        📤
+                      </button>
+                      <button
+                        onClick={() => handleAddToPlaylist(item)}
+                        className="text-purple-600 hover:text-purple-800 hover:bg-purple-50 px-2 py-1 rounded transition"
+                        title="Add to playlist"
+                      >
+                        ➕
+                      </button>
+                      <button
+                        onClick={() => handleEdit(item)}
+                        className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded transition"
+                        title="Edit"
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        onClick={() => handleDelete(item)}
+                        className="text-red-600 hover:text-red-800 hover:bg-red-50 px-2 py-1 rounded transition"
+                        title="Delete"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredContent.map((item) => (
