@@ -25,6 +25,7 @@ export default function DashboardLayout({
   const router = useRouter();
   const { user, loading: authLoading, logout: handleLogoutAuth } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const isActive = (item: typeof navigation[0]) => {
     if (item.exactMatch) {
@@ -83,25 +84,65 @@ export default function DashboardLayout({
             </div>
             <div className="flex items-center gap-4">
               {!authLoading && user && (
-                <div className="hidden sm:flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg">
-                  <div 
-                    className="w-8 h-8 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center"
-                    aria-label={`${user.email} avatar`}
+                <div className="relative">
+                  <button
+                    onClick={() => setUserMenuOpen(!userMenuOpen)}
+                    className="hidden sm:flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
                   >
-                    <span className="text-white text-sm font-semibold">{getUserInitials()}</span>
-                  </div>
-                  <div className="hidden md:block">
-                    <div className="text-sm font-medium text-gray-900">{user.email.split('@')[0]}</div>
-                    <div className="text-xs text-gray-500">{user.email}</div>
-                  </div>
+                    <div 
+                      className="w-8 h-8 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center"
+                      aria-label={`${user.email} avatar`}
+                    >
+                      <span className="text-white text-sm font-semibold">{getUserInitials()}</span>
+                    </div>
+                    <div className="hidden md:block text-left">
+                      <div className="text-sm font-medium text-gray-900">{user.email.split('@')[0]}</div>
+                      <div className="text-xs text-gray-500">{user.email}</div>
+                    </div>
+                    <svg className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                  
+                  {/* Dropdown Menu */}
+                  {userMenuOpen && (
+                    <>
+                      <div 
+                        className="fixed inset-0 z-10" 
+                        onClick={() => setUserMenuOpen(false)}
+                      />
+                      <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
+                        <div className="p-4 border-b border-gray-200">
+                          <div className="text-sm font-medium text-gray-900">{user.email.split('@')[0]}</div>
+                          <div className="text-xs text-gray-500">{user.email}</div>
+                        </div>
+                        <div className="py-2">
+                          <button
+                            onClick={() => {
+                              setUserMenuOpen(false);
+                              router.push('/dashboard/settings');
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition flex items-center gap-2"
+                          >
+                            <span>⚙️</span>
+                            <span>Settings</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setUserMenuOpen(false);
+                              handleLogout();
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition flex items-center gap-2"
+                          >
+                            <span>🚪</span>
+                            <span>Logout</span>
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
-              <button
-                onClick={handleLogout}
-                className="text-sm text-red-600 hover:text-red-700 hover:bg-red-50 px-4 py-2 rounded-lg transition font-medium"
-              >
-                Logout
-              </button>
             </div>
           </div>
         </div>
