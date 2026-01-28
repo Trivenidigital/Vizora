@@ -24,6 +24,8 @@ export default function DevicesPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 300);
+  const [sortField, setSortField] = useState<keyof Display | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
     loadDevices();
@@ -103,6 +105,49 @@ export default function DevicesPage() {
 
   const getStatusDot = (status: string) => {
     return status === 'online' ? 'bg-green-500' : 'bg-gray-400';
+  };
+
+  const handleSort = (field: keyof Display) => {
+    if (sortField === field) {
+      // Toggle direction or clear sort
+      if (sortDirection === 'asc') {
+        setSortDirection('desc');
+      } else {
+        setSortField(null);
+      }
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  // Filter and sort devices
+  const displayDevices = devices
+    .filter(d => 
+      !debouncedSearch || 
+      d.nickname.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      (d.location && d.location.toLowerCase().includes(debouncedSearch.toLowerCase()))
+    )
+    .sort((a, b) => {
+      if (!sortField) return 0;
+      
+      const aVal = a[sortField];
+      const bVal = b[sortField];
+      
+      // Handle null/undefined
+      if (aVal == null && bVal == null) return 0;
+      if (aVal == null) return 1;
+      if (bVal == null) return -1;
+      
+      // Compare
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+  const getSortIcon = (field: keyof Display) => {
+    if (sortField !== field) return null;
+    return sortDirection === 'asc' ? ' ↑' : ' ↓';
   };
 
   return (
@@ -189,14 +234,8 @@ export default function DevicesPage() {
           {debouncedSearch && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
               <p className="text-sm text-blue-800">
-                {devices.filter(d => 
-                  d.nickname.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-                  (d.location && d.location.toLowerCase().includes(debouncedSearch.toLowerCase()))
-                ).length}{' '}
-                {devices.filter(d => 
-                  d.nickname.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-                  (d.location && d.location.toLowerCase().includes(debouncedSearch.toLowerCase()))
-                ).length === 1 ? 'result' : 'results'} found
+                {displayDevices.length}{' '}
+                {displayDevices.length === 1 ? 'result' : 'results'} found
               </p>
             </div>
           )}
@@ -204,17 +243,29 @@ export default function DevicesPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Device
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                    onClick={() => handleSort('nickname')}
+                  >
+                    Device{getSortIcon('nickname')}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                    onClick={() => handleSort('status')}
+                  >
+                    Status{getSortIcon('status')}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Location
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                    onClick={() => handleSort('location')}
+                  >
+                    Location{getSortIcon('location')}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Last Seen
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                    onClick={() => handleSort('lastHeartbeat')}
+                  >
+                    Last Seen{getSortIcon('lastHeartbeat')}
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
@@ -222,13 +273,7 @@ export default function DevicesPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {devices
-                  .filter(d => 
-                    !debouncedSearch || 
-                    d.nickname.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-                    (d.location && d.location.toLowerCase().includes(debouncedSearch.toLowerCase()))
-                  )
-                  .map((device) => (
+                {displayDevices.map((device) => (
                 <tr key={device.id} className="hover:bg-gray-50 transition">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
