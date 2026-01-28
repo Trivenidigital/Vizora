@@ -329,10 +329,15 @@ export default function ContentPage() {
                 <h3 className="font-semibold text-gray-900 mb-2 truncate" title={item.title}>
                   {item.title}
                 </h3>
-                <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
+                <div className="flex items-center justify-between text-sm text-gray-500 mb-2">
                   <span className="uppercase">{item.type}</span>
                   {item.duration && <span>{item.duration}s</span>}
                 </div>
+                {item.createdAt && (
+                  <div className="text-xs text-gray-400 mb-4">
+                    Uploaded {new Date(item.createdAt).toLocaleDateString()}
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() => handlePushToDevice(item)}
