@@ -33,6 +33,9 @@ export default function ContentPage() {
   });
   const [actionLoading, setActionLoading] = useState(false);
   const [filterType, setFilterType] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterDateRange, setFilterDateRange] = useState<'all' | '7days' | '30days' | '90days'>('all');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 300);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -401,11 +404,41 @@ export default function ContentPage() {
 
   // Filter by type and search query
   const filteredContent = content.filter((c) => {
+    // Type filter
     const matchesType = filterType === 'all' || c.type === filterType;
+    
+    // Search filter
     const matchesSearch = !debouncedSearch || 
       c.title.toLowerCase().includes(debouncedSearch.toLowerCase());
-    return matchesType && matchesSearch;
+    
+    // Status filter
+    const matchesStatus = filterStatus === 'all' || c.status === filterStatus;
+    
+    // Date range filter
+    let matchesDate = true;
+    if (filterDateRange !== 'all' && c.createdAt) {
+      const contentDate = new Date(c.createdAt);
+      const now = new Date();
+      const daysAgo = {
+        '7days': 7,
+        '30days': 30,
+        '90days': 90,
+      }[filterDateRange] || 0;
+      const cutoffDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+      matchesDate = contentDate >= cutoffDate;
+    }
+    
+    return matchesType && matchesSearch && matchesStatus && matchesDate;
   });
+
+  const clearAllFilters = () => {
+    setFilterType('all');
+    setFilterStatus('all');
+    setFilterDateRange('all');
+    setSearchQuery('');
+  };
+
+  const hasActiveFilters = filterType !== 'all' || filterStatus !== 'all' || filterDateRange !== 'all' || searchQuery !== '';
 
   return (
     <div className="space-y-6">
@@ -499,21 +532,112 @@ export default function ContentPage() {
       </div>
 
       {/* Filter Tabs */}
-      <div className="bg-white rounded-lg shadow p-2 flex gap-2">
-        {['all', 'image', 'video', 'pdf', 'url'].map((type) => (
-          <button
-            key={type}
-            onClick={() => setFilterType(type)}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition ${
-              filterType === type
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            {type.charAt(0).toUpperCase() + type.slice(1)}
-            {type !== 'all' && ` (${content.filter((c) => c.type === type).length})`}
-          </button>
-        ))}
+      <div className="bg-white rounded-lg shadow p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex gap-2 flex-wrap">
+            {['all', 'image', 'video', 'pdf', 'url'].map((type) => (
+              <button
+                key={type}
+                onClick={() => setFilterType(type)}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+                  filterType === type
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {type.charAt(0).toUpperCase() + type.slice(1)}
+                {type !== 'all' && ` (${content.filter((c) => c.type === type).length})`}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            {hasActiveFilters && (
+              <button
+                onClick={clearAllFilters}
+                className="text-sm text-blue-600 hover:text-blue-800 underline"
+              >
+                Clear all
+              </button>
+            )}
+            <button
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"
+            >
+              <span>⚙️</span>
+              <span>Advanced</span>
+              <svg 
+                className={`w-4 h-4 transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`}
+                fill="currentColor" 
+                viewBox="0 0 20 20"
+              >
+                <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Advanced Filters Panel */}
+        {showAdvancedFilters && (
+          <div className="pt-3 border-t border-gray-200 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Status
+              </label>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              >
+                <option value="all">All Statuses</option>
+                <option value="ready">Ready</option>
+                <option value="processing">Processing</option>
+                <option value="error">Error</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Upload Date
+              </label>
+              <select
+                value={filterDateRange}
+                onChange={(e) => setFilterDateRange(e.target.value as any)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              >
+                <option value="all">All Time</option>
+                <option value="7days">Last 7 days</option>
+                <option value="30days">Last 30 days</option>
+                <option value="90days">Last 90 days</option>
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* Active Filters Indicator */}
+        {hasActiveFilters && (
+          <div className="pt-2 border-t border-gray-200 flex items-center gap-2 text-sm">
+            <span className="text-gray-600">Active filters:</span>
+            {filterType !== 'all' && (
+              <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                Type: {filterType}
+              </span>
+            )}
+            {filterStatus !== 'all' && (
+              <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                Status: {filterStatus}
+              </span>
+            )}
+            {filterDateRange !== 'all' && (
+              <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                Date: {filterDateRange}
+              </span>
+            )}
+            {searchQuery && (
+              <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                Search: "{searchQuery}"
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Bulk Actions Toolbar */}
