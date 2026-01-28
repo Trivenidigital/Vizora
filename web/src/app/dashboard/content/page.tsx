@@ -35,6 +35,12 @@ export default function ContentPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 300);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [uploadQueue, setUploadQueue] = useState<Array<{
+    file: File;
+    status: 'pending' | 'uploading' | 'success' | 'error';
+    progress: number;
+    error?: string;
+  }>>([]);
 
   useEffect(() => {
     loadContent();
@@ -72,8 +78,68 @@ export default function ContentPage() {
     }
   };
 
+  const handleBulkUpload = async () => {
+    if (uploadQueue.length === 0) {
+      toast.error('No files in queue');
+      return;
+    }
+
+    setActionLoading(true);
+    
+    // Upload files sequentially
+    for (let i = 0; i < uploadQueue.length; i++) {
+      const item = uploadQueue[i];
+      
+      // Update status to uploading
+      setUploadQueue(prev => prev.map((q, idx) => 
+        idx === i ? { ...q, status: 'uploading' as const } : q
+      ));
+
+      try {
+        const url = URL.createObjectURL(item.file);
+        const title = item.file.name.replace(/\.[^/.]+$/, '');
+        
+        await apiClient.createContent({
+          title,
+          type: uploadForm.type,
+          url,
+        });
+
+        // Mark as success
+        setUploadQueue(prev => prev.map((q, idx) => 
+          idx === i ? { ...q, status: 'success' as const, progress: 100 } : q
+        ));
+      } catch (error: any) {
+        // Mark as error
+        setUploadQueue(prev => prev.map((q, idx) => 
+          idx === i ? { ...q, status: 'error' as const, error: error.message } : q
+        ));
+      }
+    }
+
+    setActionLoading(false);
+    
+    const successCount = uploadQueue.filter(q => q.status === 'success').length;
+    const errorCount = uploadQueue.filter(q => q.status === 'error').length;
+    
+    if (errorCount === 0) {
+      toast.success(`${successCount} file(s) uploaded successfully`);
+      setIsUploadModalOpen(false);
+      setUploadQueue([]);
+      setUploadForm({ title: '', type: 'image', url: '' });
+      loadContent();
+    } else {
+      toast.error(`${errorCount} file(s) failed to upload`);
+    }
+  };
+
   const handleUpload = async () => {
-    // Validate form
+    // If queue has files, use bulk upload
+    if (uploadQueue.length > 0) {
+      return handleBulkUpload();
+    }
+
+    // Otherwise, single file upload
     const errors = validateForm(contentUploadSchema, uploadForm);
     setFormErrors(errors);
     
@@ -250,11 +316,20 @@ export default function ContentPage() {
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: getAcceptedFileTypes(),
-    multiple: false,
+    multiple: true, // Enable multiple file selection
     disabled: uploadForm.type === 'url',
     onDrop: (acceptedFiles) => {
-      const file = acceptedFiles[0];
-      if (file) {
+      // Add files to upload queue
+      const newQueueItems = acceptedFiles.map(file => ({
+        file,
+        status: 'pending' as const,
+        progress: 0,
+      }));
+      setUploadQueue(prev => [...prev, ...newQueueItems]);
+      
+      // For backward compatibility, set first file to uploadForm
+      if (acceptedFiles.length > 0 && !uploadForm.url) {
+        const file = acceptedFiles[0];
         const url = URL.createObjectURL(file);
         setUploadForm({ ...uploadForm, url });
         if (!uploadForm.title) {
@@ -541,21 +616,58 @@ export default function ContentPage() {
                   </>
                 )}
               </div>
-              {uploadForm.url && (
-                <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-green-600">✓</span>
-                    <span className="text-sm text-green-800">File selected</span>
+              
+              {/* Upload Queue */}
+              {uploadQueue.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-gray-700">
+                      Upload Queue ({uploadQueue.length} file{uploadQueue.length > 1 ? 's' : ''})
+                    </p>
+                    <button
+                      onClick={() => setUploadQueue([])}
+                      className="text-xs text-red-600 hover:text-red-700"
+                    >
+                      Clear All
+                    </button>
                   </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setUploadForm({ ...uploadForm, url: '' });
-                    }}
-                    className="text-red-600 hover:text-red-700 text-sm font-medium"
-                  >
-                    Remove
-                  </button>
+                  <div className="max-h-48 overflow-y-auto space-y-2">
+                    {uploadQueue.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-200"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {item.file.name}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {(item.file.size / 1024).toFixed(1)} KB
+                          </p>
+                        </div>
+                        <div className="ml-4 flex items-center gap-2">
+                          {item.status === 'pending' && (
+                            <span className="text-xs text-gray-500">Pending</span>
+                          )}
+                          {item.status === 'uploading' && (
+                            <LoadingSpinner size="sm" />
+                          )}
+                          {item.status === 'success' && (
+                            <span className="text-green-600">✓</span>
+                          )}
+                          {item.status === 'error' && (
+                            <span className="text-red-600" title={item.error}>✗</span>
+                          )}
+                          <button
+                            onClick={() => setUploadQueue(prev => prev.filter((_, i) => i !== idx))}
+                            className="text-gray-400 hover:text-red-600"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -604,10 +716,13 @@ export default function ContentPage() {
             <button
               onClick={handleUpload}
               className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition disabled:opacity-50 flex items-center gap-2"
-              disabled={actionLoading || !uploadForm.title || !uploadForm.url}
+              disabled={actionLoading || (uploadQueue.length === 0 && (!uploadForm.title || !uploadForm.url))}
             >
               {actionLoading && <LoadingSpinner size="sm" />}
-              Upload Content
+              {uploadQueue.length > 0 
+                ? `Upload ${uploadQueue.length} File${uploadQueue.length > 1 ? 's' : ''}`
+                : 'Upload Content'
+              }
             </button>
           </div>
         </div>
