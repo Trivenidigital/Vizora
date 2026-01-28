@@ -249,6 +249,38 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* Storage Usage */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Storage Usage</h3>
+          <span className="text-2xl">💾</span>
+        </div>
+        <div className="space-y-3">
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-600">Content Storage</span>
+            <span className="font-medium text-gray-900">
+              {stats.content.total > 0 
+                ? `~${(stats.content.total * 2.5).toFixed(1)} MB` 
+                : '0 MB'} / 5 GB
+            </span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+            <div
+              className="bg-gradient-to-r from-blue-500 to-purple-600 h-3 rounded-full transition-all duration-500"
+              style={{
+                width: `${Math.min((stats.content.total * 2.5 / 5000) * 100, 100)}%`,
+              }}
+            />
+          </div>
+          <div className="flex justify-between text-xs text-gray-500">
+            <span>{stats.content.total} items stored</span>
+            <span>
+              {((stats.content.total * 2.5 / 5000) * 100).toFixed(1)}% used
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* Getting Started Guide */}
       {stats.devices.total === 0 && (
         <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg shadow-lg p-8 text-white">
