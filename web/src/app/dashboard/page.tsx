@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import { HelpIcon } from '@/components/Tooltip';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -170,7 +171,10 @@ export default function DashboardPage() {
 
       {/* Quick Actions */}
       <div className="bg-white rounded-lg shadow-md p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+        <div className="flex items-center gap-2 mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Quick Actions</h3>
+          <HelpIcon content="Common tasks to get started quickly" position="right" />
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <button
             onClick={() => router.push('/dashboard/devices/pair')}
