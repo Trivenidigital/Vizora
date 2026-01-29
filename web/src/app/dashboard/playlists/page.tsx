@@ -6,6 +6,8 @@ import { Playlist, Content, Display } from '@/lib/types';
 import Modal from '@/components/Modal';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import EmptyState from '@/components/EmptyState';
+import SearchFilter from '@/components/SearchFilter';
 import { useToast } from '@/lib/hooks/useToast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import {
@@ -293,47 +295,12 @@ export default function PlaylistsPage() {
         </button>
       </div>
 
-      {/* Search Bar */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <div className="relative">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search playlists by name..."
-            className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            autoComplete="off"
-          />
-          <svg
-            className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
-            >
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-          )}
-        </div>
-      </div>
+      {/* Search Filter */}
+      <SearchFilter
+        value={searchQuery}
+        onChange={setSearchQuery}
+        placeholder="Search playlists by name..."
+      />
 
       {/* Playlists List */}
       {loading ? (
@@ -341,17 +308,15 @@ export default function PlaylistsPage() {
           <LoadingSpinner size="lg" />
         </div>
       ) : playlists.length === 0 ? (
-        <div className="bg-white rounded-lg shadow p-12 text-center">
-          <Icon name="playlists" size="6xl" className="mx-auto mb-4 text-gray-400" />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">No playlists yet</h3>
-          <p className="text-gray-600 mb-6">Create your first playlist to organize content</p>
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-semibold"
-          >
-            Create Playlist
-          </button>
-        </div>
+        <EmptyState
+          icon="playlists"
+          title="No playlists yet"
+          description="Create your first playlist to organize content"
+          action={{
+            label: 'Create Playlist',
+            onClick: () => setIsCreateModalOpen(true),
+          }}
+        />
       ) : (
         <>
           {debouncedSearch && (
