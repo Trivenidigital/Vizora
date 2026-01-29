@@ -9,6 +9,7 @@ import ConfirmDialog from '@/components/ConfirmDialog';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import EmptyState from '@/components/EmptyState';
 import SearchFilter from '@/components/SearchFilter';
+import DeviceStatusIndicator from '@/components/DeviceStatusIndicator';
 import { useToast } from '@/lib/hooks/useToast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { Icon } from '@/theme/icons';
@@ -305,16 +306,7 @@ export default function DevicesPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full ${getStatusDot(device.status)}`} />
-                      <span
-                        className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(
-                          device.status
-                        )}`}
-                      >
-                        {device.status}
-                      </span>
-                    </div>
+                    <DeviceStatusIndicator deviceId={device.id} showLabel showTime />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                     {device.location || '—'}
