@@ -26,10 +26,10 @@ export default function Toast({ message, type, onClose, duration = 5000 }: Toast
   }, [duration, onClose]);
 
   const colors = {
-    success: 'bg-green-500',
-    error: 'bg-red-500',
-    info: 'bg-blue-500',
-    warning: 'bg-yellow-500',
+    success: 'bg-success-500 text-white',
+    error: 'bg-error-500 text-white',
+    info: 'bg-info-500 text-white',
+    warning: 'bg-warning-500 text-white',
   };
 
   const icons: Record<ToastType, IconName> = {

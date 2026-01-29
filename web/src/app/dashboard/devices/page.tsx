@@ -120,11 +120,29 @@ export default function DevicesPage() {
   };
 
   const getStatusColor = (status: string) => {
-    return status === 'online' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
+    switch (status) {
+      case 'online':
+        return 'bg-success-100 dark:bg-success-900 text-success-800 dark:text-success-200';
+      case 'offline':
+        return 'bg-error-100 dark:bg-error-900 text-error-800 dark:text-error-200';
+      case 'idle':
+        return 'bg-warning-100 dark:bg-warning-900 text-warning-800 dark:text-warning-200';
+      default:
+        return 'bg-neutral-100 dark:bg-neutral-900 text-neutral-800 dark:text-neutral-200';
+    }
   };
 
   const getStatusDot = (status: string) => {
-    return status === 'online' ? 'bg-green-500' : 'bg-gray-400';
+    switch (status) {
+      case 'online':
+        return 'bg-success-500';
+      case 'offline':
+        return 'bg-error-500';
+      case 'idle':
+        return 'bg-warning-500';
+      default:
+        return 'bg-neutral-400';
+    }
   };
 
   const handleSort = (field: keyof Display) => {
@@ -188,8 +206,8 @@ export default function DevicesPage() {
 
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-bold text-gray-900">Devices</h2>
-          <p className="mt-2 text-gray-600">
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-50">Devices</h2>
+          <p className="mt-2 text-gray-600 dark:text-gray-400">
             Manage your paired display devices ({devices.length} total)
           </p>
         </div>
@@ -203,14 +221,14 @@ export default function DevicesPage() {
       </div>
 
       {/* Search Bar */}
-      <div className="bg-white rounded-lg shadow p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow p-4">
         <div className="relative">
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search devices by name or location..."
-            className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 placeholder-gray-400 dark:placeholder-gray-500 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             autoComplete="off"
           />
           <svg
@@ -246,14 +264,14 @@ export default function DevicesPage() {
 
       {/* Device List */}
       {loading ? (
-        <div className="bg-white rounded-lg shadow p-12">
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow p-12">
           <LoadingSpinner size="lg" />
         </div>
       ) : devices.length === 0 ? (
-        <div className="bg-white rounded-lg shadow p-12 text-center">
-          <Icon name="devices" size="6xl" className="mx-auto mb-4 text-gray-400" />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">No devices yet</h3>
-          <p className="text-gray-600 mb-6">Get started by pairing your first display device</p>
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow p-12 text-center">
+          <Icon name="devices" size="6xl" className="mx-auto mb-4 text-gray-400 dark:text-gray-600" />
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-50 mb-2">No devices yet</h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">Get started by pairing your first display device</p>
           <button
             onClick={() => router.push('/dashboard/devices/pair')}
             className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-semibold"
@@ -264,60 +282,60 @@ export default function DevicesPage() {
       ) : (
         <>
           {debouncedSearch && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-              <p className="text-sm text-blue-800">
+            <div className="bg-info-50 dark:bg-info-900 border border-info-200 dark:border-info-700 rounded-lg p-3 mb-4">
+              <p className="text-sm text-info-800 dark:text-info-200">
                 {displayDevices.length}{' '}
                 {displayDevices.length === 1 ? 'result' : 'results'} found
               </p>
             </div>
           )}
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow overflow-hidden">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-800">
                 <tr>
-                  <th 
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 select-none"
                     onClick={() => handleSort('nickname')}
                   >
                     Device{getSortIcon('nickname')}
                   </th>
-                  <th 
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 select-none"
                     onClick={() => handleSort('status')}
                   >
                     Status{getSortIcon('status')}
                   </th>
-                  <th 
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 select-none"
                     onClick={() => handleSort('location')}
                   >
                     Location{getSortIcon('location')}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Currently Playing
                   </th>
-                  <th 
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 select-none"
                     onClick={() => handleSort('lastHeartbeat')}
                   >
                     Last Seen{getSortIcon('lastHeartbeat')}
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
                 {displayDevices.map((device) => (
-                <tr key={device.id} className="hover:bg-gray-50 transition">
+                <tr key={device.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      <Icon name="devices" size="xl" className="mr-3 text-gray-600" />
+                      <Icon name="devices" size="xl" className="mr-3 text-gray-600 dark:text-gray-400" />
                       <div>
-                        <div className="text-sm font-semibold text-gray-900">
+                        <div className="text-sm font-semibold text-gray-900 dark:text-gray-50">
                           {device.nickname}
                         </div>
-                        <div className="text-xs text-gray-500">ID: {device.id}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">ID: {device.id}</div>
                       </div>
                     </div>
                   </td>
@@ -333,20 +351,20 @@ export default function DevicesPage() {
                       </span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                     {device.location || '—'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     {getCurrentPlaylistName(device.currentPlaylistId) ? (
-                      <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-semibold flex items-center gap-1 w-fit">
-                        <Icon name="playlists" size="sm" className="text-blue-800" />
+                      <span className="px-3 py-1 bg-primary-100 dark:bg-primary-900 text-primary-800 dark:text-primary-200 rounded-full text-xs font-semibold flex items-center gap-1 w-fit">
+                        <Icon name="playlists" size="sm" className="text-primary-800 dark:text-primary-200" />
                         <span>{getCurrentPlaylistName(device.currentPlaylistId)}</span>
                       </span>
                     ) : (
-                      <span className="text-gray-400 italic">No playlist</span>
+                      <span className="text-gray-400 dark:text-gray-600 italic">No playlist</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {device.lastSeen
                       ? new Date(device.lastSeen).toLocaleString()
                       : 'Never'}

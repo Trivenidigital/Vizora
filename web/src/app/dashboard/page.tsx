@@ -102,8 +102,8 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold text-gray-900">Dashboard Overview</h2>
-        <p className="mt-2 text-gray-600">
+        <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-50">Dashboard Overview</h2>
+        <p className="mt-2 text-gray-600 dark:text-gray-400">
           Welcome to your Vizora dashboard. Here's what's happening.
         </p>
       </div>
@@ -111,32 +111,32 @@ export default function DashboardPage() {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div
-          className="bg-white p-6 rounded-lg shadow-md hover:shadow-xl transition-all cursor-pointer transform hover:-translate-y-1"
+          className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-md hover:shadow-xl transition-all cursor-pointer transform hover:-translate-y-1"
           onClick={() => router.push('/dashboard/devices')}
         >
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-medium text-gray-600">Total Devices</p>
-            <Icon name="devices" size="2xl" className="text-gray-600" />
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Devices</p>
+            <Icon name="devices" size="2xl" className="text-gray-600 dark:text-gray-400" />
           </div>
-          <p className="text-4xl font-bold text-gray-900 mb-2">{stats.devices.total}</p>
+          <p className="text-4xl font-bold text-gray-900 dark:text-gray-50 mb-2">{stats.devices.total}</p>
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-            <p className="text-sm text-green-600 font-medium">
+            <span className="w-2 h-2 bg-success-500 rounded-full"></span>
+            <p className="text-sm text-success-600 dark:text-success-400 font-medium">
               {stats.devices.online} online
             </p>
           </div>
         </div>
 
         <div
-          className="bg-white p-6 rounded-lg shadow-md hover:shadow-xl transition-all cursor-pointer transform hover:-translate-y-1"
+          className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-md hover:shadow-xl transition-all cursor-pointer transform hover:-translate-y-1"
           onClick={() => router.push('/dashboard/content')}
         >
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-medium text-gray-600">Content Items</p>
-            <Icon name="content" size="2xl" className="text-gray-600" />
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Content Items</p>
+            <Icon name="content" size="2xl" className="text-gray-600 dark:text-gray-400" />
           </div>
-          <p className="text-4xl font-bold text-gray-900 mb-2">{stats.content.total}</p>
-          <p className="text-sm text-gray-500">
+          <p className="text-4xl font-bold text-gray-900 dark:text-gray-50 mb-2">{stats.content.total}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             {stats.content.processing > 0
               ? `${stats.content.processing} processing`
               : 'All ready'}
@@ -144,36 +144,36 @@ export default function DashboardPage() {
         </div>
 
         <div
-          className="bg-white p-6 rounded-lg shadow-md hover:shadow-xl transition-all cursor-pointer transform hover:-translate-y-1"
+          className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-md hover:shadow-xl transition-all cursor-pointer transform hover:-translate-y-1"
           onClick={() => router.push('/dashboard/playlists')}
         >
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-medium text-gray-600">Playlists</p>
-            <Icon name="playlists" size="2xl" className="text-gray-600" />
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Playlists</p>
+            <Icon name="playlists" size="2xl" className="text-gray-600 dark:text-gray-400" />
           </div>
-          <p className="text-4xl font-bold text-gray-900 mb-2">{stats.playlists.total}</p>
-          <p className="text-sm text-gray-500">
+          <p className="text-4xl font-bold text-gray-900 dark:text-gray-50 mb-2">{stats.playlists.total}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             {stats.playlists.active} active
           </p>
         </div>
 
-        <div className="bg-gradient-to-br from-blue-500 to-purple-600 p-6 rounded-lg shadow-md hover:shadow-xl transition-all transform hover:-translate-y-1 text-white">
+        <div className="bg-gradient-to-br from-primary-500 to-purple-600 dark:from-primary-600 dark:to-purple-700 p-6 rounded-lg shadow-md hover:shadow-xl transition-all transform hover:-translate-y-1 text-white">
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-medium text-blue-100">System Status</p>
-            <Icon name="power" size="2xl" className="text-blue-200" />
+            <p className="text-sm font-medium text-primary-100">System Status</p>
+            <Icon name="power" size="2xl" className="text-primary-200" />
           </div>
           <p className="text-4xl font-bold mb-2">Healthy</p>
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 bg-green-300 rounded-full animate-pulse"></span>
-            <p className="text-sm text-blue-100">All systems operational</p>
+            <span className="w-2 h-2 bg-success-300 rounded-full animate-pulse"></span>
+            <p className="text-sm text-primary-100">All systems operational</p>
           </div>
         </div>
       </div>
 
       {/* Quick Actions */}
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-6">
         <div className="flex items-center gap-2 mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Quick Actions</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-50">Quick Actions</h3>
           <HelpIcon content="Common tasks to get started quickly" position="right" />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -201,12 +201,12 @@ export default function DashboardPage() {
 
           <button
             onClick={() => router.push('/dashboard/playlists')}
-            className="flex items-center gap-3 p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg hover:from-green-100 hover:to-green-200 transition-all transform hover:scale-105"
+            className="flex items-center gap-3 p-4 bg-gradient-to-br from-success-50 dark:from-success-900 to-success-100 dark:to-success-800 rounded-lg hover:from-success-100 dark:hover:from-success-800 hover:to-success-200 dark:hover:to-success-700 transition-all transform hover:scale-105"
           >
-            <Icon name="playlists" size="2xl" className="text-green-600" />
+            <Icon name="playlists" size="2xl" className="text-success-600 dark:text-success-400" />
             <div className="text-left">
-              <div className="font-semibold text-green-900">Create Playlist</div>
-              <div className="text-xs text-green-700">Organize content</div>
+              <div className="font-semibold text-success-900 dark:text-success-100">Create Playlist</div>
+              <div className="text-xs text-success-700 dark:text-success-200">Organize content</div>
             </div>
           </button>
 
@@ -225,22 +225,22 @@ export default function DashboardPage() {
 
       {/* Recent Activity */}
       {recentActivity.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3>
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-50 mb-4">Recent Activity</h3>
           <div className="space-y-3">
             {recentActivity.map((item, idx) => (
               <div
                 key={idx}
-                className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition"
+                className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition"
               >
-                <Icon name={item.iconName} size="lg" className="text-gray-600" />
+                <Icon name={item.iconName} size="lg" className="text-gray-600 dark:text-gray-400" />
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-gray-900 truncate">
+                  <div className="text-sm font-medium text-gray-900 dark:text-gray-50 truncate">
                     {item.title}
                   </div>
-                  <div className="text-xs text-gray-500">{item.subtitle}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">{item.subtitle}</div>
                 </div>
-                <div className="text-xs text-gray-400 whitespace-nowrap">
+                <div className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
                   {new Date(item.time).toLocaleString(undefined, {
                     month: 'short',
                     day: 'numeric',
@@ -255,29 +255,29 @@ export default function DashboardPage() {
       )}
 
       {/* Storage Usage */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Storage Usage</h3>
-          <Icon name="storage" size="xl" className="text-gray-600" />
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-50">Storage Usage</h3>
+          <Icon name="storage" size="xl" className="text-gray-600 dark:text-gray-400" />
         </div>
         <div className="space-y-3">
           <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Content Storage</span>
-            <span className="font-medium text-gray-900">
-              {stats.content.total > 0 
-                ? `~${(stats.content.total * 2.5).toFixed(1)} MB` 
+            <span className="text-gray-600 dark:text-gray-400">Content Storage</span>
+            <span className="font-medium text-gray-900 dark:text-gray-50">
+              {stats.content.total > 0
+                ? `~${(stats.content.total * 2.5).toFixed(1)} MB`
                 : '0 MB'} / 5 GB
             </span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
             <div
-              className="bg-gradient-to-r from-blue-500 to-purple-600 h-3 rounded-full transition-all duration-500"
+              className="bg-gradient-to-r from-primary-500 to-purple-600 dark:from-primary-600 dark:to-purple-700 h-3 rounded-full transition-all duration-500"
               style={{
                 width: `${Math.min((stats.content.total * 2.5 / 5000) * 100, 100)}%`,
               }}
             />
           </div>
-          <div className="flex justify-between text-xs text-gray-500">
+          <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
             <span>{stats.content.total} items stored</span>
             <span>
               {((stats.content.total * 2.5 / 5000) * 100).toFixed(1)}% used
@@ -288,52 +288,52 @@ export default function DashboardPage() {
 
       {/* Getting Started Guide */}
       {stats.devices.total === 0 && (
-        <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg shadow-lg p-8 text-white">
+        <div className="bg-gradient-to-r from-primary-500 to-purple-600 dark:from-primary-600 dark:to-purple-700 rounded-lg shadow-lg p-8 text-white">
           <h3 className="text-2xl font-bold mb-4 flex items-center gap-2"><Icon name="power" size="xl" className="text-white" /> Getting Started</h3>
-          <p className="mb-6 text-blue-100">
+          <p className="mb-6 text-primary-100">
             Welcome to Vizora! Follow these steps to get your digital signage system up and running:
           </p>
           <div className="space-y-4">
             <div className="flex items-start gap-4">
-              <div className="w-8 h-8 bg-white text-blue-600 rounded-full flex items-center justify-center font-bold flex-shrink-0">
+              <div className="w-8 h-8 bg-white text-primary-600 rounded-full flex items-center justify-center font-bold flex-shrink-0">
                 1
               </div>
               <div>
                 <div className="font-semibold mb-1">Pair Your First Device</div>
-                <div className="text-sm text-blue-100">
+                <div className="text-sm text-primary-100">
                   Connect a display device to start showing content
                 </div>
               </div>
             </div>
             <div className="flex items-start gap-4">
-              <div className="w-8 h-8 bg-white text-blue-600 rounded-full flex items-center justify-center font-bold flex-shrink-0">
+              <div className="w-8 h-8 bg-white text-primary-600 rounded-full flex items-center justify-center font-bold flex-shrink-0">
                 2
               </div>
               <div>
                 <div className="font-semibold mb-1">Upload Your Content</div>
-                <div className="text-sm text-blue-100">
+                <div className="text-sm text-primary-100">
                   Add images, videos, or other media to your library
                 </div>
               </div>
             </div>
             <div className="flex items-start gap-4">
-              <div className="w-8 h-8 bg-white text-blue-600 rounded-full flex items-center justify-center font-bold flex-shrink-0">
+              <div className="w-8 h-8 bg-white text-primary-600 rounded-full flex items-center justify-center font-bold flex-shrink-0">
                 3
               </div>
               <div>
                 <div className="font-semibold mb-1">Create a Playlist</div>
-                <div className="text-sm text-blue-100">
+                <div className="text-sm text-primary-100">
                   Organize your content into playlists
                 </div>
               </div>
             </div>
             <div className="flex items-start gap-4">
-              <div className="w-8 h-8 bg-white text-blue-600 rounded-full flex items-center justify-center font-bold flex-shrink-0">
+              <div className="w-8 h-8 bg-white text-primary-600 rounded-full flex items-center justify-center font-bold flex-shrink-0">
                 4
               </div>
               <div>
                 <div className="font-semibold mb-1">Publish & Schedule</div>
-                <div className="text-sm text-blue-100">
+                <div className="text-sm text-primary-100">
                   Assign playlists to devices and set schedules
                 </div>
               </div>
@@ -341,7 +341,7 @@ export default function DashboardPage() {
           </div>
           <button
             onClick={() => router.push('/dashboard/devices/pair')}
-            className="mt-6 bg-white text-blue-600 px-6 py-3 rounded-lg font-semibold hover:bg-blue-50 transition shadow-md"
+            className="mt-6 bg-white text-primary-600 px-6 py-3 rounded-lg font-semibold hover:bg-primary-50 dark:hover:bg-gray-100 transition shadow-md"
           >
             Get Started - Pair Device
           </button>
@@ -349,13 +349,13 @@ export default function DashboardPage() {
       )}
 
       {/* Recent Activity Placeholder */}
-      <div className="bg-white rounded-lg shadow-md">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Recent Activity</h3>
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-50">Recent Activity</h3>
         </div>
         <div className="p-6">
-          <div className="text-center py-8 text-gray-500">
-            <Icon name="overview" size="3xl" className="mx-auto mb-4 text-gray-400" />
+          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+            <Icon name="overview" size="3xl" className="mx-auto mb-4 text-gray-400 dark:text-gray-600" />
             <p className="text-sm">Activity feed will appear here</p>
           </div>
         </div>
