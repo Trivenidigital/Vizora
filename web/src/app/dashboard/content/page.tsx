@@ -8,6 +8,8 @@ import Modal from '@/components/Modal';
 import PreviewModal from '@/components/PreviewModal';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import EmptyState from '@/components/EmptyState';
+import SearchFilter from '@/components/SearchFilter';
 import { useToast } from '@/lib/hooks/useToast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { contentUploadSchema, validateForm } from '@/lib/validation';
@@ -507,52 +509,17 @@ export default function ContentPage() {
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <div className="relative">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search content by title..."
-            className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            autoComplete="off"
-          />
-          <svg
-            className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
-            >
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-          )}
-        </div>
-        {debouncedSearch && (
-          <p className="mt-2 text-sm text-gray-600">
-            {filteredContent.length} {filteredContent.length === 1 ? 'result' : 'results'} found
-          </p>
-        )}
-      </div>
+      {/* Search Filter */}
+      <SearchFilter
+        value={searchQuery}
+        onChange={setSearchQuery}
+        placeholder="Search content by title..."
+      />
+      {debouncedSearch && (
+        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+          {filteredContent.length} {filteredContent.length === 1 ? 'result' : 'results'} found
+        </p>
+      )}
 
       {/* Filter Tabs */}
       <div className="bg-white rounded-lg shadow p-4 space-y-3">
@@ -697,17 +664,15 @@ export default function ContentPage() {
           <LoadingSpinner size="lg" />
         </div>
       ) : filteredContent.length === 0 ? (
-        <div className="bg-white rounded-lg shadow p-12 text-center">
-          <Icon name="folder" size="6xl" className="mx-auto mb-4 text-gray-400" />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">No content yet</h3>
-          <p className="text-gray-600 mb-6">Start by uploading your first media file</p>
-          <button
-            onClick={() => setIsUploadModalOpen(true)}
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-semibold"
-          >
-            Upload Content
-          </button>
-        </div>
+        <EmptyState
+          icon="folder"
+          title="No content yet"
+          description="Start by uploading your first media file"
+          action={{
+            label: 'Upload Content',
+            onClick: () => setIsUploadModalOpen(true),
+          }}
+        />
       ) : viewMode === 'list' ? (
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <table className="min-w-full divide-y divide-gray-200">
