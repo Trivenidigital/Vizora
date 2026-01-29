@@ -1,6 +1,7 @@
 import './globals.css';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { CustomizationProvider } from '@/components/providers/CustomizationProvider';
+import { DeviceStatusProvider } from '@/lib/context/DeviceStatusContext';
 
 export const metadata = {
   title: 'Vizora - Digital Signage Platform',
@@ -26,9 +27,11 @@ export default function RootLayout({
         </a>
         <ThemeProvider>
           <CustomizationProvider>
-            <main id="main-content">
-              {children}
-            </main>
+            <DeviceStatusProvider>
+              <main id="main-content">
+                {children}
+              </main>
+            </DeviceStatusProvider>
           </CustomizationProvider>
         </ThemeProvider>
       </body>
