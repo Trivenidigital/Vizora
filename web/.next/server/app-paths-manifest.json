@@ -8,9 +8,11 @@
   "/dashboard/content/page": "app/dashboard/content/page.js",
   "/dashboard/devices/page": "app/dashboard/devices/page.js",
   "/dashboard/devices/pair/page": "app/dashboard/devices/pair/page.js",
+  "/dashboard/health/page": "app/dashboard/health/page.js",
   "/dashboard/page": "app/dashboard/page.js",
   "/dashboard/playlists/page": "app/dashboard/playlists/page.js",
   "/dashboard/schedules/page": "app/dashboard/schedules/page.js",
+  "/dashboard/settings/customization/page": "app/dashboard/settings/customization/page.js",
   "/dashboard/settings/page": "app/dashboard/settings/page.js",
   "/page": "app/page.js"
 }

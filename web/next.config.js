@@ -13,6 +13,11 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  productionBrowserSourceMaps: false,
+  webpack: (config) => {
+    config.devtool = false;
+    return config;
+  },
 };
 
 const plugins = [
