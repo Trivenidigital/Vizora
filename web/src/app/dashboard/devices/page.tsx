@@ -13,6 +13,7 @@ import DeviceStatusIndicator from '@/components/DeviceStatusIndicator';
 import DeviceGroupSelector, { DeviceGroup } from '@/components/DeviceGroupSelector';
 import { useToast } from '@/lib/hooks/useToast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
+import { useRealtimeEvents, useOptimisticState, useErrorRecovery } from '@/lib/hooks';
 import { Icon } from '@/theme/icons';
 
 export default function DevicesPage() {
@@ -57,6 +58,56 @@ export default function DevicesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [showGroupFilter, setShowGroupFilter] = useState(false);
+  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline' | 'error'>('offline');
+
+  // Real-time event handling
+  const { isConnected, isOffline, emitDeviceUpdate } = useRealtimeEvents({
+    enabled: true,
+    onDeviceStatusChange: (update) => {
+      // Update device status in real-time
+      setDevices((prev) =>
+        prev.map((d) =>
+          d.id === update.deviceId
+            ? {
+                ...d,
+                status: update.status,
+                lastSeen: update.lastSeen,
+                currentPlaylistId: update.currentPlaylistId ?? d.currentPlaylistId,
+              }
+            : d
+        )
+      );
+      setRealtimeStatus('connected');
+      console.log('[DevicesPage] Device status updated:', update);
+    },
+    onConnectionChange: (isConnected) => {
+      setRealtimeStatus(isConnected ? 'connected' : 'offline');
+      if (isConnected) {
+        toast.info('Real-time connection established');
+      }
+    },
+  });
+
+  // Optimistic state updates
+  const {
+    updateOptimistic,
+    commitOptimistic,
+    rollbackOptimistic,
+    hasPendingUpdates,
+  } = useOptimisticState<Display[]>(devices);
+
+  // Error recovery
+  const { retry, recordError, clearError } = useErrorRecovery({
+    onError: (errorInfo) => {
+      if (errorInfo.severity === 'critical') {
+        toast.error(`Critical: ${errorInfo.error}`);
+      }
+    },
+    retryConfig: {
+      maxAttempts: 3,
+      initialDelay: 1000,
+    },
+  });
 
   useEffect(() => {
     loadDevices();
@@ -66,10 +117,22 @@ export default function DevicesPage() {
   const loadDevices = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.getDisplays();
-      setDevices(response.data || response || []);
+      await retry(
+        'loadDevices',
+        async () => {
+          const response = await apiClient.getDisplays();
+          const devicesList = response.data || response || [];
+          setDevices(devicesList);
+          clearError('loadDevices');
+          return devicesList;
+        },
+        undefined,
+        (error) => {
+          toast.error('Failed to load devices: ' + (error.message || 'Unknown error'));
+        }
+      );
     } catch (error: any) {
-      toast.error(error.message || 'Failed to load devices');
+      recordError('loadDevices', error, 'warning');
     } finally {
       setLoading(false);
     }
@@ -98,13 +161,47 @@ export default function DevicesPage() {
 
   const handleSaveEdit = async () => {
     if (!selectedDevice) return;
-    
+
     try {
       setActionLoading(true);
-      await apiClient.updateDisplay(selectedDevice.id, editForm);
-      toast.success('Device updated successfully');
-      setIsEditModalOpen(false);
-      loadDevices();
+      const updateId = `edit_${selectedDevice.id}_${Date.now()}`;
+
+      // Apply optimistic update
+      updateOptimistic(updateId, (prev) =>
+        prev.map((d) =>
+          d.id === selectedDevice.id
+            ? { ...d, nickname: editForm.nickname, location: editForm.location }
+            : d
+        )
+      );
+
+      // Send update to server with retry logic
+      await retry(
+        updateId,
+        async () => {
+          await apiClient.updateDisplay(selectedDevice.id, editForm);
+          return true;
+        },
+        () => {
+          // Commit optimistic update
+          commitOptimistic(updateId);
+          toast.success('Device updated successfully');
+          setIsEditModalOpen(false);
+
+          // Emit real-time event
+          emitDeviceUpdate({
+            deviceId: selectedDevice.id,
+            status: selectedDevice.status,
+            lastSeen: new Date().toISOString(),
+          });
+        },
+        (error) => {
+          // Rollback on failure
+          rollbackOptimistic(updateId);
+          toast.error('Failed to update device: ' + (error.message || 'Unknown error'));
+          recordError(updateId, error, 'warning');
+        }
+      );
     } catch (error: any) {
       toast.error(error.message || 'Failed to update device');
     } finally {
@@ -122,9 +219,35 @@ export default function DevicesPage() {
 
     try {
       setActionLoading(true);
-      await apiClient.deleteDisplay(selectedDevice.id);
-      toast.success('Device deleted successfully');
-      loadDevices();
+      const deleteId = `delete_${selectedDevice.id}_${Date.now()}`;
+      const deletedDeviceId = selectedDevice.id;
+
+      // Apply optimistic update (remove from list)
+      updateOptimistic(deleteId, (prev) =>
+        prev.filter((d) => d.id !== deletedDeviceId)
+      );
+
+      // Send deletion to server with retry logic
+      await retry(
+        deleteId,
+        async () => {
+          await apiClient.deleteDisplay(deletedDeviceId);
+          return true;
+        },
+        () => {
+          // Commit optimistic deletion
+          commitOptimistic(deleteId);
+          toast.success('Device deleted successfully');
+          setIsDeleteModalOpen(false);
+          setSelectedDevice(null);
+        },
+        (error) => {
+          // Rollback on failure
+          rollbackOptimistic(deleteId);
+          toast.error('Failed to delete device: ' + (error.message || 'Unknown error'));
+          recordError(deleteId, error, 'warning');
+        }
+      );
     } catch (error: any) {
       toast.error(error.message || 'Failed to delete device');
     } finally {
@@ -233,9 +356,30 @@ export default function DevicesPage() {
 
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-50">Devices</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-50">Devices</h2>
+            <div
+              className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 ${
+                realtimeStatus === 'connected'
+                  ? 'bg-success-100 text-success-800 dark:bg-success-900 dark:text-success-200'
+                  : realtimeStatus === 'offline'
+                  ? 'bg-warning-100 text-warning-800 dark:bg-warning-900 dark:text-warning-200'
+                  : 'bg-error-100 text-error-800 dark:bg-error-900 dark:text-error-200'
+              }`}
+            >
+              <span className={`h-2 w-2 rounded-full ${
+                realtimeStatus === 'connected'
+                  ? 'bg-success-500'
+                  : realtimeStatus === 'offline'
+                  ? 'bg-warning-500'
+                  : 'bg-error-500'
+              }`} />
+              {realtimeStatus === 'connected' ? 'Live' : realtimeStatus === 'offline' ? 'Offline' : 'Error'}
+            </div>
+          </div>
           <p className="mt-2 text-gray-600 dark:text-gray-400">
             Manage your paired display devices ({devices.length} total)
+            {hasPendingUpdates() && ' • Syncing changes...'}
           </p>
         </div>
         <button
