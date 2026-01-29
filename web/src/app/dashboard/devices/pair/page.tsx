@@ -43,7 +43,7 @@ export default function PairDevicePage() {
       setLoading(true);
       
       // Complete pairing with the code from the display
-      const result = await apiClient.completePairing({
+      await apiClient.completePairing({
         code: form.pairingCode.toUpperCase(),
         nickname: form.deviceName,
         location: form.location || undefined,
@@ -140,6 +140,7 @@ export default function PairDevicePage() {
                   </div>
                 </div>
                 <div className="flex justify-center p-4 bg-white rounded">
+                  {/* @ts-expect-error React 19 QRCode compatibility */}
                   <QRCodeSVG
                     value={`${window.location.origin}/dashboard/devices/pair?code=${form.pairingCode}`}
                     size={120}

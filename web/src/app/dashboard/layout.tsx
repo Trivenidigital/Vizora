@@ -75,6 +75,7 @@ export default function DashboardLayout({
                   />
                 </svg>
               </button>
+              {/* @ts-expect-error React 19 Link compatibility */}
               <Link href="/dashboard" className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
                   <span className="text-white font-bold text-lg">V</span>
@@ -161,6 +162,7 @@ export default function DashboardLayout({
             {navigation.map((item) => {
               const active = isActive(item);
               return (
+                // @ts-expect-error React 19 Link compatibility
                 <Link
                   key={item.name}
                   href={item.href}

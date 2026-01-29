@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
-import { Display } from '@/lib/types';
+import { Display, Playlist } from '@/lib/types';
 import Modal from '@/components/Modal';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import LoadingSpinner from '@/components/LoadingSpinner';
@@ -316,9 +316,9 @@ export default function DevicesPage() {
                   </th>
                   <th
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 select-none"
-                    onClick={() => handleSort('lastHeartbeat')}
+                    onClick={() => handleSort('lastSeen')}
                   >
-                    Last Seen{getSortIcon('lastHeartbeat')}
+                    Last Seen{getSortIcon('lastSeen')}
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Actions

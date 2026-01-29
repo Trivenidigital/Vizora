@@ -1,5 +1,6 @@
 import './globals.css';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
+import { CustomizationProvider } from '@/components/providers/CustomizationProvider';
 
 export const metadata = {
   title: 'Vizora - Digital Signage Platform',
@@ -20,7 +21,16 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-50">
-        <ThemeProvider>{children}</ThemeProvider>
+        <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-0 focus:left-0 focus:z-50 focus:p-4 focus:bg-blue-600 focus:text-white">
+          Skip to main content
+        </a>
+        <ThemeProvider>
+          <CustomizationProvider>
+            <main id="main-content">
+              {children}
+            </main>
+          </CustomizationProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
