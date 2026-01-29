@@ -10,6 +10,7 @@ import ConfirmDialog from '@/components/ConfirmDialog';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import EmptyState from '@/components/EmptyState';
 import SearchFilter from '@/components/SearchFilter';
+import ContentTagger, { ContentTag } from '@/components/ContentTagger';
 import { useToast } from '@/lib/hooks/useToast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { contentUploadSchema, validateForm } from '@/lib/validation';
@@ -52,6 +53,14 @@ export default function ContentPage() {
     progress: number;
     error?: string;
   }>>([]);
+  const [tags, setTags] = useState<ContentTag[]>([
+    { id: '1', name: 'Marketing', color: 'blue' },
+    { id: '2', name: 'Seasonal', color: 'green' },
+    { id: '3', name: 'Featured', color: 'red' },
+    { id: '4', name: 'Archive', color: 'gray' },
+  ]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [showTagFilter, setShowTagFilter] = useState(false);
 
   useEffect(() => {
     loadContent();
@@ -431,14 +440,14 @@ export default function ContentPage() {
   const filteredContent = content.filter((c) => {
     // Type filter
     const matchesType = filterType === 'all' || c.type === filterType;
-    
+
     // Search filter
-    const matchesSearch = !debouncedSearch || 
+    const matchesSearch = !debouncedSearch ||
       c.title.toLowerCase().includes(debouncedSearch.toLowerCase());
-    
+
     // Status filter
     const matchesStatus = filterStatus === 'all' || c.status === filterStatus;
-    
+
     // Date range filter
     let matchesDate = true;
     if (filterDateRange !== 'all' && c.createdAt) {
@@ -452,8 +461,15 @@ export default function ContentPage() {
       const cutoffDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
       matchesDate = contentDate >= cutoffDate;
     }
-    
-    return matchesType && matchesSearch && matchesStatus && matchesDate;
+
+    // Tag filter (TODO: implement when content model has tags)
+    let matchesTags = true;
+    if (selectedTags.length > 0) {
+      // For now, this is a placeholder - tags will be added to Content model
+      matchesTags = true;
+    }
+
+    return matchesType && matchesSearch && matchesStatus && matchesDate && matchesTags;
   });
 
   const clearAllFilters = () => {
@@ -520,6 +536,42 @@ export default function ContentPage() {
           {filteredContent.length} {filteredContent.length === 1 ? 'result' : 'results'} found
         </p>
       )}
+
+      {/* Tag Filter */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+        <button
+          onClick={() => setShowTagFilter(!showTagFilter)}
+          className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-3"
+        >
+          <Icon name="folder" size="md" />
+          <span>Filter by Tags</span>
+          <svg
+            className={`w-4 h-4 transition-transform ${showTagFilter ? 'rotate-180' : ''}`}
+            fill="currentColor"
+            viewBox="0 0 20 20"
+          >
+            <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+          </svg>
+        </button>
+
+        {showTagFilter && (
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
+            <ContentTagger
+              tags={tags}
+              selectedTags={selectedTags}
+              onChange={setSelectedTags}
+            />
+            {selectedTags.length > 0 && (
+              <button
+                onClick={() => setSelectedTags([])}
+                className="mt-3 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline"
+              >
+                Clear tag filters
+              </button>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Filter Tabs */}
       <div className="bg-white rounded-lg shadow p-4 space-y-3">
