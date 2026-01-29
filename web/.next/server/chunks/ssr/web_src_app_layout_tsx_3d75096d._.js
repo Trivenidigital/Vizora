@@ -1,3 +1,0 @@
-module.exports=[37271,a=>{"use strict";var b=a.i(93129);function c({children:a}){return(0,b.jsx)("html",{lang:"en",children:(0,b.jsx)("body",{className:"min-h-screen bg-gray-50",children:a})})}a.s(["default",()=>c,"metadata",0,{title:"Vizora - Digital Signage Platform",description:"Modern cloud-based digital signage management",viewport:"width=device-width, initial-scale=1",themeColor:"#3B82F6",icons:{icon:"/favicon.ico"},manifest:"/manifest.json"}])}];
-
-//# sourceMappingURL=web_src_app_layout_tsx_3d75096d._.js.map

@@ -1,0 +1,32 @@
+# .claudeignore (like .gitignore)
+node_modules/
+.next/
+dist/
+build/
+.cache/
+coverage/
+*.log
+.env
+.DS_Store
+.git/
+ClawdBot/
+
+# Large generated files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build artifacts
+*.min.js
+*.bundle.js
+*.map
+
+# Media files (if not needed)
+*.mp4
+*.mov
+*.zip
+*.tar.gz
+
+# Database files
+*.sqlite
+*.db

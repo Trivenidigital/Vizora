@@ -465,7 +465,7 @@ function triggerUpdate(msg) {
 "[hmr-entry]/hmr-entry.js { ENTRY => \"[project]/web/pages/_app\" }", ((__turbopack_context__) => {
 "use strict";
 
-__turbopack_context__.r("[next]/entry/page-loader.ts { PAGE => \"[project]/node_modules/.pnpm/next@16.0.11_@babel+core@7._0626c72f86c4564e7ec01240cb553a55/node_modules/next/app.js [client] (ecmascript)\" } [client] (ecmascript)");
+__turbopack_context__.r("[next]/entry/page-loader.ts { PAGE => \"[project]/node_modules/.pnpm/next@16.0.11_@babel+core@7._2c2d61b4ce987e30ba34ffda50ec852c/node_modules/next/app.js [client] (ecmascript)\" } [client] (ecmascript)");
 }),
 ]);
 
