@@ -6,6 +6,7 @@ import { apiClient } from '@/lib/api';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { useToast } from '@/lib/hooks/useToast';
 import { QRCodeSVG } from 'qrcode.react';
+import { Icon } from '@/theme/icons';
 
 export default function PairDevicePage() {
   const router = useRouter();
@@ -86,7 +87,7 @@ export default function PairDevicePage() {
           {/* Step Instructions */}
           <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6 border border-blue-200">
             <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <span className="text-2xl">📱</span>
+              <Icon name="devices" size="lg" className="text-blue-600" />
               How to Pair Your Device
             </h3>
             <ol className="space-y-2 text-sm text-gray-700">
@@ -205,7 +206,7 @@ export default function PairDevicePage() {
                 </>
               ) : (
                 <>
-                  <span className="text-xl">✓</span>
+                  <Icon name="success" size="md" className="text-white" />
                   <span>Pair Device</span>
                 </>
               )}
@@ -217,7 +218,7 @@ export default function PairDevicePage() {
       {/* Help Section */}
       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
         <h4 className="font-semibold text-yellow-900 mb-3 flex items-center gap-2">
-          <span className="text-xl">💡</span>
+          <Icon name="info" size="md" className="text-yellow-600" />
           Troubleshooting Tips
         </h4>
         <ul className="text-sm text-yellow-800 space-y-2">
@@ -234,21 +235,21 @@ export default function PairDevicePage() {
         <h4 className="font-semibold text-gray-900 mb-4">What to Expect</h4>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
           <div className="p-4 bg-gray-50 rounded-lg">
-            <div className="text-4xl mb-2">📺</div>
+            <Icon name="devices" size="2xl" className="mx-auto mb-2 text-gray-600" />
             <div className="font-semibold text-sm text-gray-900 mb-1">On Your Display</div>
             <div className="text-xs text-gray-600">
               A 6-character code like "ABC123" will be shown
             </div>
           </div>
           <div className="p-4 bg-gray-50 rounded-lg">
-            <div className="text-4xl mb-2">⌨️</div>
+            <Icon name="edit" size="2xl" className="mx-auto mb-2 text-gray-600" />
             <div className="font-semibold text-sm text-gray-900 mb-1">Enter Code Here</div>
             <div className="text-xs text-gray-600">
               Type the code and give your device a name
             </div>
           </div>
           <div className="p-4 bg-gray-50 rounded-lg">
-            <div className="text-4xl mb-2">✅</div>
+            <Icon name="success" size="2xl" className="mx-auto mb-2 text-green-600" />
             <div className="font-semibold text-sm text-gray-900 mb-1">Pairing Complete</div>
             <div className="text-xs text-gray-600">
               Your device will connect automatically

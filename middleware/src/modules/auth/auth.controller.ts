@@ -10,10 +10,15 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 export class AuthController {
   constructor(private authService: AuthService) {}
 
-  // Strict rate limit: 3 registrations per minute per IP
+  // Environment-aware rate limits: STRICT in production, RELAXED in dev/test
   @Public()
   @Post('register')
-  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  @Throttle({ 
+    default: { 
+      limit: process.env.NODE_ENV === 'production' ? 3 : 1000, 
+      ttl: 60000 
+    } 
+  })
   async register(@Body() dto: RegisterDto) {
     const result = await this.authService.register(dto);
     return {
@@ -22,10 +27,15 @@ export class AuthController {
     };
   }
 
-  // Strict rate limit: 5 login attempts per minute per IP
+  // Environment-aware rate limits: STRICT in production, RELAXED in dev/test
   @Public()
   @Post('login')
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Throttle({ 
+    default: { 
+      limit: process.env.NODE_ENV === 'production' ? 5 : 1000, 
+      ttl: 60000 
+    } 
+  })
   async login(@Body() dto: LoginDto) {
     const result = await this.authService.login(dto);
     return {

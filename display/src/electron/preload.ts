@@ -1,8 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
+// Preload script - exposes safe IPC methods to renderer
+console.log('[Preload] Initializing electronAPI...');
+
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
-contextBridge.exposeInMainWorld('electronAPI', {
+try {
+  contextBridge.exposeInMainWorld('electronAPI', {
   // Pairing
   getPairingCode: () => ipcRenderer.invoke('get-pairing-code'),
   checkPairingStatus: (code: string) =>
@@ -35,4 +39,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Remove listeners
   removeListener: (channel: string, callback: any) =>
     ipcRenderer.removeListener(channel, callback),
-});
+  });
+  console.log('[Preload] ✅ electronAPI exposed successfully');
+} catch (error) {
+  console.error('[Preload] ❌ Failed to expose electronAPI:', error);
+}

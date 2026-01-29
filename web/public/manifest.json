@@ -1,0 +1,9 @@
+{
+  "name": "Vizora Digital Signage",
+  "short_name": "Vizora",
+  "description": "Modern cloud-based digital signage management platform",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3B82F6"
+}

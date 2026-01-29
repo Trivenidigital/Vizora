@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Display Rendering Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .pass {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .fail {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <h1>Display App Rendering Test</h1>
+    <div id="test-results"></div>
+
+    <script>
+        const results = document.getElementById('test-results');
+        
+        function test(name, fn) {
+            try {
+                fn();
+                results.innerHTML += `<div class="test-result pass">✓ ${name}</div>`;
+                return true;
+            } catch (e) {
+                results.innerHTML += `<div class="test-result fail">✗ ${name}: ${e.message}</div>`;
+                return false;
+            }
+        }
+
+        // Test 1: Check if HTML structure exists
+        test('HTML file loads correctly', () => {
+            if (!document.getElementById('app')) throw new Error('App container missing');
+        });
+
+        // Test 2: Check if pairing screen elements exist
+        test('Pairing screen elements present', () => {
+            if (!document.getElementById('pairing-screen')) throw new Error('Pairing screen missing');
+            if (!document.getElementById('pairing-code')) throw new Error('Pairing code element missing');
+            if (!document.getElementById('qr-code')) throw new Error('QR code container missing');
+        });
+
+        // Test 3: Check if content screen exists
+        test('Content screen elements present', () => {
+            if (!document.getElementById('content-screen')) throw new Error('Content screen missing');
+            if (!document.getElementById('content-container')) throw new Error('Content container missing');
+        });
+
+        // Test 4: Check if error screen exists
+        test('Error screen elements present', () => {
+            if (!document.getElementById('error-screen')) throw new Error('Error screen missing');
+            if (!document.getElementById('error-message')) throw new Error('Error message element missing');
+        });
+
+        // Test 5: Check if app.js script is loaded
+        test('App JavaScript loaded', () => {
+            const scripts = Array.from(document.querySelectorAll('script'));
+            const hasAppJs = scripts.some(s => s.src && s.src.includes('app.js'));
+            if (!hasAppJs) throw new Error('app.js script not found');
+        });
+
+        // Test 6: Check if styles are applied
+        test('Styles are applied', () => {
+            const app = document.getElementById('app');
+            const styles = window.getComputedStyle(app);
+            if (styles.display !== 'flex') throw new Error('CSS not loaded properly');
+        });
+
+        // Simulate pairing screen display
+        setTimeout(() => {
+            test('Pairing screen can be shown', () => {
+                const pairingScreen = document.getElementById('pairing-screen');
+                pairingScreen.classList.remove('hidden');
+                
+                const isVisible = window.getComputedStyle(pairingScreen).display !== 'none';
+                if (!isVisible) throw new Error('Pairing screen not visible after removing hidden class');
+            });
+
+            // Simulate displaying a pairing code
+            test('Pairing code can be displayed', () => {
+                const codeElement = document.getElementById('pairing-code');
+                codeElement.textContent = 'ABC123';
+                if (codeElement.textContent !== 'ABC123') throw new Error('Could not set pairing code');
+            });
+
+            results.innerHTML += '<hr><h2>Summary</h2><p>All rendering tests completed! Check results above.</p>';
+        }, 100);
+    </script>
+</body>
+</html>

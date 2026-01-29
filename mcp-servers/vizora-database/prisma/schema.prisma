@@ -1,0 +1,112 @@
+// This is a symlink/copy of the main Vizora schema
+// For the MCP server to have access to Prisma types
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String       @id @default(cuid())
+  email          String       @unique
+  passwordHash   String
+  name           String?
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  role           String       @default("user")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@map("users")
+}
+
+model Organization {
+  id        String     @id @default(cuid())
+  name      String
+  subdomain String     @unique
+  users     User[]
+  displays  Display[]
+  contents  Content[]
+  playlists Playlist[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@map("organizations")
+}
+
+model Display {
+  id                String       @id @default(cuid())
+  name              String
+  location          String?
+  pairingCode       String?      @unique
+  paired            Boolean      @default(false)
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  currentPlaylistId String?
+  status            String       @default("offline")
+  lastSeen          DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@map("displays")
+}
+
+model Content {
+  id             String         @id @default(cuid())
+  name           String
+  type           String
+  url            String?
+  filePath       String?
+  duration       Int?
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  playlistItems  PlaylistItem[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@map("contents")
+}
+
+model Playlist {
+  id             String         @id @default(cuid())
+  name           String
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  items          PlaylistItem[]
+  schedules      Schedule[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@map("playlists")
+}
+
+model PlaylistItem {
+  id         String   @id @default(cuid())
+  playlistId String
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  contentId  String
+  content    Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  order      Int
+  duration   Int?
+  createdAt  DateTime @default(now())
+
+  @@map("playlist_items")
+}
+
+model Schedule {
+  id         String   @id @default(cuid())
+  playlistId String
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  startTime  DateTime
+  endTime    DateTime
+  days       String[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("schedules")
+}

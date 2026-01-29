@@ -1,13 +1,15 @@
 {
-  "extends": "./tsconfig.json",
   "compilerOptions": {
     "module": "commonjs",
     "target": "ES2020",
     "outDir": "./dist/electron",
     "rootDir": "./src/electron",
-    "moduleResolution": "node",
+    "moduleResolution": "node10",
     "esModuleInterop": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "noUnusedLocals": false,
+    "lib": ["es2020"],
+    "strict": true
   },
   "include": ["src/electron/**/*"],
   "exclude": ["node_modules", "dist"]

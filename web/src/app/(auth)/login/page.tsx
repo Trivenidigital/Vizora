@@ -1,12 +1,20 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { apiClient } from '@/lib/api';
+import { loginSchema } from '@/lib/validation';
+import Button from '@/components/Button';
+import { z } from 'zod';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams.get('redirect') || '/dashboard';
+  
   const [formData, setFormData] = useState({ email: '', password: '' });
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -14,25 +22,32 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setErrors({});
+
+    // Validate form with Zod
+    try {
+      loginSchema.parse(formData);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        const fieldErrors: Record<string, string> = {};
+        err.errors.forEach((error) => {
+          if (error.path[0]) {
+            fieldErrors[error.path[0].toString()] = error.message;
+          }
+        });
+        setErrors(fieldErrors);
+      }
+      setLoading(false);
+      return;
+    }
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || 'Login failed');
-      }
-
-      const data = await res.json();
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
-
-      router.push('/dashboard');
+      await apiClient.login(formData.email, formData.password);
+      console.log('[LOGIN] Login successful, redirecting to:', redirectUrl);
+      router.push(redirectUrl);
+      console.log('[LOGIN] Router.push called');
     } catch (err: any) {
+      console.error('[LOGIN] Login error:', err);
       setError(err.message || 'Login failed');
     } finally {
       setLoading(false);
@@ -57,12 +72,24 @@ export default function LoginPage() {
             </label>
             <input
               type="email"
-              required
               value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+              onChange={(e) => {
+                setFormData({ ...formData, email: e.target.value });
+                if (errors.email) setErrors({ ...errors, email: '' });
+              }}
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 text-gray-900 ${
+                errors.email ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+              }`}
               placeholder="you@example.com"
+              aria-label="Email address"
+              aria-invalid={!!errors.email}
+              aria-describedby={errors.email ? 'email-error' : undefined}
             />
+            {errors.email && (
+              <p id="email-error" className="mt-1 text-sm text-red-600" role="alert">
+                {errors.email}
+              </p>
+            )}
           </div>
 
           <div>
@@ -71,21 +98,34 @@ export default function LoginPage() {
             </label>
             <input
               type="password"
-              required
               value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+              onChange={(e) => {
+                setFormData({ ...formData, password: e.target.value });
+                if (errors.password) setErrors({ ...errors, password: '' });
+              }}
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 text-gray-900 ${
+                errors.password ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+              }`}
               placeholder="••••••••"
+              aria-label="Password"
+              aria-invalid={!!errors.password}
+              aria-describedby={errors.password ? 'password-error' : undefined}
             />
+            {errors.password && (
+              <p id="password-error" className="mt-1 text-sm text-red-600" role="alert">
+                {errors.password}
+              </p>
+            )}
           </div>
 
-          <button
+          <Button
             type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400 transition font-semibold"
+            loading={loading}
+            className="w-full"
+            aria-label="Log in to your account"
           >
-            {loading ? 'Logging in...' : 'Login'}
-          </button>
+            Login
+          </Button>
         </form>
 
         <p className="text-center mt-6 text-gray-600">

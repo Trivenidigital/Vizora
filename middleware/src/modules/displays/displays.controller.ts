@@ -52,6 +52,14 @@ export class DisplaysController {
     return this.displaysService.update(organizationId, id, updateDisplayDto);
   }
 
+  @Post(':id/pair')
+  async generatePairingToken(
+    @CurrentUser('organizationId') organizationId: string,
+    @Param('id') id: string,
+  ) {
+    return this.displaysService.generatePairingToken(organizationId, id);
+  }
+
   @Post(':deviceId/heartbeat')
   @Public()
   heartbeat(@Param('deviceId') deviceId: string) {

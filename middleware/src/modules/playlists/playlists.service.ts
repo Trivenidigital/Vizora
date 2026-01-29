@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { CreatePlaylistDto } from './dto/create-playlist.dto';
 import { UpdatePlaylistDto } from './dto/update-playlist.dto';
@@ -11,33 +11,64 @@ export class PlaylistsService {
   async create(organizationId: string, createPlaylistDto: CreatePlaylistDto) {
     const { items, ...playlistData } = createPlaylistDto;
 
-    const playlist = await this.db.playlist.create({
-      data: {
-        ...playlistData,
-        organizationId,
-        items: items
-          ? {
-              create: items.map((item, index) => ({
-                contentId: item.contentId,
-                order: item.order ?? index,
-                duration: item.duration,
-              })),
-            }
-          : undefined,
-      },
-      include: {
-        items: {
-          include: {
-            content: true,
-          },
-          orderBy: {
-            order: 'asc',
+    // Validate all content items exist and belong to organization
+    if (items && items.length > 0) {
+      const contentIds = items.map(item => item.contentId);
+      const contents = await this.db.content.findMany({
+        where: {
+          id: { in: contentIds },
+          organizationId,
+        },
+        select: { id: true },
+      });
+
+      if (contents.length !== contentIds.length) {
+        const foundIds = contents.map(c => c.id);
+        const missingIds = contentIds.filter(id => !foundIds.includes(id));
+        throw new NotFoundException(
+          `Content item(s) not found or do not belong to your organization: ${missingIds.join(', ')}`
+        );
+      }
+    }
+
+    try {
+      const playlist = await this.db.playlist.create({
+        data: {
+          ...playlistData,
+          organizationId,
+          items: items
+            ? {
+                create: items.map((item, index) => ({
+                  contentId: item.contentId,
+                  order: item.order ?? index,
+                  duration: item.duration,
+                })),
+              }
+            : undefined,
+        },
+        include: {
+          items: {
+            include: {
+              content: true,
+            },
+            orderBy: {
+              order: 'asc',
+            },
           },
         },
-      },
-    });
+      });
 
-    return playlist;
+      return playlist;
+    } catch (error) {
+      // Handle database constraint violations
+      if (error.code === 'P2002') {
+        throw new ConflictException('A playlist with duplicate items exists');
+      }
+      if (error.code === 'P2003') {
+        throw new NotFoundException('Referenced content item does not exist');
+      }
+      throw error;
+    }
   }
 
   async findAll(organizationId: string, pagination: PaginationDto) {

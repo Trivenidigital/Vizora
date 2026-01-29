@@ -1,4 +1,5 @@
 const { NxAppWebpackPlugin } = require('@nx/webpack/app-plugin');
+const { IgnorePlugin } = require('webpack');
 const { join } = require('path');
 
 module.exports = {
@@ -9,10 +10,19 @@ module.exports = {
       devtoolModuleFilenameTemplate: '[absolute-resource-path]',
     }),
   },
-  externals: {
-    'class-transformer/storage': 'commonjs class-transformer/storage',
-    '@prisma/client-runtime-utils': 'commonjs @prisma/client-runtime-utils',
-  },
+  externals: [
+    'class-transformer/storage',
+    '@prisma/client-runtime-utils',
+    '@sentry/profiling-node',
+    '@sentry-internal/node-cpu-profiler',
+    // Externalize all .node files (native bindings)
+    function ({ request }, callback) {
+      if (/\.node$/.test(request)) {
+        return callback(null, 'commonjs ' + request);
+      }
+      callback();
+    },
+  ],
   plugins: [
     new NxAppWebpackPlugin({
       target: 'node',
@@ -24,6 +34,14 @@ module.exports = {
       outputHashing: 'none',
       generatePackageJson: false,
       sourceMap: true,
+    }),
+    // Ignore Sentry profiling native bindings
+    new IgnorePlugin({
+      resourceRegExp: /^@sentry-internal\/node-cpu-profiler$/,
+    }),
+    new IgnorePlugin({
+      resourceRegExp: /\.node$/,
+      contextRegExp: /@sentry-internal/,
     }),
   ],
 };

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Preload Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .success { color: #00ff00; }
+        .error { color: #ff0000; }
+        pre {
+            background: #000;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Electron Preload Test</h1>
+    <div id="results"></div>
+    
+    <script>
+        const results = document.getElementById('results');
+        
+        function log(message, isError = false) {
+            const div = document.createElement('div');
+            div.className = isError ? 'error' : 'success';
+            div.textContent = message;
+            results.appendChild(div);
+            console.log(message);
+        }
+        
+        // Test 1: Check if window.electronAPI exists
+        log('Test 1: Checking window.electronAPI...');
+        if (typeof window.electronAPI === 'undefined') {
+            log('❌ FAIL: window.electronAPI is undefined!', true);
+            log('Preload script did not execute or expose the API.', true);
+        } else {
+            log('✅ PASS: window.electronAPI exists!');
+            
+            // Test 2: Check available methods
+            log('\nTest 2: Available methods:');
+            const methods = Object.keys(window.electronAPI);
+            log('Found ' + methods.length + ' methods:');
+            const pre = document.createElement('pre');
+            pre.textContent = JSON.stringify(methods, null, 2);
+            results.appendChild(pre);
+            
+            // Test 3: Check specific methods
+            log('\nTest 3: Checking required methods...');
+            const required = [
+                'getPairingCode',
+                'checkPairingStatus',
+                'onPairingRequired',
+                'onPaired',
+                'onPlaylistUpdate',
+                'sendHeartbeat',
+                'logImpression',
+                'logError'
+            ];
+            
+            required.forEach(method => {
+                if (typeof window.electronAPI[method] === 'function') {
+                    log('✅ ' + method + ' - OK');
+                } else {
+                    log('❌ ' + method + ' - MISSING', true);
+                }
+            });
+        }
+        
+        log('\n=== Test Complete ===');
+    </script>
+</body>
+</html>

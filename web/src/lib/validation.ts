@@ -134,3 +134,18 @@ export function validateForm<T>(
     return {};
   }
 }
+
+/**
+ * Extract field-level errors from Zod validation error
+ * Used for inline error display
+ */
+export function extractFieldErrors(zodError: z.ZodError): Record<string, string> {
+  return zodError.errors.reduce((acc, err) => {
+    const field = err.path[0] as string;
+    // Only store first error per field
+    if (!acc[field]) {
+      acc[field] = err.message;
+    }
+    return acc;
+  }, {} as Record<string, string>);
+}

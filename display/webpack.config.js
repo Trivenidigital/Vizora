@@ -1,25 +1,39 @@
-const { NxAppWebpackPlugin } = require('@nx/webpack/app-plugin');
-const { join } = require('path');
+const path = require('path');
+const HtmlWebpackPlugin = require('html-webpack-plugin');
 
 module.exports = {
+  entry: './src/renderer/app.ts',
+  target: 'web',
+  mode: process.env.NODE_ENV === 'production' ? 'production' : 'development',
+  devtool: 'source-map',
   output: {
-    path: join(__dirname, 'dist'),
+    path: path.resolve(__dirname, 'dist/renderer'),
+    filename: 'app.js',
     clean: true,
   },
-  devServer: {
-    port: 4200,
+  resolve: {
+    extensions: ['.ts', '.js'],
+  },
+  module: {
+    rules: [
+      {
+        test: /\.ts$/,
+        use: 'swc-loader',
+        exclude: /node_modules/,
+      },
+    ],
   },
   plugins: [
-    new NxAppWebpackPlugin({
-      tsConfig: './tsconfig.app.json',
-      compiler: 'swc',
-      main: './src/main.ts',
-      index: './src/index.html',
-      baseHref: '/',
-      assets: ['./src/favicon.ico', './src/assets'],
-      styles: ['./src/styles.css'],
-      outputHashing: process.env['NODE_ENV'] === 'production' ? 'all' : 'none',
-      optimization: process.env['NODE_ENV'] === 'production',
+    new HtmlWebpackPlugin({
+      template: './src/renderer/index.html',
+      filename: 'index.html',
     }),
   ],
+  devServer: {
+    port: 4200,
+    hot: true,
+    static: {
+      directory: path.join(__dirname, 'src/assets'),
+    },
+  },
 };

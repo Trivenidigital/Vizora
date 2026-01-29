@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Frontend API Test</title>
+    <style>
+        body { font-family: Arial; padding: 20px; background: #f0f0f0; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        .success { color: green; }
+        .error { color: red; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+        input { padding: 8px; margin: 5px; width: 300px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Frontend API Test</h1>
+        
+        <h2>Test Registration + Login</h2>
+        <div>
+            <input type="email" id="email" placeholder="email@test.com" value="frontendtest@test.com"><br>
+            <input type="password" id="password" placeholder="password" value="Test1234!"><br>
+            <input type="text" id="firstName" placeholder="First Name" value="Frontend"><br>
+            <input type="text" id="lastName" placeholder="Last Name" value="Test"><br>
+            <input type="text" id="orgName" placeholder="Organization" value="FrontendTestOrg"><br>
+            <button onclick="testRegister()">1. Test Register</button>
+            <button onclick="testLogin()">2. Test Login</button>
+            <button onclick="checkLocalStorage()">3. Check localStorage</button>
+        </div>
+        
+        <h2>Results:</h2>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000/api';
+        
+        function log(message, isError = false) {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = isError ? 'error' : 'success';
+            div.textContent = message;
+            results.appendChild(div);
+        }
+        
+        function logJson(label, data) {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.innerHTML = `<strong>${label}:</strong><pre>${JSON.stringify(data, null, 2)}</pre>`;
+            results.appendChild(div);
+        }
+        
+        async function testRegister() {
+            document.getElementById('results').innerHTML = '';
+            const email = document.getElementById('email').value + Date.now() + '@test.com';
+            const password = document.getElementById('password').value;
+            const firstName = document.getElementById('firstName').value;
+            const lastName = document.getElementById('lastName').value;
+            const organizationName = document.getElementById('orgName').value + Date.now();
+            
+            log(`📝 Registering: ${email}`);
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        email, 
+                        password, 
+                        firstName, 
+                        lastName, 
+                        organizationName 
+                    })
+                });
+                
+                const data = await response.json();
+                logJson('Response', data);
+                
+                // Check token extraction
+                if (data && data.data && data.data.token) {
+                    log('✅ Token found at: response.data.token');
+                    log(`Token: ${data.data.token.substring(0, 50)}...`);
+                    
+                    // Save to localStorage
+                    localStorage.setItem('authToken', data.data.token);
+                    log('✅ Token saved to localStorage');
+                    
+                    // Save credentials for login test
+                    localStorage.setItem('testEmail', email);
+                    localStorage.setItem('testPassword', password);
+                } else {
+                    log('❌ Token NOT found in response!', true);
+                    log(`Looking for: data.data.token`, true);
+                    log(`Got: ${JSON.stringify(data)}`, true);
+                }
+            } catch (err) {
+                log(`❌ Error: ${err.message}`, true);
+                console.error(err);
+            }
+        }
+        
+        async function testLogin() {
+            document.getElementById('results').innerHTML = '';
+            const email = localStorage.getItem('testEmail') || document.getElementById('email').value;
+            const password = localStorage.getItem('testPassword') || document.getElementById('password').value;
+            
+            log(`🔐 Logging in: ${email}`);
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                logJson('Response', data);
+                
+                // Check token extraction
+                if (data && data.data && data.data.token) {
+                    log('✅ Token found at: response.data.token');
+                    log(`Token: ${data.data.token.substring(0, 50)}...`);
+                    
+                    // Save to localStorage
+                    localStorage.setItem('authToken', data.data.token);
+                    log('✅ Token saved to localStorage');
+                } else {
+                    log('❌ Token NOT found in response!', true);
+                    log(`Looking for: data.data.token`, true);
+                }
+            } catch (err) {
+                log(`❌ Error: ${err.message}`, true);
+                console.error(err);
+            }
+        }
+        
+        function checkLocalStorage() {
+            document.getElementById('results').innerHTML = '';
+            const token = localStorage.getItem('authToken');
+            
+            if (token) {
+                log('✅ Token found in localStorage!');
+                log(`Token: ${token.substring(0, 50)}...`);
+                
+                // Try to decode JWT (just the payload, no verification)
+                try {
+                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    logJson('JWT Payload', payload);
+                } catch (err) {
+                    log('Could not decode JWT', true);
+                }
+            } else {
+                log('❌ No token in localStorage', true);
+            }
+        }
+    </script>
+</body>
+</html>
