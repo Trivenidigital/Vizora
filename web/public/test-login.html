@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login Test - Vizora</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            padding: 20px; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container { 
+            max-width: 900px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 30px; 
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 { color: #333; margin-bottom: 10px; }
+        .subtitle { color: #666; margin-bottom: 30px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: 600; color: #444; }
+        input { 
+            width: 100%; 
+            padding: 12px; 
+            border: 2px solid #ddd; 
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        button { 
+            padding: 12px 24px; 
+            margin: 5px; 
+            cursor: pointer;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        .btn-secondary {
+            background: #48bb78;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: #38a169;
+        }
+        .btn-danger {
+            background: #f56565;
+            color: white;
+        }
+        .success { 
+            color: #38a169; 
+            background: #f0fff4;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 4px solid #38a169;
+            margin: 10px 0;
+        }
+        .error { 
+            color: #e53e3e; 
+            background: #fff5f5;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 4px solid #e53e3e;
+            margin: 10px 0;
+        }
+        .info {
+            color: #3182ce;
+            background: #ebf8ff;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 4px solid #3182ce;
+            margin: 10px 0;
+        }
+        pre { 
+            background: #1a202c; 
+            color: #68d391;
+            padding: 15px; 
+            overflow-x: auto;
+            border-radius: 6px;
+            font-size: 12px;
+            margin: 10px 0;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 8px;
+            background: #f7fafc;
+            border-left: 3px solid #cbd5e0;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .log-success { border-left-color: #48bb78; background: #f0fff4; }
+        .log-error { border-left-color: #f56565; background: #fff5f5; }
+        .log-info { border-left-color: #4299e1; background: #ebf8ff; }
+        #results { margin-top: 20px; max-height: 500px; overflow-y: auto; }
+        .section { margin: 20px 0; padding: 20px; background: #f7fafc; border-radius: 8px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Vizora Login Test</h1>
+        <p class="subtitle">Direct API testing with detailed logging</p>
+        
+        <div class="section">
+            <h2>Test Credentials</h2>
+            <div class="form-group">
+                <label>Email:</label>
+                <input type="email" id="email" value="testuser@test.com">
+            </div>
+            <div class="form-group">
+                <label>Password:</label>
+                <input type="password" id="password" value="Test1234!">
+            </div>
+            <div class="form-group">
+                <label>First Name:</label>
+                <input type="text" id="firstName" value="Test">
+            </div>
+            <div class="form-group">
+                <label>Last Name:</label>
+                <input type="text" id="lastName" value="User">
+            </div>
+            <div class="form-group">
+                <label>Organization:</label>
+                <input type="text" id="orgName" value="TestOrg">
+            </div>
+            
+            <button class="btn-primary" onclick="testRegister()">1️⃣ Register New User</button>
+            <button class="btn-secondary" onclick="testLogin()">2️⃣ Test Login</button>
+            <button class="btn-danger" onclick="clearResults()">Clear Results</button>
+        </div>
+        
+        <div class="section">
+            <h2>Results:</h2>
+            <div id="results"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000/api';
+        let resultsDiv = document.getElementById('results');
+        
+        function clearResults() {
+            resultsDiv.innerHTML = '';
+        }
+        
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `log-entry log-${type}`;
+            div.textContent = message;
+            resultsDiv.appendChild(div);
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
+        }
+        
+        function logJson(label, data) {
+            const div = document.createElement('div');
+            div.innerHTML = `<strong>${label}:</strong><pre>${JSON.stringify(data, null, 2)}</pre>`;
+            resultsDiv.appendChild(div);
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
+        }
+        
+        async function testRegister() {
+            clearResults();
+            const timestamp = Date.now();
+            const email = document.getElementById('email').value.replace('@', `+${timestamp}@`);
+            const password = document.getElementById('password').value;
+            const firstName = document.getElementById('firstName').value;
+            const lastName = document.getElementById('lastName').value;
+            const orgName = document.getElementById('orgName').value + timestamp;
+            
+            log(`📝 Registering: ${email}`, 'info');
+            
+            try {
+                log(`Sending POST ${API_BASE}/auth/register`, 'info');
+                
+                const response = await fetch(`${API_BASE}/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        email, 
+                        password, 
+                        firstName, 
+                        lastName, 
+                        organizationName: orgName 
+                    })
+                });
+                
+                log(`Response status: ${response.status} ${response.statusText}`, 
+                    response.ok ? 'success' : 'error');
+                
+                const data = await response.json();
+                logJson('Full Response', data);
+                
+                // Detailed token analysis
+                log('🔍 Analyzing response structure...', 'info');
+                log(`  → response.success: ${data.success}`, 'info');
+                log(`  → response.data exists: ${!!data.data}`, 'info');
+                log(`  → response.data.token exists: ${!!data.data?.token}`, 'info');
+                
+                if (data && data.data && data.data.token) {
+                    log('✅ TOKEN FOUND at response.data.token', 'success');
+                    log(`Token (first 50 chars): ${data.data.token.substring(0, 50)}...`, 'success');
+                    
+                    // Test localStorage
+                    localStorage.setItem('authToken', data.data.token);
+                    const retrieved = localStorage.getItem('authToken');
+                    if (retrieved === data.data.token) {
+                        log('✅ Token successfully saved to localStorage', 'success');
+                    } else {
+                        log('❌ Token NOT saved to localStorage correctly', 'error');
+                    }
+                    
+                    // Save credentials for login test
+                    localStorage.setItem('testEmail', email);
+                    localStorage.setItem('testPassword', password);
+                    log('💾 Credentials saved for login test', 'info');
+                    
+                } else {
+                    log('❌ TOKEN NOT FOUND in response!', 'error');
+                    log(`Looking for: response.data.token`, 'error');
+                    log(`What we got: ${JSON.stringify(data)}`, 'error');
+                }
+                
+            } catch (err) {
+                log(`❌ Error: ${err.message}`, 'error');
+                console.error('Full error:', err);
+            }
+        }
+        
+        async function testLogin() {
+            clearResults();
+            const email = localStorage.getItem('testEmail') || document.getElementById('email').value;
+            const password = localStorage.getItem('testPassword') || document.getElementById('password').value;
+            
+            log(`🔐 Logging in: ${email}`, 'info');
+            
+            try {
+                log(`Sending POST ${API_BASE}/auth/login`, 'info');
+                
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                log(`Response status: ${response.status} ${response.statusText}`, 
+                    response.ok ? 'success' : 'error');
+                
+                const data = await response.json();
+                logJson('Full Response', data);
+                
+                // Detailed token analysis
+                log('🔍 Analyzing response structure...', 'info');
+                log(`  → response.success: ${data.success}`, 'info');
+                log(`  → response.data exists: ${!!data.data}`, 'info');
+                log(`  → response.data.token exists: ${!!data.data?.token}`, 'info');
+                
+                if (data && data.data && data.data.token) {
+                    log('✅ TOKEN FOUND at response.data.token', 'success');
+                    log(`Token (first 50 chars): ${data.data.token.substring(0, 50)}...`, 'success');
+                    
+                    // Test localStorage
+                    localStorage.setItem('authToken', data.data.token);
+                    const retrieved = localStorage.getItem('authToken');
+                    if (retrieved === data.data.token) {
+                        log('✅ Token successfully saved to localStorage', 'success');
+                        log('🎉 LOGIN SUCCESSFUL!', 'success');
+                    } else {
+                        log('❌ Token NOT saved to localStorage correctly', 'error');
+                    }
+                } else {
+                    log('❌ TOKEN NOT FOUND in response!', 'error');
+                    log(`Looking for: response.data.token`, 'error');
+                }
+                
+            } catch (err) {
+                log(`❌ Error: ${err.message}`, 'error');
+                console.error('Full error:', err);
+            }
+        }
+    </script>
+</body>
+</html>

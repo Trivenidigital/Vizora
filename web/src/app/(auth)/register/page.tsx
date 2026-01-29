@@ -3,14 +3,15 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { apiClient } from '@/lib/api';
 
 export default function RegisterPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
     firstName: '',
     lastName: '',
+    email: '',
+    password: '',
     organizationName: '',
   });
   const [error, setError] = useState('');
@@ -22,21 +23,16 @@ export default function RegisterPage() {
     setError('');
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || 'Registration failed');
-      }
-
-      const data = await res.json();
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
-
+      // Register with all required fields
+      await apiClient.register(
+        formData.email, 
+        formData.password, 
+        formData.organizationName,
+        formData.firstName,
+        formData.lastName
+      );
+      // After registration, login to get token
+      await apiClient.login(formData.email, formData.password);
       router.push('/dashboard');
     } catch (err: any) {
       setError(err.message || 'Registration failed');
@@ -65,9 +61,11 @@ export default function RegisterPage() {
               <input
                 type="text"
                 required
+                minLength={2}
                 value={formData.firstName}
                 onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                placeholder="John"
               />
             </div>
 
@@ -78,9 +76,11 @@ export default function RegisterPage() {
               <input
                 type="text"
                 required
+                minLength={2}
                 value={formData.lastName}
                 onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                placeholder="Doe"
               />
             </div>
           </div>
@@ -92,9 +92,11 @@ export default function RegisterPage() {
             <input
               type="text"
               required
+              minLength={2}
               value={formData.organizationName}
               onChange={(e) => setFormData({ ...formData, organizationName: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+              placeholder="Acme Corp"
             />
           </div>
 
@@ -108,6 +110,7 @@ export default function RegisterPage() {
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+              placeholder="john@acmecorp.com"
             />
           </div>
 
@@ -122,7 +125,11 @@ export default function RegisterPage() {
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+              placeholder="••••••••"
             />
+            <p className="mt-1 text-xs text-gray-500">
+              Must be 8+ characters with uppercase, lowercase, and number/special char
+            </p>
           </div>
 
           <button

@@ -32,6 +32,16 @@ class DisplayApp {
   }
 
   private init() {
+    // Check if electronAPI is available
+    if (!window.electronAPI) {
+      console.error('[App] CRITICAL: window.electronAPI is undefined!');
+      console.error('[App] Preload script did not load or execute properly.');
+      this.showPreloadError();
+      return;
+    }
+
+    console.log('[App] electronAPI initialized successfully');
+
     // Listen for events from main process
     window.electronAPI.onPairingRequired(() => {
       this.showPairingScreen();
@@ -103,16 +113,32 @@ class DisplayApp {
       clearInterval(this.pairingCheckInterval);
     }
 
+    let consecutiveErrors = 0;
+    const maxErrors = 3; // Stop after 3 consecutive errors (likely paired and deleted)
+
     this.pairingCheckInterval = setInterval(async () => {
       try {
         const result = await window.electronAPI.checkPairingStatus(code);
+
+        // Reset error counter on successful check
+        consecutiveErrors = 0;
 
         if (result.status === 'paired') {
           this.stopPairingCheck();
           // The onPaired event will be triggered from main process
         }
-      } catch (error) {
-        console.error('Failed to check pairing status:', error);
+      } catch (error: any) {
+        consecutiveErrors++;
+        
+        // If we get multiple consecutive errors (404), pairing likely completed
+        // and the request was deleted from backend. Stop polling.
+        if (consecutiveErrors >= maxErrors) {
+          console.log('[App] Stopping pairing check - likely already paired');
+          this.stopPairingCheck();
+        } else {
+          // Only log the error if we haven't exceeded threshold
+          console.error(`[RENDERER-ERROR] Failed to check pairing status: ${error.message || error}`);
+        }
       }
     }, 2000); // Check every 2 seconds
   }
@@ -305,6 +331,22 @@ class DisplayApp {
         break;
       default:
         console.warn('Unknown command:', command);
+    }
+  }
+
+  private showPreloadError() {
+    this.hideAllScreens();
+    const errorScreen = document.getElementById('error-screen');
+    const errorMessage = document.getElementById('error-message');
+
+    if (errorScreen && errorMessage) {
+      errorMessage.innerHTML = `
+        <strong>Preload Script Error</strong><br><br>
+        window.electronAPI is undefined<br>
+        The preload script did not load properly.<br><br>
+        <small>Check the console for more details.</small>
+      `;
+      errorScreen.classList.remove('hidden');
     }
   }
 }

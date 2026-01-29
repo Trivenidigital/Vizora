@@ -11,26 +11,43 @@ function createWindow() {
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width, height } = primaryDisplay.workAreaSize;
 
+  const preloadPath = path.join(__dirname, 'preload.js');
+
   mainWindow = new BrowserWindow({
-    width,
-    height,
-    fullscreen: true,
-    frame: false,
-    kiosk: process.env.NODE_ENV === 'production',
+    width: 1200,
+    height: 800,
+    fullscreen: false,
+    frame: true,
+    kiosk: false,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js'),
+      preload: preloadPath,
     },
   });
 
   // Load the app
-  if (process.env.NODE_ENV === 'development') {
-    mainWindow.loadURL('http://localhost:4200');
-    mainWindow.webContents.openDevTools();
+  const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+  if (isDev) {
+    mainWindow.loadURL('http://localhost:4200').catch(() => {
+      // If dev server is not running, load from dist
+      mainWindow?.loadFile(path.join(__dirname, '../renderer/index.html'));
+    });
   } else {
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
   }
+  
+  // Always open dev tools for debugging
+  mainWindow.webContents.openDevTools();
+
+  // Capture console messages from renderer process
+  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    const levelStr = ['verbose', 'info', 'warn', 'error'][level] || 'log';
+    console.log(`[RENDERER-${levelStr.toUpperCase()}] ${message}`);
+    if (sourceId) {
+      console.log(`  at ${sourceId}:${line}`);
+    }
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -43,14 +60,20 @@ function createWindow() {
     });
   }
 
-  // Initialize device client
-  initializeDeviceClient();
+  // Wait for renderer to be ready before initializing device client
+  mainWindow.webContents.on('did-finish-load', () => {
+    console.log('[Main] Renderer loaded, initializing device client...');
+    // Give renderer a moment to set up event listeners
+    setTimeout(() => {
+      initializeDeviceClient();
+    }, 500);
+  });
 }
 
 function initializeDeviceClient() {
   const deviceToken = store.get('deviceToken') as string | undefined;
   const apiUrl = process.env.API_URL || 'http://localhost:3000';
-  const realtimeUrl = process.env.REALTIME_URL || 'ws://localhost:3001';
+  const realtimeUrl = process.env.REALTIME_URL || 'ws://localhost:3002';
 
   deviceClient = new DeviceClient(apiUrl, realtimeUrl, {
     onPairingRequired: () => {

@@ -8,6 +8,7 @@ export class ThumbnailService {
   private readonly logger = new Logger(ThumbnailService.name);
   private readonly THUMBNAIL_DIR = join(process.cwd(), 'static', 'thumbnails');
   private readonly MAX_SIZE = 300; // 300x300 max
+  private readonly MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB limit
 
   constructor() {
     this.ensureThumbnailDir();
@@ -31,6 +32,12 @@ export class ThumbnailService {
     mimeType: string
   ): Promise<string> {
     try {
+      // Security: Check file size limit (DoS protection)
+      if (imageBuffer.length > this.MAX_FILE_SIZE) {
+        this.logger.warn(`Image too large for thumbnail: ${contentId} (${imageBuffer.length} bytes)`);
+        throw new Error(`Image exceeds maximum size for thumbnail generation (${this.MAX_FILE_SIZE / 1024 / 1024}MB)`);
+      }
+
       const ext = this.getExtensionFromMime(mimeType);
       const filename = `${contentId}.${ext}`;
       const filepath = join(this.THUMBNAIL_DIR, filename);

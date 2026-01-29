@@ -5,15 +5,17 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import Breadcrumbs from '@/components/Breadcrumbs';
+import { Icon } from '@/theme/icons';
+import type { IconName } from '@/theme/icons';
 
-const navigation = [
-  { name: 'Overview', href: '/dashboard', icon: '📊', exactMatch: true },
-  { name: 'Devices', href: '/dashboard/devices', icon: '📺' },
-  { name: 'Content', href: '/dashboard/content', icon: '🖼️' },
-  { name: 'Playlists', href: '/dashboard/playlists', icon: '📋' },
-  { name: 'Schedules', href: '/dashboard/schedules', icon: '📅' },
-  { name: 'Analytics', href: '/dashboard/analytics', icon: '📈' },
-  { name: 'Settings', href: '/dashboard/settings', icon: '⚙️' },
+const navigation: Array<{ name: string; href: string; icon: IconName; exactMatch?: boolean }> = [
+  { name: 'Overview', href: '/dashboard', icon: 'overview', exactMatch: true },
+  { name: 'Devices', href: '/dashboard/devices', icon: 'devices' },
+  { name: 'Content', href: '/dashboard/content', icon: 'content' },
+  { name: 'Playlists', href: '/dashboard/playlists', icon: 'playlists' },
+  { name: 'Schedules', href: '/dashboard/schedules', icon: 'schedules' },
+  { name: 'Analytics', href: '/dashboard/analytics', icon: 'analytics' },
+  { name: 'Settings', href: '/dashboard/settings', icon: 'settings' },
 ];
 
 export default function DashboardLayout({
@@ -124,7 +126,7 @@ export default function DashboardLayout({
                             }}
                             className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition flex items-center gap-2"
                           >
-                            <span>⚙️</span>
+                            <Icon name="settings" size="md" className="text-gray-500" />
                             <span>Settings</span>
                           </button>
                           <button
@@ -134,7 +136,7 @@ export default function DashboardLayout({
                             }}
                             className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition flex items-center gap-2"
                           >
-                            <span>🚪</span>
+                            <Icon name="logout" size="md" className="text-red-500" />
                             <span>Logout</span>
                           </button>
                         </div>
@@ -169,7 +171,7 @@ export default function DashboardLayout({
                       : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
                   }`}
                 >
-                  <span className="text-xl">{item.icon}</span>
+                  <Icon name={item.icon} size="lg" className="text-gray-600" />
                   <span className="flex-1">{item.name}</span>
                   {active && (
                     <span className="w-2 h-2 bg-blue-600 rounded-full"></span>

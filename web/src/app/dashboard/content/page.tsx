@@ -5,11 +5,14 @@ import { useDropzone } from 'react-dropzone';
 import { apiClient } from '@/lib/api';
 import { Content, Display, Playlist } from '@/lib/types';
 import Modal from '@/components/Modal';
+import PreviewModal from '@/components/PreviewModal';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { useToast } from '@/lib/hooks/useToast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { contentUploadSchema, validateForm } from '@/lib/validation';
+import { Icon } from '@/theme/icons';
+import type { IconName } from '@/theme/icons';
 
 export default function ContentPage() {
   const toast = useToast();
@@ -117,11 +120,20 @@ export default function ContentPage() {
         const url = URL.createObjectURL(item.file);
         const title = item.file.name.replace(/\.[^/.]+$/, '');
         
-        await apiClient.createContent({
+        const newContent = await apiClient.createContent({
           title,
           type: uploadForm.type,
           url,
         });
+
+        // Generate thumbnail for images
+        if (uploadForm.type === 'image' && newContent.id) {
+          try {
+            await apiClient.post(`/content/${newContent.id}/thumbnail`);
+          } catch (thumbnailError) {
+            console.warn('Thumbnail generation failed:', thumbnailError);
+          }
+        }
 
         // Mark as success
         setUploadQueue(prev => prev.map((q, idx) => 
@@ -168,7 +180,18 @@ export default function ContentPage() {
 
     try {
       setActionLoading(true);
-      await apiClient.createContent(uploadForm);
+      const newContent = await apiClient.createContent(uploadForm);
+      
+      // Generate thumbnail for images
+      if (uploadForm.type === 'image' && newContent.id) {
+        try {
+          await apiClient.post(`/content/${newContent.id}/thumbnail`);
+        } catch (thumbnailError) {
+          // Don't fail upload if thumbnail generation fails
+          console.warn('Thumbnail generation failed:', thumbnailError);
+        }
+      }
+      
       toast.success('Content uploaded successfully');
       setIsUploadModalOpen(false);
       setUploadForm({ title: '', type: 'image', url: '' });
@@ -338,18 +361,18 @@ export default function ContentPage() {
     }
   };
 
-  const getTypeIcon = (type: string) => {
+  const getTypeIcon = (type: string): IconName => {
     switch (type) {
       case 'image':
-        return '🖼️';
+        return 'image';
       case 'video':
-        return '🎥';
+        return 'video';
       case 'pdf':
-        return '📄';
+        return 'document';
       case 'url':
-        return '🔗';
+        return 'link';
       default:
-        return '📁';
+        return 'folder';
     }
   };
 
@@ -455,30 +478,30 @@ export default function ContentPage() {
           <div className="flex bg-white border border-gray-300 rounded-lg overflow-hidden">
             <button
               onClick={() => setViewMode('grid')}
-              className={`px-4 py-2 text-sm font-medium transition ${
+              className={`px-4 py-2 text-sm font-medium transition flex items-center gap-2 ${
                 viewMode === 'grid'
                   ? 'bg-blue-600 text-white'
                   : 'text-gray-700 hover:bg-gray-100'
               }`}
             >
-              <span className="text-lg">⊞</span>
+              <Icon name="grid" size="md" />
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className={`px-4 py-2 text-sm font-medium transition ${
+              className={`px-4 py-2 text-sm font-medium transition flex items-center gap-2 ${
                 viewMode === 'list'
                   ? 'bg-blue-600 text-white'
                   : 'text-gray-700 hover:bg-gray-100'
               }`}
             >
-              <span className="text-lg">☰</span>
+              <Icon name="list" size="md" />
             </button>
           </div>
           <button
             onClick={() => setIsUploadModalOpen(true)}
             className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
           >
-            <span className="text-xl">+</span>
+            <Icon name="add" size="lg" className="text-white" />
             <span>Upload Content</span>
           </button>
         </div>
@@ -563,7 +586,7 @@ export default function ContentPage() {
               onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
               className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"
             >
-              <span>⚙️</span>
+              <Icon name="settings" size="md" className="text-gray-600" />
               <span>Advanced</span>
               <svg 
                 className={`w-4 h-4 transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`}
@@ -661,7 +684,8 @@ export default function ContentPage() {
               className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium disabled:opacity-50 flex items-center gap-2"
             >
               {actionLoading && <LoadingSpinner size="sm" />}
-              🗑️ Delete Selected
+              <Icon name="delete" size="md" className="text-white" />
+              Delete Selected
             </button>
           </div>
         </div>
@@ -674,7 +698,7 @@ export default function ContentPage() {
         </div>
       ) : filteredContent.length === 0 ? (
         <div className="bg-white rounded-lg shadow p-12 text-center">
-          <div className="text-6xl mb-4">📁</div>
+          <Icon name="folder" size="6xl" className="mx-auto mb-4 text-gray-400" />
           <h3 className="text-xl font-semibold text-gray-900 mb-2">No content yet</h3>
           <p className="text-gray-600 mb-6">Start by uploading your first media file</p>
           <button
@@ -722,7 +746,7 @@ export default function ContentPage() {
                         {item.thumbnailUrl ? (
                           <img src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
                         ) : (
-                          <span className="text-2xl">{getTypeIcon(item.type)}</span>
+                          <Icon name={getTypeIcon(item.type)} size="xl" className="text-white" />
                         )}
                       </div>
                       <div className="min-w-0">
@@ -755,28 +779,28 @@ export default function ContentPage() {
                         className="text-green-600 hover:text-green-800 hover:bg-green-50 px-2 py-1 rounded transition"
                         title="Push to device"
                       >
-                        📤
+                        <Icon name="push" size="md" />
                       </button>
                       <button
                         onClick={() => handleAddToPlaylist(item)}
                         className="text-purple-600 hover:text-purple-800 hover:bg-purple-50 px-2 py-1 rounded transition"
                         title="Add to playlist"
                       >
-                        ➕
+                        <Icon name="add" size="md" />
                       </button>
                       <button
                         onClick={() => handleEdit(item)}
                         className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded transition"
                         title="Edit"
                       >
-                        ✏️
+                        <Icon name="edit" size="md" />
                       </button>
                       <button
                         onClick={() => handleDelete(item)}
                         className="text-red-600 hover:text-red-800 hover:bg-red-50 px-2 py-1 rounded transition"
                         title="Delete"
                       >
-                        🗑️
+                        <Icon name="delete" size="md" />
                       </button>
                     </div>
                   </td>
@@ -809,7 +833,7 @@ export default function ContentPage() {
                     }}
                   />
                 ) : null}
-                <span className={`text-6xl ${item.thumbnailUrl ? 'hidden' : ''}`}>{getTypeIcon(item.type)}</span>
+                <Icon name={getTypeIcon(item.type)} size="6xl" className={`text-white ${item.thumbnailUrl ? 'hidden' : ''}`} />
                 <div className="absolute top-3 left-3">
                   <input
                     type="checkbox"
@@ -843,27 +867,31 @@ export default function ContentPage() {
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() => handlePushToDevice(item)}
-                    className="text-sm bg-green-50 text-green-600 py-2 rounded hover:bg-green-100 transition font-medium"
+                    className="text-sm bg-green-50 text-green-600 py-2 rounded hover:bg-green-100 transition font-medium flex items-center justify-center gap-1"
                   >
-                    📤 Push
+                    <Icon name="push" size="sm" />
+                    Push
                   </button>
                   <button
                     onClick={() => handleAddToPlaylist(item)}
-                    className="text-sm bg-purple-50 text-purple-600 py-2 rounded hover:bg-purple-100 transition font-medium"
+                    className="text-sm bg-purple-50 text-purple-600 py-2 rounded hover:bg-purple-100 transition font-medium flex items-center justify-center gap-1"
                   >
-                    ➕ Playlist
+                    <Icon name="add" size="sm" />
+                    Playlist
                   </button>
-                  <button 
+                  <button
                     onClick={() => handleEdit(item)}
-                    className="text-sm bg-blue-50 text-blue-600 py-2 rounded hover:bg-blue-100 transition font-medium"
+                    className="text-sm bg-blue-50 text-blue-600 py-2 rounded hover:bg-blue-100 transition font-medium flex items-center justify-center gap-1"
                   >
-                    ✏️ Edit
+                    <Icon name="edit" size="sm" />
+                    Edit
                   </button>
                   <button
                     onClick={() => handleDelete(item)}
-                    className="text-sm bg-red-50 text-red-600 py-2 rounded hover:bg-red-100 transition font-medium"
+                    className="text-sm bg-red-50 text-red-600 py-2 rounded hover:bg-red-100 transition font-medium flex items-center justify-center gap-1"
                   >
-                    🗑️ Delete
+                    <Icon name="delete" size="sm" />
+                    Delete
                   </button>
                 </div>
               </div>
@@ -1334,6 +1362,13 @@ export default function ContentPage() {
           )}
         </div>
       </Modal>
+
+      {/* Preview Modal */}
+      <PreviewModal
+        isOpen={isPreviewModalOpen}
+        onClose={() => setIsPreviewModalOpen(false)}
+        content={selectedContent}
+      />
 
       {/* Delete Confirmation */}
       <ConfirmDialog

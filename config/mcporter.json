@@ -1,0 +1,42 @@
+{
+  "mcpServers": {
+    "vizora-service-manager": {
+      "command": "node",
+      "args": [
+        "C:/Projects/vizora/vizora/mcp-servers/vizora-service-manager/dist/index.js"
+      ],
+      "description": "Manage Vizora services (start/stop/restart) and check port status"
+    },
+    "vizora-database": {
+      "command": "node",
+      "args": [
+        "C:/Projects/vizora/vizora/mcp-servers/vizora-database/dist/index.js"
+      ],
+      "env": {
+        "DATABASE_URL": "postgresql://postgres:postgres@localhost:5432/vizora?schema=public"
+      },
+      "description": "Query and inspect Vizora database via Prisma"
+    },
+    "vizora-test-runner": {
+      "command": "node",
+      "args": [
+        "C:/Projects/vizora/vizora/mcp-servers/vizora-test-runner/dist/index.js"
+      ],
+      "description": "Run Vizora tests and generate coverage reports"
+    },
+    "vizora-git": {
+      "command": "node",
+      "args": [
+        "C:/Projects/vizora/vizora/mcp-servers/vizora-git/dist/index.js"
+      ],
+      "description": "Manage Git operations for the Vizora repository"
+    },
+    "vizora-monitoring": {
+      "command": "node",
+      "args": [
+        "C:/Projects/vizora/vizora/mcp-servers/vizora-monitoring/dist/index.js"
+      ],
+      "description": "Monitor Vizora service health and system resources"
+    }
+  }
+}

@@ -25,6 +25,8 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { Icon } from '@/theme/icons';
+import type { IconName } from '@/theme/icons';
 
 // Sortable playlist item component
 function SortablePlaylistItem({ item, idx, onRemove, onDurationChange }: {
@@ -60,7 +62,7 @@ function SortablePlaylistItem({ item, idx, onRemove, onDurationChange }: {
           {...listeners}
           className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600"
         >
-          ⋮⋮
+          <Icon name="list" size="sm" className="text-gray-400" />
         </button>
         <span className="text-gray-400 font-medium">{idx + 1}</span>
         <div className="flex-1">
@@ -91,7 +93,7 @@ function SortablePlaylistItem({ item, idx, onRemove, onDurationChange }: {
         onClick={onRemove}
         className="text-red-600 hover:text-red-800 text-sm"
       >
-        ✕
+        <Icon name="delete" size="md" className="text-red-600" />
       </button>
     </div>
   );
@@ -107,6 +109,7 @@ export default function PlaylistsPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [playlistThumbnails, setPlaylistThumbnails] = useState<Record<string, string[]>>({});
   const [isBuilderModalOpen, setIsBuilderModalOpen] = useState(false);
   const [createForm, setCreateForm] = useState({ name: '', description: '' });
   const [actionLoading, setActionLoading] = useState(false);
@@ -126,6 +129,26 @@ export default function PlaylistsPage() {
     loadContent();
     loadDevices();
   }, []);
+
+  // Load thumbnails for playlists
+  useEffect(() => {
+    if (playlists.length > 0) {
+      const thumbnails: Record<string, string[]> = {};
+      playlists.forEach((playlist) => {
+        if (playlist.items && playlist.items.length > 0) {
+          // Get first 4 items with thumbnails
+          const thumbs = playlist.items
+            .slice(0, 4)
+            .map(item => item.content?.thumbnail || '')
+            .filter(Boolean);
+          if (thumbs.length > 0) {
+            thumbnails[playlist.id] = thumbs;
+          }
+        }
+      });
+      setPlaylistThumbnails(thumbnails);
+    }
+  }, [playlists]);
 
   const loadPlaylists = async () => {
     try {
@@ -319,7 +342,7 @@ export default function PlaylistsPage() {
         </div>
       ) : playlists.length === 0 ? (
         <div className="bg-white rounded-lg shadow p-12 text-center">
-          <div className="text-6xl mb-4">📋</div>
+          <Icon name="playlists" size="6xl" className="mx-auto mb-4 text-gray-400" />
           <h3 className="text-xl font-semibold text-gray-900 mb-2">No playlists yet</h3>
           <p className="text-gray-600 mb-6">Create your first playlist to organize content</p>
           <button
@@ -349,7 +372,27 @@ export default function PlaylistsPage() {
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-start gap-4 flex-1">
-                  <span className="text-4xl">📋</span>
+                  {/* Visual Thumbnail Grid */}
+                  {playlistThumbnails[playlist.id] && playlistThumbnails[playlist.id].length > 0 ? (
+                    <div className="grid grid-cols-2 gap-1 w-20 h-20 rounded overflow-hidden flex-shrink-0 bg-gray-200">
+                      {playlistThumbnails[playlist.id].map((url, i) => (
+                        <img
+                          key={i}
+                          src={url}
+                          alt=""
+                          loading="lazy"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.src = '/placeholder.png';
+                          }}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="w-20 h-20 flex items-center justify-center text-4xl bg-gray-100 rounded flex-shrink-0">
+                      📋
+                    </div>
+                  )}
                   <div className="flex-1">
                     <h3 className="text-xl font-semibold text-gray-900 mb-1">
                       {playlist.name}
@@ -358,11 +401,15 @@ export default function PlaylistsPage() {
                       <p className="text-sm text-gray-600 mb-2">{playlist.description}</p>
                     )}
                     <div className="flex items-center gap-4 text-sm text-gray-500">
-                      <span>
-                        📹 {playlist.items?.length || 0}{' '}
+                      <span className="flex items-center gap-1">
+                        <Icon name="playlists" size="sm" className="text-gray-400" />
+                        {playlist.items?.length || 0}{' '}
                         {playlist.items?.length === 1 ? 'item' : 'items'}
                       </span>
-                      <span>⏱️ {getTotalDuration(playlist)}</span>
+                      <span className="flex items-center gap-1">
+                        <Icon name="schedules" size="sm" className="text-gray-400" />
+                        {getTotalDuration(playlist)}
+                      </span>
                     </div>
                     {playlist.updatedAt && (
                       <div className="text-xs text-gray-400 mt-2">
@@ -379,7 +426,7 @@ export default function PlaylistsPage() {
                   )}
                   {getDeviceCount(playlist.id) > 0 && (
                     <span className="px-3 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 flex items-center gap-1">
-                      <span>📺</span>
+                      <Icon name="devices" size="sm" className="text-blue-800" />
                       <span>{getDeviceCount(playlist.id)} {getDeviceCount(playlist.id) === 1 ? 'device' : 'devices'}</span>
                     </span>
                   )}
@@ -414,21 +461,24 @@ export default function PlaylistsPage() {
               <div className="flex gap-2">
                 <button
                   onClick={() => handleEdit(playlist)}
-                  className="flex-1 px-4 py-2 text-sm bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition font-medium"
+                  className="flex-1 px-4 py-2 text-sm bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition font-medium flex items-center justify-center gap-1"
                 >
-                  ✏️ Edit
+                  <Icon name="edit" size="sm" className="text-blue-600" />
+                  Edit
                 </button>
                 <button
                   onClick={() => handlePublish(playlist)}
-                  className="flex-1 px-4 py-2 text-sm bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition font-medium"
+                  className="flex-1 px-4 py-2 text-sm bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition font-medium flex items-center justify-center gap-1"
                 >
-                  🚀 Publish
+                  <Icon name="power" size="sm" className="text-green-600" />
+                  Publish
                 </button>
                 <button
                   onClick={() => handleDelete(playlist)}
-                  className="flex-1 px-4 py-2 text-sm bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition font-medium"
+                  className="flex-1 px-4 py-2 text-sm bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition font-medium flex items-center justify-center gap-1"
                 >
-                  🗑️ Delete
+                  <Icon name="delete" size="sm" className="text-red-600" />
+                  Delete
                 </button>
               </div>
             </div>
@@ -522,11 +572,10 @@ export default function PlaylistsPage() {
                       }}
                     >
                       <div className="flex items-center gap-3">
-                        <span className="text-2xl">
-                          {item.type === 'image' && '🖼️'}
-                          {item.type === 'video' && '🎥'}
-                          {item.type === 'pdf' && '📄'}
-                        </span>
+                        {item.type === 'image' && <Icon name="image" size="lg" className="text-gray-600" />}
+                        {item.type === 'video' && <Icon name="video" size="lg" className="text-gray-600" />}
+                        {item.type === 'pdf' && <Icon name="document" size="lg" className="text-gray-600" />}
+                        {!['image', 'video', 'pdf'].includes(item.type) && <Icon name="folder" size="lg" className="text-gray-600" />}
                         <div>
                           <div className="text-sm font-medium text-gray-900">{item.title}</div>
                           <div className="text-xs text-gray-500">{item.type}</div>

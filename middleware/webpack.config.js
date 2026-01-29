@@ -7,6 +7,9 @@ module.exports = {
     path: join(__dirname, 'dist'),
     clean: true,
   },
+  externals: {
+    sharp: 'commonjs sharp',
+  },
   ignoreWarnings: [/Failed to parse source map/],
   plugins: [
     new NxAppWebpackPlugin({

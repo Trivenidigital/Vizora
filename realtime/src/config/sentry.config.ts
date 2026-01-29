@@ -1,10 +1,25 @@
 import * as Sentry from '@sentry/nestjs';
-import { nodeProfilingIntegration } from '@sentry/profiling-node';
+
+// Profiling is optional - it may not be available in bundled/webpack builds
+let nodeProfilingIntegration: any = null;
+try {
+  const profilingModule = require('@sentry/profiling-node');
+  nodeProfilingIntegration = profilingModule.nodeProfilingIntegration;
+} catch (e) {
+  console.warn('⚠️  Sentry profiling not available (optional)');
+}
 
 export function initializeSentry() {
   if (!process.env.SENTRY_DSN) {
     console.warn('⚠️  Sentry DSN not configured. Error tracking disabled.');
     return;
+  }
+
+  const integrations: any[] = [];
+  
+  // Add profiling integration if available
+  if (nodeProfilingIntegration) {
+    integrations.push(nodeProfilingIntegration());
   }
 
   Sentry.init({
@@ -14,11 +29,11 @@ export function initializeSentry() {
     // Performance Monitoring
     tracesSampleRate: parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE || '0.1'),
     
-    // Profiling
-    profilesSampleRate: parseFloat(process.env.SENTRY_PROFILES_SAMPLE_RATE || '0.1'),
-    integrations: [
-      nodeProfilingIntegration(),
-    ],
+    // Profiling (only if available)
+    profilesSampleRate: nodeProfilingIntegration 
+      ? parseFloat(process.env.SENTRY_PROFILES_SAMPLE_RATE || '0.1')
+      : 0,
+    integrations,
 
     // Release tracking
     release: process.env.RELEASE_VERSION || 'unknown',

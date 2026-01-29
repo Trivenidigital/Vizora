@@ -9,6 +9,7 @@ import ConfirmDialog from '@/components/ConfirmDialog';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { useToast } from '@/lib/hooks/useToast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
+import { Icon } from '@/theme/icons';
 
 export default function DevicesPage() {
   const router = useRouter();
@@ -196,7 +197,7 @@ export default function DevicesPage() {
           onClick={() => router.push('/dashboard/devices/pair')}
           className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
         >
-          <span className="text-xl">+</span>
+          <Icon name="add" size="lg" className="text-white" />
           <span>Pair New Device</span>
         </button>
       </div>
@@ -250,7 +251,7 @@ export default function DevicesPage() {
         </div>
       ) : devices.length === 0 ? (
         <div className="bg-white rounded-lg shadow p-12 text-center">
-          <div className="text-6xl mb-4">📺</div>
+          <Icon name="devices" size="6xl" className="mx-auto mb-4 text-gray-400" />
           <h3 className="text-xl font-semibold text-gray-900 mb-2">No devices yet</h3>
           <p className="text-gray-600 mb-6">Get started by pairing your first display device</p>
           <button
@@ -311,7 +312,7 @@ export default function DevicesPage() {
                 <tr key={device.id} className="hover:bg-gray-50 transition">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      <span className="text-3xl mr-3">📺</span>
+                      <Icon name="devices" size="xl" className="mr-3 text-gray-600" />
                       <div>
                         <div className="text-sm font-semibold text-gray-900">
                           {device.nickname}
@@ -338,7 +339,7 @@ export default function DevicesPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     {getCurrentPlaylistName(device.currentPlaylistId) ? (
                       <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-semibold flex items-center gap-1 w-fit">
-                        <span>📋</span>
+                        <Icon name="playlists" size="sm" className="text-blue-800" />
                         <span>{getCurrentPlaylistName(device.currentPlaylistId)}</span>
                       </span>
                     ) : (

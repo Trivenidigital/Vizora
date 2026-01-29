@@ -11,7 +11,6 @@ interface DeviceClientConfig {
 
 export class DeviceClient {
   private socket: Socket | null = null;
-  private deviceToken: string | null = null;
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private readonly heartbeatIntervalMs = 15000; // 15 seconds
 
@@ -58,10 +57,9 @@ export class DeviceClient {
         throw new Error(`Failed to check pairing status: ${response.statusText}`);
       }
 
-      const result = await response.json();
+      const result = await response.json() as { status?: string; deviceToken?: string };
 
       if (result.status === 'paired' && result.deviceToken) {
-        this.deviceToken = result.deviceToken;
         this.config.onPaired(result.deviceToken);
         this.connect(result.deviceToken);
       }
@@ -74,8 +72,6 @@ export class DeviceClient {
   }
 
   connect(token: string) {
-    this.deviceToken = token;
-
     this.socket = io(this.realtimeUrl, {
       auth: {
         token,

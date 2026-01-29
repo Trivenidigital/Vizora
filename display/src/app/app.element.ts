@@ -4,9 +4,10 @@ export class AppElement extends HTMLElement {
   public static observedAttributes = [];
 
   connectedCallback() {
+    console.log('AppElement connected!');
     const title = '@vizora/display';
     this.innerHTML = `
-    <div class="wrapper">
+    <div class="wrapper" style="background: white; padding: 20px;">
       <div class="container">
         <!--  WELCOME  -->
         <div id="welcome">

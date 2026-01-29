@@ -91,6 +91,8 @@ model Display {
   lastHeartbeat         DateTime?
   metadata              Json?    @db.JsonB // OS, model, version, etc.
   timezone              String   @default("UTC")
+  currentPlaylistId     String?  // Direct playlist assignment for simple cases
+  currentPlaylist       Playlist? @relation("DisplayCurrentPlaylist", fields: [currentPlaylistId], references: [id], onDelete: SetNull)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
   pairedAt              DateTime?
@@ -181,8 +183,9 @@ model Playlist {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  items       PlaylistItem[]
-  schedules   Schedule[]
+  items              PlaylistItem[]
+  schedules          Schedule[]
+  assignedDisplays   Display[]      @relation("DisplayCurrentPlaylist")
 
   @@index([organizationId])
 }

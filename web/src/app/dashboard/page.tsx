@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { HelpIcon } from '@/components/Tooltip';
+import { Icon } from '@/theme/icons';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -59,21 +60,21 @@ export default function DashboardPage() {
       const activity = [
         ...devices.slice(0, 3).map((d: any) => ({
           type: 'device',
-          icon: '📺',
+          iconName: 'devices' as const,
           title: d.nickname,
           subtitle: `${d.status} • ${d.location || 'No location'}`,
           time: d.lastSeen || d.createdAt,
         })),
         ...content.slice(0, 3).map((c: any) => ({
           type: 'content',
-          icon: c.type === 'image' ? '🖼️' : c.type === 'video' ? '🎥' : '📄',
+          iconName: c.type === 'image' ? 'image' : c.type === 'video' ? 'video' : 'document',
           title: c.title,
           subtitle: `${c.type} • ${c.status}`,
           time: c.createdAt,
         })),
         ...playlists.slice(0, 3).map((p: any) => ({
           type: 'playlist',
-          icon: '📋',
+          iconName: 'playlists' as const,
           title: p.name,
           subtitle: `${p.items?.length || 0} items`,
           time: p.updatedAt || p.createdAt,
@@ -115,7 +116,7 @@ export default function DashboardPage() {
         >
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm font-medium text-gray-600">Total Devices</p>
-            <span className="text-3xl">📺</span>
+            <Icon name="devices" size="2xl" className="text-gray-600" />
           </div>
           <p className="text-4xl font-bold text-gray-900 mb-2">{stats.devices.total}</p>
           <div className="flex items-center gap-2">
@@ -132,7 +133,7 @@ export default function DashboardPage() {
         >
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm font-medium text-gray-600">Content Items</p>
-            <span className="text-3xl">🖼️</span>
+            <Icon name="content" size="2xl" className="text-gray-600" />
           </div>
           <p className="text-4xl font-bold text-gray-900 mb-2">{stats.content.total}</p>
           <p className="text-sm text-gray-500">
@@ -148,7 +149,7 @@ export default function DashboardPage() {
         >
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm font-medium text-gray-600">Playlists</p>
-            <span className="text-3xl">📋</span>
+            <Icon name="playlists" size="2xl" className="text-gray-600" />
           </div>
           <p className="text-4xl font-bold text-gray-900 mb-2">{stats.playlists.total}</p>
           <p className="text-sm text-gray-500">
@@ -159,7 +160,7 @@ export default function DashboardPage() {
         <div className="bg-gradient-to-br from-blue-500 to-purple-600 p-6 rounded-lg shadow-md hover:shadow-xl transition-all transform hover:-translate-y-1 text-white">
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm font-medium text-blue-100">System Status</p>
-            <span className="text-3xl">✨</span>
+            <Icon name="power" size="2xl" className="text-blue-200" />
           </div>
           <p className="text-4xl font-bold mb-2">Healthy</p>
           <div className="flex items-center gap-2">
@@ -180,7 +181,7 @@ export default function DashboardPage() {
             onClick={() => router.push('/dashboard/devices/pair')}
             className="flex items-center gap-3 p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg hover:from-blue-100 hover:to-blue-200 transition-all transform hover:scale-105"
           >
-            <span className="text-3xl">➕</span>
+            <Icon name="add" size="2xl" className="text-blue-600" />
             <div className="text-left">
               <div className="font-semibold text-blue-900">Pair Device</div>
               <div className="text-xs text-blue-700">Add new display</div>
@@ -191,7 +192,7 @@ export default function DashboardPage() {
             onClick={() => router.push('/dashboard/content')}
             className="flex items-center gap-3 p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg hover:from-purple-100 hover:to-purple-200 transition-all transform hover:scale-105"
           >
-            <span className="text-3xl">📤</span>
+            <Icon name="upload" size="2xl" className="text-purple-600" />
             <div className="text-left">
               <div className="font-semibold text-purple-900">Upload Content</div>
               <div className="text-xs text-purple-700">Add new media</div>
@@ -202,7 +203,7 @@ export default function DashboardPage() {
             onClick={() => router.push('/dashboard/playlists')}
             className="flex items-center gap-3 p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg hover:from-green-100 hover:to-green-200 transition-all transform hover:scale-105"
           >
-            <span className="text-3xl">📋</span>
+            <Icon name="playlists" size="2xl" className="text-green-600" />
             <div className="text-left">
               <div className="font-semibold text-green-900">Create Playlist</div>
               <div className="text-xs text-green-700">Organize content</div>
@@ -213,7 +214,7 @@ export default function DashboardPage() {
             onClick={() => router.push('/dashboard/schedules')}
             className="flex items-center gap-3 p-4 bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg hover:from-orange-100 hover:to-orange-200 transition-all transform hover:scale-105"
           >
-            <span className="text-3xl">📅</span>
+            <Icon name="schedules" size="2xl" className="text-orange-600" />
             <div className="text-left">
               <div className="font-semibold text-orange-900">Schedule</div>
               <div className="text-xs text-orange-700">Set up timing</div>
@@ -232,7 +233,7 @@ export default function DashboardPage() {
                 key={idx}
                 className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition"
               >
-                <span className="text-2xl">{item.icon}</span>
+                <Icon name={item.iconName} size="lg" className="text-gray-600" />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-gray-900 truncate">
                     {item.title}
@@ -257,7 +258,7 @@ export default function DashboardPage() {
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Storage Usage</h3>
-          <span className="text-2xl">💾</span>
+          <Icon name="storage" size="xl" className="text-gray-600" />
         </div>
         <div className="space-y-3">
           <div className="flex justify-between text-sm">
@@ -288,7 +289,7 @@ export default function DashboardPage() {
       {/* Getting Started Guide */}
       {stats.devices.total === 0 && (
         <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg shadow-lg p-8 text-white">
-          <h3 className="text-2xl font-bold mb-4">🚀 Getting Started</h3>
+          <h3 className="text-2xl font-bold mb-4 flex items-center gap-2"><Icon name="power" size="xl" className="text-white" /> Getting Started</h3>
           <p className="mb-6 text-blue-100">
             Welcome to Vizora! Follow these steps to get your digital signage system up and running:
           </p>
@@ -354,7 +355,7 @@ export default function DashboardPage() {
         </div>
         <div className="p-6">
           <div className="text-center py-8 text-gray-500">
-            <span className="text-4xl mb-2 block">📊</span>
+            <Icon name="overview" size="3xl" className="mx-auto mb-4 text-gray-400" />
             <p className="text-sm">Activity feed will appear here</p>
           </div>
         </div>

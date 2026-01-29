@@ -33,14 +33,29 @@ async function bootstrap() {
 
   const globalPrefix = 'api';
   app.setGlobalPrefix(globalPrefix);
-  const port = process.env.REALTIME_PORT || process.env.PORT || 3001;
+  
+  // STRICT PORT ENFORCEMENT - Realtime MUST use port 3002
+  const port = 3002;
+  const assignedPort = process.env.REALTIME_PORT || process.env.PORT;
+  
+  if (assignedPort && parseInt(assignedPort) !== port) {
+    Logger.error(`❌ CONFIGURATION ERROR: Realtime must use port ${port}, not ${assignedPort}`);
+    Logger.error(`Update .env: REALTIME_PORT=${port}`);
+    process.exit(1);
+  }
 
-  await app.listen(port);
-  Logger.log(
-    `🚀 Realtime Gateway running on: http://localhost:${port}/${globalPrefix}`,
-  );
-  Logger.log(`🔌 WebSocket server ready on: ws://localhost:${port}`);
-  Logger.log(`📊 Metrics available at: http://localhost:${port}/metrics`);
+  try {
+    await app.listen(port, '0.0.0.0');
+    Logger.log(`🚀 Realtime Gateway running on: http://localhost:${port}/${globalPrefix}`);
+    Logger.log(`🔌 WebSocket server ready on: ws://localhost:${port}`);
+    Logger.log(`📊 Metrics available at: http://localhost:${port}/metrics`);
+    Logger.log(`⚠️  Port ${port} is RESERVED for Realtime - will not start if occupied`);
+  } catch (error) {
+    Logger.error(`❌ FATAL: Cannot bind to port ${port}`);
+    Logger.error(`Another process is using port ${port}. Stop it first.`);
+    Logger.error(`Run: netstat -ano | findstr :${port}`);
+    process.exit(1);
+  }
 }
 
 bootstrap();
