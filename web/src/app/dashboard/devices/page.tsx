@@ -10,6 +10,7 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import EmptyState from '@/components/EmptyState';
 import SearchFilter from '@/components/SearchFilter';
 import DeviceStatusIndicator from '@/components/DeviceStatusIndicator';
+import DeviceGroupSelector, { DeviceGroup } from '@/components/DeviceGroupSelector';
 import { useToast } from '@/lib/hooks/useToast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { Icon } from '@/theme/icons';
@@ -19,6 +20,28 @@ export default function DevicesPage() {
   const toast = useToast();
   const [devices, setDevices] = useState<Display[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [deviceGroups, setDeviceGroups] = useState<DeviceGroup[]>([
+    {
+      id: 'group-1',
+      name: 'Store Locations',
+      description: 'All retail store displays',
+      deviceIds: [],
+    },
+    {
+      id: 'group-2',
+      name: 'Corporate Office',
+      description: 'Main office lobby and conference rooms',
+      deviceIds: [],
+    },
+    {
+      id: 'group-3',
+      name: 'Digital Kiosks',
+      description: 'Self-service kiosks',
+      parentGroupId: undefined,
+      deviceIds: [],
+    },
+  ]);
+  const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDevice, setSelectedDevice] = useState<Display | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -33,6 +56,7 @@ export default function DevicesPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [showGroupFilter, setShowGroupFilter] = useState(false);
 
   useEffect(() => {
     loadDevices();
