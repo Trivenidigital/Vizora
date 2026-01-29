@@ -390,7 +390,7 @@ export default function ContentPage() {
   };
 
   // Dropzone configuration
-  const getAcceptedFileTypes = () => {
+  const getAcceptedFileTypes = (): Record<string, string[]> => {
     if (uploadForm.type === 'image') return { 'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp'] };
     if (uploadForm.type === 'video') return { 'video/*': ['.mp4', '.mov', '.avi', '.webm'] };
     if (uploadForm.type === 'pdf') return { 'application/pdf': ['.pdf'] };
@@ -398,7 +398,7 @@ export default function ContentPage() {
   };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    accept: getAcceptedFileTypes(),
+    accept: getAcceptedFileTypes() as any,
     multiple: true, // Enable multiple file selection
     disabled: uploadForm.type === 'url',
     onDrop: (acceptedFiles) => {

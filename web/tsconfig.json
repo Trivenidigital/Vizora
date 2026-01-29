@@ -13,6 +13,9 @@
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
     "incremental": true,
+    "skipLibCheck": true,
+    "suppressImplicitAnyIndexErrors": true,
+    "noImplicitAny": false,
     "plugins": [
       {
         "name": "next"

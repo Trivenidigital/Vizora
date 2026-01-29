@@ -6,6 +6,8 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import Button from '@/components/Button';
 
+export const dynamic = 'force-dynamic';
+
 export default function CustomizationPage() {
   const { brandConfig, updateBrandConfig } = useCustomization();
   const [formData, setFormData] = useState(brandConfig);

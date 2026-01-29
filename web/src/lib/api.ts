@@ -339,6 +339,33 @@ class ApiClient {
       method: 'DELETE',
     });
   }
+
+  // Generic HTTP methods
+  async post<T = any>(endpoint: string, body?: any): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: 'POST',
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  }
+
+  async get<T = any>(endpoint: string): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: 'GET',
+    });
+  }
+
+  async patch<T = any>(endpoint: string, body?: any): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: 'PATCH',
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  }
+
+  async delete<T = any>(endpoint: string): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: 'DELETE',
+    });
+  }
 }
 
 export const apiClient = new ApiClient(API_BASE_URL);

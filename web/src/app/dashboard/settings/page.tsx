@@ -5,6 +5,8 @@ import { Icon } from '@/theme/icons';
 import { useTheme } from '@/components/providers/ThemeProvider';
 import { semanticColors } from '@/theme/colors';
 
+export const dynamic = 'force-dynamic';
+
 export default function SettingsPage() {
   const { mode, setMode } = useTheme();
   const [settings, setSettings] = useState({

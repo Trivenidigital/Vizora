@@ -41,6 +41,9 @@ export default function Toast({ message, type, onClose, duration = 5000 }: Toast
 
   return (
     <div
+      role="alert"
+      aria-live="assertive"
+      aria-atomic="true"
       className={`fixed top-4 right-4 z-50 flex items-center gap-3 px-6 py-4 rounded-lg shadow-lg text-white ${
         colors[type]
       } transform transition-all duration-300 ${
