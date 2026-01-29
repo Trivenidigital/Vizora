@@ -12,7 +12,7 @@ import {
   useDeviceDistribution,
   useBandwidthUsage,
   usePlaylistPerformance,
-} from '@/lib/hooks/useChartData';
+} from '@/lib/hooks/useAnalyticsData';
 
 interface KPICardProps {
   label: string;
@@ -68,14 +68,14 @@ const KPICard: React.FC<KPICardProps> = ({
 );
 
 export default function AnalyticsPage() {
-  const deviceMetrics = useDeviceMetrics();
-  const contentPerformance = useContentPerformance();
-  const usageTrends = useUsageTrends();
-  const deviceDistribution = useDeviceDistribution();
-  const bandwidthUsage = useBandwidthUsage();
-  const playlistPerformance = usePlaylistPerformance();
-
   const [dateRange, setDateRange] = useState<'week' | 'month' | 'year'>('month');
+
+  const deviceMetrics = useDeviceMetrics(dateRange);
+  const contentPerformance = useContentPerformance(dateRange);
+  const usageTrends = useUsageTrends(dateRange);
+  const deviceDistribution = useDeviceDistribution();
+  const bandwidthUsage = useBandwidthUsage(dateRange);
+  const playlistPerformance = usePlaylistPerformance(dateRange);
 
   return (
     <div className="space-y-6">
