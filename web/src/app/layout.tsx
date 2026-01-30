@@ -3,16 +3,23 @@ import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { CustomizationProvider } from '@/components/providers/CustomizationProvider';
 import { DeviceStatusProvider } from '@/lib/context/DeviceStatusContext';
 import CommandPaletteWrapper from '@/components/CommandPaletteWrapper';
+import ErrorBoundary from '@/components/ErrorBoundary';
+
+import type { Viewport } from 'next';
 
 export const metadata = {
   title: 'Vizora - Digital Signage Platform',
   description: 'Modern cloud-based digital signage management',
-  viewport: 'width=device-width, initial-scale=1',
-  themeColor: '#3B82F6',
   icons: {
     icon: '/favicon.ico',
   },
   manifest: '/manifest.json',
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  themeColor: '#3B82F6',
 };
 
 export default function RootLayout({
@@ -26,16 +33,18 @@ export default function RootLayout({
         <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-0 focus:left-0 focus:z-50 focus:p-4 focus:bg-blue-600 focus:text-white">
           Skip to main content
         </a>
-        <ThemeProvider>
-          <CustomizationProvider>
-            <DeviceStatusProvider>
-              <CommandPaletteWrapper />
-              <main id="main-content">
-                {children}
-              </main>
-            </DeviceStatusProvider>
-          </CustomizationProvider>
-        </ThemeProvider>
+        <ErrorBoundary>
+          <ThemeProvider>
+            <CustomizationProvider>
+              <DeviceStatusProvider>
+                <CommandPaletteWrapper />
+                <main id="main-content">
+                  {children}
+                </main>
+              </DeviceStatusProvider>
+            </CustomizationProvider>
+          </ThemeProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

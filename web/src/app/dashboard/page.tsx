@@ -3,12 +3,22 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
+import { useDeviceStatus } from '@/lib/context/DeviceStatusContext';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { HelpIcon } from '@/components/Tooltip';
-import { Icon } from '@/theme/icons';
+import { Icon, type IconName, iconMap } from '@/theme/icons';
+
+// Helper to ensure valid icon names
+const getValidIconName = (name: string | undefined): IconName => {
+  if (!name || !(name in iconMap)) {
+    return 'overview'; // fallback to overview icon
+  }
+  return name as IconName;
+};
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { deviceStatuses, isInitialized } = useDeviceStatus();
   const [stats, setStats] = useState({
     devices: { total: 0, online: 0 },
     content: { total: 0, processing: 0 },
@@ -16,6 +26,21 @@ export default function DashboardPage() {
   });
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Update device stats from context (real-time)
+  useEffect(() => {
+    if (!isInitialized) return;
+
+    const devicesList = Object.values(deviceStatuses);
+    setStats(prev => ({
+      ...prev,
+      devices: {
+        total: devicesList.length,
+        online: devicesList.filter(d => d.status === 'online').length,
+      },
+    }));
+  }, [deviceStatuses, isInitialized]);
 
   useEffect(() => {
     loadStats();
@@ -25,67 +50,82 @@ export default function DashboardPage() {
     try {
       setLoading(true);
       // Use allSettled for graceful degradation
+      // Note: Device stats are now handled by DeviceStatusContext, only fetch content & playlists
       const results = await Promise.allSettled([
-        apiClient.getDisplays(),
         apiClient.getContent(),
         apiClient.getPlaylists(),
       ]);
 
-      const devices = results[0].status === 'fulfilled' 
-        ? (results[0].value.data || results[0].value || []) 
+      // Safely extract arrays from results with fallbacks
+      const content = results[0].status === 'fulfilled'
+        ? Array.isArray(results[0].value?.data) ? results[0].value.data
+          : Array.isArray(results[0].value) ? results[0].value
+          : []
         : [];
-      const content = results[1].status === 'fulfilled' 
-        ? (results[1].value.data || results[1].value || []) 
-        : [];
-      const playlists = results[2].status === 'fulfilled' 
-        ? (results[2].value.data || results[2].value || []) 
+      const playlists = results[1].status === 'fulfilled'
+        ? Array.isArray(results[1].value?.data) ? results[1].value.data
+          : Array.isArray(results[1].value) ? results[1].value
+          : []
         : [];
 
-      setStats({
-        devices: {
-          total: devices.length,
-          online: devices.filter((d: any) => d.status === 'online').length,
-        },
+      // Log any failures for debugging
+      results.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          console.warn(`API call ${index + 1} failed:`, result.reason);
+        }
+      });
+
+      setStats(prev => ({
+        ...prev,
         content: {
           total: content.length,
-          processing: content.filter((c: any) => c.status === 'processing').length,
+          processing: content.filter((c: any) => c?.status === 'processing').length,
         },
         playlists: {
           total: playlists.length,
-          active: playlists.filter((p: any) => p.isActive).length,
+          active: playlists.filter((p: any) => p?.isActive === true).length,
         },
-      });
+      }));
 
       // Build recent activity feed (combining recent items from all sources)
       const activity = [
         ...devices.slice(0, 3).map((d: any) => ({
           type: 'device',
-          iconName: 'devices' as const,
-          title: d.nickname,
-          subtitle: `${d.status} • ${d.location || 'No location'}`,
-          time: d.lastSeen || d.createdAt,
+          iconName: getValidIconName('devices'),
+          title: d.nickname || 'Unnamed Device',
+          subtitle: `${d.status || 'unknown'} • ${d.location || 'No location'}`,
+          time: d.lastSeen || d.createdAt || new Date().toISOString(),
         })),
-        ...content.slice(0, 3).map((c: any) => ({
-          type: 'content',
-          iconName: c.type === 'image' ? 'image' : c.type === 'video' ? 'video' : 'document',
-          title: c.title,
-          subtitle: `${c.type} • ${c.status}`,
-          time: c.createdAt,
-        })),
+        ...content.slice(0, 3).map((c: any) => {
+          const contentType = c.type?.toLowerCase() || '';
+          const iconName = contentType === 'image' ? 'image' 
+            : contentType === 'video' ? 'video' 
+            : 'document';
+          return {
+            type: 'content',
+            iconName: getValidIconName(iconName),
+            title: c.title || 'Untitled',
+            subtitle: `${c.type || 'file'} • ${c.status || 'ready'}`,
+            time: c.createdAt || new Date().toISOString(),
+          };
+        }),
         ...playlists.slice(0, 3).map((p: any) => ({
           type: 'playlist',
-          iconName: 'playlists' as const,
-          title: p.name,
+          iconName: getValidIconName('playlists'),
+          title: p.name || 'Untitled Playlist',
           subtitle: `${p.items?.length || 0} items`,
-          time: p.updatedAt || p.createdAt,
+          time: p.updatedAt || p.createdAt || new Date().toISOString(),
         })),
       ]
+        .filter((item) => item.title && item.time && item.iconName) // Filter out invalid items
         .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
         .slice(0, 8);
 
       setRecentActivity(activity);
+      setError(null); // Clear any previous errors
     } catch (error) {
       console.error('Failed to load stats:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
@@ -107,6 +147,25 @@ export default function DashboardPage() {
           Welcome to your Vizora dashboard. Here's what's happening.
         </p>
       </div>
+
+      {/* Error Banner */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
+          <Icon name="error" size="lg" className="text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-red-900 dark:text-red-100">
+              Error loading dashboard data
+            </h3>
+            <p className="text-sm text-red-700 dark:text-red-300 mt-1">{error}</p>
+            <button
+              onClick={loadStats}
+              className="mt-3 text-sm font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 underline"
+            >
+              Try again
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -224,16 +283,16 @@ export default function DashboardPage() {
       </div>
 
       {/* Recent Activity */}
-      {recentActivity.length > 0 && (
-        <div className="bg-white dark:bg-gray-900 rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-50 mb-4">Recent Activity</h3>
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow p-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-50 mb-4">Recent Activity</h3>
+        {recentActivity.length > 0 ? (
           <div className="space-y-3">
             {recentActivity.map((item, idx) => (
               <div
                 key={idx}
                 className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition"
               >
-                <Icon name={item.iconName} size="lg" className="text-gray-600 dark:text-gray-400" />
+                <Icon name={item.iconName || 'overview'} size="lg" className="text-gray-600 dark:text-gray-400" />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-gray-900 dark:text-gray-50 truncate">
                     {item.title}
@@ -251,8 +310,14 @@ export default function DashboardPage() {
               </div>
             ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+            <Icon name="overview" size="3xl" className="mx-auto mb-4 text-gray-400 dark:text-gray-600" />
+            <p className="text-sm">No recent activity yet</p>
+            <p className="text-xs mt-2">Activity will appear here as you add devices and content</p>
+          </div>
+        )}
+      </div>
 
       {/* Storage Usage */}
       <div className="bg-white dark:bg-gray-900 rounded-lg shadow p-6">
@@ -348,18 +413,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Recent Activity Placeholder */}
-      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md">
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-50">Recent Activity</h3>
-        </div>
-        <div className="p-6">
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-            <Icon name="overview" size="3xl" className="mx-auto mb-4 text-gray-400 dark:text-gray-600" />
-            <p className="text-sm">Activity feed will appear here</p>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
