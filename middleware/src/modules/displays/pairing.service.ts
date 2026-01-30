@@ -121,10 +121,12 @@ export class PairingService {
       where: { deviceIdentifier: request.deviceIdentifier },
     });
 
-    if (display && display.jwtToken && display.status === 'online') {
+    // Device is paired if it has a JWT token (regardless of online/offline status)
+    // This allows devices to receive their token immediately after web dashboard completes pairing
+    if (display && display.jwtToken) {
       // Pairing complete! Clean up request
       this.pairingRequests.delete(code);
-      
+
       return {
         status: 'paired',
         deviceToken: display.jwtToken,
