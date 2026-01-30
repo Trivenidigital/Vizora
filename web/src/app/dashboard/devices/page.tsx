@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { Display, Playlist } from '@/lib/types';
@@ -60,32 +60,38 @@ export default function DevicesPage() {
   const [showGroupFilter, setShowGroupFilter] = useState(false);
   const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline' | 'error'>('offline');
 
+  // Memoized callback for device status changes
+  const handleDeviceStatusChange = useCallback((update) => {
+    // Update device status in real-time
+    setDevices((prev) =>
+      prev.map((d) =>
+        d.id === update.deviceId
+          ? {
+              ...d,
+              status: update.status,
+              lastSeen: update.lastSeen,
+              currentPlaylistId: update.currentPlaylistId ?? d.currentPlaylistId,
+            }
+          : d
+      )
+    );
+    setRealtimeStatus('connected');
+    console.log('[DevicesPage] Device status updated:', update);
+  }, []);
+
+  // Memoized callback for connection changes
+  const handleConnectionChange = useCallback((isConnected) => {
+    setRealtimeStatus(isConnected ? 'connected' : 'offline');
+    if (isConnected) {
+      toast.info('Real-time connection established');
+    }
+  }, [toast]);
+
   // Real-time event handling
   const { isConnected, isOffline, emitDeviceUpdate } = useRealtimeEvents({
     enabled: true,
-    onDeviceStatusChange: (update) => {
-      // Update device status in real-time
-      setDevices((prev) =>
-        prev.map((d) =>
-          d.id === update.deviceId
-            ? {
-                ...d,
-                status: update.status,
-                lastSeen: update.lastSeen,
-                currentPlaylistId: update.currentPlaylistId ?? d.currentPlaylistId,
-              }
-            : d
-        )
-      );
-      setRealtimeStatus('connected');
-      console.log('[DevicesPage] Device status updated:', update);
-    },
-    onConnectionChange: (isConnected) => {
-      setRealtimeStatus(isConnected ? 'connected' : 'offline');
-      if (isConnected) {
-        toast.info('Real-time connection established');
-      }
-    },
+    onDeviceStatusChange: handleDeviceStatusChange,
+    onConnectionChange: handleConnectionChange,
   });
 
   // Optimistic state updates
