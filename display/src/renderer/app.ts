@@ -53,10 +53,18 @@ class DisplayApp {
     });
     console.log('[App] onPairingRequired listener registered');
 
-    window.electronAPI.onPaired((_, token) => {
-      console.log('Device paired successfully');
-      this.hidePairingScreen();
-      this.showContentScreen();
+    window.electronAPI.onPaired((event, token) => {
+      console.log('[App] ✅ ✅ ✅ PAIRED EVENT RECEIVED!');
+      console.log('[App] Token length:', token ? token.length : 'NO TOKEN');
+      console.log('[App] Device paired successfully');
+      try {
+        this.hidePairingScreen();
+        console.log('[App] Pairing screen hidden');
+        this.showContentScreen();
+        console.log('[App] Content screen shown');
+      } catch (error) {
+        console.error('[App] ERROR during navigation:', error);
+      }
     });
 
     window.electronAPI.onPlaylistUpdate((_, playlist) => {

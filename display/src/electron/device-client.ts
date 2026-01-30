@@ -135,13 +135,23 @@ export class DeviceClient {
                 const result = JSON.parse(data) as { status?: string; deviceToken?: string };
 
                 if (result.status === 'paired' && result.deviceToken) {
-                  console.log('[DeviceClient] ✅ Device paired! Token received');
+                  console.log('[DeviceClient] ✅ ✅ ✅ DEVICE PAIRED! Token received');
                   console.log('[DeviceClient] Token length:', result.deviceToken.length);
-                  console.log('[DeviceClient] Calling config.onPaired callback...');
-                  this.config.onPaired(result.deviceToken);
+                  console.log('[DeviceClient] Token preview:', result.deviceToken.substring(0, 50) + '...');
+                  console.log('[DeviceClient] About to call config.onPaired callback...');
+                  try {
+                    this.config.onPaired(result.deviceToken);
+                    console.log('[DeviceClient] ✅ config.onPaired callback executed successfully');
+                  } catch (callbackError) {
+                    console.error('[DeviceClient] ❌ ERROR in onPaired callback:', callbackError);
+                  }
                   console.log('[DeviceClient] Connecting to realtime gateway with token...');
-                  this.connect(result.deviceToken);
-                  console.log('[DeviceClient] Connection initiated');
+                  try {
+                    this.connect(result.deviceToken);
+                    console.log('[DeviceClient] ✅ Connection initiated successfully');
+                  } catch (connectError) {
+                    console.error('[DeviceClient] ❌ ERROR connecting to realtime gateway:', connectError);
+                  }
                 }
 
                 resolve(result);
