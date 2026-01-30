@@ -22,7 +22,9 @@ class ApiClient {
       localStorage.setItem('authToken', token);
       // Also set as cookie for middleware to access
       document.cookie = `authToken=${token}; path=/; max-age=604800; SameSite=Lax`;
-      console.log('[API] Token saved to both localStorage and cookie');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[API] Token saved securely');
+      }
     }
   }
 
@@ -32,13 +34,16 @@ class ApiClient {
       localStorage.removeItem('authToken');
       // Also clear cookie
       document.cookie = 'authToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-      console.log('[API] Token cleared from both localStorage and cookie');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[API] Token cleared');
+      }
     }
   }
 
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    retries = 3
   ): Promise<T> {
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
@@ -46,42 +51,77 @@ class ApiClient {
       ...options.headers,
     };
 
-    console.log(`[API] Request: ${options.method || 'GET'} ${this.baseUrl}${endpoint}`);
-
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      ...options,
-      headers,
-    });
-
-    console.log(`[API] Response status: ${response.status} ${response.statusText}`);
-
-    if (!response.ok) {
-      console.error(`[API] Request failed with status ${response.status}`);
-      // Handle authentication errors
-      if (response.status === 401 || response.status === 403) {
-        this.clearToken();
-        if (typeof window !== 'undefined') {
-          // Redirect to login with return URL
-          const currentPath = window.location.pathname;
-          window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`;
-        }
-      }
-
-      const error = await response.json().catch(() => ({ message: 'Request failed' }));
-      throw new Error(error.message || `HTTP ${response.status}`);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[API] Request: ${options.method || 'GET'} ${this.baseUrl}${endpoint}`);
     }
 
-    const data = await response.json();
-    console.log('[API] Response data:', data);
-    return data;
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutMs = options.method === 'GET' ? 30000 : 30000; // 30s timeout
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        ...options,
+        headers,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[API] Response status: ${response.status} ${response.statusText}`);
+      }
+
+      if (!response.ok) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error(`[API] Request failed with status ${response.status}`);
+        }
+        // Handle authentication errors
+        if (response.status === 401 || response.status === 403) {
+          this.clearToken();
+          if (typeof window !== 'undefined') {
+            // Redirect to login with return URL
+            const currentPath = window.location.pathname;
+            window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`;
+          }
+        }
+
+        const error = await response.json().catch(() => ({ message: 'Request failed' }));
+        throw new Error(error.message || `HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[API] Response received');
+      }
+      return data;
+    } catch (error) {
+      clearTimeout(timeoutId);
+
+      // Handle timeout
+      if (error instanceof Error && error.name === 'AbortError') {
+        if (retries > 0 && (options.method === 'GET' || !options.method)) {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn(`[API] Request timeout, retrying... (${retries} attempts left)`);
+          }
+          return this.request<T>(endpoint, options, retries - 1);
+        }
+        throw new Error('Request timeout');
+      }
+
+      throw error;
+    }
   }
 
   // Auth
   async login(email: string, password: string) {
-    console.log('[API] Login called with email:', email);
-    const response = await this.request<{ 
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[API] Login called');
+    }
+    const response = await this.request<{
       success: boolean;
-      data: { 
+      data: {
         user: any;
         token: string;
         expiresIn: number;
@@ -90,34 +130,28 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
-    console.log('[API] Login response received:', response);
-    console.log('[API] Response structure:', {
-      hasSuccess: 'success' in response,
-      hasData: 'data' in response,
-      dataType: typeof response.data,
-      hasToken: response.data?.token !== undefined,
-      tokenValue: response.data?.token ? response.data.token.substring(0, 30) + '...' : 'MISSING'
-    });
-    
+
     if (response.data && response.data.token) {
-      console.log('[API] ✅ Token found, calling setToken()');
       this.setToken(response.data.token);
-      console.log('[API] ✅ Token saved to localStorage');
     } else {
-      console.error('[API] ❌ TOKEN NOT FOUND in response!');
-      console.error('[API] Response:', JSON.stringify(response, null, 2));
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[API] Token not found in response');
+      }
+      throw new Error('Authentication failed: no token received');
     }
     return response.data;
   }
 
   async register(
-    email: string, 
-    password: string, 
+    email: string,
+    password: string,
     organizationName: string,
     firstName: string,
     lastName: string
   ) {
-    console.log('[API] Register called');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[API] Register called');
+    }
     const response = await this.request<{
       success: boolean;
       data: {
@@ -128,28 +162,22 @@ class ApiClient {
       }
     }>('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ 
-        email, 
-        password, 
+      body: JSON.stringify({
+        email,
+        password,
         organizationName,
         firstName,
         lastName,
       }),
     });
-    console.log('[API] Register response received:', response);
-    console.log('[API] Response structure:', {
-      hasSuccess: 'success' in response,
-      hasData: 'data' in response,
-      hasToken: response.data?.token !== undefined,
-      tokenValue: response.data?.token ? response.data.token.substring(0, 30) + '...' : 'MISSING'
-    });
-    
+
     if (response.data && response.data.token) {
-      console.log('[API] ✅ Token found in register, calling setToken()');
       this.setToken(response.data.token);
-      console.log('[API] ✅ Token saved to localStorage');
     } else {
-      console.error('[API] ❌ TOKEN NOT FOUND in register response!');
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[API] Token not found in register response');
+      }
+      throw new Error('Registration failed: no token received');
     }
     return response.data;
   }

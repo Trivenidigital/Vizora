@@ -5,18 +5,15 @@ module.exports = {
   transform: {
     '^.+\\.(t|j)s$': ['ts-jest', {
       tsconfig: '<rootDir>/../tsconfig.spec.json',
+      isolatedModules: true,
     }],
   },
   testEnvironment: 'node',
-  setupFiles: ['reflect-metadata'],
+  setupFiles: ['reflect-metadata', '<rootDir>/setup.ts'],
+  setupFilesAfterEnv: ['<rootDir>/setup.ts'],
   testTimeout: 30000,
   // Let pnpm workspace resolve @vizora/database naturally for E2E tests
   transformIgnorePatterns: [
     'node_modules/(?!(@vizora)/)',
   ],
-  globals: {
-    'ts-jest': {
-      isolatedModules: true,
-    },
-  },
 };

@@ -3,7 +3,14 @@ import * as path from 'path';
 import { DeviceClient } from './device-client';
 import Store from 'electron-store';
 
-const store = new Store();
+const store = new Store({
+  defaults: {
+    deviceToken: null,
+  },
+  fileExtension: 'json',
+  serialize: JSON.stringify,
+  deserialize: JSON.parse,
+});
 let mainWindow: BrowserWindow | null = null;
 let deviceClient: DeviceClient | null = null;
 
@@ -11,7 +18,9 @@ function createWindow() {
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width, height } = primaryDisplay.workAreaSize;
 
+  // Construct preload script path with better error handling
   const preloadPath = path.join(__dirname, 'preload.js');
+  console.log('[Main] Loading preload script from:', preloadPath);
 
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -23,6 +32,7 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       preload: preloadPath,
+      sandbox: true, // Enable sandbox for security
     },
   });
 
@@ -71,16 +81,32 @@ function createWindow() {
 }
 
 function initializeDeviceClient() {
-  const deviceToken = store.get('deviceToken') as string | undefined;
+  let deviceToken = store.get('deviceToken') as string | undefined;
+
+  // For testing/debugging: allow token from environment variable
+  if (!deviceToken && process.env.DEVICE_TOKEN) {
+    deviceToken = process.env.DEVICE_TOKEN;
+    console.log('[Main] Using DEVICE_TOKEN from environment');
+    store.set('deviceToken', deviceToken);
+  }
+
   const apiUrl = process.env.API_URL || 'http://localhost:3000';
   const realtimeUrl = process.env.REALTIME_URL || 'ws://localhost:3002';
+
+  console.log('[Main] *** INITIALIZING DEVICE CLIENT ***');
+  console.log('[Main] Device token loaded:', deviceToken ? `${deviceToken.substring(0, 20)}...` : 'NONE - WILL REQUEST PAIRING');
 
   deviceClient = new DeviceClient(apiUrl, realtimeUrl, {
     onPairingRequired: () => {
       mainWindow?.webContents.send('pairing-required');
     },
     onPaired: (token) => {
-      store.set('deviceToken', token);
+      try {
+        store.set('deviceToken', token);
+        console.log('[Main] Device token saved successfully');
+      } catch (error) {
+        console.error('[Main] Failed to save device token:', error);
+      }
       mainWindow?.webContents.send('paired', token);
     },
     onPlaylistUpdate: (playlist) => {
@@ -95,20 +121,31 @@ function initializeDeviceClient() {
   });
 
   if (deviceToken) {
+    console.log('[Main] Device token exists, connecting...');
     deviceClient.connect(deviceToken);
   } else {
     // Request pairing
+    console.log('[Main] *** SENDING PAIRING-REQUIRED EVENT TO RENDERER ***');
     mainWindow?.webContents.send('pairing-required');
+    console.log('[Main] pairing-required event sent');
   }
 }
 
 // IPC Handlers
 ipcMain.handle('get-pairing-code', async () => {
   try {
-    const result = await deviceClient?.requestPairingCode();
+    console.log('[Main] IPC Handler: get-pairing-code called');
+    if (!deviceClient) {
+      console.error('[Main] ERROR: deviceClient is null/undefined!');
+      throw new Error('deviceClient not initialized');
+    }
+    console.log('[Main] Calling deviceClient.requestPairingCode()...');
+    const result = await deviceClient.requestPairingCode();
+    console.log('[Main] Got pairing result:', { code: result.code, hasQR: !!result.qrCode });
     return result;
-  } catch (error) {
-    console.error('Failed to get pairing code:', error);
+  } catch (error: any) {
+    console.error('[Main] *** ERROR getting pairing code:', error.message || error);
+    console.error('[Main] Full error:', error);
     throw error;
   }
 });
@@ -190,4 +227,16 @@ app.on('activate', () => {
 // Handle app termination
 app.on('before-quit', () => {
   deviceClient?.disconnect();
+});
+
+// Handle uncaught exceptions from renderer process
+process.on('uncaughtException', (error) => {
+  console.error('[Main] Uncaught exception:', error);
+  // Continue running - don't crash
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[Main] Unhandled rejection at:', promise, 'reason:', reason);
+  // Continue running - don't crash
 });

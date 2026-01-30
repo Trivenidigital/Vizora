@@ -187,11 +187,12 @@ class DisplayApp {
     }
 
     let consecutiveErrors = 0;
-    const maxErrors = 3; // Stop after 3 consecutive errors (likely paired and deleted)
+    const maxErrors = 5; // Increased from 3 to allow more retries before stopping
     let codeExpiryTime = Date.now() + (5 * 60 * 1000); // 5 minutes from now
     const codeRefreshThreshold = 30 * 1000; // Refresh code 30 seconds before expiry
+    let currentCode = code; // Use local variable for current code
 
-    this.pairingCheckInterval = setInterval(async () => {
+    const pollInterval = setInterval(async () => {
       try {
         // Check if code is about to expire and refresh it
         const timeUntilExpiry = codeExpiryTime - Date.now();
@@ -201,48 +202,65 @@ class DisplayApp {
             const newResult = await window.electronAPI.getPairingCode();
             console.log('[App] ✅ New pairing code received:', newResult.code);
             this.currentCode = newResult.code;
+            currentCode = newResult.code; // ← FIX: Update the local currentCode
             localStorage.setItem('lastPairingCode', newResult.code);
             this.displayPairingCode(newResult.code);
             if (newResult.qrCode) {
               this.displayQRCode(newResult.qrCode);
             }
             codeExpiryTime = Date.now() + (5 * 60 * 1000); // Reset expiry timer
-            consecutiveErrors = 0;
-            code = newResult.code; // Update the code variable for status checking
-            return; // Skip status check this iteration
+            consecutiveErrors = 0; // Reset error counter when code refreshed
+            // ← REMOVED: return statement that was skipping status check
+            // Continue to next iteration to check status with new code
           } catch (refreshError: any) {
             console.error('[App] ❌ Failed to refresh pairing code:', refreshError.message);
             this.showErrorScreen('Failed to refresh pairing code');
-            this.stopPairingCheck();
+            clearInterval(pollInterval);
+            this.pairingCheckInterval = null;
             this.isPairingScreenShown = false;
             return;
           }
         }
 
-        console.log('[App] Checking pairing status for code:', code);
-        const result = await window.electronAPI.checkPairingStatus(code);
-        console.log('[App] Pairing status result:', result);
+        // Check pairing status with the current code
+        console.log('[App] Checking pairing status for code:', currentCode);
+        try {
+          const result = await window.electronAPI.checkPairingStatus(currentCode);
+          console.log('[App] Pairing status result:', result);
 
-        // Reset error counter on successful check
-        consecutiveErrors = 0;
+          // Reset error counter on successful check
+          consecutiveErrors = 0;
 
-        if (result.status === 'paired') {
-          console.log('[App] Device is paired! Token received from status check');
-          this.stopPairingCheck();
-          // The onPaired event will be triggered from main process
+          if (result.status === 'paired') {
+            console.log('[App] ✅ Device is paired! Token received from status check');
+            clearInterval(pollInterval);
+            this.pairingCheckInterval = null;
+            // onPaired callback will be triggered from device-client
+            return;
+          }
+        } catch (statusError: any) {
+          consecutiveErrors++;
+          console.log(`[App] ⚠️ Pairing check error (${consecutiveErrors}/${maxErrors}):`, statusError.message);
+
+          // After pairing, backend deletes the pairing request
+          // This causes 404 errors, but we should try a few more times
+          if (consecutiveErrors >= maxErrors) {
+            console.log('[App] Stopping pairing check after multiple errors');
+            clearInterval(pollInterval);
+            this.pairingCheckInterval = null;
+          }
         }
       } catch (error: any) {
+        console.error('[App] Unexpected error in pairing check:', error.message);
         consecutiveErrors++;
-        console.log(`[App] Pairing check error (${consecutiveErrors}/${maxErrors}):`, error.message);
-
-        // If we get multiple consecutive errors (404), pairing likely completed
-        // and the request was deleted from backend. Stop polling.
         if (consecutiveErrors >= maxErrors) {
-          console.log('[App] Stopping pairing check - likely already paired');
-          this.stopPairingCheck();
+          clearInterval(pollInterval);
+          this.pairingCheckInterval = null;
         }
       }
     }, 2000); // Check every 2 seconds
+
+    this.pairingCheckInterval = pollInterval;
   }
 
   private stopPairingCheck() {

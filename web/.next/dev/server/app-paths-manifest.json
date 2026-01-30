@@ -1,1 +1,10 @@
-{}
+{
+  "/(auth)/login/page": "app/(auth)/login/page.js",
+  "/dashboard/content/page": "app/dashboard/content/page.js",
+  "/dashboard/devices/page": "app/dashboard/devices/page.js",
+  "/dashboard/devices/pair/page": "app/dashboard/devices/pair/page.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/dashboard/playlists/page": "app/dashboard/playlists/page.js",
+  "/dashboard/schedules/page": "app/dashboard/schedules/page.js",
+  "/page": "app/page.js"
+}

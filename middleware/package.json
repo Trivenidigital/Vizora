@@ -7,8 +7,15 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config=jest.e2e.config.js --runInBand",
-    "test:e2e:cov": "jest --config=jest.e2e.config.js --coverage --runInBand",
+    "db:test:start": "docker-compose -f ../docker-compose.test.yml up -d",
+    "db:test:stop": "docker-compose -f ../docker-compose.test.yml down",
+    "db:test:reset": "cross-env NODE_ENV=test pnpm exec prisma migrate reset --force --skip-generate",
+    "db:test:push": "cross-env NODE_ENV=test pnpm exec prisma db push --skip-generate",
+    "db:test:seed": "cross-env NODE_ENV=test ts-node prisma/seed.ts",
+    "test:e2e": "cross-env NODE_ENV=test jest --config=jest.e2e.config.js --runInBand",
+    "test:e2e:cov": "cross-env NODE_ENV=test jest --config=jest.e2e.config.js --coverage --runInBand",
+    "test:e2e:setup": "pnpm db:test:start && sleep 3 && pnpm db:test:push",
+    "test:e2e:full": "pnpm test:e2e:setup && pnpm test:e2e:cov && pnpm db:test:stop",
     "test:all": "pnpm test:cov && pnpm test:e2e:cov"
   },
   "nx": {
@@ -122,10 +129,16 @@
   },
   "devDependencies": {
     "@nestjs/testing": "^11.1.12",
+    "@types/cookie-parser": "^1.4.10",
     "@types/jest": "^30.0.0",
+    "@types/node": "^25.1.0",
     "@types/supertest": "^6.0.3",
+    "cookie-parser": "^1.4.7",
+    "cross-env": "^10.1.0",
+    "csurf": "^1.11.0",
     "jest": "^30.2.0",
     "supertest": "^7.2.2",
-    "ts-jest": "^29.4.6"
+    "ts-jest": "^29.4.6",
+    "ts-node": "^10.9.2"
   }
 }

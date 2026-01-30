@@ -38,55 +38,63 @@ export class AuthService {
       throw new ConflictException('Organization slug already taken');
     }
 
-    // Hash password
-    const passwordHash = await bcrypt.hash(dto.password, 12);
+    // Hash password using secure bcrypt rounds (OWASP 2025+ recommendation: 13-14 rounds)
+    const bcryptRounds = parseInt(process.env.BCRYPT_ROUNDS || '14', 10);
+    const passwordHash = await bcrypt.hash(dto.password, bcryptRounds);
 
     // Calculate trial end date (7 days from now)
     const trialEndsAt = new Date();
     trialEndsAt.setDate(trialEndsAt.getDate() + 7);
 
-    // Create organization
-    const organization = await this.databaseService.organization.create({
-      data: {
-        name: dto.organizationName,
-        slug,
-        subscriptionTier: 'free',
-        screenQuota: 5,
-        trialEndsAt,
-        subscriptionStatus: 'trial',
-      },
+    // Wrap all operations in transaction to ensure data consistency
+    const result = await this.databaseService.$transaction(async (tx) => {
+      // Create organization
+      const organization = await tx.organization.create({
+        data: {
+          name: dto.organizationName,
+          slug,
+          subscriptionTier: 'free',
+          screenQuota: 5,
+          trialEndsAt,
+          subscriptionStatus: 'trial',
+        },
+      });
+
+      // Create user
+      const user = await tx.user.create({
+        data: {
+          email: dto.email,
+          passwordHash,
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          role: 'admin', // First user is always admin
+          organizationId: organization.id,
+          isActive: true,
+        },
+      });
+
+      // Log audit event
+      await tx.auditLog.create({
+        data: {
+          organizationId: organization.id,
+          userId: user.id,
+          action: 'user_registered',
+          entityType: 'user',
+          entityId: user.id,
+          changes: {
+            email: user.email,
+            organizationName: organization.name,
+          },
+        },
+      });
+
+      return { organization, user };
     });
 
-    // Create user
-    const user = await this.databaseService.user.create({
-      data: {
-        email: dto.email,
-        passwordHash,
-        firstName: dto.firstName,
-        lastName: dto.lastName,
-        role: 'admin', // First user is always admin
-        organizationId: organization.id,
-        isActive: true,
-      },
-    });
+    const { organization, user } = result;
 
     // Generate JWT token
     const token = this.generateToken(user, organization);
-
-    // Log audit event
-    await this.databaseService.auditLog.create({
-      data: {
-        organizationId: organization.id,
-        userId: user.id,
-        action: 'user_registered',
-        entityType: 'user',
-        entityId: user.id,
-        changes: {
-          email: user.email,
-          organizationName: organization.name,
-        },
-      },
-    });
 
     return {
       user: this.sanitizeUser(user),

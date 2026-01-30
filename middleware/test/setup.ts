@@ -1,21 +1,35 @@
-// Global test setup - must be first
-import 'reflect-metadata';
-import 'tslib';
+/**
+ * Jest Setup File for E2E Tests
+ * Configures environment and initializes test database
+ */
 
-// Increase timeout for integration tests
+// Load test environment variables
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+
+// Load .env.test before any other modules
+dotenv.config({
+  path: path.resolve(__dirname, '../.env.test'),
+});
+
+// Set NODE_ENV to test
+process.env.NODE_ENV = 'test';
+
+// Global test timeout
 jest.setTimeout(30000);
 
-// Mock console.error to reduce noise in tests
+// Suppress console errors during tests (optional)
+// Note: This happens at setup time, before beforeAll hook
 const originalError = console.error;
 console.error = (...args: any[]) => {
-  // Filter out expected test errors
-  if (args[0]?.includes?.('UnauthorizedException')) return;
-  if (args[0]?.includes?.('ConflictException')) return;
-  originalError.apply(console, args);
+  // Filter out specific warnings
+  if (
+    typeof args[0] === 'string' &&
+    (args[0].includes('ts-jest') ||
+      args[0].includes('isDeprecated') ||
+      args[0].includes('isolatedModules'))
+  ) {
+    return;
+  }
+  originalError.call(console, ...args);
 };
-
-// Clean up after all tests
-afterAll(async () => {
-  // Allow pending async operations to complete
-  await new Promise((resolve) => setTimeout(resolve, 100));
-});

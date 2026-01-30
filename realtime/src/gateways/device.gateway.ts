@@ -14,6 +14,7 @@ import { RedisService } from '../services/redis.service';
 import { HeartbeatService } from '../services/heartbeat.service';
 import { PlaylistService } from '../services/playlist.service';
 import { MetricsService } from '../metrics/metrics.service';
+import { DatabaseService } from '../../database/database.service';
 import * as Sentry from '@sentry/nestjs';
 
 interface DevicePayload {
@@ -44,6 +45,7 @@ export class DeviceGateway
     private heartbeatService: HeartbeatService,
     private playlistService: PlaylistService,
     private metricsService: MetricsService,
+    private databaseService: DatabaseService,
   ) {}
 
   async handleConnection(client: Socket) {
@@ -87,6 +89,20 @@ export class DeviceGateway
         organizationId: payload.organizationId,
       });
 
+      // Also update in database so dashboard sees current status
+      try {
+        await this.databaseService.display.update({
+          where: { id: deviceId },
+          data: {
+            status: 'online',
+            lastHeartbeat: new Date(),
+          },
+        });
+      } catch (dbError) {
+        this.logger.warn(`Failed to update database for device ${deviceId}: ${dbError.message}`);
+        // Don't fail the connection if database update fails
+      }
+
       this.logger.log(`Device connected: ${deviceId} (${client.id})`);
 
       // Record metrics
@@ -124,6 +140,19 @@ export class DeviceGateway
         organizationId: client.data.organizationId,
       });
 
+      // Also update in database so dashboard sees current status
+      try {
+        await this.databaseService.display.update({
+          where: { id: deviceId },
+          data: {
+            status: 'offline',
+            lastHeartbeat: new Date(),
+          },
+        });
+      } catch (dbError) {
+        this.logger.warn(`Failed to update database for device ${deviceId}: ${dbError.message}`);
+      }
+
       this.logger.log(`Device disconnected: ${deviceId} (${client.id})`);
 
       // Record metrics
@@ -159,6 +188,20 @@ export class DeviceGateway
         metrics: data.metrics,
         currentContent: data.currentContent,
       });
+
+      // Also update database so dashboard shows current status
+      try {
+        await this.databaseService.display.update({
+          where: { id: deviceId },
+          data: {
+            status: 'online',
+            lastHeartbeat: new Date(),
+          },
+        });
+      } catch (dbError) {
+        this.logger.warn(`Failed to update database for device ${deviceId}: ${dbError.message}`);
+        // Don't fail the heartbeat if database update fails
+      }
 
       // Process heartbeat (store in ClickHouse, etc.)
       await this.heartbeatService.processHeartbeat(deviceId, data);
