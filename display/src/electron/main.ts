@@ -118,7 +118,7 @@ function initializeDeviceClient() {
     onError: (error) => {
       mainWindow?.webContents.send('error', error);
     },
-  });
+  }, store);
 
   if (deviceToken) {
     console.log('[Main] Device token exists, connecting...');

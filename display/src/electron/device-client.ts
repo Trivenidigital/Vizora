@@ -14,11 +14,13 @@ export class DeviceClient {
   private socket: Socket | null = null;
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private readonly heartbeatIntervalMs = 15000; // 15 seconds
+  private cachedDeviceIdentifier: string | null = null;
 
   constructor(
     private apiUrl: string,
     private realtimeUrl: string,
     private config: DeviceClientConfig,
+    private store?: any, // electron-store instance
   ) {}
 
   async requestPairingCode(): Promise<any> {
@@ -339,16 +341,39 @@ export class DeviceClient {
   }
 
   private getDeviceIdentifier(): string {
-    // Generate a unique device identifier
+    // Return cached identifier if available (persistence across calls)
+    if (this.cachedDeviceIdentifier) {
+      return this.cachedDeviceIdentifier;
+    }
+
+    // Try to load from electron-store if available
+    if (this.store) {
+      const storedId = this.store.get('deviceIdentifier') as string | undefined;
+      if (storedId) {
+        console.log('[DeviceClient] Loaded persisted device identifier from store');
+        this.cachedDeviceIdentifier = storedId;
+        return storedId;
+      }
+    }
+
+    // Generate a unique device identifier once
     // In production, this could be MAC address or other hardware ID
     const networkInterfaces = os.networkInterfaces();
     const firstInterface = Object.values(networkInterfaces)[0]?.[0];
     const mac = firstInterface?.mac || `device-${Date.now()}`;
 
-    // Add a random component to avoid "already paired" errors when retrying pairing
-    // The middleware checks deviceIdentifier uniqueness, so adding randomness allows fresh pairing attempts
+    // Generate random suffix once and reuse it
     const randomSuffix = Math.random().toString(36).substring(2, 8);
-    return `${mac}-${randomSuffix}`;
+    const deviceIdentifier = `${mac}-${randomSuffix}`;
+
+    // Persist the identifier for future use
+    if (this.store) {
+      this.store.set('deviceIdentifier', deviceIdentifier);
+      console.log('[DeviceClient] Persisted new device identifier to store:', deviceIdentifier);
+    }
+
+    this.cachedDeviceIdentifier = deviceIdentifier;
+    return deviceIdentifier;
   }
 
   private getDeviceMetadata() {
