@@ -158,7 +158,7 @@ export function DeviceStatusProvider({ children }: { children: ReactNode }) {
   };
 
   const subscribeToDevice = useCallback((deviceId: string, callback: (update: DeviceStatusUpdate) => void) => {
-    // Add callback to subscribers (single state update)
+    // Add callback to subscribers
     setSubscribers(prev => {
       const updated = { ...prev };
       if (!updated[deviceId]) {
@@ -168,13 +168,13 @@ export function DeviceStatusProvider({ children }: { children: ReactNode }) {
       return updated;
     });
 
-    // Call callback immediately with current status if available
-    setDeviceStatuses(prevStatuses => {
-      if (prevStatuses[deviceId]) {
-        callback(prevStatuses[deviceId]);
-      }
-      return prevStatuses;
-    });
+    // Call callback immediately with current status if available (no state update)
+    if (deviceStatuses[deviceId]) {
+      // Use a timeout to avoid calling setState during render
+      setTimeout(() => {
+        callback(deviceStatuses[deviceId]);
+      }, 0);
+    }
 
     // Return unsubscribe function
     return () => {
@@ -189,7 +189,7 @@ export function DeviceStatusProvider({ children }: { children: ReactNode }) {
         return updated;
       });
     };
-  }, []);
+  }, [deviceStatuses]);
 
   return (
     <DeviceStatusContext.Provider
