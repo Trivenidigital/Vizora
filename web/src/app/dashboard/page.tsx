@@ -88,13 +88,14 @@ export default function DashboardPage() {
       }));
 
       // Build recent activity feed (combining recent items from all sources)
+      const devicesList = Object.values(deviceStatuses);
       const activity = [
-        ...devices.slice(0, 3).map((d: any) => ({
+        ...devicesList.slice(0, 3).map((d: any) => ({
           type: 'device',
           iconName: getValidIconName('devices'),
-          title: d.nickname || 'Unnamed Device',
-          subtitle: `${d.status || 'unknown'} • ${d.location || 'No location'}`,
-          time: d.lastSeen || d.createdAt || new Date().toISOString(),
+          title: d.metadata?.nickname || 'Unnamed Device',
+          subtitle: `${d.status || 'unknown'} • ${d.metadata?.location || 'No location'}`,
+          time: d.metadata?.lastSeen || new Date().toISOString(),
         })),
         ...content.slice(0, 3).map((c: any) => {
           const contentType = c.type?.toLowerCase() || '';
