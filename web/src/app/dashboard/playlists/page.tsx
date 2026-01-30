@@ -10,6 +10,7 @@ import EmptyState from '@/components/EmptyState';
 import SearchFilter from '@/components/SearchFilter';
 import { useToast } from '@/lib/hooks/useToast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
+import { useRealtimeEvents } from '@/lib/hooks';
 import {
   DndContext,
   closestCenter,
@@ -117,6 +118,47 @@ export default function PlaylistsPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 300);
+  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline' | 'error'>('offline');
+
+  // Real-time event handling
+  const { isConnected, isOffline, emitPlaylistUpdate } = useRealtimeEvents({
+    enabled: true,
+    onPlaylistChange: (update) => {
+      // Update playlist in real-time
+      setPlaylists((prev) =>
+        prev.map((p) =>
+          p.id === update.playlistId
+            ? {
+                ...p,
+                ...update.payload,
+              }
+            : p
+        )
+      );
+      setRealtimeStatus('connected');
+
+      // Show notification for specific actions
+      switch (update.action) {
+        case 'updated':
+          toast.info('Playlist updated by another user');
+          break;
+        case 'deleted':
+          toast.warning('Playlist deleted');
+          break;
+        case 'items_reordered':
+          toast.info('Playlist items reordered');
+          break;
+      }
+
+      console.log('[PlaylistsPage] Playlist update:', update);
+    },
+    onConnectionChange: (isConnected) => {
+      setRealtimeStatus(isConnected ? 'connected' : 'offline');
+      if (isConnected) {
+        toast.info('Real-time connection established');
+      }
+    },
+  });
 
   // Drag and drop sensors
   const sensors = useSensors(
@@ -189,7 +231,7 @@ export default function PlaylistsPage() {
   const handleCreate = async () => {
     try {
       setActionLoading(true);
-      await apiClient.createPlaylist({
+      const newPlaylist = await apiClient.createPlaylist({
         name: createForm.name,
         description: createForm.description,
         items: [],
@@ -197,6 +239,14 @@ export default function PlaylistsPage() {
       toast.success('Playlist created successfully');
       setIsCreateModalOpen(false);
       setCreateForm({ name: '', description: '' });
+
+      // Emit real-time event
+      emitPlaylistUpdate({
+        playlistId: newPlaylist.id || '',
+        action: 'created',
+        payload: newPlaylist,
+      });
+
       loadPlaylists();
     } catch (error: any) {
       toast.error(error.message || 'Failed to create playlist');
@@ -220,8 +270,17 @@ export default function PlaylistsPage() {
 
     try {
       setActionLoading(true);
-      await apiClient.deletePlaylist(selectedPlaylist.id);
+      const deletedPlaylistId = selectedPlaylist.id;
+      await apiClient.deletePlaylist(deletedPlaylistId);
       toast.success('Playlist deleted successfully');
+
+      // Emit real-time event
+      emitPlaylistUpdate({
+        playlistId: deletedPlaylistId,
+        action: 'deleted',
+        payload: selectedPlaylist,
+      });
+
       loadPlaylists();
     } catch (error: any) {
       toast.error(error.message || 'Failed to delete playlist');

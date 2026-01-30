@@ -5,6 +5,8 @@ import { LineChart, BarChart, PieChart, AreaChart, ComposedChart } from '@/compo
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/theme/icons';
+import { useRealtimeEvents } from '@/lib/hooks';
+import { useToast } from '@/lib/hooks/useToast';
 import {
   useDeviceMetrics,
   useContentPerformance,
@@ -68,7 +70,10 @@ const KPICard: React.FC<KPICardProps> = ({
 );
 
 export default function AnalyticsPage() {
+  const toast = useToast();
   const [dateRange, setDateRange] = useState<'week' | 'month' | 'year'>('month');
+  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline'>('offline');
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
   const deviceMetrics = useDeviceMetrics(dateRange);
   const contentPerformance = useContentPerformance(dateRange);
@@ -76,6 +81,21 @@ export default function AnalyticsPage() {
   const deviceDistribution = useDeviceDistribution();
   const bandwidthUsage = useBandwidthUsage(dateRange);
   const playlistPerformance = usePlaylistPerformance(dateRange);
+
+  // Real-time analytics updates
+  const { isConnected } = useRealtimeEvents({
+    enabled: true,
+    onDeviceStatusChange: () => {
+      // Device status changes may affect uptime metrics
+      setLastUpdate(new Date());
+    },
+    onConnectionChange: (connected) => {
+      setRealtimeStatus(connected ? 'connected' : 'offline');
+      if (connected) {
+        toast.info('Real-time analytics enabled');
+      }
+    },
+  });
 
   return (
     <div className="space-y-6">
@@ -87,6 +107,17 @@ export default function AnalyticsPage() {
           </h2>
           <p className="mt-2 text-neutral-600 dark:text-neutral-400">
             Real-time performance metrics and insights
+            {realtimeStatus === 'connected' && (
+              <span className="ml-2 inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                <span className="w-2 h-2 bg-green-600 dark:bg-green-400 rounded-full animate-pulse"></span>
+                Real-time active
+              </span>
+            )}
+            {lastUpdate && (
+              <span className="ml-2 text-xs text-gray-500">
+                Updated {Math.round((Date.now() - lastUpdate.getTime()) / 1000)}s ago
+              </span>
+            )}
           </p>
         </div>
         <div className="flex gap-2">

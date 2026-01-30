@@ -13,6 +13,7 @@ import SearchFilter from '@/components/SearchFilter';
 import ContentTagger, { ContentTag } from '@/components/ContentTagger';
 import { useToast } from '@/lib/hooks/useToast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
+import { useRealtimeEvents, useOptimisticState, useErrorRecovery } from '@/lib/hooks';
 import { contentUploadSchema, validateForm } from '@/lib/validation';
 import { Icon } from '@/theme/icons';
 import type { IconName } from '@/theme/icons';
@@ -61,6 +62,40 @@ export default function ContentPage() {
   ]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showTagFilter, setShowTagFilter] = useState(false);
+  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline'>('offline');
+  const [offlineChanges, setOfflineChanges] = useState<number>(0);
+
+  // Real-time event handling
+  const { isConnected, isOffline } = useRealtimeEvents({
+    enabled: true,
+    onConnectionChange: (connected) => {
+      setRealtimeStatus(connected ? 'connected' : 'offline');
+      if (connected) {
+        toast.info('Real-time sync enabled');
+      }
+    },
+  });
+
+  // Optimistic state management
+  const {
+    updateOptimistic,
+    commitOptimistic,
+    rollbackOptimistic,
+    getPendingCount,
+  } = useOptimisticState<Content[]>(content);
+
+  // Error recovery
+  const { retry, recordError } = useErrorRecovery({
+    onError: (errorInfo) => {
+      if (errorInfo.severity === 'critical') {
+        toast.error(`Error: ${errorInfo.error}`);
+      }
+    },
+    retryConfig: {
+      maxAttempts: 3,
+      initialDelay: 1000,
+    },
+  });
 
   useEffect(() => {
     loadContent();
@@ -96,8 +131,12 @@ export default function ContentPage() {
     try {
       const response = await apiClient.getDisplays();
       setDevices(response.data || response || []);
-    } catch (error) {
-      // Silent fail
+    } catch (error: any) {
+      console.error('[ContentPage] Failed to load devices:', error);
+      // Non-critical: devices are optional for content listing
+      if (process.env.NODE_ENV === 'development') {
+        toast.warning('Could not load devices list');
+      }
     }
   };
 
@@ -105,8 +144,12 @@ export default function ContentPage() {
     try {
       const response = await apiClient.getPlaylists();
       setPlaylists(response.data || response || []);
-    } catch (error) {
-      // Silent fail
+    } catch (error: any) {
+      console.error('[ContentPage] Failed to load playlists:', error);
+      // Non-critical: playlists are optional for content listing
+      if (process.env.NODE_ENV === 'development') {
+        toast.warning('Could not load playlists list');
+      }
     }
   };
 
@@ -237,7 +280,7 @@ export default function ContentPage() {
     // Validate form
     const errors = validateForm(contentUploadSchema, uploadForm);
     setFormErrors(errors);
-    
+
     if (Object.keys(errors).length > 0) {
       toast.error('Please fix the errors before saving');
       return;
@@ -245,14 +288,39 @@ export default function ContentPage() {
 
     try {
       setActionLoading(true);
-      await apiClient.updateContent(selectedContent.id, {
-        title: uploadForm.title,
-        // Note: type and url typically can't be changed after upload
-        // but we include them for completeness
-      });
-      toast.success('Content updated successfully');
-      setIsEditModalOpen(false);
-      loadContent();
+      const updateId = `edit_${selectedContent.id}_${Date.now()}`;
+
+      // Apply optimistic update
+      updateOptimistic(updateId, (prev) =>
+        prev.map((item) =>
+          item.id === selectedContent.id
+            ? { ...item, title: uploadForm.title }
+            : item
+        )
+      );
+
+      // Send update with retry
+      await retry(
+        updateId,
+        async () => {
+          await apiClient.updateContent(selectedContent.id, {
+            title: uploadForm.title,
+          });
+          return true;
+        },
+        () => {
+          // Commit optimistic update
+          commitOptimistic(updateId);
+          toast.success('Content updated successfully');
+          setIsEditModalOpen(false);
+        },
+        (error) => {
+          // Rollback on failure
+          rollbackOptimistic(updateId);
+          toast.error('Failed to update content: ' + (error.message || 'Unknown error'));
+          recordError(updateId, error, 'warning');
+        }
+      );
     } catch (error: any) {
       toast.error(error.message || 'Failed to update content');
     } finally {
@@ -270,9 +338,36 @@ export default function ContentPage() {
 
     try {
       setActionLoading(true);
-      await apiClient.deleteContent(selectedContent.id);
-      toast.success('Content deleted successfully');
-      loadContent();
+      const deleteId = `delete_${selectedContent.id}_${Date.now()}`;
+      const deletedContentId = selectedContent.id;
+
+      // Apply optimistic update (remove from list immediately)
+      updateOptimistic(deleteId, (prev) =>
+        prev.filter((item) => item.id !== deletedContentId)
+      );
+
+      // Send deletion with retry
+      await retry(
+        deleteId,
+        async () => {
+          await apiClient.deleteContent(deletedContentId);
+          return true;
+        },
+        () => {
+          // Commit optimistic deletion
+          commitOptimistic(deleteId);
+          toast.success('Content deleted successfully');
+          setIsDeleteModalOpen(false);
+          setSelectedContent(null);
+        },
+        (error) => {
+          // Rollback on failure - reload list
+          rollbackOptimistic(deleteId);
+          toast.error('Failed to delete content: ' + (error.message || 'Unknown error'));
+          recordError(deleteId, error, 'warning');
+          loadContent(); // Reload to sync state
+        }
+      );
     } catch (error: any) {
       toast.error(error.message || 'Failed to delete content');
     } finally {
@@ -490,6 +585,24 @@ export default function ContentPage() {
           <h2 className="text-3xl font-bold text-gray-900">Content Library</h2>
           <p className="mt-2 text-gray-600">
             Manage your media assets ({content.length} items)
+            {realtimeStatus === 'connected' && (
+              <span className="ml-2 inline-flex items-center gap-1 text-xs text-green-600">
+                <span className="w-2 h-2 bg-green-600 rounded-full animate-pulse"></span>
+                Real-time enabled
+              </span>
+            )}
+            {realtimeStatus === 'offline' && (
+              <span className="ml-2 inline-flex items-center gap-1 text-xs text-yellow-600">
+                <span className="w-2 h-2 bg-yellow-600 rounded-full"></span>
+                Offline mode
+              </span>
+            )}
+            {getPendingCount() > 0 && (
+              <span className="ml-2 inline-flex items-center gap-1 text-xs text-blue-600">
+                <span className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></span>
+                {getPendingCount()} pending
+              </span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-3">

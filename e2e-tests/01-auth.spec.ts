@@ -47,7 +47,7 @@ test.describe('Authentication Flow', () => {
     const email = `test-${timestamp}@vizora.test`;
     const password = 'Test123!@#';
     
-    await page.request.post('http://localhost:3000/api/auth/register', {
+    const response = await page.request.post('http://localhost:3000/api/auth/register', {
       data: {
         email,
         password,
@@ -57,8 +57,15 @@ test.describe('Authentication Flow', () => {
       },
     });
 
+    // Ensure registration was successful
+    expect(response.ok()).toBeTruthy();
+
     // Now login
     await page.goto('/login');
+    
+    // Wait for login form to be visible
+    await expect(page.locator('h1')).toContainText(/login/i);
+    
     await page.fill('input[type="email"]', email);
     await page.fill('input[type="password"]', password);
     await page.click('button[type="submit"]');

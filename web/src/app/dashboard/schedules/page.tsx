@@ -10,6 +10,7 @@ import EmptyState from '@/components/EmptyState';
 import TimePicker from '@/components/TimePicker';
 import DaySelector from '@/components/DaySelector';
 import { useToast } from '@/lib/hooks/useToast';
+import { useRealtimeEvents } from '@/lib/hooks';
 import { Icon } from '@/theme/icons';
 
 interface Schedule {
@@ -33,6 +34,8 @@ export default function SchedulesPage() {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline'>('offline');
+  const [executionHistory, setExecutionHistory] = useState<Record<string, any>>({});
 
   // Modal states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -52,6 +55,65 @@ export default function SchedulesPage() {
   });
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  // Real-time event handling for schedule execution
+  const { isConnected } = useRealtimeEvents({
+    enabled: true,
+    onScheduleExecution: (execution) => {
+      console.log('[SchedulesPage] Schedule execution:', execution);
+
+      // Track execution in history
+      setExecutionHistory((prev) => ({
+        ...prev,
+        [execution.scheduleId]: {
+          action: execution.action,
+          timestamp: execution.timestamp,
+          error: execution.error,
+          displayId: execution.displayId,
+        },
+      }));
+
+      // Show notification based on execution status
+      switch (execution.action) {
+        case 'started':
+          toast.info(
+            `Schedule started on device ${execution.displayId?.substring(0, 8)}...`
+          );
+          break;
+        case 'completed':
+          toast.success(
+            `Schedule completed on device ${execution.displayId?.substring(0, 8)}...`
+          );
+          break;
+        case 'failed':
+          toast.error(
+            `Schedule failed: ${execution.error || 'Unknown error'}`
+          );
+          break;
+      }
+
+      // Update schedule status if needed
+      setSchedules((prev) =>
+        prev.map((schedule) =>
+          schedule.id === execution.scheduleId
+            ? {
+                ...schedule,
+                lastExecution: {
+                  action: execution.action,
+                  timestamp: execution.timestamp,
+                },
+              }
+            : schedule
+        )
+      );
+    },
+    onConnectionChange: (connected) => {
+      setRealtimeStatus(connected ? 'connected' : 'offline');
+      if (connected) {
+        toast.info('Real-time schedule monitoring enabled');
+      }
+    },
+  });
 
   useEffect(() => {
     loadData();

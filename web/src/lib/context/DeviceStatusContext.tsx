@@ -57,16 +57,31 @@ export function DeviceStatusProvider({ children }: { children: ReactNode }) {
         // Bulk load into context
         initializeDeviceStatuses(updates);
         setIsInitialized(true);
-      } catch (error) {
-        console.error('Failed to initialize device statuses from API:', error);
-        // Still mark as initialized to unblock UI
+      } catch (error: any) {
+        // Only log non-401 errors (401 = not authenticated yet, which is normal)
+        if (error?.response?.status !== 401 && error?.status !== 401) {
+          console.error('Failed to initialize device statuses from API:', error);
+        }
+        // Still mark as initialized to unblock UI, even if not authenticated
         setIsInitialized(true);
       } finally {
         setIsInitializing(false);
       }
     };
 
-    initializeFromAPI();
+    // Only initialize if we're not on login/register pages
+    if (typeof window !== 'undefined') {
+      const pathname = window.location.pathname;
+      const isAuthPage = pathname.includes('/login') || pathname.includes('/register');
+
+      if (!isAuthPage) {
+        initializeFromAPI();
+      } else {
+        // On auth pages, just mark as initialized with empty state
+        setIsInitialized(true);
+        setIsInitializing(false);
+      }
+    }
   }, []);
 
   // Listen for device status updates from Socket.io

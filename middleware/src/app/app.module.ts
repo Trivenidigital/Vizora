@@ -24,36 +24,36 @@ import { HealthModule } from '../modules/health/health.module';
             // PRODUCTION: Strict limits
             {
               name: 'short',
-              ttl: 1000, // 1 second
-              limit: 10, // 10 requests per second
+              ttl: 1000,
+              limit: 10,
             },
             {
               name: 'medium',
-              ttl: 60000, // 1 minute  
-              limit: 100, // 100 requests per minute
+              ttl: 60000,
+              limit: 100,
             },
             {
               name: 'long',
-              ttl: 3600000, // 1 hour
-              limit: 1000, // 1000 requests per hour
+              ttl: 3600000,
+              limit: 1000,
             },
           ]
         : [
             // DEVELOPMENT/TEST: Very permissive limits
             {
               name: 'short',
-              ttl: 1000, // 1 second
-              limit: 1000, // 1000 requests per second (no real limit)
+              ttl: 1000,
+              limit: 1000,
             },
             {
               name: 'medium',
-              ttl: 60000, // 1 minute  
-              limit: 10000, // 10k requests per minute (no real limit)
+              ttl: 60000,
+              limit: 10000,
             },
             {
               name: 'long',
-              ttl: 3600000, // 1 hour
-              limit: 100000, // 100k requests per hour (no real limit)
+              ttl: 3600000,
+              limit: 100000,
             },
           ]
     ),

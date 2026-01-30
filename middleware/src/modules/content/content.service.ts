@@ -25,9 +25,17 @@ export class ContentService {
     const { page = 1, limit = 10 } = pagination;
     const skip = (page - 1) * limit;
 
+    // Validate filter values - only allow whitelisted values
+    const validTypes = ['image', 'video', 'url', 'html'];
+    const validStatuses = ['active', 'archived', 'draft'];
+
     const where: any = { organizationId };
-    if (filters?.type) where.type = filters.type;
-    if (filters?.status) where.status = filters.status;
+    if (filters?.type && validTypes.includes(filters.type)) {
+      where.type = filters.type;
+    }
+    if (filters?.status && validStatuses.includes(filters.status)) {
+      where.status = filters.status;
+    }
 
     const [data, total] = await Promise.all([
       this.db.content.findMany({

@@ -109,8 +109,13 @@ export function Icon({
   className?: string;
   [key: string]: any;
 }) {
-  const Component = iconMap[name];
+  const Component = iconMap[name] || iconMap.overview; // Fallback to overview icon
   const sizePixels = ICON_SIZES[size];
+
+  if (!Component) {
+    console.error(`Invalid icon name: "${name}". Falling back to overview icon.`);
+    return null; // Fail gracefully
+  }
 
   return (
     <Component

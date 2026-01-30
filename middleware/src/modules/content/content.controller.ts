@@ -9,9 +9,16 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  UploadedFile,
+  UseInterceptors,
+  MaxFileSizeValidator,
+  ParseFilePipe,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ContentService } from './content.service';
 import { ThumbnailService } from './thumbnail.service';
+import { FileValidationService } from './file-validation.service';
 import { CreateContentDto } from './dto/create-content.dto';
 import { UpdateContentDto } from './dto/update-content.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
@@ -22,14 +29,64 @@ export class ContentController {
   constructor(
     private readonly contentService: ContentService,
     private readonly thumbnailService: ThumbnailService,
+    private readonly fileValidationService: FileValidationService,
   ) {}
 
   @Post()
-  create(
+  async create(
     @CurrentUser('organizationId') organizationId: string,
     @Body() createContentDto: CreateContentDto,
   ) {
+    // Validate URL if provided
+    if (createContentDto.url) {
+      this.fileValidationService.validateUrl(createContentDto.url);
+    }
     return this.contentService.create(organizationId, createContentDto);
+  }
+
+  @Post('upload')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadFile(
+    @CurrentUser('organizationId') organizationId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Body('name') name?: string,
+    @Body('type') type?: string,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file provided');
+    }
+
+    // Validate file using magic numbers, size, etc.
+    const validation = await this.fileValidationService.validateFile(
+      file.buffer,
+      file.originalname,
+      file.mimetype,
+    );
+
+    // Sanitize filename
+    const safeFilename = this.fileValidationService.sanitizeFilename(
+      file.originalname,
+    );
+
+    // TODO: Upload to storage service (S3, MinIO, etc.)
+    // For now, store locally or return validation result
+    const fileUrl = `/uploads/${validation.hash}-${safeFilename}`;
+
+    // Create content record
+    const content = await this.contentService.create(organizationId, {
+      name: name || safeFilename,
+      type: type || file.mimetype.split('/')[0], // image, video, etc.
+      url: fileUrl,
+      fileHash: validation.hash,
+      fileSize: file.size,
+      mimeType: file.mimetype,
+    } as any);
+
+    return {
+      success: true,
+      content,
+      fileHash: validation.hash,
+    };
   }
 
   @Get()

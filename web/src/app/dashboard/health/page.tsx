@@ -9,6 +9,7 @@ import EmptyState from '@/components/EmptyState';
 import SearchFilter from '@/components/SearchFilter';
 import { useToast } from '@/lib/hooks/useToast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
+import { useRealtimeEvents } from '@/lib/hooks';
 import { Icon } from '@/theme/icons';
 
 // Mock device health data generator
@@ -35,6 +36,75 @@ export default function HealthMonitoringPage() {
   const debouncedSearch = useDebounce(searchQuery, 300);
   const [sortBy, setSortBy] = useState<'name' | 'health' | 'cpu' | 'memory'>('health');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline' | 'error'>('offline');
+  const [activeAlerts, setActiveAlerts] = useState<Record<string, any>>({});
+
+  // Real-time event handling for health alerts
+  const { isConnected, isOffline } = useRealtimeEvents({
+    enabled: true,
+    onHealthAlert: (alert) => {
+      console.log('[HealthPage] Health alert received:', alert);
+
+      // Add to active alerts
+      setActiveAlerts((prev) => ({
+        ...prev,
+        [alert.deviceId]: alert,
+      }));
+
+      // Update device health if we have that device
+      setDeviceHealthData((prev) => {
+        const device = devices.find((d) => d.id === alert.deviceId);
+        if (!device) return prev;
+
+        const currentHealth = prev[alert.deviceId] || generateMockDeviceHealth(alert.deviceId, device.nickname);
+
+        // Adjust health score based on alert severity
+        let newScore = currentHealth.score;
+        if (alert.severity === 'critical') {
+          newScore = Math.max(0, newScore - 20);
+        } else if (alert.severity === 'warning') {
+          newScore = Math.max(0, newScore - 10);
+        }
+
+        return {
+          ...prev,
+          [alert.deviceId]: {
+            ...currentHealth,
+            score: newScore,
+          },
+        };
+      });
+
+      // Show toast notification
+      switch (alert.severity) {
+        case 'critical':
+          toast.error(`Critical: ${alert.message} (${alert.deviceType || 'Device'})`);
+          break;
+        case 'warning':
+          toast.warning(`Warning: ${alert.message} (${alert.deviceType || 'Device'})`);
+          break;
+        default:
+          toast.info(`${alert.message} (${alert.deviceType || 'Device'})`);
+      }
+
+      // Clear alert after 30 seconds
+      setTimeout(() => {
+        setActiveAlerts((prev) => {
+          const updated = { ...prev };
+          delete updated[alert.deviceId];
+          return updated;
+        });
+      }, 30000);
+    },
+    onConnectionChange: (isConnected) => {
+      setRealtimeStatus(isConnected ? 'connected' : 'offline');
+      if (isConnected) {
+        toast.info('Real-time health monitoring connected');
+      } else {
+        toast.warning('Real-time health monitoring disconnected');
+      }
+    },
+  });
 
   useEffect(() => {
     loadDevicesAndHealth();
@@ -135,6 +205,18 @@ export default function HealthMonitoringPage() {
           <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-50">Device Health</h2>
           <p className="mt-2 text-gray-600 dark:text-gray-400">
             Monitor device performance and system health
+            {realtimeStatus === 'connected' && (
+              <span className="ml-2 inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                <span className="w-2 h-2 bg-green-600 dark:bg-green-400 rounded-full animate-pulse"></span>
+                Real-time monitoring active
+              </span>
+            )}
+            {realtimeStatus === 'offline' && (
+              <span className="ml-2 inline-flex items-center gap-1 text-xs text-yellow-600 dark:text-yellow-400">
+                <span className="w-2 h-2 bg-yellow-600 dark:bg-yellow-400 rounded-full"></span>
+                Polling mode
+              </span>
+            )}
           </p>
         </div>
         <button
@@ -303,15 +385,40 @@ export default function HealthMonitoringPage() {
                   </div>
                 </div>
 
-                {/* Alert Banner */}
-                {health.score < 50 && (
+                {/* Real-time Alert Banner */}
+                {activeAlerts[device.id] && (
+                  <div
+                    className={`mt-4 border rounded p-3 animate-pulse ${
+                      activeAlerts[device.id].severity === 'critical'
+                        ? 'bg-red-100 dark:bg-red-900 border-red-300 dark:border-red-700'
+                        : activeAlerts[device.id].severity === 'warning'
+                        ? 'bg-yellow-100 dark:bg-yellow-900 border-yellow-300 dark:border-yellow-700'
+                        : 'bg-blue-100 dark:bg-blue-900 border-blue-300 dark:border-blue-700'
+                    }`}
+                  >
+                    <p
+                      className={`text-sm font-semibold ${
+                        activeAlerts[device.id].severity === 'critical'
+                          ? 'text-red-800 dark:text-red-200'
+                          : activeAlerts[device.id].severity === 'warning'
+                          ? 'text-yellow-800 dark:text-yellow-200'
+                          : 'text-blue-800 dark:text-blue-200'
+                      }`}
+                    >
+                      🔴 {activeAlerts[device.id].message}
+                    </p>
+                  </div>
+                )}
+
+                {/* Static Alert Banners */}
+                {!activeAlerts[device.id] && health.score < 50 && (
                   <div className="mt-4 bg-red-100 dark:bg-red-900 border border-red-300 dark:border-red-700 rounded p-3">
                     <p className="text-sm font-semibold text-red-800 dark:text-red-200">
                       ⚠️ Critical: Device performance degraded. Consider maintenance.
                     </p>
                   </div>
                 )}
-                {health.score < 70 && health.score >= 50 && (
+                {!activeAlerts[device.id] && health.score < 70 && health.score >= 50 && (
                   <div className="mt-4 bg-yellow-100 dark:bg-yellow-900 border border-yellow-300 dark:border-yellow-700 rounded p-3">
                     <p className="text-sm font-semibold text-yellow-800 dark:text-yellow-200">
                       ⚡ Warning: Some metrics need attention.
