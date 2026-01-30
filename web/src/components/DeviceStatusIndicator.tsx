@@ -72,7 +72,9 @@ export default function DeviceStatusIndicator({
     }
 
     return unsubscribe;
-  }, [deviceId, subscribeToDevice, getDeviceStatus]);
+    // Only depend on deviceId - subscribeToDevice and getDeviceStatus are stable from context
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deviceId]);
 
   const config = statusConfig[status];
 
