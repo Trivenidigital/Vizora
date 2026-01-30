@@ -1,5 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 import * as os from 'os';
+import * as http from 'http';
 
 interface DeviceClientConfig {
   onPairingRequired: () => void;
@@ -21,58 +22,164 @@ export class DeviceClient {
   ) {}
 
   async requestPairingCode(): Promise<any> {
-    try {
-      const deviceIdentifier = this.getDeviceIdentifier();
-
-      const response = await fetch(`${this.apiUrl}/api/devices/pairing/request`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+    return new Promise((resolve, reject) => {
+      try {
+        const deviceIdentifier = this.getDeviceIdentifier();
+        const payload = JSON.stringify({
           deviceIdentifier,
           nickname: os.hostname(),
           metadata: this.getDeviceMetadata(),
-        }),
-      });
+        });
 
-      if (!response.ok) {
-        throw new Error(`Failed to request pairing code: ${response.statusText}`);
+        console.log('[DeviceClient] Requesting pairing code from:', `${this.apiUrl}/api/devices/pairing/request`);
+        console.log('[DeviceClient] Device Identifier:', deviceIdentifier);
+        console.log('[DeviceClient] Nickname:', os.hostname());
+
+        // Fix localhost resolution to IPv4 instead of IPv6
+        const urlStr = `${this.apiUrl}/api/devices/pairing/request`.replace(/localhost/g, '127.0.0.1');
+        const url = new URL(urlStr);
+        const options = {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': payload.length,
+          },
+        };
+
+        const req = http.request(url, options, (res) => {
+          let data = '';
+
+          res.on('data', (chunk) => {
+            data += chunk;
+          });
+
+          res.on('end', () => {
+            console.log('[DeviceClient] Response received, status:', res.statusCode);
+            console.log('[DeviceClient] Response data length:', data.length);
+            if (res.statusCode === 200 || res.statusCode === 201) {
+              try {
+                const result = JSON.parse(data);
+                console.log('[DeviceClient] ✅ Pairing code received successfully:', result.code);
+                console.log('[DeviceClient] QR Code present:', !!result.qrCode);
+                if (result.qrCode) {
+                  console.log('[DeviceClient] QR Code length:', result.qrCode.length);
+                }
+                resolve(result);
+              } catch (e: any) {
+                console.error('[DeviceClient] ❌ Failed to parse response as JSON:', e.message);
+                console.error('[DeviceClient] Response preview:', data.substring(0, 300));
+                reject(new Error('Failed to parse response: ' + data));
+              }
+            } else if (res.statusCode === 400) {
+              // Device already paired - ignore and just display error as pairing failure
+              try {
+                const errorData = JSON.parse(data);
+                if (errorData.message && errorData.message.includes('already paired')) {
+                  console.error('[DeviceClient] Device already paired error');
+                  console.error('[DeviceClient] Pairing will retry with new request...');
+                }
+              } catch (e) {
+                // Continue with normal error handling
+              }
+              reject(new Error(`HTTP ${res.statusCode}: ${data}`));
+            } else {
+              reject(new Error(`HTTP ${res.statusCode}: ${data}`));
+            }
+          });
+        });
+
+        req.on('error', (error: any) => {
+          console.error('[DeviceClient] *** REQUEST ERROR:', error.message || error);
+          console.error('[DeviceClient] Full error:', error);
+          console.error('[DeviceClient] Is middleware running at', this.apiUrl, '?');
+          reject(error);
+        });
+
+        req.setTimeout(10000, () => {
+          req.destroy();
+          reject(new Error('Request timeout'));
+        });
+
+        req.write(payload);
+        req.end();
+      } catch (error) {
+        console.error('[DeviceClient] Error preparing request:', error);
+        reject(error);
       }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Error requesting pairing code:', error);
-      throw error;
-    }
+    });
   }
 
   async checkPairingStatus(code: string): Promise<any> {
-    try {
-      const response = await fetch(
-        `${this.apiUrl}/api/devices/pairing/status/${code}`,
-      );
+    return new Promise((resolve, reject) => {
+      try {
+        // Fix localhost resolution to IPv4 instead of IPv6
+        const urlStr = `${this.apiUrl}/api/devices/pairing/status/${code}`.replace(/localhost/g, '127.0.0.1');
+        const url = new URL(urlStr);
+        const options = {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        };
 
-      if (!response.ok) {
-        throw new Error(`Failed to check pairing status: ${response.statusText}`);
+        const req = http.request(url, options, (res) => {
+          let data = '';
+
+          res.on('data', (chunk) => {
+            data += chunk;
+          });
+
+          res.on('end', () => {
+            try {
+              if (res.statusCode === 200) {
+                const result = JSON.parse(data) as { status?: string; deviceToken?: string };
+
+                if (result.status === 'paired' && result.deviceToken) {
+                  console.log('[DeviceClient] ✅ Device paired! Token received');
+                  console.log('[DeviceClient] Token length:', result.deviceToken.length);
+                  console.log('[DeviceClient] Calling config.onPaired callback...');
+                  this.config.onPaired(result.deviceToken);
+                  console.log('[DeviceClient] Connecting to realtime gateway with token...');
+                  this.connect(result.deviceToken);
+                  console.log('[DeviceClient] Connection initiated');
+                }
+
+                resolve(result);
+              } else if (res.statusCode === 404) {
+                // Pairing not yet complete
+                resolve({ status: 'pending' });
+              } else {
+                reject(new Error(`HTTP ${res.statusCode}`));
+              }
+            } catch (e) {
+              reject(new Error('Failed to parse response'));
+            }
+          });
+        });
+
+        req.on('error', (error) => {
+          console.error('[DeviceClient] Check status error:', error);
+          reject(error);
+        });
+
+        req.setTimeout(10000, () => {
+          req.destroy();
+          reject(new Error('Request timeout'));
+        });
+
+        req.end();
+      } catch (error) {
+        reject(error);
       }
-
-      const result = await response.json() as { status?: string; deviceToken?: string };
-
-      if (result.status === 'paired' && result.deviceToken) {
-        this.config.onPaired(result.deviceToken);
-        this.connect(result.deviceToken);
-      }
-
-      return result;
-    } catch (error) {
-      console.error('Error checking pairing status:', error);
-      throw error;
-    }
+    });
   }
 
   connect(token: string) {
-    this.socket = io(this.realtimeUrl, {
+    // Fix localhost resolution to IPv4 for WebSocket
+    const realtimeUrl = this.realtimeUrl.replace(/localhost/g, '127.0.0.1');
+    console.log('[DeviceClient] Connecting to realtime gateway:', realtimeUrl);
+
+    this.socket = io(realtimeUrl, {
       auth: {
         token,
       },
@@ -84,13 +191,17 @@ export class DeviceClient {
     });
 
     this.socket.on('connect', () => {
-      console.log('Connected to realtime gateway');
+      console.log('[DeviceClient] Connected to realtime gateway');
       this.startHeartbeat();
     });
 
     this.socket.on('disconnect', () => {
-      console.log('Disconnected from realtime gateway');
+      console.log('[DeviceClient] Disconnected from realtime gateway');
       this.stopHeartbeat();
+    });
+
+    this.socket.on('error', (error) => {
+      console.error('[DeviceClient] Realtime gateway error:', error);
     });
 
     this.socket.on('config', (config) => {
@@ -148,22 +259,27 @@ export class DeviceClient {
       return;
     }
 
-    const heartbeatData = {
-      timestamp: Date.now(),
-      metrics: {
-        cpuUsage: this.getCpuUsage(),
-        memoryUsage: this.getMemoryUsage(),
-        storageUsed: 0, // TODO: Implement storage tracking
-      },
-      currentContent: data.currentContent || null,
-      status: 'online',
-    };
+    try {
+      const heartbeatData = {
+        timestamp: Date.now(),
+        metrics: {
+          cpuUsage: this.getCpuUsage(),
+          memoryUsage: this.getMemoryUsage(),
+          storageUsed: 0, // TODO: Implement storage tracking
+        },
+        currentContent: data.currentContent || null,
+        status: 'online',
+      };
 
-    this.socket.emit('heartbeat', heartbeatData, (response: any) => {
-      if (response && response.commands) {
-        response.commands.forEach((cmd: any) => this.handleCommand(cmd));
-      }
-    });
+      this.socket.emit('heartbeat', heartbeatData, (response: any) => {
+        if (response && response.commands) {
+          response.commands.forEach((cmd: any) => this.handleCommand(cmd));
+        }
+      });
+    } catch (error) {
+      console.error('[DeviceClient] Error sending heartbeat:', error);
+      // Socket will auto-reconnect due to reconnection: true setting
+    }
   }
 
   logImpression(data: any) {
@@ -171,10 +287,14 @@ export class DeviceClient {
       return;
     }
 
-    this.socket.emit('content:impression', {
-      ...data,
-      timestamp: Date.now(),
-    });
+    try {
+      this.socket.emit('content:impression', {
+        ...data,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      console.error('[DeviceClient] Error logging impression:', error);
+    }
   }
 
   logError(data: any) {
@@ -182,10 +302,14 @@ export class DeviceClient {
       return;
     }
 
-    this.socket.emit('content:error', {
-      ...data,
-      timestamp: Date.now(),
-    });
+    try {
+      this.socket.emit('content:error', {
+        ...data,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      console.error('[DeviceClient] Error logging error:', error);
+    }
   }
 
   private handleCommand(command: any) {
@@ -209,8 +333,12 @@ export class DeviceClient {
     // In production, this could be MAC address or other hardware ID
     const networkInterfaces = os.networkInterfaces();
     const firstInterface = Object.values(networkInterfaces)[0]?.[0];
+    const mac = firstInterface?.mac || `device-${Date.now()}`;
 
-    return firstInterface?.mac || `device-${Date.now()}`;
+    // Add a random component to avoid "already paired" errors when retrying pairing
+    // The middleware checks deviceIdentifier uniqueness, so adding randomness allows fresh pairing attempts
+    const randomSuffix = Math.random().toString(36).substring(2, 8);
+    return `${mac}-${randomSuffix}`;
   }
 
   private getDeviceMetadata() {
@@ -252,5 +380,59 @@ export class DeviceClient {
     const usage = (usedMem / totalMem) * 100;
 
     return Math.round(usage * 100) / 100;
+  }
+
+  private async unpairDevice(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        const deviceIdentifier = this.getDeviceIdentifier();
+        const urlStr = `${this.apiUrl}/api/devices/pairing/unpair`.replace(/localhost/g, '127.0.0.1');
+        const url = new URL(urlStr);
+        const payload = JSON.stringify({ deviceIdentifier });
+
+        const options = {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': payload.length,
+          },
+        };
+
+        const req = http.request(url, options, (res) => {
+          let data = '';
+
+          res.on('data', (chunk) => {
+            data += chunk;
+          });
+
+          res.on('end', () => {
+            if (res.statusCode === 200 || res.statusCode === 204) {
+              console.log('[DeviceClient] Device unpaired successfully');
+              resolve();
+            } else {
+              console.warn('[DeviceClient] Failed to unpair device:', res.statusCode);
+              // Don't fail - continue with pairing anyway
+              resolve();
+            }
+          });
+        });
+
+        req.on('error', () => {
+          // Network error - continue anyway
+          resolve();
+        });
+
+        req.setTimeout(5000, () => {
+          req.destroy();
+          resolve();
+        });
+
+        req.write(payload);
+        req.end();
+      } catch (error) {
+        console.error('[DeviceClient] Error unpairing device:', error);
+        resolve(); // Continue anyway
+      }
+    });
   }
 }

@@ -26,12 +26,15 @@ class DisplayApp {
   private playbackTimer: NodeJS.Timeout | null = null;
   private pairingCheckInterval: NodeJS.Timeout | null = null;
   private currentCode: string | null = null;
+  private isPairingScreenShown = false;
 
   constructor() {
+    console.log('[App] Constructor: Creating DisplayApp instance');
     this.init();
   }
 
   private init() {
+    console.log('[App] init(): Initializing DisplayApp');
     // Check if electronAPI is available
     if (!window.electronAPI) {
       console.error('[App] CRITICAL: window.electronAPI is undefined!');
@@ -43,9 +46,12 @@ class DisplayApp {
     console.log('[App] electronAPI initialized successfully');
 
     // Listen for events from main process
+    console.log('[App] Setting up onPairingRequired listener...');
     window.electronAPI.onPairingRequired(() => {
+      console.log('[App] *** PAIRING REQUIRED EVENT FIRED ***');
       this.showPairingScreen();
     });
+    console.log('[App] onPairingRequired listener registered');
 
     window.electronAPI.onPaired((_, token) => {
       console.log('Device paired successfully');
@@ -70,74 +76,170 @@ class DisplayApp {
   }
 
   private async showPairingScreen() {
+    // Prevent duplicate pairing screens if event is fired multiple times
+    if (this.isPairingScreenShown) {
+      console.log('[App] ⚠️  Pairing screen already shown, ignoring duplicate request');
+      return;
+    }
+    this.isPairingScreenShown = true;
+
+    console.log('[App] showPairingScreen(): Displaying pairing screen');
     this.hideAllScreens();
-    document.getElementById('pairing-screen')?.classList.remove('hidden');
+    const pairingScreen = document.getElementById('pairing-screen');
+    console.log('[App] Pairing screen element:', pairingScreen);
+    pairingScreen?.classList.remove('hidden');
+    console.log('[App] Hidden class removed from pairing-screen');
 
     try {
+      console.log('[App] Requesting pairing code from device client...');
       const result = await window.electronAPI.getPairingCode();
+      console.log('[App] *** PAIRING CODE RECEIVED ***');
+      console.log('[App] Result keys:', Object.keys(result));
+      console.log('[App] Code:', result.code);
+      console.log('[App] Has QR:', result.qrCode ? 'YES' : 'NO');
+      if (result.qrCode) {
+        console.log('[App] QR length:', result.qrCode.length);
+      }
 
       if (result.code) {
         this.currentCode = result.code;
+        // Store the pairing code in case we need it again
+        localStorage.setItem('lastPairingCode', result.code);
         this.displayPairingCode(result.code);
 
         if (result.qrCode) {
+          console.log('[App] Calling displayQRCode...');
           this.displayQRCode(result.qrCode);
+        } else {
+          console.warn('[App] ⚠️  NO QR CODE IN RESPONSE');
         }
 
         // Start checking pairing status
         this.startPairingCheck(result.code);
+      } else {
+        console.error('[App] ❌ NO CODE IN RESPONSE:', result);
       }
-    } catch (error) {
-      console.error('Failed to get pairing code:', error);
+    } catch (error: any) {
+      console.error('[App] *** ERROR getting pairing code:', error.message || error);
+      console.error('[App] Full error:', error);
+
+      // Check if error is "device already paired"
+      if (error?.message?.includes('already paired')) {
+        console.log('[App] Device already paired, checking status with stored code...');
+        const storedCode = localStorage.getItem('lastPairingCode');
+        if (storedCode) {
+          // Try to get the token using the stored pairing code
+          this.startPairingCheck(storedCode);
+          return;
+        }
+      }
+
       this.showErrorScreen('Failed to request pairing code');
+      this.isPairingScreenShown = false; // Reset so pairing can be retried
     }
   }
 
   private displayPairingCode(code: string) {
+    console.log('[App] displayPairingCode() called with code:', code);
     const codeElement = document.getElementById('pairing-code');
+    console.log('[App] Found pairing-code element:', codeElement ? 'YES' : 'NO');
     if (codeElement) {
+      console.log('[App] Setting pairing code text to:', code);
       codeElement.textContent = code;
+      console.log('[App] Pairing code displayed');
+    } else {
+      console.error('[App] ❌ pairing-code element not found!');
     }
   }
 
   private displayQRCode(qrCodeDataUrl: string) {
     const qrContainer = document.getElementById('qr-code');
     if (qrContainer) {
-      qrContainer.innerHTML = `<img src="${qrCodeDataUrl}" alt="QR Code" width="300" height="300" />`;
+      if (!qrCodeDataUrl) {
+        console.warn('[App] displayQRCode(): Received empty QR code data URL');
+        return;
+      }
+      console.log('[App] displayQRCode(): Rendering QR code, URL length:', qrCodeDataUrl.length);
+      const img = document.createElement('img');
+      img.src = qrCodeDataUrl;
+      img.alt = 'QR Code';
+      img.width = 300;
+      img.height = 300;
+      img.onerror = () => {
+        console.error('[App] QR code image failed to load');
+      };
+      img.onload = () => {
+        console.log('[App] QR code image loaded successfully');
+      };
+      qrContainer.innerHTML = '';
+      qrContainer.appendChild(img);
       qrContainer.classList.remove('hidden');
+      console.log('[App] QR code container shown');
+    } else {
+      console.error('[App] QR code container element not found');
     }
   }
 
   private startPairingCheck(code: string) {
+    console.log('[App] startPairingCheck(): Starting pairing status check with code:', code);
     if (this.pairingCheckInterval) {
       clearInterval(this.pairingCheckInterval);
     }
 
     let consecutiveErrors = 0;
     const maxErrors = 3; // Stop after 3 consecutive errors (likely paired and deleted)
+    let codeExpiryTime = Date.now() + (5 * 60 * 1000); // 5 minutes from now
+    const codeRefreshThreshold = 30 * 1000; // Refresh code 30 seconds before expiry
 
     this.pairingCheckInterval = setInterval(async () => {
       try {
+        // Check if code is about to expire and refresh it
+        const timeUntilExpiry = codeExpiryTime - Date.now();
+        if (timeUntilExpiry < codeRefreshThreshold) {
+          console.log('[App] ⏰ Pairing code about to expire, requesting new code...');
+          try {
+            const newResult = await window.electronAPI.getPairingCode();
+            console.log('[App] ✅ New pairing code received:', newResult.code);
+            this.currentCode = newResult.code;
+            localStorage.setItem('lastPairingCode', newResult.code);
+            this.displayPairingCode(newResult.code);
+            if (newResult.qrCode) {
+              this.displayQRCode(newResult.qrCode);
+            }
+            codeExpiryTime = Date.now() + (5 * 60 * 1000); // Reset expiry timer
+            consecutiveErrors = 0;
+            code = newResult.code; // Update the code variable for status checking
+            return; // Skip status check this iteration
+          } catch (refreshError: any) {
+            console.error('[App] ❌ Failed to refresh pairing code:', refreshError.message);
+            this.showErrorScreen('Failed to refresh pairing code');
+            this.stopPairingCheck();
+            this.isPairingScreenShown = false;
+            return;
+          }
+        }
+
+        console.log('[App] Checking pairing status for code:', code);
         const result = await window.electronAPI.checkPairingStatus(code);
+        console.log('[App] Pairing status result:', result);
 
         // Reset error counter on successful check
         consecutiveErrors = 0;
 
         if (result.status === 'paired') {
+          console.log('[App] Device is paired! Token received from status check');
           this.stopPairingCheck();
           // The onPaired event will be triggered from main process
         }
       } catch (error: any) {
         consecutiveErrors++;
-        
+        console.log(`[App] Pairing check error (${consecutiveErrors}/${maxErrors}):`, error.message);
+
         // If we get multiple consecutive errors (404), pairing likely completed
         // and the request was deleted from backend. Stop polling.
         if (consecutiveErrors >= maxErrors) {
           console.log('[App] Stopping pairing check - likely already paired');
           this.stopPairingCheck();
-        } else {
-          // Only log the error if we haven't exceeded threshold
-          console.error(`[RENDERER-ERROR] Failed to check pairing status: ${error.message || error}`);
         }
       }
     }, 2000); // Check every 2 seconds
@@ -153,6 +255,7 @@ class DisplayApp {
   private hidePairingScreen() {
     document.getElementById('pairing-screen')?.classList.add('hidden');
     this.stopPairingCheck();
+    this.isPairingScreenShown = false;
   }
 
   private showContentScreen() {
