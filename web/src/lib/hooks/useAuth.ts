@@ -1,60 +1,68 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '@/lib/api';
 
 interface User {
   id: string;
   email: string;
+  firstName: string;
+  lastName: string;
   organizationId: string;
-  organizationName?: string;
-  role?: string;
+  role: string;
+  organization?: {
+    name: string;
+    subscriptionTier: string;
+  };
 }
 
-export function useAuth() {
+interface UseAuthReturn {
+  user: User | null;
+  loading: boolean;
+  error: string | null;
+  isAuthenticated: boolean;
+  logout: () => Promise<void>;
+  reload: () => Promise<void>;
+}
+
+export function useAuth(): UseAuthReturn {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadUser();
-  }, []);
-
-  const loadUser = async () => {
+  const loadUser = useCallback(async () => {
     try {
       setLoading(true);
-      // Try to get user info from token or API
-      const token = localStorage.getItem('authToken');
-      if (!token) {
-        setUser(null);
-        return;
-      }
+      setError(null);
 
-      // Decode JWT to get user info (basic implementation)
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        setUser({
-          id: payload.sub || payload.userId,
-          email: payload.email,
-          organizationId: payload.organizationId,
-          organizationName: payload.organizationName,
-          role: payload.role,
-        });
-      } catch (e) {
-        console.error('Failed to decode token:', e);
-        setUser(null);
-      }
-    } catch (err: any) {
-      setError(err.message);
+      // Fetch user from server - this validates the httpOnly cookie
+      const userData = await apiClient.getCurrentUser();
+      setUser(userData);
+      apiClient.setAuthenticated(true);
+    } catch (err) {
+      // User is not authenticated - this is expected for unauthenticated users
       setUser(null);
+      apiClient.setAuthenticated(false);
+
+      // Only set error for unexpected errors, not auth failures
+      if (err instanceof Error && !err.message.includes('401') && !err.message.includes('403')) {
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const logout = () => {
-    apiClient.clearToken();
-    setUser(null);
-    window.location.href = '/login';
-  };
+  useEffect(() => {
+    loadUser();
+  }, [loadUser]);
+
+  const logout = useCallback(async () => {
+    try {
+      await apiClient.logout();
+    } finally {
+      setUser(null);
+      window.location.href = '/login';
+    }
+  }, []);
 
   return {
     user,

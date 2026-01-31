@@ -654,7 +654,61 @@ class ApiClient {
         return this.request(`/content/${id}`);
     }
     async createContent(data) {
-        // Backend expects 'name' instead of 'title'
+        // If file is provided, use multipart upload endpoint
+        if (data.file) {
+            const formData = new FormData();
+            formData.append('file', data.file);
+            formData.append('name', data.title);
+            formData.append('type', data.type);
+            // Use raw fetch for multipart/form-data (bypass request() which sets Content-Type: application/json)
+            const headers = {
+                ...this.token && {
+                    Authorization: `Bearer ${this.token}`
+                }
+            };
+            if ("TURBOPACK compile-time truthy", 1) {
+                console.log(`[API] Request: POST ${this.baseUrl}/content/upload (multipart/form-data)`);
+            }
+            const controller = new AbortController();
+            const timeoutId = setTimeout(()=>controller.abort(), 60000); // 60s timeout for uploads
+            try {
+                const response = await fetch(`${this.baseUrl}/content/upload`, {
+                    method: 'POST',
+                    headers,
+                    body: formData,
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                if ("TURBOPACK compile-time truthy", 1) {
+                    console.log(`[API] Response status: ${response.status} ${response.statusText}`);
+                }
+                if (!response.ok) {
+                    if (response.status === 401 || response.status === 403) {
+                        this.clearToken();
+                        if ("TURBOPACK compile-time truthy", 1) {
+                            const currentPath = window.location.pathname;
+                            window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`;
+                        }
+                    }
+                    const error = await response.json().catch(()=>({
+                            message: 'Upload failed'
+                        }));
+                    throw new Error(error.message || `HTTP ${response.status}`);
+                }
+                const result = await response.json();
+                if ("TURBOPACK compile-time truthy", 1) {
+                    console.log('[API] File upload successful');
+                }
+                return result.content || result;
+            } catch (error) {
+                clearTimeout(timeoutId);
+                if (error instanceof Error && error.name === 'AbortError') {
+                    throw new Error('Upload timeout');
+                }
+                throw error;
+            }
+        }
+        // Otherwise use JSON endpoint (for URLs)
         const payload = {
             name: data.title,
             type: data.type === 'pdf' ? 'url' : data.type,

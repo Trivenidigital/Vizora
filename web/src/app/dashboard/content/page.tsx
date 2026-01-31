@@ -37,6 +37,7 @@ export default function ContentPage() {
     title: '',
     type: 'image' as 'image' | 'video' | 'pdf' | 'url',
     url: '',
+    file: null as File | null,
   });
   const [actionLoading, setActionLoading] = useState(false);
   const [filterType, setFilterType] = useState<string>('all');
@@ -171,13 +172,13 @@ export default function ContentPage() {
       ));
 
       try {
-        const url = URL.createObjectURL(item.file);
         const title = item.file.name.replace(/\.[^/.]+$/, '');
-        
+
+        // Pass file directly to API - it will handle multipart upload
         const newContent = await apiClient.createContent({
           title,
           type: uploadForm.type,
-          url,
+          file: item.file, // Pass file object instead of blob URL
         });
 
         // Generate thumbnail for images
@@ -210,7 +211,7 @@ export default function ContentPage() {
       toast.success(`${successCount} file(s) uploaded successfully`);
       setIsUploadModalOpen(false);
       setUploadQueue([]);
-      setUploadForm({ title: '', type: 'image', url: '' });
+      setUploadForm({ title: '', type: 'image', url: '', file: null });
       loadContent();
     } else {
       toast.error(`${errorCount} file(s) failed to upload`);
@@ -234,7 +235,12 @@ export default function ContentPage() {
 
     try {
       setActionLoading(true);
-      const newContent = await apiClient.createContent(uploadForm);
+      // Pass file if available, otherwise pass the form as-is (for URL type)
+      const contentData = uploadForm.file
+        ? { title: uploadForm.title, type: uploadForm.type, file: uploadForm.file }
+        : { title: uploadForm.title, type: uploadForm.type, url: uploadForm.url };
+
+      const newContent = await apiClient.createContent(contentData);
       
       // Generate thumbnail for images
       if (uploadForm.type === 'image' && newContent.id) {
@@ -248,7 +254,7 @@ export default function ContentPage() {
       
       toast.success('Content uploaded successfully');
       setIsUploadModalOpen(false);
-      setUploadForm({ title: '', type: 'image', url: '' });
+      setUploadForm({ title: '', type: 'image', url: '', file: null });
       setFormErrors({});
       loadContent();
     } catch (error: any) {
@@ -517,14 +523,17 @@ export default function ContentPage() {
       setUploadQueue(prev => [...prev, ...newQueueItems]);
       
       // For backward compatibility, set first file to uploadForm
-      if (acceptedFiles.length > 0 && !uploadForm.url) {
+      if (acceptedFiles.length > 0 && !uploadForm.file) {
         const file = acceptedFiles[0];
-        const url = URL.createObjectURL(file);
-        setUploadForm({ ...uploadForm, url });
+        setUploadForm(prev => ({
+          ...prev,
+          file,
+          url: URL.createObjectURL(file),
+        }));
         if (!uploadForm.title) {
-          setUploadForm(prev => ({ 
-            ...prev, 
-            title: file.name.replace(/\.[^/.]+$/, '') 
+          setUploadForm(prev => ({
+            ...prev,
+            title: file.name.replace(/\.[^/.]+$/, '')
           }));
         }
       }

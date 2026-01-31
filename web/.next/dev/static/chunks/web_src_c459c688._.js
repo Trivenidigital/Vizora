@@ -2998,7 +2998,8 @@ function ContentPage() {
     const [uploadForm, setUploadForm] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])({
         title: '',
         type: 'image',
-        url: ''
+        url: '',
+        file: null
     });
     const [actionLoading, setActionLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
     const [filterType, setFilterType] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])('all');
@@ -3140,12 +3141,12 @@ function ContentPage() {
                         status: 'uploading'
                     } : q));
             try {
-                const url = URL.createObjectURL(item.file);
                 const title = item.file.name.replace(/\.[^/.]+$/, '');
+                // Pass file directly to API - it will handle multipart upload
                 const newContent = await __TURBOPACK__imported__module__$5b$project$5d2f$web$2f$src$2f$lib$2f$api$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiClient"].createContent({
                     title,
                     type: uploadForm.type,
-                    url
+                    file: item.file
                 });
                 // Generate thumbnail for images
                 if (uploadForm.type === 'image' && newContent.id) {
@@ -3180,7 +3181,8 @@ function ContentPage() {
             setUploadForm({
                 title: '',
                 type: 'image',
-                url: ''
+                url: '',
+                file: null
             });
             loadContent();
         } else {
@@ -3201,7 +3203,17 @@ function ContentPage() {
         }
         try {
             setActionLoading(true);
-            const newContent = await __TURBOPACK__imported__module__$5b$project$5d2f$web$2f$src$2f$lib$2f$api$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiClient"].createContent(uploadForm);
+            // Pass file if available, otherwise pass the form as-is (for URL type)
+            const contentData = uploadForm.file ? {
+                title: uploadForm.title,
+                type: uploadForm.type,
+                file: uploadForm.file
+            } : {
+                title: uploadForm.title,
+                type: uploadForm.type,
+                url: uploadForm.url
+            };
+            const newContent = await __TURBOPACK__imported__module__$5b$project$5d2f$web$2f$src$2f$lib$2f$api$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiClient"].createContent(contentData);
             // Generate thumbnail for images
             if (uploadForm.type === 'image' && newContent.id) {
                 try {
@@ -3216,7 +3228,8 @@ function ContentPage() {
             setUploadForm({
                 title: '',
                 type: 'image',
-                url: ''
+                url: '',
+                file: null
             });
             setFormErrors({});
             loadContent();
@@ -3469,13 +3482,15 @@ function ContentPage() {
                         ]
                 }["ContentPage.useDropzone"]);
                 // For backward compatibility, set first file to uploadForm
-                if (acceptedFiles.length > 0 && !uploadForm.url) {
+                if (acceptedFiles.length > 0 && !uploadForm.file) {
                     const file = acceptedFiles[0];
-                    const url = URL.createObjectURL(file);
                     setUploadForm({
-                        ...uploadForm,
-                        url
-                    });
+                        "ContentPage.useDropzone": (prev)=>({
+                                ...prev,
+                                file,
+                                url: URL.createObjectURL(file)
+                            })
+                    }["ContentPage.useDropzone"]);
                     if (!uploadForm.title) {
                         setUploadForm({
                             "ContentPage.useDropzone": (prev)=>({
@@ -3529,7 +3544,7 @@ function ContentPage() {
         children: [
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(toast.ToastContainer, {}, void 0, false, {
                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                lineNumber: 581,
+                lineNumber: 590,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3542,7 +3557,7 @@ function ContentPage() {
                                 children: "Content Library"
                             }, void 0, false, {
                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                lineNumber: 585,
+                                lineNumber: 594,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -3558,14 +3573,14 @@ function ContentPage() {
                                                 className: "w-2 h-2 bg-green-600 rounded-full animate-pulse"
                                             }, void 0, false, {
                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                lineNumber: 590,
+                                                lineNumber: 599,
                                                 columnNumber: 17
                                             }, this),
                                             "Real-time enabled"
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 589,
+                                        lineNumber: 598,
                                         columnNumber: 15
                                     }, this),
                                     realtimeStatus === 'offline' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -3575,14 +3590,14 @@ function ContentPage() {
                                                 className: "w-2 h-2 bg-yellow-600 rounded-full"
                                             }, void 0, false, {
                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                lineNumber: 596,
+                                                lineNumber: 605,
                                                 columnNumber: 17
                                             }, this),
                                             "Offline mode"
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 595,
+                                        lineNumber: 604,
                                         columnNumber: 15
                                     }, this),
                                     getPendingCount() > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -3592,7 +3607,7 @@ function ContentPage() {
                                                 className: "w-2 h-2 bg-blue-600 rounded-full animate-pulse"
                                             }, void 0, false, {
                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                lineNumber: 602,
+                                                lineNumber: 611,
                                                 columnNumber: 17
                                             }, this),
                                             getPendingCount(),
@@ -3600,19 +3615,19 @@ function ContentPage() {
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 601,
+                                        lineNumber: 610,
                                         columnNumber: 15
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                lineNumber: 586,
+                                lineNumber: 595,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                        lineNumber: 584,
+                        lineNumber: 593,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3629,12 +3644,12 @@ function ContentPage() {
                                             size: "md"
                                         }, void 0, false, {
                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                            lineNumber: 618,
+                                            lineNumber: 627,
                                             columnNumber: 15
                                         }, this)
                                     }, void 0, false, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 610,
+                                        lineNumber: 619,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -3645,18 +3660,18 @@ function ContentPage() {
                                             size: "md"
                                         }, void 0, false, {
                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                            lineNumber: 628,
+                                            lineNumber: 637,
                                             columnNumber: 15
                                         }, this)
                                     }, void 0, false, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 620,
+                                        lineNumber: 629,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                lineNumber: 609,
+                                lineNumber: 618,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -3669,32 +3684,32 @@ function ContentPage() {
                                         className: "text-white"
                                     }, void 0, false, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 635,
+                                        lineNumber: 644,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                         children: "Upload Content"
                                     }, void 0, false, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 636,
+                                        lineNumber: 645,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                lineNumber: 631,
+                                lineNumber: 640,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                        lineNumber: 608,
+                        lineNumber: 617,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                lineNumber: 583,
+                lineNumber: 592,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$web$2f$src$2f$components$2f$SearchFilter$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
@@ -3703,7 +3718,7 @@ function ContentPage() {
                 placeholder: "Search content by title..."
             }, void 0, false, {
                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                lineNumber: 642,
+                lineNumber: 651,
                 columnNumber: 7
             }, this),
             debouncedSearch && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -3716,7 +3731,7 @@ function ContentPage() {
                 ]
             }, void 0, true, {
                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                lineNumber: 648,
+                lineNumber: 657,
                 columnNumber: 9
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3731,14 +3746,14 @@ function ContentPage() {
                                 size: "md"
                             }, void 0, false, {
                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                lineNumber: 659,
+                                lineNumber: 668,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                 children: "Filter by Tags"
                             }, void 0, false, {
                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                lineNumber: 660,
+                                lineNumber: 669,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("svg", {
@@ -3751,18 +3766,18 @@ function ContentPage() {
                                     clipRule: "evenodd"
                                 }, void 0, false, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 666,
+                                    lineNumber: 675,
                                     columnNumber: 13
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                lineNumber: 661,
+                                lineNumber: 670,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                        lineNumber: 655,
+                        lineNumber: 664,
                         columnNumber: 9
                     }, this),
                     showTagFilter && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3774,7 +3789,7 @@ function ContentPage() {
                                 onChange: setSelectedTags
                             }, void 0, false, {
                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                lineNumber: 672,
+                                lineNumber: 681,
                                 columnNumber: 13
                             }, this),
                             selectedTags.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -3783,19 +3798,19 @@ function ContentPage() {
                                 children: "Clear tag filters"
                             }, void 0, false, {
                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                lineNumber: 678,
+                                lineNumber: 687,
                                 columnNumber: 15
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                        lineNumber: 671,
+                        lineNumber: 680,
                         columnNumber: 11
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                lineNumber: 654,
+                lineNumber: 663,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3821,12 +3836,12 @@ function ContentPage() {
                                         ]
                                     }, type, true, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 694,
+                                        lineNumber: 703,
                                         columnNumber: 15
                                     }, this))
                             }, void 0, false, {
                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                lineNumber: 692,
+                                lineNumber: 701,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3838,7 +3853,7 @@ function ContentPage() {
                                         children: "Clear all"
                                     }, void 0, false, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 710,
+                                        lineNumber: 719,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -3851,14 +3866,14 @@ function ContentPage() {
                                                 className: "text-gray-600"
                                             }, void 0, false, {
                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                lineNumber: 721,
+                                                lineNumber: 730,
                                                 columnNumber: 15
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                 children: "Advanced"
                                             }, void 0, false, {
                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                lineNumber: 722,
+                                                lineNumber: 731,
                                                 columnNumber: 15
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("svg", {
@@ -3871,30 +3886,30 @@ function ContentPage() {
                                                     clipRule: "evenodd"
                                                 }, void 0, false, {
                                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                    lineNumber: 728,
+                                                    lineNumber: 737,
                                                     columnNumber: 17
                                                 }, this)
                                             }, void 0, false, {
                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                lineNumber: 723,
+                                                lineNumber: 732,
                                                 columnNumber: 15
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 717,
+                                        lineNumber: 726,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                lineNumber: 708,
+                                lineNumber: 717,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                        lineNumber: 691,
+                        lineNumber: 700,
                         columnNumber: 9
                     }, this),
                     showAdvancedFilters && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3907,7 +3922,7 @@ function ContentPage() {
                                         children: "Status"
                                     }, void 0, false, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 738,
+                                        lineNumber: 747,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("select", {
@@ -3920,7 +3935,7 @@ function ContentPage() {
                                                 children: "All Statuses"
                                             }, void 0, false, {
                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                lineNumber: 746,
+                                                lineNumber: 755,
                                                 columnNumber: 17
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("option", {
@@ -3928,7 +3943,7 @@ function ContentPage() {
                                                 children: "Ready"
                                             }, void 0, false, {
                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                lineNumber: 747,
+                                                lineNumber: 756,
                                                 columnNumber: 17
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("option", {
@@ -3936,7 +3951,7 @@ function ContentPage() {
                                                 children: "Processing"
                                             }, void 0, false, {
                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                lineNumber: 748,
+                                                lineNumber: 757,
                                                 columnNumber: 17
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("option", {
@@ -3944,19 +3959,19 @@ function ContentPage() {
                                                 children: "Error"
                                             }, void 0, false, {
                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                lineNumber: 749,
+                                                lineNumber: 758,
                                                 columnNumber: 17
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 741,
+                                        lineNumber: 750,
                                         columnNumber: 15
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                lineNumber: 737,
+                                lineNumber: 746,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3966,7 +3981,7 @@ function ContentPage() {
                                         children: "Upload Date"
                                     }, void 0, false, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 753,
+                                        lineNumber: 762,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("select", {
@@ -3979,7 +3994,7 @@ function ContentPage() {
                                                 children: "All Time"
                                             }, void 0, false, {
                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                lineNumber: 761,
+                                                lineNumber: 770,
                                                 columnNumber: 17
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("option", {
@@ -3987,7 +4002,7 @@ function ContentPage() {
                                                 children: "Last 7 days"
                                             }, void 0, false, {
                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                lineNumber: 762,
+                                                lineNumber: 771,
                                                 columnNumber: 17
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("option", {
@@ -3995,7 +4010,7 @@ function ContentPage() {
                                                 children: "Last 30 days"
                                             }, void 0, false, {
                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                lineNumber: 763,
+                                                lineNumber: 772,
                                                 columnNumber: 17
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("option", {
@@ -4003,25 +4018,25 @@ function ContentPage() {
                                                 children: "Last 90 days"
                                             }, void 0, false, {
                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                lineNumber: 764,
+                                                lineNumber: 773,
                                                 columnNumber: 17
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 756,
+                                        lineNumber: 765,
                                         columnNumber: 15
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                lineNumber: 752,
+                                lineNumber: 761,
                                 columnNumber: 13
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                        lineNumber: 736,
+                        lineNumber: 745,
                         columnNumber: 11
                     }, this),
                     hasActiveFilters && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4032,7 +4047,7 @@ function ContentPage() {
                                 children: "Active filters:"
                             }, void 0, false, {
                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                lineNumber: 773,
+                                lineNumber: 782,
                                 columnNumber: 13
                             }, this),
                             filterType !== 'all' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -4043,7 +4058,7 @@ function ContentPage() {
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                lineNumber: 775,
+                                lineNumber: 784,
                                 columnNumber: 15
                             }, this),
                             filterStatus !== 'all' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -4054,7 +4069,7 @@ function ContentPage() {
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                lineNumber: 780,
+                                lineNumber: 789,
                                 columnNumber: 15
                             }, this),
                             filterDateRange !== 'all' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -4065,7 +4080,7 @@ function ContentPage() {
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                lineNumber: 785,
+                                lineNumber: 794,
                                 columnNumber: 15
                             }, this),
                             searchQuery && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -4077,19 +4092,19 @@ function ContentPage() {
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                lineNumber: 790,
+                                lineNumber: 799,
                                 columnNumber: 15
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                        lineNumber: 772,
+                        lineNumber: 781,
                         columnNumber: 11
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                lineNumber: 690,
+                lineNumber: 699,
                 columnNumber: 7
             }, this),
             selectedItems.size > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4108,7 +4123,7 @@ function ContentPage() {
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                lineNumber: 802,
+                                lineNumber: 811,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -4117,13 +4132,13 @@ function ContentPage() {
                                 children: "Clear selection"
                             }, void 0, false, {
                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                lineNumber: 805,
+                                lineNumber: 814,
                                 columnNumber: 13
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                        lineNumber: 801,
+                        lineNumber: 810,
                         columnNumber: 11
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4137,7 +4152,7 @@ function ContentPage() {
                                     size: "sm"
                                 }, void 0, false, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 818,
+                                    lineNumber: 827,
                                     columnNumber: 33
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$web$2f$src$2f$theme$2f$icons$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Icon"], {
@@ -4146,25 +4161,25 @@ function ContentPage() {
                                     className: "text-white"
                                 }, void 0, false, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 819,
+                                    lineNumber: 828,
                                     columnNumber: 15
                                 }, this),
                                 "Delete Selected"
                             ]
                         }, void 0, true, {
                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                            lineNumber: 813,
+                            lineNumber: 822,
                             columnNumber: 13
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                        lineNumber: 812,
+                        lineNumber: 821,
                         columnNumber: 11
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                lineNumber: 800,
+                lineNumber: 809,
                 columnNumber: 9
             }, this),
             loading ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4173,12 +4188,12 @@ function ContentPage() {
                     size: "lg"
                 }, void 0, false, {
                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                    lineNumber: 829,
+                    lineNumber: 838,
                     columnNumber: 11
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                lineNumber: 828,
+                lineNumber: 837,
                 columnNumber: 9
             }, this) : filteredContent.length === 0 ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$web$2f$src$2f$components$2f$EmptyState$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
                 icon: "folder",
@@ -4190,7 +4205,7 @@ function ContentPage() {
                 }
             }, void 0, false, {
                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                lineNumber: 832,
+                lineNumber: 841,
                 columnNumber: 9
             }, this) : viewMode === 'list' ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                 className: "bg-white rounded-lg shadow overflow-hidden",
@@ -4210,25 +4225,9 @@ function ContentPage() {
                                             className: "rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                         }, void 0, false, {
                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                            lineNumber: 847,
+                                            lineNumber: 856,
                                             columnNumber: 19
                                         }, this)
-                                    }, void 0, false, {
-                                        fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 846,
-                                        columnNumber: 17
-                                    }, this),
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("th", {
-                                        className: "px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase",
-                                        children: "Content"
-                                    }, void 0, false, {
-                                        fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 854,
-                                        columnNumber: 17
-                                    }, this),
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("th", {
-                                        className: "px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase",
-                                        children: "Type"
                                     }, void 0, false, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
                                         lineNumber: 855,
@@ -4236,10 +4235,26 @@ function ContentPage() {
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("th", {
                                         className: "px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase",
+                                        children: "Content"
+                                    }, void 0, false, {
+                                        fileName: "[project]/web/src/app/dashboard/content/page.tsx",
+                                        lineNumber: 863,
+                                        columnNumber: 17
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("th", {
+                                        className: "px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase",
+                                        children: "Type"
+                                    }, void 0, false, {
+                                        fileName: "[project]/web/src/app/dashboard/content/page.tsx",
+                                        lineNumber: 864,
+                                        columnNumber: 17
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("th", {
+                                        className: "px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase",
                                         children: "Status"
                                     }, void 0, false, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 856,
+                                        lineNumber: 865,
                                         columnNumber: 17
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("th", {
@@ -4247,7 +4262,7 @@ function ContentPage() {
                                         children: "Uploaded"
                                     }, void 0, false, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 857,
+                                        lineNumber: 866,
                                         columnNumber: 17
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("th", {
@@ -4255,18 +4270,18 @@ function ContentPage() {
                                         children: "Actions"
                                     }, void 0, false, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 858,
+                                        lineNumber: 867,
                                         columnNumber: 17
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                lineNumber: 845,
+                                lineNumber: 854,
                                 columnNumber: 15
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                            lineNumber: 844,
+                            lineNumber: 853,
                             columnNumber: 13
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("tbody", {
@@ -4284,12 +4299,12 @@ function ContentPage() {
                                                 onClick: (e)=>e.stopPropagation()
                                             }, void 0, false, {
                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                lineNumber: 865,
+                                                lineNumber: 874,
                                                 columnNumber: 21
                                             }, this)
                                         }, void 0, false, {
                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                            lineNumber: 864,
+                                            lineNumber: 873,
                                             columnNumber: 19
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("td", {
@@ -4306,7 +4321,7 @@ function ContentPage() {
                                                             className: "w-full h-full object-cover"
                                                         }, void 0, false, {
                                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                            lineNumber: 877,
+                                                            lineNumber: 886,
                                                             columnNumber: 27
                                                         }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$web$2f$src$2f$theme$2f$icons$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Icon"], {
                                                             name: getTypeIcon(item.type),
@@ -4314,12 +4329,12 @@ function ContentPage() {
                                                             className: "text-white"
                                                         }, void 0, false, {
                                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                            lineNumber: 879,
+                                                            lineNumber: 888,
                                                             columnNumber: 27
                                                         }, this)
                                                     }, void 0, false, {
                                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                        lineNumber: 875,
+                                                        lineNumber: 884,
                                                         columnNumber: 23
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4331,7 +4346,7 @@ function ContentPage() {
                                                                 children: item.title
                                                             }, void 0, false, {
                                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                                lineNumber: 883,
+                                                                lineNumber: 892,
                                                                 columnNumber: 25
                                                             }, this),
                                                             item.duration && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4342,24 +4357,24 @@ function ContentPage() {
                                                                 ]
                                                             }, void 0, true, {
                                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                                lineNumber: 887,
+                                                                lineNumber: 896,
                                                                 columnNumber: 27
                                                             }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                        lineNumber: 882,
+                                                        lineNumber: 891,
                                                         columnNumber: 23
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                lineNumber: 874,
+                                                lineNumber: 883,
                                                 columnNumber: 21
                                             }, this)
                                         }, void 0, false, {
                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                            lineNumber: 873,
+                                            lineNumber: 882,
                                             columnNumber: 19
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("td", {
@@ -4369,12 +4384,12 @@ function ContentPage() {
                                                 children: item.type
                                             }, void 0, false, {
                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                lineNumber: 893,
+                                                lineNumber: 902,
                                                 columnNumber: 21
                                             }, this)
                                         }, void 0, false, {
                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                            lineNumber: 892,
+                                            lineNumber: 901,
                                             columnNumber: 19
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("td", {
@@ -4384,12 +4399,12 @@ function ContentPage() {
                                                 children: item.status
                                             }, void 0, false, {
                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                lineNumber: 898,
+                                                lineNumber: 907,
                                                 columnNumber: 21
                                             }, this)
                                         }, void 0, false, {
                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                            lineNumber: 897,
+                                            lineNumber: 906,
                                             columnNumber: 19
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("td", {
@@ -4397,7 +4412,7 @@ function ContentPage() {
                                             children: item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '—'
                                         }, void 0, false, {
                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                            lineNumber: 902,
+                                            lineNumber: 911,
                                             columnNumber: 19
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("td", {
@@ -4414,12 +4429,12 @@ function ContentPage() {
                                                             size: "md"
                                                         }, void 0, false, {
                                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                            lineNumber: 912,
+                                                            lineNumber: 921,
                                                             columnNumber: 25
                                                         }, this)
                                                     }, void 0, false, {
                                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                        lineNumber: 907,
+                                                        lineNumber: 916,
                                                         columnNumber: 23
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -4431,12 +4446,12 @@ function ContentPage() {
                                                             size: "md"
                                                         }, void 0, false, {
                                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                            lineNumber: 919,
+                                                            lineNumber: 928,
                                                             columnNumber: 25
                                                         }, this)
                                                     }, void 0, false, {
                                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                        lineNumber: 914,
+                                                        lineNumber: 923,
                                                         columnNumber: 23
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -4448,12 +4463,12 @@ function ContentPage() {
                                                             size: "md"
                                                         }, void 0, false, {
                                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                            lineNumber: 926,
+                                                            lineNumber: 935,
                                                             columnNumber: 25
                                                         }, this)
                                                     }, void 0, false, {
                                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                        lineNumber: 921,
+                                                        lineNumber: 930,
                                                         columnNumber: 23
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -4465,45 +4480,45 @@ function ContentPage() {
                                                             size: "md"
                                                         }, void 0, false, {
                                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                            lineNumber: 933,
+                                                            lineNumber: 942,
                                                             columnNumber: 25
                                                         }, this)
                                                     }, void 0, false, {
                                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                        lineNumber: 928,
+                                                        lineNumber: 937,
                                                         columnNumber: 23
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                lineNumber: 906,
+                                                lineNumber: 915,
                                                 columnNumber: 21
                                             }, this)
                                         }, void 0, false, {
                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                            lineNumber: 905,
+                                            lineNumber: 914,
                                             columnNumber: 19
                                         }, this)
                                     ]
                                 }, item.id, true, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 863,
+                                    lineNumber: 872,
                                     columnNumber: 17
                                 }, this))
                         }, void 0, false, {
                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                            lineNumber: 861,
+                            lineNumber: 870,
                             columnNumber: 13
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                    lineNumber: 843,
+                    lineNumber: 852,
                     columnNumber: 11
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                lineNumber: 842,
+                lineNumber: 851,
                 columnNumber: 9
             }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                 className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6",
@@ -4526,7 +4541,7 @@ function ContentPage() {
                                         }
                                     }, void 0, false, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 955,
+                                        lineNumber: 964,
                                         columnNumber: 19
                                     }, this) : null,
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$web$2f$src$2f$theme$2f$icons$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Icon"], {
@@ -4535,7 +4550,7 @@ function ContentPage() {
                                         className: `text-white ${item.thumbnailUrl ? 'hidden' : ''}`
                                     }, void 0, false, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 966,
+                                        lineNumber: 975,
                                         columnNumber: 17
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4548,12 +4563,12 @@ function ContentPage() {
                                             className: "w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 bg-white shadow-sm"
                                         }, void 0, false, {
                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                            lineNumber: 968,
+                                            lineNumber: 977,
                                             columnNumber: 19
                                         }, this)
                                     }, void 0, false, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 967,
+                                        lineNumber: 976,
                                         columnNumber: 17
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -4561,13 +4576,13 @@ function ContentPage() {
                                         children: item.status
                                     }, void 0, false, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 976,
+                                        lineNumber: 985,
                                         columnNumber: 17
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                lineNumber: 949,
+                                lineNumber: 958,
                                 columnNumber: 15
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4579,7 +4594,7 @@ function ContentPage() {
                                         children: item.title
                                     }, void 0, false, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 985,
+                                        lineNumber: 994,
                                         columnNumber: 17
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4590,7 +4605,7 @@ function ContentPage() {
                                                 children: item.type
                                             }, void 0, false, {
                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                lineNumber: 989,
+                                                lineNumber: 998,
                                                 columnNumber: 19
                                             }, this),
                                             item.duration && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -4600,13 +4615,13 @@ function ContentPage() {
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                lineNumber: 990,
+                                                lineNumber: 999,
                                                 columnNumber: 37
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 988,
+                                        lineNumber: 997,
                                         columnNumber: 17
                                     }, this),
                                     item.createdAt && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4617,7 +4632,7 @@ function ContentPage() {
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 993,
+                                        lineNumber: 1002,
                                         columnNumber: 19
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4632,14 +4647,14 @@ function ContentPage() {
                                                         size: "sm"
                                                     }, void 0, false, {
                                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                        lineNumber: 1002,
+                                                        lineNumber: 1011,
                                                         columnNumber: 21
                                                     }, this),
                                                     "Push"
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                lineNumber: 998,
+                                                lineNumber: 1007,
                                                 columnNumber: 19
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -4651,14 +4666,14 @@ function ContentPage() {
                                                         size: "sm"
                                                     }, void 0, false, {
                                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                        lineNumber: 1009,
+                                                        lineNumber: 1018,
                                                         columnNumber: 21
                                                     }, this),
                                                     "Playlist"
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                lineNumber: 1005,
+                                                lineNumber: 1014,
                                                 columnNumber: 19
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -4670,14 +4685,14 @@ function ContentPage() {
                                                         size: "sm"
                                                     }, void 0, false, {
                                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                        lineNumber: 1016,
+                                                        lineNumber: 1025,
                                                         columnNumber: 21
                                                     }, this),
                                                     "Edit"
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                lineNumber: 1012,
+                                                lineNumber: 1021,
                                                 columnNumber: 19
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -4689,37 +4704,37 @@ function ContentPage() {
                                                         size: "sm"
                                                     }, void 0, false, {
                                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                        lineNumber: 1023,
+                                                        lineNumber: 1032,
                                                         columnNumber: 21
                                                     }, this),
                                                     "Delete"
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                lineNumber: 1019,
+                                                lineNumber: 1028,
                                                 columnNumber: 19
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 997,
+                                        lineNumber: 1006,
                                         columnNumber: 17
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                lineNumber: 984,
+                                lineNumber: 993,
                                 columnNumber: 15
                             }, this)
                         ]
                     }, item.id, true, {
                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                        lineNumber: 945,
+                        lineNumber: 954,
                         columnNumber: 13
                     }, this))
             }, void 0, false, {
                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                lineNumber: 943,
+                lineNumber: 952,
                 columnNumber: 9
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$web$2f$src$2f$components$2f$Modal$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
@@ -4737,7 +4752,7 @@ function ContentPage() {
                                     children: "Content Title"
                                 }, void 0, false, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 1042,
+                                    lineNumber: 1051,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -4771,7 +4786,7 @@ function ContentPage() {
                                     autoComplete: "off"
                                 }, void 0, false, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 1045,
+                                    lineNumber: 1054,
                                     columnNumber: 13
                                 }, this),
                                 formErrors.title && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -4779,13 +4794,13 @@ function ContentPage() {
                                     children: formErrors.title
                                 }, void 0, false, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 1069,
+                                    lineNumber: 1078,
                                     columnNumber: 15
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                            lineNumber: 1041,
+                            lineNumber: 1050,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4795,7 +4810,7 @@ function ContentPage() {
                                     children: "Content Type"
                                 }, void 0, false, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 1073,
+                                    lineNumber: 1082,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("select", {
@@ -4811,7 +4826,7 @@ function ContentPage() {
                                             children: "Image"
                                         }, void 0, false, {
                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                            lineNumber: 1083,
+                                            lineNumber: 1092,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("option", {
@@ -4819,7 +4834,7 @@ function ContentPage() {
                                             children: "Video"
                                         }, void 0, false, {
                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                            lineNumber: 1084,
+                                            lineNumber: 1093,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("option", {
@@ -4827,7 +4842,7 @@ function ContentPage() {
                                             children: "PDF"
                                         }, void 0, false, {
                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                            lineNumber: 1085,
+                                            lineNumber: 1094,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("option", {
@@ -4835,19 +4850,19 @@ function ContentPage() {
                                             children: "URL/Web Page"
                                         }, void 0, false, {
                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                            lineNumber: 1086,
+                                            lineNumber: 1095,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 1076,
+                                    lineNumber: 1085,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                            lineNumber: 1072,
+                            lineNumber: 1081,
                             columnNumber: 11
                         }, this),
                         uploadForm.type !== 'url' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4857,7 +4872,7 @@ function ContentPage() {
                                     children: "Upload File"
                                 }, void 0, false, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 1093,
+                                    lineNumber: 1102,
                                     columnNumber: 15
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4868,7 +4883,7 @@ function ContentPage() {
                                             ...getInputProps()
                                         }, void 0, false, {
                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                            lineNumber: 1104,
+                                            lineNumber: 1113,
                                             columnNumber: 17
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("svg", {
@@ -4883,12 +4898,12 @@ function ContentPage() {
                                                 strokeLinejoin: "round"
                                             }, void 0, false, {
                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                lineNumber: 1111,
+                                                lineNumber: 1120,
                                                 columnNumber: 19
                                             }, this)
                                         }, void 0, false, {
                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                            lineNumber: 1105,
+                                            lineNumber: 1114,
                                             columnNumber: 17
                                         }, this),
                                         isDragActive ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -4896,7 +4911,7 @@ function ContentPage() {
                                             children: "Drop the file here..."
                                         }, void 0, false, {
                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                            lineNumber: 1119,
+                                            lineNumber: 1128,
                                             columnNumber: 19
                                         }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Fragment"], {
                                             children: [
@@ -4905,7 +4920,7 @@ function ContentPage() {
                                                     children: "Drag & drop file here, or click to browse"
                                                 }, void 0, false, {
                                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                    lineNumber: 1124,
+                                                    lineNumber: 1133,
                                                     columnNumber: 21
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -4917,7 +4932,7 @@ function ContentPage() {
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                    lineNumber: 1127,
+                                                    lineNumber: 1136,
                                                     columnNumber: 21
                                                 }, this)
                                             ]
@@ -4925,7 +4940,7 @@ function ContentPage() {
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 1096,
+                                    lineNumber: 1105,
                                     columnNumber: 15
                                 }, this),
                                 uploadQueue.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4945,7 +4960,7 @@ function ContentPage() {
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                    lineNumber: 1140,
+                                                    lineNumber: 1149,
                                                     columnNumber: 21
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -4954,13 +4969,13 @@ function ContentPage() {
                                                     children: "Clear All"
                                                 }, void 0, false, {
                                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                    lineNumber: 1143,
+                                                    lineNumber: 1152,
                                                     columnNumber: 21
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                            lineNumber: 1139,
+                                            lineNumber: 1148,
                                             columnNumber: 19
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4976,7 +4991,7 @@ function ContentPage() {
                                                                     children: item.file.name
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                                    lineNumber: 1157,
+                                                                    lineNumber: 1166,
                                                                     columnNumber: 27
                                                                 }, this),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -4987,13 +5002,13 @@ function ContentPage() {
                                                                     ]
                                                                 }, void 0, true, {
                                                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                                    lineNumber: 1160,
+                                                                    lineNumber: 1169,
                                                                     columnNumber: 27
                                                                 }, this)
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                            lineNumber: 1156,
+                                                            lineNumber: 1165,
                                                             columnNumber: 25
                                                         }, this),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5004,14 +5019,14 @@ function ContentPage() {
                                                                     children: "Pending"
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                                    lineNumber: 1166,
+                                                                    lineNumber: 1175,
                                                                     columnNumber: 29
                                                                 }, this),
                                                                 item.status === 'uploading' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$web$2f$src$2f$components$2f$LoadingSpinner$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
                                                                     size: "sm"
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                                    lineNumber: 1169,
+                                                                    lineNumber: 1178,
                                                                     columnNumber: 29
                                                                 }, this),
                                                                 item.status === 'success' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -5019,7 +5034,7 @@ function ContentPage() {
                                                                     children: "✓"
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                                    lineNumber: 1172,
+                                                                    lineNumber: 1181,
                                                                     columnNumber: 29
                                                                 }, this),
                                                                 item.status === 'error' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -5028,7 +5043,7 @@ function ContentPage() {
                                                                     children: "✗"
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                                    lineNumber: 1175,
+                                                                    lineNumber: 1184,
                                                                     columnNumber: 29
                                                                 }, this),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -5037,36 +5052,36 @@ function ContentPage() {
                                                                     children: "×"
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                                    lineNumber: 1177,
+                                                                    lineNumber: 1186,
                                                                     columnNumber: 27
                                                                 }, this)
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                            lineNumber: 1164,
+                                                            lineNumber: 1173,
                                                             columnNumber: 25
                                                         }, this)
                                                     ]
                                                 }, idx, true, {
                                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                    lineNumber: 1152,
+                                                    lineNumber: 1161,
                                                     columnNumber: 23
                                                 }, this))
                                         }, void 0, false, {
                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                            lineNumber: 1150,
+                                            lineNumber: 1159,
                                             columnNumber: 19
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 1138,
+                                    lineNumber: 1147,
                                     columnNumber: 17
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                            lineNumber: 1092,
+                            lineNumber: 1101,
                             columnNumber: 13
                         }, this),
                         uploadForm.type === 'url' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5076,7 +5091,7 @@ function ContentPage() {
                                     children: "URL"
                                 }, void 0, false, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 1195,
+                                    lineNumber: 1204,
                                     columnNumber: 15
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -5108,7 +5123,7 @@ function ContentPage() {
                                     autoComplete: "off"
                                 }, void 0, false, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 1198,
+                                    lineNumber: 1207,
                                     columnNumber: 15
                                 }, this),
                                 formErrors.url && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -5116,13 +5131,13 @@ function ContentPage() {
                                     children: formErrors.url
                                 }, void 0, false, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 1220,
+                                    lineNumber: 1229,
                                     columnNumber: 17
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                            lineNumber: 1194,
+                            lineNumber: 1203,
                             columnNumber: 13
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5134,7 +5149,7 @@ function ContentPage() {
                                     children: "Cancel"
                                 }, void 0, false, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 1226,
+                                    lineNumber: 1235,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -5146,31 +5161,31 @@ function ContentPage() {
                                             size: "sm"
                                         }, void 0, false, {
                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                            lineNumber: 1237,
+                                            lineNumber: 1246,
                                             columnNumber: 33
                                         }, this),
                                         uploadQueue.length > 0 ? `Upload ${uploadQueue.length} File${uploadQueue.length > 1 ? 's' : ''}` : 'Upload Content'
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 1232,
+                                    lineNumber: 1241,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                            lineNumber: 1225,
+                            lineNumber: 1234,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                    lineNumber: 1040,
+                    lineNumber: 1049,
                     columnNumber: 9
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                lineNumber: 1034,
+                lineNumber: 1043,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$web$2f$src$2f$components$2f$Modal$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
@@ -5190,7 +5205,7 @@ function ContentPage() {
                                     children: "Content Title"
                                 }, void 0, false, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 1258,
+                                    lineNumber: 1267,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -5222,7 +5237,7 @@ function ContentPage() {
                                     autoComplete: "off"
                                 }, void 0, false, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 1261,
+                                    lineNumber: 1270,
                                     columnNumber: 13
                                 }, this),
                                 formErrors.title && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -5230,13 +5245,13 @@ function ContentPage() {
                                     children: formErrors.title
                                 }, void 0, false, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 1283,
+                                    lineNumber: 1292,
                                     columnNumber: 15
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                            lineNumber: 1257,
+                            lineNumber: 1266,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5249,7 +5264,7 @@ function ContentPage() {
                                             children: "Type:"
                                         }, void 0, false, {
                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                            lineNumber: 1289,
+                                            lineNumber: 1298,
                                             columnNumber: 15
                                         }, this),
                                         " ",
@@ -5257,7 +5272,7 @@ function ContentPage() {
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 1288,
+                                    lineNumber: 1297,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -5265,13 +5280,13 @@ function ContentPage() {
                                     children: "Content type cannot be changed after upload"
                                 }, void 0, false, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 1291,
+                                    lineNumber: 1300,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                            lineNumber: 1287,
+                            lineNumber: 1296,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5286,7 +5301,7 @@ function ContentPage() {
                                     children: "Cancel"
                                 }, void 0, false, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 1297,
+                                    lineNumber: 1306,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -5298,31 +5313,31 @@ function ContentPage() {
                                             size: "sm"
                                         }, void 0, false, {
                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                            lineNumber: 1311,
+                                            lineNumber: 1320,
                                             columnNumber: 33
                                         }, this),
                                         "Save Changes"
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 1306,
+                                    lineNumber: 1315,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                            lineNumber: 1296,
+                            lineNumber: 1305,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                    lineNumber: 1256,
+                    lineNumber: 1265,
                     columnNumber: 9
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                lineNumber: 1248,
+                lineNumber: 1257,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$web$2f$src$2f$components$2f$Modal$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
@@ -5341,7 +5356,7 @@ function ContentPage() {
                             ]
                         }, void 0, true, {
                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                            lineNumber: 1325,
+                            lineNumber: 1334,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5365,7 +5380,7 @@ function ContentPage() {
                                             className: "mr-3 h-4 w-4"
                                         }, void 0, false, {
                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                            lineNumber: 1334,
+                                            lineNumber: 1343,
                                             columnNumber: 17
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5376,7 +5391,7 @@ function ContentPage() {
                                                     children: device.nickname
                                                 }, void 0, false, {
                                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                    lineNumber: 1347,
+                                                    lineNumber: 1356,
                                                     columnNumber: 19
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5384,24 +5399,24 @@ function ContentPage() {
                                                     children: device.status
                                                 }, void 0, false, {
                                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                    lineNumber: 1348,
+                                                    lineNumber: 1357,
                                                     columnNumber: 19
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                            lineNumber: 1346,
+                                            lineNumber: 1355,
                                             columnNumber: 17
                                         }, this)
                                     ]
                                 }, device.id, true, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 1330,
+                                    lineNumber: 1339,
                                     columnNumber: 15
                                 }, this))
                         }, void 0, false, {
                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                            lineNumber: 1328,
+                            lineNumber: 1337,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5413,7 +5428,7 @@ function ContentPage() {
                                     children: "Cancel"
                                 }, void 0, false, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 1354,
+                                    lineNumber: 1363,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -5425,7 +5440,7 @@ function ContentPage() {
                                             size: "sm"
                                         }, void 0, false, {
                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                            lineNumber: 1365,
+                                            lineNumber: 1374,
                                             columnNumber: 33
                                         }, this),
                                         "Push to ",
@@ -5434,24 +5449,24 @@ function ContentPage() {
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 1360,
+                                    lineNumber: 1369,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                            lineNumber: 1353,
+                            lineNumber: 1362,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                    lineNumber: 1324,
+                    lineNumber: 1333,
                     columnNumber: 9
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                lineNumber: 1319,
+                lineNumber: 1328,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$web$2f$src$2f$components$2f$Modal$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
@@ -5470,7 +5485,7 @@ function ContentPage() {
                             ]
                         }, void 0, true, {
                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                            lineNumber: 1379,
+                            lineNumber: 1388,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("select", {
@@ -5483,7 +5498,7 @@ function ContentPage() {
                                     children: "Select a playlist"
                                 }, void 0, false, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 1387,
+                                    lineNumber: 1396,
                                     columnNumber: 13
                                 }, this),
                                 playlists.map((playlist)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("option", {
@@ -5496,13 +5511,13 @@ function ContentPage() {
                                         ]
                                     }, playlist.id, true, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 1389,
+                                        lineNumber: 1398,
                                         columnNumber: 15
                                     }, this))
                             ]
                         }, void 0, true, {
                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                            lineNumber: 1382,
+                            lineNumber: 1391,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5514,7 +5529,7 @@ function ContentPage() {
                                     children: "Cancel"
                                 }, void 0, false, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 1395,
+                                    lineNumber: 1404,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -5526,31 +5541,31 @@ function ContentPage() {
                                             size: "sm"
                                         }, void 0, false, {
                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                            lineNumber: 1406,
+                                            lineNumber: 1415,
                                             columnNumber: 33
                                         }, this),
                                         "Add to Playlist"
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 1401,
+                                    lineNumber: 1410,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                            lineNumber: 1394,
+                            lineNumber: 1403,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                    lineNumber: 1378,
+                    lineNumber: 1387,
                     columnNumber: 9
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                lineNumber: 1373,
+                lineNumber: 1382,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$web$2f$src$2f$components$2f$Modal$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
@@ -5570,12 +5585,12 @@ function ContentPage() {
                                     className: "max-w-full max-h-[70vh] object-contain rounded"
                                 }, void 0, false, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 1425,
+                                    lineNumber: 1434,
                                     columnNumber: 19
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                lineNumber: 1424,
+                                lineNumber: 1433,
                                 columnNumber: 17
                             }, this),
                             selectedContent.type === 'video' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5588,12 +5603,12 @@ function ContentPage() {
                                     children: "Your browser does not support video playback."
                                 }, void 0, false, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 1435,
+                                    lineNumber: 1444,
                                     columnNumber: 19
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                lineNumber: 1434,
+                                lineNumber: 1443,
                                 columnNumber: 17
                             }, this),
                             selectedContent.type === 'pdf' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5607,12 +5622,12 @@ function ContentPage() {
                                     title: selectedContent.title
                                 }, void 0, false, {
                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                    lineNumber: 1448,
+                                    lineNumber: 1457,
                                     columnNumber: 19
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                lineNumber: 1447,
+                                lineNumber: 1456,
                                 columnNumber: 17
                             }, this),
                             selectedContent.type === 'url' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5627,12 +5642,12 @@ function ContentPage() {
                                                     children: "URL Content:"
                                                 }, void 0, false, {
                                                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                    lineNumber: 1460,
+                                                    lineNumber: 1469,
                                                     columnNumber: 23
                                                 }, this)
                                             }, void 0, false, {
                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                lineNumber: 1459,
+                                                lineNumber: 1468,
                                                 columnNumber: 21
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
@@ -5643,13 +5658,13 @@ function ContentPage() {
                                                 children: selectedContent.url
                                             }, void 0, false, {
                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                lineNumber: 1462,
+                                                lineNumber: 1471,
                                                 columnNumber: 21
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 1458,
+                                        lineNumber: 1467,
                                         columnNumber: 19
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5664,18 +5679,18 @@ function ContentPage() {
                                             sandbox: "allow-same-origin allow-scripts"
                                         }, void 0, false, {
                                             fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                            lineNumber: 1472,
+                                            lineNumber: 1481,
                                             columnNumber: 21
                                         }, this)
                                     }, void 0, false, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 1471,
+                                        lineNumber: 1480,
                                         columnNumber: 19
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                lineNumber: 1457,
+                                lineNumber: 1466,
                                 columnNumber: 17
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5687,7 +5702,7 @@ function ContentPage() {
                                                 children: "Type:"
                                             }, void 0, false, {
                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                lineNumber: 1483,
+                                                lineNumber: 1492,
                                                 columnNumber: 20
                                             }, this),
                                             " ",
@@ -5695,7 +5710,7 @@ function ContentPage() {
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 1483,
+                                        lineNumber: 1492,
                                         columnNumber: 17
                                     }, this),
                                     selectedContent.duration && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -5704,7 +5719,7 @@ function ContentPage() {
                                                 children: "Duration:"
                                             }, void 0, false, {
                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                lineNumber: 1485,
+                                                lineNumber: 1494,
                                                 columnNumber: 22
                                             }, this),
                                             " ",
@@ -5713,7 +5728,7 @@ function ContentPage() {
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 1485,
+                                        lineNumber: 1494,
                                         columnNumber: 19
                                     }, this),
                                     selectedContent.createdAt && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -5722,7 +5737,7 @@ function ContentPage() {
                                                 children: "Uploaded:"
                                             }, void 0, false, {
                                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                                lineNumber: 1488,
+                                                lineNumber: 1497,
                                                 columnNumber: 22
                                             }, this),
                                             " ",
@@ -5730,25 +5745,25 @@ function ContentPage() {
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                        lineNumber: 1488,
+                                        lineNumber: 1497,
                                         columnNumber: 19
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                                lineNumber: 1482,
+                                lineNumber: 1491,
                                 columnNumber: 15
                             }, this)
                         ]
                     }, void 0, true)
                 }, void 0, false, {
                     fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                    lineNumber: 1420,
+                    lineNumber: 1429,
                     columnNumber: 9
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                lineNumber: 1414,
+                lineNumber: 1423,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$web$2f$src$2f$components$2f$PreviewModal$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
@@ -5757,7 +5772,7 @@ function ContentPage() {
                 content: selectedContent
             }, void 0, false, {
                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                lineNumber: 1497,
+                lineNumber: 1506,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f2e$pnpm$2f$next$40$16$2e$0$2e$11_$40$babel$2b$core$40$7$2e$_2c2d61b4ce987e30ba34ffda50ec852c$2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$web$2f$src$2f$components$2f$ConfirmDialog$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
@@ -5770,17 +5785,17 @@ function ContentPage() {
                 type: "danger"
             }, void 0, false, {
                 fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-                lineNumber: 1504,
+                lineNumber: 1513,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/web/src/app/dashboard/content/page.tsx",
-        lineNumber: 580,
+        lineNumber: 589,
         columnNumber: 5
     }, this);
 }
-_s(ContentPage, "Zk5plwECk5u0GQKYrDZE0j7gf1g=", false, function() {
+_s(ContentPage, "4PtOjfvlBTDaUzEFi+YtDBNEVTc=", false, function() {
     return [
         __TURBOPACK__imported__module__$5b$project$5d2f$web$2f$src$2f$lib$2f$hooks$2f$useToast$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useToast"],
         __TURBOPACK__imported__module__$5b$project$5d2f$web$2f$src$2f$lib$2f$hooks$2f$useDebounce$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useDebounce"],

@@ -2,10 +2,31 @@ import { Injectable, NotFoundException, ConflictException, Logger } from '@nestj
 import { JwtService } from '@nestjs/jwt';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
+import * as crypto from 'crypto';
 import { DatabaseService } from '../database/database.service';
+import { CircuitBreakerService } from '../common/services/circuit-breaker.service';
 import { CreateDisplayDto } from './dto/create-display.dto';
 import { UpdateDisplayDto } from './dto/update-display.dto';
 import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
+
+/**
+ * Hash a token using SHA-256 for secure storage
+ * We use SHA-256 instead of bcrypt because:
+ * 1. JWT tokens are already cryptographically random
+ * 2. We only need to verify exact matches, not password-like comparisons
+ * 3. Faster lookup performance for real-time operations
+ */
+function hashToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+/** Circuit breaker configuration for realtime service */
+const REALTIME_CIRCUIT_CONFIG = {
+  failureThreshold: 5,
+  resetTimeout: 30000, // 30 seconds
+  successThreshold: 2,
+  failureWindow: 60000, // 1 minute
+};
 
 @Injectable()
 export class DisplaysService {
@@ -16,6 +37,7 @@ export class DisplaysService {
     private readonly db: DatabaseService,
     private readonly jwtService: JwtService,
     private readonly httpService: HttpService,
+    private readonly circuitBreaker: CircuitBreakerService,
   ) {}
 
   async create(organizationId: string, createDisplayDto: CreateDisplayDto) {
@@ -115,7 +137,6 @@ export class DisplaysService {
     let playlist = null;
     if (currentPlaylistId !== undefined) {
       if (currentPlaylistId) {
-        this.logger.log(`Looking for playlist: ${currentPlaylistId} in org: ${organizationId}`);
         playlist = await this.db.playlist.findFirst({
           where: {
             id: currentPlaylistId,
@@ -129,15 +150,6 @@ export class DisplaysService {
             },
           },
         });
-
-        this.logger.log(`Playlist found: ${playlist ? 'YES' : 'NO'}`);
-        if (playlist) {
-          this.logger.log(`Playlist org: ${playlist.organizationId}`);
-        } else {
-          // DEBUG: Log all playlists to see what's happening
-          const allPlaylists = await this.db.playlist.findMany({ where: { organizationId } });
-          this.logger.error(`All playlists in org ${organizationId}: ${JSON.stringify(allPlaylists.map(p => ({ id: p.id, name: p.name })))}`);
-        }
 
         if (!playlist) {
           throw new NotFoundException('Playlist not found or does not belong to your organization');
@@ -166,22 +178,35 @@ export class DisplaysService {
     return updatedDisplay;
   }
 
-  private async notifyPlaylistUpdate(displayId: string, playlist: any) {
-    try {
-      const url = `${this.realtimeUrl}/api/push/playlist`;
-      this.logger.log(`Attempting to notify realtime at: ${url}`);
-      const response = await firstValueFrom(
-        this.httpService.post(url, {
-          deviceId: displayId,
-          playlist,
-        })
-      );
-      this.logger.log(`Notified realtime service of playlist update for display ${displayId}`);
-      this.logger.log(`Response: ${JSON.stringify(response.data)}`);
-    } catch (error) {
-      this.logger.error(`Failed to notify realtime service: ${error.message}`);
-      // Don't throw - this is a background notification, main operation already succeeded
-    }
+  private async notifyPlaylistUpdate(displayId: string, playlist: unknown): Promise<void> {
+    const url = `${this.realtimeUrl}/api/push/playlist`;
+
+    // Use circuit breaker with fallback - if circuit is open or call fails, just log
+    await this.circuitBreaker.executeWithFallback(
+      'realtime-service',
+      async () => {
+        await firstValueFrom(
+          this.httpService.post(url, {
+            deviceId: displayId,
+            playlist,
+          }),
+        );
+        this.logger.log(`Notified realtime service of playlist update for display ${displayId}`);
+      },
+      (error) => {
+        // Fallback: log warning but don't block the operation
+        if (error) {
+          this.logger.warn(
+            `Failed to notify realtime service for display ${displayId}: ${error.message}`,
+          );
+        } else {
+          this.logger.warn(
+            `Realtime service circuit is open, skipping notification for display ${displayId}`,
+          );
+        }
+      },
+      REALTIME_CIRCUIT_CONFIG,
+    );
   }
 
   async updateHeartbeat(deviceIdentifier: string) {
@@ -205,16 +230,21 @@ export class DisplaysService {
       type: 'device',
     });
 
-    // Update display with pairing info
+    // Hash the token before storing in database for security
+    // If database is compromised, attacker cannot use the hashed tokens
+    const hashedToken = hashToken(pairingToken);
+
+    // Update display with hashed token
     await this.db.display.update({
       where: { id },
       data: {
-        jwtToken: pairingToken,
+        jwtToken: hashedToken, // Store hash, not plaintext
         pairedAt: new Date(),
         status: 'pairing',
       },
     });
 
+    // Return the actual token to the client (only time it's available)
     return {
       pairingToken,
       expiresIn: '30d',

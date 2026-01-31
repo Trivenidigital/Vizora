@@ -1,12 +1,32 @@
 import { Controller, Get, Post, Body } from '@nestjs/common';
 import { DeviceGateway } from '../gateways/device.gateway';
+import { PushPlaylistRequest } from '../types';
+
+interface HealthResponse {
+  status: string;
+  service: string;
+  timestamp: string;
+  uptime: number;
+}
+
+interface StatusResponse {
+  status: string;
+  service: string;
+  version: string;
+  websocket: string;
+}
+
+interface PushResponse {
+  success: boolean;
+  message: string;
+}
 
 @Controller()
 export class AppController {
   constructor(private readonly deviceGateway: DeviceGateway) {}
 
   @Get('health')
-  getHealth() {
+  getHealth(): HealthResponse {
     return {
       status: 'ok',
       service: 'realtime-gateway',
@@ -16,7 +36,7 @@ export class AppController {
   }
 
   @Get('status')
-  getStatus() {
+  getStatus(): StatusResponse {
     return {
       status: 'running',
       service: 'Vizora Realtime Gateway',
@@ -26,7 +46,7 @@ export class AppController {
   }
 
   @Post('push/playlist')
-  async pushPlaylist(@Body() data: { deviceId: string; playlist: any }) {
+  async pushPlaylist(@Body() data: PushPlaylistRequest): Promise<PushResponse> {
     await this.deviceGateway.sendPlaylistUpdate(data.deviceId, data.playlist);
     return {
       success: true,

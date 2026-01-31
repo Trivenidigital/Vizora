@@ -6,6 +6,7 @@ import {
   OnGatewayDisconnect,
   ConnectedSocket,
   MessageBody,
+  UsePipes,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
@@ -15,6 +16,20 @@ import { HeartbeatService } from '../services/heartbeat.service';
 import { PlaylistService } from '../services/playlist.service';
 import { MetricsService } from '../metrics/metrics.service';
 import { DatabaseService } from '../../database/database.service';
+import { WsValidationPipe } from './pipes/ws-validation.pipe';
+import {
+  HeartbeatMessageDto,
+  ContentImpressionDto,
+  ContentErrorDto,
+  PlaylistRequestDto,
+  createSuccessResponse,
+  createErrorResponse,
+} from './dto';
+import {
+  Playlist,
+  DeviceCommand,
+  BroadcastData,
+} from '../types';
 import * as Sentry from '@sentry/nestjs';
 
 interface DevicePayload {
@@ -98,8 +113,9 @@ export class DeviceGateway
             lastHeartbeat: new Date(),
           },
         });
-      } catch (dbError) {
-        this.logger.warn(`Failed to update database for device ${deviceId}: ${dbError.message}`);
+      } catch (dbError: unknown) {
+        const errorMessage = dbError instanceof Error ? dbError.message : 'Unknown error';
+        this.logger.warn(`Failed to update database for device ${deviceId}: ${errorMessage}`);
         // Don't fail the connection if database update fails
       }
 
@@ -122,8 +138,9 @@ export class DeviceGateway
         cacheSize: 524288000, // 500MB
         autoUpdate: true,
       });
-    } catch (error) {
-      this.logger.error('Connection error:', error.message);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Connection error: ${errorMessage}`);
       client.disconnect();
     }
   }
@@ -149,8 +166,9 @@ export class DeviceGateway
             lastHeartbeat: new Date(),
           },
         });
-      } catch (dbError) {
-        this.logger.warn(`Failed to update database for device ${deviceId}: ${dbError.message}`);
+      } catch (dbError: unknown) {
+        const errorMessage = dbError instanceof Error ? dbError.message : 'Unknown error';
+        this.logger.warn(`Failed to update database for device ${deviceId}: ${errorMessage}`);
       }
 
       this.logger.log(`Device disconnected: ${deviceId} (${client.id})`);
@@ -171,9 +189,10 @@ export class DeviceGateway
   }
 
   @SubscribeMessage('heartbeat')
+  @UsePipes(new WsValidationPipe())
   async handleHeartbeat(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: any,
+    @MessageBody() data: HeartbeatMessageDto,
   ) {
     const deviceId = client.data.deviceId;
     const startTime = Date.now();
@@ -198,8 +217,9 @@ export class DeviceGateway
             lastHeartbeat: new Date(),
           },
         });
-      } catch (dbError) {
-        this.logger.warn(`Failed to update database for device ${deviceId}: ${dbError.message}`);
+      } catch (dbError: unknown) {
+        const errorMessage = dbError instanceof Error ? dbError.message : 'Unknown error';
+        this.logger.warn(`Failed to update database for device ${deviceId}: ${errorMessage}`);
         // Don't fail the heartbeat if database update fails
       }
 
@@ -222,35 +242,32 @@ export class DeviceGateway
       const duration = (Date.now() - startTime) / 1000;
       this.metricsService.recordHeartbeat(deviceId, true, duration);
 
-      return {
-        success: true,
+      return createSuccessResponse({
         nextHeartbeatIn: 15000,
         commands: commands || [],
-        timestamp: new Date().toISOString(),
-      };
-    } catch (error) {
-      this.logger.error(`Heartbeat error for ${deviceId}:`, error.message);
-      
+      });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Heartbeat error for ${deviceId}: ${errorMessage}`);
+
       // Record failed heartbeat
       const duration = (Date.now() - startTime) / 1000;
       this.metricsService.recordHeartbeat(deviceId, false, duration);
-      
+
       // Report to Sentry
       Sentry.captureException(error, {
         tags: { deviceId, event: 'heartbeat' },
       });
 
-      return {
-        success: false,
-        error: 'Failed to process heartbeat',
-      };
+      return createErrorResponse('Failed to process heartbeat');
     }
   }
 
   @SubscribeMessage('content:impression')
+  @UsePipes(new WsValidationPipe())
   async handleContentImpression(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: any,
+    @MessageBody() data: ContentImpressionDto,
   ) {
     const deviceId = client.data.deviceId;
 
@@ -261,30 +278,26 @@ export class DeviceGateway
       // Record metrics
       this.metricsService.recordImpression(deviceId, data.contentId);
 
-      return {
-        success: true,
-        timestamp: new Date().toISOString(),
-      };
-    } catch (error) {
-      this.logger.error(`Impression error for ${deviceId}:`, error.message);
+      return createSuccessResponse();
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Impression error for ${deviceId}: ${errorMessage}`);
       Sentry.captureException(error, {
         tags: { deviceId, event: 'content:impression' },
       });
-      return {
-        success: false,
-        error: 'Failed to log impression',
-      };
+      return createErrorResponse('Failed to log impression');
     }
   }
 
   @SubscribeMessage('content:error')
+  @UsePipes(new WsValidationPipe())
   async handleContentError(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: any,
+    @MessageBody() data: ContentErrorDto,
   ) {
     const deviceId = client.data.deviceId;
 
-    this.logger.error(`Content error on ${deviceId}:`, data);
+    this.logger.warn(`Content error on ${deviceId}: ${data.errorType} - ${data.contentId}`);
 
     try {
       // Log error for analytics
@@ -301,50 +314,49 @@ export class DeviceGateway
           errorType: data.errorType,
           contentId: data.contentId,
         },
-        extra: data,
+        extra: {
+          errorMessage: data.errorMessage,
+          errorCode: data.errorCode,
+          context: data.context,
+        },
       });
 
-      return {
-        success: true,
-      };
-    } catch (error) {
-      this.logger.error(`Error logging failed for ${deviceId}:`, error.message);
+      return createSuccessResponse();
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Error logging failed for ${deviceId}: ${errorMessage}`);
       Sentry.captureException(error, {
         tags: { deviceId, event: 'content:error' },
       });
-      return {
-        success: false,
-      };
+      return createErrorResponse('Failed to log error');
     }
   }
 
   @SubscribeMessage('playlist:request')
+  @UsePipes(new WsValidationPipe())
   async handlePlaylistRequest(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: any,
+    @MessageBody() data: PlaylistRequestDto,
   ) {
     const deviceId = client.data.deviceId;
 
     try {
       // Get current playlist for device
-      const playlist = await this.playlistService.getDevicePlaylist(deviceId);
+      const playlist = await this.playlistService.getDevicePlaylist(
+        deviceId,
+        data?.forceRefresh,
+      );
 
-      return {
-        success: true,
-        playlist,
-        timestamp: new Date().toISOString(),
-      };
-    } catch (error) {
-      this.logger.error(`Playlist request error for ${deviceId}:`, error.message);
-      return {
-        success: false,
-        error: 'Failed to get playlist',
-      };
+      return createSuccessResponse({ playlist });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Playlist request error for ${deviceId}: ${errorMessage}`);
+      return createErrorResponse('Failed to get playlist');
     }
   }
 
   // Admin methods (called from API)
-  async sendPlaylistUpdate(deviceId: string, playlist: any) {
+  async sendPlaylistUpdate(deviceId: string, playlist: Playlist): Promise<void> {
     this.server.to(`device:${deviceId}`).emit('playlist:update', {
       playlist,
       timestamp: new Date().toISOString(),
@@ -353,16 +365,16 @@ export class DeviceGateway
     this.logger.log(`Sent playlist update to device: ${deviceId}`);
   }
 
-  async sendCommand(deviceId: string, command: any) {
+  async sendCommand(deviceId: string, command: DeviceCommand): Promise<void> {
     this.server.to(`device:${deviceId}`).emit('command', {
       ...command,
       timestamp: new Date().toISOString(),
     });
 
-    this.logger.log(`Sent command to device: ${deviceId}`, command);
+    this.logger.log(`Sent command ${command.type} to device: ${deviceId}`);
   }
 
-  async broadcastToOrganization(organizationId: string, event: string, data: any) {
+  async broadcastToOrganization(organizationId: string, event: string, data: BroadcastData): Promise<void> {
     this.server.to(`org:${organizationId}`).emit(event, {
       ...data,
       timestamp: new Date().toISOString(),

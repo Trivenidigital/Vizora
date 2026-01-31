@@ -1,37 +1,43 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RedisService } from './redis.service';
+import {
+  HeartbeatData as HeartbeatPayload,
+  ImpressionData as ImpressionPayload,
+  ContentErrorData,
+  DeviceMetrics,
+  CurrentContentState,
+} from '../types';
 
-interface HeartbeatData {
+interface StoredHeartbeat {
   deviceId: string;
   timestamp: number;
-  metrics?: {
-    cpuUsage?: number;
-    memoryUsage?: number;
-    storageUsed?: number;
-    networkLatency?: number;
-  };
-  currentContent?: {
-    contentId?: string;
-    playlistId?: string;
-    position?: number;
-  };
+  metrics?: DeviceMetrics;
+  currentContent?: CurrentContentState;
   status?: string;
 }
 
-interface ImpressionData {
-  contentId: string;
-  playlistId?: string;
-  duration: number;
-  completed: boolean;
+interface StoredImpression extends ImpressionPayload {
+  deviceId: string;
   timestamp: number;
 }
 
-interface ErrorData {
-  contentId?: string;
-  errorType: string;
-  errorMessage: string;
-  stackTrace?: string;
+interface StoredError extends ContentErrorData {
+  deviceId: string;
   timestamp: number;
+}
+
+interface DeviceHealth {
+  status: 'online' | 'offline' | 'unknown';
+  lastSeen: string | null;
+  metrics?: DeviceMetrics;
+  currentContent?: CurrentContentState;
+  error?: string;
+}
+
+interface DeviceStats {
+  impressions: number;
+  errors: number;
+  recentErrors: StoredError[];
 }
 
 @Injectable()
@@ -43,14 +49,13 @@ export class HeartbeatService {
   /**
    * Process device heartbeat
    */
-  async processHeartbeat(deviceId: string, data: any): Promise<void> {
+  async processHeartbeat(deviceId: string, data: HeartbeatPayload): Promise<void> {
     try {
-      const heartbeat: HeartbeatData = {
+      const heartbeat: StoredHeartbeat = {
         deviceId,
         timestamp: Date.now(),
         metrics: data.metrics,
         currentContent: data.currentContent,
-        status: data.status,
       };
 
       // Store in Redis for quick access
@@ -73,9 +78,9 @@ export class HeartbeatService {
   /**
    * Log content impression
    */
-  async logImpression(deviceId: string, data: ImpressionData): Promise<void> {
+  async logImpression(deviceId: string, data: ImpressionPayload): Promise<void> {
     try {
-      const impression = {
+      const impression: StoredImpression = {
         deviceId,
         ...data,
         timestamp: Date.now(),
@@ -99,9 +104,9 @@ export class HeartbeatService {
   /**
    * Log playback error
    */
-  async logError(deviceId: string, data: ErrorData): Promise<void> {
+  async logError(deviceId: string, data: ContentErrorData): Promise<void> {
     try {
-      const errorLog = {
+      const errorLog: StoredError = {
         deviceId,
         ...data,
         timestamp: Date.now(),
@@ -133,7 +138,7 @@ export class HeartbeatService {
   /**
    * Get device health status
    */
-  async getDeviceHealth(deviceId: string): Promise<any> {
+  async getDeviceHealth(deviceId: string): Promise<DeviceHealth> {
     try {
       const heartbeatJson = await this.redisService.get(`heartbeat:${deviceId}:latest`);
 
@@ -144,7 +149,7 @@ export class HeartbeatService {
         };
       }
 
-      const heartbeat: HeartbeatData = JSON.parse(heartbeatJson);
+      const heartbeat: StoredHeartbeat = JSON.parse(heartbeatJson);
       const timeSinceHeartbeat = Date.now() - heartbeat.timestamp;
 
       return {
@@ -153,11 +158,13 @@ export class HeartbeatService {
         metrics: heartbeat.metrics,
         currentContent: heartbeat.currentContent,
       };
-    } catch (error) {
-      this.logger.error(`Failed to get health for ${deviceId}:`, error);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to get health for ${deviceId}: ${errorMessage}`);
       return {
         status: 'unknown',
-        error: error.message,
+        lastSeen: null,
+        error: errorMessage,
       };
     }
   }
@@ -165,22 +172,23 @@ export class HeartbeatService {
   /**
    * Get device statistics
    */
-  async getDeviceStats(deviceId: string): Promise<any> {
+  async getDeviceStats(deviceId: string): Promise<DeviceStats> {
     try {
       const today = new Date().toISOString().split('T')[0];
       const impressionsKey = `stats:device:${deviceId}:impressions:${today}`;
 
       const impressions = await this.redisService.get(impressionsKey);
       const errorsJson = await this.redisService.get(`errors:device:${deviceId}`);
-      const errors = errorsJson ? JSON.parse(errorsJson) : [];
+      const errors: StoredError[] = errorsJson ? JSON.parse(errorsJson) : [];
 
       return {
         impressions: parseInt(impressions || '0', 10),
         errors: errors.length,
         recentErrors: errors.slice(-5),
       };
-    } catch (error) {
-      this.logger.error(`Failed to get stats for ${deviceId}:`, error);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to get stats for ${deviceId}: ${errorMessage}`);
       return {
         impressions: 0,
         errors: 0,
