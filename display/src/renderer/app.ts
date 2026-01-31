@@ -195,7 +195,7 @@ class DisplayApp {
     }
 
     let consecutiveErrors = 0;
-    const maxErrors = 5; // Increased from 3 to allow more retries before stopping
+    const maxErrors = 10; // Allow more retries - device-client needs time to connect
     let codeExpiryTime = Date.now() + (5 * 60 * 1000); // 5 minutes from now
     const codeRefreshThreshold = 30 * 1000; // Refresh code 30 seconds before expiry
     let currentCode = code; // Use local variable for current code
@@ -210,7 +210,7 @@ class DisplayApp {
             const newResult = await window.electronAPI.getPairingCode();
             console.log('[App] ✅ New pairing code received:', newResult.code);
             this.currentCode = newResult.code;
-            currentCode = newResult.code; // ← FIX: Update the local currentCode
+            currentCode = newResult.code;
             localStorage.setItem('lastPairingCode', newResult.code);
             this.displayPairingCode(newResult.code);
             if (newResult.qrCode) {
@@ -218,15 +218,17 @@ class DisplayApp {
             }
             codeExpiryTime = Date.now() + (5 * 60 * 1000); // Reset expiry timer
             consecutiveErrors = 0; // Reset error counter when code refreshed
-            // ← REMOVED: return statement that was skipping status check
-            // Continue to next iteration to check status with new code
           } catch (refreshError: any) {
             console.error('[App] ❌ Failed to refresh pairing code:', refreshError.message);
-            this.showErrorScreen('Failed to refresh pairing code');
-            clearInterval(pollInterval);
-            this.pairingCheckInterval = null;
-            this.isPairingScreenShown = false;
-            return;
+            // Don't show error screen yet - try to continue with current code
+            // Only show error if we can't recover
+            if (timeUntilExpiry <= 0) {
+              this.showErrorScreen('Pairing code expired. Please restart the app.');
+              clearInterval(pollInterval);
+              this.pairingCheckInterval = null;
+              this.isPairingScreenShown = false;
+              return;
+            }
           }
         }
 
@@ -243,27 +245,60 @@ class DisplayApp {
             console.log('[App] ✅ Device is paired! Token received from status check');
             clearInterval(pollInterval);
             this.pairingCheckInterval = null;
-            // onPaired callback will be triggered from device-client
+
+            // IMPORTANT: Directly transition to content screen here
+            // Don't rely solely on the IPC event which may have timing issues
+            console.log('[App] Transitioning to content screen from poll result...');
+            this.hidePairingScreen();
+            this.showContentScreen();
             return;
           }
         } catch (statusError: any) {
           consecutiveErrors++;
           console.log(`[App] ⚠️ Pairing check error (${consecutiveErrors}/${maxErrors}):`, statusError.message);
 
-          // After pairing, backend deletes the pairing request
-          // This causes 404 errors, but we should try a few more times
+          // After pairing completes, backend deletes the pairing request
+          // This causes 404 errors, which may mean pairing succeeded
+          // Keep trying - the onPaired IPC event should arrive
           if (consecutiveErrors >= maxErrors) {
-            console.log('[App] Stopping pairing check after multiple errors');
-            clearInterval(pollInterval);
-            this.pairingCheckInterval = null;
+            console.log('[App] Max errors reached - refreshing pairing code...');
+            // Instead of stopping, try to get a new code
+            try {
+              const newResult = await window.electronAPI.getPairingCode();
+              console.log('[App] ✅ New pairing code received after errors:', newResult.code);
+              this.currentCode = newResult.code;
+              currentCode = newResult.code;
+              localStorage.setItem('lastPairingCode', newResult.code);
+              this.displayPairingCode(newResult.code);
+              if (newResult.qrCode) {
+                this.displayQRCode(newResult.qrCode);
+              }
+              codeExpiryTime = Date.now() + (5 * 60 * 1000);
+              consecutiveErrors = 0;
+            } catch (refreshError: any) {
+              console.error('[App] ❌ Failed to recover with new code:', refreshError.message);
+              // Check if device is already paired (error message contains 'already paired')
+              if (refreshError.message && refreshError.message.includes('already paired')) {
+                console.log('[App] Device already paired - transitioning to content screen');
+                clearInterval(pollInterval);
+                this.pairingCheckInterval = null;
+                this.hidePairingScreen();
+                this.showContentScreen();
+                return;
+              }
+              this.showErrorScreen('Connection lost. Please restart the app.');
+              clearInterval(pollInterval);
+              this.pairingCheckInterval = null;
+              this.isPairingScreenShown = false;
+            }
           }
         }
       } catch (error: any) {
         console.error('[App] Unexpected error in pairing check:', error.message);
         consecutiveErrors++;
         if (consecutiveErrors >= maxErrors) {
-          clearInterval(pollInterval);
-          this.pairingCheckInterval = null;
+          // Try to recover instead of giving up
+          console.log('[App] Attempting recovery after unexpected errors...');
         }
       }
     }, 2000); // Check every 2 seconds

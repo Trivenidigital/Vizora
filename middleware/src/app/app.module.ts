@@ -1,10 +1,11 @@
-import { Module } from '@nestjs/common';
+import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from '../modules/config/config.module';
 import { DatabaseModule } from '../modules/database/database.module';
+import { CommonModule } from '../modules/common/common.module';
 import { AuthModule } from '../modules/auth/auth.module';
 import { OrganizationsModule } from '../modules/organizations/organizations.module';
 import { DisplaysModule } from '../modules/displays/displays.module';
@@ -12,6 +13,7 @@ import { ContentModule } from '../modules/content/content.module';
 import { PlaylistsModule } from '../modules/playlists/playlists.module';
 import { SchedulesModule } from '../modules/schedules/schedules.module';
 import { HealthModule } from '../modules/health/health.module';
+import { CsrfMiddleware } from '../modules/common/middleware/csrf.middleware';
 
 @Module({
   imports: [
@@ -57,6 +59,7 @@ import { HealthModule } from '../modules/health/health.module';
             },
           ]
     ),
+    CommonModule,
     DatabaseModule,
     AuthModule,
     OrganizationsModule,
@@ -75,4 +78,9 @@ import { HealthModule } from '../modules/health/health.module';
     },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    // Apply CSRF protection to all routes
+    consumer.apply(CsrfMiddleware).forRoutes('*');
+  }
+}

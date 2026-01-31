@@ -179,6 +179,7 @@ export class PairingService {
 
     if (display) {
       // Update existing display
+      // Set status to 'pairing' - the WebSocket gateway will update to 'online' when device connects
       display = await this.db.display.update({
         where: { id: display.id },
         data: {
@@ -186,12 +187,12 @@ export class PairingService {
           organizationId,
           jwtToken,
           pairedAt: new Date(),
-          status: 'online',
-          lastHeartbeat: new Date(),
+          status: 'pairing',
         },
       });
     } else {
       // Create new display
+      // Set status to 'pairing' - the WebSocket gateway will update to 'online' when device connects
       display = await this.db.display.create({
         data: {
           id: devicePayload.sub,
@@ -200,8 +201,7 @@ export class PairingService {
           organizationId,
           jwtToken,
           pairedAt: new Date(),
-          status: 'online',
-          lastHeartbeat: new Date(),
+          status: 'pairing',
           location: request.metadata?.hostname || null,
           metadata: request.metadata,
         },

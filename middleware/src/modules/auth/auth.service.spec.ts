@@ -104,7 +104,8 @@ describe('AuthService', () => {
       expect(mockDatabaseService.user.findUnique).toHaveBeenCalledWith({
         where: { email: registerDto.email },
       });
-      expect(bcrypt.hash).toHaveBeenCalledWith(registerDto.password, 12);
+      // Default bcrypt rounds is 14 (OWASP 2025+ recommendation)
+      expect(bcrypt.hash).toHaveBeenCalledWith(registerDto.password, 14);
     });
 
     it('should throw ConflictException if email already exists', async () => {
@@ -364,7 +365,7 @@ describe('AuthService', () => {
   });
 
   describe('Password Security', () => {
-    it('should hash password with cost factor 12', async () => {
+    it('should hash password with cost factor 14 (OWASP recommended)', async () => {
       mockDatabaseService.user.findUnique.mockResolvedValue(null);
       mockDatabaseService.organization.findUnique.mockResolvedValue(null);
       mockDatabaseService.organization.create.mockResolvedValue(mockOrganization);
@@ -380,7 +381,7 @@ describe('AuthService', () => {
         organizationName: 'Test Org',
       });
 
-      expect(bcrypt.hash).toHaveBeenCalledWith('SecurePass123!', 12);
+      expect(bcrypt.hash).toHaveBeenCalledWith('SecurePass123!', 14);
     });
 
     it('should not return password hash in response', async () => {

@@ -7,8 +7,10 @@ import 'dotenv/config';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { join } from 'path';
 import helmet from 'helmet';
+import * as cookieParser from 'cookie-parser';
 import { AppModule } from './app/app.module';
 import { SanitizeInterceptor } from './modules/common/interceptors/sanitize.interceptor';
 
@@ -20,6 +22,9 @@ async function bootstrap() {
     prefix: '/static/',
   });
 
+  // Cookie parser (required for httpOnly cookie authentication)
+  app.use(cookieParser());
+
   // Security headers
   app.use(helmet({
     contentSecurityPolicy: process.env.NODE_ENV === 'production',
@@ -29,12 +34,12 @@ async function bootstrap() {
   // CORS configuration
   const corsOrigins = process.env.CORS_ORIGIN?.split(',').map(o => o.trim()) || [];
   app.enableCors({
-    origin: process.env.NODE_ENV === 'production' 
-      ? corsOrigins 
+    origin: process.env.NODE_ENV === 'production'
+      ? corsOrigins
       : true, // Allow all in development
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRF-Token'],
   });
 
   // Global validation pipe
@@ -56,6 +61,46 @@ async function bootstrap() {
 
   const globalPrefix = 'api';
   app.setGlobalPrefix(globalPrefix);
+
+  // Swagger API Documentation (only in development)
+  if (process.env.NODE_ENV !== 'production') {
+    const config = new DocumentBuilder()
+      .setTitle('Vizora API')
+      .setDescription('Digital Signage Management Platform API')
+      .setVersion('1.0')
+      .addBearerAuth(
+        {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          name: 'Authorization',
+          description: 'Enter JWT token',
+          in: 'header',
+        },
+        'JWT-auth',
+      )
+      .addCookieAuth('vizora_auth_token', {
+        type: 'apiKey',
+        in: 'cookie',
+        name: 'vizora_auth_token',
+      })
+      .addTag('auth', 'Authentication endpoints')
+      .addTag('displays', 'Display device management')
+      .addTag('content', 'Content management')
+      .addTag('playlists', 'Playlist management')
+      .addTag('schedules', 'Schedule management')
+      .addTag('organizations', 'Organization management')
+      .build();
+
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup(`${globalPrefix}/docs`, app, document, {
+      swaggerOptions: {
+        persistAuthorization: true,
+      },
+    });
+
+    Logger.log(`📚 API Documentation available at: http://localhost:3000/${globalPrefix}/docs`);
+  }
 
   // Graceful shutdown
   app.enableShutdownHooks();

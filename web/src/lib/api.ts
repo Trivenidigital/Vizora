@@ -1,42 +1,109 @@
 // API Client for Vizora Middleware
+// Uses httpOnly cookies for secure JWT token storage
 
 import type { Display, Content, Playlist, PlaylistItem, Schedule, PaginatedResponse } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
 
+// Type definitions for API responses
+interface AuthUser {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  organizationId: string;
+  organization?: {
+    name: string;
+    subscriptionTier: string;
+  };
+}
+
+interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+  subscriptionTier: string;
+  screenQuota: number;
+  trialEndsAt: string;
+}
+
+interface LoginResponse {
+  user: AuthUser;
+  expiresIn: number;
+}
+
+interface RegisterResponse {
+  user: AuthUser;
+  organization: Organization;
+  expiresIn: number;
+}
+
+interface ScheduleData {
+  name: string;
+  playlistId: string;
+  displayId?: string;
+  displayGroupId?: string;
+  startDate: string;
+  endDate?: string;
+  startTime?: string;
+  endTime?: string;
+  daysOfWeek?: number[];
+  priority?: number;
+  isActive?: boolean;
+}
+
+// CSRF cookie name (must match backend)
+const CSRF_COOKIE_NAME = 'vizora_csrf_token';
+
+/**
+ * Get CSRF token from cookie
+ */
+function getCsrfToken(): string | null {
+  if (typeof document === 'undefined') return null;
+
+  const cookies = document.cookie.split(';');
+  for (const cookie of cookies) {
+    const [name, value] = cookie.trim().split('=');
+    if (name === CSRF_COOKIE_NAME) {
+      return value;
+    }
+  }
+  return null;
+}
+
 class ApiClient {
   private baseUrl: string;
-  private token: string | null = null;
+  private isAuthenticated = false;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
-    // Load token from localStorage if available
-    if (typeof window !== 'undefined') {
-      this.token = localStorage.getItem('authToken');
-    }
   }
 
-  setToken(token: string) {
-    this.token = token;
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('authToken', token);
-      // Also set as cookie for middleware to access
-      document.cookie = `authToken=${token}; path=/; max-age=604800; SameSite=Lax`;
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[API] Token saved securely');
-      }
-    }
+  /**
+   * Mark client as authenticated after successful login/register
+   * Token is stored in httpOnly cookie by the server
+   */
+  setAuthenticated(authenticated: boolean): void {
+    this.isAuthenticated = authenticated;
   }
 
-  clearToken() {
-    this.token = null;
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('authToken');
-      // Also clear cookie
-      document.cookie = 'authToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[API] Token cleared');
-      }
+  /**
+   * Clear authentication state and call logout endpoint
+   */
+  async clearAuthentication(): Promise<void> {
+    this.isAuthenticated = false;
+    // Call logout to clear httpOnly cookie server-side
+    try {
+      await fetch(`${this.baseUrl}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'X-CSRF-Token': getCsrfToken() || '',
+        },
+      });
+    } catch {
+      // Ignore errors during logout
     }
   }
 
@@ -45,9 +112,11 @@ class ApiClient {
     options: RequestInit = {},
     retries = 3
   ): Promise<T> {
+    // Include CSRF token for state-changing requests
+    const csrfToken = getCsrfToken();
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
-      ...(this.token && { Authorization: `Bearer ${this.token}` }),
+      ...(csrfToken && { 'X-CSRF-Token': csrfToken }),
       ...options.headers,
     };
 
@@ -57,13 +126,14 @@ class ApiClient {
 
     // Create abort controller for timeout
     const controller = new AbortController();
-    const timeoutMs = options.method === 'GET' ? 30000 : 30000; // 30s timeout
+    const timeoutMs = 30000; // 30s timeout
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         ...options,
         headers,
+        credentials: 'include', // Always include cookies for httpOnly auth
         signal: controller.signal,
       });
 
@@ -79,11 +149,13 @@ class ApiClient {
         }
         // Handle authentication errors
         if (response.status === 401 || response.status === 403) {
-          this.clearToken();
+          this.isAuthenticated = false;
           if (typeof window !== 'undefined') {
             // Redirect to login with return URL
             const currentPath = window.location.pathname;
-            window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`;
+            if (!currentPath.startsWith('/login') && !currentPath.startsWith('/register')) {
+              window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`;
+            }
           }
         }
 
@@ -114,31 +186,21 @@ class ApiClient {
     }
   }
 
-  // Auth
-  async login(email: string, password: string) {
+  // Auth - token is set as httpOnly cookie by server
+  async login(email: string, password: string): Promise<LoginResponse> {
     if (process.env.NODE_ENV === 'development') {
       console.log('[API] Login called');
     }
     const response = await this.request<{
       success: boolean;
-      data: {
-        user: any;
-        token: string;
-        expiresIn: number;
-      }
+      data: LoginResponse;
     }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
 
-    if (response.data && response.data.token) {
-      this.setToken(response.data.token);
-    } else {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('[API] Token not found in response');
-      }
-      throw new Error('Authentication failed: no token received');
-    }
+    // Mark as authenticated - token is in httpOnly cookie
+    this.isAuthenticated = true;
     return response.data;
   }
 
@@ -148,18 +210,13 @@ class ApiClient {
     organizationName: string,
     firstName: string,
     lastName: string
-  ) {
+  ): Promise<RegisterResponse> {
     if (process.env.NODE_ENV === 'development') {
       console.log('[API] Register called');
     }
     const response = await this.request<{
       success: boolean;
-      data: {
-        user: any;
-        organization: any;
-        token: string;
-        expiresIn: number;
-      }
+      data: RegisterResponse;
     }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify({
@@ -171,20 +228,36 @@ class ApiClient {
       }),
     });
 
-    if (response.data && response.data.token) {
-      this.setToken(response.data.token);
-    } else {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('[API] Token not found in register response');
-      }
-      throw new Error('Registration failed: no token received');
-    }
+    // Mark as authenticated - token is in httpOnly cookie
+    this.isAuthenticated = true;
     return response.data;
+  }
+
+  async logout(): Promise<void> {
+    await this.clearAuthentication();
+  }
+
+  async refreshToken(): Promise<{ expiresIn: number }> {
+    const response = await this.request<{
+      success: boolean;
+      data: { expiresIn: number };
+    }>('/auth/refresh', {
+      method: 'POST',
+    });
+    return response.data;
+  }
+
+  async getCurrentUser(): Promise<AuthUser> {
+    const response = await this.request<{
+      success: boolean;
+      data: { user: AuthUser };
+    }>('/auth/me');
+    return response.data.user;
   }
 
   // Displays
   async getDisplays(params?: { page?: number; limit?: number }): Promise<PaginatedResponse<Display>> {
-    const query = new URLSearchParams(params as any).toString();
+    const query = params ? new URLSearchParams(params as Record<string, string>).toString() : '';
     return this.request<PaginatedResponse<Display>>(`/displays${query ? `?${query}` : ''}`);
   }
 
@@ -197,7 +270,7 @@ class ApiClient {
     const payload = {
       name: data.nickname,
       location: data.location,
-      deviceId: `device-${Date.now()}-${Math.random().toString(36).substring(7)}`, // Generate unique device ID
+      deviceId: `device-${Date.now()}-${Math.random().toString(36).substring(7)}`,
     };
     return this.request<Display>('/displays', {
       method: 'POST',
@@ -205,13 +278,15 @@ class ApiClient {
     });
   }
 
-  async updateDisplay(id: string, data: Partial<{ nickname: string; location?: string; currentPlaylistId?: string }>): Promise<Display> {
-    // Backend expects 'name', frontend uses 'nickname'
-    const payload: any = {};
+  async updateDisplay(
+    id: string,
+    data: Partial<{ nickname: string; location?: string; currentPlaylistId?: string }>
+  ): Promise<Display> {
+    const payload: Record<string, string | undefined> = {};
     if (data.nickname !== undefined) payload.name = data.nickname;
     if (data.location !== undefined) payload.location = data.location;
     if (data.currentPlaylistId !== undefined) payload.currentPlaylistId = data.currentPlaylistId;
-    
+
     return this.request<Display>(`/displays/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(payload),
@@ -230,16 +305,21 @@ class ApiClient {
     });
   }
 
-  async completePairing(data: { code: string; nickname: string; location?: string }): Promise<any> {
-    return this.request<any>('/devices/pairing/complete', {
+  async completePairing(data: { code: string; nickname: string; location?: string }): Promise<Display> {
+    return this.request<Display>('/devices/pairing/complete', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
   // Content
-  async getContent(params?: { page?: number; limit?: number; type?: string; status?: string }): Promise<PaginatedResponse<Content>> {
-    const query = new URLSearchParams(params as any).toString();
+  async getContent(params?: {
+    page?: number;
+    limit?: number;
+    type?: string;
+    status?: string;
+  }): Promise<PaginatedResponse<Content>> {
+    const query = params ? new URLSearchParams(params as Record<string, string>).toString() : '';
     return this.request<PaginatedResponse<Content>>(`/content${query ? `?${query}` : ''}`);
   }
 
@@ -251,12 +331,67 @@ class ApiClient {
     title: string;
     type: string;
     url?: string;
-    metadata?: any;
+    file?: File;
+    metadata?: Record<string, unknown>;
   }): Promise<Content> {
-    // Backend expects 'name' instead of 'title'
+    // If file is provided, use multipart upload endpoint
+    if (data.file) {
+      const formData = new FormData();
+      formData.append('file', data.file);
+      formData.append('name', data.title);
+      formData.append('type', data.type);
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[API] Request: POST ${this.baseUrl}/content/upload (multipart/form-data)`);
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout for uploads
+
+      try {
+        const response = await fetch(`${this.baseUrl}/content/upload`, {
+          method: 'POST',
+          body: formData,
+          credentials: 'include', // Include httpOnly cookie
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[API] Response status: ${response.status} ${response.statusText}`);
+        }
+
+        if (!response.ok) {
+          if (response.status === 401 || response.status === 403) {
+            this.isAuthenticated = false;
+            if (typeof window !== 'undefined') {
+              const currentPath = window.location.pathname;
+              window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`;
+            }
+          }
+          const error = await response.json().catch(() => ({ message: 'Upload failed' }));
+          throw new Error(error.message || `HTTP ${response.status}`);
+        }
+
+        const result = await response.json();
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[API] File upload successful');
+        }
+        return result.content || result;
+      } catch (error) {
+        clearTimeout(timeoutId);
+        if (error instanceof Error && error.name === 'AbortError') {
+          throw new Error('Upload timeout');
+        }
+        throw error;
+      }
+    }
+
+    // Otherwise use JSON endpoint (for URLs)
     const payload = {
       name: data.title,
-      type: data.type === 'pdf' ? 'url' : data.type, // Map pdf to url type
+      type: data.type === 'pdf' ? 'url' : data.type,
       url: data.url || '',
       metadata: data.metadata,
     };
@@ -266,7 +401,10 @@ class ApiClient {
     });
   }
 
-  async updateContent(id: string, data: Partial<{ title: string; metadata?: any }>): Promise<Content> {
+  async updateContent(
+    id: string,
+    data: Partial<{ title: string; metadata?: Record<string, unknown> }>
+  ): Promise<Content> {
     return this.request<Content>(`/content/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
@@ -287,7 +425,7 @@ class ApiClient {
 
   // Playlists
   async getPlaylists(params?: { page?: number; limit?: number }): Promise<PaginatedResponse<Playlist>> {
-    const query = new URLSearchParams(params as any).toString();
+    const query = params ? new URLSearchParams(params as Record<string, string>).toString() : '';
     return this.request<PaginatedResponse<Playlist>>(`/playlists${query ? `?${query}` : ''}`);
   }
 
@@ -306,10 +444,10 @@ class ApiClient {
     });
   }
 
-  async updatePlaylist(id: string, data: Partial<{
-    name: string;
-    description?: string;
-  }>): Promise<Playlist> {
+  async updatePlaylist(
+    id: string,
+    data: Partial<{ name: string; description?: string }>
+  ): Promise<Playlist> {
     return this.request<Playlist>(`/playlists/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
@@ -322,7 +460,11 @@ class ApiClient {
     });
   }
 
-  async addPlaylistItem(playlistId: string, contentId: string, duration?: number): Promise<PlaylistItem> {
+  async addPlaylistItem(
+    playlistId: string,
+    contentId: string,
+    duration?: number
+  ): Promise<PlaylistItem> {
     return this.request<PlaylistItem>(`/playlists/${playlistId}/items`, {
       method: 'POST',
       body: JSON.stringify({ contentId, duration }),
@@ -335,7 +477,11 @@ class ApiClient {
     });
   }
 
-  async updatePlaylistItem(playlistId: string, itemId: string, data: { duration?: number }): Promise<PlaylistItem> {
+  async updatePlaylistItem(
+    playlistId: string,
+    itemId: string,
+    data: { duration?: number }
+  ): Promise<PlaylistItem> {
     return this.request<PlaylistItem>(`/playlists/${playlistId}/items/${itemId}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
@@ -343,53 +489,53 @@ class ApiClient {
   }
 
   // Schedules
-  async getSchedules(params?: { page?: number; limit?: number }) {
-    const query = new URLSearchParams(params as any).toString();
-    return this.request<any>(`/schedules${query ? `?${query}` : ''}`);
+  async getSchedules(params?: { page?: number; limit?: number }): Promise<PaginatedResponse<Schedule>> {
+    const query = params ? new URLSearchParams(params as Record<string, string>).toString() : '';
+    return this.request<PaginatedResponse<Schedule>>(`/schedules${query ? `?${query}` : ''}`);
   }
 
-  async createSchedule(data: any) {
-    return this.request<any>('/schedules', {
+  async createSchedule(data: ScheduleData): Promise<Schedule> {
+    return this.request<Schedule>('/schedules', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
-  async updateSchedule(id: string, data: any) {
-    return this.request<any>(`/schedules/${id}`, {
+  async updateSchedule(id: string, data: Partial<ScheduleData>): Promise<Schedule> {
+    return this.request<Schedule>(`/schedules/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
   }
 
-  async deleteSchedule(id: string) {
-    return this.request<any>(`/schedules/${id}`, {
+  async deleteSchedule(id: string): Promise<void> {
+    return this.request<void>(`/schedules/${id}`, {
       method: 'DELETE',
     });
   }
 
   // Generic HTTP methods
-  async post<T = any>(endpoint: string, body?: any): Promise<T> {
+  async post<T = unknown>(endpoint: string, body?: unknown): Promise<T> {
     return this.request<T>(endpoint, {
       method: 'POST',
       body: body ? JSON.stringify(body) : undefined,
     });
   }
 
-  async get<T = any>(endpoint: string): Promise<T> {
+  async get<T = unknown>(endpoint: string): Promise<T> {
     return this.request<T>(endpoint, {
       method: 'GET',
     });
   }
 
-  async patch<T = any>(endpoint: string, body?: any): Promise<T> {
+  async patch<T = unknown>(endpoint: string, body?: unknown): Promise<T> {
     return this.request<T>(endpoint, {
       method: 'PATCH',
       body: body ? JSON.stringify(body) : undefined,
     });
   }
 
-  async delete<T = any>(endpoint: string): Promise<T> {
+  async delete<T = unknown>(endpoint: string): Promise<T> {
     return this.request<T>(endpoint, {
       method: 'DELETE',
     });

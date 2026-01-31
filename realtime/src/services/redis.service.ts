@@ -1,14 +1,13 @@
 import { Injectable, OnModuleDestroy, Logger } from '@nestjs/common';
 import Redis from 'ioredis';
+import {
+  DeviceStatus,
+  DeviceCommand,
+  Playlist,
+} from '../types';
 
-export interface DeviceStatus {
-  status: 'online' | 'offline' | 'pairing' | 'error';
-  lastHeartbeat: number;
-  socketId: string | null;
-  organizationId: string;
-  metrics?: any;
-  currentContent?: any;
-}
+// Re-export DeviceStatus for backwards compatibility
+export type { DeviceStatus } from '../types';
 
 @Injectable()
 export class RedisService implements OnModuleDestroy {
@@ -72,23 +71,45 @@ export class RedisService implements OnModuleDestroy {
 
   /**
    * Get all devices for an organization
+   * Uses SCAN instead of KEYS to avoid blocking Redis in production
    */
   async getOrganizationDevices(organizationId: string): Promise<string[]> {
     const pattern = 'device:status:*';
-    const keys = await this.redis.keys(pattern);
-
     const devices: string[] = [];
 
-    for (const key of keys) {
-      const data = await this.redis.get(key);
-      if (data) {
-        const status: DeviceStatus = JSON.parse(data);
-        if (status.organizationId === organizationId) {
-          const deviceId = key.replace('device:status:', '');
-          devices.push(deviceId);
+    // Use SCAN with cursor-based iteration for production safety
+    let cursor = '0';
+    do {
+      const [nextCursor, keys] = await this.redis.scan(
+        cursor,
+        'MATCH',
+        pattern,
+        'COUNT',
+        100, // Process 100 keys per iteration
+      );
+      cursor = nextCursor;
+
+      // Process keys in parallel for efficiency
+      if (keys.length > 0) {
+        const values = await this.redis.mget(...keys);
+
+        for (let i = 0; i < keys.length; i++) {
+          const data = values[i];
+          if (data) {
+            try {
+              const status: DeviceStatus = JSON.parse(data);
+              if (status.organizationId === organizationId) {
+                const deviceId = keys[i].replace('device:status:', '');
+                devices.push(deviceId);
+              }
+            } catch {
+              // Skip invalid JSON entries
+              this.logger.warn(`Invalid JSON in key ${keys[i]}`);
+            }
+          }
         }
       }
-    }
+    } while (cursor !== '0');
 
     return devices;
   }
@@ -96,7 +117,7 @@ export class RedisService implements OnModuleDestroy {
   /**
    * Store commands for a device
    */
-  async addDeviceCommand(deviceId: string, command: any): Promise<void> {
+  async addDeviceCommand(deviceId: string, command: DeviceCommand): Promise<void> {
     const key = `device:commands:${deviceId}`;
     await this.redis.lpush(key, JSON.stringify(command));
     await this.redis.expire(key, 300); // 5 minutes
@@ -105,20 +126,20 @@ export class RedisService implements OnModuleDestroy {
   /**
    * Get pending commands for a device
    */
-  async getDeviceCommands(deviceId: string): Promise<any[]> {
+  async getDeviceCommands(deviceId: string): Promise<DeviceCommand[]> {
     const key = `device:commands:${deviceId}`;
     const commands = await this.redis.lrange(key, 0, -1);
 
     // Clear commands after retrieving
     await this.redis.del(key);
 
-    return commands.map((cmd) => JSON.parse(cmd));
+    return commands.map((cmd) => JSON.parse(cmd) as DeviceCommand);
   }
 
   /**
    * Cache playlist for a device
    */
-  async cachePlaylist(deviceId: string, playlist: any): Promise<void> {
+  async cachePlaylist(deviceId: string, playlist: Playlist): Promise<void> {
     const key = `playlist:${deviceId}`;
     await this.redis.setex(key, 3600, JSON.stringify(playlist)); // 1 hour
   }
@@ -126,7 +147,7 @@ export class RedisService implements OnModuleDestroy {
   /**
    * Get cached playlist
    */
-  async getCachedPlaylist(deviceId: string): Promise<any | null> {
+  async getCachedPlaylist(deviceId: string): Promise<Playlist | null> {
     const key = `playlist:${deviceId}`;
     const data = await this.redis.get(key);
 
@@ -134,26 +155,26 @@ export class RedisService implements OnModuleDestroy {
       return null;
     }
 
-    return JSON.parse(data);
+    return JSON.parse(data) as Playlist;
   }
 
   /**
    * Publish event to channel
    */
-  async publish(channel: string, message: any): Promise<void> {
+  async publish<T = unknown>(channel: string, message: T): Promise<void> {
     await this.redis.publish(channel, JSON.stringify(message));
   }
 
   /**
    * Subscribe to channel
    */
-  async subscribe(channel: string, callback: (message: any) => void): Promise<void> {
+  async subscribe<T = unknown>(channel: string, callback: (message: T) => void): Promise<void> {
     await this.subscriber.subscribe(channel);
 
     this.subscriber.on('message', (ch, message) => {
       if (ch === channel) {
         try {
-          const data = JSON.parse(message);
+          const data = JSON.parse(message) as T;
           callback(data);
         } catch (error) {
           this.logger.error('Failed to parse message:', error);
@@ -210,11 +231,30 @@ export class RedisService implements OnModuleDestroy {
 
   /**
    * Delete keys matching pattern
+   * Uses SCAN instead of KEYS to avoid blocking Redis in production
    */
   async deletePattern(pattern: string): Promise<void> {
-    const keys = await this.redis.keys(pattern);
-    if (keys.length > 0) {
-      await this.redis.del(...keys);
+    let cursor = '0';
+    let deletedCount = 0;
+
+    do {
+      const [nextCursor, keys] = await this.redis.scan(
+        cursor,
+        'MATCH',
+        pattern,
+        'COUNT',
+        100,
+      );
+      cursor = nextCursor;
+
+      if (keys.length > 0) {
+        await this.redis.del(...keys);
+        deletedCount += keys.length;
+      }
+    } while (cursor !== '0');
+
+    if (deletedCount > 0) {
+      this.logger.log(`Deleted ${deletedCount} keys matching pattern: ${pattern}`);
     }
   }
 }
