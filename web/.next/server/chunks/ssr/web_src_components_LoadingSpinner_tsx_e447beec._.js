@@ -1,3 +1,0 @@
-module.exports=[51355,a=>{"use strict";var b=a.i(64239);function c({size:a="md"}){return(0,b.jsx)("div",{className:"flex items-center justify-center",role:"status","aria-live":"polite","aria-label":"Loading",children:(0,b.jsx)("div",{className:`${{sm:"w-4 h-4",md:"w-8 h-8",lg:"w-12 h-12"}[a]} border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin`,"aria-hidden":"true"})})}a.s(["default",()=>c])}];
-
-//# sourceMappingURL=web_src_components_LoadingSpinner_tsx_e447beec._.js.map

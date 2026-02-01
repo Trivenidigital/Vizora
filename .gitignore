@@ -5,21 +5,33 @@ node_modules/
 
 # Testing
 coverage/
+**/coverage/
 *.lcov
 .nyc_output
 junit.xml
+test-results/
+playwright-report/
 
-# Production
+# Production builds
 dist/
 build/
 out/
+.next/
+**/.next/
 
-# Environment variables
+# Environment variables - NEVER commit secrets!
 .env
 .env.local
+.env.*.local
 .env.development.local
 .env.test.local
 .env.production.local
+.env.production
+
+# Keep only example/template env files
+!.env.example
+!.env.test
+!.env.load-test
 
 # Logs
 logs/
@@ -49,6 +61,9 @@ Thumbs.db
 *.tmp
 *.temp
 .cache/
+.turbo/
+.swc/
+**/.swc/
 
 # Database
 *.db
@@ -57,6 +72,7 @@ Thumbs.db
 
 # Uploads/Storage
 uploads/
+**/uploads/
 storage/
 
 # Docker
@@ -65,7 +81,9 @@ docker-compose.override.yml
 # NX
 .nx/
 
-# Keep env examples
-!.env.example
-!.env.test
-!.env.load-test
+# Electron builds
+release/
+
+# Misc
+*.tsbuildinfo
+**/*.tsbuildinfo
