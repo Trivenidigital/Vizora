@@ -10,7 +10,7 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import EmptyState from '@/components/EmptyState';
 import SearchFilter from '@/components/SearchFilter';
 import DeviceStatusIndicator from '@/components/DeviceStatusIndicator';
-import DeviceGroupSelector, { DeviceGroup } from '@/components/DeviceGroupSelector';
+import { DeviceGroup } from '@/components/DeviceGroupSelector';
 import { useToast } from '@/lib/hooks/useToast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { useRealtimeEvents, useOptimisticState, useErrorRecovery } from '@/lib/hooks';
@@ -21,7 +21,8 @@ export default function DevicesPage() {
   const toast = useToast();
   const [devices, setDevices] = useState<Display[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  const [deviceGroups, setDeviceGroups] = useState<DeviceGroup[]>([
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_deviceGroups, _setDeviceGroups] = useState<DeviceGroup[]>([
     {
       id: 'group-1',
       name: 'Store Locations',
@@ -42,7 +43,8 @@ export default function DevicesPage() {
       deviceIds: [],
     },
   ]);
-  const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_selectedGroups, _setSelectedGroups] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDevice, setSelectedDevice] = useState<Display | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -57,11 +59,12 @@ export default function DevicesPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [showGroupFilter, setShowGroupFilter] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_showGroupFilter, _setShowGroupFilter] = useState(false);
   const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline' | 'error'>('offline');
 
   // Memoized callback for device status changes
-  const handleDeviceStatusChange = useCallback((update) => {
+  const handleDeviceStatusChange = useCallback((update: { deviceId: string; status: 'online' | 'offline'; lastSeen?: string; currentPlaylistId?: string }) => {
     // Update device status in real-time
     setDevices((prev) =>
       prev.map((d) =>
@@ -69,7 +72,7 @@ export default function DevicesPage() {
           ? {
               ...d,
               status: update.status,
-              lastSeen: update.lastSeen,
+              lastSeen: update.lastSeen ?? d.lastSeen,
               currentPlaylistId: update.currentPlaylistId ?? d.currentPlaylistId,
             }
           : d
@@ -80,7 +83,7 @@ export default function DevicesPage() {
   }, []);
 
   // Memoized callback for connection changes
-  const handleConnectionChange = useCallback((isConnected) => {
+  const handleConnectionChange = useCallback((isConnected: boolean) => {
     setRealtimeStatus(isConnected ? 'connected' : 'offline');
     if (isConnected) {
       toast.info('Real-time connection established');
@@ -88,7 +91,8 @@ export default function DevicesPage() {
   }, [toast]);
 
   // Real-time event handling
-  const { isConnected, isOffline, emitDeviceUpdate } = useRealtimeEvents({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { isConnected: _isConnected, isOffline: _isOffline, emitDeviceUpdate } = useRealtimeEvents({
     enabled: true,
     onDeviceStatusChange: handleDeviceStatusChange,
     onConnectionChange: handleConnectionChange,
@@ -275,31 +279,7 @@ export default function DevicesPage() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'online':
-        return 'bg-success-100 dark:bg-success-900 text-success-800 dark:text-success-200';
-      case 'offline':
-        return 'bg-error-100 dark:bg-error-900 text-error-800 dark:text-error-200';
-      case 'idle':
-        return 'bg-warning-100 dark:bg-warning-900 text-warning-800 dark:text-warning-200';
-      default:
-        return 'bg-neutral-100 dark:bg-neutral-900 text-neutral-800 dark:text-neutral-200';
-    }
-  };
 
-  const getStatusDot = (status: string) => {
-    switch (status) {
-      case 'online':
-        return 'bg-success-500';
-      case 'offline':
-        return 'bg-error-500';
-      case 'idle':
-        return 'bg-warning-500';
-      default:
-        return 'bg-neutral-400';
-    }
-  };
 
   const handleSort = (field: keyof Display) => {
     if (sortField === field) {

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Icon } from '@/theme/icons';
 
-interface Command {
+export interface Command {
   id: string;
   title: string;
   description?: string;

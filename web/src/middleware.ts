@@ -12,8 +12,9 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
   
-  // Check for auth token in cookies or localStorage (via header)
-  const tokenFromCookie = request.cookies.get('authToken')?.value;
+  // Check for auth token in cookies (httpOnly cookie set by backend)
+  // Cookie name must match AUTH_CONSTANTS.COOKIE_NAME from middleware
+  const tokenFromCookie = request.cookies.get('vizora_auth_token')?.value;
   const tokenFromHeader = request.headers.get('authorization')?.replace('Bearer ', '');
   const token = tokenFromCookie || tokenFromHeader;
   

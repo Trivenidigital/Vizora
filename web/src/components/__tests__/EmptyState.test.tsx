@@ -62,9 +62,9 @@ describe('EmptyState', () => {
   describe('variants', () => {
     it('renders default variant by default', () => {
       render(<EmptyState {...defaultProps} />);
-      // Default variant has gradient background
-      const container = screen.getByText('No items found').closest('div');
-      expect(container?.parentElement?.className).toContain('bg-gradient-to-br');
+      // Default variant has gradient background - the title's container div has the gradient
+      const container = screen.getByText('No items found').closest('div.bg-gradient-to-br');
+      expect(container).toBeInTheDocument();
     });
 
     it('renders minimal variant', () => {

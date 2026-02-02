@@ -344,6 +344,7 @@ describe('useOptimisticState', () => {
 
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('[OptimisticState]'),
+        expect.anything(),
         expect.anything()
       );
 

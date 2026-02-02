@@ -36,15 +36,40 @@ function createWindow() {
     },
   });
 
+  // Set Content Security Policy to allow loading images from the middleware server
+  mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src 'self'; " +
+          "script-src 'self' 'unsafe-inline'; " +
+          "style-src 'self' 'unsafe-inline'; " +
+          "img-src 'self' data: http://localhost:3000 http://127.0.0.1:3000; " +
+          "connect-src 'self' http://localhost:3000 http://127.0.0.1:3000 ws://localhost:3002 ws://127.0.0.1:3002; " +
+          "media-src 'self' http://localhost:3000 http://127.0.0.1:3000; " +
+          "frame-src 'self' http: https:;"
+        ]
+      }
+    });
+  });
+
   // Load the app
-  const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
-  if (isDev) {
-    mainWindow.loadURL('http://localhost:4200').catch(() => {
-      // If dev server is not running, load from dist
+  // Always load from dist in development for reliability
+  // Use webpack-dev-server only if explicitly requested via env var
+  const useDevServer = process.env.USE_DEV_SERVER === 'true';
+
+  if (useDevServer) {
+    console.log('[Main] Loading from webpack dev server at http://localhost:4200');
+    mainWindow.loadURL('http://localhost:4200').catch((err) => {
+      console.log('[Main] Dev server not available, falling back to dist:', err.message);
       mainWindow?.loadFile(path.join(__dirname, '../renderer/index.html'));
     });
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+    console.log('[Main] Loading from dist/renderer/index.html');
+    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html')).catch((err) => {
+      console.error('[Main] Failed to load renderer:', err);
+    });
   }
   
   // Always open dev tools for debugging
@@ -123,6 +148,9 @@ function initializeDeviceClient() {
   if (deviceToken) {
     console.log('[Main] Device token exists, connecting...');
     deviceClient.connect(deviceToken);
+    // Send paired event to renderer so it shows content screen instead of pairing
+    console.log('[Main] Sending paired event to renderer (existing token)');
+    mainWindow?.webContents.send('paired', deviceToken);
   } else {
     // Request pairing
     console.log('[Main] *** SENDING PAIRING-REQUIRED EVENT TO RENDERER ***');

@@ -139,8 +139,6 @@ export function getSemanticColor(
   colorType: keyof typeof semanticColors,
   mode: 'light' | 'dark' = 'light'
 ): string {
-  const color = semanticColors[colorType];
-  const modeKey = mode as unknown as keyof typeof color;
-  const colorValue = color[modeKey];
-  return (colorValue as any) || (color['500' as any]) || '#000000';
+  const color = semanticColors[colorType] as Record<string, string>;
+  return color[mode] || color['500'] || '#000000';
 }

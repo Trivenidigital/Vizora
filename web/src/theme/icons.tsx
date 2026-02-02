@@ -25,6 +25,13 @@ import {
   Menu,
   Folder,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Check,
+  Clock,
 } from 'lucide-react';
 
 export const ICON_SIZES = {
@@ -84,6 +91,17 @@ export const iconMap = {
   grid: Grid,
   list: Menu,
   storage: Folder,
+
+  // Chevrons & Navigation
+  chevronDown: ChevronDown,
+  chevronUp: ChevronUp,
+  chevronLeft: ChevronLeft,
+  chevronRight: ChevronRight,
+
+  // Additional UI
+  close: X,
+  check: Check,
+  clock: Clock,
 } as const;
 
 export type IconName = keyof typeof iconMap;

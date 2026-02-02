@@ -16,7 +16,7 @@ export default function PreviewModal({ isOpen, onClose, content }: PreviewModalP
         return (
           <img 
             src={content.url} 
-            alt={content.name}
+            alt={content.title}
             className="max-w-full max-h-[80vh] object-contain cursor-zoom-in"
             onClick={(e) => {
               // Click to toggle zoom
@@ -41,7 +41,7 @@ export default function PreviewModal({ isOpen, onClose, content }: PreviewModalP
             src={content.url}
             className="w-full h-[80vh]"
             sandbox="allow-scripts allow-same-origin"
-            title={`PDF: ${content.name}`}
+            title={`PDF: ${content.title}`}
           />
         );
       
@@ -66,7 +66,7 @@ export default function PreviewModal({ isOpen, onClose, content }: PreviewModalP
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={content.name}>
+    <Modal isOpen={isOpen} onClose={onClose} title={content.title}>
       <div className="flex items-center justify-center min-h-[400px]">
         {renderPreview()}
       </div>

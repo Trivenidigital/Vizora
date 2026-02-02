@@ -6,16 +6,15 @@ import {
   OnGatewayDisconnect,
   ConnectedSocket,
   MessageBody,
-  UsePipes,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger } from '@nestjs/common';
+import { Logger, UsePipes } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { RedisService } from '../services/redis.service';
 import { HeartbeatService } from '../services/heartbeat.service';
 import { PlaylistService } from '../services/playlist.service';
 import { MetricsService } from '../metrics/metrics.service';
-import { DatabaseService } from '../../database/database.service';
+import { DatabaseService } from '../database/database.service';
 import { WsValidationPipe } from './pipes/ws-validation.pipe';
 import {
   HeartbeatMessageDto,
@@ -138,6 +137,68 @@ export class DeviceGateway
         cacheSize: 524288000, // 500MB
         autoUpdate: true,
       });
+
+      // Fetch and send current playlist to device on connection
+      try {
+        const display = await this.databaseService.display.findUnique({
+          where: { id: deviceId },
+          include: {
+            currentPlaylist: {
+              include: {
+                items: {
+                  include: {
+                    content: true,
+                  },
+                  orderBy: {
+                    order: 'asc',
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        if (display?.currentPlaylist) {
+          // Transform playlist to the format expected by the display client
+          const playlist = {
+            id: display.currentPlaylist.id,
+            name: display.currentPlaylist.name,
+            items: display.currentPlaylist.items.map((item: any) => ({
+              id: item.id,
+              contentId: item.contentId,
+              duration: item.duration || 10,
+              order: item.order,
+              content: item.content ? {
+                id: item.content.id,
+                name: item.content.name,
+                type: item.content.type,
+                url: item.content.url,
+                thumbnail: item.content.thumbnail,
+                mimeType: item.content.mimeType,
+                duration: item.content.duration,
+              } : null,
+            })),
+            totalDuration: display.currentPlaylist.items.reduce(
+              (sum: number, item: any) => sum + (item.duration || 10),
+              0
+            ),
+            loopPlaylist: true,
+          };
+
+          client.emit('playlist:update', {
+            playlist,
+            timestamp: new Date().toISOString(),
+          });
+
+          this.logger.log(`Sent current playlist to device: ${deviceId} (playlist: ${display.currentPlaylist.name})`);
+        } else {
+          this.logger.log(`Device ${deviceId} has no assigned playlist`);
+        }
+      } catch (playlistError: unknown) {
+        const playlistErrorMsg = playlistError instanceof Error ? playlistError.message : 'Unknown error';
+        this.logger.warn(`Failed to fetch playlist for device ${deviceId}: ${playlistErrorMsg}`);
+        // Don't fail the connection if playlist fetch fails
+      }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Connection error: ${errorMessage}`);

@@ -76,7 +76,7 @@ export default function DeviceStatusIndicator({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deviceId]);
 
-  const config = statusConfig[status];
+  const config = statusConfig[status] || statusConfig.offline;
 
   const formatTime = () => {
     if (!lastUpdate) return '';

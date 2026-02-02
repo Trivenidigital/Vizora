@@ -1,10 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+import { RedisService } from '../redis/redis.service';
 
 interface HealthCheck {
-  status: 'healthy' | 'unhealthy';
+  status: 'healthy' | 'unhealthy' | 'degraded';
   responseTime?: number;
   error?: string;
+  details?: Record<string, unknown>;
 }
 
 interface HealthResponse {
@@ -14,6 +16,7 @@ interface HealthResponse {
   version: string;
   checks: {
     database: HealthCheck;
+    redis: HealthCheck;
     memory: HealthCheck;
   };
 }
@@ -22,25 +25,38 @@ interface HealthResponse {
 export class HealthService {
   private readonly startTime = Date.now();
 
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    @Optional() private readonly redis?: RedisService,
+  ) {}
 
   async check(): Promise<HealthResponse> {
-    const checks = {
-      database: await this.checkDatabase(),
-      memory: this.checkMemory(),
-    };
+    const [database, redis, memory] = await Promise.all([
+      this.checkDatabase(),
+      this.checkRedis(),
+      Promise.resolve(this.checkMemory()),
+    ]);
+
+    const checks = { database, redis, memory };
 
     // Determine overall status
-    const allHealthy = Object.values(checks).every(c => c.status === 'healthy');
-    const anyUnhealthy = Object.values(checks).some(c => c.status === 'unhealthy');
+    const statuses = Object.values(checks).map(c => c.status);
+    const hasUnhealthy = statuses.includes('unhealthy');
+    const hasDegraded = statuses.includes('degraded');
 
     let status: 'ok' | 'degraded' | 'unhealthy';
-    if (allHealthy) {
-      status = 'ok';
-    } else if (anyUnhealthy) {
-      status = 'unhealthy';
-    } else {
+    if (hasUnhealthy) {
+      // Database unhealthy = overall unhealthy
+      // Redis unhealthy = degraded (it's optional for basic functionality)
+      if (database.status === 'unhealthy') {
+        status = 'unhealthy';
+      } else {
+        status = 'degraded';
+      }
+    } else if (hasDegraded) {
       status = 'degraded';
+    } else {
+      status = 'ok';
     }
 
     return {
@@ -69,19 +85,75 @@ export class HealthService {
     }
   }
 
+  private async checkRedis(): Promise<HealthCheck> {
+    const start = Date.now();
+
+    // If Redis service is not available (not injected)
+    if (!this.redis) {
+      return {
+        status: 'degraded',
+        responseTime: 0,
+        error: 'Redis service not configured',
+        details: { configured: false },
+      };
+    }
+
+    try {
+      const result = await this.redis.healthCheck();
+
+      if (result.healthy) {
+        return {
+          status: 'healthy',
+          responseTime: result.responseTime,
+          details: { connected: true },
+        };
+      }
+
+      return {
+        status: 'unhealthy',
+        responseTime: result.responseTime,
+        error: result.error || 'Redis health check failed',
+        details: { connected: false },
+      };
+    } catch (error) {
+      return {
+        status: 'unhealthy',
+        responseTime: Date.now() - start,
+        error: error instanceof Error ? error.message : 'Redis check failed',
+        details: { connected: false },
+      };
+    }
+  }
+
   private checkMemory(): HealthCheck {
     const used = process.memoryUsage();
     const heapUsedMB = Math.round(used.heapUsed / 1024 / 1024);
     const heapTotalMB = Math.round(used.heapTotal / 1024 / 1024);
     const heapUsagePercent = (used.heapUsed / used.heapTotal) * 100;
+    const rssMB = Math.round(used.rss / 1024 / 1024);
 
-    // Consider unhealthy if heap usage > 95%
-    const status = heapUsagePercent > 95 ? 'unhealthy' : 'healthy';
+    // Consider degraded if heap usage > 85%, unhealthy if > 95%
+    let status: 'healthy' | 'degraded' | 'unhealthy';
+    if (heapUsagePercent > 95) {
+      status = 'unhealthy';
+    } else if (heapUsagePercent > 85) {
+      status = 'degraded';
+    } else {
+      status = 'healthy';
+    }
+
+    const details = {
+      heapUsedMB,
+      heapTotalMB,
+      heapUsagePercent: Math.round(heapUsagePercent * 10) / 10,
+      rssMB,
+    };
 
     return {
       status,
       responseTime: 0,
-      ...(status === 'unhealthy' && {
+      details,
+      ...(status !== 'healthy' && {
         error: `High memory usage: ${heapUsedMB}MB / ${heapTotalMB}MB (${heapUsagePercent.toFixed(1)}%)`,
       }),
     };

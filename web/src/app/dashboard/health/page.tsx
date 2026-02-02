@@ -13,7 +13,7 @@ import { useRealtimeEvents } from '@/lib/hooks';
 import { Icon } from '@/theme/icons';
 
 // Mock device health data generator
-const generateMockDeviceHealth = (deviceId: string, deviceName: string): DeviceHealth => {
+const generateMockDeviceHealth = (deviceId: string, _deviceName: string): DeviceHealth => {
   const baseScore = Math.random() * 40 + 60; // 60-100
   return {
     deviceId,
@@ -40,7 +40,7 @@ export default function HealthMonitoringPage() {
   const [activeAlerts, setActiveAlerts] = useState<Record<string, any>>({});
 
   // Real-time event handling for health alerts
-  const { isConnected, isOffline } = useRealtimeEvents({
+  useRealtimeEvents({
     enabled: true,
     onHealthAlert: (alert) => {
       console.log('[HealthPage] Health alert received:', alert);
@@ -78,13 +78,13 @@ export default function HealthMonitoringPage() {
       // Show toast notification
       switch (alert.severity) {
         case 'critical':
-          toast.error(`Critical: ${alert.message} (${alert.deviceType || 'Device'})`);
+          toast.error(`Critical: ${alert.message} (Device)`);
           break;
         case 'warning':
-          toast.warning(`Warning: ${alert.message} (${alert.deviceType || 'Device'})`);
+          toast.warning(`Warning: ${alert.message} (Device)`);
           break;
         default:
-          toast.info(`${alert.message} (${alert.deviceType || 'Device'})`);
+          toast.info(`${alert.message} (Device)`);
       }
 
       // Clear alert after 30 seconds

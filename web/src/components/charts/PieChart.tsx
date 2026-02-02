@@ -78,14 +78,7 @@ export const PieChart: React.FC<PieChartProps> = ({
             cx="50%"
             cy="50%"
             outerRadius={100}
-            label={
-              showLabel
-                ? {
-                    position: 'outside' as const,
-                    formatter: (value: number) => `${value}%`,
-                  }
-                : false
-            }
+            label={showLabel ? ({ value }: { value: number }) => `${value}%` : false}
             isAnimationActive={true}
           >
             {colors.map((color, index) => (

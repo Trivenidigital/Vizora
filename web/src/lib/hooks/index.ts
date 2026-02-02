@@ -7,9 +7,15 @@ export { useToast } from './useToast';
 export { useTheme } from './useTheme';
 export { useDebounce } from './useDebounce';
 
-// Analytics and data hooks
-export { useAnalyticsData } from './useAnalyticsData';
-export { useChartData } from './useChartData';
+// Analytics and data hooks (from useAnalyticsData - real API integration)
+export {
+  useDeviceMetrics,
+  useContentPerformance,
+  useUsageTrends,
+  useDeviceDistribution,
+  useBandwidthUsage,
+  usePlaylistPerformance,
+} from './useAnalyticsData';
 
 // Real-time and state management hooks (Phase 8 - Socket.io integration)
 export { useRealtimeEvents } from './useRealtimeEvents';

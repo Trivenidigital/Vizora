@@ -37,12 +37,30 @@ export class FileValidationService {
     },
     // Videos
     'video/mp4': {
-      extensions: ['.mp4'],
+      extensions: ['.mp4', '.m4v'],
       maxSize: 100 * 1024 * 1024, // 100MB
       magicNumbers: [
         Buffer.from([0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70]), // ftyp
         Buffer.from([0x00, 0x00, 0x00, 0x1C, 0x66, 0x74, 0x79, 0x70]),
         Buffer.from([0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70]),
+      ],
+    },
+    'video/quicktime': {
+      extensions: ['.mov', '.qt'],
+      maxSize: 100 * 1024 * 1024, // 100MB
+      magicNumbers: [
+        Buffer.from([0x00, 0x00, 0x00, 0x14, 0x66, 0x74, 0x79, 0x70]), // ftyp qt
+        Buffer.from([0x00, 0x00, 0x00, 0x08, 0x77, 0x69, 0x64, 0x65]), // wide
+        Buffer.from([0x6D, 0x6F, 0x6F, 0x76]), // moov
+        Buffer.from([0x66, 0x72, 0x65, 0x65]), // free
+        Buffer.from([0x6D, 0x64, 0x61, 0x74]), // mdat
+      ],
+    },
+    'video/x-msvideo': {
+      extensions: ['.avi'],
+      maxSize: 100 * 1024 * 1024, // 100MB
+      magicNumbers: [
+        Buffer.from([0x52, 0x49, 0x46, 0x46]), // RIFF
       ],
     },
     'video/webm': {

@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { DatabaseModule } from '../database/database.module';
 import { DeviceGateway } from '../gateways/device.gateway';
 import { RedisService } from '../services/redis.service';
 import { HeartbeatService } from '../services/heartbeat.service';
@@ -21,6 +22,7 @@ import { MetricsInterceptor } from '../interceptors/metrics.interceptor';
       secret: process.env.DEVICE_JWT_SECRET || 'device-jwt-secret-changeme',
       signOptions: { expiresIn: '365d' },
     }),
+    DatabaseModule,
     MetricsModule,
   ],
   controllers: [AppController],
