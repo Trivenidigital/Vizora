@@ -23,6 +23,8 @@ import { CreateContentDto } from './dto/create-content.dto';
 import { UpdateContentDto } from './dto/update-content.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Controller('content')
 export class ContentController {
@@ -68,18 +70,37 @@ export class ContentController {
       file.originalname,
     );
 
-    // TODO: Upload to storage service (S3, MinIO, etc.)
-    // For now, store locally or return validation result
-    const fileUrl = `/uploads/${validation.hash}-${safeFilename}`;
+    // Save file to local uploads directory
+    const uploadsDir = path.join(process.cwd(), 'uploads');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
 
-    // Create content record
+    const filename = `${validation.hash}-${safeFilename}`;
+    const filePath = path.join(uploadsDir, filename);
+    fs.writeFileSync(filePath, file.buffer);
+
+    // Use full URL so Electron app can access it via HTTP
+    const baseUrl = process.env.API_BASE_URL || 'http://localhost:3000';
+    const fileUrl = `${baseUrl}/uploads/${filename}`;
+
+    // Determine the content type from the file mimetype
+    const contentType = type || (file.mimetype.startsWith('video/') ? 'video' :
+                                 file.mimetype.startsWith('image/') ? 'image' :
+                                 file.mimetype === 'application/pdf' ? 'pdf' : 'url');
+
+    // For images, use the image URL as the thumbnail
+    const thumbnailUrl = contentType === 'image' ? fileUrl : undefined;
+
+    // Create content record (fileHash stored in metadata since not in schema)
     const content = await this.contentService.create(organizationId, {
       name: name || safeFilename,
-      type: type || file.mimetype.split('/')[0], // image, video, etc.
+      type: contentType,
       url: fileUrl,
-      fileHash: validation.hash,
+      thumbnail: thumbnailUrl,
       fileSize: file.size,
       mimeType: file.mimetype,
+      metadata: { fileHash: validation.hash },
     } as any);
 
     return {

@@ -149,7 +149,7 @@ export default function DeviceHealthMonitor({
       {health.score < 70 && (
         <div className="pt-2 border-t border-gray-200 dark:border-gray-800">
           <div className={`px-3 py-2 rounded text-xs font-medium ${healthStatus.bgColor} ${healthStatus.color} flex items-center gap-2`}>
-            <Icon name="alertTriangle" size="sm" />
+            <Icon name="warning" size="sm" />
             <span>
               {health.score < 50
                 ? 'Device health is poor. Recommended immediate maintenance.'

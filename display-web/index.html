@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Vizora Display</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    /* Pairing Screen */
+    #pairing-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      color: white;
+    }
+
+    #pairing-screen.hidden {
+      display: none;
+    }
+
+    .logo {
+      font-size: 3rem;
+      font-weight: bold;
+      margin-bottom: 2rem;
+      background: linear-gradient(90deg, #667eea, #764ba2);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .pairing-container {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 3rem;
+      text-align: center;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .pairing-title {
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+      color: #e0e0e0;
+    }
+
+    .pairing-instruction {
+      font-size: 1rem;
+      color: #a0a0a0;
+      margin-bottom: 2rem;
+    }
+
+    #qr-code {
+      background: white;
+      padding: 1rem;
+      border-radius: 10px;
+      margin-bottom: 2rem;
+    }
+
+    #qr-code img, #qr-code canvas {
+      display: block;
+      width: 200px;
+      height: 200px;
+    }
+
+    .pairing-code {
+      font-size: 3rem;
+      font-weight: bold;
+      letter-spacing: 0.5rem;
+      color: #667eea;
+      margin-bottom: 1rem;
+      font-family: 'Courier New', monospace;
+    }
+
+    .pairing-url {
+      font-size: 0.9rem;
+      color: #888;
+    }
+
+    /* Content Screen */
+    #content-screen {
+      width: 100%;
+      height: 100%;
+      background: #000;
+    }
+
+    #content-screen.hidden {
+      display: none;
+    }
+
+    #content-container {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    .content-item {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .content-item img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+
+    .content-item video {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+
+    .content-item iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+
+    /* Loading/Error States */
+    #loading-screen, #error-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background: #1a1a2e;
+      color: white;
+    }
+
+    #loading-screen.hidden, #error-screen.hidden {
+      display: none;
+    }
+
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 4px solid rgba(255, 255, 255, 0.1);
+      border-top-color: #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      margin-top: 1rem;
+      color: #888;
+    }
+
+    /* Status indicator */
+    #status-indicator {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      color: white;
+      z-index: 1000;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #4ade80;
+    }
+
+    .status-dot.offline {
+      background: #f87171;
+    }
+
+    .status-dot.connecting {
+      background: #fbbf24;
+      animation: pulse 1s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Loading Screen -->
+  <div id="loading-screen">
+    <div class="spinner"></div>
+    <div class="loading-text">Initializing Vizora Display...</div>
+  </div>
+
+  <!-- Pairing Screen -->
+  <div id="pairing-screen" class="hidden">
+    <div class="logo">Vizora</div>
+    <div class="pairing-container">
+      <h2 class="pairing-title">Pair This Display</h2>
+      <p class="pairing-instruction">Scan the QR code or enter the code in your Vizora dashboard</p>
+      <div id="qr-code"></div>
+      <div class="pairing-code" id="pairing-code">------</div>
+      <div class="pairing-url">dashboard.vizora.io/pair</div>
+    </div>
+  </div>
+
+  <!-- Content Screen -->
+  <div id="content-screen" class="hidden">
+    <div id="content-container"></div>
+  </div>
+
+  <!-- Error Screen -->
+  <div id="error-screen" class="hidden">
+    <div style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
+    <div id="error-message">An error occurred</div>
+    <div style="margin-top: 1rem; color: #888; font-size: 0.9rem;">
+      The display will automatically retry...
+    </div>
+  </div>
+
+  <!-- Status Indicator -->
+  <div id="status-indicator">
+    <div class="status-dot connecting" id="status-dot"></div>
+    <span id="status-text">Connecting...</span>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

@@ -48,9 +48,10 @@ interface ScheduleData {
   endDate?: string;
   startTime?: string;
   endTime?: string;
-  daysOfWeek?: number[];
+  daysOfWeek: number[];  // 0-6 (Sunday-Saturday)
   priority?: number;
   isActive?: boolean;
+  description?: string;
 }
 
 // CSRF cookie name (must match backend)
@@ -346,7 +347,10 @@ class ApiClient {
       }
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout for uploads
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 120s timeout for uploads
+
+      // Get CSRF token for the upload request
+      const csrfToken = getCsrfToken();
 
       try {
         const response = await fetch(`${this.baseUrl}/content/upload`, {
@@ -354,6 +358,10 @@ class ApiClient {
           body: formData,
           credentials: 'include', // Include httpOnly cookie
           signal: controller.signal,
+          headers: {
+            // Don't set Content-Type - browser will set it with boundary for FormData
+            ...(csrfToken && { 'X-CSRF-Token': csrfToken }),
+          },
         });
 
         clearTimeout(timeoutId);
@@ -363,15 +371,24 @@ class ApiClient {
         }
 
         if (!response.ok) {
+          // Log the actual error for debugging
+          const errorData = await response.json().catch(() => ({ message: 'Upload failed' }));
+          if (process.env.NODE_ENV === 'development') {
+            console.error('[API] Upload error:', response.status, errorData);
+          }
+
           if (response.status === 401 || response.status === 403) {
-            this.isAuthenticated = false;
-            if (typeof window !== 'undefined') {
-              const currentPath = window.location.pathname;
-              window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`;
+            // Don't immediately redirect on 403 - could be CSRF issue
+            // Only redirect on 401 (truly unauthorized)
+            if (response.status === 401) {
+              this.isAuthenticated = false;
+              if (typeof window !== 'undefined') {
+                const currentPath = window.location.pathname;
+                window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`;
+              }
             }
           }
-          const error = await response.json().catch(() => ({ message: 'Upload failed' }));
-          throw new Error(error.message || `HTTP ${response.status}`);
+          throw new Error(errorData.message || `HTTP ${response.status}`);
         }
 
         const result = await response.json();

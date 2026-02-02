@@ -8,7 +8,7 @@ export class CreateContentDto {
   @IsString()
   description?: string;
 
-  @IsEnum(['image', 'video', 'url', 'html'])
+  @IsEnum(['image', 'video', 'url', 'html', 'pdf'])
   type!: string;
 
   @IsString()
@@ -31,6 +31,10 @@ export class CreateContentDto {
   @IsOptional()
   @IsString()
   mimeType?: string;
+
+  @IsOptional()
+  @IsString()
+  fileHash?: string;
 
   @IsOptional()
   @IsObject()

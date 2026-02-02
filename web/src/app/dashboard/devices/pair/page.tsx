@@ -140,7 +140,6 @@ export default function PairDevicePage() {
                   </div>
                 </div>
                 <div className="flex justify-center p-4 bg-white rounded">
-                  {/* @ts-expect-error React 19 QRCode compatibility */}
                   <QRCodeSVG
                     value={`${window.location.origin}/dashboard/devices/pair?code=${form.pairingCode}`}
                     size={120}

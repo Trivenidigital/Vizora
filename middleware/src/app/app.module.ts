@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from '../modules/config/config.module';
 import { DatabaseModule } from '../modules/database/database.module';
+import { RedisModule } from '../modules/redis/redis.module';
 import { CommonModule } from '../modules/common/common.module';
 import { AuthModule } from '../modules/auth/auth.module';
 import { OrganizationsModule } from '../modules/organizations/organizations.module';
@@ -61,6 +62,7 @@ import { CsrfMiddleware } from '../modules/common/middleware/csrf.middleware';
     ),
     CommonModule,
     DatabaseModule,
+    RedisModule,
     AuthModule,
     OrganizationsModule,
     DisplaysModule,
@@ -81,6 +83,7 @@ import { CsrfMiddleware } from '../modules/common/middleware/csrf.middleware';
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
     // Apply CSRF protection to all routes
-    consumer.apply(CsrfMiddleware).forRoutes('*');
+    // Using '{*path}' syntax for path-to-regexp v8+ compatibility
+    consumer.apply(CsrfMiddleware).forRoutes('{*path}');
   }
 }

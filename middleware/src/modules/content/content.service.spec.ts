@@ -104,12 +104,30 @@ describe('ContentService', () => {
   });
 
   describe('findOne', () => {
-    it('should return content by id', async () => {
+    it('should return content by id with mapped fields', async () => {
       mockDatabaseService.content.findFirst.mockResolvedValue(mockContent);
 
       const result = await service.findOne('org-123', 'content-123');
 
-      expect(result).toEqual(mockContent);
+      // Service maps name->title and thumbnail->thumbnailUrl for frontend compatibility
+      expect(result).toEqual({
+        ...mockContent,
+        title: mockContent.name, // name is mapped to title
+        thumbnailUrl: undefined, // thumbnail is mapped to thumbnailUrl (undefined since not in mock)
+      });
+      expect(result.title).toBe('Test Content');
+    });
+
+    it('should include thumbnail mapping when content has thumbnail', async () => {
+      const contentWithThumbnail = {
+        ...mockContent,
+        thumbnail: 'https://example.com/thumb.jpg',
+      };
+      mockDatabaseService.content.findFirst.mockResolvedValue(contentWithThumbnail);
+
+      const result = await service.findOne('org-123', 'content-123');
+
+      expect(result.thumbnailUrl).toBe('https://example.com/thumb.jpg');
     });
 
     it('should throw NotFoundException if content not found', async () => {

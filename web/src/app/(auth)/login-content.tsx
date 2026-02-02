@@ -130,7 +130,6 @@ export default function LoginContent() {
 
         <p className="text-center mt-6 text-gray-600">
           Don't have an account?{' '}
-          {/* @ts-expect-error React 19 Link compatibility */}
           <Link href="/register" className="text-blue-600 hover:underline">
             Sign up
           </Link>

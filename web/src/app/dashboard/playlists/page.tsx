@@ -29,7 +29,6 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Icon } from '@/theme/icons';
-import type { IconName } from '@/theme/icons';
 
 // Sortable playlist item component
 function SortablePlaylistItem({ item, idx, onRemove, onDurationChange }: {
@@ -183,7 +182,7 @@ export default function PlaylistsPage() {
           // Get first 4 items with thumbnails
           const thumbs = playlist.items
             .slice(0, 4)
-            .map(item => item.content?.thumbnail || '')
+            .map(item => item.content?.thumbnailUrl || '')
             .filter(Boolean);
           if (thumbs.length > 0) {
             thumbnails[playlist.id] = thumbs;
@@ -588,6 +587,9 @@ export default function PlaylistsPage() {
                           try {
                             await apiClient.addPlaylistItem(selectedPlaylist.id, item.id);
                             toast.success('Item added to playlist');
+                            // Fetch updated playlist and update selectedPlaylist
+                            const updatedPlaylist = await apiClient.getPlaylist(selectedPlaylist.id);
+                            setSelectedPlaylist(updatedPlaylist);
                             loadPlaylists();
                           } catch (error: any) {
                             toast.error(error.message || 'Failed to add item');
@@ -643,6 +645,9 @@ export default function PlaylistsPage() {
                             try {
                               await apiClient.removePlaylistItem(selectedPlaylist.id, item.id);
                               toast.success('Item removed from playlist');
+                              // Fetch updated playlist and update selectedPlaylist
+                              const updatedPlaylist = await apiClient.getPlaylist(selectedPlaylist.id);
+                              setSelectedPlaylist(updatedPlaylist);
                               loadPlaylists();
                             } catch (error: any) {
                               toast.error(error.message || 'Failed to remove item');
@@ -652,6 +657,9 @@ export default function PlaylistsPage() {
                             try {
                               await apiClient.updatePlaylistItem(selectedPlaylist.id, item.id, { duration: newDuration });
                               toast.success('Duration updated');
+                              // Fetch updated playlist and update selectedPlaylist
+                              const updatedPlaylist = await apiClient.getPlaylist(selectedPlaylist.id);
+                              setSelectedPlaylist(updatedPlaylist);
                               loadPlaylists();
                             } catch (error: any) {
                               toast.error(error.message || 'Failed to update duration');

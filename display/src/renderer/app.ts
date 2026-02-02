@@ -68,7 +68,13 @@ class DisplayApp {
     });
 
     window.electronAPI.onPlaylistUpdate((_, playlist) => {
-      console.log('Received playlist update:', playlist);
+      console.log('[App] Received playlist update:', playlist);
+      // If we receive a playlist update, we're connected - hide pairing if shown, show content
+      if (this.isPairingScreenShown) {
+        console.log('[App] Hiding pairing screen due to playlist update');
+        this.hidePairingScreen();
+      }
+      this.showContentScreen();
       this.updatePlaylist(playlist);
     });
 
@@ -81,6 +87,10 @@ class DisplayApp {
       console.error('Error:', error);
       this.showErrorScreen(error.message || 'Unknown error');
     });
+
+    // Don't proactively show pairing screen - wait for main process to tell us
+    // The main process will send 'pairing-required' if no token exists
+    console.log('[App] Renderer ready, waiting for main process events...');
   }
 
   private async showPairingScreen() {
@@ -389,17 +399,20 @@ class DisplayApp {
 
     const startTime = Date.now();
 
+    // Support both 'source' and 'url' field names for compatibility
+    const contentSource = currentItem.content?.source || currentItem.content?.url;
+
     switch (currentItem.content?.type) {
       case 'image':
         const img = document.createElement('img');
-        img.src = currentItem.content.source;
+        img.src = contentSource;
         img.onerror = () => this.handleContentError(currentItem, 'Image load failed');
         contentDiv.appendChild(img);
         break;
 
       case 'video':
         const video = document.createElement('video');
-        video.src = currentItem.content.source;
+        video.src = contentSource;
         video.autoplay = true;
         video.muted = false;
         video.onerror = () => this.handleContentError(currentItem, 'Video load failed');
@@ -408,8 +421,9 @@ class DisplayApp {
         break;
 
       case 'webpage':
+      case 'url':
         const iframe = document.createElement('iframe');
-        iframe.src = currentItem.content.source;
+        iframe.src = contentSource;
         iframe.allow = 'autoplay';
         contentDiv.appendChild(iframe);
         break;

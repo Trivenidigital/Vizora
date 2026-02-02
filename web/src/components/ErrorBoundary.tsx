@@ -28,7 +28,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
     };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+  override componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     // Log to error tracking service (Sentry, LogRocket, etc.)
     if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
       console.error('Error Boundary caught:', error, errorInfo);
@@ -42,7 +42,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
     this.setState({ hasError: false, error: null });
   };
 
-  render() {
+  override render() {
     const { hasError, error } = this.state;
     const { children, fallback } = this.props;
 

@@ -10,7 +10,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { join } from 'path';
 import helmet from 'helmet';
-import * as cookieParser from 'cookie-parser';
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app/app.module';
 import { SanitizeInterceptor } from './modules/common/interceptors/sanitize.interceptor';
 
@@ -20,6 +20,11 @@ async function bootstrap() {
   // Serve static files (thumbnails)
   app.useStaticAssets(join(__dirname, '..', 'static'), {
     prefix: '/static/',
+  });
+
+  // Serve uploaded content files
+  app.useStaticAssets(join(process.cwd(), 'uploads'), {
+    prefix: '/uploads/',
   });
 
   // Cookie parser (required for httpOnly cookie authentication)

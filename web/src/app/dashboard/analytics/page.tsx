@@ -83,7 +83,7 @@ export default function AnalyticsPage() {
   const playlistPerformance = usePlaylistPerformance(dateRange);
 
   // Real-time analytics updates
-  const { isConnected } = useRealtimeEvents({
+  useRealtimeEvents({
     enabled: true,
     onDeviceStatusChange: () => {
       // Device status changes may affect uptime metrics

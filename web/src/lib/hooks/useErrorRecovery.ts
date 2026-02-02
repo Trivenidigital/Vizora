@@ -251,17 +251,20 @@ export function useErrorRecovery(options: UseErrorRecoveryOptions = {}) {
 
             setErrors((prev) => {
               const updated = new Map(prev);
-              const errorInfo = updated.get(id) ?? {
+              const existingInfo = updated.get(id);
+              const errorInfo: ErrorInfo = existingInfo ?? {
                 id,
                 error,
                 severity: 'warning' as const,
                 timestamp: Date.now(),
                 retryCount: 0,
+                lastRetryTime: undefined,
+                nextRetryTime: undefined,
               };
               errorInfo.retryCount = retryCount + 1;
               errorInfo.lastRetryTime = Date.now();
               errorInfo.nextRetryTime = nextRetryTime;
-              updated.set(id, errorInfo as ErrorInfo);
+              updated.set(id, errorInfo);
               return updated;
             });
 

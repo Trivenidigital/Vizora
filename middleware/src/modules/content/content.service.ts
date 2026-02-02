@@ -8,13 +8,24 @@ import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
 export class ContentService {
   constructor(private readonly db: DatabaseService) {}
 
+  // Map database content to API response format
+  private mapContentResponse(content: any) {
+    if (!content) return content;
+    return {
+      ...content,
+      title: content.name, // Map name to title for frontend compatibility
+      thumbnailUrl: content.thumbnail, // Map thumbnail to thumbnailUrl for frontend
+    };
+  }
+
   async create(organizationId: string, createContentDto: CreateContentDto) {
-    return this.db.content.create({
+    const content = await this.db.content.create({
       data: {
         ...createContentDto,
         organizationId,
       },
     });
+    return this.mapContentResponse(content);
   }
 
   async findAll(
@@ -54,7 +65,9 @@ export class ContentService {
       this.db.content.count({ where }),
     ]);
 
-    return new PaginatedResponse(data, total, page, limit);
+    // Map each content item to include thumbnailUrl
+    const mappedData = data.map(item => this.mapContentResponse(item));
+    return new PaginatedResponse(mappedData, total, page, limit);
   }
 
   async findOne(organizationId: string, id: string) {
@@ -78,16 +91,17 @@ export class ContentService {
       throw new NotFoundException('Content not found');
     }
 
-    return content;
+    return this.mapContentResponse(content);
   }
 
   async update(organizationId: string, id: string, updateContentDto: UpdateContentDto) {
     await this.findOne(organizationId, id);
 
-    return this.db.content.update({
+    const content = await this.db.content.update({
       where: { id },
       data: updateContentDto,
     });
+    return this.mapContentResponse(content);
   }
 
   async remove(organizationId: string, id: string) {

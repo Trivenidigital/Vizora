@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { HttpService } from '@nestjs/axios';
 import { DisplaysService } from './displays.service';
 import { DatabaseService } from '../database/database.service';
+import { CircuitBreakerService } from '../common/services/circuit-breaker.service';
 import { NotFoundException, ConflictException } from '@nestjs/common';
 import { CreateDisplayDto } from './dto/create-display.dto';
 import { UpdateDisplayDto } from './dto/update-display.dto';
@@ -53,6 +54,14 @@ describe('DisplaysService', () => {
       get: jest.fn(),
     };
 
+    const mockCircuitBreakerService = {
+      execute: jest.fn().mockImplementation((name, fn) => fn()),
+      executeWithFallback: jest.fn().mockImplementation((name, fn, fallback) => fn().catch(fallback)),
+      getCircuitState: jest.fn().mockReturnValue('CLOSED'),
+      getCircuitStats: jest.fn().mockReturnValue({ state: 'CLOSED', failures: 0, successes: 0, recentFailures: 0 }),
+      resetCircuit: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DisplaysService,
@@ -67,6 +76,10 @@ describe('DisplaysService', () => {
         {
           provide: HttpService,
           useValue: mockHttpService,
+        },
+        {
+          provide: CircuitBreakerService,
+          useValue: mockCircuitBreakerService,
         },
       ],
     }).compile();

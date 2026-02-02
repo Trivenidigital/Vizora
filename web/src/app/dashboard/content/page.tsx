@@ -55,7 +55,7 @@ export default function ContentPage() {
     progress: number;
     error?: string;
   }>>([]);
-  const [tags, setTags] = useState<ContentTag[]>([
+  const [tags] = useState<ContentTag[]>([
     { id: '1', name: 'Marketing', color: 'blue' },
     { id: '2', name: 'Seasonal', color: 'green' },
     { id: '3', name: 'Featured', color: 'red' },
@@ -64,10 +64,10 @@ export default function ContentPage() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showTagFilter, setShowTagFilter] = useState(false);
   const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline'>('offline');
-  const [offlineChanges, setOfflineChanges] = useState<number>(0);
 
   // Real-time event handling
-  const { isConnected, isOffline } = useRealtimeEvents({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { isConnected: _isConnected, isOffline: _isOffline } = useRealtimeEvents({
     enabled: true,
     onConnectionChange: (connected) => {
       setRealtimeStatus(connected ? 'connected' : 'offline');
@@ -275,6 +275,7 @@ export default function ContentPage() {
       title: item.title,
       type: item.type as 'image' | 'video' | 'pdf' | 'url',
       url: item.url || '',
+      file: null,
     });
     setFormErrors({});
     setIsEditModalOpen(true);

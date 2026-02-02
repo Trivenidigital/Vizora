@@ -82,9 +82,16 @@ export class PlaylistsService {
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
+          items: {
+            include: {
+              content: true,
+            },
+            orderBy: {
+              order: 'asc',
+            },
+          },
           _count: {
             select: {
-              items: true,
               schedules: true,
             },
           },
@@ -93,7 +100,20 @@ export class PlaylistsService {
       this.db.playlist.count({ where: { organizationId } }),
     ]);
 
-    return new PaginatedResponse(data, total, page, limit);
+    // Map content items to include title and thumbnailUrl
+    const mappedData = data.map(playlist => ({
+      ...playlist,
+      items: playlist.items.map(item => ({
+        ...item,
+        content: item.content ? {
+          ...item.content,
+          title: item.content.name,
+          thumbnailUrl: item.content.thumbnail,
+        } : null,
+      })),
+    }));
+
+    return new PaginatedResponse(mappedData, total, page, limit);
   }
 
   async findOne(organizationId: string, id: string) {
@@ -118,7 +138,18 @@ export class PlaylistsService {
       throw new NotFoundException('Playlist not found');
     }
 
-    return playlist;
+    // Map content items to include title and thumbnailUrl
+    return {
+      ...playlist,
+      items: playlist.items.map(item => ({
+        ...item,
+        content: item.content ? {
+          ...item.content,
+          title: item.content.name,
+          thumbnailUrl: item.content.thumbnail,
+        } : null,
+      })),
+    };
   }
 
   async update(organizationId: string, id: string, updatePlaylistDto: UpdatePlaylistDto) {

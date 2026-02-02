@@ -154,7 +154,6 @@ export default function RegisterContent() {
 
         <p className="text-center mt-6 text-gray-600">
           Already have an account?{' '}
-          {/* @ts-expect-error React 19 Link compatibility */}
           <Link href="/login" className="text-blue-600 hover:underline">
             Login
           </Link>

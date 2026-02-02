@@ -1,9 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
 
 type DateRange = 'week' | 'month' | 'year';
+
+// Cast apiClient to any for analytics methods that may not be implemented yet
+// These hooks gracefully fall back to mock data when the API methods don't exist
+const analyticsApi = apiClient as any;
 
 /**
  * Device Metrics Hook - Real API Integration
@@ -30,7 +34,7 @@ export function useDeviceMetrics(dateRange: DateRange = 'month') {
 
         // Try to fetch from API
         try {
-          const response = await apiClient.getDeviceMetrics?.(dateRange);
+          const response = await analyticsApi.getDeviceMetrics?.(dateRange);
           if (response && response.length > 0) {
             setData(response);
             return;
@@ -82,7 +86,7 @@ export function useContentPerformance(dateRange: DateRange = 'month') {
 
         // Try to fetch from API
         try {
-          const response = await apiClient.getContentPerformance?.(dateRange);
+          const response = await analyticsApi.getContentPerformance?.(dateRange);
           if (response && response.length > 0) {
             setData(response);
             return;
@@ -139,7 +143,7 @@ export function useUsageTrends(dateRange: DateRange = 'month') {
 
         // Try to fetch from API
         try {
-          const response = await apiClient.getUsageTrends?.(dateRange);
+          const response = await analyticsApi.getUsageTrends?.(dateRange);
           if (response && response.length > 0) {
             setData(response);
             return;
@@ -191,7 +195,7 @@ export function useDeviceDistribution() {
 
         // Try to fetch from API
         try {
-          const response = await apiClient.getDeviceDistribution?.();
+          const response = await analyticsApi.getDeviceDistribution?.();
           if (response && response.length > 0) {
             setData(response);
             return;
@@ -247,7 +251,7 @@ export function useBandwidthUsage(dateRange: DateRange = 'month') {
 
         // Try to fetch from API
         try {
-          const response = await apiClient.getBandwidthUsage?.(dateRange);
+          const response = await analyticsApi.getBandwidthUsage?.(dateRange);
           if (response && response.length > 0) {
             setData(response);
             return;
@@ -298,7 +302,7 @@ export function usePlaylistPerformance(dateRange: DateRange = 'month') {
 
         // Try to fetch from API
         try {
-          const response = await apiClient.getPlaylistPerformance?.(dateRange);
+          const response = await analyticsApi.getPlaylistPerformance?.(dateRange);
           if (response && response.length > 0) {
             setData(response);
             return;

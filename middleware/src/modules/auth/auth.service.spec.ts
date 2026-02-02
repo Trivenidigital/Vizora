@@ -56,6 +56,10 @@ describe('AuthService', () => {
       auditLog: {
         create: jest.fn(),
       },
+      // Mock $transaction to execute the callback with the same mock database
+      $transaction: jest.fn().mockImplementation(async (callback) => {
+        return callback(mockDatabaseService);
+      }),
     };
 
     mockJwtService = {

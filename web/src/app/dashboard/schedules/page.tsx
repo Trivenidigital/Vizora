@@ -16,16 +16,56 @@ import { Icon } from '@/theme/icons';
 interface Schedule {
   id: string;
   name: string;
-  startTime: string;  // HH:MM
-  duration: number;   // minutes
-  days: string[];
-  timezone: string;
+  description?: string;
+  startTime?: string;  // HH:MM
+  endTime?: string;    // HH:MM
+  daysOfWeek: number[];  // 0-6 (Sunday-Saturday)
+  startDate: string;
+  endDate?: string;
   playlistId: string;
-  deviceIds: string[];
-  active: boolean;
+  displayId?: string;
+  displayGroupId?: string;
+  isActive: boolean;
+  priority?: number;
   createdAt: Date;
   updatedAt: Date;
+  // For backward compatibility with UI
+  days?: string[];
+  deviceIds?: string[];
+  duration?: number;
+  timezone?: string;
+  active?: boolean;
 }
+
+// Helper functions to convert between day names and numbers
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+const dayNamesToNumbers = (names: string[]): number[] => {
+  return names.map(name => DAY_NAMES.indexOf(name)).filter(n => n !== -1);
+};
+
+const dayNumbersToNames = (numbers: number[]): string[] => {
+  return numbers.map(n => DAY_NAMES[n]).filter(Boolean);
+};
+
+// Convert startTime + duration to endTime
+const calculateEndTime = (startTime: string, duration: number): string => {
+  const [hours, minutes] = startTime.split(':').map(Number);
+  const totalMinutes = hours * 60 + minutes + duration;
+  const endHours = Math.floor(totalMinutes / 60) % 24;
+  const endMinutes = totalMinutes % 60;
+  return `${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`;
+};
+
+// Calculate duration from startTime and endTime
+const calculateDuration = (startTime?: string, endTime?: string): number => {
+  if (!startTime || !endTime) return 60; // default 1 hour
+  const [startH, startM] = startTime.split(':').map(Number);
+  const [endH, endM] = endTime.split(':').map(Number);
+  let duration = (endH * 60 + endM) - (startH * 60 + startM);
+  if (duration <= 0) duration += 24 * 60; // handle overnight
+  return duration;
+};
 
 export default function SchedulesPage() {
   const toast = useToast();
@@ -129,13 +169,30 @@ export default function SchedulesPage() {
       ]);
 
       if (schedulesRes.status === 'fulfilled') {
-        setSchedules(schedulesRes.value || []);
+        const scheduleData = schedulesRes.value.data || schedulesRes.value || [];
+        // Transform backend data to UI format
+        const transformedSchedules = (scheduleData as any[]).map((s: any) => ({
+          ...s,
+          // Convert daysOfWeek numbers to day names for UI
+          days: s.daysOfWeek ? dayNumbersToNames(s.daysOfWeek) : [],
+          // Convert displayId to deviceIds array for UI
+          deviceIds: s.displayId ? [s.displayId] : [],
+          // Calculate duration from startTime and endTime
+          duration: calculateDuration(s.startTime, s.endTime),
+          // Default timezone
+          timezone: 'America/New_York',
+          // Map isActive to active for UI compatibility
+          active: s.isActive,
+        }));
+        setSchedules(transformedSchedules as Schedule[]);
       }
       if (devicesRes.status === 'fulfilled') {
-        setDevices(devicesRes.value || []);
+        const deviceData = devicesRes.value.data || devicesRes.value || [];
+        setDevices(deviceData as unknown as Display[]);
       }
       if (playlistsRes.status === 'fulfilled') {
-        setPlaylists(playlistsRes.value || []);
+        const playlistData = playlistsRes.value.data || playlistsRes.value || [];
+        setPlaylists(playlistData as unknown as Playlist[]);
       }
     } catch (error: any) {
       toast.error(error.message || 'Failed to load data');
@@ -172,17 +229,39 @@ export default function SchedulesPage() {
 
     try {
       setActionLoading(true);
-      const newSchedule = {
-        ...formData,
-        id: Math.random().toString(36).substr(2, 9),
-        active: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      // TODO: Call API when backend is ready
-      // await apiClient.createSchedule(formData);
 
-      setSchedules([...schedules, newSchedule as Schedule]);
+      // Transform UI data to backend format
+      const scheduleData = {
+        name: formData.name,
+        playlistId: formData.playlistId,
+        // Backend requires either displayId OR displayGroupId
+        // For simplicity, we'll use the first selected device
+        displayId: formData.deviceIds[0],
+        // Convert day names to numbers (0-6)
+        daysOfWeek: dayNamesToNumbers(formData.days),
+        // Start date is required - use today
+        startDate: new Date().toISOString(),
+        // Start time
+        startTime: formData.startTime,
+        // Calculate end time from start time + duration
+        endTime: calculateEndTime(formData.startTime, formData.duration),
+        isActive: true,
+        priority: 1,
+      };
+
+      const createdSchedule = await apiClient.createSchedule(scheduleData);
+
+      // Transform response back to UI format and add to state
+      const uiSchedule: Schedule = {
+        ...createdSchedule,
+        days: dayNumbersToNames(createdSchedule.daysOfWeek || []),
+        deviceIds: createdSchedule.displayId ? [createdSchedule.displayId] : [],
+        duration: calculateDuration(createdSchedule.startTime, createdSchedule.endTime),
+        timezone: formData.timezone,
+        active: createdSchedule.isActive,
+      };
+
+      setSchedules([...schedules, uiSchedule]);
       resetForm();
       setIsCreateModalOpen(false);
       toast.success('Schedule created successfully');
@@ -198,10 +277,30 @@ export default function SchedulesPage() {
 
     try {
       setActionLoading(true);
-      // TODO: Call API when backend is ready
-      // await apiClient.updateSchedule(selectedSchedule.id, formData);
 
-      setSchedules(schedules.map(s => s.id === selectedSchedule.id ? { ...selectedSchedule, ...formData } : s));
+      // Transform UI data to backend format
+      const scheduleData = {
+        name: formData.name,
+        playlistId: formData.playlistId,
+        displayId: formData.deviceIds[0],
+        daysOfWeek: dayNamesToNumbers(formData.days),
+        startTime: formData.startTime,
+        endTime: calculateEndTime(formData.startTime, formData.duration),
+      };
+
+      const updatedSchedule = await apiClient.updateSchedule(selectedSchedule.id, scheduleData);
+
+      // Transform response back to UI format and update state
+      const uiSchedule: Schedule = {
+        ...updatedSchedule,
+        days: dayNumbersToNames(updatedSchedule.daysOfWeek || []),
+        deviceIds: updatedSchedule.displayId ? [updatedSchedule.displayId] : [],
+        duration: calculateDuration(updatedSchedule.startTime, updatedSchedule.endTime),
+        timezone: formData.timezone,
+        active: updatedSchedule.isActive,
+      };
+
+      setSchedules(schedules.map(s => s.id === selectedSchedule.id ? uiSchedule : s));
       resetForm();
       setIsEditModalOpen(false);
       toast.success('Schedule updated successfully');
@@ -217,8 +316,8 @@ export default function SchedulesPage() {
 
     try {
       setActionLoading(true);
-      // TODO: Call API when backend is ready
-      // await apiClient.deleteSchedule(selectedSchedule.id);
+
+      await apiClient.deleteSchedule(selectedSchedule.id);
 
       setSchedules(schedules.filter(s => s.id !== selectedSchedule.id));
       setIsDeleteModalOpen(false);
@@ -407,9 +506,10 @@ export default function SchedulesPage() {
                 </button>
                 <button
                   onClick={() => {
-                    setSelectedSchedule(schedule);
+                    // Don't set selectedSchedule so it's treated as a new schedule
+                    setSelectedSchedule(null);
                     setFormData({
-                      name: schedule.name,
+                      name: `${schedule.name} (Copy)`,
                       startTime: schedule.startTime,
                       duration: schedule.duration,
                       days: schedule.days,
@@ -454,30 +554,14 @@ export default function SchedulesPage() {
       {/* Create/Edit Schedule Modal */}
       {(isCreateModalOpen || isEditModalOpen) && (
         <Modal
-          open={isCreateModalOpen || isEditModalOpen}
+          isOpen={isCreateModalOpen || isEditModalOpen}
           onClose={() => {
             if (isCreateModalOpen) setIsCreateModalOpen(false);
             if (isEditModalOpen) setIsEditModalOpen(false);
             resetForm();
           }}
           title={selectedSchedule ? 'Edit Schedule' : 'Create Schedule'}
-          actions={[
-            {
-              label: 'Cancel',
-              onClick: () => {
-                if (isCreateModalOpen) setIsCreateModalOpen(false);
-                if (isEditModalOpen) setIsEditModalOpen(false);
-                resetForm();
-              },
-              variant: 'secondary',
-            },
-            {
-              label: selectedSchedule ? 'Update' : 'Create',
-              onClick: selectedSchedule ? handleUpdate : handleCreate,
-              loading: actionLoading,
-              variant: 'primary',
-            },
-          ]}
+          size="lg"
         >
           <div className="space-y-6 max-h-96 overflow-y-auto">
             {/* Name */}
@@ -639,22 +723,49 @@ export default function SchedulesPage() {
               )}
             </div>
           </div>
+          {/* Action Buttons */}
+          <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <button
+              type="button"
+              onClick={() => {
+                if (isCreateModalOpen) setIsCreateModalOpen(false);
+                if (isEditModalOpen) setIsEditModalOpen(false);
+                resetForm();
+              }}
+              className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={selectedSchedule ? handleUpdate : handleCreate}
+              disabled={actionLoading}
+              className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-400 rounded-lg transition flex items-center gap-2"
+            >
+              {actionLoading && (
+                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              )}
+              {selectedSchedule ? 'Update' : 'Create'}
+            </button>
+          </div>
         </Modal>
       )}
 
       {/* Delete Confirmation */}
       {isDeleteModalOpen && selectedSchedule && (
         <ConfirmDialog
-          open={isDeleteModalOpen}
+          isOpen={isDeleteModalOpen}
           onClose={() => {
             setIsDeleteModalOpen(false);
             setSelectedSchedule(null);
           }}
           title="Delete Schedule"
-          description={`Are you sure you want to delete "${selectedSchedule.name}"? This action cannot be undone.`}
+          message={`Are you sure you want to delete "${selectedSchedule.name}"? This action cannot be undone.`}
           onConfirm={handleDelete}
-          loading={actionLoading}
-          variant="danger"
+          type="danger"
         />
       )}
     </div>
