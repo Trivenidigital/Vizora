@@ -1,5 +1,7 @@
 // Type definitions for Vizora
 
+export type DisplayOrientation = 'landscape' | 'portrait' | 'landscape_flipped' | 'portrait_flipped';
+
 export interface Display {
   id: string;
   nickname: string;
@@ -8,6 +10,7 @@ export interface Display {
   status: 'online' | 'offline';
   lastSeen?: Date | string;
   currentPlaylistId?: string;
+  orientation?: DisplayOrientation;
   createdAt: Date | string;
   updatedAt: Date | string;
 }
@@ -120,4 +123,19 @@ export interface ScreenshotResponse {
   capturedAt: string;
   width?: number;
   height?: number;
+}
+
+export interface ApiKey {
+  id: string;
+  name: string;
+  prefix: string;
+  scopes: string[];
+  lastUsedAt: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+}
+
+export interface CreateApiKeyResponse {
+  key: string; // Plain key, only shown once
+  apiKey: ApiKey;
 }

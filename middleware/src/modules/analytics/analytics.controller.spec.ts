@@ -17,6 +17,9 @@ describe('AnalyticsController', () => {
       getBandwidthUsage: jest.fn(),
       getPlaylistPerformance: jest.fn(),
       getSummary: jest.fn(),
+      exportAnalytics: jest.fn(),
+      getDeviceUptime: jest.fn(),
+      getUptimeSummary: jest.fn(),
     } as any;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -111,6 +114,60 @@ describe('AnalyticsController', () => {
 
       expect(result).toEqual(mockData);
       expect(mockAnalyticsService.getSummary).toHaveBeenCalledWith(organizationId);
+    });
+  });
+
+  describe('getDeviceUptime', () => {
+    it('should return device uptime data', async () => {
+      const mockData = {
+        deviceId: 'device-123',
+        uptimePercent: 95,
+        totalOnlineMinutes: 40680,
+        totalOfflineMinutes: 2520,
+        lastHeartbeat: new Date().toISOString(),
+      };
+      mockAnalyticsService.getDeviceUptime.mockResolvedValue(mockData);
+
+      const result = await controller.getDeviceUptime('device-123', undefined, organizationId);
+
+      expect(result).toEqual(mockData);
+      expect(mockAnalyticsService.getDeviceUptime).toHaveBeenCalledWith(organizationId, 'device-123', 30);
+    });
+
+    it('should parse days query parameter', async () => {
+      const mockData = { deviceId: 'device-123', uptimePercent: 95 };
+      mockAnalyticsService.getDeviceUptime.mockResolvedValue(mockData);
+
+      await controller.getDeviceUptime('device-123', '7', organizationId);
+
+      expect(mockAnalyticsService.getDeviceUptime).toHaveBeenCalledWith(organizationId, 'device-123', 7);
+    });
+  });
+
+  describe('getUptimeSummary', () => {
+    it('should return uptime summary', async () => {
+      const mockData = {
+        avgUptimePercent: 85,
+        deviceCount: 10,
+        onlineCount: 8,
+        offlineCount: 2,
+        devices: [{ id: 'd1', nickname: 'Device 1', uptimePercent: 95 }],
+      };
+      mockAnalyticsService.getUptimeSummary.mockResolvedValue(mockData);
+
+      const result = await controller.getUptimeSummary(undefined, organizationId);
+
+      expect(result).toEqual(mockData);
+      expect(mockAnalyticsService.getUptimeSummary).toHaveBeenCalledWith(organizationId, 30);
+    });
+
+    it('should parse days query parameter', async () => {
+      const mockData = { avgUptimePercent: 85, deviceCount: 5, onlineCount: 4, offlineCount: 1, devices: [] };
+      mockAnalyticsService.getUptimeSummary.mockResolvedValue(mockData);
+
+      await controller.getUptimeSummary('14', organizationId);
+
+      expect(mockAnalyticsService.getUptimeSummary).toHaveBeenCalledWith(organizationId, 14);
     });
   });
 });

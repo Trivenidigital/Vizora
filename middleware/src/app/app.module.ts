@@ -20,6 +20,7 @@ import { AnalyticsModule } from '../modules/analytics/analytics.module';
 import { UsersModule } from '../modules/users/users.module';
 import { NotificationsModule } from '../modules/notifications/notifications.module';
 import { FoldersModule } from '../modules/folders/folders.module';
+import { ApiKeysModule } from '../modules/api-keys/api-keys.module';
 import { CsrfMiddleware } from '../modules/common/middleware/csrf.middleware';
 import { StorageModule } from '../modules/storage/storage.module';
 
@@ -85,6 +86,7 @@ import { StorageModule } from '../modules/storage/storage.module';
     UsersModule,
     NotificationsModule,
     FoldersModule,
+    ApiKeysModule,
   ],
   controllers: [AppController],
   providers: [

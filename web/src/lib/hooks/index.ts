@@ -41,3 +41,6 @@ export type {
 
 // Notifications hook
 export { useNotifications } from './useNotifications';
+
+// Playlist undo/redo history hook
+export { usePlaylistHistory } from './usePlaylistHistory';
