@@ -409,6 +409,66 @@ describe('SchedulesService', () => {
     });
   });
 
+  describe('duplicate', () => {
+    const mockScheduleWithRelations = {
+      ...mockSchedule,
+      playlist: {
+        id: mockPlaylistId,
+        items: [],
+      },
+      display: { id: mockDisplayId },
+      displayGroup: null,
+    };
+
+    it('should duplicate a schedule successfully', async () => {
+      const duplicatedSchedule = {
+        id: 'schedule-456',
+        name: 'Test Schedule (Copy)',
+        playlistId: mockPlaylistId,
+        displayId: mockDisplayId,
+        displayGroupId: null,
+        isActive: false,
+        organizationId: mockOrganizationId,
+        playlist: { id: mockPlaylistId, name: 'Test Playlist' },
+        display: { id: mockDisplayId, nickname: 'Test Display' },
+        displayGroup: null,
+      };
+
+      databaseService.schedule.findFirst.mockResolvedValue(mockScheduleWithRelations);
+      databaseService.schedule.create.mockResolvedValue(duplicatedSchedule);
+
+      const result = await service.duplicate(mockOrganizationId, mockScheduleId);
+
+      expect(databaseService.schedule.findFirst).toHaveBeenCalled();
+      expect(databaseService.schedule.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          name: 'Test Schedule (Copy)',
+          playlistId: mockPlaylistId,
+          displayId: mockDisplayId,
+          isActive: false,
+          organizationId: mockOrganizationId,
+        }),
+        include: {
+          playlist: true,
+          display: true,
+          displayGroup: true,
+        },
+      });
+      expect(result).toEqual(duplicatedSchedule);
+      expect(result.isActive).toBe(false);
+    });
+
+    it('should throw NotFoundException if schedule not found', async () => {
+      databaseService.schedule.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.duplicate(mockOrganizationId, 'invalid-id')
+      ).rejects.toThrow(NotFoundException);
+
+      expect(databaseService.schedule.create).not.toHaveBeenCalled();
+    });
+  });
+
   describe('remove', () => {
     const mockScheduleWithRelations = {
       ...mockSchedule,

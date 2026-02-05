@@ -132,7 +132,12 @@ describe('PlaylistsService', () => {
 
       const result = await service.findOne('org-123', 'playlist-123');
 
-      expect(result).toEqual(mockPlaylist);
+      expect(result).toEqual({
+        ...mockPlaylist,
+        itemCount: 0,
+        totalDuration: 0,
+        totalSize: 0,
+      });
     });
 
     it('should throw NotFoundException if playlist not found', async () => {
@@ -211,6 +216,62 @@ describe('PlaylistsService', () => {
       const result = await service.removeItem('org-123', 'playlist-123', 'item-123');
 
       expect(result).toEqual(mockPlaylistItem);
+    });
+  });
+
+  describe('duplicate', () => {
+    it('should duplicate a playlist with items', async () => {
+      const playlistWithItems = {
+        ...mockPlaylist,
+        name: 'Test Playlist',
+        description: 'Test description',
+        items: [
+          { id: 'item-1', contentId: 'content-1', order: 0, duration: 10, content: null },
+          { id: 'item-2', contentId: 'content-2', order: 1, duration: 20, content: null },
+        ],
+        itemCount: 2,
+        totalDuration: 30,
+        totalSize: 0,
+      };
+
+      const duplicatedPlaylist = {
+        id: 'playlist-456',
+        name: 'Test Playlist (Copy)',
+        description: 'Test description',
+        organizationId: 'org-123',
+        items: [
+          { id: 'item-3', contentId: 'content-1', order: 0, duration: 10 },
+          { id: 'item-4', contentId: 'content-2', order: 1, duration: 20 },
+        ],
+      };
+
+      mockDatabaseService.playlist.findFirst.mockResolvedValue(playlistWithItems);
+      mockDatabaseService.playlist.create.mockResolvedValue(duplicatedPlaylist);
+
+      const result = await service.duplicate('org-123', 'playlist-123');
+
+      expect(result).toEqual(duplicatedPlaylist);
+      expect(mockDatabaseService.playlist.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            name: 'Test Playlist (Copy)',
+            description: 'Test description',
+            organizationId: 'org-123',
+            items: {
+              create: [
+                { contentId: 'content-1', order: 0, duration: 10 },
+                { contentId: 'content-2', order: 1, duration: 20 },
+              ],
+            },
+          }),
+        }),
+      );
+    });
+
+    it('should throw NotFoundException if playlist not found', async () => {
+      mockDatabaseService.playlist.findFirst.mockResolvedValue(null);
+
+      await expect(service.duplicate('org-123', 'invalid-id')).rejects.toThrow(NotFoundException);
     });
   });
 

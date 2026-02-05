@@ -260,6 +260,49 @@ export class DisplaysService {
     });
   }
 
+  async getTags(organizationId: string, displayId: string) {
+    await this.findOne(organizationId, displayId);
+
+    const displayTags = await this.db.displayTag.findMany({
+      where: { displayId },
+      include: { tag: true },
+    });
+
+    return displayTags.map((dt) => dt.tag);
+  }
+
+  async addTags(organizationId: string, displayId: string, tagIds: string[]) {
+    await this.findOne(organizationId, displayId);
+
+    // Create DisplayTag entries for each tag, skipping duplicates
+    const createPromises = tagIds.map((tagId) =>
+      this.db.displayTag.upsert({
+        where: {
+          displayId_tagId: { displayId, tagId },
+        },
+        create: { displayId, tagId },
+        update: {},
+        include: { tag: true },
+      }),
+    );
+
+    const results = await Promise.all(createPromises);
+    return results.map((dt) => dt.tag);
+  }
+
+  async removeTags(organizationId: string, displayId: string, tagIds: string[]) {
+    await this.findOne(organizationId, displayId);
+
+    await this.db.displayTag.deleteMany({
+      where: {
+        displayId,
+        tagId: { in: tagIds },
+      },
+    });
+
+    return { success: true, removed: tagIds.length };
+  }
+
   async pushContent(
     organizationId: string,
     displayId: string,

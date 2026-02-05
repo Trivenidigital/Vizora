@@ -39,6 +39,8 @@ export interface Playlist {
   description?: string;
   items: PlaylistItem[];
   totalDuration?: number;
+  totalSize?: number;
+  itemCount?: number;
   isActive: boolean;
   createdAt: Date | string;
   updatedAt: Date | string;

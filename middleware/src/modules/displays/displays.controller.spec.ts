@@ -17,6 +17,10 @@ describe('DisplaysController', () => {
       generatePairingToken: jest.fn(),
       updateHeartbeat: jest.fn(),
       remove: jest.fn(),
+      pushContent: jest.fn(),
+      getTags: jest.fn(),
+      addTags: jest.fn(),
+      removeTags: jest.fn(),
     } as any;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -147,6 +151,97 @@ describe('DisplaysController', () => {
       await controller.remove(organizationId, 'display-123');
 
       expect(mockDisplaysService.remove).toHaveBeenCalledWith(organizationId, 'display-123');
+    });
+  });
+
+  describe('pushContent', () => {
+    it('should push content to a display', async () => {
+      const expectedResult = { success: true, message: 'Content pushed to display' };
+      mockDisplaysService.pushContent.mockResolvedValue(expectedResult as any);
+
+      const result = await controller.pushContent(organizationId, 'display-123', {
+        contentId: 'content-456',
+        duration: 60,
+      });
+
+      expect(result).toEqual(expectedResult);
+      expect(mockDisplaysService.pushContent).toHaveBeenCalledWith(
+        organizationId,
+        'display-123',
+        'content-456',
+        60,
+      );
+    });
+
+    it('should push content without duration', async () => {
+      const expectedResult = { success: true, message: 'Content pushed to display' };
+      mockDisplaysService.pushContent.mockResolvedValue(expectedResult as any);
+
+      const result = await controller.pushContent(organizationId, 'display-123', {
+        contentId: 'content-456',
+      });
+
+      expect(result).toEqual(expectedResult);
+      expect(mockDisplaysService.pushContent).toHaveBeenCalledWith(
+        organizationId,
+        'display-123',
+        'content-456',
+        undefined,
+      );
+    });
+  });
+
+  describe('getTags', () => {
+    it('should return tags for a display', async () => {
+      const expectedTags = [
+        { id: 'tag-1', name: 'Lobby' },
+        { id: 'tag-2', name: 'Floor 1' },
+      ];
+      mockDisplaysService.getTags.mockResolvedValue(expectedTags as any);
+
+      const result = await controller.getTags(organizationId, 'display-123');
+
+      expect(result).toEqual(expectedTags);
+      expect(mockDisplaysService.getTags).toHaveBeenCalledWith(organizationId, 'display-123');
+    });
+  });
+
+  describe('addTags', () => {
+    it('should add tags to a display', async () => {
+      const expectedTags = [
+        { id: 'tag-1', name: 'Lobby' },
+        { id: 'tag-2', name: 'Floor 1' },
+      ];
+      mockDisplaysService.addTags.mockResolvedValue(expectedTags as any);
+
+      const result = await controller.addTags(organizationId, 'display-123', {
+        tagIds: ['tag-1', 'tag-2'],
+      });
+
+      expect(result).toEqual(expectedTags);
+      expect(mockDisplaysService.addTags).toHaveBeenCalledWith(
+        organizationId,
+        'display-123',
+        ['tag-1', 'tag-2'],
+      );
+    });
+  });
+
+  describe('removeTags', () => {
+    it('should remove tags from a display', async () => {
+      const expectedResult = { success: true, removed: 2 };
+      mockDisplaysService.removeTags.mockResolvedValue(expectedResult as any);
+
+      const result = await controller.removeTags(organizationId, 'display-123', {
+        tagIds: ['tag-1', 'tag-2'],
+      });
+
+      expect(result).toEqual(expectedResult);
+      expect(mockDisplaysService.removeTags).toHaveBeenCalledWith(
+        organizationId,
+        'display-123',
+        ['tag-1', 'tag-2'],
+      );
     });
   });
 });

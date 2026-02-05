@@ -175,6 +175,33 @@ export class SchedulesService {
     });
   }
 
+  async duplicate(organizationId: string, id: string) {
+    const original = await this.findOne(organizationId, id);
+
+    return this.db.schedule.create({
+      data: {
+        name: `${original.name} (Copy)`,
+        description: original.description,
+        playlistId: original.playlistId,
+        displayId: original.displayId,
+        displayGroupId: original.displayGroupId,
+        startDate: original.startDate,
+        endDate: original.endDate,
+        startTime: original.startTime,
+        endTime: original.endTime,
+        daysOfWeek: original.daysOfWeek,
+        priority: original.priority,
+        isActive: false, // Duplicated schedules start inactive
+        organizationId,
+      },
+      include: {
+        playlist: true,
+        display: true,
+        displayGroup: true,
+      },
+    });
+  }
+
   async remove(organizationId: string, id: string) {
     await this.findOne(organizationId, id);
     return this.db.schedule.delete({

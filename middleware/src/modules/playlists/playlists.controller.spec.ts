@@ -16,6 +16,7 @@ describe('PlaylistsController', () => {
       update: jest.fn(),
       addItem: jest.fn(),
       removeItem: jest.fn(),
+      duplicate: jest.fn(),
       remove: jest.fn(),
     } as any;
 
@@ -158,6 +159,23 @@ describe('PlaylistsController', () => {
         'playlist-123',
         'item-456',
       );
+    });
+  });
+
+  describe('duplicate', () => {
+    it('should duplicate a playlist', async () => {
+      const expectedPlaylist = {
+        id: 'playlist-456',
+        name: 'Morning Playlist (Copy)',
+        description: 'Content for morning display',
+        items: [{ id: 'item-1', contentId: 'content-1', order: 0 }],
+      };
+      mockPlaylistsService.duplicate.mockResolvedValue(expectedPlaylist as any);
+
+      const result = await controller.duplicate(organizationId, 'playlist-123');
+
+      expect(result).toEqual(expectedPlaylist);
+      expect(mockPlaylistsService.duplicate).toHaveBeenCalledWith(organizationId, 'playlist-123');
     });
   });
 

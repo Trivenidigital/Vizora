@@ -22,7 +22,7 @@ export class CreateDisplayDto {
   status?: string;
 
   @IsOptional()
-  @IsEnum(['landscape', 'portrait'])
+  @IsEnum(['landscape', 'portrait', 'landscape_flipped', 'portrait_flipped'])
   orientation?: string;
 
   @IsOptional()

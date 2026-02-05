@@ -109,17 +109,24 @@ export class PlaylistsService {
     ]);
 
     // Map content items to include title and thumbnailUrl
-    const mappedData = data.map(playlist => ({
-      ...playlist,
-      items: playlist.items.map(item => ({
+    const mappedData = data.map(playlist => {
+      const items = playlist.items.map(item => ({
         ...item,
         content: item.content ? {
           ...item.content,
           title: item.content.name,
           thumbnailUrl: item.content.thumbnail,
         } : null,
-      })),
-    }));
+      }));
+
+      return {
+        ...playlist,
+        items,
+        itemCount: items.length,
+        totalDuration: items.reduce((sum, item) => sum + (item.duration || item.content?.duration || 10), 0),
+        totalSize: items.reduce((sum, item) => sum + (item.content?.fileSize || 0), 0),
+      };
+    });
 
     return new PaginatedResponse(mappedData, total, page, limit);
   }
@@ -147,16 +154,21 @@ export class PlaylistsService {
     }
 
     // Map content items to include title and thumbnailUrl
+    const items = playlist.items.map(item => ({
+      ...item,
+      content: item.content ? {
+        ...item.content,
+        title: item.content.name,
+        thumbnailUrl: item.content.thumbnail,
+      } : null,
+    }));
+
     return {
       ...playlist,
-      items: playlist.items.map(item => ({
-        ...item,
-        content: item.content ? {
-          ...item.content,
-          title: item.content.name,
-          thumbnailUrl: item.content.thumbnail,
-        } : null,
-      })),
+      items,
+      itemCount: items.length,
+      totalDuration: items.reduce((sum, item) => sum + (item.duration || item.content?.duration || 10), 0),
+      totalSize: items.reduce((sum, item) => sum + (item.content?.fileSize || 0), 0),
     };
   }
 
@@ -265,6 +277,32 @@ export class PlaylistsService {
         this.logger.error(`Failed to notify displays after item update: ${error.message}`);
       });
     }
+  }
+
+  async duplicate(organizationId: string, id: string) {
+    const original = await this.findOne(organizationId, id);
+
+    // Create the playlist copy with items
+    return this.db.playlist.create({
+      data: {
+        name: `${original.name} (Copy)`,
+        description: original.description,
+        organizationId,
+        items: {
+          create: original.items.map((item, index) => ({
+            contentId: item.contentId,
+            order: item.order ?? index,
+            duration: item.duration,
+          })),
+        },
+      },
+      include: {
+        items: {
+          include: { content: true },
+          orderBy: { order: 'asc' },
+        },
+      },
+    });
   }
 
   async remove(organizationId: string, id: string) {
