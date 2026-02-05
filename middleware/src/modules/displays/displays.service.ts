@@ -365,4 +365,54 @@ export class DisplaysService {
 
     return { success: true, message: 'Content pushed to display' };
   }
+
+  async bulkDelete(organizationId: string, displayIds: string[]) {
+    const result = await this.db.display.deleteMany({
+      where: {
+        id: { in: displayIds },
+        organizationId,
+      },
+    });
+    return { deleted: result.count };
+  }
+
+  async bulkAssignPlaylist(organizationId: string, displayIds: string[], playlistId: string) {
+    // Verify playlist belongs to org
+    const playlist = await this.db.playlist.findFirst({
+      where: { id: playlistId, organizationId },
+    });
+    if (!playlist) {
+      throw new NotFoundException('Playlist not found or does not belong to your organization');
+    }
+
+    const result = await this.db.display.updateMany({
+      where: {
+        id: { in: displayIds },
+        organizationId,
+      },
+      data: { currentPlaylistId: playlistId },
+    });
+    return { updated: result.count };
+  }
+
+  async bulkAssignGroup(organizationId: string, displayIds: string[], displayGroupId: string) {
+    // Verify group belongs to org
+    const group = await this.db.displayGroup.findFirst({
+      where: { id: displayGroupId, organizationId },
+    });
+    if (!group) {
+      throw new NotFoundException('Display group not found or does not belong to your organization');
+    }
+
+    const members = displayIds.map(displayId => ({
+      displayId,
+      displayGroupId,
+    }));
+
+    const result = await this.db.displayGroupMember.createMany({
+      data: members,
+      skipDuplicates: true,
+    });
+    return { added: result.count };
+  }
 }

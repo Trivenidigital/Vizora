@@ -7,7 +7,10 @@ import {
   Param,
   Delete,
   Query,
+  UseGuards,
 } from '@nestjs/common';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { DisplayGroupsService } from './display-groups.service';
 import { CreateDisplayGroupDto } from './dto/create-display-group.dto';
 import { UpdateDisplayGroupDto } from './dto/update-display-group.dto';
@@ -15,11 +18,13 @@ import { ManageDisplaysDto } from './dto/manage-displays.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
+@UseGuards(RolesGuard)
 @Controller('display-groups')
 export class DisplayGroupsController {
   constructor(private readonly displayGroupsService: DisplayGroupsService) {}
 
   @Post()
+  @Roles('admin', 'manager')
   create(
     @CurrentUser('organizationId') organizationId: string,
     @Body() createDisplayGroupDto: CreateDisplayGroupDto,
@@ -44,6 +49,7 @@ export class DisplayGroupsController {
   }
 
   @Patch(':id')
+  @Roles('admin', 'manager')
   update(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
@@ -53,6 +59,7 @@ export class DisplayGroupsController {
   }
 
   @Delete(':id')
+  @Roles('admin')
   remove(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
@@ -61,6 +68,7 @@ export class DisplayGroupsController {
   }
 
   @Post(':id/displays')
+  @Roles('admin', 'manager')
   addDisplays(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
@@ -70,6 +78,7 @@ export class DisplayGroupsController {
   }
 
   @Delete(':id/displays')
+  @Roles('admin', 'manager')
   removeDisplays(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,

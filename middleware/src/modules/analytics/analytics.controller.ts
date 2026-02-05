@@ -1,12 +1,16 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { AnalyticsService } from './analytics.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
+@UseGuards(RolesGuard)
 @Controller('analytics')
 export class AnalyticsController {
   constructor(private readonly analyticsService: AnalyticsService) {}
 
   @Get('device-metrics')
+  @Roles('admin', 'manager')
   getDeviceMetrics(
     @CurrentUser('organizationId') organizationId: string,
     @Query('range') range: string = 'month',
@@ -15,6 +19,7 @@ export class AnalyticsController {
   }
 
   @Get('content-performance')
+  @Roles('admin', 'manager')
   getContentPerformance(
     @CurrentUser('organizationId') organizationId: string,
     @Query('range') range: string = 'month',
@@ -23,6 +28,7 @@ export class AnalyticsController {
   }
 
   @Get('usage-trends')
+  @Roles('admin', 'manager')
   getUsageTrends(
     @CurrentUser('organizationId') organizationId: string,
     @Query('range') range: string = 'month',
@@ -31,6 +37,7 @@ export class AnalyticsController {
   }
 
   @Get('device-distribution')
+  @Roles('admin', 'manager')
   getDeviceDistribution(
     @CurrentUser('organizationId') organizationId: string,
   ) {
@@ -38,6 +45,7 @@ export class AnalyticsController {
   }
 
   @Get('bandwidth')
+  @Roles('admin', 'manager')
   getBandwidthUsage(
     @CurrentUser('organizationId') organizationId: string,
     @Query('range') range: string = 'month',
@@ -46,6 +54,7 @@ export class AnalyticsController {
   }
 
   @Get('playlist-performance')
+  @Roles('admin', 'manager')
   getPlaylistPerformance(
     @CurrentUser('organizationId') organizationId: string,
     @Query('range') range: string = 'month',
@@ -54,9 +63,19 @@ export class AnalyticsController {
   }
 
   @Get('summary')
+  @Roles('admin', 'manager')
   getSummary(
     @CurrentUser('organizationId') organizationId: string,
   ) {
     return this.analyticsService.getSummary(organizationId);
+  }
+
+  @Get('export')
+  @Roles('admin', 'manager')
+  exportAnalytics(
+    @CurrentUser('organizationId') organizationId: string,
+    @Query('range') range: string = 'month',
+  ) {
+    return this.analyticsService.exportAnalytics(organizationId, range);
   }
 }

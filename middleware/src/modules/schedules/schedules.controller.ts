@@ -7,7 +7,10 @@ import {
   Param,
   Delete,
   Query,
+  UseGuards,
 } from '@nestjs/common';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { SchedulesService } from './schedules.service';
 import { CreateScheduleDto } from './dto/create-schedule.dto';
 import { UpdateScheduleDto } from './dto/update-schedule.dto';
@@ -16,11 +19,13 @@ import { PaginationDto } from '../common/dto/pagination.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 
+@UseGuards(RolesGuard)
 @Controller('schedules')
 export class SchedulesController {
   constructor(private readonly schedulesService: SchedulesService) {}
 
   @Post()
+  @Roles('admin', 'manager')
   create(
     @CurrentUser('organizationId') organizationId: string,
     @Body() createScheduleDto: CreateScheduleDto,
@@ -29,6 +34,7 @@ export class SchedulesController {
   }
 
   @Post('check-conflicts')
+  @Roles('admin', 'manager')
   checkConflicts(
     @CurrentUser('organizationId') organizationId: string,
     @Body() checkConflictsDto: CheckConflictsDto,
@@ -66,6 +72,7 @@ export class SchedulesController {
   }
 
   @Patch(':id')
+  @Roles('admin', 'manager')
   update(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
@@ -75,6 +82,7 @@ export class SchedulesController {
   }
 
   @Post(':id/duplicate')
+  @Roles('admin', 'manager')
   duplicate(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
@@ -83,6 +91,7 @@ export class SchedulesController {
   }
 
   @Delete(':id')
+  @Roles('admin')
   remove(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
