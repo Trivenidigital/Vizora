@@ -347,6 +347,95 @@ describe('PlaylistsService', () => {
         service.reorder('org-123', 'playlist-123', ['item-1'])
       ).rejects.toThrow(NotFoundException);
     });
+
+    it('should use two-pass approach with negative orders then final orders', async () => {
+      const playlistWithItems = {
+        id: 'playlist-123',
+        organizationId: 'org-123',
+        name: 'Test Playlist',
+        description: 'Test description',
+        isDefault: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        items: [
+          { id: 'item-1', contentId: 'c-1', order: 0, duration: 10, content: null },
+          { id: 'item-2', contentId: 'c-2', order: 1, duration: 20, content: null },
+        ],
+        itemCount: 2,
+        totalDuration: 30,
+        totalSize: 0,
+      };
+
+      mockDatabaseService.playlist.findFirst
+        .mockResolvedValueOnce(playlistWithItems)
+        .mockResolvedValueOnce(playlistWithItems);
+
+      const updateCalls: Array<{ id: string; order: number }> = [];
+      mockDatabaseService.$transaction.mockImplementation(async (fn) => {
+        const txProxy = {
+          ...mockDatabaseService,
+          playlistItem: {
+            ...mockDatabaseService.playlistItem,
+            update: jest.fn().mockImplementation(({ where, data }) => {
+              updateCalls.push({ id: where.id, order: data.order });
+              return Promise.resolve({});
+            }),
+          },
+        };
+        return fn(txProxy);
+      });
+
+      await service.reorder('org-123', 'playlist-123', ['item-2', 'item-1']);
+
+      // Should have 4 calls: 2 negative + 2 final
+      expect(updateCalls).toHaveLength(4);
+      // Pass 1: negative values
+      expect(updateCalls[0]).toEqual({ id: 'item-2', order: -1 });
+      expect(updateCalls[1]).toEqual({ id: 'item-1', order: -2 });
+      // Pass 2: final values
+      expect(updateCalls[2]).toEqual({ id: 'item-2', order: 0 });
+      expect(updateCalls[3]).toEqual({ id: 'item-1', order: 1 });
+    });
+
+    it('should handle single item reorder', async () => {
+      const playlistWithItems = {
+        id: 'playlist-123',
+        organizationId: 'org-123',
+        name: 'Test Playlist',
+        description: 'Test description',
+        isDefault: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        items: [
+          { id: 'item-1', contentId: 'c-1', order: 0, duration: 10, content: null },
+        ],
+        itemCount: 1,
+        totalDuration: 10,
+        totalSize: 0,
+      };
+
+      mockDatabaseService.playlist.findFirst
+        .mockResolvedValueOnce(playlistWithItems)
+        .mockResolvedValueOnce(playlistWithItems);
+
+      mockDatabaseService.$transaction.mockImplementation(async (fn) => {
+        return fn(mockDatabaseService);
+      });
+      mockDatabaseService.playlistItem.update.mockResolvedValue({});
+
+      const result = await service.reorder('org-123', 'playlist-123', ['item-1']);
+
+      expect(mockDatabaseService.$transaction).toHaveBeenCalled();
+      expect(result).toBeDefined();
+    });
+
+    it('should throw NotFoundException when playlist does not exist', async () => {
+      mockDatabaseService.playlist.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.reorder('org-123', 'nonexistent', ['item-1'])
+      ).rejects.toThrow(NotFoundException);
+    });
   });
 
   describe('remove', () => {

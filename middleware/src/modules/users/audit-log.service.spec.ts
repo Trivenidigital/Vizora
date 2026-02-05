@@ -176,5 +176,59 @@ describe('AuditLogService', () => {
       );
       expect(result.meta.totalPages).toBe(5);
     });
+
+    it('should filter by endDate only', async () => {
+      db.auditLog.findMany.mockResolvedValue([]);
+      db.auditLog.count.mockResolvedValue(0);
+
+      await service.findAll(organizationId, { page: 1, limit: 10 }, { endDate: '2026-01-31' });
+
+      expect(db.auditLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            organizationId,
+            createdAt: {
+              lte: new Date('2026-01-31'),
+            },
+          },
+        }),
+      );
+    });
+
+    it('should combine multiple filters', async () => {
+      db.auditLog.findMany.mockResolvedValue([]);
+      db.auditLog.count.mockResolvedValue(0);
+
+      await service.findAll(organizationId, { page: 1, limit: 10 }, {
+        action: 'user_invited',
+        entityType: 'user',
+        userId: 'admin-1',
+      });
+
+      expect(db.auditLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            organizationId,
+            action: 'user_invited',
+            entityType: 'user',
+            userId: 'admin-1',
+          },
+        }),
+      );
+    });
+
+    it('should use default pagination values when not provided', async () => {
+      db.auditLog.findMany.mockResolvedValue([]);
+      db.auditLog.count.mockResolvedValue(0);
+
+      await service.findAll(organizationId, {}, {});
+
+      expect(db.auditLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          skip: 0,
+          take: 10,
+        }),
+      );
+    });
   });
 });
