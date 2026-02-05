@@ -66,7 +66,7 @@ export class ContentService {
   async findAll(
     organizationId: string,
     pagination: PaginationDto,
-    filters?: { type?: string; status?: string },
+    filters?: { type?: string; status?: string; templateOrientation?: string },
   ) {
     const { page = 1, limit = 10 } = pagination;
     const skip = (page - 1) * limit;
@@ -74,6 +74,7 @@ export class ContentService {
     // Validate filter values - only allow whitelisted values
     const validTypes = ['image', 'video', 'url', 'html', 'pdf', 'template'];
     const validStatuses = ['active', 'archived', 'draft'];
+    const validOrientations = ['landscape', 'portrait', 'both'];
 
     const where: any = { organizationId };
     if (filters?.type && validTypes.includes(filters.type)) {
@@ -81,6 +82,9 @@ export class ContentService {
     }
     if (filters?.status && validStatuses.includes(filters.status)) {
       where.status = filters.status;
+    }
+    if (filters?.templateOrientation && validOrientations.includes(filters.templateOrientation)) {
+      where.templateOrientation = filters.templateOrientation;
     }
 
     const [data, total] = await Promise.all([

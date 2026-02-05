@@ -36,6 +36,11 @@ import {
   Sun,
   Moon,
   RefreshCw,
+  Undo2,
+  Redo2,
+  Key,
+  Copy,
+  Shield,
 } from 'lucide-react';
 
 export const ICON_SIZES = {
@@ -110,6 +115,11 @@ export const iconMap = {
   sun: Sun,
   moon: Moon,
   refresh: RefreshCw,
+  undo: Undo2,
+  redo: Redo2,
+  key: Key,
+  copy: Copy,
+  shield: Shield,
 } as const;
 
 export type IconName = keyof typeof iconMap;

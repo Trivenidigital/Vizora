@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common';
 import { AnalyticsService } from './analytics.service';
 import { DatabaseService } from '../database/database.service';
 
@@ -9,6 +10,7 @@ describe('AnalyticsService', () => {
     mockDb = {
       display: {
         findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn().mockResolvedValue(null),
         count: jest.fn().mockResolvedValue(0),
       },
       content: {
@@ -258,6 +260,149 @@ describe('AnalyticsService', () => {
       const result = await service.getBandwidthUsage('org-123', 'week');
       // Current should now equal average (no random jitter)
       expect(result[0].current).toBe(result[0].average);
+    });
+  });
+
+  describe('getDeviceUptime', () => {
+    it('should return uptime data for a device', async () => {
+      const now = new Date();
+      mockDb.display.findFirst.mockResolvedValue({
+        id: 'device-123',
+        nickname: 'Test Device',
+        status: 'online',
+        lastHeartbeat: now,
+      });
+
+      const result = await service.getDeviceUptime('org-123', 'device-123', 30);
+
+      expect(result.deviceId).toBe('device-123');
+      expect(result.uptimePercent).toBe(95); // Online device gets 95%
+      expect(result.totalOnlineMinutes).toBeGreaterThan(0);
+      expect(result.totalOfflineMinutes).toBeGreaterThan(0);
+      expect(result.lastHeartbeat).toEqual(now);
+    });
+
+    it('should throw NotFoundException for invalid device', async () => {
+      mockDb.display.findFirst.mockResolvedValue(null);
+
+      await expect(service.getDeviceUptime('org-123', 'invalid-id', 30)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should calculate lower uptime for offline devices', async () => {
+      const staleHeartbeat = new Date(Date.now() - 10 * 60 * 1000); // 10 minutes ago
+      mockDb.display.findFirst.mockResolvedValue({
+        id: 'device-123',
+        nickname: 'Test Device',
+        status: 'offline',
+        lastHeartbeat: staleHeartbeat,
+      });
+
+      const result = await service.getDeviceUptime('org-123', 'device-123', 30);
+
+      expect(result.uptimePercent).toBe(20); // Offline device gets 20%
+    });
+
+    it('should calculate medium uptime for device with online status but stale heartbeat', async () => {
+      const staleHeartbeat = new Date(Date.now() - 10 * 60 * 1000); // 10 minutes ago
+      mockDb.display.findFirst.mockResolvedValue({
+        id: 'device-123',
+        nickname: 'Test Device',
+        status: 'online',
+        lastHeartbeat: staleHeartbeat,
+      });
+
+      const result = await service.getDeviceUptime('org-123', 'device-123', 30);
+
+      expect(result.uptimePercent).toBe(80); // Online status but stale heartbeat gets 80%
+    });
+
+    it('should use correct days parameter for calculations', async () => {
+      const now = new Date();
+      mockDb.display.findFirst.mockResolvedValue({
+        id: 'device-123',
+        nickname: 'Test Device',
+        status: 'online',
+        lastHeartbeat: now,
+      });
+
+      const result7Days = await service.getDeviceUptime('org-123', 'device-123', 7);
+      const result30Days = await service.getDeviceUptime('org-123', 'device-123', 30);
+
+      // Both have 95% uptime, but total minutes differ based on days
+      expect(result7Days.totalOnlineMinutes + result7Days.totalOfflineMinutes).toBe(7 * 24 * 60);
+      expect(result30Days.totalOnlineMinutes + result30Days.totalOfflineMinutes).toBe(30 * 24 * 60);
+    });
+  });
+
+  describe('getUptimeSummary', () => {
+    it('should return aggregated uptime data for all devices', async () => {
+      const now = new Date();
+      mockDb.display.findMany.mockResolvedValue([
+        { id: 'd1', nickname: 'Device 1', status: 'online', lastHeartbeat: now },
+        { id: 'd2', nickname: 'Device 2', status: 'offline', lastHeartbeat: null },
+      ]);
+
+      const result = await service.getUptimeSummary('org-123', 30);
+
+      expect(result.deviceCount).toBe(2);
+      expect(result.onlineCount).toBe(1);
+      expect(result.offlineCount).toBe(1);
+      expect(result.devices).toHaveLength(2);
+    });
+
+    it('should handle empty device list', async () => {
+      mockDb.display.findMany.mockResolvedValue([]);
+
+      const result = await service.getUptimeSummary('org-123', 30);
+
+      expect(result.deviceCount).toBe(0);
+      expect(result.onlineCount).toBe(0);
+      expect(result.offlineCount).toBe(0);
+      expect(result.avgUptimePercent).toBe(0);
+      expect(result.devices).toEqual([]);
+    });
+
+    it('should calculate correct average uptime', async () => {
+      const now = new Date();
+      const staleHeartbeat = new Date(Date.now() - 10 * 60 * 1000);
+      mockDb.display.findMany.mockResolvedValue([
+        { id: 'd1', nickname: 'Online Device', status: 'online', lastHeartbeat: now }, // 95%
+        { id: 'd2', nickname: 'Offline Device', status: 'offline', lastHeartbeat: staleHeartbeat }, // 20%
+      ]);
+
+      const result = await service.getUptimeSummary('org-123', 30);
+
+      // Average of 95 and 20 = 57.5
+      expect(result.avgUptimePercent).toBe(57.5);
+    });
+
+    it('should use "Unnamed Device" for null nicknames', async () => {
+      const now = new Date();
+      mockDb.display.findMany.mockResolvedValue([
+        { id: 'd1', nickname: null, status: 'online', lastHeartbeat: now },
+      ]);
+
+      const result = await service.getUptimeSummary('org-123', 30);
+
+      expect(result.devices[0].nickname).toBe('Unnamed Device');
+    });
+
+    it('should return per-device uptime percentages', async () => {
+      const now = new Date();
+      mockDb.display.findMany.mockResolvedValue([
+        { id: 'd1', nickname: 'Device 1', status: 'online', lastHeartbeat: now },
+        { id: 'd2', nickname: 'Device 2', status: 'offline', lastHeartbeat: null },
+      ]);
+
+      const result = await service.getUptimeSummary('org-123', 30);
+
+      const device1 = result.devices.find((d) => d.id === 'd1');
+      const device2 = result.devices.find((d) => d.id === 'd2');
+
+      expect(device1?.uptimePercent).toBe(95);
+      expect(device2?.uptimePercent).toBe(20);
     });
   });
 

@@ -1,7 +1,7 @@
 // API Client for Vizora Middleware
 // Uses httpOnly cookies for secure JWT token storage
 
-import type { Display, Content, Playlist, PlaylistItem, Schedule, PaginatedResponse, ContentFolder, AppNotification } from './types';
+import type { Display, DisplayOrientation, Content, Playlist, PlaylistItem, Schedule, PaginatedResponse, ContentFolder, AppNotification, ApiKey, CreateApiKeyResponse } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
 
@@ -281,12 +281,13 @@ class ApiClient {
 
   async updateDisplay(
     id: string,
-    data: Partial<{ nickname: string; location?: string; currentPlaylistId?: string }>
+    data: Partial<{ nickname: string; location?: string; currentPlaylistId?: string | null; orientation?: DisplayOrientation }>
   ): Promise<Display> {
-    const payload: Record<string, string | undefined> = {};
+    const payload: Record<string, string | undefined | null> = {};
     if (data.nickname !== undefined) payload.name = data.nickname;
     if (data.location !== undefined) payload.location = data.location;
     if (data.currentPlaylistId !== undefined) payload.currentPlaylistId = data.currentPlaylistId;
+    if (data.orientation !== undefined) payload.orientation = data.orientation;
 
     return this.request<Display>(`/displays/${id}`, {
       method: 'PATCH',
@@ -319,8 +320,11 @@ class ApiClient {
     limit?: number;
     type?: string;
     status?: string;
+    templateOrientation?: 'landscape' | 'portrait' | 'both';
   }): Promise<PaginatedResponse<Content>> {
-    const query = params ? new URLSearchParams(params as Record<string, string>).toString() : '';
+    const query = params ? new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([_, v]) => v !== undefined)) as Record<string, string>
+    ).toString() : '';
     return this.request<PaginatedResponse<Content>>(`/content${query ? `?${query}` : ''}`);
   }
 
@@ -614,6 +618,44 @@ class ApiClient {
     return this.request<any>(`/analytics/export?range=${range}`);
   }
 
+  // Device Uptime Analytics
+  async getDeviceUptime(
+    deviceId: string,
+    days?: number,
+  ): Promise<{
+    deviceId: string;
+    uptimePercent: number;
+    totalOnlineMinutes: number;
+    totalOfflineMinutes: number;
+    lastHeartbeat: string | null;
+  }> {
+    const params = days ? `?days=${days}` : '';
+    return this.request<{
+      deviceId: string;
+      uptimePercent: number;
+      totalOnlineMinutes: number;
+      totalOfflineMinutes: number;
+      lastHeartbeat: string | null;
+    }>(`/analytics/device-uptime/${deviceId}${params}`);
+  }
+
+  async getUptimeSummary(days?: number): Promise<{
+    avgUptimePercent: number;
+    deviceCount: number;
+    onlineCount: number;
+    offlineCount: number;
+    devices: Array<{ id: string; nickname: string; uptimePercent: number }>;
+  }> {
+    const params = days ? `?days=${days}` : '';
+    return this.request<{
+      avgUptimePercent: number;
+      deviceCount: number;
+      onlineCount: number;
+      offlineCount: number;
+      devices: Array<{ id: string; nickname: string; uptimePercent: number }>;
+    }>(`/analytics/uptime-summary${params}`);
+  }
+
   // Push content directly to display (temporary override)
   async pushContentToDisplay(
     displayId: string,
@@ -856,6 +898,24 @@ class ApiClient {
     return this.request<{ url: string; capturedAt: string; width?: number; height?: number } | null>(
       `/displays/${displayId}/screenshot`,
     );
+  }
+
+  // API Keys
+  async getApiKeys(): Promise<ApiKey[]> {
+    return this.request<ApiKey[]>('/api-keys');
+  }
+
+  async createApiKey(data: { name: string; scopes?: string[]; expiresAt?: string }): Promise<CreateApiKeyResponse> {
+    return this.request<CreateApiKeyResponse>('/api-keys', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async revokeApiKey(id: string): Promise<void> {
+    await this.request<{ success: boolean }>(`/api-keys/${id}`, {
+      method: 'DELETE',
+    });
   }
 }
 

@@ -634,6 +634,81 @@ describe('ContentService', () => {
     });
   });
 
+  describe('findAll with templateOrientation filter', () => {
+    it('should filter by landscape orientation', async () => {
+      mockDatabaseService.content.findMany.mockResolvedValue([mockContent]);
+      mockDatabaseService.content.count.mockResolvedValue(1);
+
+      await service.findAll('org-123', { page: 1, limit: 10 }, { templateOrientation: 'landscape' });
+
+      expect(mockDatabaseService.content.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ templateOrientation: 'landscape' }),
+        }),
+      );
+    });
+
+    it('should filter by portrait orientation', async () => {
+      mockDatabaseService.content.findMany.mockResolvedValue([mockContent]);
+      mockDatabaseService.content.count.mockResolvedValue(1);
+
+      await service.findAll('org-123', { page: 1, limit: 10 }, { templateOrientation: 'portrait' });
+
+      expect(mockDatabaseService.content.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ templateOrientation: 'portrait' }),
+        }),
+      );
+    });
+
+    it('should filter by both orientation', async () => {
+      mockDatabaseService.content.findMany.mockResolvedValue([mockContent]);
+      mockDatabaseService.content.count.mockResolvedValue(1);
+
+      await service.findAll('org-123', { page: 1, limit: 10 }, { templateOrientation: 'both' });
+
+      expect(mockDatabaseService.content.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ templateOrientation: 'both' }),
+        }),
+      );
+    });
+
+    it('should ignore invalid templateOrientation values', async () => {
+      mockDatabaseService.content.findMany.mockResolvedValue([mockContent]);
+      mockDatabaseService.content.count.mockResolvedValue(1);
+
+      await service.findAll('org-123', { page: 1, limit: 10 }, { templateOrientation: 'invalid' });
+
+      expect(mockDatabaseService.content.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.not.objectContaining({ templateOrientation: 'invalid' }),
+        }),
+      );
+    });
+
+    it('should combine templateOrientation with other filters', async () => {
+      mockDatabaseService.content.findMany.mockResolvedValue([]);
+      mockDatabaseService.content.count.mockResolvedValue(0);
+
+      await service.findAll('org-123', { page: 1, limit: 10 }, {
+        type: 'template',
+        status: 'active',
+        templateOrientation: 'landscape',
+      });
+
+      expect(mockDatabaseService.content.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            type: 'template',
+            status: 'active',
+            templateOrientation: 'landscape',
+          }),
+        }),
+      );
+    });
+  });
+
   // ============================================================================
   // FILE REPLACEMENT TESTS
   // ============================================================================

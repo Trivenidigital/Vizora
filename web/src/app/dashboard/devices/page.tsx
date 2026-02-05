@@ -12,6 +12,7 @@ import SearchFilter from '@/components/SearchFilter';
 import DeviceStatusIndicator from '@/components/DeviceStatusIndicator';
 import DeviceGroupSelector from '@/components/DeviceGroupSelector';
 import DevicePreviewModal from '@/components/DevicePreviewModal';
+import PlaylistQuickSelect from '@/components/PlaylistQuickSelect';
 import { useToast } from '@/lib/hooks/useToast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { useRealtimeEvents, useOptimisticState, useErrorRecovery } from '@/lib/hooks';
@@ -155,12 +156,6 @@ export default function DevicesPage() {
     } catch (error) {
       // Silent fail
     }
-  };
-
-  const getCurrentPlaylistName = (playlistId?: string) => {
-    if (!playlistId) return null;
-    const playlist = playlists.find(p => p.id === playlistId);
-    return playlist?.name || null;
   };
 
   const handleEdit = (device: Display) => {
@@ -622,14 +617,16 @@ export default function DevicesPage() {
                     {device.location || '—'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {getCurrentPlaylistName(device.currentPlaylistId) ? (
-                      <span className="px-3 py-1 bg-primary-100 dark:bg-primary-900 text-primary-800 dark:text-primary-200 rounded-full text-xs font-semibold flex items-center gap-1 w-fit">
-                        <Icon name="playlists" size="sm" className="text-primary-800 dark:text-primary-200" />
-                        <span>{getCurrentPlaylistName(device.currentPlaylistId)}</span>
-                      </span>
-                    ) : (
-                      <span className="text-gray-400 dark:text-gray-600 italic">No playlist</span>
-                    )}
+                    <PlaylistQuickSelect
+                      device={device}
+                      playlists={playlists}
+                      onSuccess={() => toast.success('Playlist updated')}
+                      onError={(err) => toast.error(err.message || 'Failed to update playlist')}
+                      onUpdate={() => {
+                        // Update local state after successful change
+                        loadDevices();
+                      }}
+                    />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {device.lastSeen

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Icon } from '@/theme/icons';
 import { useTheme } from '@/components/providers/ThemeProvider';
 import { semanticColors } from '@/theme/colors';
@@ -183,6 +184,23 @@ export default function SettingsPage() {
               className="w-5 h-5"
             />
           </label>
+        </div>
+      </div>
+
+      {/* Developer Settings */}
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-50 mb-4">Developer</h3>
+        <div className="space-y-3">
+          <Link
+            href="/dashboard/settings/api-keys"
+            className="w-full px-4 py-3 text-sm bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition font-medium text-left flex items-center gap-2"
+          >
+            <Icon name="key" size="md" className="text-gray-600 dark:text-gray-400" />
+            API Keys
+            <span className="ml-auto text-gray-400 dark:text-gray-500">
+              <Icon name="chevronRight" size="md" />
+            </span>
+          </Link>
         </div>
       </div>
 

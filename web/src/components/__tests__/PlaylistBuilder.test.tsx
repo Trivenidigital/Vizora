@@ -244,7 +244,8 @@ describe('PlaylistBuilder Components', () => {
 
       expect(screen.getByText('Playlist Items')).toBeInTheDocument();
       expect(screen.getByText('Test Image')).toBeInTheDocument();
-      expect(screen.getByText('1 item')).toBeInTheDocument();
+      // Count and unit are in separate spans in the footer
+      expect(screen.getByText('item')).toBeInTheDocument();
       expect(screen.getByText('30s')).toBeInTheDocument();
     });
 

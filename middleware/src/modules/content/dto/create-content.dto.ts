@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEnum, IsInt, IsObject, Min, IsDateString } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsInt, IsObject, Min, IsDateString, IsIn } from 'class-validator';
 
 export class CreateContentDto {
   @IsString()
@@ -48,4 +48,9 @@ export class CreateContentDto {
   @IsOptional()
   @IsString()
   replacementContentId?: string;
+
+  // Template orientation filter (for filtering templates by display orientation)
+  @IsOptional()
+  @IsIn(['landscape', 'portrait', 'both'])
+  templateOrientation?: 'landscape' | 'portrait' | 'both';
 }

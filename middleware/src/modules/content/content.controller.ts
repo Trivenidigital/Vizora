@@ -166,8 +166,9 @@ export class ContentController {
     @Query() pagination: PaginationDto,
     @Query('type') type?: string,
     @Query('status') status?: string,
+    @Query('templateOrientation') templateOrientation?: string,
   ) {
-    return this.contentService.findAll(organizationId, pagination, { type, status });
+    return this.contentService.findAll(organizationId, pagination, { type, status, templateOrientation });
   }
 
   @Get(':id')
