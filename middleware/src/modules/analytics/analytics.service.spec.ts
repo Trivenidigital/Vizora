@@ -205,4 +205,120 @@ describe('AnalyticsService', () => {
       expect(result.totalContentSize).toBe(1024000);
     });
   });
+
+  describe('deterministic output', () => {
+    it('getDeviceMetrics should return same values on repeated calls', async () => {
+      mockDb.display.findMany.mockResolvedValue([
+        { id: '1', status: 'online', lastHeartbeat: new Date(), createdAt: new Date('2025-01-01') },
+      ]);
+
+      const result1 = await service.getDeviceMetrics('org-123', 'week');
+      const result2 = await service.getDeviceMetrics('org-123', 'week');
+
+      expect(result1).toEqual(result2);
+    });
+
+    it('getUsageTrends should return same values on repeated calls', async () => {
+      mockDb.content.groupBy.mockResolvedValue([
+        { type: 'video', _count: { id: 5 } },
+        { type: 'image', _count: { id: 3 } },
+      ]);
+
+      const result1 = await service.getUsageTrends('org-123', 'week');
+      const result2 = await service.getUsageTrends('org-123', 'week');
+
+      expect(result1).toEqual(result2);
+    });
+
+    it('getBandwidthUsage should return same values on repeated calls', async () => {
+      mockDb.content.aggregate.mockResolvedValue({ _sum: { fileSize: 1048576 }, _count: { id: 1 } });
+      mockDb.display.count.mockResolvedValue(5);
+
+      const result1 = await service.getBandwidthUsage('org-123', 'week');
+      const result2 = await service.getBandwidthUsage('org-123', 'week');
+
+      expect(result1).toEqual(result2);
+    });
+
+    it('getUsageTrends should use fixed multipliers', async () => {
+      mockDb.content.groupBy.mockResolvedValue([
+        { type: 'video', _count: { id: 1 } },
+      ]);
+
+      const result = await service.getUsageTrends('org-123', 'week');
+      // With 1 video content, each day should have video = 1 * 25 = 25
+      expect(result[0].video).toBe(25);
+      expect(result[0].image).toBe(0);
+    });
+
+    it('getBandwidthUsage current should equal average', async () => {
+      mockDb.content.aggregate.mockResolvedValue({ _sum: { fileSize: 1048576 }, _count: { id: 1 } });
+      mockDb.display.count.mockResolvedValue(5);
+
+      const result = await service.getBandwidthUsage('org-123', 'week');
+      // Current should now equal average (no random jitter)
+      expect(result[0].current).toBe(result[0].average);
+    });
+  });
+
+  describe('exportAnalytics', () => {
+    it('should return combined analytics data', async () => {
+      // Mock all the sub-queries
+      mockDb.display.findMany.mockResolvedValue([]);
+      mockDb.display.count.mockResolvedValue(0);
+      mockDb.content.findMany.mockResolvedValue([]);
+      mockDb.content.groupBy.mockResolvedValue([]);
+      mockDb.content.aggregate.mockResolvedValue({ _sum: { fileSize: 0 }, _count: { id: 0 } });
+      mockDb.content.count.mockResolvedValue(0);
+      mockDb.playlist.findMany.mockResolvedValue([]);
+      mockDb.playlist.count.mockResolvedValue(0);
+
+      const result = await service.exportAnalytics('org-123', 'month');
+
+      expect(result).toHaveProperty('summary');
+      expect(result).toHaveProperty('deviceMetrics');
+      expect(result).toHaveProperty('contentPerformance');
+      expect(result).toHaveProperty('usageTrends');
+      expect(result).toHaveProperty('deviceDistribution');
+      expect(result).toHaveProperty('bandwidthUsage');
+      expect(result).toHaveProperty('playlistPerformance');
+    });
+
+    it('should respect range parameter', async () => {
+      mockDb.display.findMany.mockResolvedValue([
+        { id: '1', status: 'online', lastHeartbeat: new Date(), createdAt: new Date('2025-01-01') },
+      ]);
+      mockDb.display.count.mockResolvedValue(1);
+      mockDb.content.findMany.mockResolvedValue([]);
+      mockDb.content.groupBy.mockResolvedValue([]);
+      mockDb.content.aggregate.mockResolvedValue({ _sum: { fileSize: 0 }, _count: { id: 0 } });
+      mockDb.content.count.mockResolvedValue(0);
+      mockDb.playlist.findMany.mockResolvedValue([]);
+      mockDb.playlist.count.mockResolvedValue(0);
+
+      const weekResult = await service.exportAnalytics('org-123', 'week');
+      expect(weekResult.deviceMetrics.length).toBe(7);
+
+      const monthResult = await service.exportAnalytics('org-123', 'month');
+      expect(monthResult.deviceMetrics.length).toBe(30);
+    });
+
+    it('should return empty data for org with no resources', async () => {
+      mockDb.display.findMany.mockResolvedValue([]);
+      mockDb.display.count.mockResolvedValue(0);
+      mockDb.content.findMany.mockResolvedValue([]);
+      mockDb.content.groupBy.mockResolvedValue([]);
+      mockDb.content.aggregate.mockResolvedValue({ _sum: { fileSize: 0 }, _count: { id: 0 } });
+      mockDb.content.count.mockResolvedValue(0);
+      mockDb.playlist.findMany.mockResolvedValue([]);
+      mockDb.playlist.count.mockResolvedValue(0);
+
+      const result = await service.exportAnalytics('org-123', 'month');
+
+      expect(result.summary.totalDevices).toBe(0);
+      expect(result.deviceMetrics).toEqual([]);
+      expect(result.contentPerformance).toEqual([]);
+      expect(result.playlistPerformance).toEqual([]);
+    });
+  });
 });

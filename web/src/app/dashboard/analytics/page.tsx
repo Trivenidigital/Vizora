@@ -81,6 +81,7 @@ const formatBytes = (bytes: number) => {
 export default function AnalyticsPage() {
   const toast = useToast();
   const [dateRange, setDateRange] = useState<'week' | 'month' | 'year'>('month');
+  const [exporting, setExporting] = useState(false);
   const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline'>('offline');
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [summary, setSummary] = useState<any>(null);
@@ -113,6 +114,72 @@ export default function AnalyticsPage() {
     },
   });
 
+  const handleExportCSV = async () => {
+    try {
+      setExporting(true);
+      const data = await apiClient.exportAnalytics(dateRange);
+
+      // Build CSV sections
+      const sections: string[] = [];
+
+      // Summary section
+      if (data.summary) {
+        sections.push('SUMMARY');
+        sections.push(['Metric', 'Value'].join(','));
+        sections.push(`"Total Devices","${data.summary.totalDevices}"`);
+        sections.push(`"Online Devices","${data.summary.onlineDevices}"`);
+        sections.push(`"Total Content","${data.summary.totalContent}"`);
+        sections.push(`"Total Playlists","${data.summary.totalPlaylists}"`);
+        sections.push(`"Uptime %","${data.summary.uptimePercent}"`);
+        sections.push('');
+      }
+
+      // Device Metrics section
+      if (data.deviceMetrics?.length) {
+        sections.push('DEVICE METRICS');
+        sections.push(['Date', 'Mobile', 'Tablet', 'Desktop'].join(','));
+        data.deviceMetrics.forEach((d: any) => {
+          sections.push([`"${d.date}"`, d.mobile?.toFixed(1), d.tablet?.toFixed(1), d.desktop?.toFixed(1)].join(','));
+        });
+        sections.push('');
+      }
+
+      // Content Performance section
+      if (data.contentPerformance?.length) {
+        sections.push('CONTENT PERFORMANCE');
+        sections.push(['Title', 'Views', 'Engagement', 'Shares'].join(','));
+        data.contentPerformance.forEach((c: any) => {
+          sections.push([`"${String(c.title).replace(/"/g, '""')}"`, c.views, c.engagement, c.shares].join(','));
+        });
+        sections.push('');
+      }
+
+      // Playlist Performance section
+      if (data.playlistPerformance?.length) {
+        sections.push('PLAYLIST PERFORMANCE');
+        sections.push(['Name', 'Plays', 'Engagement', 'Unique Devices', 'Completion'].join(','));
+        data.playlistPerformance.forEach((p: any) => {
+          sections.push([`"${String(p.name).replace(/"/g, '""')}"`, p.plays, p.engagement, p.uniqueDevices, p.completion].join(','));
+        });
+        sections.push('');
+      }
+
+      const csvContent = sections.join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `analytics-${dateRange}-${new Date().toISOString().split('T')[0]}.csv`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+
+      toast.success('Analytics exported successfully');
+    } catch (error: any) {
+      toast.error(error.message || 'Export failed');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -136,20 +203,29 @@ export default function AnalyticsPage() {
             )}
           </p>
         </div>
-        <div className="flex gap-2">
-          {(['week', 'month', 'year'] as const).map((range) => (
-            <button
-              key={range}
-              onClick={() => setDateRange(range)}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors capitalize ${
-                dateRange === range
-                  ? 'bg-primary-600 dark:bg-primary-400 text-white'
-                  : 'bg-neutral-200 dark:bg-neutral-700 text-neutral-900 dark:text-neutral-50 hover:bg-neutral-300 dark:hover:bg-neutral-600'
-              }`}
-            >
-              {range}
-            </button>
-          ))}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleExportCSV}
+            disabled={exporting}
+            className="px-4 py-2 rounded-lg font-medium transition-colors bg-neutral-200 dark:bg-neutral-700 text-neutral-900 dark:text-neutral-50 hover:bg-neutral-300 dark:hover:bg-neutral-600 disabled:opacity-50 flex items-center gap-2"
+          >
+            {exporting ? 'Exporting...' : 'Export CSV'}
+          </button>
+          <div className="flex gap-2">
+            {(['week', 'month', 'year'] as const).map((range) => (
+              <button
+                key={range}
+                onClick={() => setDateRange(range)}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors capitalize ${
+                  dateRange === range
+                    ? 'bg-primary-600 dark:bg-primary-400 text-white'
+                    : 'bg-neutral-200 dark:bg-neutral-700 text-neutral-900 dark:text-neutral-50 hover:bg-neutral-300 dark:hover:bg-neutral-600'
+                }`}
+              >
+                {range}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

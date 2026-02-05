@@ -7,19 +7,25 @@ import {
   Param,
   Delete,
   Query,
+  UseGuards,
 } from '@nestjs/common';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { DisplaysService } from './displays.service';
 import { CreateDisplayDto } from './dto/create-display.dto';
 import { UpdateDisplayDto } from './dto/update-display.dto';
+import { BulkDisplayIdsDto, BulkAssignPlaylistDto, BulkAssignGroupDto } from './dto/bulk-operations.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 
+@UseGuards(RolesGuard)
 @Controller('displays')
 export class DisplaysController {
   constructor(private readonly displaysService: DisplaysService) {}
 
   @Post()
+  @Roles('admin', 'manager')
   create(
     @CurrentUser('organizationId') organizationId: string,
     @Body() createDisplayDto: CreateDisplayDto,
@@ -35,6 +41,33 @@ export class DisplaysController {
     return this.displaysService.findAll(organizationId, pagination);
   }
 
+  @Post('bulk/delete')
+  @Roles('admin')
+  bulkDelete(
+    @CurrentUser('organizationId') organizationId: string,
+    @Body() dto: BulkDisplayIdsDto,
+  ) {
+    return this.displaysService.bulkDelete(organizationId, dto.displayIds);
+  }
+
+  @Post('bulk/assign-playlist')
+  @Roles('admin', 'manager')
+  bulkAssignPlaylist(
+    @CurrentUser('organizationId') organizationId: string,
+    @Body() dto: BulkAssignPlaylistDto,
+  ) {
+    return this.displaysService.bulkAssignPlaylist(organizationId, dto.displayIds, dto.playlistId);
+  }
+
+  @Post('bulk/assign-group')
+  @Roles('admin', 'manager')
+  bulkAssignGroup(
+    @CurrentUser('organizationId') organizationId: string,
+    @Body() dto: BulkAssignGroupDto,
+  ) {
+    return this.displaysService.bulkAssignGroup(organizationId, dto.displayIds, dto.displayGroupId);
+  }
+
   @Get(':id')
   findOne(
     @CurrentUser('organizationId') organizationId: string,
@@ -44,6 +77,7 @@ export class DisplaysController {
   }
 
   @Patch(':id')
+  @Roles('admin', 'manager')
   update(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
@@ -53,6 +87,7 @@ export class DisplaysController {
   }
 
   @Post(':id/pair')
+  @Roles('admin', 'manager')
   async generatePairingToken(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
@@ -67,6 +102,7 @@ export class DisplaysController {
   }
 
   @Delete(':id')
+  @Roles('admin')
   remove(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
@@ -83,6 +119,7 @@ export class DisplaysController {
   }
 
   @Post(':id/tags')
+  @Roles('admin', 'manager')
   addTags(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
@@ -92,6 +129,7 @@ export class DisplaysController {
   }
 
   @Delete(':id/tags')
+  @Roles('admin')
   removeTags(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
@@ -101,6 +139,7 @@ export class DisplaysController {
   }
 
   @Post(':id/push-content')
+  @Roles('admin', 'manager')
   pushContent(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,

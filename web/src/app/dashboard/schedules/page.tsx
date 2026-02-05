@@ -9,9 +9,11 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import EmptyState from '@/components/EmptyState';
 import TimePicker from '@/components/TimePicker';
 import DaySelector from '@/components/DaySelector';
+import ScheduleCalendar from '@/components/ScheduleCalendar';
 import { useToast } from '@/lib/hooks/useToast';
 import { useRealtimeEvents } from '@/lib/hooks';
 import { Icon } from '@/theme/icons';
+import { format } from 'date-fns';
 
 interface Schedule {
   id: string;
@@ -79,6 +81,7 @@ export default function SchedulesPage() {
   const [targetType, setTargetType] = useState<'device' | 'group'>('device');
   const [displayGroups, setDisplayGroups] = useState<any[]>([]);
   const [conflictWarnings, setConflictWarnings] = useState<any[]>([]);
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
 
   // Modal states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -438,16 +441,42 @@ export default function SchedulesPage() {
             Automate content playback with schedules ({schedules.length} total)
           </p>
         </div>
-        <button
-          onClick={() => {
-            resetForm();
-            setIsCreateModalOpen(true);
-          }}
-          className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2 active:scale-95"
-        >
-          <Icon name="add" size="lg" className="text-white" />
-          <span>Create Schedule</span>
-        </button>
+        <div className="flex items-center gap-3">
+          {/* View Toggle */}
+          <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`px-3 py-1.5 text-sm rounded-md transition font-medium ${
+                viewMode === 'list'
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-50 shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              }`}
+            >
+              List
+            </button>
+            <button
+              onClick={() => setViewMode('calendar')}
+              className={`px-3 py-1.5 text-sm rounded-md transition font-medium ${
+                viewMode === 'calendar'
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-50 shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              }`}
+            >
+              Calendar
+            </button>
+          </div>
+          {/* Create button */}
+          <button
+            onClick={() => {
+              resetForm();
+              setIsCreateModalOpen(true);
+            }}
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2 active:scale-95"
+          >
+            <Icon name="add" size="lg" className="text-white" />
+            <span>Create Schedule</span>
+          </button>
+        </div>
       </div>
 
       {/* Empty State */}
@@ -462,6 +491,23 @@ export default function SchedulesPage() {
               resetForm();
               setIsCreateModalOpen(true);
             },
+          }}
+        />
+      ) : viewMode === 'calendar' ? (
+        <ScheduleCalendar
+          schedules={schedules}
+          onSelectEvent={(schedule) => openEditModal(schedule)}
+          onSelectSlot={(slotInfo) => {
+            resetForm();
+            const startTime = format(slotInfo.start, 'HH:mm');
+            const endTime = format(slotInfo.end, 'HH:mm');
+            setFormData(prev => ({
+              ...prev,
+              startTime: startTime !== '00:00' ? startTime : '09:00',
+              duration: startTime !== '00:00' ? calculateDuration(startTime, endTime) : 60,
+              days: slotInfo.daysOfWeek.map(d => DAY_NAMES[d]),
+            }));
+            setIsCreateModalOpen(true);
           }}
         />
       ) : (

@@ -11,11 +11,14 @@ import {
   HttpStatus,
   UploadedFile,
   UseInterceptors,
+  UseGuards,
   MaxFileSizeValidator,
   ParseFilePipe,
   BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { ContentService } from './content.service';
 import { ThumbnailService } from './thumbnail.service';
 import { FileValidationService } from './file-validation.service';
@@ -31,6 +34,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import * as fs from 'fs';
 import * as path from 'path';
 
+@UseGuards(RolesGuard)
 @Controller('content')
 export class ContentController {
   constructor(
@@ -40,6 +44,7 @@ export class ContentController {
   ) {}
 
   @Post()
+  @Roles('admin', 'manager')
   async create(
     @CurrentUser('organizationId') organizationId: string,
     @Body() createContentDto: CreateContentDto,
@@ -52,6 +57,7 @@ export class ContentController {
   }
 
   @Post('upload')
+  @Roles('admin', 'manager')
   @UseInterceptors(FileInterceptor('file'))
   async uploadFile(
     @CurrentUser('organizationId') organizationId: string,
@@ -134,6 +140,7 @@ export class ContentController {
   }
 
   @Patch(':id')
+  @Roles('admin', 'manager')
   update(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
@@ -143,6 +150,7 @@ export class ContentController {
   }
 
   @Post(':id/thumbnail')
+  @Roles('admin', 'manager')
   @HttpCode(HttpStatus.OK)
   async generateThumbnail(
     @CurrentUser('organizationId') organizationId: string,
@@ -168,6 +176,7 @@ export class ContentController {
   }
 
   @Post(':id/archive')
+  @Roles('admin', 'manager')
   archive(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
@@ -176,6 +185,7 @@ export class ContentController {
   }
 
   @Delete(':id')
+  @Roles('admin')
   remove(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
@@ -188,6 +198,7 @@ export class ContentController {
   // ============================================================================
 
   @Post(':id/replace')
+  @Roles('admin', 'manager')
   @HttpCode(HttpStatus.OK)
   @UseInterceptors(FileInterceptor('file'))
   async replaceFile(
@@ -260,6 +271,7 @@ export class ContentController {
   }
 
   @Post(':id/restore')
+  @Roles('admin', 'manager')
   @HttpCode(HttpStatus.OK)
   restore(
     @CurrentUser('organizationId') organizationId: string,
@@ -273,6 +285,7 @@ export class ContentController {
   // ============================================================================
 
   @Patch(':id/expiration')
+  @Roles('admin', 'manager')
   setExpiration(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
@@ -287,6 +300,7 @@ export class ContentController {
   }
 
   @Delete(':id/expiration')
+  @Roles('admin', 'manager')
   @HttpCode(HttpStatus.OK)
   clearExpiration(
     @CurrentUser('organizationId') organizationId: string,
@@ -300,6 +314,7 @@ export class ContentController {
   // ============================================================================
 
   @Post('templates')
+  @Roles('admin', 'manager')
   createTemplate(
     @CurrentUser('organizationId') organizationId: string,
     @Body() dto: CreateTemplateDto,
@@ -308,6 +323,7 @@ export class ContentController {
   }
 
   @Patch('templates/:id')
+  @Roles('admin', 'manager')
   updateTemplate(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
@@ -317,18 +333,21 @@ export class ContentController {
   }
 
   @Post('templates/preview')
+  @Roles('admin', 'manager')
   @HttpCode(HttpStatus.OK)
   previewTemplate(@Body() dto: PreviewTemplateDto) {
     return this.contentService.previewTemplate(dto);
   }
 
   @Post('templates/validate')
+  @Roles('admin', 'manager')
   @HttpCode(HttpStatus.OK)
   validateTemplate(@Body() body: { templateHtml: string }) {
     return this.contentService.validateTemplateHtml(body.templateHtml);
   }
 
   @Get('templates/:id/rendered')
+  @Roles('admin', 'manager')
   getRenderedTemplate(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
@@ -337,6 +356,7 @@ export class ContentController {
   }
 
   @Post('templates/:id/refresh')
+  @Roles('admin', 'manager')
   @HttpCode(HttpStatus.OK)
   refreshTemplate(
     @CurrentUser('organizationId') organizationId: string,
@@ -350,6 +370,7 @@ export class ContentController {
   // ============================================================================
 
   @Post('bulk/update')
+  @Roles('admin', 'manager')
   @HttpCode(HttpStatus.OK)
   bulkUpdate(
     @CurrentUser('organizationId') organizationId: string,
@@ -359,6 +380,7 @@ export class ContentController {
   }
 
   @Post('bulk/archive')
+  @Roles('admin', 'manager')
   @HttpCode(HttpStatus.OK)
   bulkArchive(
     @CurrentUser('organizationId') organizationId: string,
@@ -368,6 +390,7 @@ export class ContentController {
   }
 
   @Post('bulk/restore')
+  @Roles('admin', 'manager')
   @HttpCode(HttpStatus.OK)
   bulkRestore(
     @CurrentUser('organizationId') organizationId: string,
@@ -377,6 +400,7 @@ export class ContentController {
   }
 
   @Post('bulk/delete')
+  @Roles('admin')
   @HttpCode(HttpStatus.OK)
   bulkDelete(
     @CurrentUser('organizationId') organizationId: string,
@@ -386,6 +410,7 @@ export class ContentController {
   }
 
   @Post('bulk/tags')
+  @Roles('admin', 'manager')
   @HttpCode(HttpStatus.OK)
   bulkAddTags(
     @CurrentUser('organizationId') organizationId: string,
@@ -395,6 +420,7 @@ export class ContentController {
   }
 
   @Post('bulk/duration')
+  @Roles('admin', 'manager')
   @HttpCode(HttpStatus.OK)
   bulkSetDuration(
     @CurrentUser('organizationId') organizationId: string,

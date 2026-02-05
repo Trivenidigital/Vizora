@@ -593,6 +593,11 @@ class ApiClient {
     return this.request<any[]>(`/analytics/playlist-performance?range=${range}`);
   }
 
+  // Analytics Export
+  async exportAnalytics(range: string = 'month'): Promise<any> {
+    return this.request<any>(`/analytics/export?range=${range}`);
+  }
+
   // Push content directly to display (temporary override)
   async pushContentToDisplay(
     displayId: string,
@@ -715,6 +720,28 @@ class ApiClient {
       Object.fromEntries(Object.entries(params).filter(([_, v]) => v !== undefined)) as Record<string, string>
     ).toString() : '';
     return this.request<PaginatedResponse<any>>(`/audit-logs${query ? `?${query}` : ''}`);
+  }
+
+  // Bulk Display Operations
+  async bulkDeleteDisplays(displayIds: string[]): Promise<{ deleted: number }> {
+    return this.request<{ deleted: number }>('/displays/bulk/delete', {
+      method: 'POST',
+      body: JSON.stringify({ displayIds }),
+    });
+  }
+
+  async bulkAssignPlaylist(displayIds: string[], playlistId: string): Promise<{ updated: number }> {
+    return this.request<{ updated: number }>('/displays/bulk/assign-playlist', {
+      method: 'POST',
+      body: JSON.stringify({ displayIds, playlistId }),
+    });
+  }
+
+  async bulkAssignGroup(displayIds: string[], displayGroupId: string): Promise<{ added: number }> {
+    return this.request<{ added: number }>('/displays/bulk/assign-group', {
+      method: 'POST',
+      body: JSON.stringify({ displayIds, displayGroupId }),
+    });
   }
 }
 

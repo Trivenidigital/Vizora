@@ -7,7 +7,10 @@ import {
   Param,
   Delete,
   Query,
+  UseGuards,
 } from '@nestjs/common';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { PlaylistsService } from './playlists.service';
 import { CreatePlaylistDto } from './dto/create-playlist.dto';
 import { UpdatePlaylistDto } from './dto/update-playlist.dto';
@@ -15,11 +18,13 @@ import { ReorderPlaylistDto } from './dto/reorder-playlist.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
+@UseGuards(RolesGuard)
 @Controller('playlists')
 export class PlaylistsController {
   constructor(private readonly playlistsService: PlaylistsService) {}
 
   @Post()
+  @Roles('admin', 'manager')
   create(
     @CurrentUser('organizationId') organizationId: string,
     @Body() createPlaylistDto: CreatePlaylistDto,
@@ -44,6 +49,7 @@ export class PlaylistsController {
   }
 
   @Patch(':id')
+  @Roles('admin', 'manager')
   update(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
@@ -53,6 +59,7 @@ export class PlaylistsController {
   }
 
   @Post(':id/duplicate')
+  @Roles('admin', 'manager')
   duplicate(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
@@ -61,6 +68,7 @@ export class PlaylistsController {
   }
 
   @Post(':id/reorder')
+  @Roles('admin', 'manager')
   reorder(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
@@ -70,6 +78,7 @@ export class PlaylistsController {
   }
 
   @Post(':id/items')
+  @Roles('admin', 'manager')
   addItem(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') playlistId: string,
@@ -80,6 +89,7 @@ export class PlaylistsController {
   }
 
   @Delete(':id/items/:itemId')
+  @Roles('admin')
   removeItem(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') playlistId: string,
@@ -89,6 +99,7 @@ export class PlaylistsController {
   }
 
   @Delete(':id')
+  @Roles('admin')
   remove(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,

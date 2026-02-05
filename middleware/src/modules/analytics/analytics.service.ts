@@ -65,9 +65,9 @@ export class AnalyticsService {
 
       dataPoints.push({
         date: dateStr,
-        mobile: Math.min(100, Math.max(0, baseUptime * 0.85 + (Math.random() * 5))),
-        tablet: Math.min(100, Math.max(0, baseUptime * 0.92 + (Math.random() * 4))),
-        desktop: Math.min(100, Math.max(0, baseUptime * 0.98 + (Math.random() * 2))),
+        mobile: Math.min(100, Math.max(0, baseUptime * 0.85)),
+        tablet: Math.min(100, Math.max(0, baseUptime * 0.92)),
+        desktop: Math.min(100, Math.max(0, baseUptime * 0.98)),
       });
     }
 
@@ -144,10 +144,10 @@ export class AnalyticsService {
 
       dataPoints.push({
         date: dateStr,
-        video: (typeCounts['video'] || 0) * (20 + Math.random() * 10),
-        image: (typeCounts['image'] || 0) * (15 + Math.random() * 8),
-        text: (typeCounts['html'] || 0) * (10 + Math.random() * 5),
-        interactive: (typeCounts['url'] || 0) * (8 + Math.random() * 4),
+        video: (typeCounts['video'] || 0) * 25,
+        image: (typeCounts['image'] || 0) * 19,
+        text: (typeCounts['html'] || 0) * 12.5,
+        interactive: (typeCounts['url'] || 0) * 10,
       });
     }
 
@@ -215,7 +215,7 @@ export class AnalyticsService {
 
       dataPoints.push({
         time: dateStr,
-        current: Math.max(0, avgDailyMB * (0.8 + Math.random() * 0.4)),
+        current: avgDailyMB,
         average: avgDailyMB,
         peak: avgDailyMB * 1.5,
       });
@@ -280,6 +280,39 @@ export class AnalyticsService {
       totalPlaylists,
       totalContentSize: contentSize._sum.fileSize || 0,
       uptimePercent: parseFloat(uptimePercent),
+    };
+  }
+
+  /**
+   * Export all analytics data combined
+   */
+  async exportAnalytics(organizationId: string, range: string = 'month') {
+    const [
+      summary,
+      deviceMetrics,
+      contentPerformance,
+      usageTrends,
+      deviceDistribution,
+      bandwidthUsage,
+      playlistPerformance,
+    ] = await Promise.all([
+      this.getSummary(organizationId),
+      this.getDeviceMetrics(organizationId, range),
+      this.getContentPerformance(organizationId, range),
+      this.getUsageTrends(organizationId, range),
+      this.getDeviceDistribution(organizationId),
+      this.getBandwidthUsage(organizationId, range),
+      this.getPlaylistPerformance(organizationId, range),
+    ]);
+
+    return {
+      summary,
+      deviceMetrics,
+      contentPerformance,
+      usageTrends,
+      deviceDistribution,
+      bandwidthUsage,
+      playlistPerformance,
     };
   }
 }
