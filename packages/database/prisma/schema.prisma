@@ -94,6 +94,8 @@ model Display {
   lastHeartbeat         DateTime?
   metadata              Json?    @db.JsonB // OS, model, version, etc.
   timezone              String   @default("UTC")
+  lastScreenshot        String?  // URL to last captured screenshot
+  lastScreenshotAt      DateTime? // When screenshot was taken
   currentPlaylistId     String?  // Direct playlist assignment for simple cases
   currentPlaylist       Playlist? @relation("DisplayCurrentPlaylist", fields: [currentPlaylistId], references: [id], onDelete: SetNull)
   createdAt             DateTime @default(now())
