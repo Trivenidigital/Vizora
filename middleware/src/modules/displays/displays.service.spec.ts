@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { HttpService } from '@nestjs/axios';
+import { of } from 'rxjs';
 import { DisplaysService } from './displays.service';
 import { DatabaseService } from '../database/database.service';
 import { CircuitBreakerService } from '../common/services/circuit-breaker.service';
@@ -12,6 +13,7 @@ import { PaginationDto } from '../common/dto/pagination.dto';
 describe('DisplaysService', () => {
   let service: DisplaysService;
   let databaseService: jest.Mocked<DatabaseService>;
+  let httpService: jest.Mocked<HttpService>;
 
   const mockOrganizationId = 'org-123';
   const mockDisplayId = 'display-123';
@@ -86,6 +88,7 @@ describe('DisplaysService', () => {
 
     service = module.get<DisplaysService>(DisplaysService);
     databaseService = module.get(DatabaseService);
+    httpService = module.get(HttpService);
   });
 
   afterEach(() => {
@@ -397,6 +400,168 @@ describe('DisplaysService', () => {
       ).rejects.toThrow(NotFoundException);
 
       expect(databaseService.display.delete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('requestScreenshot', () => {
+    const mockDisplayWithRelations = {
+      ...mockDisplay,
+      status: 'online',
+      tags: [],
+      groups: [],
+      schedules: [],
+    };
+
+    it('should request screenshot successfully', async () => {
+      databaseService.display.findFirst.mockResolvedValue(mockDisplayWithRelations);
+      httpService.post.mockReturnValue(of({ data: { success: true } }) as any);
+
+      const result = await service.requestScreenshot(mockOrganizationId, mockDisplayId);
+
+      expect(result).toHaveProperty('requestId');
+      expect(typeof result.requestId).toBe('string');
+      expect(httpService.post).toHaveBeenCalledWith(
+        expect.stringContaining('/internal/command'),
+        expect.objectContaining({
+          displayId: mockDisplayId,
+          command: 'screenshot',
+          payload: expect.objectContaining({ requestId: expect.any(String) }),
+        }),
+      );
+    });
+
+    it('should throw NotFoundException if display not found', async () => {
+      databaseService.display.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.requestScreenshot(mockOrganizationId, mockDisplayId)
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ConflictException if device is offline', async () => {
+      databaseService.display.findFirst.mockResolvedValue({
+        ...mockDisplayWithRelations,
+        status: 'offline',
+      });
+
+      await expect(
+        service.requestScreenshot(mockOrganizationId, mockDisplayId)
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('should throw error if display belongs to different organization', async () => {
+      databaseService.display.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.requestScreenshot('different-org', mockDisplayId)
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('getLastScreenshot', () => {
+    const mockDisplayWithRelations = {
+      ...mockDisplay,
+      tags: [],
+      groups: [],
+      schedules: [],
+      lastScreenshot: JSON.stringify({
+        url: 'https://example.com/screenshot.png',
+        width: 1920,
+        height: 1080,
+      }),
+      lastScreenshotAt: new Date('2026-02-05T10:00:00Z'),
+    };
+
+    it('should return screenshot data', async () => {
+      databaseService.display.findFirst.mockResolvedValue(mockDisplayWithRelations);
+
+      const result = await service.getLastScreenshot(mockOrganizationId, mockDisplayId);
+
+      expect(result).toEqual({
+        url: 'https://example.com/screenshot.png',
+        width: 1920,
+        height: 1080,
+        capturedAt: new Date('2026-02-05T10:00:00Z'),
+      });
+    });
+
+    it('should return null when no screenshot available', async () => {
+      databaseService.display.findFirst.mockResolvedValue({
+        ...mockDisplayWithRelations,
+        lastScreenshot: null,
+        lastScreenshotAt: null,
+      });
+
+      const result = await service.getLastScreenshot(mockOrganizationId, mockDisplayId);
+
+      expect(result).toBeNull();
+    });
+
+    it('should throw NotFoundException if display not found', async () => {
+      databaseService.display.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.getLastScreenshot(mockOrganizationId, mockDisplayId)
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should handle legacy plain URL format', async () => {
+      databaseService.display.findFirst.mockResolvedValue({
+        ...mockDisplayWithRelations,
+        lastScreenshot: 'https://example.com/legacy-screenshot.png',
+        lastScreenshotAt: new Date('2026-02-05T10:00:00Z'),
+      });
+
+      const result = await service.getLastScreenshot(mockOrganizationId, mockDisplayId);
+
+      expect(result).toEqual({
+        url: 'https://example.com/legacy-screenshot.png',
+        capturedAt: new Date('2026-02-05T10:00:00Z'),
+      });
+    });
+  });
+
+  describe('saveScreenshot', () => {
+    it('should save screenshot metadata', async () => {
+      databaseService.display.update.mockResolvedValue(mockDisplay);
+
+      await service.saveScreenshot(
+        mockDisplayId,
+        'https://example.com/screenshot.png',
+        1920,
+        1080,
+      );
+
+      expect(databaseService.display.update).toHaveBeenCalledWith({
+        where: { id: mockDisplayId },
+        data: {
+          lastScreenshot: JSON.stringify({
+            url: 'https://example.com/screenshot.png',
+            width: 1920,
+            height: 1080,
+          }),
+          lastScreenshotAt: expect.any(Date),
+        },
+      });
+    });
+
+    it('should save screenshot without dimensions', async () => {
+      databaseService.display.update.mockResolvedValue(mockDisplay);
+
+      await service.saveScreenshot(
+        mockDisplayId,
+        'https://example.com/screenshot.png',
+      );
+
+      expect(databaseService.display.update).toHaveBeenCalledWith({
+        where: { id: mockDisplayId },
+        data: {
+          lastScreenshot: JSON.stringify({
+            url: 'https://example.com/screenshot.png',
+          }),
+          lastScreenshotAt: expect.any(Date),
+        },
+      });
     });
   });
 });

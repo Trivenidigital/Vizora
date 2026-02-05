@@ -22,7 +22,7 @@ module.exports = {
     '^@vizora/database$': '<rootDir>/../test/__mocks__/database.ts',
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(@vizora|isomorphic-dompurify|@exodus|html-encoding-sniffer|jsdom)/)',
+    'node_modules/(?!(@vizora|isomorphic-dompurify|@exodus|html-encoding-sniffer|jsdom|uuid)/)',
   ],
   setupFiles: ['reflect-metadata'],
   setupFilesAfterEnv: ['<rootDir>/../test/setup.ts'],

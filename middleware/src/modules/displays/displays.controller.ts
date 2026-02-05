@@ -15,6 +15,7 @@ import { DisplaysService } from './displays.service';
 import { CreateDisplayDto } from './dto/create-display.dto';
 import { UpdateDisplayDto } from './dto/update-display.dto';
 import { BulkDisplayIdsDto, BulkAssignPlaylistDto, BulkAssignGroupDto } from './dto/bulk-operations.dto';
+import { ScreenshotResponseDto, ScreenshotResultDto } from './dto/screenshot.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
@@ -151,5 +152,38 @@ export class DisplaysController {
       body.contentId,
       body.duration,
     );
+  }
+
+  @Post(':id/screenshot')
+  @Roles('admin', 'manager')
+  async requestScreenshot(
+    @Param('id') id: string,
+    @CurrentUser('organizationId') organizationId: string,
+  ): Promise<ScreenshotResponseDto> {
+    const { requestId } = await this.displaysService.requestScreenshot(organizationId, id);
+    return {
+      requestId,
+      status: 'pending',
+    };
+  }
+
+  @Get(':id/screenshot')
+  @Roles('admin', 'manager', 'viewer')
+  async getScreenshot(
+    @Param('id') id: string,
+    @CurrentUser('organizationId') organizationId: string,
+  ): Promise<ScreenshotResultDto | null> {
+    const screenshot = await this.displaysService.getLastScreenshot(organizationId, id);
+
+    if (!screenshot) {
+      return null;
+    }
+
+    return {
+      url: screenshot.url,
+      capturedAt: screenshot.capturedAt.toISOString(),
+      width: screenshot.width,
+      height: screenshot.height,
+    };
   }
 }

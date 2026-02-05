@@ -35,6 +35,7 @@ import {
   Bell,
   Sun,
   Moon,
+  RefreshCw,
 } from 'lucide-react';
 
 export const ICON_SIZES = {
@@ -108,6 +109,7 @@ export const iconMap = {
   bell: Bell,
   sun: Sun,
   moon: Moon,
+  refresh: RefreshCw,
 } as const;
 
 export type IconName = keyof typeof iconMap;

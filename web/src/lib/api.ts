@@ -547,6 +547,12 @@ class ApiClient {
     });
   }
 
+  async duplicateSchedule(id: string): Promise<Schedule> {
+    return this.request<Schedule>(`/schedules/${id}/duplicate`, {
+      method: 'POST',
+    });
+  }
+
   // Generic HTTP methods
   async post<T = unknown>(endpoint: string, body?: unknown): Promise<T> {
     return this.request<T>(endpoint, {
@@ -834,6 +840,22 @@ class ApiClient {
     return this.request<void>(`/notifications/${id}/dismiss`, {
       method: 'PATCH',
     });
+  }
+
+  // Device Screenshots
+  async requestDeviceScreenshot(displayId: string): Promise<{ requestId: string; status: string }> {
+    return this.request<{ requestId: string; status: string }>(
+      `/displays/${displayId}/screenshot`,
+      {
+        method: 'POST',
+      },
+    );
+  }
+
+  async getDeviceScreenshot(displayId: string): Promise<{ url: string; capturedAt: string; width?: number; height?: number } | null> {
+    return this.request<{ url: string; capturedAt: string; width?: number; height?: number } | null>(
+      `/displays/${displayId}/screenshot`,
+    );
   }
 }
 

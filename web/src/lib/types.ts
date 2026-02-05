@@ -114,3 +114,10 @@ export interface AppNotification {
   userId?: string;
   createdAt: string;
 }
+
+export interface ScreenshotResponse {
+  url: string;
+  capturedAt: string;
+  width?: number;
+  height?: number;
+}

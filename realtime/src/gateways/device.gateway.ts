@@ -16,6 +16,7 @@ import { PlaylistService } from '../services/playlist.service';
 import { NotificationService } from '../services/notification.service';
 import { MetricsService } from '../metrics/metrics.service';
 import { DatabaseService } from '../database/database.service';
+import { StorageService } from '../storage/storage.service';
 import { WsValidationPipe } from './pipes/ws-validation.pipe';
 import {
   HeartbeatMessageDto,
@@ -62,6 +63,7 @@ export class DeviceGateway
     private notificationService: NotificationService,
     private metricsService: MetricsService,
     private databaseService: DatabaseService,
+    private storageService: StorageService,
   ) {}
 
   async handleConnection(client: Socket) {
@@ -552,5 +554,82 @@ export class DeviceGateway
     this.logger.log(`Client ${client.id} left room: ${data.room}`);
 
     return createSuccessResponse({ left: true, room: data.room });
+  }
+
+  /**
+   * Handle screenshot response from device
+   * Device sends base64-encoded image data which we upload to MinIO
+   */
+  @SubscribeMessage('screenshot:response')
+  async handleScreenshotResponse(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: {
+      requestId: string;
+      imageData: string;
+      width: number;
+      height: number;
+      timestamp: string;
+    },
+  ) {
+    const deviceId = client.data.deviceId;
+    const organizationId = client.data.organizationId;
+
+    this.logger.log(`Screenshot received from device ${deviceId} (requestId: ${data.requestId})`);
+
+    try {
+      // Validate MinIO is available
+      if (!this.storageService.isMinioAvailable()) {
+        this.logger.error('MinIO not available, cannot save screenshot');
+        return createErrorResponse('Storage service unavailable');
+      }
+
+      // Convert base64 to buffer
+      const imageBuffer = Buffer.from(data.imageData, 'base64');
+
+      // Generate object key
+      const objectKey = this.storageService.generateScreenshotKey(organizationId, deviceId);
+
+      // Upload to MinIO
+      await this.storageService.uploadScreenshot(imageBuffer, objectKey);
+
+      // Generate presigned URL (valid for 7 days)
+      const presignedUrl = await this.storageService.getPresignedUrl(objectKey, 7 * 24 * 3600);
+
+      // Update display record in database
+      await this.databaseService.display.update({
+        where: { id: deviceId },
+        data: {
+          lastScreenshot: JSON.stringify({
+            url: presignedUrl,
+            width: data.width,
+            height: data.height,
+          }),
+          lastScreenshotAt: new Date(),
+        },
+      });
+
+      this.logger.log(`Screenshot saved for device ${deviceId}: ${objectKey}`);
+
+      // Emit screenshot:ready event to organization room so dashboard can update
+      this.server.to(`org:${organizationId}`).emit('screenshot:ready', {
+        deviceId,
+        requestId: data.requestId,
+        url: presignedUrl,
+        width: data.width,
+        height: data.height,
+        capturedAt: data.timestamp,
+        timestamp: new Date().toISOString(),
+      });
+
+      return createSuccessResponse({ saved: true });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to save screenshot for ${deviceId}: ${errorMessage}`);
+      Sentry.captureException(error, {
+        tags: { deviceId, event: 'screenshot:response' },
+      });
+      return createErrorResponse('Failed to save screenshot');
+    }
   }
 }

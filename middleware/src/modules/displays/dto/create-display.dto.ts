@@ -21,6 +21,13 @@ export class CreateDisplayDto {
   @IsEnum(['online', 'offline', 'error'])
   status?: string;
 
+  /**
+   * Display orientation setting
+   * - 'landscape': Standard horizontal orientation (0° rotation)
+   * - 'portrait': Vertical orientation (90° clockwise rotation)
+   * - 'landscape_flipped': Upside-down horizontal (180° rotation)
+   * - 'portrait_flipped': Vertical inverted (270° clockwise rotation)
+   */
   @IsOptional()
   @IsEnum(['landscape', 'portrait', 'landscape_flipped', 'portrait_flipped'])
   orientation?: string;

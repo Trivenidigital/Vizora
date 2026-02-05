@@ -13,6 +13,7 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import EmptyState from '@/components/EmptyState';
 import SearchFilter from '@/components/SearchFilter';
 import ContentTagger, { ContentTag } from '@/components/ContentTagger';
+import { ViewToggle, getInitialView } from '@/components/ViewToggle';
 import { useToast } from '@/lib/hooks/useToast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { useRealtimeEvents, useOptimisticState, useErrorRecovery } from '@/lib/hooks';
@@ -49,7 +50,7 @@ export default function ContentPage() {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 300);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(getInitialView);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [uploadQueue, setUploadQueue] = useState<Array<{
@@ -697,28 +698,7 @@ export default function ContentPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex bg-white border border-gray-300 rounded-lg overflow-hidden">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`px-4 py-2 text-sm font-medium transition flex items-center gap-2 ${
-                viewMode === 'grid'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              <Icon name="grid" size="md" />
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`px-4 py-2 text-sm font-medium transition flex items-center gap-2 ${
-                viewMode === 'list'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              <Icon name="list" size="md" />
-            </button>
-          </div>
+          <ViewToggle view={viewMode} onChange={setViewMode} />
           <button
             onClick={() => setIsUploadModalOpen(true)}
             className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"

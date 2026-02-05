@@ -415,4 +415,125 @@ export class DisplaysService {
     });
     return { added: result.count };
   }
+
+  /**
+   * Request a screenshot from a remote device
+   * Sends a command to the realtime service, which forwards it to the device
+   */
+  async requestScreenshot(organizationId: string, displayId: string): Promise<{ requestId: string }> {
+    // Verify display exists and belongs to organization
+    const display = await this.findOne(organizationId, displayId);
+
+    // Check if device is online
+    if (display.status !== 'online') {
+      throw new ConflictException('Cannot request screenshot from offline device');
+    }
+
+    // Generate unique request ID
+    const requestId = crypto.randomUUID();
+
+    // Send command to realtime service
+    const url = `${this.realtimeUrl}/internal/command`;
+
+    try {
+      await this.circuitBreaker.executeWithFallback(
+        'realtime-service',
+        async () => {
+          await firstValueFrom(
+            this.httpService.post(url, {
+              displayId,
+              command: 'screenshot',
+              payload: { requestId },
+            }),
+          );
+          this.logger.log(`Screenshot requested for display ${displayId} (requestId: ${requestId})`);
+        },
+        (error) => {
+          if (error) {
+            this.logger.warn(
+              `Failed to send screenshot command to display ${displayId}: ${error.message}`,
+            );
+            throw error;
+          } else {
+            this.logger.warn(
+              `Realtime service circuit is open, cannot send screenshot command to display ${displayId}`,
+            );
+            throw new Error('Realtime service temporarily unavailable');
+          }
+        },
+        REALTIME_CIRCUIT_CONFIG,
+      );
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to request screenshot: ${errorMessage}`);
+      throw new Error('Failed to send screenshot request to device');
+    }
+
+    return { requestId };
+  }
+
+  /**
+   * Get the last captured screenshot for a display
+   */
+  async getLastScreenshot(
+    organizationId: string,
+    displayId: string,
+  ): Promise<{ url: string; capturedAt: Date; width?: number; height?: number } | null> {
+    // Verify display exists and belongs to organization
+    const display = await this.findOne(organizationId, displayId);
+
+    if (!display.lastScreenshot || !display.lastScreenshotAt) {
+      return null;
+    }
+
+    // Parse metadata from lastScreenshot field if it's JSON
+    // Format: { url: string, width?: number, height?: number }
+    let metadata: any = {};
+    try {
+      if (display.lastScreenshot.startsWith('{')) {
+        metadata = JSON.parse(display.lastScreenshot);
+      } else {
+        // Legacy format: just the URL
+        metadata = { url: display.lastScreenshot };
+      }
+    } catch {
+      // Invalid JSON, treat as plain URL
+      metadata = { url: display.lastScreenshot };
+    }
+
+    return {
+      url: metadata.url || display.lastScreenshot,
+      capturedAt: display.lastScreenshotAt,
+      width: metadata.width,
+      height: metadata.height,
+    };
+  }
+
+  /**
+   * Save screenshot metadata after a device uploads one
+   * Called by the realtime service after receiving screenshot data
+   */
+  async saveScreenshot(
+    displayId: string,
+    screenshotUrl: string,
+    width?: number,
+    height?: number,
+  ): Promise<void> {
+    // Store as JSON to include dimensions
+    const metadata = JSON.stringify({
+      url: screenshotUrl,
+      ...(width && { width }),
+      ...(height && { height }),
+    });
+
+    await this.db.display.update({
+      where: { id: displayId },
+      data: {
+        lastScreenshot: metadata,
+        lastScreenshotAt: new Date(),
+      },
+    });
+
+    this.logger.log(`Screenshot saved for display ${displayId}: ${screenshotUrl}`);
+  }
 }
