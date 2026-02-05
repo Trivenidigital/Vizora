@@ -40,6 +40,7 @@ model Organization {
   auditLogs      AuditLog[]
   contentFolders ContentFolder[]
   notifications  Notification[]
+  apiKeys        ApiKey[]
 
   @@index([slug])
   @@index([stripeCustomerId])
@@ -65,6 +66,7 @@ model User {
 
   auditLogs      AuditLog[]
   notifications  Notification[]
+  apiKeys        ApiKey[]
 
   @@index([organizationId])
   @@index([email])
@@ -163,6 +165,7 @@ model Content {
   mimeType    String?
   metadata    Json?    @db.JsonB
   status      String   @default("active") // active, archived, expired
+  templateOrientation  String?  // 'landscape' | 'portrait' | 'both' for template filtering
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -392,4 +395,30 @@ model Notification {
   @@index([organizationId, createdAt])
   @@index([userId])
   @@map("notifications")
+}
+
+// ============================================================================
+// API KEY MANAGEMENT
+// ============================================================================
+
+model ApiKey {
+  id             String    @id @default(cuid())
+  name           String    // User-friendly name
+  prefix         String    // First 8 chars for identification (e.g., "vz_live_")
+  hashedKey      String    // SHA-256 hash of full key
+  lastUsedAt     DateTime?
+  expiresAt      DateTime?
+  revokedAt      DateTime?
+  scopes         String[]  // ['read:content', 'write:playlists', etc.]
+  createdAt      DateTime  @default(now())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  createdById    String?
+  createdBy      User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([prefix])
+  @@map("api_keys")
 }
