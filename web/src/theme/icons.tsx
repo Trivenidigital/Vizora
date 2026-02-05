@@ -32,6 +32,9 @@ import {
   X,
   Check,
   Clock,
+  Bell,
+  Sun,
+  Moon,
 } from 'lucide-react';
 
 export const ICON_SIZES = {
@@ -102,6 +105,9 @@ export const iconMap = {
   close: X,
   check: Check,
   clock: Clock,
+  bell: Bell,
+  sun: Sun,
+  moon: Moon,
 } as const;
 
 export type IconName = keyof typeof iconMap;

@@ -21,6 +21,7 @@ export interface Content {
   status: 'ready' | 'processing' | 'error';
   duration?: number;
   metadata?: Record<string, any>;
+  folderId?: string;
   createdAt: Date | string;
   updatedAt: Date | string;
 }
@@ -87,4 +88,29 @@ export interface DisplayGroup {
   _count?: {
     displays: number;
   };
+}
+
+export interface ContentFolder {
+  id: string;
+  name: string;
+  parentId: string | null;
+  organizationId: string;
+  createdAt: string;
+  updatedAt: string;
+  children?: ContentFolder[];
+  contentCount?: number;
+}
+
+export interface AppNotification {
+  id: string;
+  type: 'device_offline' | 'device_online' | 'content_expired' | 'system';
+  title: string;
+  message: string;
+  severity: 'info' | 'warning' | 'critical';
+  read: boolean;
+  dismissedAt: string | null;
+  metadata?: Record<string, unknown>;
+  organizationId: string;
+  userId?: string;
+  createdAt: string;
 }

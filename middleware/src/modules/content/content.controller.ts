@@ -15,6 +15,8 @@ import {
   MaxFileSizeValidator,
   ParseFilePipe,
   BadRequestException,
+  NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -22,6 +24,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { ContentService } from './content.service';
 import { ThumbnailService } from './thumbnail.service';
 import { FileValidationService } from './file-validation.service';
+import { StorageService } from '../storage/storage.service';
 import { CreateContentDto } from './dto/create-content.dto';
 import { UpdateContentDto } from './dto/update-content.dto';
 import { ReplaceFileDto } from './dto/replace-file.dto';
@@ -34,13 +37,19 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import * as fs from 'fs';
 import * as path from 'path';
 
+// Prefix used to identify MinIO-stored content
+const MINIO_URL_PREFIX = 'minio://';
+
 @UseGuards(RolesGuard)
 @Controller('content')
 export class ContentController {
+  private readonly logger = new Logger(ContentController.name);
+
   constructor(
     private readonly contentService: ContentService,
     private readonly thumbnailService: ThumbnailService,
     private readonly fileValidationService: FileValidationService,
+    private readonly storageService: StorageService,
   ) {}
 
   @Post()
@@ -81,27 +90,41 @@ export class ContentController {
       file.originalname,
     );
 
-    // Save file to local uploads directory
-    const uploadsDir = path.join(process.cwd(), 'uploads');
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
-    }
-
+    let fileUrl: string;
     const filename = `${validation.hash}-${safeFilename}`;
-    const filePath = path.join(uploadsDir, filename);
-    fs.writeFileSync(filePath, file.buffer);
 
-    // Use full URL so Electron app can access it via HTTP
-    const baseUrl = process.env.API_BASE_URL || 'http://localhost:3000';
-    const fileUrl = `${baseUrl}/uploads/${filename}`;
+    // Try MinIO first, fall back to local storage
+    if (this.storageService.isMinioAvailable()) {
+      try {
+        const objectKey = this.storageService.generateObjectKey(
+          organizationId,
+          validation.hash,
+          safeFilename,
+        );
+        await this.storageService.uploadFile(file.buffer, objectKey, file.mimetype);
+        // Store with minio:// prefix to identify MinIO-stored content
+        fileUrl = `${MINIO_URL_PREFIX}${objectKey}`;
+        this.logger.debug(`File uploaded to MinIO: ${objectKey}`);
+      } catch (error) {
+        this.logger.warn(`MinIO upload failed, falling back to local storage: ${error}`);
+        // Fall back to local storage
+        fileUrl = await this.saveFileLocally(filename, file.buffer);
+      }
+    } else {
+      // MinIO not available, use local storage
+      fileUrl = await this.saveFileLocally(filename, file.buffer);
+    }
 
     // Determine the content type from the file mimetype
     const contentType = type || (file.mimetype.startsWith('video/') ? 'video' :
                                  file.mimetype.startsWith('image/') ? 'image' :
                                  file.mimetype === 'application/pdf' ? 'pdf' : 'url');
 
-    // For images, use the image URL as the thumbnail
-    const thumbnailUrl = contentType === 'image' ? fileUrl : undefined;
+    // For images stored locally, use the URL as thumbnail
+    // For MinIO images, thumbnail will be generated on demand
+    const thumbnailUrl = contentType === 'image' && !fileUrl.startsWith(MINIO_URL_PREFIX)
+      ? fileUrl
+      : undefined;
 
     // Create content record (fileHash stored in metadata since not in schema)
     const content = await this.contentService.create(organizationId, {
@@ -121,6 +144,22 @@ export class ContentController {
     };
   }
 
+  /**
+   * Helper to save file to local uploads directory
+   */
+  private async saveFileLocally(filename: string, buffer: Buffer): Promise<string> {
+    const uploadsDir = path.join(process.cwd(), 'uploads');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    const filePath = path.join(uploadsDir, filename);
+    fs.writeFileSync(filePath, buffer);
+
+    const baseUrl = process.env.API_BASE_URL || 'http://localhost:3000';
+    return `${baseUrl}/uploads/${filename}`;
+  }
+
   @Get()
   findAll(
     @CurrentUser('organizationId') organizationId: string,
@@ -137,6 +176,51 @@ export class ContentController {
     @Param('id') id: string,
   ) {
     return this.contentService.findOne(organizationId, id);
+  }
+
+  /**
+   * Get a download URL for content
+   * For MinIO-stored content, generates a presigned URL
+   * For local content, returns the direct URL
+   */
+  @Get(':id/download')
+  async getDownloadUrl(
+    @CurrentUser('organizationId') organizationId: string,
+    @Param('id') id: string,
+    @Query('expirySeconds') expirySeconds?: string,
+  ): Promise<{ url: string; expiresIn: number }> {
+    const content = await this.contentService.findOne(organizationId, id);
+
+    if (!content.url) {
+      throw new NotFoundException('Content has no associated file');
+    }
+
+    // Check if content is stored in MinIO
+    if (content.url.startsWith(MINIO_URL_PREFIX)) {
+      const objectKey = content.url.substring(MINIO_URL_PREFIX.length);
+      const expiry = expirySeconds ? parseInt(expirySeconds, 10) : 3600;
+
+      if (!this.storageService.isMinioAvailable()) {
+        throw new BadRequestException('Storage service is currently unavailable');
+      }
+
+      try {
+        const presignedUrl = await this.storageService.getPresignedUrl(objectKey, expiry);
+        return {
+          url: presignedUrl,
+          expiresIn: expiry,
+        };
+      } catch (error) {
+        this.logger.error(`Failed to generate presigned URL for ${id}: ${error}`);
+        throw new BadRequestException('Failed to generate download URL');
+      }
+    }
+
+    // For local/external URLs, return directly (no expiration)
+    return {
+      url: content.url,
+      expiresIn: 0, // 0 indicates no expiration
+    };
   }
 
   @Patch(':id')
@@ -223,24 +307,35 @@ export class ContentController {
       file.originalname,
     );
 
-    // Save file to local uploads directory
-    const uploadsDir = path.join(process.cwd(), 'uploads');
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
-    }
-
+    let fileUrl: string;
     const filename = `${validation.hash}-${safeFilename}`;
-    const filePath = path.join(uploadsDir, filename);
-    fs.writeFileSync(filePath, file.buffer);
 
-    const baseUrl = process.env.API_BASE_URL || 'http://localhost:3000';
-    const fileUrl = `${baseUrl}/uploads/${filename}`;
+    // Try MinIO first, fall back to local storage
+    if (this.storageService.isMinioAvailable()) {
+      try {
+        const objectKey = this.storageService.generateObjectKey(
+          organizationId,
+          validation.hash,
+          safeFilename,
+        );
+        await this.storageService.uploadFile(file.buffer, objectKey, file.mimetype);
+        fileUrl = `${MINIO_URL_PREFIX}${objectKey}`;
+        this.logger.debug(`Replacement file uploaded to MinIO: ${objectKey}`);
+      } catch (error) {
+        this.logger.warn(`MinIO upload failed for replacement, falling back to local: ${error}`);
+        fileUrl = await this.saveFileLocally(filename, file.buffer);
+      }
+    } else {
+      fileUrl = await this.saveFileLocally(filename, file.buffer);
+    }
 
     // Determine thumbnail for images
     const contentType = file.mimetype.startsWith('video/') ? 'video' :
                        file.mimetype.startsWith('image/') ? 'image' :
                        file.mimetype === 'application/pdf' ? 'pdf' : 'url';
-    const thumbnailUrl = contentType === 'image' ? fileUrl : undefined;
+    const thumbnailUrl = contentType === 'image' && !fileUrl.startsWith(MINIO_URL_PREFIX)
+      ? fileUrl
+      : undefined;
 
     const content = await this.contentService.replaceFile(
       organizationId,

@@ -13,6 +13,7 @@ import { JwtService } from '@nestjs/jwt';
 import { RedisService } from '../services/redis.service';
 import { HeartbeatService } from '../services/heartbeat.service';
 import { PlaylistService } from '../services/playlist.service';
+import { NotificationService } from '../services/notification.service';
 import { MetricsService } from '../metrics/metrics.service';
 import { DatabaseService } from '../database/database.service';
 import { WsValidationPipe } from './pipes/ws-validation.pipe';
@@ -58,6 +59,7 @@ export class DeviceGateway
     private redisService: RedisService,
     private heartbeatService: HeartbeatService,
     private playlistService: PlaylistService,
+    private notificationService: NotificationService,
     private metricsService: MetricsService,
     private databaseService: DatabaseService,
   ) {}
@@ -119,6 +121,35 @@ export class DeviceGateway
       }
 
       this.logger.log(`Device connected: ${deviceId} (${client.id})`);
+
+      // Cancel any pending offline notification for this device
+      const wasOfflineLong = await this.notificationService.wasDeviceOfflineLong(deviceId);
+      await this.notificationService.cancelOfflineNotification(deviceId);
+
+      // If the device was offline for > 2 minutes, create an "online" notification
+      if (wasOfflineLong) {
+        try {
+          const device = await this.databaseService.display.findUnique({
+            where: { id: deviceId },
+            select: { nickname: true, deviceIdentifier: true },
+          });
+          const deviceName = device?.nickname || device?.deviceIdentifier || deviceId;
+          await this.notificationService.createOnlineNotification(
+            deviceId,
+            deviceName,
+            payload.organizationId,
+          );
+          // Emit notification to dashboard
+          this.server.to(`org:${payload.organizationId}`).emit('notification:new', {
+            type: 'device_online',
+            deviceId,
+            deviceName,
+            timestamp: new Date().toISOString(),
+          });
+        } catch (notifError) {
+          this.logger.warn(`Failed to create online notification for device ${deviceId}`);
+        }
+      }
 
       // Record metrics
       this.metricsService.recordConnection(payload.organizationId, 'connected');
@@ -219,17 +250,31 @@ export class DeviceGateway
       });
 
       // Also update in database so dashboard sees current status
+      let deviceName = deviceId;
       try {
-        await this.databaseService.display.update({
+        const device = await this.databaseService.display.update({
           where: { id: deviceId },
           data: {
             status: 'offline',
             lastHeartbeat: new Date(),
           },
+          select: { nickname: true, deviceIdentifier: true },
         });
+        deviceName = device?.nickname || device?.deviceIdentifier || deviceId;
       } catch (dbError: unknown) {
         const errorMessage = dbError instanceof Error ? dbError.message : 'Unknown error';
         this.logger.warn(`Failed to update database for device ${deviceId}: ${errorMessage}`);
+      }
+
+      // Schedule an offline notification (will fire after 2 minutes if device doesn't reconnect)
+      try {
+        await this.notificationService.scheduleOfflineNotification(
+          deviceId,
+          deviceName,
+          client.data.organizationId,
+        );
+      } catch (notifError) {
+        this.logger.warn(`Failed to schedule offline notification for device ${deviceId}`);
       }
 
       this.logger.log(`Device disconnected: ${deviceId} (${client.id})`);

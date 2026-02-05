@@ -12,12 +12,14 @@ import { ContentController } from './content.controller';
 import { ContentService } from './content.service';
 import { ThumbnailService } from './thumbnail.service';
 import { FileValidationService } from './file-validation.service';
+import { StorageService } from '../storage/storage.service';
 
 describe('ContentController', () => {
   let controller: ContentController;
   let mockContentService: jest.Mocked<ContentService>;
   let mockThumbnailService: jest.Mocked<ThumbnailService>;
   let mockFileValidationService: jest.Mocked<FileValidationService>;
+  let mockStorageService: jest.Mocked<StorageService>;
 
   const organizationId = 'org-123';
 
@@ -62,12 +64,27 @@ describe('ContentController', () => {
       sanitizeFilename: jest.fn(),
     } as any;
 
+    mockStorageService = {
+      isMinioAvailable: jest.fn().mockReturnValue(false),
+      uploadFile: jest.fn(),
+      getPresignedUrl: jest.fn(),
+      deleteFile: jest.fn(),
+      generateObjectKey: jest.fn(),
+      fileExists: jest.fn(),
+      getFileMetadata: jest.fn(),
+      healthCheck: jest.fn(),
+      listObjects: jest.fn(),
+      copyFile: jest.fn(),
+      getBucket: jest.fn().mockReturnValue('vizora-content'),
+    } as any;
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ContentController],
       providers: [
         { provide: ContentService, useValue: mockContentService },
         { provide: ThumbnailService, useValue: mockThumbnailService },
         { provide: FileValidationService, useValue: mockFileValidationService },
+        { provide: StorageService, useValue: mockStorageService },
       ],
     }).compile();
 

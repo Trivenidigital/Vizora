@@ -38,3 +38,6 @@ export type {
   ErrorInfo,
   UseErrorRecoveryOptions,
 } from './useErrorRecovery';
+
+// Notifications hook
+export { useNotifications } from './useNotifications';
