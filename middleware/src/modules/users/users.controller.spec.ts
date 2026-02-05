@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 
@@ -72,6 +73,12 @@ describe('UsersController', () => {
       expect(result).toEqual(expectedUser);
       expect(mockUsersService.findOne).toHaveBeenCalledWith(organizationId, 'user-1');
     });
+
+    it('should propagate NotFoundException from service', async () => {
+      mockUsersService.findOne.mockRejectedValue(new NotFoundException());
+
+      await expect(controller.findOne(organizationId, 'invalid-id')).rejects.toThrow(NotFoundException);
+    });
   });
 
   describe('invite', () => {
@@ -93,6 +100,14 @@ describe('UsersController', () => {
 
       expect(result).toEqual(expectedResult);
       expect(mockUsersService.invite).toHaveBeenCalledWith(organizationId, inviteDto, userId);
+    });
+
+    it('should propagate ConflictException for duplicate email', async () => {
+      mockUsersService.invite.mockRejectedValue(new ConflictException('A user with this email already exists'));
+
+      await expect(
+        controller.invite(organizationId, userId, { email: 'duplicate@test.com', firstName: 'X', lastName: 'Y', role: 'viewer' } as any),
+      ).rejects.toThrow(ConflictException);
     });
   });
 
@@ -119,6 +134,14 @@ describe('UsersController', () => {
 
       expect(result).toEqual(expectedUser);
       expect(mockUsersService.deactivate).toHaveBeenCalledWith(organizationId, 'user-1', userId);
+    });
+
+    it('should propagate BadRequestException for self-deactivation', async () => {
+      mockUsersService.deactivate.mockRejectedValue(new BadRequestException('Cannot deactivate your own account'));
+
+      await expect(
+        controller.deactivate(organizationId, userId, userId),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });

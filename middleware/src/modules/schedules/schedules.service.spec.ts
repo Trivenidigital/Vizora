@@ -553,6 +553,134 @@ describe('SchedulesService', () => {
         }),
       );
     });
+
+    it('should treat all-day schedules (null times) as always conflicting', async () => {
+      databaseService.schedule.findMany.mockResolvedValue([
+        {
+          id: 'schedule-allday',
+          name: 'All Day Schedule',
+          startTime: null,
+          endTime: null,
+          daysOfWeek: [1, 2, 3],
+          playlist: { id: 'p-1', name: 'Playlist 1' },
+          display: { id: 'display-1', nickname: 'Display 1' },
+          displayGroup: null,
+        },
+      ]);
+
+      const result = await service.checkConflicts('org-123', {
+        displayId: 'display-1',
+        daysOfWeek: [1, 2, 3],
+        startTime: '09:00',
+        endTime: '10:00',
+      });
+
+      expect(result.hasConflicts).toBe(true);
+      expect(result.conflicts).toHaveLength(1);
+      expect(result.conflicts[0].name).toBe('All Day Schedule');
+    });
+
+    it('should not flag adjacent time slots as conflicts (10:00 end vs 10:00 start)', async () => {
+      databaseService.schedule.findMany.mockResolvedValue([
+        {
+          id: 'schedule-1',
+          name: 'Morning Schedule',
+          startTime: '10:00',
+          endTime: '11:00',
+          daysOfWeek: [1, 2],
+          playlist: { id: 'p-1', name: 'Playlist 1' },
+          display: { id: 'display-1', nickname: 'Display 1' },
+          displayGroup: null,
+        },
+      ]);
+
+      const result = await service.checkConflicts('org-123', {
+        displayId: 'display-1',
+        daysOfWeek: [1, 2],
+        startTime: '09:00',
+        endTime: '10:00',
+      });
+
+      expect(result.hasConflicts).toBe(false);
+      expect(result.conflicts).toHaveLength(0);
+    });
+
+    it('should detect multiple conflicts on the same display', async () => {
+      databaseService.schedule.findMany.mockResolvedValue([
+        {
+          id: 'schedule-1',
+          name: 'Morning Meeting',
+          startTime: '09:00',
+          endTime: '10:00',
+          daysOfWeek: [1],
+          playlist: { id: 'p-1', name: 'Playlist 1' },
+          display: { id: 'display-1', nickname: 'Display 1' },
+          displayGroup: null,
+        },
+        {
+          id: 'schedule-2',
+          name: 'Training Session',
+          startTime: '09:30',
+          endTime: '10:30',
+          daysOfWeek: [1],
+          playlist: { id: 'p-2', name: 'Playlist 2' },
+          display: { id: 'display-1', nickname: 'Display 1' },
+          displayGroup: null,
+        },
+      ]);
+
+      const result = await service.checkConflicts('org-123', {
+        displayId: 'display-1',
+        daysOfWeek: [1],
+        startTime: '09:00',
+        endTime: '10:00',
+      });
+
+      expect(result.hasConflicts).toBe(true);
+      expect(result.conflicts).toHaveLength(2);
+    });
+
+    it('should filter by displayGroupId when provided', async () => {
+      databaseService.schedule.findMany.mockResolvedValue([]);
+
+      await service.checkConflicts('org-123', {
+        displayGroupId: 'group-1',
+        daysOfWeek: [1, 2],
+        startTime: '09:00',
+        endTime: '10:00',
+      });
+
+      expect(databaseService.schedule.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            displayGroupId: 'group-1',
+          }),
+        }),
+      );
+    });
+
+    it('should treat requests without times as always conflicting', async () => {
+      databaseService.schedule.findMany.mockResolvedValue([
+        {
+          id: 'schedule-1',
+          name: 'Timed Schedule',
+          startTime: '09:00',
+          endTime: '17:00',
+          daysOfWeek: [1, 2, 3, 4, 5],
+          playlist: { id: 'p-1', name: 'Playlist 1' },
+          display: { id: 'display-1', nickname: 'Display 1' },
+          displayGroup: null,
+        },
+      ]);
+
+      const result = await service.checkConflicts('org-123', {
+        displayId: 'display-1',
+        daysOfWeek: [1, 2, 3],
+      });
+
+      expect(result.hasConflicts).toBe(true);
+      expect(result.conflicts).toHaveLength(1);
+    });
   });
 
   describe('remove', () => {

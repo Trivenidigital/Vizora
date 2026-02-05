@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { NotFoundException } from '@nestjs/common';
 import { DisplayGroupsController } from './display-groups.controller';
 import { DisplayGroupsService } from './display-groups.service';
 
@@ -82,6 +83,15 @@ describe('DisplayGroupsController', () => {
       const result = await controller.findAll(organizationId, pagination as any);
 
       expect(result).toEqual(expectedResult);
+    });
+
+    it('should pass pagination to service', async () => {
+      const pagination = { page: 2, limit: 5 };
+      mockDisplayGroupsService.findAll.mockResolvedValue({ data: [], meta: { total: 0, page: 2, limit: 5, totalPages: 0 } } as any);
+
+      await controller.findAll(organizationId, pagination as any);
+
+      expect(mockDisplayGroupsService.findAll).toHaveBeenCalledWith(organizationId, pagination);
     });
   });
 
@@ -213,6 +223,20 @@ describe('DisplayGroupsController', () => {
         'group-123',
         manageDto,
       );
+    });
+  });
+
+  describe('error propagation', () => {
+    it('should propagate NotFoundException from findOne', async () => {
+      mockDisplayGroupsService.findOne.mockRejectedValue(new NotFoundException());
+
+      await expect(controller.findOne(organizationId, 'invalid-id')).rejects.toThrow(NotFoundException);
+    });
+
+    it('should propagate NotFoundException from update', async () => {
+      mockDisplayGroupsService.update.mockRejectedValue(new NotFoundException());
+
+      await expect(controller.update(organizationId, 'invalid-id', { name: 'X' } as any)).rejects.toThrow(NotFoundException);
     });
   });
 });

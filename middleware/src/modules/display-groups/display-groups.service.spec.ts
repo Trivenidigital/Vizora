@@ -186,6 +186,21 @@ describe('DisplayGroupsService', () => {
       expect(result.displays).toHaveLength(1);
       expect(result.displays[0].display.name).toBe('Lobby Screen');
     });
+
+    it('should enforce organization isolation in findOne', async () => {
+      mockDatabaseService.displayGroup.findFirst.mockResolvedValue(null);
+
+      await expect(service.findOne('org-different', 'group-123')).rejects.toThrow(NotFoundException);
+
+      expect(mockDatabaseService.displayGroup.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            id: 'group-123',
+            organizationId: 'org-different',
+          }),
+        }),
+      );
+    });
   });
 
   describe('update', () => {
@@ -223,6 +238,16 @@ describe('DisplayGroupsService', () => {
 
       expect(result.description).toBe('Updated description');
     });
+
+    it('should enforce organization isolation in update', async () => {
+      mockDatabaseService.displayGroup.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.update('org-different', 'group-123', { name: 'Hacked' }),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(mockDatabaseService.displayGroup.update).not.toHaveBeenCalled();
+    });
   });
 
   describe('remove', () => {
@@ -239,6 +264,14 @@ describe('DisplayGroupsService', () => {
       mockDatabaseService.displayGroup.findFirst.mockResolvedValue(null);
 
       await expect(service.remove('org-123', 'invalid-id')).rejects.toThrow(NotFoundException);
+    });
+
+    it('should enforce organization isolation in remove', async () => {
+      mockDatabaseService.displayGroup.findFirst.mockResolvedValue(null);
+
+      await expect(service.remove('org-different', 'group-123')).rejects.toThrow(NotFoundException);
+
+      expect(mockDatabaseService.displayGroup.delete).not.toHaveBeenCalled();
     });
   });
 
@@ -291,6 +324,45 @@ describe('DisplayGroupsService', () => {
         }),
       );
     });
+
+    it('should handle adding a single display', async () => {
+      const singleDto = { displayIds: ['display-1'] };
+      const groupWithDisplay = {
+        ...{
+          id: 'group-123',
+          organizationId: 'org-123',
+          name: 'Store Displays',
+          description: 'All retail store displays',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          displays: [],
+        },
+        displays: [
+          { id: 'member-1', displayId: 'display-1', display: { id: 'display-1' } },
+        ],
+      };
+
+      mockDatabaseService.displayGroup.findFirst
+        .mockResolvedValueOnce({
+          id: 'group-123',
+          organizationId: 'org-123',
+          name: 'Store Displays',
+          description: 'All retail store displays',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          displays: [],
+        })
+        .mockResolvedValueOnce(groupWithDisplay);
+      mockDatabaseService.displayGroupMember.createMany.mockResolvedValue({ count: 1 });
+
+      const result = await service.addDisplays('org-123', 'group-123', singleDto);
+
+      expect(result.displays).toHaveLength(1);
+      expect(mockDatabaseService.displayGroupMember.createMany).toHaveBeenCalledWith({
+        data: [{ displayGroupId: 'group-123', displayId: 'display-1' }],
+        skipDuplicates: true,
+      });
+    });
   });
 
   describe('removeDisplays', () => {
@@ -336,6 +408,41 @@ describe('DisplayGroupsService', () => {
           displayId: { in: ['display-1', 'display-2', 'display-3'] },
         },
       });
+    });
+
+    it('should enforce organization isolation in removeDisplays', async () => {
+      mockDatabaseService.displayGroup.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.removeDisplays('org-different', 'group-123', { displayIds: ['display-1'] }),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(mockDatabaseService.displayGroupMember.deleteMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('findAll edge cases', () => {
+    it('should use default pagination when page/limit not specified', async () => {
+      mockDatabaseService.displayGroup.findMany.mockResolvedValue([]);
+      mockDatabaseService.displayGroup.count.mockResolvedValue(0);
+
+      await service.findAll('org-123', {});
+
+      expect(mockDatabaseService.displayGroup.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          skip: 0,
+          take: 10,
+        }),
+      );
+    });
+
+    it('should calculate totalPages correctly', async () => {
+      mockDatabaseService.displayGroup.findMany.mockResolvedValue([]);
+      mockDatabaseService.displayGroup.count.mockResolvedValue(25);
+
+      const result = await service.findAll('org-123', { page: 1, limit: 10 });
+
+      expect(result.meta.totalPages).toBe(3);
     });
   });
 });

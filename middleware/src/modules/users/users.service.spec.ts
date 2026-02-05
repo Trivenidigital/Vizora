@@ -171,6 +171,68 @@ describe('UsersService', () => {
         }),
       );
     });
+
+    it('should generate a 16-character temp password', async () => {
+      db.user.findUnique.mockResolvedValue(null);
+      db.user.create.mockResolvedValue({ id: 'user-new', email: 'new@test.com', role: 'viewer' });
+      db.auditLog.create.mockResolvedValue({});
+
+      const result = await service.invite(organizationId, {
+        email: 'new@test.com',
+        firstName: 'New',
+        lastName: 'User',
+        role: 'viewer',
+      } as any, adminUserId);
+
+      expect(typeof result.tempPassword).toBe('string');
+      expect(result.tempPassword.length).toBe(16);
+    });
+
+    it('should call bcrypt.hash with password and rounds from environment', async () => {
+      const bcrypt = require('bcryptjs');
+      db.user.findUnique.mockResolvedValue(null);
+      db.user.create.mockResolvedValue({ id: 'user-new', email: 'new@test.com', role: 'viewer' });
+      db.auditLog.create.mockResolvedValue({});
+
+      await service.invite(organizationId, {
+        email: 'new@test.com',
+        firstName: 'New',
+        lastName: 'User',
+        role: 'viewer',
+      } as any, adminUserId);
+
+      expect(bcrypt.hash).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Number),
+      );
+    });
+
+    it('should include user data in the invite return value', async () => {
+      const createdUser = {
+        id: 'user-new',
+        email: 'new@test.com',
+        firstName: 'New',
+        lastName: 'User',
+        role: 'viewer',
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      db.user.findUnique.mockResolvedValue(null);
+      db.user.create.mockResolvedValue(createdUser);
+      db.auditLog.create.mockResolvedValue({});
+
+      const result = await service.invite(organizationId, {
+        email: 'new@test.com',
+        firstName: 'New',
+        lastName: 'User',
+        role: 'viewer',
+      } as any, adminUserId);
+
+      expect(result.user).toEqual(createdUser);
+      expect(result).toHaveProperty('user');
+      expect(result).toHaveProperty('tempPassword');
+    });
   });
 
   describe('update', () => {
@@ -227,6 +289,41 @@ describe('UsersService', () => {
         }),
       );
     });
+
+    it('should allow admin to change another user role', async () => {
+      db.user.findFirst.mockResolvedValue(mockUser);
+      db.user.update.mockResolvedValue({ ...mockUser, role: 'manager' });
+      db.auditLog.create.mockResolvedValue({});
+
+      const result = await service.update(organizationId, 'user-1', { role: 'manager' } as any, adminUserId);
+
+      expect(result.role).toBe('manager');
+      expect(db.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { role: 'manager' },
+        }),
+      );
+    });
+
+    it('should throw NotFoundException for nonexistent user on update', async () => {
+      db.user.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.update(organizationId, 'nonexistent', { firstName: 'X' } as any, adminUserId),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(db.user.update).not.toHaveBeenCalled();
+    });
+
+    it('should allow admin to update their own name without error', async () => {
+      db.user.findFirst.mockResolvedValue({ ...mockUser, id: adminUserId, role: 'admin' });
+      db.user.update.mockResolvedValue({ ...mockUser, id: adminUserId, firstName: 'NewName' });
+      db.auditLog.create.mockResolvedValue({});
+
+      const result = await service.update(organizationId, adminUserId, { firstName: 'NewName' } as any, adminUserId);
+
+      expect(result.firstName).toBe('NewName');
+    });
   });
 
   describe('deactivate', () => {
@@ -279,6 +376,21 @@ describe('UsersService', () => {
       await expect(
         service.deactivate(organizationId, 'nonexistent', adminUserId),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should return deactivated user with isActive false', async () => {
+      const deactivatedUser = {
+        ...mockUser,
+        isActive: false,
+      };
+      db.user.findFirst.mockResolvedValue(mockUser);
+      db.user.update.mockResolvedValue(deactivatedUser);
+      db.auditLog.create.mockResolvedValue({});
+
+      const result = await service.deactivate(organizationId, 'user-1', adminUserId);
+
+      expect(result.isActive).toBe(false);
+      expect(result.email).toBe('alice@test.com');
     });
   });
 });
