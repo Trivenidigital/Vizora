@@ -4,10 +4,10 @@ test.describe('Analytics Dashboard', () => {
   test('should show analytics page', async ({ authenticatedPage }) => {
     await authenticatedPage.goto('/dashboard/analytics');
     await authenticatedPage.waitForLoadState('networkidle');
-    
+
     // Check page loaded
     await expect(authenticatedPage.locator('h2').filter({ hasText: 'Analytics' })).toBeVisible({ timeout: 10000 });
-    
+
     // Check subtitle
     await expect(authenticatedPage.locator('text=/performance metrics and insights/i')).toBeVisible();
   });
@@ -15,47 +15,48 @@ test.describe('Analytics Dashboard', () => {
   test('should display key metrics cards', async ({ authenticatedPage }) => {
     await authenticatedPage.goto('/dashboard/analytics');
     await authenticatedPage.waitForLoadState('networkidle');
-    
-    // Check for metrics cards
-    await expect(authenticatedPage.locator('text=Total Impressions')).toBeVisible({ timeout: 10000 });
-    await expect(authenticatedPage.locator('text=Avg. Play Time')).toBeVisible();
-    await expect(authenticatedPage.locator('text=Uptime')).toBeVisible();
+
+    // Check for metrics cards (updated to match current UI)
+    await expect(authenticatedPage.locator('text=Total Devices')).toBeVisible({ timeout: 10000 });
+    await expect(authenticatedPage.locator('text=Content Served')).toBeVisible();
+    await expect(authenticatedPage.locator('text=System Uptime')).toBeVisible();
   });
 
   test('should show metrics values', async ({ authenticatedPage }) => {
     await authenticatedPage.goto('/dashboard/analytics');
     await authenticatedPage.waitForLoadState('networkidle');
-    
-    // Check for metric values (from mock data)
-    await expect(authenticatedPage.locator('text=12,543')).toBeVisible({ timeout: 10000 });
-    await expect(authenticatedPage.locator('text=4.2m')).toBeVisible();
+
+    // Check for metric values (updated to match current UI)
+    await expect(authenticatedPage.locator('text=366')).toBeVisible({ timeout: 10000 });
+    await expect(authenticatedPage.locator('text=12.5K')).toBeVisible();
     await expect(authenticatedPage.locator('text=98.5%')).toBeVisible();
   });
 
   test('should show growth indicators', async ({ authenticatedPage }) => {
     await authenticatedPage.goto('/dashboard/analytics');
     await authenticatedPage.waitForLoadState('networkidle');
-    
-    // Check for growth/comparison text
-    await expect(authenticatedPage.locator('text=/from last week/i')).toBeVisible({ timeout: 10000 });
-    await expect(authenticatedPage.locator('text=/per device per day/i')).toBeVisible();
-    await expect(authenticatedPage.locator('text=/above target/i')).toBeVisible();
+
+    // Check for growth/comparison text (use first() to avoid strict mode violation)
+    await expect(authenticatedPage.locator('text=/from last month/i').first()).toBeVisible({ timeout: 10000 });
+    await expect(authenticatedPage.locator('text=/above target/i').first()).toBeVisible();
   });
 
-  test('should show coming soon message', async ({ authenticatedPage }) => {
+  test('should display date range buttons', async ({ authenticatedPage }) => {
     await authenticatedPage.goto('/dashboard/analytics');
     await authenticatedPage.waitForLoadState('networkidle');
-    
-    // Check for coming soon section
-    await expect(authenticatedPage.locator('text=Analytics Dashboard Coming Soon')).toBeVisible({ timeout: 10000 });
-    await expect(authenticatedPage.locator('text=/detailed analytics and reporting/i')).toBeVisible();
+
+    // Check for date range buttons
+    await expect(authenticatedPage.locator('button').filter({ hasText: 'week' })).toBeVisible({ timeout: 10000 });
+    await expect(authenticatedPage.locator('button').filter({ hasText: 'month' })).toBeVisible();
+    await expect(authenticatedPage.locator('button').filter({ hasText: 'year' })).toBeVisible();
   });
 
-  test('should display analytics icon', async ({ authenticatedPage }) => {
+  test('should display chart sections', async ({ authenticatedPage }) => {
     await authenticatedPage.goto('/dashboard/analytics');
     await authenticatedPage.waitForLoadState('networkidle');
-    
-    // Check for chart emoji/icon (use first() to avoid strict mode violation)
-    await expect(authenticatedPage.locator('text=📊').first()).toBeVisible({ timeout: 10000 });
+
+    // Check for chart sections
+    await expect(authenticatedPage.locator('text=Device Uptime Timeline')).toBeVisible({ timeout: 10000 });
+    await expect(authenticatedPage.locator('text=Content Performance')).toBeVisible();
   });
 });

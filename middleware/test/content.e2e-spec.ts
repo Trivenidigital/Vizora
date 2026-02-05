@@ -1,3 +1,11 @@
+// Mock isomorphic-dompurify before importing modules
+jest.mock('isomorphic-dompurify', () => ({
+  __esModule: true,
+  default: {
+    sanitize: jest.fn((html: string) => html.replace(/<script[^>]*>.*?<\/script>/gi, '')),
+  },
+}));
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
@@ -452,6 +460,431 @@ describe('Content (e2e)', () => {
         .expect((res) => {
           db.content.delete({ where: { id: res.body.id } }).catch(() => {});
         });
+    });
+  });
+
+  // ============================================================================
+  // CONTENT TEMPLATES
+  // ============================================================================
+
+  describe('Content Templates', () => {
+    let templateId: string;
+
+    const testTemplate = {
+      name: 'Menu Board Template',
+      description: 'Restaurant menu display template',
+      templateHtml: '<h1>{{title}}</h1><ul>{{#each items}}<li>{{name}} - ${{price}}</li>{{/each}}</ul>',
+      dataSource: {
+        type: 'manual',
+        manualData: {
+          title: 'Today\'s Menu',
+          items: [
+            { name: 'Burger', price: '9.99' },
+            { name: 'Fries', price: '3.99' },
+          ],
+        },
+      },
+      refreshConfig: {
+        enabled: false,
+        intervalMinutes: 15,
+      },
+      sampleData: {
+        title: 'Sample Menu',
+        items: [{ name: 'Sample Item', price: '0.00' }],
+      },
+      duration: 30,
+    };
+
+    afterAll(async () => {
+      if (templateId) {
+        await db.content.delete({ where: { id: templateId } }).catch(() => {});
+      }
+    });
+
+    describe('/api/content/templates (POST)', () => {
+      it('should create a new template', () => {
+        return request(app.getHttpServer())
+          .post('/api/content/templates')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send(testTemplate)
+          .expect(201)
+          .expect((res) => {
+            expect(res.body).toHaveProperty('id');
+            expect(res.body.name).toBe(testTemplate.name);
+            expect(res.body.type).toBe('template');
+            expect(res.body.organizationId).toBe(organizationId);
+            expect(res.body.metadata).toHaveProperty('templateHtml');
+            expect(res.body.metadata).toHaveProperty('renderedHtml');
+
+            templateId = res.body.id;
+          });
+      });
+
+      it('should reject template creation without auth', () => {
+        return request(app.getHttpServer())
+          .post('/api/content/templates')
+          .send(testTemplate)
+          .expect(401);
+      });
+
+      it('should reject template with script tags', () => {
+        return request(app.getHttpServer())
+          .post('/api/content/templates')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send({
+            ...testTemplate,
+            name: 'Malicious Template',
+            templateHtml: '<script>alert("xss")</script><h1>{{title}}</h1>',
+          })
+          .expect(400)
+          .expect((res) => {
+            expect(res.body.message).toContain('validation failed');
+          });
+      });
+
+      it('should reject template with iframe tags', () => {
+        return request(app.getHttpServer())
+          .post('/api/content/templates')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send({
+            ...testTemplate,
+            name: 'Iframe Template',
+            templateHtml: '<iframe src="https://evil.com"></iframe>',
+          })
+          .expect(400);
+      });
+
+      it('should reject template with onclick handlers', () => {
+        return request(app.getHttpServer())
+          .post('/api/content/templates')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send({
+            ...testTemplate,
+            name: 'Event Handler Template',
+            templateHtml: '<button onclick="alert(1)">Click</button>',
+          })
+          .expect(400);
+      });
+
+      it('should reject template with javascript: URLs', () => {
+        return request(app.getHttpServer())
+          .post('/api/content/templates')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send({
+            ...testTemplate,
+            name: 'JS URL Template',
+            templateHtml: '<a href="javascript:alert(1)">Click</a>',
+          })
+          .expect(400);
+      });
+
+      it('should reject template without required fields', () => {
+        return request(app.getHttpServer())
+          .post('/api/content/templates')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send({
+            name: 'Incomplete Template',
+            // Missing templateHtml, dataSource, refreshConfig
+          })
+          .expect(400);
+      });
+
+      it('should create template with REST API data source', async () => {
+        const res = await request(app.getHttpServer())
+          .post('/api/content/templates')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send({
+            ...testTemplate,
+            name: 'API Template',
+            dataSource: {
+              type: 'rest_api',
+              url: 'https://api.example.com/menu',
+              method: 'GET',
+              headers: { 'X-API-Key': 'test-key' },
+              jsonPath: '$.data',
+            },
+          })
+          .expect(201);
+
+        expect(res.body.metadata.dataSource.type).toBe('rest_api');
+        expect(res.body.metadata.dataSource.url).toBe('https://api.example.com/menu');
+
+        await db.content.delete({ where: { id: res.body.id } }).catch(() => {});
+      });
+    });
+
+    describe('/api/content/templates/:id (PATCH)', () => {
+      it('should update template', () => {
+        return request(app.getHttpServer())
+          .patch(`/api/content/templates/${templateId}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .send({
+            name: 'Updated Menu Board',
+            templateHtml: '<h2>{{title}}</h2>',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.name).toBe('Updated Menu Board');
+          });
+      });
+
+      it('should update refresh config', () => {
+        return request(app.getHttpServer())
+          .patch(`/api/content/templates/${templateId}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .send({
+            refreshConfig: {
+              enabled: true,
+              intervalMinutes: 30,
+            },
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.metadata.refreshConfig.enabled).toBe(true);
+            expect(res.body.metadata.refreshConfig.intervalMinutes).toBe(30);
+          });
+      });
+
+      it('should reject update with invalid template HTML', () => {
+        return request(app.getHttpServer())
+          .patch(`/api/content/templates/${templateId}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .send({
+            templateHtml: '<form action="https://evil.com"><input></form>',
+          })
+          .expect(400);
+      });
+
+      it('should enforce multi-tenant isolation', () => {
+        return request(app.getHttpServer())
+          .patch(`/api/content/templates/${templateId}`)
+          .set('Authorization', `Bearer ${secondUserToken}`)
+          .send({
+            name: 'Hacked Template',
+          })
+          .expect(404);
+      });
+
+      it('should reject update without auth', () => {
+        return request(app.getHttpServer())
+          .patch(`/api/content/templates/${templateId}`)
+          .send({
+            name: 'Unauthorized Update',
+          })
+          .expect(401);
+      });
+    });
+
+    describe('/api/content/templates/preview (POST)', () => {
+      it('should preview template with sample data', () => {
+        return request(app.getHttpServer())
+          .post('/api/content/templates/preview')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send({
+            templateHtml: '<h1>{{title}}</h1>',
+            sampleData: { title: 'Preview Test' },
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.html).toBe('<h1>Preview Test</h1>');
+          });
+      });
+
+      it('should preview template with each loop', () => {
+        return request(app.getHttpServer())
+          .post('/api/content/templates/preview')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send({
+            templateHtml: '{{#each items}}<span>{{this}}</span>{{/each}}',
+            sampleData: { items: ['A', 'B', 'C'] },
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.html).toContain('<span>A</span>');
+            expect(res.body.html).toContain('<span>B</span>');
+            expect(res.body.html).toContain('<span>C</span>');
+          });
+      });
+
+      it('should auto-escape HTML in preview', () => {
+        return request(app.getHttpServer())
+          .post('/api/content/templates/preview')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send({
+            templateHtml: '<div>{{content}}</div>',
+            sampleData: { content: '<script>alert(1)</script>' },
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.html).not.toContain('<script>');
+            expect(res.body.html).toContain('&lt;script&gt;');
+          });
+      });
+
+      it('should reject preview with forbidden tags', () => {
+        return request(app.getHttpServer())
+          .post('/api/content/templates/preview')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send({
+            templateHtml: '<script>alert(1)</script>',
+            sampleData: {},
+          })
+          .expect(400);
+      });
+    });
+
+    describe('/api/content/templates/validate (POST)', () => {
+      it('should validate clean template', () => {
+        return request(app.getHttpServer())
+          .post('/api/content/templates/validate')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send({
+            templateHtml: '<h1>{{title}}</h1><p>{{description}}</p>',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.valid).toBe(true);
+            expect(res.body.errors).toHaveLength(0);
+          });
+      });
+
+      it('should detect script tags in validation', () => {
+        return request(app.getHttpServer())
+          .post('/api/content/templates/validate')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send({
+            templateHtml: '<script>alert("xss")</script>',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.valid).toBe(false);
+            expect(res.body.errors).toContain('Forbidden tag found: <script>');
+          });
+      });
+
+      it('should detect event handlers in validation', () => {
+        return request(app.getHttpServer())
+          .post('/api/content/templates/validate')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send({
+            templateHtml: '<img src="x" onerror="alert(1)">',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.valid).toBe(false);
+            expect(res.body.errors).toContain('Forbidden attribute found: onerror');
+          });
+      });
+
+      it('should warn about unescaped expressions', () => {
+        return request(app.getHttpServer())
+          .post('/api/content/templates/validate')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send({
+            templateHtml: '<div>{{{unsafeContent}}}</div>',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.valid).toBe(false);
+            expect(res.body.errors.some((e: string) => e.includes('Unescaped'))).toBe(true);
+          });
+      });
+    });
+
+    describe('/api/content/templates/:id/rendered (GET)', () => {
+      it('should get rendered HTML for template', () => {
+        return request(app.getHttpServer())
+          .get(`/api/content/templates/${templateId}/rendered`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(200)
+          .expect((res) => {
+            expect(res.body).toHaveProperty('html');
+            expect(res.body).toHaveProperty('renderedAt');
+          });
+      });
+
+      it('should enforce multi-tenant isolation', () => {
+        return request(app.getHttpServer())
+          .get(`/api/content/templates/${templateId}/rendered`)
+          .set('Authorization', `Bearer ${secondUserToken}`)
+          .expect(404);
+      });
+
+      it('should reject without auth', () => {
+        return request(app.getHttpServer())
+          .get(`/api/content/templates/${templateId}/rendered`)
+          .expect(401);
+      });
+
+      it('should return 404 for non-existent template', () => {
+        return request(app.getHttpServer())
+          .get('/api/content/templates/00000000-0000-0000-0000-000000000000/rendered')
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(404);
+      });
+    });
+
+    describe('/api/content/templates/:id/refresh (POST)', () => {
+      it('should manually refresh template', () => {
+        return request(app.getHttpServer())
+          .post(`/api/content/templates/${templateId}/refresh`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(200)
+          .expect((res) => {
+            expect(res.body).toHaveProperty('metadata');
+            expect(res.body.metadata.refreshConfig.lastRefresh).toBeDefined();
+          });
+      });
+
+      it('should enforce multi-tenant isolation', () => {
+        return request(app.getHttpServer())
+          .post(`/api/content/templates/${templateId}/refresh`)
+          .set('Authorization', `Bearer ${secondUserToken}`)
+          .expect(404);
+      });
+
+      it('should reject without auth', () => {
+        return request(app.getHttpServer())
+          .post(`/api/content/templates/${templateId}/refresh`)
+          .expect(401);
+      });
+    });
+
+    describe('Template in content list', () => {
+      it('should include templates in content list', () => {
+        return request(app.getHttpServer())
+          .get('/api/content')
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(200)
+          .expect((res) => {
+            const template = res.body.data.find((c: any) => c.id === templateId);
+            expect(template).toBeDefined();
+            expect(template.type).toBe('template');
+          });
+      });
+
+      it('should filter by template type', () => {
+        return request(app.getHttpServer())
+          .get('/api/content?type=template')
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(200)
+          .expect((res) => {
+            const allTemplates = res.body.data.every((c: any) => c.type === 'template');
+            expect(allTemplates).toBe(true);
+          });
+      });
+
+      it('should get single template by ID', () => {
+        return request(app.getHttpServer())
+          .get(`/api/content/${templateId}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.id).toBe(templateId);
+            expect(res.body.type).toBe('template');
+            expect(res.body.metadata).toHaveProperty('templateHtml');
+          });
+      });
     });
   });
 });

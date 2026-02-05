@@ -13,6 +13,7 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app/app.module';
 import { SanitizeInterceptor } from './modules/common/interceptors/sanitize.interceptor';
+import { LoggingInterceptor } from './modules/common/interceptors/logging.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -61,8 +62,12 @@ async function bootstrap() {
     }),
   );
 
-  // Global input sanitization (XSS protection)
-  app.useGlobalInterceptors(new SanitizeInterceptor());
+  // Global interceptors
+  // Order matters: logging first, then sanitization
+  app.useGlobalInterceptors(
+    new LoggingInterceptor(),
+    new SanitizeInterceptor(),
+  );
 
   const globalPrefix = 'api';
   app.setGlobalPrefix(globalPrefix);

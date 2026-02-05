@@ -44,18 +44,39 @@ async function bootstrap() {
     process.exit(1);
   }
 
+  // Enable graceful shutdown hooks
+  app.enableShutdownHooks();
+
   try {
     await app.listen(port, '0.0.0.0');
     Logger.log(`🚀 Realtime Gateway running on: http://localhost:${port}/${globalPrefix}`);
     Logger.log(`🔌 WebSocket server ready on: ws://localhost:${port}`);
     Logger.log(`📊 Metrics available at: http://localhost:${port}/metrics`);
+    Logger.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     Logger.log(`⚠️  Port ${port} is RESERVED for Realtime - will not start if occupied`);
   } catch (error) {
     Logger.error(`❌ FATAL: Cannot bind to port ${port}`);
     Logger.error(`Another process is using port ${port}. Stop it first.`);
     Logger.error(`Run: netstat -ano | findstr :${port}`);
+    Logger.error(`Error details: ${error instanceof Error ? error.message : 'Unknown error'}`);
     process.exit(1);
   }
 }
 
-bootstrap();
+// Bootstrap with proper error handling
+bootstrap().catch((err) => {
+  Logger.error('💥 Fatal error during bootstrap:', err);
+  process.exit(1);
+});
+
+// Catch unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  Logger.error('🚨 Unhandled Rejection at:', promise, 'reason:', reason);
+  // Don't exit immediately - log and let graceful shutdown handle it
+});
+
+// Catch uncaught exceptions
+process.on('uncaughtException', (error) => {
+  Logger.error('🚨 Uncaught Exception:', error);
+  process.exit(1);
+});

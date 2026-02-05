@@ -4,25 +4,59 @@ import { PrismaClient } from '@vizora/database';
 @Injectable()
 export class DatabaseService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DatabaseService.name);
+  private reconnectAttempts = 0;
+  private readonly maxReconnectAttempts = 5;
+  private readonly reconnectDelay = 5000; // 5 seconds
 
   constructor() {
+    // Configure connection pool via DATABASE_URL query params or environment
+    // PostgreSQL pool settings: ?connection_limit=10&pool_timeout=30
+    const connectionUrl = process.env.DATABASE_URL || '';
+    const hasPoolConfig = connectionUrl.includes('connection_limit');
+
+    // Add default pool config if not specified
+    const finalUrl = hasPoolConfig
+      ? connectionUrl
+      : `${connectionUrl}${connectionUrl.includes('?') ? '&' : '?'}connection_limit=10&pool_timeout=30`;
+
     super({
       datasources: {
         db: {
-          url: process.env.DATABASE_URL,
+          url: finalUrl,
         },
       },
       log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
     });
+
+    this.logger.log('Database service initialized with connection pooling');
   }
 
   async onModuleInit() {
-    try {
-      await this.$connect();
-      this.logger.log('Database connected successfully');
-    } catch (error) {
-      this.logger.error('Failed to connect to database', error);
-      throw error;
+    await this.connectWithRetry();
+  }
+
+  private async connectWithRetry(): Promise<void> {
+    while (this.reconnectAttempts < this.maxReconnectAttempts) {
+      try {
+        await this.$connect();
+        this.logger.log('Database connected successfully');
+        this.reconnectAttempts = 0; // Reset on success
+        return;
+      } catch (error) {
+        this.reconnectAttempts++;
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        this.logger.error(
+          `Failed to connect to database (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}): ${errorMessage}`
+        );
+
+        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+          this.logger.error('Max reconnect attempts reached. Giving up.');
+          throw error;
+        }
+
+        this.logger.log(`Retrying in ${this.reconnectDelay / 1000} seconds...`);
+        await new Promise((resolve) => setTimeout(resolve, this.reconnectDelay));
+      }
     }
   }
 
@@ -31,7 +65,20 @@ export class DatabaseService extends PrismaClient implements OnModuleInit, OnMod
       await this.$disconnect();
       this.logger.log('Database disconnected');
     } catch (error) {
-      this.logger.error('Error disconnecting from database', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Error disconnecting from database: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Health check method for monitoring
+   */
+  async isHealthy(): Promise<boolean> {
+    try {
+      await this.$queryRaw`SELECT 1`;
+      return true;
+    } catch {
+      return false;
     }
   }
 }

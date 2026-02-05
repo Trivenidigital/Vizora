@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEnum, IsInt, IsObject, Min } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsInt, IsObject, Min, IsDateString } from 'class-validator';
 
 export class CreateContentDto {
   @IsString()
@@ -8,7 +8,7 @@ export class CreateContentDto {
   @IsString()
   description?: string;
 
-  @IsEnum(['image', 'video', 'url', 'html', 'pdf'])
+  @IsEnum(['image', 'video', 'url', 'html', 'pdf', 'template'])
   type!: string;
 
   @IsString()
@@ -39,4 +39,13 @@ export class CreateContentDto {
   @IsOptional()
   @IsObject()
   metadata?: Record<string, any>;
+
+  // Content expiration fields
+  @IsOptional()
+  @IsDateString()
+  expiresAt?: string;
+
+  @IsOptional()
+  @IsString()
+  replacementContentId?: string;
 }

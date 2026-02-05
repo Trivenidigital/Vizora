@@ -557,6 +557,21 @@ class ApiClient {
       method: 'DELETE',
     });
   }
+
+  // Push content directly to display (temporary override)
+  async pushContentToDisplay(
+    displayId: string,
+    contentId: string,
+    duration: number = 30,
+  ): Promise<{ success: boolean; message: string }> {
+    return this.request<{ success: boolean; message: string }>(
+      `/displays/${displayId}/push-content`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ contentId, duration }),
+      },
+    );
+  }
 }
 
 export const apiClient = new ApiClient(API_BASE_URL);

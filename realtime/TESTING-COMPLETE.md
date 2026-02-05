@@ -65,7 +65,7 @@ pnpm test:load:combined    # Both simultaneously
 
 ### 1. Verify Setup
 ```bash
-cd C:\Projects\vizora\vizora\realtime
+cd C:\Projects\vizora\realtime
 
 # Check E2E test setup
 node verify-test-setup.js

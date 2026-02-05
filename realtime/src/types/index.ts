@@ -47,6 +47,7 @@ export enum DeviceCommandType {
   SKIP_CONTENT = 'skip_content',
   PAUSE = 'pause',
   RESUME = 'resume',
+  PUSH_CONTENT = 'push_content',
 }
 
 /**
@@ -143,4 +144,26 @@ export interface PushPlaylistRequest {
 export interface PushCommandRequest {
   deviceId: string;
   command: DeviceCommand;
+}
+
+/**
+ * Content data for push content command
+ */
+export interface PushContentData {
+  id: string;
+  name: string;
+  type: string;
+  url: string;
+  thumbnailUrl?: string;
+  mimeType?: string;
+  duration?: number;
+}
+
+/**
+ * Push content request data
+ */
+export interface PushContentRequest {
+  deviceId: string;
+  content: PushContentData;
+  duration?: number;
 }

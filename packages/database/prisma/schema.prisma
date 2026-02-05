@@ -157,9 +157,21 @@ model Content {
   fileSize    Int?     // Size in bytes
   mimeType    String?
   metadata    Json?    @db.JsonB
-  status      String   @default("active") // active, archived
+  status      String   @default("active") // active, archived, expired
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  // Content expiration feature
+  expiresAt            DateTime?  // When this content should expire
+  replacementContentId String?    // Content to replace with when expired
+  replacementContent   Content?   @relation("ContentReplacement", fields: [replacementContentId], references: [id], onDelete: SetNull)
+  replacedBy           Content[]  @relation("ContentReplacement")
+
+  // Version history for file replacement
+  previousVersionId    String?    // Reference to the previous version
+  previousVersion      Content?   @relation("ContentVersions", fields: [previousVersionId], references: [id], onDelete: SetNull)
+  newerVersions        Content[]  @relation("ContentVersions")
+  versionNumber        Int        @default(1)
 
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -170,6 +182,7 @@ model Content {
   @@index([organizationId])
   @@index([type])
   @@index([status])
+  @@index([expiresAt])
 }
 
 model Playlist {

@@ -258,8 +258,8 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
   useEffect(() => {
     if (!enabled || !socket) return;
 
-    // Device status updates
-    const unsubDeviceStatus = on('device:status-update', handleDeviceStatusUpdate);
+    // Device status updates (gateway emits 'device:status')
+    const unsubDeviceStatus = on('device:status', handleDeviceStatusUpdate);
 
     // Playlist changes
     const unsubPlaylist = on('playlist:updated', handlePlaylistUpdate);
