@@ -30,14 +30,16 @@ model Organization {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
-  users         User[]
-  displays      Display[]
-  content       Content[]
-  playlists     Playlist[]
-  schedules     Schedule[]
-  tags          Tag[]
-  displayGroups DisplayGroup[]
-  auditLogs     AuditLog[]
+  users          User[]
+  displays       Display[]
+  content        Content[]
+  playlists      Playlist[]
+  schedules      Schedule[]
+  tags           Tag[]
+  displayGroups  DisplayGroup[]
+  auditLogs      AuditLog[]
+  contentFolders ContentFolder[]
+  notifications  Notification[]
 
   @@index([slug])
   @@index([stripeCustomerId])
@@ -62,6 +64,7 @@ model User {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   auditLogs      AuditLog[]
+  notifications  Notification[]
 
   @@index([organizationId])
   @@index([email])
@@ -176,6 +179,9 @@ model Content {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
+  folderId       String?
+  folder         ContentFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+
   playlistItems  PlaylistItem[]
   tags           ContentTag[]
 
@@ -183,6 +189,7 @@ model Content {
   @@index([type])
   @@index([status])
   @@index([expiresAt])
+  @@index([folderId])
 }
 
 model Playlist {
@@ -335,4 +342,52 @@ model AuditLog {
   @@index([userId])
   @@index([entityType, entityId])
   @@index([createdAt])
+}
+
+// ============================================================================
+// CONTENT FOLDER ORGANIZATION
+// ============================================================================
+
+model ContentFolder {
+  id             String   @id @default(cuid())
+  name           String
+  parentId       String?
+  parent         ContentFolder?  @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children       ContentFolder[] @relation("FolderHierarchy")
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  content        Content[]
+
+  @@unique([organizationId, name, parentId])
+  @@index([organizationId])
+  @@index([parentId])
+  @@map("content_folders")
+}
+
+// ============================================================================
+// IN-APP NOTIFICATIONS
+// ============================================================================
+
+model Notification {
+  id             String    @id @default(cuid())
+  type           String    // device_offline, device_online, content_expired, system
+  title          String
+  message        String
+  severity       String    @default("info") // info, warning, critical
+  read           Boolean   @default(false)
+  dismissedAt    DateTime?
+  metadata       Json?     @db.JsonB
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String?
+  user           User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt      DateTime  @default(now())
+
+  @@index([organizationId, read])
+  @@index([organizationId, createdAt])
+  @@index([userId])
+  @@map("notifications")
 }
