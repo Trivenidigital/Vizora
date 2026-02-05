@@ -6,6 +6,7 @@ import { APP_INTERCEPTOR } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DatabaseModule } from '../database/database.module';
+import { StorageModule } from '../storage/storage.module';
 import { DeviceGateway } from '../gateways/device.gateway';
 import { RedisService } from '../services/redis.service';
 import { HeartbeatService } from '../services/heartbeat.service';
@@ -26,6 +27,7 @@ import { MetricsInterceptor } from '../interceptors/metrics.interceptor';
     }),
     ScheduleModule.forRoot(),
     DatabaseModule,
+    StorageModule,
     MetricsModule,
   ],
   controllers: [AppController],

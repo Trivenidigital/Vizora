@@ -11,6 +11,7 @@ import EmptyState from '@/components/EmptyState';
 import SearchFilter from '@/components/SearchFilter';
 import DeviceStatusIndicator from '@/components/DeviceStatusIndicator';
 import DeviceGroupSelector from '@/components/DeviceGroupSelector';
+import DevicePreviewModal from '@/components/DevicePreviewModal';
 import { useToast } from '@/lib/hooks/useToast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { useRealtimeEvents, useOptimisticState, useErrorRecovery } from '@/lib/hooks';
@@ -28,6 +29,7 @@ export default function DevicesPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isPairingModalOpen, setIsPairingModalOpen] = useState(false);
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [pairingCode, setPairingCode] = useState('');
   const [editForm, setEditForm] = useState({ nickname: '', location: '' });
   const [actionLoading, setActionLoading] = useState(false);
@@ -165,6 +167,11 @@ export default function DevicesPage() {
     setSelectedDevice(device);
     setEditForm({ nickname: device.nickname, location: device.location || '' });
     setIsEditModalOpen(true);
+  };
+
+  const handlePreview = (device: Display) => {
+    setSelectedDevice(device);
+    setIsPreviewModalOpen(true);
   };
 
   const handleSaveEdit = async () => {
@@ -632,6 +639,13 @@ export default function DevicesPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex justify-end gap-2">
                       <button
+                        onClick={() => handlePreview(device)}
+                        className="text-green-600 hover:text-green-800 hover:bg-green-50 px-3 py-1 rounded transition font-medium"
+                        title="Preview device screen"
+                      >
+                        Preview
+                      </button>
+                      <button
                         onClick={() => handleEdit(device)}
                         className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-3 py-1 rounded transition font-medium"
                       >
@@ -888,6 +902,15 @@ export default function DevicesPage() {
           </div>
         </div>
       </Modal>
+
+      {/* Device Preview Modal */}
+      {selectedDevice && (
+        <DevicePreviewModal
+          device={selectedDevice}
+          isOpen={isPreviewModalOpen}
+          onClose={() => setIsPreviewModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

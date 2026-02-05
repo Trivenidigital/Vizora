@@ -21,6 +21,8 @@ describe('DisplaysController', () => {
       getTags: jest.fn(),
       addTags: jest.fn(),
       removeTags: jest.fn(),
+      requestScreenshot: jest.fn(),
+      getLastScreenshot: jest.fn(),
     } as any;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -242,6 +244,73 @@ describe('DisplaysController', () => {
         'display-123',
         ['tag-1', 'tag-2'],
       );
+    });
+  });
+
+  describe('requestScreenshot', () => {
+    it('should request screenshot successfully', async () => {
+      const expectedResult = { requestId: 'request-123' };
+      mockDisplaysService.requestScreenshot.mockResolvedValue(expectedResult as any);
+
+      const result = await controller.requestScreenshot('display-123', organizationId);
+
+      expect(result).toEqual({
+        requestId: 'request-123',
+        status: 'pending',
+      });
+      expect(mockDisplaysService.requestScreenshot).toHaveBeenCalledWith(
+        organizationId,
+        'display-123',
+      );
+    });
+
+    it('should handle errors when requesting screenshot', async () => {
+      mockDisplaysService.requestScreenshot.mockRejectedValue(new Error('Device offline'));
+
+      await expect(
+        controller.requestScreenshot('display-123', organizationId)
+      ).rejects.toThrow('Device offline');
+    });
+  });
+
+  describe('getScreenshot', () => {
+    it('should return screenshot data', async () => {
+      const expectedScreenshot = {
+        url: 'https://example.com/screenshot.png',
+        capturedAt: new Date('2026-02-05T10:00:00Z'),
+        width: 1920,
+        height: 1080,
+      };
+      mockDisplaysService.getLastScreenshot.mockResolvedValue(expectedScreenshot as any);
+
+      const result = await controller.getScreenshot('display-123', organizationId);
+
+      expect(result).toEqual({
+        url: 'https://example.com/screenshot.png',
+        capturedAt: '2026-02-05T10:00:00.000Z',
+        width: 1920,
+        height: 1080,
+      });
+      expect(mockDisplaysService.getLastScreenshot).toHaveBeenCalledWith(
+        organizationId,
+        'display-123',
+      );
+    });
+
+    it('should return null when no screenshot available', async () => {
+      mockDisplaysService.getLastScreenshot.mockResolvedValue(null);
+
+      const result = await controller.getScreenshot('display-123', organizationId);
+
+      expect(result).toBeNull();
+    });
+
+    it('should handle errors when getting screenshot', async () => {
+      mockDisplaysService.getLastScreenshot.mockRejectedValue(new Error('Display not found'));
+
+      await expect(
+        controller.getScreenshot('display-123', organizationId)
+      ).rejects.toThrow('Display not found');
     });
   });
 });

@@ -180,4 +180,18 @@ export class AppController {
       message: 'Content pushed to device',
     };
   }
+
+  @Post('internal/command')
+  async sendCommand(
+    @Body() data: { displayId: string; command: string; payload?: Record<string, unknown> },
+  ): Promise<PushResponse> {
+    await this.deviceGateway.sendCommand(data.displayId, {
+      type: data.command as DeviceCommandType,
+      payload: data.payload,
+    });
+    return {
+      success: true,
+      message: `Command ${data.command} sent to device`,
+    };
+  }
 }

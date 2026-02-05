@@ -167,3 +167,27 @@ export interface PushContentRequest {
   content: PushContentData;
   duration?: number;
 }
+
+/**
+ * Screenshot response data from device
+ */
+export interface ScreenshotResponseData {
+  requestId: string;
+  imageData: string;
+  width: number;
+  height: number;
+  timestamp: string;
+}
+
+/**
+ * Screenshot ready event data
+ */
+export interface ScreenshotReadyData {
+  deviceId: string;
+  requestId: string;
+  url: string;
+  width: number;
+  height: number;
+  capturedAt: string;
+  timestamp: string;
+}

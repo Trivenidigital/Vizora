@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { Playlist, Content, Display } from '@/lib/types';
 import Modal from '@/components/Modal';
@@ -103,6 +104,7 @@ function SortablePlaylistItem({ item, idx, onRemove, onDurationChange }: {
 }
 
 export default function PlaylistsPage() {
+  const router = useRouter();
   const toast = useToast();
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [content, setContent] = useState<Content[]>([]);
@@ -257,8 +259,7 @@ export default function PlaylistsPage() {
   };
 
   const handleEdit = async (playlist: Playlist) => {
-    setSelectedPlaylist(playlist);
-    setIsBuilderModalOpen(true);
+    router.push(`/dashboard/playlists/${playlist.id}`);
   };
 
   const handleDelete = (playlist: Playlist) => {
