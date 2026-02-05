@@ -41,7 +41,9 @@ describe('PlaylistsService', () => {
         findFirst: jest.fn(),
         delete: jest.fn(),
         deleteMany: jest.fn(),
+        update: jest.fn(),
       },
+      $transaction: jest.fn(),
       content: {
         findMany: jest.fn(),
       },
@@ -272,6 +274,78 @@ describe('PlaylistsService', () => {
       mockDatabaseService.playlist.findFirst.mockResolvedValue(null);
 
       await expect(service.duplicate('org-123', 'invalid-id')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('reorder', () => {
+    it('should reorder playlist items', async () => {
+      const playlistWithItems = {
+        ...mockPlaylist,
+        items: [
+          { id: 'item-1', contentId: 'c-1', order: 0, duration: 10, content: null },
+          { id: 'item-2', contentId: 'c-2', order: 1, duration: 20, content: null },
+          { id: 'item-3', contentId: 'c-3', order: 2, duration: 15, content: null },
+        ],
+        itemCount: 3,
+        totalDuration: 45,
+        totalSize: 0,
+      };
+
+      // findOne for validation
+      mockDatabaseService.playlist.findFirst
+        .mockResolvedValueOnce(playlistWithItems)
+        // findOne after reorder
+        .mockResolvedValueOnce(playlistWithItems);
+
+      // Transaction mock
+      mockDatabaseService.$transaction.mockImplementation(async (fn) => {
+        return fn(mockDatabaseService);
+      });
+
+      // playlistItem.update mocks (6 calls: 3 negative + 3 final)
+      mockDatabaseService.playlistItem.update = jest.fn().mockResolvedValue({});
+
+      const result = await service.reorder('org-123', 'playlist-123', ['item-3', 'item-1', 'item-2']);
+
+      expect(mockDatabaseService.$transaction).toHaveBeenCalled();
+      expect(result).toBeDefined();
+    });
+
+    it('should throw NotFoundException for invalid item IDs', async () => {
+      const playlistWithItems = {
+        ...mockPlaylist,
+        items: [
+          { id: 'item-1', contentId: 'c-1', order: 0, duration: 10, content: null },
+        ],
+        itemCount: 1,
+        totalDuration: 10,
+        totalSize: 0,
+      };
+
+      mockDatabaseService.playlist.findFirst.mockResolvedValue(playlistWithItems);
+
+      await expect(
+        service.reorder('org-123', 'playlist-123', ['item-1', 'invalid-id'])
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw NotFoundException if not all items included', async () => {
+      const playlistWithItems = {
+        ...mockPlaylist,
+        items: [
+          { id: 'item-1', contentId: 'c-1', order: 0, duration: 10, content: null },
+          { id: 'item-2', contentId: 'c-2', order: 1, duration: 20, content: null },
+        ],
+        itemCount: 2,
+        totalDuration: 30,
+        totalSize: 0,
+      };
+
+      mockDatabaseService.playlist.findFirst.mockResolvedValue(playlistWithItems);
+
+      await expect(
+        service.reorder('org-123', 'playlist-123', ['item-1'])
+      ).rejects.toThrow(NotFoundException);
     });
   });
 

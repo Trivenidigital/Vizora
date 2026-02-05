@@ -607,6 +607,115 @@ class ApiClient {
       },
     );
   }
+
+  // Playlist reorder
+  async reorderPlaylistItems(playlistId: string, itemIds: string[]): Promise<any> {
+    return this.request<any>(`/playlists/${playlistId}/reorder`, {
+      method: 'POST',
+      body: JSON.stringify({ itemIds }),
+    });
+  }
+
+  // Schedule conflict checking
+  async checkScheduleConflicts(data: {
+    displayId?: string;
+    displayGroupId?: string;
+    daysOfWeek: number[];
+    startTime?: string;
+    endTime?: string;
+    excludeScheduleId?: string;
+  }): Promise<{ hasConflicts: boolean; conflicts: any[] }> {
+    return this.request<{ hasConflicts: boolean; conflicts: any[] }>('/schedules/check-conflicts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Display Groups
+  async getDisplayGroups(params?: { page?: number; limit?: number }): Promise<PaginatedResponse<any>> {
+    const query = params ? new URLSearchParams(params as Record<string, string>).toString() : '';
+    return this.request<PaginatedResponse<any>>(`/display-groups${query ? `?${query}` : ''}`);
+  }
+
+  async getDisplayGroup(id: string): Promise<any> {
+    return this.request<any>(`/display-groups/${id}`);
+  }
+
+  async createDisplayGroup(data: { name: string; description?: string }): Promise<any> {
+    return this.request<any>('/display-groups', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateDisplayGroup(id: string, data: { name?: string; description?: string }): Promise<any> {
+    return this.request<any>(`/display-groups/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteDisplayGroup(id: string): Promise<void> {
+    return this.request<void>(`/display-groups/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async addDisplaysToGroup(groupId: string, displayIds: string[]): Promise<any> {
+    return this.request<any>(`/display-groups/${groupId}/displays`, {
+      method: 'POST',
+      body: JSON.stringify({ displayIds }),
+    });
+  }
+
+  async removeDisplaysFromGroup(groupId: string, displayIds: string[]): Promise<any> {
+    return this.request<any>(`/display-groups/${groupId}/displays`, {
+      method: 'DELETE',
+      body: JSON.stringify({ displayIds }),
+    });
+  }
+
+  // Users / Team Management
+  async getUsers(params?: { page?: number; limit?: number }): Promise<PaginatedResponse<any>> {
+    const query = params ? new URLSearchParams(params as Record<string, string>).toString() : '';
+    return this.request<PaginatedResponse<any>>(`/users${query ? `?${query}` : ''}`);
+  }
+
+  async inviteUser(data: { email: string; firstName: string; lastName: string; role: string }): Promise<any> {
+    return this.request<any>('/users/invite', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateUser(id: string, data: { firstName?: string; lastName?: string; role?: string; isActive?: boolean }): Promise<any> {
+    return this.request<any>(`/users/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deactivateUser(id: string): Promise<any> {
+    return this.request<any>(`/users/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Audit Logs
+  async getAuditLogs(params?: {
+    page?: number;
+    limit?: number;
+    action?: string;
+    entityType?: string;
+    userId?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<PaginatedResponse<any>> {
+    const query = params ? new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([_, v]) => v !== undefined)) as Record<string, string>
+    ).toString() : '';
+    return this.request<PaginatedResponse<any>>(`/audit-logs${query ? `?${query}` : ''}`);
+  }
 }
 
 export const apiClient = new ApiClient(API_BASE_URL);

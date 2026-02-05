@@ -11,6 +11,7 @@ import {
 import { SchedulesService } from './schedules.service';
 import { CreateScheduleDto } from './dto/create-schedule.dto';
 import { UpdateScheduleDto } from './dto/update-schedule.dto';
+import { CheckConflictsDto } from './dto/check-conflicts.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
@@ -25,6 +26,14 @@ export class SchedulesController {
     @Body() createScheduleDto: CreateScheduleDto,
   ) {
     return this.schedulesService.create(organizationId, createScheduleDto);
+  }
+
+  @Post('check-conflicts')
+  checkConflicts(
+    @CurrentUser('organizationId') organizationId: string,
+    @Body() checkConflictsDto: CheckConflictsDto,
+  ) {
+    return this.schedulesService.checkConflicts(organizationId, checkConflictsDto);
   }
 
   @Get()

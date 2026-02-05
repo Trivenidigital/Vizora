@@ -16,6 +16,7 @@ describe('SchedulesController', () => {
       findOne: jest.fn(),
       update: jest.fn(),
       duplicate: jest.fn(),
+      checkConflicts: jest.fn(),
       remove: jest.fn(),
     } as any;
 
@@ -237,6 +238,60 @@ describe('SchedulesController', () => {
 
       expect(result).toEqual(expectedSchedule);
       expect(mockSchedulesService.duplicate).toHaveBeenCalledWith(organizationId, 'schedule-123');
+    });
+  });
+
+  describe('checkConflicts', () => {
+    it('should check for schedule conflicts', async () => {
+      const checkConflictsDto = {
+        displayId: 'display-123',
+        daysOfWeek: [1, 2, 3],
+        startTime: '09:00',
+        endTime: '10:00',
+      };
+      const expectedResult = {
+        hasConflicts: false,
+        conflicts: [],
+      };
+      mockSchedulesService.checkConflicts.mockResolvedValue(expectedResult as any);
+
+      const result = await controller.checkConflicts(organizationId, checkConflictsDto as any);
+
+      expect(result).toEqual(expectedResult);
+      expect(mockSchedulesService.checkConflicts).toHaveBeenCalledWith(
+        organizationId,
+        checkConflictsDto,
+      );
+    });
+
+    it('should return conflicts when they exist', async () => {
+      const checkConflictsDto = {
+        displayId: 'display-123',
+        daysOfWeek: [1, 2],
+        startTime: '09:00',
+        endTime: '10:00',
+      };
+      const expectedResult = {
+        hasConflicts: true,
+        conflicts: [
+          {
+            id: 'schedule-1',
+            name: 'Existing Schedule',
+            startTime: '09:30',
+            endTime: '10:30',
+            daysOfWeek: [1, 2],
+            playlist: { id: 'p-1', name: 'Playlist 1' },
+            display: { id: 'display-123', nickname: 'Display 1' },
+            displayGroup: null,
+          },
+        ],
+      };
+      mockSchedulesService.checkConflicts.mockResolvedValue(expectedResult as any);
+
+      const result = await controller.checkConflicts(organizationId, checkConflictsDto as any);
+
+      expect(result.hasConflicts).toBe(true);
+      expect(result.conflicts).toHaveLength(1);
     });
   });
 

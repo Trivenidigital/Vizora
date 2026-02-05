@@ -279,6 +279,51 @@ export class PlaylistsService {
     }
   }
 
+  async reorder(organizationId: string, playlistId: string, itemIds: string[]) {
+    const playlist = await this.findOne(organizationId, playlistId);
+
+    // Validate all item IDs belong to this playlist
+    const playlistItemIds = playlist.items.map(item => item.id);
+    const invalidIds = itemIds.filter(id => !playlistItemIds.includes(id));
+    if (invalidIds.length > 0) {
+      throw new NotFoundException(`Playlist items not found: ${invalidIds.join(', ')}`);
+    }
+
+    if (itemIds.length !== playlistItemIds.length) {
+      throw new NotFoundException('All playlist items must be included in reorder');
+    }
+
+    // Use transaction with two-pass approach to avoid unique constraint violations
+    // (@@unique([playlistId, order]))
+    await this.db.$transaction(async (tx) => {
+      // Pass 1: Set all orders to negative values to avoid conflicts
+      for (let i = 0; i < itemIds.length; i++) {
+        await tx.playlistItem.update({
+          where: { id: itemIds[i] },
+          data: { order: -(i + 1) },
+        });
+      }
+
+      // Pass 2: Set final order values
+      for (let i = 0; i < itemIds.length; i++) {
+        await tx.playlistItem.update({
+          where: { id: itemIds[i] },
+          data: { order: i },
+        });
+      }
+    });
+
+    // Return updated playlist
+    const updatedPlaylist = await this.findOne(organizationId, playlistId);
+
+    // Notify displays
+    this.notifyDisplaysOfPlaylistUpdate(playlistId, updatedPlaylist).catch(error => {
+      this.logger.error(`Failed to notify displays of playlist reorder: ${error.message}`);
+    });
+
+    return updatedPlaylist;
+  }
+
   async duplicate(organizationId: string, id: string) {
     const original = await this.findOne(organizationId, id);
 

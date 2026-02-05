@@ -3,14 +3,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
-import { Display, Playlist } from '@/lib/types';
+import { Display, Playlist, DisplayGroup } from '@/lib/types';
 import Modal from '@/components/Modal';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import EmptyState from '@/components/EmptyState';
 import SearchFilter from '@/components/SearchFilter';
 import DeviceStatusIndicator from '@/components/DeviceStatusIndicator';
-import { DeviceGroup } from '@/components/DeviceGroupSelector';
+import DeviceGroupSelector from '@/components/DeviceGroupSelector';
 import { useToast } from '@/lib/hooks/useToast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { useRealtimeEvents, useOptimisticState, useErrorRecovery } from '@/lib/hooks';
@@ -21,30 +21,8 @@ export default function DevicesPage() {
   const toast = useToast();
   const [devices, setDevices] = useState<Display[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [_deviceGroups, _setDeviceGroups] = useState<DeviceGroup[]>([
-    {
-      id: 'group-1',
-      name: 'Store Locations',
-      description: 'All retail store displays',
-      deviceIds: [],
-    },
-    {
-      id: 'group-2',
-      name: 'Corporate Office',
-      description: 'Main office lobby and conference rooms',
-      deviceIds: [],
-    },
-    {
-      id: 'group-3',
-      name: 'Digital Kiosks',
-      description: 'Self-service kiosks',
-      parentGroupId: undefined,
-      deviceIds: [],
-    },
-  ]);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [_selectedGroups, _setSelectedGroups] = useState<string[]>([]);
+  const [deviceGroups, setDeviceGroups] = useState<any[]>([]);
+  const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDevice, setSelectedDevice] = useState<Display | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -59,8 +37,7 @@ export default function DevicesPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [_showGroupFilter, _setShowGroupFilter] = useState(false);
+  const [showGroupFilter, setShowGroupFilter] = useState(false);
   const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline' | 'error'>('offline');
 
   // Memoized callback for device status changes
@@ -122,6 +99,7 @@ export default function DevicesPage() {
   useEffect(() => {
     loadDevices();
     loadPlaylists();
+    loadGroups();
   }, []);
 
   const loadDevices = async () => {
@@ -152,6 +130,21 @@ export default function DevicesPage() {
     try {
       const response = await apiClient.getPlaylists();
       setPlaylists(response.data || response || []);
+    } catch (error) {
+      // Silent fail
+    }
+  };
+
+  const loadGroups = async () => {
+    try {
+      const response = await apiClient.getDisplayGroups();
+      const groups = response.data || [];
+      setDeviceGroups(groups.map((g: any) => ({
+        id: g.id,
+        name: g.name,
+        description: g.description || '',
+        deviceIds: g.displays?.map((d: any) => d.displayId) || [],
+      })));
     } catch (error) {
       // Silent fail
     }
@@ -383,6 +376,38 @@ export default function DevicesPage() {
         onChange={setSearchQuery}
         placeholder="Search devices by name or location..."
       />
+
+      {/* Device Groups */}
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow">
+        <button
+          onClick={() => setShowGroupFilter(!showGroupFilter)}
+          className="w-full px-6 py-3 flex items-center justify-between text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition rounded-lg"
+        >
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Device Groups ({deviceGroups.length})
+          </span>
+          <span className="text-gray-400">{showGroupFilter ? '\u25B2' : '\u25BC'}</span>
+        </button>
+        {showGroupFilter && (
+          <div className="px-6 pb-4">
+            <DeviceGroupSelector
+              groups={deviceGroups}
+              selectedGroupIds={selectedGroups}
+              onChange={setSelectedGroups}
+              showCreate={true}
+              onCreateGroup={async (name, description) => {
+                try {
+                  await apiClient.createDisplayGroup({ name, description });
+                  toast.success('Group created');
+                  loadGroups();
+                } catch (error: any) {
+                  toast.error(error.message || 'Failed to create group');
+                }
+              }}
+            />
+          </div>
+        )}
+      </div>
 
       {/* Device List */}
       {loading ? (

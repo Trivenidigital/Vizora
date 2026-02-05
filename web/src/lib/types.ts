@@ -71,3 +71,20 @@ export interface PaginatedResponse<T> {
     totalPages: number;
   };
 }
+
+export interface DisplayGroup {
+  id: string;
+  name: string;
+  description?: string;
+  organizationId: string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  displays?: Array<{
+    id: string;
+    displayId: string;
+    display?: Display;
+  }>;
+  _count?: {
+    displays: number;
+  };
+}
