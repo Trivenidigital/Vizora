@@ -74,6 +74,32 @@ export class DisplaysController {
     return this.displaysService.remove(organizationId, id);
   }
 
+  @Get(':id/tags')
+  getTags(
+    @CurrentUser('organizationId') organizationId: string,
+    @Param('id') id: string,
+  ) {
+    return this.displaysService.getTags(organizationId, id);
+  }
+
+  @Post(':id/tags')
+  addTags(
+    @CurrentUser('organizationId') organizationId: string,
+    @Param('id') id: string,
+    @Body() body: { tagIds: string[] },
+  ) {
+    return this.displaysService.addTags(organizationId, id, body.tagIds);
+  }
+
+  @Delete(':id/tags')
+  removeTags(
+    @CurrentUser('organizationId') organizationId: string,
+    @Param('id') id: string,
+    @Body() body: { tagIds: string[] },
+  ) {
+    return this.displaysService.removeTags(organizationId, id, body.tagIds);
+  }
+
   @Post(':id/push-content')
   pushContent(
     @CurrentUser('organizationId') organizationId: string,

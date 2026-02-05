@@ -65,6 +65,14 @@ export class SchedulesController {
     return this.schedulesService.update(organizationId, id, updateScheduleDto);
   }
 
+  @Post(':id/duplicate')
+  duplicate(
+    @CurrentUser('organizationId') organizationId: string,
+    @Param('id') id: string,
+  ) {
+    return this.schedulesService.duplicate(organizationId, id);
+  }
+
   @Delete(':id')
   remove(
     @CurrentUser('organizationId') organizationId: string,

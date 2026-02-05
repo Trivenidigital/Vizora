@@ -15,6 +15,7 @@ describe('SchedulesController', () => {
       findActiveSchedules: jest.fn(),
       findOne: jest.fn(),
       update: jest.fn(),
+      duplicate: jest.fn(),
       remove: jest.fn(),
     } as any;
 
@@ -215,6 +216,27 @@ describe('SchedulesController', () => {
         'schedule-123',
         updateDto,
       );
+    });
+  });
+
+  describe('duplicate', () => {
+    it('should duplicate a schedule', async () => {
+      const expectedSchedule = {
+        id: 'schedule-456',
+        name: 'Morning Schedule (Copy)',
+        playlistId: 'playlist-123',
+        displayId: 'display-123',
+        isActive: false,
+        playlist: { id: 'playlist-123', name: 'Test Playlist' },
+        display: { id: 'display-123', nickname: 'Test Display' },
+        displayGroup: null,
+      };
+      mockSchedulesService.duplicate.mockResolvedValue(expectedSchedule as any);
+
+      const result = await controller.duplicate(organizationId, 'schedule-123');
+
+      expect(result).toEqual(expectedSchedule);
+      expect(mockSchedulesService.duplicate).toHaveBeenCalledWith(organizationId, 'schedule-123');
     });
   });
 

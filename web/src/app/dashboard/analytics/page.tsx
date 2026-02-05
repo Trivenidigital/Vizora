@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LineChart, BarChart, PieChart, AreaChart, ComposedChart } from '@/components/charts';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/theme/icons';
 import { useRealtimeEvents } from '@/lib/hooks';
+import { apiClient } from '@/lib/api';
 import { useToast } from '@/lib/hooks/useToast';
 import {
   useDeviceMetrics,
@@ -69,11 +70,26 @@ const KPICard: React.FC<KPICardProps> = ({
   </Card>
 );
 
+const formatBytes = (bytes: number) => {
+  if (!bytes || bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+};
+
 export default function AnalyticsPage() {
   const toast = useToast();
   const [dateRange, setDateRange] = useState<'week' | 'month' | 'year'>('month');
   const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline'>('offline');
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [summary, setSummary] = useState<any>(null);
+
+  useEffect(() => {
+    apiClient.getAnalyticsSummary()
+      .then(data => setSummary(data))
+      .catch(() => {/* fall back to defaults */});
+  }, []);
 
   const deviceMetrics = useDeviceMetrics(dateRange);
   const contentPerformance = useContentPerformance(dateRange);
@@ -141,30 +157,30 @@ export default function AnalyticsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
           label="Total Devices"
-          value="366"
-          change="12% from last month"
+          value={summary ? String(summary.totalDevices) : '---'}
+          change={summary ? `${summary.onlineDevices} online` : ''}
           changeType="positive"
           icon="devices"
         />
         <KPICard
-          label="Content Served"
-          value="12.5K"
-          change="23% from last month"
+          label="Content Items"
+          value={summary ? String(summary.totalContent) : '---'}
+          change={summary ? `${summary.totalPlaylists} playlists` : ''}
           changeType="positive"
           icon="content"
         />
         <KPICard
-          label="Avg. Bandwidth"
-          value="2.4 GB/h"
-          change="5% from last month"
-          changeType="negative"
+          label="Total Size"
+          value={summary ? formatBytes(summary.totalContentSize) : '---'}
+          change=""
+          changeType="neutral"
           icon="analytics"
         />
         <KPICard
           label="System Uptime"
-          value="98.5%"
-          change="Above target"
-          changeType="positive"
+          value={summary ? `${summary.uptimePercent}%` : '---'}
+          change={summary?.uptimePercent >= 95 ? 'Above target' : 'Below target'}
+          changeType={summary?.uptimePercent >= 95 ? 'positive' : 'negative'}
           icon="overview"
         />
       </div>

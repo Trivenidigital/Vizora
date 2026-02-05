@@ -477,6 +477,12 @@ class ApiClient {
     });
   }
 
+  async duplicatePlaylist(id: string): Promise<Playlist> {
+    return this.request<Playlist>(`/playlists/${id}/duplicate`, {
+      method: 'POST',
+    });
+  }
+
   async addPlaylistItem(
     playlistId: string,
     contentId: string,
@@ -556,6 +562,35 @@ class ApiClient {
     return this.request<T>(endpoint, {
       method: 'DELETE',
     });
+  }
+
+  // Analytics
+  async getAnalyticsSummary(): Promise<any> {
+    return this.request<any>('/analytics/summary');
+  }
+
+  async getDeviceMetrics(range: string = 'month'): Promise<any[]> {
+    return this.request<any[]>(`/analytics/device-metrics?range=${range}`);
+  }
+
+  async getContentPerformance(range: string = 'month'): Promise<any[]> {
+    return this.request<any[]>(`/analytics/content-performance?range=${range}`);
+  }
+
+  async getUsageTrends(range: string = 'month'): Promise<any[]> {
+    return this.request<any[]>(`/analytics/usage-trends?range=${range}`);
+  }
+
+  async getDeviceDistribution(): Promise<any[]> {
+    return this.request<any[]>('/analytics/device-distribution');
+  }
+
+  async getBandwidthUsage(range: string = 'month'): Promise<any[]> {
+    return this.request<any[]>(`/analytics/bandwidth?range=${range}`);
+  }
+
+  async getPlaylistPerformance(range: string = 'month'): Promise<any[]> {
+    return this.request<any[]>(`/analytics/playlist-performance?range=${range}`);
   }
 
   // Push content directly to display (temporary override)

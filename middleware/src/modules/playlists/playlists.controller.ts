@@ -51,6 +51,14 @@ export class PlaylistsController {
     return this.playlistsService.update(organizationId, id, updatePlaylistDto);
   }
 
+  @Post(':id/duplicate')
+  duplicate(
+    @CurrentUser('organizationId') organizationId: string,
+    @Param('id') id: string,
+  ) {
+    return this.playlistsService.duplicate(organizationId, id);
+  }
+
   @Post(':id/items')
   addItem(
     @CurrentUser('organizationId') organizationId: string,

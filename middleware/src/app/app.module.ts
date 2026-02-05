@@ -15,6 +15,7 @@ import { ContentModule } from '../modules/content/content.module';
 import { PlaylistsModule } from '../modules/playlists/playlists.module';
 import { SchedulesModule } from '../modules/schedules/schedules.module';
 import { HealthModule } from '../modules/health/health.module';
+import { AnalyticsModule } from '../modules/analytics/analytics.module';
 import { CsrfMiddleware } from '../modules/common/middleware/csrf.middleware';
 
 @Module({
@@ -73,6 +74,7 @@ import { CsrfMiddleware } from '../modules/common/middleware/csrf.middleware';
     PlaylistsModule,
     SchedulesModule,
     HealthModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [

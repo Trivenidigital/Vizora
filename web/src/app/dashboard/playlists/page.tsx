@@ -29,6 +29,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Icon } from '@/theme/icons';
+import PlaylistPreview from '@/components/PlaylistPreview';
 
 // Sortable playlist item component
 function SortablePlaylistItem({ item, idx, onRemove, onDurationChange }: {
@@ -118,6 +119,7 @@ export default function PlaylistsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 300);
   const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline' | 'error'>('offline');
+  const [previewPlaylist, setPreviewPlaylist] = useState<Playlist | null>(null);
 
   // Real-time event handling
   const { isConnected, isOffline, emitPlaylistUpdate } = useRealtimeEvents({
@@ -298,13 +300,22 @@ export default function PlaylistsPage() {
     }
   };
 
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
   const getTotalDuration = (playlist: Playlist) => {
-    if (!playlist.items || playlist.items.length === 0) return '0s';
-    const total = playlist.items.reduce((sum, item) => sum + (item.duration || 30), 0);
+    const total = (playlist as any).totalDuration ||
+      (playlist.items?.reduce((sum, item) => sum + (item.duration || 30), 0) || 0);
+    if (total === 0) return '0s';
     if (total < 60) return `${total}s`;
     const minutes = Math.floor(total / 60);
     const seconds = total % 60;
-    return `${minutes}m ${seconds}s`;
+    return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -433,6 +444,12 @@ export default function PlaylistsPage() {
                         <Icon name="schedules" size="sm" className="text-gray-400" />
                         {getTotalDuration(playlist)}
                       </span>
+                      {playlist.totalSize && playlist.totalSize > 0 && (
+                        <span className="flex items-center gap-1">
+                          <Icon name="content" size="sm" className="text-gray-400" />
+                          {formatFileSize(playlist.totalSize)}
+                        </span>
+                      )}
                     </div>
                     {playlist.updatedAt && (
                       <div className="text-xs text-gray-400 mt-2">
@@ -481,7 +498,14 @@ export default function PlaylistsPage() {
                 </div>
               )}
 
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  onClick={() => setPreviewPlaylist(playlist)}
+                  className="flex-1 px-4 py-2 text-sm bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition font-medium flex items-center justify-center gap-1"
+                >
+                  <Icon name="preview" size="sm" className="text-gray-600" />
+                  Preview
+                </button>
                 <button
                   onClick={() => handleEdit(playlist)}
                   className="flex-1 px-4 py-2 text-sm bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition font-medium flex items-center justify-center gap-1"
@@ -495,6 +519,21 @@ export default function PlaylistsPage() {
                 >
                   <Icon name="power" size="sm" className="text-green-600" />
                   Publish
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      await apiClient.duplicatePlaylist(playlist.id);
+                      toast.success('Playlist duplicated');
+                      loadPlaylists();
+                    } catch (error: any) {
+                      toast.error(error.message || 'Failed to duplicate playlist');
+                    }
+                  }}
+                  className="flex-1 px-4 py-2 text-sm bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 transition font-medium flex items-center justify-center gap-1"
+                >
+                  <Icon name="playlists" size="sm" className="text-purple-600" />
+                  Duplicate
                 </button>
                 <button
                   onClick={() => handleDelete(playlist)}
@@ -698,6 +737,21 @@ export default function PlaylistsPage() {
         confirmText="Delete"
         type="danger"
       />
+
+      {/* Preview Modal */}
+      <Modal
+        isOpen={!!previewPlaylist}
+        onClose={() => setPreviewPlaylist(null)}
+        title={`Preview: ${previewPlaylist?.name}`}
+        size="xl"
+      >
+        {previewPlaylist && (
+          <PlaylistPreview
+            items={previewPlaylist.items || []}
+            onClose={() => setPreviewPlaylist(null)}
+          />
+        )}
+      </Modal>
     </div>
   );
 }
