@@ -18,7 +18,10 @@ import { SchedulesModule } from '../modules/schedules/schedules.module';
 import { HealthModule } from '../modules/health/health.module';
 import { AnalyticsModule } from '../modules/analytics/analytics.module';
 import { UsersModule } from '../modules/users/users.module';
+import { NotificationsModule } from '../modules/notifications/notifications.module';
+import { FoldersModule } from '../modules/folders/folders.module';
 import { CsrfMiddleware } from '../modules/common/middleware/csrf.middleware';
+import { StorageModule } from '../modules/storage/storage.module';
 
 @Module({
   imports: [
@@ -67,6 +70,7 @@ import { CsrfMiddleware } from '../modules/common/middleware/csrf.middleware';
           ]
     ),
     CommonModule,
+    StorageModule,
     DatabaseModule,
     RedisModule,
     AuthModule,
@@ -79,6 +83,8 @@ import { CsrfMiddleware } from '../modules/common/middleware/csrf.middleware';
     HealthModule,
     AnalyticsModule,
     UsersModule,
+    NotificationsModule,
+    FoldersModule,
   ],
   controllers: [AppController],
   providers: [

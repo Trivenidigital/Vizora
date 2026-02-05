@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { apiClient } from '@/lib/api';
-import { Content, Display, Playlist } from '@/lib/types';
+import { Content, Display, Playlist, ContentFolder } from '@/lib/types';
+import FolderTree from '@/components/FolderTree';
+import FolderBreadcrumb from '@/components/FolderBreadcrumb';
 import Modal from '@/components/Modal';
 import PreviewModal from '@/components/PreviewModal';
 import ConfirmDialog from '@/components/ConfirmDialog';
@@ -66,6 +68,15 @@ export default function ContentPage() {
   const [showTagFilter, setShowTagFilter] = useState(false);
   const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline'>('offline');
 
+  // Folder state
+  const [folders, setFolders] = useState<ContentFolder[]>([]);
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false);
+  const [isMoveToFolderModalOpen, setIsMoveToFolderModalOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [newFolderParentId, setNewFolderParentId] = useState<string | null>(null);
+  const [targetFolderId, setTargetFolderId] = useState<string | null>(null);
+
   // Real-time event handling
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { isConnected: _isConnected, isOffline: _isOffline } = useRealtimeEvents({
@@ -103,7 +114,13 @@ export default function ContentPage() {
     loadContent();
     loadDevices();
     loadPlaylists();
+    loadFolders();
   }, []);
+
+  // Reload content when folder selection changes
+  useEffect(() => {
+    loadContent();
+  }, [selectedFolderId]);
 
   // ESC key handler for preview modal
   useEffect(() => {
@@ -120,12 +137,69 @@ export default function ContentPage() {
   const loadContent = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.getContent();
+      let response;
+      if (selectedFolderId) {
+        response = await apiClient.getFolderContent(selectedFolderId);
+      } else {
+        response = await apiClient.getContent();
+      }
       setContent(response.data || response || []);
     } catch (error: any) {
       toast.error(error.message || 'Failed to load content');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadFolders = async () => {
+    try {
+      const folderList = await apiClient.getFolders({ format: 'tree' });
+      setFolders(folderList || []);
+    } catch (error: any) {
+      console.error('[ContentPage] Failed to load folders:', error);
+    }
+  };
+
+  const handleCreateFolder = async () => {
+    if (!newFolderName.trim()) {
+      toast.error('Folder name is required');
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      await apiClient.createFolder({
+        name: newFolderName.trim(),
+        parentId: newFolderParentId || undefined,
+      });
+      toast.success('Folder created successfully');
+      setIsCreateFolderModalOpen(false);
+      setNewFolderName('');
+      setNewFolderParentId(null);
+      loadFolders();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to create folder');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleMoveToFolder = async () => {
+    if (selectedItems.size === 0 || !targetFolderId) return;
+
+    try {
+      setActionLoading(true);
+      await apiClient.moveContentToFolder(targetFolderId, Array.from(selectedItems));
+      toast.success(`${selectedItems.size} item(s) moved to folder`);
+      setIsMoveToFolderModalOpen(false);
+      setSelectedItems(new Set());
+      setTargetFolderId(null);
+      loadContent();
+      loadFolders();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to move content');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -582,7 +656,19 @@ export default function ContentPage() {
   const hasActiveFilters = filterType !== 'all' || filterStatus !== 'all' || filterDateRange !== 'all' || searchQuery !== '';
 
   return (
-    <div className="space-y-6">
+    <div className="flex h-full">
+      {/* Folder Sidebar */}
+      <div className="w-64 flex-shrink-0 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
+        <FolderTree
+          folders={folders}
+          selectedFolderId={selectedFolderId}
+          onSelectFolder={setSelectedFolderId}
+          onCreateFolder={() => setIsCreateFolderModalOpen(true)}
+        />
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 overflow-auto p-6 space-y-6">
       <toast.ToastContainer />
 
       <div className="flex justify-between items-center">
@@ -800,6 +886,13 @@ export default function ContentPage() {
         )}
       </div>
 
+      {/* Folder Breadcrumb */}
+      <FolderBreadcrumb
+        folders={folders}
+        currentFolderId={selectedFolderId}
+        onNavigate={setSelectedFolderId}
+      />
+
       {/* Bulk Actions Toolbar */}
       {selectedItems.size > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center justify-between">
@@ -815,6 +908,14 @@ export default function ContentPage() {
             </button>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsMoveToFolderModalOpen(true)}
+              disabled={actionLoading}
+              className="px-4 py-2 text-sm bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition font-medium disabled:opacity-50 flex items-center gap-2"
+            >
+              <Icon name="folder" size="md" className="text-white" />
+              Move to Folder
+            </button>
             <button
               onClick={handleBulkDelete}
               disabled={actionLoading}
@@ -1576,6 +1677,124 @@ export default function ContentPage() {
         confirmText="Delete"
         type="danger"
       />
+
+      {/* Create Folder Modal */}
+      <Modal
+        isOpen={isCreateFolderModalOpen}
+        onClose={() => {
+          setIsCreateFolderModalOpen(false);
+          setNewFolderName('');
+          setNewFolderParentId(null);
+        }}
+        title="Create New Folder"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Folder Name
+            </label>
+            <input
+              type="text"
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+              placeholder="e.g., Marketing Materials"
+              autoComplete="off"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Parent Folder (optional)
+            </label>
+            <select
+              value={newFolderParentId || ''}
+              onChange={(e) => setNewFolderParentId(e.target.value || null)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+            >
+              <option value="">Root (No Parent)</option>
+              {folders.map((folder) => (
+                <option key={folder.id} value={folder.id}>
+                  {folder.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex justify-end gap-3 pt-4">
+            <button
+              onClick={() => {
+                setIsCreateFolderModalOpen(false);
+                setNewFolderName('');
+                setNewFolderParentId(null);
+              }}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleCreateFolder}
+              disabled={actionLoading || !newFolderName.trim()}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition disabled:opacity-50 flex items-center gap-2"
+            >
+              {actionLoading && <LoadingSpinner size="sm" />}
+              Create Folder
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Move to Folder Modal */}
+      <Modal
+        isOpen={isMoveToFolderModalOpen}
+        onClose={() => {
+          setIsMoveToFolderModalOpen(false);
+          setTargetFolderId(null);
+        }}
+        title="Move Content to Folder"
+      >
+        <div className="space-y-4">
+          <p className="text-gray-600">
+            Move {selectedItems.size} item{selectedItems.size > 1 ? 's' : ''} to a folder:
+          </p>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Select Destination Folder
+            </label>
+            <select
+              value={targetFolderId || ''}
+              onChange={(e) => setTargetFolderId(e.target.value || null)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+            >
+              <option value="">Select a folder...</option>
+              {folders.map((folder) => (
+                <option key={folder.id} value={folder.id}>
+                  {folder.name} ({folder.contentCount || 0} items)
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex justify-end gap-3 pt-4">
+            <button
+              onClick={() => {
+                setIsMoveToFolderModalOpen(false);
+                setTargetFolderId(null);
+              }}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleMoveToFolder}
+              disabled={actionLoading || !targetFolderId}
+              className="px-4 py-2 text-sm font-medium text-white bg-yellow-600 rounded-lg hover:bg-yellow-700 transition disabled:opacity-50 flex items-center gap-2"
+            >
+              {actionLoading && <LoadingSpinner size="sm" />}
+              <Icon name="folder" size="md" className="text-white" />
+              Move to Folder
+            </button>
+          </div>
+        </div>
+      </Modal>
+      </div>
     </div>
   );
 }

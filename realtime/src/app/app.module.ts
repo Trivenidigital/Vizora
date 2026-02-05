@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
+import { ScheduleModule } from '@nestjs/schedule';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -9,6 +10,7 @@ import { DeviceGateway } from '../gateways/device.gateway';
 import { RedisService } from '../services/redis.service';
 import { HeartbeatService } from '../services/heartbeat.service';
 import { PlaylistService } from '../services/playlist.service';
+import { NotificationService } from '../services/notification.service';
 import { MetricsModule } from '../metrics/metrics.module';
 import { SentryInterceptor } from '../interceptors/sentry.interceptor';
 import { MetricsInterceptor } from '../interceptors/metrics.interceptor';
@@ -22,6 +24,7 @@ import { MetricsInterceptor } from '../interceptors/metrics.interceptor';
       secret: process.env.DEVICE_JWT_SECRET || 'device-jwt-secret-changeme',
       signOptions: { expiresIn: '365d' },
     }),
+    ScheduleModule.forRoot(),
     DatabaseModule,
     MetricsModule,
   ],
@@ -32,6 +35,7 @@ import { MetricsInterceptor } from '../interceptors/metrics.interceptor';
     RedisService,
     HeartbeatService,
     PlaylistService,
+    NotificationService,
     {
       provide: APP_INTERCEPTOR,
       useClass: SentryInterceptor,

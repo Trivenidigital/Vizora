@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import ThemeToggle from '@/components/ThemeToggle';
+import NotificationBell from '@/components/NotificationBell';
 import { Icon } from '@/theme/icons';
 import type { IconName } from '@/theme/icons';
 
@@ -86,6 +87,7 @@ export default function DashboardLayout({
               </Link>
             </div>
             <div className="flex items-center gap-4">
+              <NotificationBell />
               <ThemeToggle />
               {!authLoading && user && (
                 <div className="relative">

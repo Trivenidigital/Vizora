@@ -1,7 +1,7 @@
 // API Client for Vizora Middleware
 // Uses httpOnly cookies for secure JWT token storage
 
-import type { Display, Content, Playlist, PlaylistItem, Schedule, PaginatedResponse } from './types';
+import type { Display, Content, Playlist, PlaylistItem, Schedule, PaginatedResponse, ContentFolder, AppNotification } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
 
@@ -440,6 +440,16 @@ class ApiClient {
     });
   }
 
+  /**
+   * Get a download URL for content
+   * For MinIO-stored content, returns a presigned URL with expiration
+   * For local content, returns the direct URL
+   */
+  async getContentDownloadUrl(id: string, expirySeconds?: number): Promise<{ url: string; expiresIn: number }> {
+    const query = expirySeconds ? `?expirySeconds=${expirySeconds}` : '';
+    return this.request<{ url: string; expiresIn: number }>(`/content/${id}/download${query}`);
+  }
+
   // Playlists
   async getPlaylists(params?: { page?: number; limit?: number }): Promise<PaginatedResponse<Playlist>> {
     const query = params ? new URLSearchParams(params as Record<string, string>).toString() : '';
@@ -741,6 +751,88 @@ class ApiClient {
     return this.request<{ added: number }>('/displays/bulk/assign-group', {
       method: 'POST',
       body: JSON.stringify({ displayIds, displayGroupId }),
+    });
+  }
+
+  // Content Folders
+  async getFolders(params?: { format?: 'flat' | 'tree' }): Promise<ContentFolder[]> {
+    const query = params?.format ? `?format=${params.format}` : '';
+    return this.request<ContentFolder[]>(`/folders${query}`);
+  }
+
+  async getFolder(id: string): Promise<ContentFolder> {
+    return this.request<ContentFolder>(`/folders/${id}`);
+  }
+
+  async createFolder(data: { name: string; parentId?: string }): Promise<ContentFolder> {
+    return this.request<ContentFolder>('/folders', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateFolder(id: string, data: { name?: string; parentId?: string }): Promise<ContentFolder> {
+    return this.request<ContentFolder>(`/folders/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteFolder(id: string): Promise<void> {
+    return this.request<void>(`/folders/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async moveContentToFolder(folderId: string, contentIds: string[]): Promise<{ moved: number }> {
+    return this.request<{ moved: number }>(`/folders/${folderId}/content`, {
+      method: 'POST',
+      body: JSON.stringify({ contentIds }),
+    });
+  }
+
+  async getFolderContent(folderId: string, params?: { page?: number; limit?: number }): Promise<PaginatedResponse<Content>> {
+    const query = params ? new URLSearchParams(params as Record<string, string>).toString() : '';
+    return this.request<PaginatedResponse<Content>>(`/folders/${folderId}/content${query ? `?${query}` : ''}`);
+  }
+
+  // Notifications
+  async getNotifications(params?: {
+    read?: boolean;
+    severity?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<PaginatedResponse<AppNotification>> {
+    const queryParams: Record<string, string> = {};
+    if (params?.read !== undefined) queryParams.read = String(params.read);
+    if (params?.severity) queryParams.severity = params.severity;
+    if (params?.page) queryParams.page = String(params.page);
+    if (params?.limit) queryParams.limit = String(params.limit);
+    const query = Object.keys(queryParams).length > 0
+      ? `?${new URLSearchParams(queryParams).toString()}`
+      : '';
+    return this.request<PaginatedResponse<AppNotification>>(`/notifications${query}`);
+  }
+
+  async getUnreadNotificationCount(): Promise<{ count: number }> {
+    return this.request<{ count: number }>('/notifications/unread-count');
+  }
+
+  async markNotificationAsRead(id: string): Promise<AppNotification> {
+    return this.request<AppNotification>(`/notifications/${id}/read`, {
+      method: 'PATCH',
+    });
+  }
+
+  async markAllNotificationsAsRead(): Promise<void> {
+    return this.request<void>('/notifications/read-all', {
+      method: 'POST',
+    });
+  }
+
+  async dismissNotification(id: string): Promise<void> {
+    return this.request<void>(`/notifications/${id}/dismiss`, {
+      method: 'PATCH',
     });
   }
 }
