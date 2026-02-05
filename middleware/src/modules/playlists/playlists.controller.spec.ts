@@ -17,6 +17,7 @@ describe('PlaylistsController', () => {
       addItem: jest.fn(),
       removeItem: jest.fn(),
       duplicate: jest.fn(),
+      reorder: jest.fn(),
       remove: jest.fn(),
     } as any;
 
@@ -176,6 +177,28 @@ describe('PlaylistsController', () => {
 
       expect(result).toEqual(expectedPlaylist);
       expect(mockPlaylistsService.duplicate).toHaveBeenCalledWith(organizationId, 'playlist-123');
+    });
+  });
+
+  describe('reorder', () => {
+    it('should reorder playlist items', async () => {
+      const expectedPlaylist = {
+        id: 'playlist-123',
+        items: [
+          { id: 'item-2', order: 0 },
+          { id: 'item-1', order: 1 },
+        ],
+      };
+      mockPlaylistsService.reorder.mockResolvedValue(expectedPlaylist as any);
+
+      const result = await controller.reorder(organizationId, 'playlist-123', { itemIds: ['item-2', 'item-1'] } as any);
+
+      expect(result).toEqual(expectedPlaylist);
+      expect(mockPlaylistsService.reorder).toHaveBeenCalledWith(
+        organizationId,
+        'playlist-123',
+        ['item-2', 'item-1'],
+      );
     });
   });
 

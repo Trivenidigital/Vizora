@@ -469,6 +469,92 @@ describe('SchedulesService', () => {
     });
   });
 
+  describe('checkConflicts', () => {
+    it('should return no conflicts when no overlapping schedules exist', async () => {
+      databaseService.schedule.findMany.mockResolvedValue([]);
+
+      const result = await service.checkConflicts('org-123', {
+        displayId: 'display-1',
+        daysOfWeek: [1, 2, 3],
+        startTime: '09:00',
+        endTime: '10:00',
+      });
+
+      expect(result.hasConflicts).toBe(false);
+      expect(result.conflicts).toHaveLength(0);
+    });
+
+    it('should detect time overlap conflicts', async () => {
+      databaseService.schedule.findMany.mockResolvedValue([
+        {
+          id: 'schedule-1',
+          name: 'Existing Schedule',
+          startTime: '09:30',
+          endTime: '10:30',
+          daysOfWeek: [1, 2],
+          playlist: { id: 'p-1', name: 'Playlist 1' },
+          display: { id: 'display-1', nickname: 'Display 1' },
+          displayGroup: null,
+        },
+      ]);
+
+      const result = await service.checkConflicts('org-123', {
+        displayId: 'display-1',
+        daysOfWeek: [1, 2, 3],
+        startTime: '09:00',
+        endTime: '10:00',
+      });
+
+      expect(result.hasConflicts).toBe(true);
+      expect(result.conflicts).toHaveLength(1);
+      expect(result.conflicts[0].name).toBe('Existing Schedule');
+    });
+
+    it('should not flag non-overlapping times', async () => {
+      databaseService.schedule.findMany.mockResolvedValue([
+        {
+          id: 'schedule-1',
+          name: 'Earlier Schedule',
+          startTime: '07:00',
+          endTime: '08:00',
+          daysOfWeek: [1, 2],
+          playlist: { id: 'p-1', name: 'Playlist 1' },
+          display: { id: 'display-1', nickname: 'Display 1' },
+          displayGroup: null,
+        },
+      ]);
+
+      const result = await service.checkConflicts('org-123', {
+        displayId: 'display-1',
+        daysOfWeek: [1, 2, 3],
+        startTime: '09:00',
+        endTime: '10:00',
+      });
+
+      expect(result.hasConflicts).toBe(false);
+    });
+
+    it('should exclude specified schedule from conflicts', async () => {
+      databaseService.schedule.findMany.mockResolvedValue([]);
+
+      await service.checkConflicts('org-123', {
+        displayId: 'display-1',
+        daysOfWeek: [1],
+        startTime: '09:00',
+        endTime: '10:00',
+        excludeScheduleId: 'schedule-1',
+      });
+
+      expect(databaseService.schedule.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            id: { not: 'schedule-1' },
+          }),
+        }),
+      );
+    });
+  });
+
   describe('remove', () => {
     const mockScheduleWithRelations = {
       ...mockSchedule,

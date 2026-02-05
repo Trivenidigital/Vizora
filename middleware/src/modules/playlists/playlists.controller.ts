@@ -11,6 +11,7 @@ import {
 import { PlaylistsService } from './playlists.service';
 import { CreatePlaylistDto } from './dto/create-playlist.dto';
 import { UpdatePlaylistDto } from './dto/update-playlist.dto';
+import { ReorderPlaylistDto } from './dto/reorder-playlist.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -57,6 +58,15 @@ export class PlaylistsController {
     @Param('id') id: string,
   ) {
     return this.playlistsService.duplicate(organizationId, id);
+  }
+
+  @Post(':id/reorder')
+  reorder(
+    @CurrentUser('organizationId') organizationId: string,
+    @Param('id') id: string,
+    @Body() reorderDto: ReorderPlaylistDto,
+  ) {
+    return this.playlistsService.reorder(organizationId, id, reorderDto.itemIds);
   }
 
   @Post(':id/items')

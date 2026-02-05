@@ -11,11 +11,13 @@ import { CommonModule } from '../modules/common/common.module';
 import { AuthModule } from '../modules/auth/auth.module';
 import { OrganizationsModule } from '../modules/organizations/organizations.module';
 import { DisplaysModule } from '../modules/displays/displays.module';
+import { DisplayGroupsModule } from '../modules/display-groups/display-groups.module';
 import { ContentModule } from '../modules/content/content.module';
 import { PlaylistsModule } from '../modules/playlists/playlists.module';
 import { SchedulesModule } from '../modules/schedules/schedules.module';
 import { HealthModule } from '../modules/health/health.module';
 import { AnalyticsModule } from '../modules/analytics/analytics.module';
+import { UsersModule } from '../modules/users/users.module';
 import { CsrfMiddleware } from '../modules/common/middleware/csrf.middleware';
 
 @Module({
@@ -70,11 +72,13 @@ import { CsrfMiddleware } from '../modules/common/middleware/csrf.middleware';
     AuthModule,
     OrganizationsModule,
     DisplaysModule,
+    DisplayGroupsModule,
     ContentModule,
     PlaylistsModule,
     SchedulesModule,
     HealthModule,
     AnalyticsModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [

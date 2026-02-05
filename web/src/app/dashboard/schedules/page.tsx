@@ -76,6 +76,9 @@ export default function SchedulesPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline'>('offline');
   const [executionHistory, setExecutionHistory] = useState<Record<string, any>>({});
+  const [targetType, setTargetType] = useState<'device' | 'group'>('device');
+  const [displayGroups, setDisplayGroups] = useState<any[]>([]);
+  const [conflictWarnings, setConflictWarnings] = useState<any[]>([]);
 
   // Modal states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -162,10 +165,11 @@ export default function SchedulesPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [schedulesRes, devicesRes, playlistsRes] = await Promise.allSettled([
+      const [schedulesRes, devicesRes, playlistsRes, groupsRes] = await Promise.allSettled([
         apiClient.getSchedules(),
         apiClient.getDisplays(),
         apiClient.getPlaylists(),
+        apiClient.getDisplayGroups?.() ?? Promise.resolve({ data: [] }),
       ]);
 
       if (schedulesRes.status === 'fulfilled') {
@@ -193,6 +197,9 @@ export default function SchedulesPage() {
       if (playlistsRes.status === 'fulfilled') {
         const playlistData = playlistsRes.value.data || playlistsRes.value || [];
         setPlaylists(playlistData as unknown as Playlist[]);
+      }
+      if (groupsRes?.status === 'fulfilled') {
+        setDisplayGroups((groupsRes.value as any)?.data || []);
       }
     } catch (error: any) {
       toast.error(error.message || 'Failed to load data');
@@ -234,9 +241,9 @@ export default function SchedulesPage() {
       const scheduleData = {
         name: formData.name,
         playlistId: formData.playlistId,
-        // Backend requires either displayId OR displayGroupId
-        // For simplicity, we'll use the first selected device
-        displayId: formData.deviceIds[0],
+        ...(targetType === 'device'
+          ? { displayId: formData.deviceIds[0] }
+          : { displayGroupId: formData.deviceIds[0] }),
         // Convert day names to numbers (0-6)
         daysOfWeek: dayNamesToNumbers(formData.days),
         // Start date is required - use today
@@ -282,7 +289,9 @@ export default function SchedulesPage() {
       const scheduleData = {
         name: formData.name,
         playlistId: formData.playlistId,
-        displayId: formData.deviceIds[0],
+        ...(targetType === 'device'
+          ? { displayId: formData.deviceIds[0] }
+          : { displayGroupId: formData.deviceIds[0] }),
         daysOfWeek: dayNamesToNumbers(formData.days),
         startTime: formData.startTime,
         endTime: calculateEndTime(formData.startTime, formData.duration),
@@ -362,6 +371,8 @@ export default function SchedulesPage() {
     });
     setFormErrors({});
     setSelectedSchedule(null);
+    setTargetType('device');
+    setConflictWarnings([]);
   };
 
   const getPlaylistName = (playlistId: string) => {
@@ -687,41 +698,110 @@ export default function SchedulesPage() {
               {formErrors.playlistId && <p className="text-red-600 dark:text-red-400 text-sm mt-1">{formErrors.playlistId}</p>}
             </div>
 
-            {/* Device Selection */}
+            {/* Target Type Toggle */}
             <div>
               <label className="block text-sm font-medium text-gray-900 dark:text-gray-50 mb-2">
-                Devices <span className="text-red-500">*</span>
+                Target Type
               </label>
-              <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-300 dark:border-gray-700 rounded-lg p-3 bg-white dark:bg-gray-800">
-                {devices.length === 0 ? (
-                  <p className="text-sm text-gray-500 dark:text-gray-400">No devices available</p>
-                ) : (
-                  devices.map(device => (
-                    <label key={device.id} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.deviceIds.includes(device.id)}
-                        onChange={e => {
-                          const newDeviceIds = e.target.checked
-                            ? [...formData.deviceIds, device.id]
-                            : formData.deviceIds.filter(id => id !== device.id);
-                          setFormData({ ...formData, deviceIds: newDeviceIds });
-                          if (formErrors.deviceIds) setFormErrors({ ...formErrors, deviceIds: '' });
-                        }}
-                        className="rounded border-gray-300 dark:border-gray-700 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-700 dark:text-gray-300">{device.nickname}</span>
-                    </label>
-                  ))
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTargetType('device')}
+                  className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition ${
+                    targetType === 'device'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  Individual Device
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTargetType('group')}
+                  className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition ${
+                    targetType === 'group'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  Device Group
+                </button>
+              </div>
+            </div>
+
+            {/* Device/Group Selection */}
+            {targetType === 'group' ? (
+              <div>
+                <label className="block text-sm font-medium text-gray-900 dark:text-gray-50 mb-2">
+                  Device Group <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.deviceIds[0] || ''}
+                  onChange={e => {
+                    setFormData({ ...formData, deviceIds: e.target.value ? [e.target.value] : [] });
+                    if (formErrors.deviceIds) setFormErrors({ ...formErrors, deviceIds: '' });
+                  }}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 focus:ring-2 focus:ring-blue-500 transition"
+                >
+                  <option value="">Select a group...</option>
+                  {displayGroups.map((g: any) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name} ({g._count?.displays || 0} devices)
+                    </option>
+                  ))}
+                </select>
+                {formErrors.deviceIds && <p className="text-red-600 dark:text-red-400 text-sm mt-1">{formErrors.deviceIds}</p>}
+              </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-medium text-gray-900 dark:text-gray-50 mb-2">
+                  Devices <span className="text-red-500">*</span>
+                </label>
+                <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-300 dark:border-gray-700 rounded-lg p-3 bg-white dark:bg-gray-800">
+                  {devices.length === 0 ? (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">No devices available</p>
+                  ) : (
+                    devices.map(device => (
+                      <label key={device.id} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.deviceIds.includes(device.id)}
+                          onChange={e => {
+                            const newDeviceIds = e.target.checked
+                              ? [...formData.deviceIds, device.id]
+                              : formData.deviceIds.filter(id => id !== device.id);
+                            setFormData({ ...formData, deviceIds: newDeviceIds });
+                            if (formErrors.deviceIds) setFormErrors({ ...formErrors, deviceIds: '' });
+                          }}
+                          className="rounded border-gray-300 dark:border-gray-700 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">{device.nickname}</span>
+                      </label>
+                    ))
+                  )}
+                </div>
+                {formErrors.deviceIds && <p className="text-red-600 dark:text-red-400 text-sm mt-1">{formErrors.deviceIds}</p>}
+                {formData.deviceIds.length > 0 && (
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                    {formData.deviceIds.length} device{formData.deviceIds.length !== 1 ? 's' : ''} selected
+                  </p>
                 )}
               </div>
-              {formErrors.deviceIds && <p className="text-red-600 dark:text-red-400 text-sm mt-1">{formErrors.deviceIds}</p>}
-              {formData.deviceIds.length > 0 && (
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                  {formData.deviceIds.length} device{formData.deviceIds.length !== 1 ? 's' : ''} selected
+            )}
+
+            {/* Conflict Warnings */}
+            {conflictWarnings.length > 0 && (
+              <div className="bg-yellow-50 dark:bg-yellow-900 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
+                <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-1">
+                  Schedule Conflicts Detected
                 </p>
-              )}
-            </div>
+                {conflictWarnings.map((c: any, i: number) => (
+                  <p key={i} className="text-xs text-yellow-700 dark:text-yellow-300">
+                    Overlaps with &quot;{c.name}&quot; ({c.startTime} - {c.endTime})
+                  </p>
+                ))}
+              </div>
+            )}
           </div>
           {/* Action Buttons */}
           <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">

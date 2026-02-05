@@ -332,11 +332,9 @@ export default function PlaylistsPage() {
       setSelectedPlaylist({ ...selectedPlaylist, items: newItems });
 
       try {
-        // Update backend (would need API endpoint to reorder)
-        // For now, we'll just keep the optimistic update
-        // await apiClient.reorderPlaylistItems(selectedPlaylist.id, newItems.map(item => item.id));
+        await apiClient.reorderPlaylistItems(selectedPlaylist.id, newItems.map(item => item.id));
         toast.success('Playlist reordered');
-        loadPlaylists(); // Refresh
+        loadPlaylists();
       } catch (error: any) {
         toast.error(error.message || 'Failed to reorder items');
         loadPlaylists(); // Revert on error
