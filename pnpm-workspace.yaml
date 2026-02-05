@@ -1,9 +1,7 @@
 packages:
   - 'packages/*'
   - 'middleware'
-  - 'middleware-e2e'
   - 'realtime'
-  - 'realtime-e2e'
   - 'web'
   - 'display'
 autoInstallPeers: true

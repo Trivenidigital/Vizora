@@ -4,7 +4,7 @@
 
 ```bash
 # Navigate to display app
-cd C:\Projects\vizora\vizora\display
+cd C:\Projects\vizora\display
 
 # Clean build
 rm -r dist/
@@ -28,7 +28,7 @@ Before building, make sure these are running:
 
 - ✅ **Backend Middleware** (port 3000)
   ```bash
-  cd C:\Projects\vizora\vizora\middleware
+  cd C:\Projects\vizora\middleware
   npm run dev
   ```
 
@@ -40,14 +40,14 @@ Before building, make sure these are running:
 
 - ✅ **WebSocket Realtime Server** (port 3002)
   ```bash
-  cd C:\Projects\vizora\vizora\realtime
+  cd C:\Projects\vizora\realtime
   npm run dev
   ```
 
 ### Step 2: Build Display App
 
 ```bash
-cd C:\Projects\vizora\vizora\display
+cd C:\Projects\vizora\display
 
 # Install/update dependencies
 npm install

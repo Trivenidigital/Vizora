@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, OnModuleDestroy, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { DatabaseService } from '../database/database.service';
 import { RequestPairingDto } from './dto/request-pairing.dto';
@@ -17,17 +17,30 @@ interface PairingRequest {
 }
 
 @Injectable()
-export class PairingService {
+export class PairingService implements OnModuleDestroy {
+  private readonly logger = new Logger(PairingService.name);
   private pairingRequests = new Map<string, PairingRequest>();
   private readonly PAIRING_CODE_LENGTH = 6;
   private readonly PAIRING_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
+  private cleanupIntervalId: NodeJS.Timeout | null = null;
 
   constructor(
     private readonly db: DatabaseService,
     private readonly jwtService: JwtService,
   ) {
     // Clean up expired pairing requests every minute
-    setInterval(() => this.cleanupExpiredRequests(), 60000);
+    this.cleanupIntervalId = setInterval(() => this.cleanupExpiredRequests(), 60000);
+  }
+
+  onModuleDestroy() {
+    // Clean up interval to prevent memory leak
+    if (this.cleanupIntervalId) {
+      clearInterval(this.cleanupIntervalId);
+      this.cleanupIntervalId = null;
+      this.logger.log('Pairing cleanup interval cleared');
+    }
+    // Clear any pending pairing requests
+    this.pairingRequests.clear();
   }
 
   async requestPairingCode(requestDto: RequestPairingDto) {
@@ -75,7 +88,7 @@ export class PairingService {
         },
       });
     } catch (error) {
-      console.error('Failed to generate QR code:', error);
+      this.logger.error('Failed to generate QR code:', error);
       // Continue without QR code
     }
 
@@ -92,7 +105,7 @@ export class PairingService {
 
     this.pairingRequests.set(code, pairingRequest);
 
-    console.log(`Pairing code generated: ${code} for device ${deviceIdentifier}`);
+    this.logger.log(`Pairing code generated: ${code} for device ${deviceIdentifier}`);
 
     return {
       code,
@@ -208,10 +221,12 @@ export class PairingService {
       });
     }
 
-    // Clean up pairing request
-    this.pairingRequests.delete(code);
+    this.logger.log(`Device paired successfully: ${display.id} to org ${organizationId}`);
 
-    console.log(`Device paired successfully: ${display.id} to org ${organizationId}`);
+    // Note: Don't delete the pairing request here.
+    // Let checkPairingStatus delete it after the device retrieves its token.
+    // This fixes the race condition where the device polls and gets 404
+    // before it can retrieve its token.
 
     return {
       success: true,
@@ -267,7 +282,7 @@ export class PairingService {
 
     expiredCodes.forEach((code) => {
       this.pairingRequests.delete(code);
-      console.log(`Cleaned up expired pairing code: ${code}`);
+      this.logger.debug(`Cleaned up expired pairing code: ${code}`);
     });
   }
 }

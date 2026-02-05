@@ -14,37 +14,85 @@ export class RedisService implements OnModuleDestroy {
   private readonly logger = new Logger(RedisService.name);
   private redis: Redis;
   private subscriber: Redis;
+  private subscriptions: Map<string, Set<(channel: string, message: string) => void>> = new Map();
+  private messageHandler: ((channel: string, message: string) => void) | null = null;
+  private isConnected = false;
+  private readonly maxRetryAttempts = 10;
 
   constructor() {
     const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 
+    // Enhanced retry strategy with exponential backoff and max retries
+    const retryStrategy = (times: number): number | null => {
+      if (times > this.maxRetryAttempts) {
+        this.logger.error(`Redis max retry attempts (${this.maxRetryAttempts}) exceeded`);
+        // Return null to stop retrying (will trigger 'end' event)
+        return null;
+      }
+      const delay = Math.min(times * 100, 5000); // Max 5 second delay
+      this.logger.warn(`Redis reconnecting in ${delay}ms (attempt ${times}/${this.maxRetryAttempts})`);
+      return delay;
+    };
+
     this.redis = new Redis(redisUrl, {
-      retryStrategy: (times) => {
-        const delay = Math.min(times * 50, 2000);
-        return delay;
-      },
+      retryStrategy,
       maxRetriesPerRequest: 3,
+      enableReadyCheck: true,
+      lazyConnect: false,
     });
 
     this.subscriber = new Redis(redisUrl, {
-      retryStrategy: (times) => {
-        const delay = Math.min(times * 50, 2000);
-        return delay;
-      },
+      retryStrategy,
+      enableReadyCheck: true,
+      lazyConnect: false,
     });
 
+    // Connection event handlers for main client
     this.redis.on('connect', () => {
-      this.logger.log('Connected to Redis');
+      this.logger.log('Redis connecting...');
+    });
+
+    this.redis.on('ready', () => {
+      this.isConnected = true;
+      this.logger.log('Redis connected and ready');
     });
 
     this.redis.on('error', (error) => {
-      this.logger.error('Redis error:', error.message);
+      this.logger.error(`Redis error: ${error.message}`);
+    });
+
+    this.redis.on('close', () => {
+      this.isConnected = false;
+      this.logger.warn('Redis connection closed');
+    });
+
+    this.redis.on('reconnecting', () => {
+      this.logger.log('Redis reconnecting...');
+    });
+
+    this.redis.on('end', () => {
+      this.isConnected = false;
+      this.logger.error('Redis connection ended (max retries exceeded or disconnected)');
+    });
+
+    // Subscriber event handlers
+    this.subscriber.on('error', (error) => {
+      this.logger.error(`Redis subscriber error: ${error.message}`);
+    });
+
+    this.subscriber.on('ready', () => {
+      this.logger.log('Redis subscriber ready');
     });
   }
 
   async onModuleDestroy() {
+    this.logger.log('Cleaning up Redis connections...');
+    // Clean up all subscriptions first
+    await this.unsubscribeAll();
+    // Then close connections
     await this.redis.quit();
     await this.subscriber.quit();
+    this.logger.log('Redis connections closed');
   }
 
   /**
@@ -166,12 +214,22 @@ export class RedisService implements OnModuleDestroy {
   }
 
   /**
-   * Subscribe to channel
+   * Subscribe to channel - returns unsubscribe function to prevent memory leaks
    */
-  async subscribe<T = unknown>(channel: string, callback: (message: T) => void): Promise<void> {
-    await this.subscriber.subscribe(channel);
+  async subscribe<T = unknown>(channel: string, callback: (message: T) => void): Promise<() => void> {
+    // Initialize the global message handler if not exists (single handler for all channels)
+    if (!this.messageHandler) {
+      this.messageHandler = (ch: string, message: string) => {
+        const handlers = this.subscriptions.get(ch);
+        if (handlers) {
+          handlers.forEach((handler) => handler(ch, message));
+        }
+      };
+      this.subscriber.on('message', this.messageHandler);
+    }
 
-    this.subscriber.on('message', (ch, message) => {
+    // Create channel-specific handler
+    const handler = (ch: string, message: string) => {
       if (ch === channel) {
         try {
           const data = JSON.parse(message) as T;
@@ -180,7 +238,43 @@ export class RedisService implements OnModuleDestroy {
           this.logger.error('Failed to parse message:', error);
         }
       }
-    });
+    };
+
+    // Track the subscription
+    if (!this.subscriptions.has(channel)) {
+      this.subscriptions.set(channel, new Set());
+      await this.subscriber.subscribe(channel);
+    }
+    this.subscriptions.get(channel)!.add(handler);
+
+    // Return unsubscribe function
+    return () => {
+      const handlers = this.subscriptions.get(channel);
+      if (handlers) {
+        handlers.delete(handler);
+        // Unsubscribe from Redis channel if no more handlers
+        if (handlers.size === 0) {
+          this.subscriptions.delete(channel);
+          this.subscriber.unsubscribe(channel).catch((err) => {
+            this.logger.error(`Failed to unsubscribe from ${channel}:`, err);
+          });
+        }
+      }
+    };
+  }
+
+  /**
+   * Unsubscribe from all channels - for cleanup
+   */
+  async unsubscribeAll(): Promise<void> {
+    for (const channel of this.subscriptions.keys()) {
+      await this.subscriber.unsubscribe(channel);
+    }
+    this.subscriptions.clear();
+    if (this.messageHandler) {
+      this.subscriber.removeListener('message', this.messageHandler);
+      this.messageHandler = null;
+    }
   }
 
   /**
@@ -256,5 +350,27 @@ export class RedisService implements OnModuleDestroy {
     if (deletedCount > 0) {
       this.logger.log(`Deleted ${deletedCount} keys matching pattern: ${pattern}`);
     }
+  }
+
+  /**
+   * Health check for Redis connection
+   */
+  async isHealthy(): Promise<boolean> {
+    try {
+      const result = await this.redis.ping();
+      return result === 'PONG';
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Get connection status
+   */
+  getConnectionStatus(): { connected: boolean; status: string } {
+    return {
+      connected: this.isConnected,
+      status: this.redis.status,
+    };
   }
 }

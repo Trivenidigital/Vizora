@@ -21,6 +21,11 @@ import { ThumbnailService } from './thumbnail.service';
 import { FileValidationService } from './file-validation.service';
 import { CreateContentDto } from './dto/create-content.dto';
 import { UpdateContentDto } from './dto/update-content.dto';
+import { ReplaceFileDto } from './dto/replace-file.dto';
+import { CreateTemplateDto } from './dto/create-template.dto';
+import { UpdateTemplateDto } from './dto/update-template.dto';
+import { PreviewTemplateDto } from './dto/preview-template.dto';
+import { BulkUpdateDto, BulkArchiveDto, BulkRestoreDto, BulkDeleteDto, BulkTagDto, BulkDurationDto } from './dto/bulk-operations.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import * as fs from 'fs';
@@ -176,5 +181,225 @@ export class ContentController {
     @Param('id') id: string,
   ) {
     return this.contentService.remove(organizationId, id);
+  }
+
+  // ============================================================================
+  // FILE REPLACEMENT
+  // ============================================================================
+
+  @Post(':id/replace')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(FileInterceptor('file'))
+  async replaceFile(
+    @CurrentUser('organizationId') organizationId: string,
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() replaceFileDto: ReplaceFileDto,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file provided');
+    }
+
+    // Validate file
+    const validation = await this.fileValidationService.validateFile(
+      file.buffer,
+      file.originalname,
+      file.mimetype,
+    );
+
+    // Sanitize filename
+    const safeFilename = this.fileValidationService.sanitizeFilename(
+      file.originalname,
+    );
+
+    // Save file to local uploads directory
+    const uploadsDir = path.join(process.cwd(), 'uploads');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    const filename = `${validation.hash}-${safeFilename}`;
+    const filePath = path.join(uploadsDir, filename);
+    fs.writeFileSync(filePath, file.buffer);
+
+    const baseUrl = process.env.API_BASE_URL || 'http://localhost:3000';
+    const fileUrl = `${baseUrl}/uploads/${filename}`;
+
+    // Determine thumbnail for images
+    const contentType = file.mimetype.startsWith('video/') ? 'video' :
+                       file.mimetype.startsWith('image/') ? 'image' :
+                       file.mimetype === 'application/pdf' ? 'pdf' : 'url';
+    const thumbnailUrl = contentType === 'image' ? fileUrl : undefined;
+
+    const content = await this.contentService.replaceFile(
+      organizationId,
+      id,
+      fileUrl,
+      {
+        name: replaceFileDto.name,
+        keepBackup: replaceFileDto.keepBackup,
+        thumbnail: thumbnailUrl,
+        fileSize: file.size,
+        mimeType: file.mimetype,
+      },
+    );
+
+    return {
+      success: true,
+      content,
+      fileHash: validation.hash,
+    };
+  }
+
+  @Get(':id/versions')
+  getVersionHistory(
+    @CurrentUser('organizationId') organizationId: string,
+    @Param('id') id: string,
+  ) {
+    return this.contentService.getVersionHistory(organizationId, id);
+  }
+
+  @Post(':id/restore')
+  @HttpCode(HttpStatus.OK)
+  restore(
+    @CurrentUser('organizationId') organizationId: string,
+    @Param('id') id: string,
+  ) {
+    return this.contentService.restore(organizationId, id);
+  }
+
+  // ============================================================================
+  // CONTENT EXPIRATION
+  // ============================================================================
+
+  @Patch(':id/expiration')
+  setExpiration(
+    @CurrentUser('organizationId') organizationId: string,
+    @Param('id') id: string,
+    @Body() body: { expiresAt: string; replacementContentId?: string },
+  ) {
+    return this.contentService.setExpiration(
+      organizationId,
+      id,
+      new Date(body.expiresAt),
+      body.replacementContentId,
+    );
+  }
+
+  @Delete(':id/expiration')
+  @HttpCode(HttpStatus.OK)
+  clearExpiration(
+    @CurrentUser('organizationId') organizationId: string,
+    @Param('id') id: string,
+  ) {
+    return this.contentService.clearExpiration(organizationId, id);
+  }
+
+  // ============================================================================
+  // CONTENT TEMPLATES
+  // ============================================================================
+
+  @Post('templates')
+  createTemplate(
+    @CurrentUser('organizationId') organizationId: string,
+    @Body() dto: CreateTemplateDto,
+  ) {
+    return this.contentService.createTemplate(organizationId, dto);
+  }
+
+  @Patch('templates/:id')
+  updateTemplate(
+    @CurrentUser('organizationId') organizationId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateTemplateDto,
+  ) {
+    return this.contentService.updateTemplate(organizationId, id, dto);
+  }
+
+  @Post('templates/preview')
+  @HttpCode(HttpStatus.OK)
+  previewTemplate(@Body() dto: PreviewTemplateDto) {
+    return this.contentService.previewTemplate(dto);
+  }
+
+  @Post('templates/validate')
+  @HttpCode(HttpStatus.OK)
+  validateTemplate(@Body() body: { templateHtml: string }) {
+    return this.contentService.validateTemplateHtml(body.templateHtml);
+  }
+
+  @Get('templates/:id/rendered')
+  getRenderedTemplate(
+    @CurrentUser('organizationId') organizationId: string,
+    @Param('id') id: string,
+  ) {
+    return this.contentService.getRenderedTemplate(organizationId, id);
+  }
+
+  @Post('templates/:id/refresh')
+  @HttpCode(HttpStatus.OK)
+  refreshTemplate(
+    @CurrentUser('organizationId') organizationId: string,
+    @Param('id') id: string,
+  ) {
+    return this.contentService.triggerTemplateRefresh(organizationId, id);
+  }
+
+  // ============================================================================
+  // BULK OPERATIONS
+  // ============================================================================
+
+  @Post('bulk/update')
+  @HttpCode(HttpStatus.OK)
+  bulkUpdate(
+    @CurrentUser('organizationId') organizationId: string,
+    @Body() dto: BulkUpdateDto,
+  ) {
+    return this.contentService.bulkUpdate(organizationId, dto);
+  }
+
+  @Post('bulk/archive')
+  @HttpCode(HttpStatus.OK)
+  bulkArchive(
+    @CurrentUser('organizationId') organizationId: string,
+    @Body() dto: BulkArchiveDto,
+  ) {
+    return this.contentService.bulkArchive(organizationId, dto);
+  }
+
+  @Post('bulk/restore')
+  @HttpCode(HttpStatus.OK)
+  bulkRestore(
+    @CurrentUser('organizationId') organizationId: string,
+    @Body() dto: BulkRestoreDto,
+  ) {
+    return this.contentService.bulkRestore(organizationId, dto);
+  }
+
+  @Post('bulk/delete')
+  @HttpCode(HttpStatus.OK)
+  bulkDelete(
+    @CurrentUser('organizationId') organizationId: string,
+    @Body() dto: BulkDeleteDto,
+  ) {
+    return this.contentService.bulkDelete(organizationId, dto);
+  }
+
+  @Post('bulk/tags')
+  @HttpCode(HttpStatus.OK)
+  bulkAddTags(
+    @CurrentUser('organizationId') organizationId: string,
+    @Body() dto: BulkTagDto,
+  ) {
+    return this.contentService.bulkAddTags(organizationId, dto);
+  }
+
+  @Post('bulk/duration')
+  @HttpCode(HttpStatus.OK)
+  bulkSetDuration(
+    @CurrentUser('organizationId') organizationId: string,
+    @Body() dto: BulkDurationDto,
+  ) {
+    return this.contentService.bulkSetDuration(organizationId, dto);
   }
 }

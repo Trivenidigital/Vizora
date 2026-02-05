@@ -15,6 +15,7 @@ import { App } from '@capacitor/app';
 import { Network } from '@capacitor/network';
 import { Preferences } from '@capacitor/preferences';
 import { SplashScreen } from '@capacitor/splash-screen';
+import { CapacitorHttp, HttpResponse } from '@capacitor/core';
 import { io, Socket } from 'socket.io-client';
 
 // Configuration - can be overridden via URL params or stored preferences
@@ -23,6 +24,13 @@ const DEFAULT_CONFIG = {
   realtimeUrl: import.meta.env.VITE_REALTIME_URL || 'http://localhost:3002',
   dashboardUrl: import.meta.env.VITE_DASHBOARD_URL || 'http://localhost:3001',
 };
+
+// Transform URLs from localhost to the configured API URL (needed for Android emulator)
+function transformContentUrl(url: string, apiUrl: string): string {
+  if (!url) return url;
+  // Replace localhost:3000 with the configured API URL (e.g., 10.0.2.2:3000 for Android emulator)
+  return url.replace(/http:\/\/localhost:3000/g, apiUrl);
+}
 
 interface Config {
   apiUrl: string;
@@ -53,6 +61,16 @@ interface PlaylistItem {
   } | null;
 }
 
+interface PushContent {
+  id: string;
+  name: string;
+  type: string;
+  url: string;
+  thumbnailUrl?: string;
+  mimeType?: string;
+  duration?: number;
+}
+
 class VizoraAndroidTV {
   private socket: Socket | null = null;
   private deviceId: string | null = null;
@@ -65,6 +83,11 @@ class VizoraAndroidTV {
   private currentIndex = 0;
   private playbackTimer: ReturnType<typeof setTimeout> | null = null;
   private isOnline = true;
+
+  // Temporary content push state
+  private temporaryContent: PushContent | null = null;
+  private temporaryContentTimer: ReturnType<typeof setTimeout> | null = null;
+  private savedPlaylistState: { playlist: Playlist; index: number } | null = null;
 
   constructor() {
     this.init();
@@ -236,19 +259,29 @@ class VizoraAndroidTV {
     }
 
     try {
-      const response = await fetch(`${this.config.apiUrl}/api/pairing/request`, {
-        method: 'POST',
+      // Generate a unique device identifier
+      const deviceInfo = await this.getDeviceInfo();
+      const deviceIdentifier = `android-${deviceInfo.screenWidth}x${deviceInfo.screenHeight}-${Date.now().toString(36)}`;
+
+      console.log('[Vizora] Making pairing request to:', `${this.config.apiUrl}/api/devices/pairing/request`);
+
+      // Use Capacitor's native HTTP for Android
+      const response: HttpResponse = await CapacitorHttp.post({
+        url: `${this.config.apiUrl}/api/devices/pairing/request`,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          deviceInfo: await this.getDeviceInfo(),
-        }),
+        data: {
+          deviceIdentifier,
+          metadata: deviceInfo,
+        },
       });
 
-      if (!response.ok) {
+      console.log('[Vizora] Pairing response status:', response.status);
+
+      if (response.status < 200 || response.status >= 300) {
         throw new Error(`Failed to request pairing code: ${response.status}`);
       }
 
-      const data = await response.json();
+      const data = response.data;
       this.pairingCode = data.code;
       this.deviceId = data.deviceId;
 
@@ -322,11 +355,12 @@ class VizoraAndroidTV {
       if (!this.pairingCode || !this.isOnline) return;
 
       try {
-        const response = await fetch(
-          `${this.config.apiUrl}/api/pairing/status/${this.pairingCode}`
-        );
+        // Use Capacitor's native HTTP for Android
+        const response: HttpResponse = await CapacitorHttp.get({
+          url: `${this.config.apiUrl}/api/devices/pairing/status/${this.pairingCode}`,
+        });
 
-        if (!response.ok) {
+        if (response.status < 200 || response.status >= 300) {
           if (response.status === 404) {
             console.log('[Vizora] Pairing code expired, requesting new one...');
             this.startPairing();
@@ -335,7 +369,7 @@ class VizoraAndroidTV {
           throw new Error('Failed to check pairing status');
         }
 
-        const data = await response.json();
+        const data = response.data;
 
         if (data.status === 'paired' && data.deviceToken) {
           console.log('[Vizora] Device paired successfully!');
@@ -482,7 +516,8 @@ class VizoraAndroidTV {
     const contentDiv = document.createElement('div');
     contentDiv.className = 'content-item';
 
-    const contentUrl = currentItem.content.url;
+    // Transform URL for Android emulator (localhost -> 10.0.2.2)
+    const contentUrl = transformContentUrl(currentItem.content.url, this.config.apiUrl);
     const contentType = currentItem.content.type;
 
     switch (contentType) {
@@ -526,6 +561,17 @@ class VizoraAndroidTV {
         contentDiv.appendChild(iframe);
         break;
 
+      case 'html':
+      case 'template':
+        // Render pre-rendered HTML content from backend
+        const htmlContainer = document.createElement('div');
+        htmlContainer.className = 'html-content';
+        // For templates, contentUrl contains the pre-rendered HTML
+        // For html type, contentUrl is the raw HTML content
+        htmlContainer.innerHTML = contentUrl;
+        contentDiv.appendChild(htmlContainer);
+        break;
+
       default:
         console.warn('[Vizora] Unknown content type:', contentType);
         this.nextContent();
@@ -561,7 +607,7 @@ class VizoraAndroidTV {
 
   // ==================== COMMANDS ====================
 
-  private async handleCommand(command: { type: string; [key: string]: unknown }) {
+  private async handleCommand(command: { type: string; payload?: Record<string, unknown>; [key: string]: unknown }) {
     switch (command.type) {
       case 'reload':
         window.location.reload();
@@ -591,8 +637,149 @@ class VizoraAndroidTV {
         window.location.reload();
         break;
 
+      case 'push_content':
+        if (command.payload) {
+          const content = command.payload.content as PushContent;
+          const duration = (command.payload.duration as number) || 30;
+          this.handleContentPush(content, duration);
+        }
+        break;
+
       default:
         console.warn('[Vizora] Unknown command:', command.type);
+    }
+  }
+
+  // ==================== TEMPORARY CONTENT PUSH ====================
+
+  private handleContentPush(content: PushContent, duration: number = 30) {
+    console.log(`[Vizora] Pushing content: ${content.name} for ${duration}s`);
+
+    // Save current playlist state if playing
+    if (this.currentPlaylist && !this.temporaryContent) {
+      this.savedPlaylistState = {
+        playlist: this.currentPlaylist,
+        index: this.currentIndex,
+      };
+    }
+
+    // Clear current playback timer
+    if (this.playbackTimer) {
+      clearTimeout(this.playbackTimer);
+      this.playbackTimer = null;
+    }
+
+    // Clear any existing temporary content timer
+    if (this.temporaryContentTimer) {
+      clearTimeout(this.temporaryContentTimer);
+      this.temporaryContentTimer = null;
+    }
+
+    // Show temporary content
+    this.temporaryContent = content;
+    this.renderTemporaryContent(content);
+
+    // Set timer to resume playlist after duration
+    this.temporaryContentTimer = setTimeout(() => {
+      this.resumePlaylist();
+    }, duration * 1000);
+  }
+
+  private renderTemporaryContent(content: PushContent) {
+    const container = document.getElementById('content-container');
+    if (!container) return;
+
+    // Clear current content
+    container.innerHTML = '';
+
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'content-item';
+
+    // Transform URL for Android emulator
+    const contentUrl = transformContentUrl(content.url, this.config.apiUrl);
+    const contentType = content.type;
+
+    console.log(`[Vizora] Rendering temporary content: ${contentType} - ${contentUrl}`);
+
+    switch (contentType) {
+      case 'image':
+        const img = document.createElement('img');
+        img.src = contentUrl;
+        img.alt = content.name;
+        img.onerror = () => {
+          console.error('[Vizora] Temporary image load failed:', contentUrl);
+        };
+        contentDiv.appendChild(img);
+        break;
+
+      case 'video':
+        const video = document.createElement('video');
+        video.src = contentUrl;
+        video.autoplay = true;
+        video.muted = false;
+        video.playsInline = true;
+        video.setAttribute('x5-video-player-type', 'h5');
+        video.setAttribute('x5-video-player-fullscreen', 'true');
+        video.onerror = () => {
+          console.error('[Vizora] Temporary video load failed:', contentUrl);
+        };
+        // For video, resume playlist when video ends OR when timer fires (whichever comes first)
+        video.onended = () => {
+          if (this.temporaryContent) {
+            this.resumePlaylist();
+          }
+        };
+        contentDiv.appendChild(video);
+        break;
+
+      case 'webpage':
+      case 'url':
+        const iframe = document.createElement('iframe');
+        iframe.src = contentUrl;
+        iframe.allow = 'autoplay; fullscreen';
+        contentDiv.appendChild(iframe);
+        break;
+
+      case 'html':
+      case 'template':
+        // Render pre-rendered HTML content
+        const htmlContainer = document.createElement('div');
+        htmlContainer.className = 'html-content';
+        htmlContainer.innerHTML = contentUrl;
+        contentDiv.appendChild(htmlContainer);
+        break;
+
+      default:
+        console.warn('[Vizora] Unknown temporary content type:', contentType);
+        return;
+    }
+
+    container.appendChild(contentDiv);
+    this.showScreen('content');
+  }
+
+  private resumePlaylist() {
+    console.log('[Vizora] Resuming playlist after temporary content');
+
+    // Clear temporary content state
+    this.temporaryContent = null;
+    if (this.temporaryContentTimer) {
+      clearTimeout(this.temporaryContentTimer);
+      this.temporaryContentTimer = null;
+    }
+
+    // Restore playlist state
+    if (this.savedPlaylistState) {
+      this.currentPlaylist = this.savedPlaylistState.playlist;
+      this.currentIndex = this.savedPlaylistState.index;
+      this.savedPlaylistState = null;
+      this.playContent();
+    } else {
+      // No playlist was playing, just clear the screen
+      const container = document.getElementById('content-container');
+      if (container) {
+        container.innerHTML = '';
+      }
     }
   }
 

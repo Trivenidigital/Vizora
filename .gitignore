@@ -84,6 +84,9 @@ docker-compose.override.yml
 # Electron builds
 release/
 
+# Archived/unused files
+unusedInCode/
+
 # Misc
 *.tsbuildinfo
 **/*.tsbuildinfo

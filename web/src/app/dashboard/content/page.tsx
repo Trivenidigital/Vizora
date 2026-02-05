@@ -33,6 +33,7 @@ export default function ContentPage() {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
   const [selectedPlaylist, setSelectedPlaylist] = useState('');
+  const [pushDuration, setPushDuration] = useState(30);
   const [uploadForm, setUploadForm] = useState({
     title: '',
     type: 'image' as 'image' | 'video' | 'pdf' | 'url',
@@ -385,6 +386,7 @@ export default function ContentPage() {
   const handlePushToDevice = (item: Content) => {
     setSelectedContent(item);
     setSelectedDevices([]);
+    setPushDuration(30);
     setIsPushModalOpen(true);
   };
 
@@ -393,21 +395,14 @@ export default function ContentPage() {
 
     try {
       setActionLoading(true);
-      // Create a temporary playlist and assign to devices
-      const playlist = await apiClient.createPlaylist({
-        name: `Quick Push - ${selectedContent.title}`,
-        description: 'Auto-generated playlist for direct content push',
-        items: [{ contentId: selectedContent.id, duration: 30 }],
-      });
-
-      // Assign the playlist to all selected devices
+      // Push content directly to each selected device (temporary override)
       await Promise.all(
         selectedDevices.map((deviceId) =>
-          apiClient.updateDisplay(deviceId, { currentPlaylistId: playlist.id })
+          apiClient.pushContentToDisplay(deviceId, selectedContent.id, pushDuration)
         )
       );
 
-      toast.success(`Content pushed to ${selectedDevices.length} device(s)`);
+      toast.success(`Content pushed to ${selectedDevices.length} device(s) for ${pushDuration}s`);
       setIsPushModalOpen(false);
     } catch (error: any) {
       toast.error(error.message || 'Failed to push content');
@@ -1329,37 +1324,97 @@ export default function ContentPage() {
       <Modal
         isOpen={isPushModalOpen}
         onClose={() => setIsPushModalOpen(false)}
-        title="Push to Devices"
+        title="Push Content to Devices"
       >
         <div className="space-y-4">
           <p className="text-gray-600">
-            Select devices to push "{selectedContent?.title}" to:
+            Push "{selectedContent?.title}" directly to devices. The content will display for the specified duration, then the previous playlist will resume.
           </p>
-          <div className="max-h-64 overflow-y-auto space-y-2">
-            {devices.map((device) => (
-              <label
-                key={device.id}
-                className="flex items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedDevices.includes(device.id)}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setSelectedDevices([...selectedDevices, device.id]);
-                    } else {
-                      setSelectedDevices(selectedDevices.filter((id) => id !== device.id));
-                    }
-                  }}
-                  className="mr-3 h-4 w-4"
-                />
-                <div className="flex-1">
-                  <div className="font-medium text-gray-900">{device.nickname}</div>
-                  <div className="text-sm text-gray-500">{device.status}</div>
-                </div>
-              </label>
-            ))}
+
+          {/* Duration Input */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Display Duration (seconds)
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={5}
+                max={3600}
+                value={pushDuration}
+                onChange={(e) => setPushDuration(Math.max(5, Math.min(3600, parseInt(e.target.value) || 30)))}
+                className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+              />
+              <div className="flex gap-1">
+                {[15, 30, 60, 120].map((sec) => (
+                  <button
+                    key={sec}
+                    onClick={() => setPushDuration(sec)}
+                    className={`px-2 py-1 text-xs rounded ${
+                      pushDuration === sec
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {sec}s
+                  </button>
+                ))}
+              </div>
+            </div>
+            <p className="mt-1 text-xs text-gray-500">
+              Min: 5s, Max: 3600s (1 hour)
+            </p>
           </div>
+
+          {/* Device Selection */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Select Devices ({devices.filter(d => d.status === 'online').length} online)
+            </label>
+            <div className="max-h-48 overflow-y-auto space-y-2 border border-gray-200 rounded-lg p-2">
+              {devices.length === 0 ? (
+                <p className="text-sm text-gray-500 text-center py-4">No devices available</p>
+              ) : (
+                devices.map((device) => (
+                  <label
+                    key={device.id}
+                    className={`flex items-center p-3 border rounded-lg cursor-pointer transition ${
+                      device.status === 'online'
+                        ? 'border-gray-200 hover:bg-gray-50'
+                        : 'border-gray-100 bg-gray-50 opacity-60'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedDevices.includes(device.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedDevices([...selectedDevices, device.id]);
+                        } else {
+                          setSelectedDevices(selectedDevices.filter((id) => id !== device.id));
+                        }
+                      }}
+                      className="mr-3 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-900">{device.nickname}</div>
+                      <div className="text-xs text-gray-500">{device.location || 'No location'}</div>
+                    </div>
+                    <span
+                      className={`px-2 py-1 text-xs rounded-full ${
+                        device.status === 'online'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      {device.status}
+                    </span>
+                  </label>
+                ))
+              )}
+            </div>
+          </div>
+
           <div className="flex justify-end gap-3 pt-4">
             <button
               onClick={() => setIsPushModalOpen(false)}
@@ -1373,7 +1428,8 @@ export default function ContentPage() {
               disabled={actionLoading || selectedDevices.length === 0}
             >
               {actionLoading && <LoadingSpinner size="sm" />}
-              Push to {selectedDevices.length} Device(s)
+              <Icon name="push" size="md" className="text-white" />
+              Push to {selectedDevices.length} Device{selectedDevices.length !== 1 ? 's' : ''}
             </button>
           </div>
         </div>

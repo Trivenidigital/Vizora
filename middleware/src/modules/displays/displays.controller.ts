@@ -73,4 +73,18 @@ export class DisplaysController {
   ) {
     return this.displaysService.remove(organizationId, id);
   }
+
+  @Post(':id/push-content')
+  pushContent(
+    @CurrentUser('organizationId') organizationId: string,
+    @Param('id') id: string,
+    @Body() body: { contentId: string; duration?: number },
+  ) {
+    return this.displaysService.pushContent(
+      organizationId,
+      id,
+      body.contentId,
+      body.duration,
+    );
+  }
 }

@@ -8,6 +8,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Public } from '../auth/decorators/public.decorator';
+import { SkipCsrf } from '../common/guards/csrf.guard';
 import { PairingService } from './pairing.service';
 import { RequestPairingDto } from './dto/request-pairing.dto';
 import { CompletePairingDto } from './dto/complete-pairing.dto';
@@ -19,8 +20,10 @@ export class PairingController {
 
   /**
    * Display requests a pairing code (Public endpoint)
+   * Skip CSRF - unpaired devices don't have CSRF tokens
    */
   @Public()
+  @SkipCsrf()
   @Post('request')
   async requestPairingCode(@Body() requestDto: RequestPairingDto) {
     return this.pairingService.requestPairingCode(requestDto);

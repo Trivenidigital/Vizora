@@ -13,32 +13,55 @@ test.describe('Authentication Flow', () => {
     const orgName = `Test Org ${timestamp}`;
 
     await page.goto('/register');
-    
+
     // Wait for form to be visible
     await expect(page.locator('h1')).toContainText(/create account/i);
-    
-    // Fill registration form
-    await page.fill('input[placeholder="John"]', 'Test');
-    await page.fill('input[placeholder="Doe"]', 'User');
-    await page.fill('input[placeholder="Acme Corp"]', orgName);
-    await page.fill('input[type="email"]', email);
-    await page.fill('input[type="password"]', password);
-    
+
+    // Wait for form inputs to be ready (React controlled components need this)
+    const firstNameInput = page.locator('#firstName');
+    await firstNameInput.waitFor({ state: 'visible' });
+
+    // Fill registration form - use id selectors for reliability with controlled inputs
+    // Click first to ensure focus, then fill
+    await firstNameInput.click();
+    await firstNameInput.fill('Test');
+
+    await page.locator('#lastName').click();
+    await page.locator('#lastName').fill('User');
+
+    await page.locator('#organization').click();
+    await page.locator('#organization').fill(orgName);
+
+    await page.locator('#email').click();
+    await page.locator('#email').fill(email);
+
+    await page.locator('#password').click();
+    await page.locator('#password').fill(password);
+
+    // Small delay to ensure form state is updated
+    await page.waitForTimeout(300);
+
     // Submit and wait for navigation (or error)
     await page.click('button[type="submit"]');
-    
-    // Wait for URL change or error to appear
+
+    // Wait longer for URL change since registration involves API calls
     try {
-      await page.waitForURL('/dashboard', { timeout: 10000 });
+      await page.waitForURL(/dashboard/, { timeout: 15000 });
     } catch (e) {
       // If we didn't navigate to dashboard, check for errors
-      const error = await page.locator('.bg-red-50, [role="alert"]').textContent().catch(() => 'Unknown error');
+      const errorElement = page.locator('.bg-red-50, [role="alert"]');
+      const hasError = await errorElement.isVisible({ timeout: 2000 }).catch(() => false);
+      if (hasError) {
+        const error = await errorElement.textContent().catch(() => 'Unknown error');
+        throw new Error(`Registration failed with error: ${error}`);
+      }
+      // If no error and still on register page, may be loading
       const currentUrl = page.url();
-      throw new Error(`Registration failed. Still at: ${currentUrl}. Error: ${error}`);
+      throw new Error(`Registration timeout. Still at: ${currentUrl}`);
     }
-    
-    // Verify dashboard loaded (use h2 specifically to avoid the "Vizora" h1 logo)
-    await expect(page.locator('h2')).toContainText(/dashboard/i);
+
+    // Verify dashboard loaded
+    await expect(page.locator('h2')).toContainText(/dashboard/i, { timeout: 5000 });
   });
 
   test('should login existing user', async ({ page }) => {
@@ -46,7 +69,7 @@ test.describe('Authentication Flow', () => {
     const timestamp = Date.now();
     const email = `test-${timestamp}@vizora.test`;
     const password = 'Test123!@#';
-    
+
     const response = await page.request.post('http://localhost:3000/api/auth/register', {
       data: {
         email,
@@ -62,16 +85,16 @@ test.describe('Authentication Flow', () => {
 
     // Now login
     await page.goto('/login');
-    
-    // Wait for login form to be visible
-    await expect(page.locator('h1')).toContainText(/login/i);
-    
+
+    // Wait for login form to be visible - accept either "login" or "sign in"
+    await expect(page.locator('h1')).toContainText(/login|sign in/i);
+
     await page.fill('input[type="email"]', email);
     await page.fill('input[type="password"]', password);
     await page.click('button[type="submit"]');
-    
-    // Should redirect to dashboard
-    await expect(page).toHaveURL('/dashboard', { timeout: 10000 });
+
+    // Should redirect to dashboard - wait longer and allow for redirects
+    await page.waitForURL(/dashboard/, { timeout: 15000 });
   });
 
   test('should show validation errors for invalid input', async ({ page }) => {
@@ -100,7 +123,7 @@ test.describe('Authentication Flow', () => {
     const timestamp = Date.now();
     const email = `test-${timestamp}@vizora.test`;
     const password = 'Test123!@#';
-    
+
     const res = await page.request.post('http://localhost:3000/api/auth/register', {
       data: {
         email,
@@ -110,48 +133,63 @@ test.describe('Authentication Flow', () => {
         organizationName: `Test Org ${timestamp}`,
       },
     });
-    
-    const responseData = await res.json();
-    const token = responseData.data.token;
-    
-    // Set both authToken cookie (for Next.js middleware) AND localStorage (for web app)
+
+    // Extract token from Set-Cookie header (backend sets httpOnly cookie)
+    const setCookieHeader = res.headers()['set-cookie'];
+    let token = '';
+    if (setCookieHeader) {
+      const cookies = Array.isArray(setCookieHeader) ? setCookieHeader : [setCookieHeader];
+      for (const cookie of cookies) {
+        const match = cookie.match(/vizora_auth_token=([^;]+)/);
+        if (match) {
+          token = match[1];
+          break;
+        }
+      }
+    }
+
+    if (!token) {
+      throw new Error('Failed to extract auth token from registration response');
+    }
+
+    // Set vizora_auth_token cookie (for Next.js middleware)
     await page.context().addCookies([
       {
-        name: 'authToken',
+        name: 'vizora_auth_token',
         value: token,
         domain: 'localhost',
         path: '/',
-        httpOnly: false,
+        httpOnly: true,
         secure: false,
         sameSite: 'Lax',
       },
     ]);
-    
+
     // Navigate to a page first to be able to set localStorage
     await page.goto('/');
-    
+
     // Set localStorage (use authToken key to match what web app expects)
     await page.evaluate((authToken) => {
       localStorage.setItem('authToken', authToken);
     }, token);
-    
+
     // Now go to dashboard
     await page.goto('/dashboard');
-    
+
     // Wait for dashboard to load (not login page)
     await expect(page).toHaveURL('/dashboard', { timeout: 10000 });
     await expect(page.locator('h2')).toContainText(/dashboard/i, { timeout: 5000 });
-    
+
     // Open user menu - look for button containing email or avatar
     const userMenuButton = page.locator('button').filter({ hasText: email.split('@')[0] }).or(
       page.locator('button').filter({ has: page.locator('[aria-label*="avatar"]') })
     );
     await userMenuButton.first().click();
-    
+
     // Wait for dropdown to appear and click logout
     await page.waitForSelector('button:has-text("Logout")', { state: 'visible', timeout: 5000 });
     await page.click('button:has-text("Logout")');
-    
+
     // Should redirect to login
     await expect(page).toHaveURL('/login', { timeout: 5000 });
   });

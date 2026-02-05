@@ -7,10 +7,13 @@ const config: CapacitorConfig = {
   server: {
     // For development - connect to local server
     // url: 'http://YOUR_DEV_IP:3003',
-    // cleartext: true,
-    androidScheme: 'https',
+    cleartext: true,
+    androidScheme: 'http', // Use http for local development to avoid mixed content issues
   },
   plugins: {
+    CapacitorHttp: {
+      enabled: true, // Enable native HTTP handling
+    },
     SplashScreen: {
       launchShowDuration: 2000,
       launchAutoHide: true,

@@ -443,4 +443,69 @@ export class DeviceGateway
 
     this.logger.log(`Broadcast ${event} to organization: ${organizationId}`);
   }
+
+  /**
+   * Allow dashboard clients to join organization rooms
+   * This enables them to receive device status updates
+   */
+  @SubscribeMessage('join:organization')
+  async handleJoinOrganization(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { organizationId: string },
+  ) {
+    if (!data?.organizationId) {
+      return createErrorResponse('Organization ID required');
+    }
+
+    // Join the organization room
+    await client.join(`org:${data.organizationId}`);
+    client.data.organizationId = data.organizationId;
+    client.data.isDashboard = true;
+
+    this.logger.log(`Dashboard client ${client.id} joined org room: ${data.organizationId}`);
+
+    // Emit confirmation
+    client.emit('joined:organization', {
+      organizationId: data.organizationId,
+      timestamp: new Date().toISOString(),
+    });
+
+    return createSuccessResponse({ joined: true, organizationId: data.organizationId });
+  }
+
+  /**
+   * Allow clients to join arbitrary rooms
+   */
+  @SubscribeMessage('join:room')
+  async handleJoinRoom(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { room: string },
+  ) {
+    if (!data?.room) {
+      return createErrorResponse('Room name required');
+    }
+
+    await client.join(data.room);
+    this.logger.log(`Client ${client.id} joined room: ${data.room}`);
+
+    return createSuccessResponse({ joined: true, room: data.room });
+  }
+
+  /**
+   * Allow clients to leave rooms
+   */
+  @SubscribeMessage('leave:room')
+  async handleLeaveRoom(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { room: string },
+  ) {
+    if (!data?.room) {
+      return createErrorResponse('Room name required');
+    }
+
+    await client.leave(data.room);
+    this.logger.log(`Client ${client.id} left room: ${data.room}`);
+
+    return createSuccessResponse({ left: true, room: data.room });
+  }
 }

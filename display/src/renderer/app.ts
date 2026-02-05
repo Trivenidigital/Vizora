@@ -428,6 +428,17 @@ class DisplayApp {
         contentDiv.appendChild(iframe);
         break;
 
+      case 'html':
+      case 'template':
+        // Render pre-rendered HTML content from backend
+        const htmlContainer = document.createElement('div');
+        htmlContainer.className = 'html-content';
+        // For templates, the contentSource contains the pre-rendered HTML
+        // For html type, contentSource is the raw HTML content
+        htmlContainer.innerHTML = contentSource;
+        contentDiv.appendChild(htmlContainer);
+        break;
+
       default:
         console.warn('Unknown content type:', currentItem.content?.type);
     }

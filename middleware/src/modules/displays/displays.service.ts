@@ -259,4 +259,67 @@ export class DisplaysService {
       where: { id },
     });
   }
+
+  async pushContent(
+    organizationId: string,
+    displayId: string,
+    contentId: string,
+    duration: number = 30,
+  ) {
+    // Verify display exists and belongs to organization
+    await this.findOne(organizationId, displayId);
+
+    // Fetch content details
+    const content = await this.db.content.findFirst({
+      where: {
+        id: contentId,
+        organizationId,
+      },
+    });
+
+    if (!content) {
+      throw new NotFoundException('Content not found or does not belong to your organization');
+    }
+
+    const url = `${this.realtimeUrl}/api/push/content`;
+
+    // Use circuit breaker with fallback
+    await this.circuitBreaker.executeWithFallback(
+      'realtime-service',
+      async () => {
+        await firstValueFrom(
+          this.httpService.post(url, {
+            deviceId: displayId,
+            content: {
+              id: content.id,
+              name: content.name,
+              type: content.type,
+              url: content.url,
+              thumbnailUrl: content.thumbnail,
+              mimeType: content.mimeType,
+              duration: content.duration,
+            },
+            duration,
+          }),
+        );
+        this.logger.log(`Pushed content ${contentId} to display ${displayId} for ${duration}s`);
+      },
+      (error) => {
+        if (error) {
+          this.logger.warn(
+            `Failed to push content to display ${displayId}: ${error.message}`,
+          );
+          throw error;
+        } else {
+          this.logger.warn(
+            `Realtime service circuit is open, cannot push content to display ${displayId}`,
+          );
+          throw new Error('Realtime service temporarily unavailable');
+        }
+      },
+      REALTIME_CIRCUIT_CONFIG,
+    );
+
+    return { success: true, message: 'Content pushed to display' };
+  }
 }

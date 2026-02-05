@@ -48,10 +48,15 @@ export class CsrfMiddleware implements NestMiddleware {
       return next();
     }
 
-    // Skip CSRF for public auth endpoints (login, register)
-    // These don't have cookies yet and use other protections (rate limiting)
-    const publicPaths = ['/api/auth/login', '/api/auth/register'];
-    if (publicPaths.some((path) => req.path.startsWith(path))) {
+    // Skip CSRF for public endpoints that don't require cookies
+    // These use other protections (rate limiting)
+    // Check using includes() to handle various path formats
+    const fullPath = req.originalUrl || req.url || req.path;
+    const isDevicePairing = fullPath.includes('/devices/pairing');
+    const isAuthLogin = fullPath.includes('/auth/login');
+    const isAuthRegister = fullPath.includes('/auth/register');
+
+    if (isDevicePairing || isAuthLogin || isAuthRegister) {
       return next();
     }
 

@@ -1,4 +1,5 @@
 # .claudeignore (like .gitignore)
+unusedInCode/
 node_modules/
 .next/
 dist/
