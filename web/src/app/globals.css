@@ -4,29 +4,29 @@
 
 @layer base {
   :root {
-    /* Light Mode - Default */
-    --background: #ffffff;
-    --background-secondary: #f9fafb;
-    --background-tertiary: #f3f4f6;
-    --foreground: #111827;
-    --foreground-secondary: #374151;
-    --foreground-tertiary: #6b7280;
+    /* Light Mode — Electric Horizon (warm cream) */
+    --background: #F0ECE8;
+    --background-secondary: #E8E3DD;
+    --background-tertiary: #DDD7D0;
+    --foreground: #1A1A1A;
+    --foreground-secondary: #3D3632;
+    --foreground-tertiary: #5A5248;
 
     /* Surface and Cards */
-    --surface: #ffffff;
-    --surface-secondary: #f9fafb;
-    --surface-hover: #f3f4f6;
+    --surface: #FFFFFF;
+    --surface-secondary: #F5F2EE;
+    --surface-hover: #E8E3DD;
 
     /* Borders */
-    --border: #e5e7eb;
-    --border-light: #f3f4f6;
-    --border-dark: #d1d5db;
+    --border: #D1CBC5;
+    --border-light: #E8E3DD;
+    --border-dark: #B5AEA6;
 
     /* Semantic Colors - Light Mode */
-    --primary: #0284c7;
-    --primary-light: #0ea5e9;
-    --primary-lighter: #bae6fd;
-    --primary-lightest: #f0f9ff;
+    --primary: #00CC8E;
+    --primary-light: #00E5A0;
+    --primary-lighter: #A7F3D0;
+    --primary-lightest: #ECFDF5;
 
     --success: #16a34a;
     --success-light: #22c55e;
@@ -43,23 +43,23 @@
     --error-lighter: #fecaca;
     --error-lightest: #fef2f2;
 
-    --info: #2563eb;
-    --info-light: #3b82f6;
-    --info-lighter: #bfdbfe;
-    --info-lightest: #eff6ff;
+    --info: #0097B8;
+    --info-light: #00B4D8;
+    --info-lighter: #A5F3FC;
+    --info-lightest: #ECFEFF;
 
     /* Utility Colors */
-    --gray-50: #f9fafb;
-    --gray-100: #f3f4f6;
-    --gray-200: #e5e7eb;
-    --gray-300: #d1d5db;
-    --gray-400: #9ca3af;
-    --gray-500: #6b7280;
-    --gray-600: #4b5563;
-    --gray-700: #374151;
-    --gray-800: #1f2937;
-    --gray-900: #111827;
-    --gray-950: #030712;
+    --gray-50: #F0ECE8;
+    --gray-100: #E8E3DD;
+    --gray-200: #D1CBC5;
+    --gray-300: #B5AEA6;
+    --gray-400: #8A8278;
+    --gray-500: #5A5248;
+    --gray-600: #3D3632;
+    --gray-700: #1B3D47;
+    --gray-800: #122D35;
+    --gray-900: #0A222E;
+    --gray-950: #061A21;
 
     /* Shadows */
     --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -80,30 +80,30 @@
     --focus-ring-color: var(--primary);
   }
 
-  /* Dark Mode */
+  /* Dark Mode — Electric Horizon (deep teal) */
   .dark {
-    --background: #030712;
-    --background-secondary: #111827;
-    --background-tertiary: #1f2937;
-    --foreground: #f9fafb;
-    --foreground-secondary: #d1d5db;
-    --foreground-tertiary: #9ca3af;
+    --background: #061A21;
+    --background-secondary: #081E28;
+    --background-tertiary: #0A222E;
+    --foreground: #F0ECE8;
+    --foreground-secondary: #B5AEA6;
+    --foreground-tertiary: #8A8278;
 
     /* Surface and Cards */
-    --surface: #111827;
-    --surface-secondary: #1f2937;
-    --surface-hover: #374151;
+    --surface: #0C2229;
+    --surface-secondary: #122D35;
+    --surface-hover: #1B3D47;
 
     /* Borders */
-    --border: #374151;
-    --border-light: #1f2937;
-    --border-dark: #4b5563;
+    --border: #1B3D47;
+    --border-light: #122D35;
+    --border-dark: #264A55;
 
     /* Semantic Colors - Dark Mode */
-    --primary: #0ea5e9;
-    --primary-light: #38bdf8;
-    --primary-lighter: #7dd3fc;
-    --primary-lightest: #e0f2fe;
+    --primary: #00E5A0;
+    --primary-light: #34D399;
+    --primary-lighter: #6EE7B7;
+    --primary-lightest: #D1FAE5;
 
     --success: #22c55e;
     --success-light: #4ade80;
@@ -120,25 +120,25 @@
     --error-lighter: #fca5a5;
     --error-lightest: #fee2e2;
 
-    --info: #3b82f6;
-    --info-light: #60a5fa;
-    --info-lighter: #93c5fd;
-    --info-lightest: #dbeafe;
+    --info: #00B4D8;
+    --info-light: #22D3EE;
+    --info-lighter: #67E8F9;
+    --info-lightest: #CFFAFE;
 
     /* Utility Colors - Dark */
-    --gray-50: #f9fafb;
-    --gray-100: #f3f4f6;
-    --gray-200: #e5e7eb;
-    --gray-300: #d1d5db;
-    --gray-400: #9ca3af;
-    --gray-500: #6b7280;
-    --gray-600: #4b5563;
-    --gray-700: #374151;
-    --gray-800: #1f2937;
-    --gray-900: #111827;
-    --gray-950: #030712;
+    --gray-50: #F0ECE8;
+    --gray-100: #E8E3DD;
+    --gray-200: #D1CBC5;
+    --gray-300: #B5AEA6;
+    --gray-400: #8A8278;
+    --gray-500: #5A5248;
+    --gray-600: #3D3632;
+    --gray-700: #1B3D47;
+    --gray-800: #122D35;
+    --gray-900: #0A222E;
+    --gray-950: #061A21;
 
-    /* Shadows - Dark mode uses lighter opacity */
+    /* Shadows - Dark mode uses neon-tinted opacity */
     --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3);
@@ -173,4 +173,95 @@ body {
 * {
   transition-property: background-color, border-color, color;
   transition-duration: var(--transition-normal);
+}
+
+/* ── Electric Horizon Global Utilities ── */
+
+.eh-reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+.eh-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.eh-gradient {
+  background: linear-gradient(135deg, #00E5A0, #00B4D8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.eh-btn-neon {
+  background: #00E5A0;
+  color: #061A21;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+.eh-btn-neon:hover {
+  background: #00CC8E;
+  box-shadow: 0 0 28px rgba(0, 229, 160, 0.3);
+}
+
+.eh-btn-ghost {
+  border: 1px solid #1B3D47;
+  color: #8A8278;
+  transition: all 0.2s ease;
+}
+.eh-btn-ghost:hover {
+  color: #00E5A0;
+  border-color: rgba(0, 229, 160, 0.3);
+}
+
+.eh-card {
+  background: rgba(12, 34, 41, 0.6);
+  border: 1px solid #1B3D47;
+  transition: transform 0.25s ease, border-color 0.25s ease,
+    box-shadow 0.25s ease !important;
+}
+.eh-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(0, 229, 160, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 229, 160, 0.06);
+}
+
+.eh-nav-link {
+  position: relative;
+}
+.eh-nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 1.5px;
+  background: #00E5A0;
+  transition: width 0.25s ease;
+}
+.eh-nav-link:hover::after {
+  width: 100%;
+}
+
+@keyframes eh-neon-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(0,229,160,0.25); }
+  50% { opacity: 0.4; box-shadow: 0 0 4px rgba(0,229,160,0.15); }
+}
+@keyframes eh-glow-breathe {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+@keyframes eh-float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+@keyframes eh-slide-in-left {
+  from { opacity: 0; transform: translateX(-30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes eh-slide-in-right {
+  from { opacity: 0; transform: translateX(30px); }
+  to { opacity: 1; transform: translateX(0); }
 }
