@@ -188,3 +188,120 @@ export interface CheckoutResponse {
 export interface BillingPortalResponse {
   url: string;
 }
+
+// Admin types
+export interface AdminPlan {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  screenQuota: number;
+  storageQuotaMb: number;
+  apiRateLimit: number;
+  priceUsdMonthly: number;
+  priceUsdYearly: number;
+  priceInrMonthly: number;
+  priceInrYearly: number;
+  stripePriceIdMonthly: string | null;
+  stripePriceIdYearly: string | null;
+  razorpayPlanIdMonthly: string | null;
+  razorpayPlanIdYearly: string | null;
+  features: string[];
+  isActive: boolean;
+  isPublic: boolean;
+  sortOrder: number;
+  highlightText: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Promotion {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  discountType: 'percentage' | 'fixed_amount' | 'free_months';
+  discountValue: number;
+  currency: string | null;
+  maxRedemptions: number | null;
+  maxPerCustomer: number;
+  currentRedemptions: number;
+  minPurchaseAmount: number | null;
+  startsAt: string;
+  expiresAt: string | null;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface AdminOrganization {
+  id: string;
+  name: string;
+  slug: string;
+  subscriptionTier: string;
+  subscriptionStatus: string;
+  screenQuota: number;
+  country: string | null;
+  createdAt: string;
+  _count: { users: number; displays: number };
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  isActive: boolean;
+  isSuperAdmin: boolean;
+  lastLoginAt: string | null;
+  organization: { id: string; name: string };
+}
+
+export interface PlatformStats {
+  totalOrganizations: number;
+  totalUsers: number;
+  totalScreens: number;
+  onlineScreens: number;
+  mrr: number;
+  arr: number;
+}
+
+export interface SystemConfig {
+  id: string;
+  key: string;
+  value: any;
+  dataType: string;
+  category: string;
+  description: string | null;
+  isSecret: boolean;
+}
+
+export interface AdminAuditLog {
+  id: string;
+  adminUserId: string;
+  action: string;
+  targetType: string | null;
+  targetId: string | null;
+  details: any;
+  ipAddress: string | null;
+  createdAt: string;
+}
+
+export interface SystemAnnouncement {
+  id: string;
+  title: string;
+  message: string;
+  type: 'info' | 'warning' | 'critical' | 'maintenance';
+  isActive: boolean;
+  startsAt: string;
+  expiresAt: string | null;
+}
+
+export interface IpBlocklistEntry {
+  id: string;
+  ipAddress: string;
+  reason: string | null;
+  isActive: boolean;
+  expiresAt: string | null;
+  createdAt: string;
+}

@@ -1,7 +1,7 @@
 // API Client for Vizora Middleware
 // Uses httpOnly cookies for secure JWT token storage
 
-import type { Display, DisplayOrientation, Content, Playlist, PlaylistItem, Schedule, PaginatedResponse, ContentFolder, AppNotification, ApiKey, CreateApiKeyResponse, SubscriptionStatus, Plan, QuotaUsage, Invoice, CheckoutResponse, BillingPortalResponse } from './types';
+import type { Display, DisplayOrientation, Content, Playlist, PlaylistItem, Schedule, PaginatedResponse, ContentFolder, AppNotification, ApiKey, CreateApiKeyResponse, SubscriptionStatus, Plan, QuotaUsage, Invoice, CheckoutResponse, BillingPortalResponse, AdminPlan, Promotion, AdminOrganization, AdminUser, PlatformStats, SystemConfig, AdminAuditLog, SystemAnnouncement, IpBlocklistEntry } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
 
@@ -956,6 +956,181 @@ class ApiClient {
   async getInvoices(limit?: number): Promise<Invoice[]> {
     const params = limit ? `?limit=${limit}` : '';
     return this.request<Invoice[]>(`/billing/invoices${params}`);
+  }
+
+  // ========== Admin API Methods ==========
+
+  // Admin - Plans
+  async getAdminPlans(): Promise<AdminPlan[]> {
+    return this.request<AdminPlan[]>('/admin/plans');
+  }
+
+  async createPlan(data: Partial<AdminPlan>): Promise<AdminPlan> {
+    return this.request<AdminPlan>('/admin/plans', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updatePlan(id: string, data: Partial<AdminPlan>): Promise<AdminPlan> {
+    return this.request<AdminPlan>(`/admin/plans/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deletePlan(id: string): Promise<void> {
+    await this.request<void>(`/admin/plans/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Admin - Promotions
+  async getAdminPromotions(): Promise<Promotion[]> {
+    return this.request<Promotion[]>('/admin/promotions');
+  }
+
+  async createPromotion(data: Partial<Promotion>): Promise<Promotion> {
+    return this.request<Promotion>('/admin/promotions', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updatePromotion(id: string, data: Partial<Promotion>): Promise<Promotion> {
+    return this.request<Promotion>(`/admin/promotions/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deletePromotion(id: string): Promise<void> {
+    await this.request<void>(`/admin/promotions/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Admin - Organizations
+  async getAdminOrganizations(params?: { search?: string; status?: string }): Promise<{ data: AdminOrganization[]; total: number }> {
+    const query = params
+      ? `?${new URLSearchParams(
+          Object.fromEntries(Object.entries(params).filter(([_, v]) => v !== undefined)) as Record<string, string>
+        ).toString()}`
+      : '';
+    return this.request<{ data: AdminOrganization[]; total: number }>(`/admin/organizations${query}`);
+  }
+
+  async getAdminOrganization(id: string): Promise<AdminOrganization> {
+    return this.request<AdminOrganization>(`/admin/organizations/${id}`);
+  }
+
+  async suspendOrganization(id: string): Promise<void> {
+    await this.request<void>(`/admin/organizations/${id}/suspend`, {
+      method: 'POST',
+    });
+  }
+
+  async unsuspendOrganization(id: string): Promise<void> {
+    await this.request<void>(`/admin/organizations/${id}/unsuspend`, {
+      method: 'POST',
+    });
+  }
+
+  async extendTrial(id: string, days: number): Promise<void> {
+    await this.request<void>(`/admin/organizations/${id}/extend-trial`, {
+      method: 'POST',
+      body: JSON.stringify({ days }),
+    });
+  }
+
+  // Admin - Users
+  async getAdminUsers(params?: { search?: string }): Promise<{ data: AdminUser[]; total: number }> {
+    const query = params?.search ? `?search=${encodeURIComponent(params.search)}` : '';
+    return this.request<{ data: AdminUser[]; total: number }>(`/admin/users${query}`);
+  }
+
+  async getAdminUser(id: string): Promise<AdminUser> {
+    return this.request<AdminUser>(`/admin/users/${id}`);
+  }
+
+  async disableUser(id: string): Promise<void> {
+    await this.request<void>(`/admin/users/${id}/disable`, {
+      method: 'POST',
+    });
+  }
+
+  async enableUser(id: string): Promise<void> {
+    await this.request<void>(`/admin/users/${id}/enable`, {
+      method: 'POST',
+    });
+  }
+
+  // Admin - Stats & Health
+  async getPlatformStats(): Promise<PlatformStats> {
+    return this.request<PlatformStats>('/admin/stats');
+  }
+
+  async getPlatformHealth(): Promise<any> {
+    return this.request<any>('/admin/health');
+  }
+
+  // Admin - Config
+  async getSystemConfigs(): Promise<SystemConfig[]> {
+    return this.request<SystemConfig[]>('/admin/config');
+  }
+
+  async updateSystemConfig(key: string, value: any): Promise<void> {
+    await this.request<void>(`/admin/config/${encodeURIComponent(key)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ value }),
+    });
+  }
+
+  // Admin - Security
+  async getAdminAuditLogs(): Promise<AdminAuditLog[]> {
+    return this.request<AdminAuditLog[]>('/admin/audit-logs');
+  }
+
+  async getIpBlocklist(): Promise<IpBlocklistEntry[]> {
+    return this.request<IpBlocklistEntry[]>('/admin/security/ip-blocklist');
+  }
+
+  async blockIp(ip: string, reason: string): Promise<void> {
+    await this.request<void>('/admin/security/ip-blocklist', {
+      method: 'POST',
+      body: JSON.stringify({ ipAddress: ip, reason }),
+    });
+  }
+
+  async unblockIp(id: string): Promise<void> {
+    await this.request<void>(`/admin/security/ip-blocklist/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Admin - Announcements
+  async getAnnouncements(): Promise<SystemAnnouncement[]> {
+    return this.request<SystemAnnouncement[]>('/admin/announcements');
+  }
+
+  async createAnnouncement(data: Partial<SystemAnnouncement>): Promise<SystemAnnouncement> {
+    return this.request<SystemAnnouncement>('/admin/announcements', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateAnnouncement(id: string, data: Partial<SystemAnnouncement>): Promise<SystemAnnouncement> {
+    return this.request<SystemAnnouncement>(`/admin/announcements/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteAnnouncement(id: string): Promise<void> {
+    await this.request<void>(`/admin/announcements/${id}`, {
+      method: 'DELETE',
+    });
   }
 }
 

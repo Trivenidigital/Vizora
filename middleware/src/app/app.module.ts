@@ -22,6 +22,7 @@ import { NotificationsModule } from '../modules/notifications/notifications.modu
 import { FoldersModule } from '../modules/folders/folders.module';
 import { ApiKeysModule } from '../modules/api-keys/api-keys.module';
 import { BillingModule } from '../modules/billing/billing.module';
+import { AdminModule } from '../modules/admin/admin.module';
 import { CsrfMiddleware } from '../modules/common/middleware/csrf.middleware';
 import { StorageModule } from '../modules/storage/storage.module';
 
@@ -89,6 +90,7 @@ import { StorageModule } from '../modules/storage/storage.module';
     FoldersModule,
     ApiKeysModule,
     BillingModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [
