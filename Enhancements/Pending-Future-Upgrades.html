@@ -176,7 +176,7 @@
     .wave-5 { background: #f3e8fd; color: #6c5ce7; }
     .wave-6 { background: #e8f4fd; color: #0077b6; }
     .wave-7 { background: #fde8e8; color: #d63031; }
-    .wave-7-5 { background: #fff3e0; color: #e65100; }
+    .wave-8 { background: #fff3e0; color: #e65100; }
 
     .progress-bar {
       width: 100%;
@@ -250,7 +250,7 @@
       <div class="label">Partially Done</div>
     </div>
     <div class="summary-card blue">
-      <div class="number">7.5</div>
+      <div class="number">8</div>
       <div class="label">Next: Admin System</div>
     </div>
     <div class="summary-card red">
@@ -322,10 +322,10 @@
         <td>207</td>
       </tr>
       <tr>
-        <td><span class="wave-badge wave-7-5">Wave 7.5</span></td>
-        <td>Admin System</td>
-        <td>SuperAdmin flag, Plan/Promotion/SystemConfig models, AdminModule, admin dashboard UI</td>
-        <td>~65 (planned)</td>
+        <td><span class="wave-badge wave-8">Wave 8</span></td>
+        <td>Admin System (Comprehensive)</td>
+        <td>SuperAdmin, Plans CRUD, Promotions, Org/User management, Health monitoring, Analytics, Security tools, Announcements</td>
+        <td>~200 (planned)</td>
       </tr>
     </table>
   </div>
@@ -807,23 +807,15 @@
     </ul>
   </div>
 
-  <!-- Wave 7.5 Planned -->
+  <!-- Wave 8 Planned - Comprehensive Admin System -->
   <div class="section">
-    <h2>Wave 7.5 (Next Sprint) — Admin System</h2>
+    <h2>Wave 8 (Next) — Comprehensive Admin System</h2>
 
     <div class="callout callout-info">
-      <strong>Business Critical:</strong> Wave 7.5 adds a Vizora Admin System for platform super-admins to manage plans, promotions, and system-wide configurations. Currently plans are hardcoded - any price or feature change requires code deployment.
+      <strong>Platform Operations:</strong> Wave 8 builds a complete Vizora Admin System for platform super-admins. This enables full control over plans, pricing, promotions, organization management, platform health, security, and communications — without code deployments.
     </div>
 
-    <h3>Why This Matters</h3>
-    <ul class="checklist">
-      <li><span class="pending">[ ]</span> <strong>Dynamic plan management</strong> - Change prices, features, quotas without code deployment</li>
-      <li><span class="pending">[ ]</span> <strong>Promotion campaigns</strong> - Time-limited discounts, promo codes (LAUNCH50, DIWALI2026)</li>
-      <li><span class="pending">[ ]</span> <strong>System configuration</strong> - Feature flags, maintenance mode, global settings</li>
-      <li><span class="pending">[ ]</span> <strong>Platform analytics</strong> - Cross-org stats for business intelligence</li>
-    </ul>
-
-    <h3>Schema Additions</h3>
+    <h3>Schema Additions (9 models)</h3>
     <table>
       <tr>
         <th>Model</th>
@@ -835,51 +827,118 @@
       </tr>
       <tr>
         <td><code>Plan</code></td>
-        <td>Dynamic plan tiers stored in DB (replaces hardcoded PLAN_TIERS)</td>
+        <td>Dynamic plan tiers with pricing, quotas, features, payment provider IDs</td>
       </tr>
       <tr>
         <td><code>Promotion</code></td>
-        <td>Discount codes with expiry, redemption limits, plan restrictions</td>
+        <td>Discount codes with expiry, redemption limits, discount types</td>
       </tr>
       <tr>
         <td><code>PlanPromotion</code></td>
         <td>Join table for plan-specific promotions</td>
       </tr>
       <tr>
+        <td><code>PromotionRedemption</code></td>
+        <td>Track who used what promo code</td>
+      </tr>
+      <tr>
         <td><code>SystemConfig</code></td>
-        <td>Key-value store for system-wide configuration</td>
+        <td>Key-value store for system-wide settings (maintenance mode, limits)</td>
+      </tr>
+      <tr>
+        <td><code>AdminAuditLog</code></td>
+        <td>Log all admin actions for accountability</td>
+      </tr>
+      <tr>
+        <td><code>SystemAnnouncement</code></td>
+        <td>Platform-wide announcements and maintenance notices</td>
+      </tr>
+      <tr>
+        <td><code>IpBlocklist</code></td>
+        <td>Block malicious IPs from the platform</td>
       </tr>
     </table>
 
-    <h3>Backend: AdminModule</h3>
+    <h3>Admin Functions by Category</h3>
+
+    <h4>P0: Foundation (Must Have)</h4>
+    <ul class="checklist">
+      <li><span class="pending">[ ]</span> <strong>Plan Management</strong> - CRUD plans, set prices (USD/INR), configure quotas, link Stripe/Razorpay IDs</li>
+      <li><span class="pending">[ ]</span> <strong>Organization Overview</strong> - List/search all orgs, view details, suspend, extend trial</li>
+      <li><span class="pending">[ ]</span> <strong>Platform Dashboard</strong> - Overview stats (orgs, users, screens, revenue)</li>
+      <li><span class="pending">[ ]</span> <strong>System Health</strong> - Service status (DB, Redis, MinIO, WebSocket)</li>
+    </ul>
+
+    <h4>P1: Core Operations</h4>
+    <ul class="checklist">
+      <li><span class="pending">[ ]</span> <strong>Promotion Management</strong> - Create promo codes, set discounts, track redemptions</li>
+      <li><span class="pending">[ ]</span> <strong>User Management</strong> - List users, disable accounts, reset passwords, impersonate</li>
+      <li><span class="pending">[ ]</span> <strong>Billing Operations</strong> - View transactions, retry failed payments, issue refunds</li>
+      <li><span class="pending">[ ]</span> <strong>System Configuration</strong> - Feature flags, maintenance mode, default settings</li>
+      <li><span class="pending">[ ]</span> <strong>Platform Analytics</strong> - MRR/ARR, signups, churn, feature adoption</li>
+      <li><span class="pending">[ ]</span> <strong>Security Tools</strong> - IP blocklist, audit log, API key management</li>
+    </ul>
+
+    <h4>P2: Communications & Support</h4>
+    <ul class="checklist">
+      <li><span class="pending">[ ]</span> <strong>System Announcements</strong> - Banner notices, maintenance alerts</li>
+      <li><span class="pending">[ ]</span> <strong>Support Tools</strong> - Quick lookup, test push, cache clear, debug reports</li>
+      <li><span class="pending">[ ]</span> <strong>Device Diagnostics</strong> - Remote device health checks</li>
+    </ul>
+
+    <h3>API Endpoints (50+ endpoints)</h3>
     <table>
       <tr>
-        <th>Endpoint</th>
-        <th>Description</th>
+        <th>Category</th>
+        <th>Endpoints</th>
       </tr>
       <tr>
-        <td><code>GET/POST/PUT/DELETE /admin/plans</code></td>
-        <td>Full CRUD for plan tiers</td>
+        <td>Plans</td>
+        <td><code>/admin/plans</code> - CRUD, duplicate, reorder</td>
       </tr>
       <tr>
-        <td><code>GET/POST/PUT/DELETE /admin/promotions</code></td>
-        <td>Promotion management</td>
+        <td>Promotions</td>
+        <td><code>/admin/promotions</code> - CRUD, validate, bulk-generate, redemptions</td>
       </tr>
       <tr>
-        <td><code>POST /admin/promotions/:id/validate</code></td>
-        <td>Validate promo code for checkout</td>
+        <td>Organizations</td>
+        <td><code>/admin/organizations</code> - List, details, suspend, extend-trial, impersonate, notes</td>
       </tr>
       <tr>
-        <td><code>GET/PUT /admin/config</code></td>
-        <td>System configuration CRUD</td>
+        <td>Users</td>
+        <td><code>/admin/users</code> - List, details, disable, reset-password, grant/revoke super-admin</td>
       </tr>
       <tr>
-        <td><code>GET /admin/stats</code></td>
-        <td>Platform-wide statistics</td>
+        <td>Health</td>
+        <td><code>/admin/health</code> - Services, database, redis, storage, websocket, errors, uptime</td>
+      </tr>
+      <tr>
+        <td>Analytics</td>
+        <td><code>/admin/stats</code> - Overview, revenue, signups, churn, usage, geographic, plans</td>
+      </tr>
+      <tr>
+        <td>Billing</td>
+        <td><code>/admin/billing</code> - Transactions, failed-payments, retry, refund, revenue-report</td>
+      </tr>
+      <tr>
+        <td>Config</td>
+        <td><code>/admin/config</code> - Get, update, bulk, by-category</td>
+      </tr>
+      <tr>
+        <td>Security</td>
+        <td><code>/admin/security</code> - Audit-log, failed-logins, ip-blocklist, api-keys, sessions</td>
+      </tr>
+      <tr>
+        <td>Announcements</td>
+        <td><code>/admin/announcements</code> - CRUD, publish</td>
+      </tr>
+      <tr>
+        <td>Support</td>
+        <td><code>/admin/support</code> - Lookup, test-push, clear-cache, debug-report, diagnostics</td>
       </tr>
     </table>
 
-    <h3>Frontend: Admin Dashboard</h3>
+    <h3>Frontend: Admin Dashboard (15 pages)</h3>
     <table>
       <tr>
         <th>Page</th>
@@ -887,61 +946,97 @@
       </tr>
       <tr>
         <td><code>/admin</code></td>
-        <td>Dashboard with platform stats, quick actions</td>
+        <td>Dashboard overview with stats, charts, quick actions</td>
       </tr>
       <tr>
         <td><code>/admin/plans</code></td>
-        <td>Plan table with edit/create modals, Stripe/Razorpay ID config</td>
+        <td>Plan table, create/edit forms, pricing config</td>
       </tr>
       <tr>
         <td><code>/admin/promotions</code></td>
-        <td>Promotion list with date pickers, redemption tracking</td>
+        <td>Promo list, date pickers, redemption stats</td>
+      </tr>
+      <tr>
+        <td><code>/admin/organizations</code></td>
+        <td>Org list with filters, detail view, action buttons</td>
+      </tr>
+      <tr>
+        <td><code>/admin/users</code></td>
+        <td>User list, search, detail view, impersonate</td>
+      </tr>
+      <tr>
+        <td><code>/admin/health</code></td>
+        <td>Service status cards, DB/Redis/MinIO stats</td>
+      </tr>
+      <tr>
+        <td><code>/admin/analytics</code></td>
+        <td>Revenue charts, signup trends, usage graphs</td>
+      </tr>
+      <tr>
+        <td><code>/admin/billing</code></td>
+        <td>Transaction table, failed payments, refund actions</td>
       </tr>
       <tr>
         <td><code>/admin/config</code></td>
-        <td>Key-value config editor with JSON support</td>
+        <td>Config editor with categories, JSON support</td>
+      </tr>
+      <tr>
+        <td><code>/admin/security</code></td>
+        <td>Audit log viewer, IP blocklist manager</td>
+      </tr>
+      <tr>
+        <td><code>/admin/announcements</code></td>
+        <td>Announcement list, create/edit with targeting</td>
+      </tr>
+      <tr>
+        <td><code>/admin/support</code></td>
+        <td>Quick lookup, diagnostic tools</td>
       </tr>
     </table>
 
-    <h3>Integration Updates</h3>
-    <ul class="checklist">
-      <li><span class="pending">[ ]</span> <strong>SuperAdminGuard</strong> - Protect /admin/* routes with isSuperAdmin check</li>
-      <li><span class="pending">[ ]</span> <strong>Update BillingService</strong> - Read plans from DB instead of constants</li>
-      <li><span class="pending">[ ]</span> <strong>Promo code on checkout</strong> - Apply discount, track redemptions</li>
-      <li><span class="pending">[ ]</span> <strong>Seed migration</strong> - Migrate PLAN_TIERS constants to Plan table</li>
-    </ul>
-
-    <h3>Estimated Effort</h3>
+    <h3>Implementation Phases</h3>
     <table>
       <tr>
-        <th>Component</th>
+        <th>Phase</th>
+        <th>Focus</th>
         <th>Effort</th>
         <th>Tests</th>
       </tr>
       <tr>
-        <td>Schema + Migration</td>
-        <td>1 hour</td>
-        <td>-</td>
+        <td>Phase 1 (P0)</td>
+        <td>Schema, Plans CRUD, Basic Org List, Health</td>
+        <td>~12 hours</td>
+        <td>~50</td>
       </tr>
       <tr>
-        <td>Backend (AdminModule)</td>
-        <td>4 hours</td>
+        <td>Phase 2 (P1a)</td>
+        <td>Promotions, Org Actions, User Management, Config</td>
+        <td>~12 hours</td>
+        <td>~50</td>
+      </tr>
+      <tr>
+        <td>Phase 3 (P1b)</td>
+        <td>Analytics, Health Dashboard, Stats Charts</td>
+        <td>~10 hours</td>
         <td>~40</td>
       </tr>
       <tr>
-        <td>Frontend (Admin UI)</td>
-        <td>4 hours</td>
-        <td>~25</td>
+        <td>Phase 4 (P1c)</td>
+        <td>Billing Operations, Security Tools, Audit Log</td>
+        <td>~8 hours</td>
+        <td>~35</td>
       </tr>
       <tr>
-        <td>Integration + Testing</td>
-        <td>2 hours</td>
-        <td>-</td>
+        <td>Phase 5 (P2)</td>
+        <td>Announcements, Support Tools, Diagnostics</td>
+        <td>~6 hours</td>
+        <td>~25</td>
       </tr>
       <tr style="font-weight: bold; background: #f1f3f5;">
         <td>Total</td>
-        <td>~11 hours</td>
-        <td>~65 tests</td>
+        <td>Complete Admin System</td>
+        <td>~48 hours</td>
+        <td>~200 tests</td>
       </tr>
     </table>
   </div>
