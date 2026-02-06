@@ -176,6 +176,7 @@
     .wave-5 { background: #f3e8fd; color: #6c5ce7; }
     .wave-6 { background: #e8f4fd; color: #0077b6; }
     .wave-7 { background: #fde8e8; color: #d63031; }
+    .wave-7-5 { background: #fff3e0; color: #e65100; }
 
     .progress-bar {
       width: 100%;
@@ -248,9 +249,9 @@
       <div class="number">4</div>
       <div class="label">Partially Done</div>
     </div>
-    <div class="summary-card purple">
-      <div class="number">207</div>
-      <div class="label">New Tests (Wave 7)</div>
+    <div class="summary-card blue">
+      <div class="number">7.5</div>
+      <div class="label">Next: Admin System</div>
     </div>
     <div class="summary-card red">
       <div class="number">13</div>
@@ -319,6 +320,12 @@
         <td>Billing & Subscriptions</td>
         <td>Stripe + Razorpay dual payment, BillingModule, subscription/quota guards, webhook handlers, billing UI (overview, plans, history)</td>
         <td>207</td>
+      </tr>
+      <tr>
+        <td><span class="wave-badge wave-7-5">Wave 7.5</span></td>
+        <td>Admin System</td>
+        <td>SuperAdmin flag, Plan/Promotion/SystemConfig models, AdminModule, admin dashboard UI</td>
+        <td>~65 (planned)</td>
       </tr>
     </table>
   </div>
@@ -791,13 +798,152 @@
       </tr>
     </table>
 
-    <h3>Phase 3 (Next)</h3>
+    <h3>Phase 3 (After Wave 7.5)</h3>
     <ul class="checklist">
       <li><span class="pending">[ ]</span> <strong>Template library</strong> - Searchable templates with categories</li>
       <li><span class="pending">[ ]</span> <strong>Widget architecture</strong> - Weather, social feeds, RSS integration</li>
       <li><span class="pending">[ ]</span> <strong>QR code overlay</strong> - Dynamic QR codes on content</li>
       <li><span class="pending">[ ]</span> <strong>Split-screen layouts</strong> - Multi-zone display support</li>
     </ul>
+  </div>
+
+  <!-- Wave 7.5 Planned -->
+  <div class="section">
+    <h2>Wave 7.5 (Next Sprint) — Admin System</h2>
+
+    <div class="callout callout-info">
+      <strong>Business Critical:</strong> Wave 7.5 adds a Vizora Admin System for platform super-admins to manage plans, promotions, and system-wide configurations. Currently plans are hardcoded - any price or feature change requires code deployment.
+    </div>
+
+    <h3>Why This Matters</h3>
+    <ul class="checklist">
+      <li><span class="pending">[ ]</span> <strong>Dynamic plan management</strong> - Change prices, features, quotas without code deployment</li>
+      <li><span class="pending">[ ]</span> <strong>Promotion campaigns</strong> - Time-limited discounts, promo codes (LAUNCH50, DIWALI2026)</li>
+      <li><span class="pending">[ ]</span> <strong>System configuration</strong> - Feature flags, maintenance mode, global settings</li>
+      <li><span class="pending">[ ]</span> <strong>Platform analytics</strong> - Cross-org stats for business intelligence</li>
+    </ul>
+
+    <h3>Schema Additions</h3>
+    <table>
+      <tr>
+        <th>Model</th>
+        <th>Purpose</th>
+      </tr>
+      <tr>
+        <td><code>User.isSuperAdmin</code></td>
+        <td>Boolean flag for Vizora platform admins (separate from org admins)</td>
+      </tr>
+      <tr>
+        <td><code>Plan</code></td>
+        <td>Dynamic plan tiers stored in DB (replaces hardcoded PLAN_TIERS)</td>
+      </tr>
+      <tr>
+        <td><code>Promotion</code></td>
+        <td>Discount codes with expiry, redemption limits, plan restrictions</td>
+      </tr>
+      <tr>
+        <td><code>PlanPromotion</code></td>
+        <td>Join table for plan-specific promotions</td>
+      </tr>
+      <tr>
+        <td><code>SystemConfig</code></td>
+        <td>Key-value store for system-wide configuration</td>
+      </tr>
+    </table>
+
+    <h3>Backend: AdminModule</h3>
+    <table>
+      <tr>
+        <th>Endpoint</th>
+        <th>Description</th>
+      </tr>
+      <tr>
+        <td><code>GET/POST/PUT/DELETE /admin/plans</code></td>
+        <td>Full CRUD for plan tiers</td>
+      </tr>
+      <tr>
+        <td><code>GET/POST/PUT/DELETE /admin/promotions</code></td>
+        <td>Promotion management</td>
+      </tr>
+      <tr>
+        <td><code>POST /admin/promotions/:id/validate</code></td>
+        <td>Validate promo code for checkout</td>
+      </tr>
+      <tr>
+        <td><code>GET/PUT /admin/config</code></td>
+        <td>System configuration CRUD</td>
+      </tr>
+      <tr>
+        <td><code>GET /admin/stats</code></td>
+        <td>Platform-wide statistics</td>
+      </tr>
+    </table>
+
+    <h3>Frontend: Admin Dashboard</h3>
+    <table>
+      <tr>
+        <th>Page</th>
+        <th>Features</th>
+      </tr>
+      <tr>
+        <td><code>/admin</code></td>
+        <td>Dashboard with platform stats, quick actions</td>
+      </tr>
+      <tr>
+        <td><code>/admin/plans</code></td>
+        <td>Plan table with edit/create modals, Stripe/Razorpay ID config</td>
+      </tr>
+      <tr>
+        <td><code>/admin/promotions</code></td>
+        <td>Promotion list with date pickers, redemption tracking</td>
+      </tr>
+      <tr>
+        <td><code>/admin/config</code></td>
+        <td>Key-value config editor with JSON support</td>
+      </tr>
+    </table>
+
+    <h3>Integration Updates</h3>
+    <ul class="checklist">
+      <li><span class="pending">[ ]</span> <strong>SuperAdminGuard</strong> - Protect /admin/* routes with isSuperAdmin check</li>
+      <li><span class="pending">[ ]</span> <strong>Update BillingService</strong> - Read plans from DB instead of constants</li>
+      <li><span class="pending">[ ]</span> <strong>Promo code on checkout</strong> - Apply discount, track redemptions</li>
+      <li><span class="pending">[ ]</span> <strong>Seed migration</strong> - Migrate PLAN_TIERS constants to Plan table</li>
+    </ul>
+
+    <h3>Estimated Effort</h3>
+    <table>
+      <tr>
+        <th>Component</th>
+        <th>Effort</th>
+        <th>Tests</th>
+      </tr>
+      <tr>
+        <td>Schema + Migration</td>
+        <td>1 hour</td>
+        <td>-</td>
+      </tr>
+      <tr>
+        <td>Backend (AdminModule)</td>
+        <td>4 hours</td>
+        <td>~40</td>
+      </tr>
+      <tr>
+        <td>Frontend (Admin UI)</td>
+        <td>4 hours</td>
+        <td>~25</td>
+      </tr>
+      <tr>
+        <td>Integration + Testing</td>
+        <td>2 hours</td>
+        <td>-</td>
+      </tr>
+      <tr style="font-weight: bold; background: #f1f3f5;">
+        <td>Total</td>
+        <td>~11 hours</td>
+        <td>~65 tests</td>
+      </tr>
+    </table>
   </div>
 
   <!-- Branch & Commit Info -->
