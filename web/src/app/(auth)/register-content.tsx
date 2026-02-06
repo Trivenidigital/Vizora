@@ -42,12 +42,12 @@ export default function RegisterContent() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 py-12">
-      <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
-        <h1 className="text-3xl font-bold text-center mb-6">Create Account</h1>
+    <div className="min-h-screen flex items-center justify-center bg-[var(--background)] py-12">
+      <div className="bg-[var(--surface)] p-8 rounded-xl shadow-lg border border-[var(--border)] w-full max-w-md">
+        <h1 className="text-3xl font-bold text-center mb-6 eh-gradient">Create Account</h1>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+          <div className="bg-red-500/10 border border-red-500/30 text-red-500 px-4 py-3 rounded mb-4">
             {error}
           </div>
         )}
@@ -55,7 +55,7 @@ export default function RegisterContent() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="firstName" className="block text-sm font-medium text-[var(--foreground-secondary)] mb-1">
                 First Name
               </label>
               <input
@@ -65,14 +65,14 @@ export default function RegisterContent() {
                 minLength={2}
                 value={formData.firstName}
                 onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-2 focus:outline-offset-2 focus:outline-blue-500 focus:ring-2 focus:ring-blue-500 text-gray-900"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[#00E5A0] bg-[var(--background)] text-[var(--foreground)]"
                 placeholder="John"
                 aria-label="First Name"
               />
             </div>
 
             <div>
-              <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="lastName" className="block text-sm font-medium text-[var(--foreground-secondary)] mb-1">
                 Last Name
               </label>
               <input
@@ -82,7 +82,7 @@ export default function RegisterContent() {
                 minLength={2}
                 value={formData.lastName}
                 onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-2 focus:outline-offset-2 focus:outline-blue-500 focus:ring-2 focus:ring-blue-500 text-gray-900"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[#00E5A0] bg-[var(--background)] text-[var(--foreground)]"
                 placeholder="Doe"
                 aria-label="Last Name"
               />
@@ -90,7 +90,7 @@ export default function RegisterContent() {
           </div>
 
           <div>
-            <label htmlFor="organization" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="organization" className="block text-sm font-medium text-[var(--foreground-secondary)] mb-1">
               Organization Name
             </label>
             <input
@@ -100,14 +100,14 @@ export default function RegisterContent() {
               minLength={2}
               value={formData.organizationName}
               onChange={(e) => setFormData({ ...formData, organizationName: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-2 focus:outline-offset-2 focus:outline-blue-500 focus:ring-2 focus:ring-blue-500 text-gray-900"
+              className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[#00E5A0] bg-[var(--background)] text-[var(--foreground)]"
               placeholder="Acme Corp"
               aria-label="Organization Name"
             />
           </div>
 
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="email" className="block text-sm font-medium text-[var(--foreground-secondary)] mb-1">
               Email
             </label>
             <input
@@ -116,14 +116,14 @@ export default function RegisterContent() {
               required
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-2 focus:outline-offset-2 focus:outline-blue-500 focus:ring-2 focus:ring-blue-500 text-gray-900"
+              className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[#00E5A0] bg-[var(--background)] text-[var(--foreground)]"
               placeholder="john@acmecorp.com"
               aria-label="Email address"
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="password" className="block text-sm font-medium text-[var(--foreground-secondary)] mb-1">
               Password
             </label>
             <input
@@ -133,12 +133,12 @@ export default function RegisterContent() {
               minLength={8}
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-2 focus:outline-offset-2 focus:outline-blue-500 focus:ring-2 focus:ring-blue-500 text-gray-900"
+              className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[#00E5A0] bg-[var(--background)] text-[var(--foreground)]"
               placeholder="••••••••"
               aria-label="Password"
               aria-describedby="password-requirements"
             />
-            <p id="password-requirements" className="mt-1 text-xs text-gray-500" role="note">
+            <p id="password-requirements" className="mt-1 text-xs text-[var(--foreground-tertiary)]" role="note">
               Must be 8+ characters with uppercase, lowercase, and number/special char
             </p>
           </div>
@@ -146,15 +146,15 @@ export default function RegisterContent() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400 transition font-semibold"
+            className="w-full bg-[#00E5A0] text-[#061A21] py-2 rounded-md hover:bg-[#00CC8E] disabled:opacity-50 transition font-semibold"
           >
             {loading ? 'Creating account...' : 'Create Account'}
           </button>
         </form>
 
-        <p className="text-center mt-6 text-gray-600">
+        <p className="text-center mt-6 text-[var(--foreground-secondary)]">
           Already have an account?{' '}
-          <Link href="/login" className="text-blue-600 hover:underline">
+          <Link href="/login" className="text-[#00E5A0] hover:underline">
             Login
           </Link>
         </p>
