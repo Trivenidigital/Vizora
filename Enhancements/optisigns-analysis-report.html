@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Comprehensive Digital Signage Platform</title>
+  <style>
+    :root {
+      --primary: #2cb67d;
+      --primary-dark: #1e9e6b;
+      --bg: #f8f9fa;
+      --card-bg: #ffffff;
+      --text: #2d3436;
+      --text-muted: #636e72;
+      --border: #dfe6e9;
+      --accent-blue: #0984e3;
+      --accent-orange: #e17055;
+      --accent-purple: #6c5ce7;
+      --accent-red: #d63031;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    .header {
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: white;
+      padding: 3rem 2rem;
+      text-align: center;
+    }
+    .header h1 { font-size: 2.2rem; margin-bottom: 0.5rem; }
+    .header .subtitle { opacity: 0.9; font-size: 1.1rem; }
+    .header .meta {
+      margin-top: 1rem;
+      font-size: 0.9rem;
+      opacity: 0.8;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    .toc {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      border: 1px solid var(--border);
+    }
+    .toc h2 { font-size: 1.3rem; margin-bottom: 1rem; color: var(--primary-dark); }
+    .toc ol { padding-left: 1.5rem; }
+    .toc li { margin-bottom: 0.4rem; }
+    .toc a { color: var(--accent-blue); text-decoration: none; }
+    .toc a:hover { text-decoration: underline; }
+
+    .section {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 1.5rem;
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .section h2 {
+      font-size: 1.5rem;
+      color: var(--primary-dark);
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid var(--primary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .section h3 {
+      font-size: 1.15rem;
+      color: var(--text);
+      margin: 1.2rem 0 0.6rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.6rem;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .badge-green { background: #e6f9f0; color: #1e9e6b; }
+    .badge-blue { background: #e3f2fd; color: #0984e3; }
+    .badge-orange { background: #ffeee8; color: #e17055; }
+    .badge-purple { background: #f0ebff; color: #6c5ce7; }
+    .badge-red { background: #fde8e8; color: #d63031; }
+
+    ul.features { list-style: none; padding: 0; }
+    ul.features li {
+      padding: 0.4rem 0 0.4rem 1.5rem;
+      position: relative;
+    }
+    ul.features li::before {
+      content: "\2713";
+      position: absolute;
+      left: 0;
+      color: var(--primary);
+      font-weight: bold;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.92rem;
+    }
+    th, td {
+      padding: 0.7rem 0.8rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      background: #f1f3f5;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+    }
+    tr:hover td { background: #f8f9fa; }
+
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+    .pricing-card {
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      padding: 1.2rem;
+      text-align: center;
+      transition: transform 0.2s;
+    }
+    .pricing-card:hover { transform: translateY(-2px); }
+    .pricing-card.popular { border-color: var(--primary); }
+    .pricing-card .plan-name { font-weight: 700; font-size: 1.1rem; }
+    .pricing-card .plan-tagline { font-size: 0.8rem; color: var(--text-muted); margin: 0.3rem 0; }
+    .pricing-card .plan-price { font-size: 1.8rem; font-weight: 700; color: var(--primary-dark); margin: 0.5rem 0; }
+    .pricing-card .plan-price span { font-size: 0.85rem; font-weight: 400; color: var(--text-muted); }
+    .pricing-card .plan-support { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.5rem; }
+
+    .comparison-row { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+    .comparison-row .tag {
+      display: inline-block;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.78rem;
+      font-weight: 500;
+    }
+    .tag-has { background: #e6f9f0; color: #1e9e6b; }
+    .tag-partial { background: #fff3cd; color: #856404; }
+    .tag-missing { background: #fde8e8; color: #d63031; }
+
+    .settings-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 0.5rem;
+      margin: 1rem 0;
+    }
+    .settings-item {
+      padding: 0.5rem 0.8rem;
+      background: #f1f3f5;
+      border-radius: 6px;
+      font-size: 0.88rem;
+    }
+
+    .callout {
+      padding: 1rem 1.2rem;
+      border-radius: 8px;
+      margin: 1rem 0;
+      border-left: 4px solid;
+    }
+    .callout-info { background: #e3f2fd; border-color: #0984e3; }
+    .callout-warning { background: #fff3cd; border-color: #f39c12; }
+    .callout-success { background: #e6f9f0; border-color: #1e9e6b; }
+
+    .footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    @media (max-width: 768px) {
+      .header h1 { font-size: 1.6rem; }
+      .pricing-grid { grid-template-columns: 1fr 1fr; }
+      table { font-size: 0.82rem; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Comprehensive Digital Signage Platform</h1>
+  <div class="subtitle">Competitive Analysis for Vizora Digital Signage Platform</div>
+  <div class="meta">
+    Generated: February 5, 2026 &nbsp;|&nbsp; Account: Srini Yelavarthi (Standard Plan, 10 Screens)
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Table of Contents -->
+  <div class="toc">
+    <h2>Table of Contents</h2>
+    <ol>
+      <li><a href="#overview">Platform Overview</a></li>
+      <li><a href="#screens">Screens Management</a></li>
+      <li><a href="#assets">Files / Assets Management</a></li>
+      <li><a href="#playlists">Playlists Management</a></li>
+      <li><a href="#schedules">Schedules Management</a></li>
+      <li><a href="#templates">Templates &amp; Design Studio</a></li>
+      <li><a href="#engage">Engage (Interactive Experiences)</a></li>
+      <li><a href="#analytics">Analytics</a></li>
+      <li><a href="#pricing">Pricing Tiers</a></li>
+      <li><a href="#settings">Account &amp; Settings</a></li>
+      <li><a href="#addons">Add-on Products</a></li>
+      <li><a href="#comparison">Vizora Comparison Matrix</a></li>
+      <li><a href="#opportunities">Enhancement Opportunities for Vizora</a></li>
+    </ol>
+  </div>
+
+  <!-- 1. Overview -->
+  <div class="section" id="overview">
+    <h2>1. Platform Overview</h2>
+    <p>
+      Future Signage is a cloud-based digital signage management platform enabling businesses to manage
+      and distribute content to display screens across locations. The platform uses a SPA-based web
+      dashboard at <strong>Future Signage</strong> with a consistent green-themed UI and top navigation bar.
+    </p>
+    <div class="callout callout-info">
+      <strong>Architecture:</strong> Cloud-hosted SPA with real-time updates. Supports multiple device types
+      including Fire TV Stick, Android TV, Raspberry Pi, Windows, Chrome OS, LG webOS, Samsung Tizen, and their
+      own OptiKiosk hardware. Per-screen licensing model with 5 pricing tiers.
+    </div>
+    <h3>Primary Navigation</h3>
+    <ul class="features">
+      <li>Screens &mdash; Device management and monitoring</li>
+      <li>Files/Assets &mdash; Media library and content storage</li>
+      <li>Playlists &mdash; Content sequence builder</li>
+      <li>Schedules &mdash; Calendar-based content scheduling</li>
+      <li>Templates &mdash; Design studio with AI generation</li>
+      <li>Engage &mdash; Interactive experiences (kiosks, QR, IoT)</li>
+      <li>Analytics &mdash; Proof of Play and AI-powered audience analytics</li>
+    </ul>
+  </div>
+
+  <!-- 2. Screens -->
+  <div class="section" id="screens">
+    <h2>2. Screens Management</h2>
+
+    <h3>Device Inventory</h3>
+    <ul class="features">
+      <li>List view with real-time <span class="badge badge-green">Online</span> / <span class="badge badge-red">Offline</span> status badges</li>
+      <li>Each screen shows assigned content (Playlist or Asset) with quick-change dropdown</li>
+      <li>Preview and Edit actions per screen, plus 3-dot overflow menu for advanced options</li>
+      <li>Checkbox-based bulk selection with search, sort, and filter controls</li>
+      <li>Folder organization with "OnHold Devices" staging area</li>
+    </ul>
+
+    <h3>Edit Screen Dialog</h3>
+    <table>
+      <tr><th>Field</th><th>Description</th></tr>
+      <tr><td>Device Name</td><td>User-friendly display name</td></tr>
+      <tr><td>Tags</td><td>Free-form tagging for organization</td></tr>
+      <tr><td>Type</td><td>Playlist or single Asset assignment</td></tr>
+      <tr><td>Selected Playlist</td><td>Dropdown with "Go To" link to edit playlist</td></tr>
+      <tr><td>Orientation</td><td>Normal, Rotate 90&deg;, Rotate 180&deg;, Rotate 270&deg;</td></tr>
+      <tr><td>Operational Schedule</td><td>Expandable section for on/off hours</td></tr>
+      <tr><td>Background Music</td><td>Expandable section for ambient audio</td></tr>
+      <tr><td>Advanced</td><td>Expandable section for device-specific settings</td></tr>
+    </table>
+
+    <h3>Top-Level Actions</h3>
+    <ul class="features">
+      <li><strong>Add Screen</strong> &mdash; Pair a new display device</li>
+      <li><strong>Add Folder</strong> &mdash; Organize screens into groups</li>
+      <li><strong>Order Devices</strong> &mdash; Purchase Future Signage hardware</li>
+      <li><strong>Add-ons</strong> &mdash; Extend functionality (OptiSound, AeriCast)</li>
+    </ul>
+
+    <h3>Observed Devices (Account)</h3>
+    <table>
+      <tr><th>Device</th><th>Status</th><th>Assigned Content</th></tr>
+      <tr><td>TV 3</td><td><span class="badge badge-green">Online</span></td><td>Playlist: TV3</td></tr>
+      <tr><td>Bakery screen 1</td><td><span class="badge badge-green">Online</span></td><td>Playlist: Screen 3 bakery</td></tr>
+      <tr><td>Bakery #2</td><td><span class="badge badge-red">Offline</span></td><td>Playlist: bakery 2 playlist</td></tr>
+      <tr><td>Meat Screen</td><td><span class="badge badge-green">Online</span></td><td>Playlist: Meat Screen</td></tr>
+      <tr><td>Bakery #3</td><td><span class="badge badge-red">Offline</span></td><td>Playlist: Screen 3 bakery</td></tr>
+      <tr><td>TV1</td><td><span class="badge badge-red">Offline</span></td><td>Asset: WhatsApp Image</td></tr>
+      <tr><td>FOOD TRUCK MENU</td><td><span class="badge badge-red">Offline</span></td><td>Playlist: Food Truck Menu</td></tr>
+      <tr><td>TV4</td><td><span class="badge badge-green">Online</span></td><td>Playlist: TV4</td></tr>
+      <tr><td>TV5</td><td><span class="badge badge-green">Online</span></td><td>Playlist: TV5</td></tr>
+      <tr><td>TV2</td><td><span class="badge badge-green">Online</span></td><td>Playlist: TV2</td></tr>
+    </table>
+  </div>
+
+  <!-- 3. Assets -->
+  <div class="section" id="assets">
+    <h2>3. Files / Assets Management</h2>
+
+    <h3>Content Library</h3>
+    <ul class="features">
+      <li>Grid and list view toggle for browsing assets</li>
+      <li>Folder organization (observed: "non veg", "Breakfast -- FoodTruck")</li>
+      <li>Upload Files button for direct media upload</li>
+      <li>Search functionality with asset name matching</li>
+      <li>Sort controls for ordering content</li>
+    </ul>
+
+    <h3>Content Sources</h3>
+    <table>
+      <tr><th>Source</th><th>Description</th></tr>
+      <tr><td>Upload Files</td><td>Direct upload of images, videos, documents</td></tr>
+      <tr><td>Apps</td><td>100+ integrations (weather, social, dashboards, etc.)</td></tr>
+      <tr><td>Templates</td><td>Pre-designed signage templates</td></tr>
+      <tr><td>Feeds</td><td>Dynamic data feeds (RSS, social, calendars)</td></tr>
+    </table>
+
+    <h3>Type Filters</h3>
+    <ul class="features">
+      <li><strong>All</strong> &mdash; Show all asset types</li>
+      <li><strong>Images</strong> &mdash; JPEG, PNG, BMP, GIF</li>
+      <li><strong>Videos</strong> &mdash; MP4, MOV, AVI</li>
+      <li><strong>Docs</strong> &mdash; PDF, PowerPoint, Word</li>
+      <li><strong>Apps</strong> &mdash; Installed app widgets</li>
+    </ul>
+
+    <h3>Tagging System</h3>
+    <p>Assets support free-form tags (observed: "tv-5", "tv4") for cross-cutting organization beyond folder hierarchy.</p>
+  </div>
+
+  <!-- 4. Playlists -->
+  <div class="section" id="playlists">
+    <h2>4. Playlists Management</h2>
+
+    <h3>Three-Panel Layout</h3>
+    <table>
+      <tr><th>Panel</th><th>Function</th></tr>
+      <tr><td>Left &mdash; Playlist List</td><td>All playlists with color-coded status dots, search, and "Create Playlist" button</td></tr>
+      <tr><td>Center &mdash; Playlist Editor</td><td>Ordered list of items with per-item duration, delete, edit, and settings controls</td></tr>
+      <tr><td>Right &mdash; Asset Browser</td><td>Drag-and-drop source panel showing folders and assets for adding to playlists</td></tr>
+    </table>
+
+    <h3>Playlist Metadata</h3>
+    <ul class="features">
+      <li>Total size (MB) for storage awareness</li>
+      <li>Total time (seconds) for duration planning</li>
+      <li>Number of items count</li>
+      <li>Color-coded status indicator (blue, green, orange, red, brown)</li>
+    </ul>
+
+    <h3>Per-Item Controls</h3>
+    <ul class="features">
+      <li>Duration (seconds) &mdash; configurable per item</li>
+      <li>Edit (pencil icon) &mdash; modify item properties</li>
+      <li>Delete (trash icon) &mdash; remove from playlist</li>
+      <li>Settings (gear icon) &mdash; advanced item configuration</li>
+    </ul>
+
+    <h3>Playlist Toolbar</h3>
+    <ul class="features">
+      <li>Undo / Redo for change management</li>
+      <li>Preview on simulated screen</li>
+      <li>Copy / Duplicate playlist</li>
+      <li>Export playlist</li>
+      <li>Settings (gear) for playlist-level configuration</li>
+    </ul>
+
+    <h3>Observed Playlists</h3>
+    <p>TV2, TV3, TV4, TV5, TV 1, New Playlist (x2), fc1, Meat Screen, food truck, Weekday Morning, Bakery1</p>
+  </div>
+
+  <!-- 5. Schedules -->
+  <div class="section" id="schedules">
+    <h2>5. Schedules Management</h2>
+
+    <h3>Calendar Interface</h3>
+    <ul class="features">
+      <li>Full calendar view with <strong>Month / Week / Day</strong> toggle</li>
+      <li>Navigation arrows with "today" quick jump button</li>
+      <li>Hourly time slots (all-day, 6am, 7am, 8am, ...)</li>
+      <li>Current day highlighted (yellow background)</li>
+      <li>Click-to-create event scheduling</li>
+    </ul>
+
+    <h3>Schedule Management</h3>
+    <ul class="features">
+      <li><strong>Create Schedule</strong> button for new schedule entries</li>
+      <li>Schedule list in left sidebar with checkboxes for bulk operations</li>
+      <li>Search, sort, and filter controls</li>
+      <li>Tools button (wrench icon) for advanced schedule configuration</li>
+      <li>Schedule toolbar: copy, duplicate, export, delete icons</li>
+    </ul>
+
+    <div class="callout callout-info">
+      <strong>Use Case:</strong> Schedule different playlists for different times of day (e.g., breakfast menu
+      from 6am-11am, lunch menu from 11am-3pm, dinner menu from 3pm-close). Supports recurring schedules and
+      day-of-week targeting.
+    </div>
+  </div>
+
+  <!-- 6. Templates -->
+  <div class="section" id="templates">
+    <h2>6. Templates &amp; Design Studio</h2>
+
+    <h3>Template Discovery</h3>
+    <ul class="features">
+      <li>Prominent search bar with placeholder suggestions</li>
+      <li>Contextual quick-search tags (e.g., "Valentine's Day promotion", "Presidents' Day sale", "Weekly staff recognition")</li>
+      <li>Featured templates carousel with seasonal content</li>
+    </ul>
+
+    <h3>Categories (30+ total)</h3>
+    <ul class="features">
+      <li>All, Featured, Popular, Your Templates, Recent Designs</li>
+      <li>Industry-specific: Restaurants, Promotion Series, and 29+ more</li>
+    </ul>
+
+    <h3>Filters</h3>
+    <ul class="features">
+      <li><strong>Orientation:</strong> Landscape or Portrait</li>
+      <li><strong>Visual Mode:</strong> Additional visual style filtering</li>
+    </ul>
+
+    <h3>Design Tools</h3>
+    <table>
+      <tr><th>Tool</th><th>Description</th></tr>
+      <tr><td>AI Designer</td><td>AI-powered template generation from text prompts</td></tr>
+      <tr><td>New Design</td><td>Canva-like drag-and-drop design studio</td></tr>
+      <tr><td>Your Designs</td><td>Previously created/modified templates</td></tr>
+    </table>
+
+    <div class="callout callout-success">
+      <strong>Differentiator:</strong> The AI Designer feature is a notable competitive advantage, allowing users
+      to generate professional signage designs from natural language descriptions.
+    </div>
+  </div>
+
+  <!-- 7. Engage -->
+  <div class="section" id="engage">
+    <h2>7. Engage (Interactive Experiences)</h2>
+
+    <div class="callout callout-warning">
+      <strong>Plan Requirement:</strong> Engage features require the Engage plan ($30/screen/month).
+      The Standard plan allows a trial on 1 device.
+    </div>
+
+    <h3>Core Interactive Features</h3>
+    <table>
+      <tr><th>Feature</th><th>Description</th></tr>
+      <tr><td>Touch Screen Kiosks</td><td>Full interactive touch screen experiences for customer self-service, wayfinding, catalogs</td></tr>
+      <tr><td>QR Overlay</td><td>Custom QR codes overlaid on signage content for sharing links, videos, contacts, and more</td></tr>
+      <tr><td>Lift and Learn</td><td>IoT sensor-powered product exploration &mdash; customer lifts a product, screen automatically shows its details</td></tr>
+      <tr><td>Live TV Overlay</td><td>Overlay branded content on top of live TV feeds</td></tr>
+      <tr><td>AI Camera</td><td>Camera-based audience measurement and interaction</td></tr>
+      <tr><td>IoT Sensors</td><td>Trigger content based on environmental sensors</td></tr>
+    </table>
+
+    <h3>Navigation</h3>
+    <ul class="features">
+      <li>Home, Recent, Folder, Shared with me views</li>
+      <li>Engage Hub for discovering new interactive features</li>
+      <li>New App creation workflow</li>
+    </ul>
+  </div>
+
+  <!-- 8. Analytics -->
+  <div class="section" id="analytics">
+    <h2>8. Analytics</h2>
+
+    <h3>Proof of Play <span class="badge badge-purple">Pro Plus &amp; Enterprise</span></h3>
+    <ul class="features">
+      <li>Playback Report with Play Count and Duration charts</li>
+      <li>Time-series visualization with Day / Week / Month views</li>
+      <li>Filtering by Field, Type, and Value</li>
+      <li>Open, Save, Export, Filter, Refresh, Columns controls</li>
+      <li>Tabular data: Asset Name, Asset Tag, Type, Play Count, Duration, AI Count</li>
+    </ul>
+
+    <h3>AI Analytics <span class="badge badge-orange">Engage Plan</span></h3>
+    <ul class="features">
+      <li>Real-time audience measurement dashboards</li>
+      <li>Metrics: Total Count (429), Male Count (370), Female Count (59)</li>
+      <li>Dwell time tracking per demographic segment</li>
+      <li>Number of active devices (7)</li>
+      <li>Time-series charts: Male/Female Count and Dwell Time trends</li>
+      <li>Export capabilities for reporting</li>
+    </ul>
+  </div>
+
+  <!-- 9. Pricing -->
+  <div class="section" id="pricing">
+    <h2>9. Pricing Tiers</h2>
+
+    <p>Monthly pricing per screen. Annual billing saves 10%. Currency: USD.</p>
+
+    <div class="pricing-grid">
+      <div class="pricing-card">
+        <div class="plan-name">Free</div>
+        <div class="plan-tagline">Get Started for Free</div>
+        <div class="plan-price">$0 <span>forever</span></div>
+        <div class="plan-support">Support: Knowledge Base</div>
+      </div>
+      <div class="pricing-card">
+        <div class="plan-name">Standard</div>
+        <div class="plan-tagline">Digital Signage Simplified</div>
+        <div class="plan-price">$10 <span>/screen/mo</span></div>
+        <div class="plan-support">Support: Email</div>
+      </div>
+      <div class="pricing-card popular">
+        <div class="plan-name">Pro Plus</div>
+        <div class="plan-tagline">Most Popular</div>
+        <div class="plan-price">$15 <span>/screen/mo</span></div>
+        <div class="plan-support">Support: Email, Phone</div>
+      </div>
+      <div class="pricing-card">
+        <div class="plan-name">Engage</div>
+        <div class="plan-tagline">Interactive Experiences</div>
+        <div class="plan-price">$30 <span>/screen/mo</span></div>
+        <div class="plan-support">Support: Email, Phone, Zoom</div>
+      </div>
+      <div class="pricing-card">
+        <div class="plan-name">Enterprise</div>
+        <div class="plan-tagline">Scalable Enterprise</div>
+        <div class="plan-price">$45 <span>/screen/mo</span></div>
+        <div class="plan-support">Support: Dedicated Account Mgr</div>
+      </div>
+    </div>
+
+    <h3>Feature Breakdown by Plan</h3>
+    <table>
+      <tr>
+        <th>Feature</th>
+        <th>Free</th>
+        <th>Standard</th>
+        <th>Pro Plus</th>
+        <th>Engage</th>
+        <th>Enterprise</th>
+      </tr>
+      <tr><td>Max Screens</td><td>3</td><td>Unlimited</td><td>Unlimited</td><td>Unlimited</td><td>Min 25</td></tr>
+      <tr><td>Cloud Storage</td><td>1 GB</td><td>Unlimited</td><td>Unlimited</td><td>Unlimited</td><td>Unlimited</td></tr>
+      <tr><td>File Size Limit</td><td>25 MB</td><td>Unlimited</td><td>Unlimited</td><td>Unlimited</td><td>Unlimited</td></tr>
+      <tr><td>Apps</td><td>25 basic</td><td>100+</td><td>100+</td><td>100+</td><td>100+</td></tr>
+      <tr><td>Playlists &amp; Schedules</td><td>&mdash;</td><td>&check;</td><td>&check;</td><td>&check;</td><td>&check;</td></tr>
+      <tr><td>Templates &amp; Designer</td><td>&mdash;</td><td>&check;</td><td>&check;</td><td>&check;</td><td>&check;</td></tr>
+      <tr><td>Multi Users</td><td>&mdash;</td><td>&check;</td><td>&check;</td><td>&check;</td><td>&check;</td></tr>
+      <tr><td>Split Screen Zones</td><td>&mdash;</td><td>&check;</td><td>&check;</td><td>&check;</td><td>&check;</td></tr>
+      <tr><td>Feeds</td><td>&mdash;</td><td>&check;</td><td>&check;</td><td>&check;</td><td>&check;</td></tr>
+      <tr><td>MS365 / Google Integration</td><td>&mdash;</td><td>&mdash;</td><td>&check;</td><td>&check;</td><td>&check;</td></tr>
+      <tr><td>BI Dashboards (Power BI, Salesforce)</td><td>&mdash;</td><td>&mdash;</td><td>&check;</td><td>&check;</td><td>&check;</td></tr>
+      <tr><td>Slack &amp; Teams</td><td>&mdash;</td><td>&mdash;</td><td>&check;</td><td>&check;</td><td>&check;</td></tr>
+      <tr><td>OptiSync (Dynamic Data)</td><td>&mdash;</td><td>&mdash;</td><td>&check;</td><td>&check;</td><td>&check;</td></tr>
+      <tr><td>Auto Power On/Off TV</td><td>&mdash;</td><td>&mdash;</td><td>&check;</td><td>&check;</td><td>&check;</td></tr>
+      <tr><td>Remote Troubleshooting</td><td>&mdash;</td><td>&mdash;</td><td>&check;</td><td>&check;</td><td>&check;</td></tr>
+      <tr><td>Team Workspaces &amp; Roles</td><td>&mdash;</td><td>&mdash;</td><td>&check;</td><td>&check;</td><td>&check;</td></tr>
+      <tr><td>Approval Workflow</td><td>&mdash;</td><td>&mdash;</td><td>&check;</td><td>&check;</td><td>&check;</td></tr>
+      <tr><td>Custom Branding</td><td>&mdash;</td><td>&mdash;</td><td>&check;</td><td>&check;</td><td>&check;</td></tr>
+      <tr><td>Proof of Play Reporting</td><td>&mdash;</td><td>&mdash;</td><td>&check;</td><td>&check;</td><td>&check;</td></tr>
+      <tr><td>Campaign Management</td><td>&mdash;</td><td>&mdash;</td><td>&check;</td><td>&check;</td><td>&check;</td></tr>
+      <tr><td>Audit Logs</td><td>&mdash;</td><td>&mdash;</td><td>&check;</td><td>&check;</td><td>&check;</td></tr>
+      <tr><td>SAML SSO</td><td>&mdash;</td><td>&mdash;</td><td>&check;</td><td>&check;</td><td>&check;</td></tr>
+      <tr><td>Interactive Kiosk Designer</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&check;</td><td>&check;</td></tr>
+      <tr><td>Lift &amp; Learn (IoT)</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&check;</td><td>&check;</td></tr>
+      <tr><td>QR Scan-to-Interact</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&check;</td><td>&check;</td></tr>
+      <tr><td>AI Analytics (Demographics)</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&check;</td><td>&check;</td></tr>
+      <tr><td>GraphQL API</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&check;</td></tr>
+      <tr><td>PaaS (White-label)</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&check;</td></tr>
+      <tr><td>Dedicated Account Manager</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&check;</td></tr>
+    </table>
+
+    <div class="callout callout-info">
+      <strong>Your Current Plan:</strong> Standard &mdash; $10.00/month &times; 10 screens with 50% discount = <strong>$50.00/month</strong> total.
+    </div>
+  </div>
+
+  <!-- 10. Settings -->
+  <div class="section" id="settings">
+    <h2>10. Account &amp; Settings</h2>
+
+    <h3>Settings Menu Structure</h3>
+    <div class="settings-grid">
+      <div class="settings-item">Personal Profile</div>
+      <div class="settings-item">Company Settings</div>
+      <div class="settings-item">Account Members</div>
+      <div class="settings-item">Subscription Plan</div>
+      <div class="settings-item">Payment Settings</div>
+      <div class="settings-item">Billing History</div>
+      <div class="settings-item">Sub-Account Billing</div>
+      <div class="settings-item">Coupons</div>
+      <div class="settings-item">Order Devices</div>
+      <div class="settings-item">Order History</div>
+    </div>
+
+    <h3>Advanced Settings</h3>
+    <div class="settings-grid">
+      <div class="settings-item">Operational Schedule</div>
+      <div class="settings-item">Proof of Play</div>
+      <div class="settings-item">Branding</div>
+      <div class="settings-item">Audit Log</div>
+      <div class="settings-item">Monitoring Alert</div>
+      <div class="settings-item">SAML Single Sign-On</div>
+      <div class="settings-item">API Keys</div>
+      <div class="settings-item">External Comms (RS232)</div>
+      <div class="settings-item">Integrations</div>
+    </div>
+  </div>
+
+  <!-- 11. Add-ons -->
+  <div class="section" id="addons">
+    <h2>11. Add-on Products</h2>
+    <table>
+      <tr><th>Add-on</th><th>Description</th><th>Pricing</th></tr>
+      <tr>
+        <td><strong>OptiSound</strong></td>
+        <td>Licensed, ad-free background music curated for businesses. Pairs with digital signage displays.</td>
+        <td>Subscription add-on</td>
+      </tr>
+      <tr>
+        <td><strong>OptiKiosk</strong></td>
+        <td>Purpose-built kiosk hardware in 10", 32", and 50" sizes. Interactive countertop to floor-standing displays.</td>
+        <td>Hardware purchase</td>
+      </tr>
+      <tr>
+        <td><strong>AeriCast</strong></td>
+        <td>Wireless screen casting add-on for presentations and meeting rooms.</td>
+        <td>Trial available, subscription add-on</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- 12. Comparison -->
+  <div class="section" id="comparison">
+    <h2>12. Vizora Comparison Matrix</h2>
+
+    <table>
+      <tr>
+        <th>Capability</th>
+        <th>Future Signage</th>
+        <th>Vizora</th>
+        <th>Gap</th>
+      </tr>
+      <tr>
+        <td>Screen Management</td>
+        <td>Robust online/offline monitoring, folders, bulk ops, tags</td>
+        <td>WebSocket real-time status, organization-based grouping</td>
+        <td><span class="tag tag-partial">Partial</span></td>
+      </tr>
+      <tr>
+        <td>Content Types</td>
+        <td>Image, video, docs, apps, URLs, templates</td>
+        <td>Image, video, URL, HTML with Handlebars templates</td>
+        <td><span class="tag tag-partial">Partial</span></td>
+      </tr>
+      <tr>
+        <td>Playlist Builder</td>
+        <td>3-panel drag-and-drop, per-item duration, undo/redo</td>
+        <td>Playlist management with schedule assignment</td>
+        <td><span class="tag tag-partial">Partial</span></td>
+      </tr>
+      <tr>
+        <td>Schedule System</td>
+        <td>Full calendar UI (month/week/day)</td>
+        <td>Schedule management module</td>
+        <td><span class="tag tag-partial">Partial</span></td>
+      </tr>
+      <tr>
+        <td>Template Library</td>
+        <td>1000+ templates, AI Designer, Canva-like editor</td>
+        <td>Handlebars template rendering</td>
+        <td><span class="tag tag-missing">Major Gap</span></td>
+      </tr>
+      <tr>
+        <td>Interactive / Engage</td>
+        <td>Touch kiosks, QR overlay, Lift &amp; Learn, AI camera</td>
+        <td>Not present</td>
+        <td><span class="tag tag-missing">Not Available</span></td>
+      </tr>
+      <tr>
+        <td>Analytics</td>
+        <td>Proof of Play, AI demographics, dwell time</td>
+        <td>Not present</td>
+        <td><span class="tag tag-missing">Not Available</span></td>
+      </tr>
+      <tr>
+        <td>Integrations</td>
+        <td>100+ apps, MS365, Google, Slack, Teams, Power BI, Salesforce</td>
+        <td>Limited integrations</td>
+        <td><span class="tag tag-missing">Major Gap</span></td>
+      </tr>
+      <tr>
+        <td>Device Support</td>
+        <td>Fire TV, Android TV, Raspberry Pi, Windows, Chrome OS, LG, Samsung, custom kiosks</td>
+        <td>Electron (desktop), Android TV (Capacitor)</td>
+        <td><span class="tag tag-partial">Partial</span></td>
+      </tr>
+      <tr>
+        <td>Multi-Tenancy</td>
+        <td>Sub-accounts, team workspaces, role-based access</td>
+        <td>Organization-based multi-tenancy, user roles</td>
+        <td><span class="tag tag-has">Comparable</span></td>
+      </tr>
+      <tr>
+        <td>Security</td>
+        <td>SAML SSO, audit logs, approval workflows</td>
+        <td>Dual JWT auth, CSRF, Helmet, rate limiting, XSS sanitization</td>
+        <td><span class="tag tag-has">Comparable</span></td>
+      </tr>
+      <tr>
+        <td>Real-time Updates</td>
+        <td>Cloud-based push</td>
+        <td>WebSocket (Socket.IO) with device/org rooms, dual persistence</td>
+        <td><span class="tag tag-has">Strong</span></td>
+      </tr>
+      <tr>
+        <td>API</td>
+        <td>GraphQL API (Enterprise only)</td>
+        <td>REST API with Swagger docs (all plans)</td>
+        <td><span class="tag tag-has">Advantage</span></td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- 13. Opportunities -->
+  <div class="section" id="opportunities">
+    <h2>13. Enhancement Opportunities for Vizora</h2>
+
+    <h3>High Priority (Competitive Parity)</h3>
+    <table>
+      <tr><th>#</th><th>Feature</th><th>Future Signage Equivalent</th><th>Effort</th></tr>
+      <tr><td>1</td><td>Template library with searchable, categorized templates</td><td>1000+ templates with AI Designer</td><td>High</td></tr>
+      <tr><td>2</td><td>Drag-and-drop playlist builder UI</td><td>3-panel playlist editor</td><td>Medium</td></tr>
+      <tr><td>3</td><td>Calendar-based schedule view</td><td>Month/week/day calendar</td><td>Medium</td></tr>
+      <tr><td>4</td><td>Proof of Play analytics</td><td>Playback reports with charts</td><td>Medium</td></tr>
+      <tr><td>5</td><td>Device tagging and folder organization</td><td>Tags + folders for screens/assets</td><td>Low</td></tr>
+    </table>
+
+    <h3>Medium Priority (Differentiation)</h3>
+    <table>
+      <tr><th>#</th><th>Feature</th><th>Future Signage Equivalent</th><th>Effort</th></tr>
+      <tr><td>6</td><td>Split-screen / multi-zone layouts</td><td>Split Screen Zones (Standard+)</td><td>High</td></tr>
+      <tr><td>7</td><td>App/integration marketplace</td><td>100+ apps (weather, social, BI)</td><td>High</td></tr>
+      <tr><td>8</td><td>Background music / audio overlay</td><td>OptiSound add-on</td><td>Medium</td></tr>
+      <tr><td>9</td><td>Screen orientation controls</td><td>0&deg; / 90&deg; / 180&deg; / 270&deg; rotation</td><td>Low</td></tr>
+      <tr><td>10</td><td>Operational schedule (auto on/off)</td><td>Per-device on/off scheduling</td><td>Low</td></tr>
+    </table>
+
+    <h3>Lower Priority (Advanced / Enterprise)</h3>
+    <table>
+      <tr><th>#</th><th>Feature</th><th>Future Signage Equivalent</th><th>Effort</th></tr>
+      <tr><td>11</td><td>Interactive kiosk experiences</td><td>Engage module</td><td>Very High</td></tr>
+      <tr><td>12</td><td>AI audience analytics (demographics)</td><td>AI Analytics with camera</td><td>Very High</td></tr>
+      <tr><td>13</td><td>QR code overlay generation</td><td>QR Overlay in Engage</td><td>Medium</td></tr>
+      <tr><td>14</td><td>Approval workflow for content changes</td><td>Approval Workflow (Pro Plus+)</td><td>Medium</td></tr>
+      <tr><td>15</td><td>Custom branding / white-label</td><td>Branding settings + PaaS</td><td>Medium</td></tr>
+    </table>
+
+    <div class="callout callout-success">
+      <strong>Vizora's Existing Strengths:</strong> Real-time WebSocket architecture with dual persistence,
+      REST API with Swagger docs available to all plans (vs GraphQL Enterprise-only at Future Signage),
+      strong security layers (dual JWT, CSRF, Helmet, XSS sanitization), and self-hosted deployment option
+      with PM2 cluster mode. These are areas where Vizora already matches or exceeds Future Signage.
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  <p>Future Signage Analysis Report &mdash; Prepared for Vizora Digital Signage Platform</p>
+  <p>Date: February 5, 2026 &nbsp;|&nbsp; Confidential &mdash; Internal Use Only</p>
+</div>
+
+</body>
+</html>
