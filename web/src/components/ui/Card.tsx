@@ -24,7 +24,7 @@ interface CardFooterProps {
 
 const CardRoot: React.FC<CardProps> = ({ children, className }) => (
   <div
-    className={`bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 shadow-sm hover:shadow-md transition-shadow ${
+    className={`bg-[var(--surface)] rounded-lg border border-[var(--border)] shadow-sm hover:shadow-md transition-shadow ${
       className || ''
     }`}
   >
@@ -34,7 +34,7 @@ const CardRoot: React.FC<CardProps> = ({ children, className }) => (
 
 const CardHeader: React.FC<CardHeaderProps> = ({ children, className }) => (
   <div
-    className={`px-6 py-4 border-b border-neutral-200 dark:border-neutral-700 ${
+    className={`px-6 py-4 border-b border-[var(--border)] ${
       className || ''
     }`}
   >
@@ -48,7 +48,7 @@ const CardBody: React.FC<CardBodyProps> = ({ children, className }) => (
 
 const CardFooter: React.FC<CardFooterProps> = ({ children, className }) => (
   <div
-    className={`px-6 py-3 border-t border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900/50 rounded-b-lg ${
+    className={`px-6 py-3 border-t border-[var(--border)] bg-[var(--background)] rounded-b-lg ${
       className || ''
     }`}
   >

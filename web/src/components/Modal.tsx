@@ -45,9 +45,9 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' }:
   };
 
   return (
-    <div 
-      className="fixed inset-0 z-50 overflow-y-auto" 
-      role="dialog" 
+    <div
+      className="fixed inset-0 z-50 overflow-y-auto"
+      role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
     >
@@ -61,15 +61,15 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' }:
 
         {/* Modal */}
         <div
-          className={`relative bg-white rounded-lg shadow-xl ${sizeClasses[size]} w-full transform transition-all`}
+          className={`relative bg-[var(--surface)] rounded-lg shadow-xl ${sizeClasses[size]} w-full transform transition-all`}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200">
-            <h3 id="modal-title" className="text-xl font-semibold text-gray-900">{title}</h3>
+          <div className="flex items-center justify-between p-6 border-b border-[var(--border)]">
+            <h3 id="modal-title" className="text-xl font-semibold text-[var(--foreground)]">{title}</h3>
             <button
               ref={closeButtonRef}
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+              className="text-[var(--foreground-tertiary)] hover:text-[var(--foreground-secondary)] transition focus:outline-none focus:ring-2 focus:ring-[#00E5A0] rounded"
               aria-label="Close modal"
             >
               <svg

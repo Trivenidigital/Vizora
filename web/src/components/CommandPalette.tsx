@@ -103,7 +103,7 @@ export default function CommandPalette({ commands, open: controlledOpen, onOpenC
     <>
       {/* Keyboard Shortcut Hint (optional, can be hidden) */}
       {!open && (
-        <div className="fixed bottom-4 right-4 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-xs font-medium pointer-events-none z-40">
+        <div className="fixed bottom-4 right-4 px-3 py-2 rounded-lg bg-[var(--background-secondary)] text-[var(--foreground-secondary)] text-xs font-medium pointer-events-none z-40">
           ⌘K
         </div>
       )}
@@ -122,11 +122,11 @@ export default function CommandPalette({ commands, open: controlledOpen, onOpenC
       {/* Command Palette Modal */}
       {open && (
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-20">
-          <div className="w-full max-w-xl mx-4 bg-white dark:bg-gray-900 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+          <div className="w-full max-w-xl mx-4 bg-[var(--surface)] rounded-lg shadow-2xl border border-[var(--border)] overflow-hidden">
             {/* Search Input */}
-            <div className="p-4 border-b border-gray-200 dark:border-gray-800">
+            <div className="p-4 border-b border-[var(--border)]">
               <div className="flex items-center gap-3">
-                <Icon name="search" size="sm" className="text-gray-400" />
+                <Icon name="search" size="sm" className="text-[var(--foreground-tertiary)]" />
                 <input
                   type="text"
                   value={search}
@@ -135,10 +135,10 @@ export default function CommandPalette({ commands, open: controlledOpen, onOpenC
                     setSelectedIndex(0);
                   }}
                   placeholder="Search commands..."
-                  className="flex-1 bg-transparent text-gray-900 dark:text-gray-50 focus:outline-none text-sm"
+                  className="flex-1 bg-transparent text-[var(--foreground)] focus:outline-none text-sm"
                   autoFocus
                 />
-                <div className="text-xs text-gray-400 font-medium">ESC</div>
+                <div className="text-xs text-[var(--foreground-tertiary)] font-medium">ESC</div>
               </div>
             </div>
 
@@ -146,13 +146,13 @@ export default function CommandPalette({ commands, open: controlledOpen, onOpenC
             <div className="max-h-96 overflow-y-auto">
               {filteredCommands.length === 0 ? (
                 <div className="p-8 text-center">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">No commands found</p>
+                  <p className="text-sm text-[var(--foreground-secondary)]">No commands found</p>
                 </div>
               ) : (
                 sortedGroups.map(category => (
                   <div key={category}>
                     {/* Category Header */}
-                    <div className="px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-50 dark:bg-gray-800">
+                    <div className="px-4 py-2 text-xs font-semibold text-[var(--foreground-tertiary)] uppercase tracking-wider bg-[var(--background)]">
                       {category.replace('-', ' ')}
                     </div>
 
@@ -171,8 +171,8 @@ export default function CommandPalette({ commands, open: controlledOpen, onOpenC
                           }}
                           className={`w-full px-4 py-3 text-left flex items-center gap-3 transition-colors ${
                             isSelected
-                              ? 'bg-blue-600 dark:bg-blue-700 text-white'
-                              : 'text-gray-900 dark:text-gray-50 hover:bg-gray-100 dark:hover:bg-gray-800'
+                              ? 'bg-[#00E5A0] text-[#061A21]'
+                              : 'text-[var(--foreground)] hover:bg-[var(--surface-hover)]'
                           }`}
                         >
                           {cmd.icon && (
@@ -194,7 +194,7 @@ export default function CommandPalette({ commands, open: controlledOpen, onOpenC
 
             {/* Footer Help */}
             {filteredCommands.length > 0 && (
-              <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 text-xs text-gray-500 dark:text-gray-400 flex items-center justify-between">
+              <div className="px-4 py-3 border-t border-[var(--border)] bg-[var(--background)] text-xs text-[var(--foreground-tertiary)] flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <span>↑↓ Navigate</span>
                   <span>↵ Select</span>

@@ -17,8 +17,8 @@ const sizeStyles = {
 } as const;
 
 const variantStyles = {
-  primary: 'text-blue-600 hover:text-blue-800 hover:bg-blue-50',
-  secondary: 'text-gray-600 hover:text-gray-800 hover:bg-gray-100',
+  primary: 'text-[#00E5A0] hover:text-[#00CC8E] hover:bg-[#00E5A0]/10',
+  secondary: 'text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--surface-hover)]',
   danger: 'text-red-600 hover:text-red-800 hover:bg-red-50',
   success: 'text-green-600 hover:text-green-800 hover:bg-green-50',
   warning: 'text-yellow-600 hover:text-yellow-800 hover:bg-yellow-50',
@@ -44,7 +44,7 @@ export function IconButton({
         inline-flex items-center justify-center
         rounded-lg transition-colors duration-200
         disabled:opacity-50 disabled:cursor-not-allowed
-        focus:outline-2 focus:outline-offset-2 focus:outline-blue-500
+        focus:outline-2 focus:outline-offset-2 focus:outline-[#00E5A0]
         ${sizeStyles[size]}
         ${variantStyles[variant]}
         ${className}
