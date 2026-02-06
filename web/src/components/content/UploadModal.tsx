@@ -87,21 +87,21 @@ export function UploadModal({ isOpen, onClose, onUpload }: UploadModalProps) {
     <Modal isOpen={isOpen} onClose={onClose} title="Upload Content" size="lg">
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
             Content Title
           </label>
           <input
             type="text"
             value={uploadForm.title}
             onChange={(e) => setUploadForm({ ...uploadForm, title: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+            className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)]"
             placeholder="e.g., Summer Sale Banner"
             autoComplete="off"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
             Content Type
           </label>
           <select
@@ -109,7 +109,7 @@ export function UploadModal({ isOpen, onClose, onUpload }: UploadModalProps) {
             onChange={(e) =>
               setUploadForm({ ...uploadForm, type: e.target.value as any })
             }
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+            className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)]"
           >
             <option value="image">Image</option>
             <option value="video">Video</option>
@@ -120,20 +120,20 @@ export function UploadModal({ isOpen, onClose, onUpload }: UploadModalProps) {
 
         {uploadForm.type !== 'url' && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
               Upload File
             </label>
             <div
               {...getRootProps()}
               className={`border-2 border-dashed rounded-lg p-6 text-center transition-all cursor-pointer ${
                 isDragActive
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'
+                  ? 'border-[#00E5A0] bg-[#00E5A0]/5'
+                  : 'border-[var(--border)] hover:border-[#00E5A0] hover:bg-[var(--surface-hover)]'
               }`}
             >
               <input {...getInputProps()} />
               <svg
-                className="w-12 h-12 text-gray-400 mb-3 mx-auto"
+                className="w-12 h-12 text-[var(--foreground-tertiary)] mb-3 mx-auto"
                 stroke="currentColor"
                 fill="none"
                 viewBox="0 0 48 48"
@@ -146,15 +146,15 @@ export function UploadModal({ isOpen, onClose, onUpload }: UploadModalProps) {
                 />
               </svg>
               {isDragActive ? (
-                <p className="text-sm font-medium text-blue-600">
+                <p className="text-sm font-medium text-[#00E5A0]">
                   Drop the file here...
                 </p>
               ) : (
                 <>
-                  <p className="text-sm font-medium text-blue-600 hover:text-blue-700 mb-1">
+                  <p className="text-sm font-medium text-[#00E5A0] hover:text-[#00CC8E] mb-1">
                     Drag & drop file here, or click to browse
                   </p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-[var(--foreground-tertiary)]">
                     {uploadForm.type === 'image' && 'PNG, JPG, GIF up to 10MB'}
                     {uploadForm.type === 'video' && 'MP4, MOV, AVI up to 100MB'}
                     {uploadForm.type === 'pdf' && 'PDF up to 50MB'}
@@ -166,7 +166,7 @@ export function UploadModal({ isOpen, onClose, onUpload }: UploadModalProps) {
             {uploadQueue.length > 0 && (
               <div className="mt-4 space-y-2">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-gray-700">
+                  <p className="text-sm font-medium text-[var(--foreground-secondary)]">
                     Upload Queue ({uploadQueue.length} file
                     {uploadQueue.length > 1 ? 's' : ''})
                   </p>
@@ -181,19 +181,19 @@ export function UploadModal({ isOpen, onClose, onUpload }: UploadModalProps) {
                   {uploadQueue.map((item, idx) => (
                     <div
                       key={idx}
-                      className="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-200"
+                      className="flex items-center justify-between p-2 bg-[var(--background)] rounded border border-[var(--border)]"
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
+                        <p className="text-sm font-medium text-[var(--foreground)] truncate">
                           {item.file.name}
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-[var(--foreground-tertiary)]">
                           {(item.file.size / 1024).toFixed(1)} KB
                         </p>
                       </div>
                       <div className="ml-4 flex items-center gap-2">
                         {item.status === 'pending' && (
-                          <span className="text-xs text-gray-500">Pending</span>
+                          <span className="text-xs text-[var(--foreground-tertiary)]">Pending</span>
                         )}
                         {item.status === 'uploading' && <LoadingSpinner size="sm" />}
                         {item.status === 'success' && (
@@ -208,7 +208,7 @@ export function UploadModal({ isOpen, onClose, onUpload }: UploadModalProps) {
                           onClick={() =>
                             setUploadQueue((prev) => prev.filter((_, i) => i !== idx))
                           }
-                          className="text-gray-400 hover:text-red-600"
+                          className="text-[var(--foreground-tertiary)] hover:text-red-600"
                         >
                           ×
                         </button>
@@ -223,14 +223,14 @@ export function UploadModal({ isOpen, onClose, onUpload }: UploadModalProps) {
 
         {uploadForm.type === 'url' && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
               URL
             </label>
             <input
               type="url"
               value={uploadForm.url}
               onChange={(e) => setUploadForm({ ...uploadForm, url: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+              className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)]"
               placeholder="https://example.com/page"
               autoComplete="off"
             />
@@ -240,13 +240,13 @@ export function UploadModal({ isOpen, onClose, onUpload }: UploadModalProps) {
         <div className="flex justify-end gap-3 pt-4">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+            className="px-4 py-2 text-sm font-medium text-[var(--foreground-secondary)] bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition disabled:opacity-50 flex items-center gap-2"
+            className="px-4 py-2 text-sm font-medium text-[#061A21] bg-[#00E5A0] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
             disabled={
               actionLoading ||
               (uploadQueue.length === 0 && (!uploadForm.title || !uploadForm.url))

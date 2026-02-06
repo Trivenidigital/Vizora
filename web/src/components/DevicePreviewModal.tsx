@@ -129,11 +129,11 @@ export default function DevicePreviewModal({ device, isOpen, onClose }: DevicePr
     <Modal isOpen={isOpen} onClose={onClose} title="Device Preview" size="xl">
       <div className="space-y-4">
         {/* Device Info Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between pb-4 border-b border-[var(--border)]">
           <div className="flex items-center gap-3">
-            <Icon name="devices" size="xl" className="text-gray-600 dark:text-gray-400" />
+            <Icon name="devices" size="xl" className="text-[var(--foreground-secondary)]" />
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-50">
+              <h3 className="text-lg font-semibold text-[var(--foreground)]">
                 {device.nickname}
               </h3>
               <div className="flex items-center gap-2 mt-1">
@@ -141,18 +141,18 @@ export default function DevicePreviewModal({ device, isOpen, onClose }: DevicePr
                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
                     device.status === 'online'
                       ? 'bg-success-100 text-success-800 dark:bg-success-900 dark:text-success-200'
-                      : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
+                      : 'bg-[var(--background-secondary)] text-[var(--foreground)]'
                   }`}
                 >
                   <span
                     className={`h-1.5 w-1.5 rounded-full ${
-                      device.status === 'online' ? 'bg-success-500' : 'bg-gray-400'
+                      device.status === 'online' ? 'bg-success-500' : 'bg-[var(--foreground-tertiary)]'
                     }`}
                   />
                   {device.status === 'online' ? 'Online' : 'Offline'}
                 </span>
                 {device.location && (
-                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                  <span className="text-sm text-[var(--foreground-tertiary)]">
                     • {device.location}
                   </span>
                 )}
@@ -162,7 +162,7 @@ export default function DevicePreviewModal({ device, isOpen, onClose }: DevicePr
           <button
             onClick={handleRefresh}
             disabled={refreshing || device.status !== 'online'}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition font-medium"
+            className="flex items-center gap-2 px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] disabled:opacity-50 disabled:cursor-not-allowed transition font-medium"
           >
             {refreshing ? (
               <>
@@ -171,7 +171,7 @@ export default function DevicePreviewModal({ device, isOpen, onClose }: DevicePr
               </>
             ) : (
               <>
-                <Icon name="refresh" size="lg" className="text-white" />
+                <Icon name="refresh" size="lg" className="text-[#061A21]" />
                 <span>Refresh Screenshot</span>
               </>
             )}
@@ -179,7 +179,7 @@ export default function DevicePreviewModal({ device, isOpen, onClose }: DevicePr
         </div>
 
         {/* Screenshot Display Area */}
-        <div className="relative bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden" style={{ aspectRatio: '16/9', maxWidth: '800px', margin: '0 auto' }}>
+        <div className="relative bg-[var(--background-secondary)] rounded-lg overflow-hidden" style={{ aspectRatio: '16/9', maxWidth: '800px', margin: '0 auto' }}>
           {loading ? (
             <div className="absolute inset-0 flex items-center justify-center">
               <LoadingSpinner size="lg" />
@@ -192,7 +192,7 @@ export default function DevicePreviewModal({ device, isOpen, onClose }: DevicePr
               </p>
               <button
                 onClick={loadScreenshot}
-                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium"
+                className="text-[#00E5A0] hover:text-[#00CC8E] text-sm font-medium"
               >
                 Try Again
               </button>
@@ -219,14 +219,14 @@ export default function DevicePreviewModal({ device, isOpen, onClose }: DevicePr
             </>
           ) : (
             <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
-              <Icon name="image" size="2xl" className="text-gray-400 dark:text-gray-600 mb-3" />
-              <p className="text-gray-600 dark:text-gray-400 mb-2">
+              <Icon name="image" size="2xl" className="text-[var(--foreground-tertiary)] mb-3" />
+              <p className="text-[var(--foreground-secondary)] mb-2">
                 No screenshot available yet
               </p>
               <button
                 onClick={handleRefresh}
                 disabled={device.status !== 'online'}
-                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="text-[#00E5A0] hover:text-[#00CC8E] text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {device.status === 'online' ? 'Capture Screenshot' : 'Device is offline'}
               </button>
@@ -248,7 +248,7 @@ export default function DevicePreviewModal({ device, isOpen, onClose }: DevicePr
         <div className="flex justify-end pt-2">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition font-medium"
+            className="px-4 py-2 text-[var(--foreground-secondary)] bg-[var(--background-secondary)] rounded-lg hover:bg-[var(--surface-hover)] transition font-medium"
           >
             Close
           </button>

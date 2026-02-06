@@ -44,7 +44,7 @@ export default function PlaylistQuickSelect({
         value={device.currentPlaylistId || ''}
         onChange={handleChange}
         disabled={loading}
-        className={`text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-[140px] ${
+        className={`text-sm border border-[var(--border)] rounded-lg px-2 py-1.5 bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent min-w-[140px] ${
           loading ? 'opacity-50 cursor-wait' : ''
         }`}
         data-testid={`playlist-select-${device.id}`}

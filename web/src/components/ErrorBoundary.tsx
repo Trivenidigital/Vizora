@@ -49,13 +49,13 @@ export class ErrorBoundary extends React.Component<Props, State> {
     if (hasError && error) {
       return (
         fallback?.(error, this.handleReset) || (
-          <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-            <div className="max-w-md w-full bg-white rounded-lg shadow-md p-8">
+          <div className="min-h-screen flex items-center justify-center bg-[var(--background)] px-4">
+            <div className="max-w-md w-full bg-[var(--surface)] rounded-lg shadow-md p-8">
               <div className="text-center">
-                <h1 className="text-2xl font-bold text-gray-900 mb-4">
+                <h1 className="text-2xl font-bold text-[var(--foreground)] mb-4">
                   Something went wrong
                 </h1>
-                <p className="text-gray-600 mb-4">
+                <p className="text-[var(--foreground-secondary)] mb-4">
                   An unexpected error occurred. Please try again.
                 </p>
                 {process.env.NODE_ENV === 'development' && (
@@ -63,7 +63,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
                     <summary className="text-sm font-mono text-red-600 cursor-pointer">
                       Error details (dev only)
                     </summary>
-                    <pre className="mt-2 text-xs bg-gray-100 p-2 rounded overflow-auto">
+                    <pre className="mt-2 text-xs bg-[var(--background-secondary)] p-2 rounded overflow-auto">
                       {error.message}
                       {'\n\n'}
                       {error.stack}
@@ -72,7 +72,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
                 )}
                 <button
                   onClick={this.handleReset}
-                  className="mt-6 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded transition"
+                  className="mt-6 w-full bg-[#00E5A0] hover:bg-[#00CC8E] text-[#061A21] font-semibold py-2 px-4 rounded transition"
                 >
                   Try Again
                 </button>

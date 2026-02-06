@@ -25,15 +25,15 @@ interface Schedule {
   startTime?: string;  // HH:MM
   endTime?: string;    // HH:MM
   daysOfWeek: number[];  // 0-6 (Sunday-Saturday)
-  startDate: string;
+  startDate?: string;
   endDate?: string;
   playlistId: string;
   displayId?: string;
   displayGroupId?: string;
   isActive: boolean;
   priority?: number;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Date | string;
+  updatedAt: Date | string;
   days?: string[];
   deviceIds?: string[];
   duration?: number;
@@ -84,7 +84,8 @@ export default function ScheduleCalendar({
     const calendarEvents: CalendarEvent[] = [];
 
     for (const schedule of schedules) {
-      const scheduleStart = new Date(schedule.startDate);
+      // Use current date as default if startDate is not set
+      const scheduleStart = schedule.startDate ? new Date(schedule.startDate) : new Date();
       const scheduleEnd = schedule.endDate ? new Date(schedule.endDate) : null;
 
       for (const date of allDates) {
@@ -143,7 +144,7 @@ export default function ScheduleCalendar({
       };
     }
 
-    let backgroundColor = '#3B82F6'; // blue-500 (default / priority >= 3 / no priority)
+    let backgroundColor = '#00E5A0'; // brand green (default / priority >= 3 / no priority)
 
     if (schedule.priority === 2) {
       backgroundColor = '#22C55E'; // green-500
@@ -156,7 +157,7 @@ export default function ScheduleCalendar({
         backgroundColor,
         borderRadius: '4px',
         border: 'none',
-        color: '#FFFFFF',
+        color: '#061A21',
       },
     };
   }, []);
@@ -188,7 +189,7 @@ export default function ScheduleCalendar({
   }, []);
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-6 schedule-calendar">
+    <div className="bg-[var(--surface)] rounded-lg shadow-md p-6 schedule-calendar">
       <style jsx global>{`
         .schedule-calendar .rbc-calendar {
           font-family: inherit;
@@ -207,11 +208,11 @@ export default function ScheduleCalendar({
           background-color: #E5E7EB;
         }
         .schedule-calendar .rbc-toolbar button.rbc-active {
-          background-color: #3B82F6;
-          color: white;
+          background-color: #00E5A0;
+          color: #061A21;
         }
         .schedule-calendar .rbc-toolbar button.rbc-active:hover {
-          background-color: #2563EB;
+          background-color: #00CC8E;
         }
         .schedule-calendar .rbc-event {
           font-size: 0.75rem;
@@ -232,8 +233,8 @@ export default function ScheduleCalendar({
           background-color: #374151;
         }
         .dark .schedule-calendar .rbc-toolbar button.rbc-active {
-          background-color: #3B82F6;
-          color: white;
+          background-color: #00E5A0;
+          color: #061A21;
         }
         .dark .schedule-calendar .rbc-today {
           background-color: #1E293B;

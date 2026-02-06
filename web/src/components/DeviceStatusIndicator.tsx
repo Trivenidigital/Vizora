@@ -115,7 +115,7 @@ export default function DeviceStatusIndicator({
 
       {/* Time since update */}
       {showTime && lastUpdate && (
-        <div className="text-xs text-gray-500 dark:text-gray-400 ml-1">
+        <div className="text-xs text-[var(--foreground-tertiary)] ml-1">
           {formatTime()}
         </div>
       )}

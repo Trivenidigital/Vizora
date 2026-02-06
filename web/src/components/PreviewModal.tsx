@@ -48,12 +48,12 @@ export default function PreviewModal({ isOpen, onClose, content }: PreviewModalP
       case 'url':
         return (
           <div className="text-center p-8">
-            <p className="text-gray-600 mb-4">External content:</p>
+            <p className="text-[var(--foreground-secondary)] mb-4">External content:</p>
             <a 
               href={content.url} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="text-blue-600 hover:underline break-all"
+              className="text-[#00E5A0] hover:underline break-all"
             >
               {content.url}
             </a>
@@ -61,7 +61,7 @@ export default function PreviewModal({ isOpen, onClose, content }: PreviewModalP
         );
       
       default:
-        return <p className="text-gray-500 p-8">Preview not available for this content type</p>;
+        return <p className="text-[var(--foreground-tertiary)] p-8">Preview not available for this content type</p>;
     }
   };
 

@@ -63,7 +63,7 @@ export const Tabs: React.FC<TabsProps> = ({
             onClick={() => handleTabClick(tab.id)}
             className={`${baseTabClass} ${
               activeTab === tab.id
-                ? `${activeClass} ${variant === 'pills' ? 'bg-white dark:bg-neutral-700 rounded' : ''}`
+                ? `${activeClass} ${variant === 'pills' ? 'bg-[var(--surface)] rounded' : ''}`
                 : inactiveClass
             } ${variant === 'underline' ? 'relative' : ''}`}
           >

@@ -49,7 +49,7 @@ export function ContentGrid({
       case 'error':
         return 'bg-red-100 text-red-800';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-[var(--background-secondary)] text-[var(--foreground)]';
     }
   };
 
@@ -58,10 +58,10 @@ export function ContentGrid({
       {content.map((item) => (
         <div
           key={item.id}
-          className="bg-white rounded-lg shadow overflow-hidden hover:shadow-xl transition-all transform hover:-translate-y-1"
+          className="bg-[var(--surface)] rounded-lg shadow overflow-hidden hover:shadow-xl transition-all transform hover:-translate-y-1"
         >
           <div
-            className="h-48 bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center relative overflow-hidden cursor-pointer"
+            className="h-48 bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] flex items-center justify-center relative overflow-hidden cursor-pointer"
             onClick={() => onPreview(item)}
             title="Click to preview"
           >
@@ -87,7 +87,7 @@ export function ContentGrid({
                 checked={selectedItems.has(item.id)}
                 onChange={() => onToggleSelect(item.id)}
                 onClick={(e) => e.stopPropagation()}
-                className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 bg-white shadow-sm"
+                className="w-5 h-5 rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0] bg-[var(--surface)] shadow-sm"
               />
             </div>
             <span
@@ -100,17 +100,17 @@ export function ContentGrid({
           </div>
           <div className="p-4">
             <h3
-              className="font-semibold text-gray-900 mb-2 truncate"
+              className="font-semibold text-[var(--foreground)] mb-2 truncate"
               title={item.title}
             >
               {item.title}
             </h3>
-            <div className="flex items-center justify-between text-sm text-gray-500 mb-2">
+            <div className="flex items-center justify-between text-sm text-[var(--foreground-tertiary)] mb-2">
               <span className="uppercase">{item.type}</span>
               {item.duration && <span>{item.duration}s</span>}
             </div>
             {item.createdAt && (
-              <div className="text-xs text-gray-400 mb-4">
+              <div className="text-xs text-[var(--foreground-tertiary)] mb-4">
                 Uploaded {new Date(item.createdAt).toLocaleDateString()}
               </div>
             )}
@@ -131,7 +131,7 @@ export function ContentGrid({
               </button>
               <button
                 onClick={() => onEdit(item)}
-                className="text-sm bg-blue-50 text-blue-600 py-2 rounded hover:bg-blue-100 transition font-medium flex items-center justify-center gap-1"
+                className="text-sm bg-[#00E5A0]/5 text-[#00E5A0] py-2 rounded hover:bg-[#00E5A0]/10 transition font-medium flex items-center justify-center gap-1"
               >
                 <Icon name="edit" size="sm" />
                 Edit

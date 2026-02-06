@@ -47,7 +47,7 @@ export default function Tooltip({
 export function HelpIcon({ content, position }: { content: string; position?: 'top' | 'bottom' | 'left' | 'right' }) {
   return (
     <Tooltip content={content} position={position}>
-      <span className="inline-flex items-center justify-center w-4 h-4 text-xs text-gray-500 border border-gray-400 rounded-full hover:text-blue-600 hover:border-blue-600 transition">
+      <span className="inline-flex items-center justify-center w-4 h-4 text-xs text-[var(--foreground-tertiary)] border border-[var(--foreground-tertiary)] rounded-full hover:text-[#00E5A0] hover:border-[#00E5A0] transition">
         ?
       </span>
     </Tooltip>
