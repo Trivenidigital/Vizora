@@ -53,15 +53,15 @@ export default function DashboardLayout({
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[var(--background)]">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200 fixed top-0 left-0 right-0 z-30">
+      <header className="bg-[var(--surface)]/90 backdrop-blur-xl border-b border-[var(--border)] fixed top-0 left-0 right-0 z-30">
         <div className="px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-4">
               <button
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition lg:hidden"
+                className="p-2 rounded-md text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--surface-hover)] transition lg:hidden"
               >
                 <svg
                   className="w-6 h-6"
@@ -78,10 +78,10 @@ export default function DashboardLayout({
                 </svg>
               </button>
               <Link href="/dashboard" className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">V</span>
+                <div className="w-8 h-8 bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] rounded-lg flex items-center justify-center">
+                  <span className="text-[#061A21] font-bold text-lg">V</span>
                 </div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                <h1 className="text-2xl font-bold eh-gradient">
                   Vizora
                 </h1>
               </Link>
@@ -93,34 +93,34 @@ export default function DashboardLayout({
                 <div className="relative">
                   <button
                     onClick={() => setUserMenuOpen(!userMenuOpen)}
-                    className="hidden sm:flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
+                    className="hidden sm:flex items-center gap-2 px-3 py-2 bg-[var(--surface-hover)] rounded-lg hover:bg-[var(--border)] transition"
                   >
-                    <div 
-                      className="w-8 h-8 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center"
+                    <div
+                      className="w-8 h-8 bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] rounded-full flex items-center justify-center"
                       aria-label={`${user.email} avatar`}
                     >
-                      <span className="text-white text-sm font-semibold">{getUserInitials()}</span>
+                      <span className="text-[#061A21] text-sm font-semibold">{getUserInitials()}</span>
                     </div>
                     <div className="hidden md:block text-left">
-                      <div className="text-sm font-medium text-gray-900">{user.email.split('@')[0]}</div>
-                      <div className="text-xs text-gray-500">{user.email}</div>
+                      <div className="text-sm font-medium text-[var(--foreground)]">{user.email.split('@')[0]}</div>
+                      <div className="text-xs text-[var(--foreground-tertiary)]">{user.email}</div>
                     </div>
-                    <svg className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 text-[var(--foreground-tertiary)]" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
                     </svg>
                   </button>
-                  
+
                   {/* Dropdown Menu */}
                   {userMenuOpen && (
                     <>
-                      <div 
-                        className="fixed inset-0 z-10" 
+                      <div
+                        className="fixed inset-0 z-10"
                         onClick={() => setUserMenuOpen(false)}
                       />
-                      <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
-                        <div className="p-4 border-b border-gray-200">
-                          <div className="text-sm font-medium text-gray-900">{user.email.split('@')[0]}</div>
-                          <div className="text-xs text-gray-500">{user.email}</div>
+                      <div className="absolute right-0 mt-2 w-56 bg-[var(--surface)] rounded-lg shadow-lg border border-[var(--border)] z-20">
+                        <div className="p-4 border-b border-[var(--border)]">
+                          <div className="text-sm font-medium text-[var(--foreground)]">{user.email.split('@')[0]}</div>
+                          <div className="text-xs text-[var(--foreground-tertiary)]">{user.email}</div>
                         </div>
                         <div className="py-2">
                           <button
@@ -128,9 +128,9 @@ export default function DashboardLayout({
                               setUserMenuOpen(false);
                               router.push('/dashboard/settings');
                             }}
-                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition flex items-center gap-2"
+                            className="w-full text-left px-4 py-2 text-sm text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] transition flex items-center gap-2"
                           >
-                            <Icon name="settings" size="md" className="text-gray-500" />
+                            <Icon name="settings" size="md" className="text-[var(--foreground-tertiary)]" />
                             <span>Settings</span>
                           </button>
                           <button
@@ -138,7 +138,7 @@ export default function DashboardLayout({
                               setUserMenuOpen(false);
                               handleLogout();
                             }}
-                            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition flex items-center gap-2"
+                            className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-500/10 transition flex items-center gap-2"
                           >
                             <Icon name="logout" size="md" className="text-red-500" />
                             <span>Logout</span>
@@ -159,7 +159,7 @@ export default function DashboardLayout({
         <aside
           className={`${
             sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-          } fixed lg:relative lg:translate-x-0 w-64 bg-white min-h-[calc(100vh-4rem)] border-r border-gray-200 transition-transform duration-300 ease-in-out z-20`}
+          } fixed lg:relative lg:translate-x-0 w-64 bg-[var(--surface)] min-h-[calc(100vh-4rem)] border-r border-[var(--border)] transition-transform duration-300 ease-in-out z-20`}
         >
           <nav className="p-4 space-y-1">
             {navigation.map((item) => {
@@ -171,14 +171,14 @@ export default function DashboardLayout({
                   onClick={() => setSidebarOpen(false)}
                   className={`flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
                     active
-                      ? 'bg-gradient-to-r from-blue-50 to-purple-50 text-blue-700 shadow-sm'
-                      : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                      ? 'bg-[#00E5A0]/10 text-[#00E5A0] border-l-2 border-[#00E5A0]'
+                      : 'text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]'
                   }`}
                 >
-                  <Icon name={item.icon} size="lg" className="text-gray-600" />
+                  <Icon name={item.icon} size="lg" className={active ? 'text-[#00E5A0]' : 'text-[var(--foreground-tertiary)]'} />
                   <span className="flex-1">{item.name}</span>
                   {active && (
-                    <span className="w-2 h-2 bg-blue-600 rounded-full"></span>
+                    <span className="w-2 h-2 bg-[#00E5A0] rounded-full shadow-neon-sm"></span>
                   )}
                 </Link>
               );
@@ -186,8 +186,8 @@ export default function DashboardLayout({
           </nav>
 
           {/* Sidebar Footer */}
-          <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 bg-gradient-to-br from-blue-50 to-purple-50">
-            <div className="text-xs text-gray-600 space-y-1">
+          <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-[var(--border)] bg-[var(--surface-secondary)]">
+            <div className="text-xs text-[var(--foreground-tertiary)] space-y-1">
               <div className="flex justify-between">
                 <span>Version</span>
                 <span className="font-semibold">1.0.0</span>
@@ -196,7 +196,7 @@ export default function DashboardLayout({
                 <span>Status</span>
                 <span className="flex items-center gap-1">
                   <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                  <span className="font-semibold text-green-600">Online</span>
+                  <span className="font-semibold text-green-500">Online</span>
                 </span>
               </div>
             </div>
