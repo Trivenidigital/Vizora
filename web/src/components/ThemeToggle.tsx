@@ -51,15 +51,15 @@ export default function ThemeToggle() {
   ];
 
   return (
-    <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+    <div className="flex items-center gap-1 bg-[var(--background-secondary)] rounded-lg p-1">
       {themes.map((t) => (
         <button
           key={t.value}
           onClick={() => handleThemeChange(t.value)}
           className={`flex items-center gap-2 px-3 py-2 rounded-md transition-all duration-200 ${
             theme === t.value
-              ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              ? 'bg-[var(--surface)] text-[var(--foreground)] shadow-sm'
+              : 'text-[var(--foreground-secondary)] hover:text-[var(--foreground)]'
           }`}
           title={t.label}
           aria-label={`Switch to ${t.label} theme`}

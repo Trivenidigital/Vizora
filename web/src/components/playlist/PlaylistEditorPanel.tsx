@@ -64,19 +64,19 @@ function SortablePlaylistItem({
     <div
       ref={setNodeRef}
       style={style}
-      className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-all"
+      className="flex items-center gap-3 p-3 bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:shadow-sm transition-all"
     >
       {/* Drag Handle */}
       <button
         {...attributes}
         {...listeners}
-        className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600"
+        className="cursor-grab active:cursor-grabbing text-[var(--foreground-tertiary)] hover:text-[var(--foreground-secondary)]"
       >
-        <Icon name="list" size="sm" className="text-gray-400" />
+        <Icon name="list" size="sm" className="text-[var(--foreground-tertiary)]" />
       </button>
 
       {/* Index */}
-      <span className="text-sm font-medium text-gray-500 w-6">{index + 1}</span>
+      <span className="text-sm font-medium text-[var(--foreground-tertiary)] w-6">{index + 1}</span>
 
       {/* Thumbnail */}
       {item.content?.thumbnailUrl ? (
@@ -89,17 +89,17 @@ function SortablePlaylistItem({
           }}
         />
       ) : (
-        <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center flex-shrink-0">
-          <Icon name={getTypeIcon(item.content?.type)} size="lg" className="text-gray-400" />
+        <div className="w-12 h-12 bg-[var(--background-secondary)] rounded flex items-center justify-center flex-shrink-0">
+          <Icon name={getTypeIcon(item.content?.type)} size="lg" className="text-[var(--foreground-tertiary)]" />
         </div>
       )}
 
       {/* Content Info */}
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-gray-900 truncate">
+        <div className="text-sm font-medium text-[var(--foreground)] truncate">
           {item.content?.title || `Content ${item.contentId}`}
         </div>
-        <div className="text-xs text-gray-500 capitalize">
+        <div className="text-xs text-[var(--foreground-tertiary)] capitalize">
           {item.content?.type || 'unknown'}
         </div>
       </div>
@@ -118,9 +118,9 @@ function SortablePlaylistItem({
             }
           }}
           onClick={(e) => e.stopPropagation()}
-          className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+          className="w-16 px-2 py-1 text-sm border border-[var(--border)] rounded focus:ring-1 focus:ring-[#00E5A0] focus:border-[#00E5A0]"
         />
-        <span className="text-sm text-gray-500">s</span>
+        <span className="text-sm text-[var(--foreground-tertiary)]">s</span>
       </div>
 
       {/* Remove Button */}
@@ -155,11 +155,11 @@ export default function PlaylistEditorPanel({
   };
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full bg-[var(--surface)]">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900">Playlist Items</h3>
-        <p className="text-sm text-gray-600 mt-1">
+      <div className="p-4 border-b border-[var(--border)]">
+        <h3 className="text-lg font-semibold text-[var(--foreground)]">Playlist Items</h3>
+        <p className="text-sm text-[var(--foreground-secondary)] mt-1">
           Drag content from the library or reorder items below
         </p>
       </div>
@@ -169,18 +169,18 @@ export default function PlaylistEditorPanel({
         ref={setNodeRef}
         className={`
           flex-1 overflow-y-auto p-4 space-y-2
-          ${isOver ? 'bg-blue-50 border-2 border-blue-400 border-dashed' : ''}
+          ${isOver ? 'bg-[#00E5A0]/5 border-2 border-[#00E5A0] border-dashed' : ''}
         `}
       >
         {items.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center py-12">
-            <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-              <Icon name="playlists" size="2xl" className="text-gray-400" />
+            <div className="w-20 h-20 bg-[var(--background-secondary)] rounded-full flex items-center justify-center mb-4">
+              <Icon name="playlists" size="2xl" className="text-[var(--foreground-tertiary)]" />
             </div>
-            <h4 className="text-lg font-medium text-gray-900 mb-2">
+            <h4 className="text-lg font-medium text-[var(--foreground)] mb-2">
               Empty Playlist
             </h4>
-            <p className="text-sm text-gray-500 max-w-xs">
+            <p className="text-sm text-[var(--foreground-tertiary)] max-w-xs">
               Drag content from the library to build your playlist
             </p>
           </div>
@@ -200,22 +200,22 @@ export default function PlaylistEditorPanel({
       </div>
 
       {/* Footer Stats */}
-      <div className="p-4 border-t border-gray-200 bg-gray-50">
+      <div className="p-4 border-t border-[var(--border)] bg-[var(--background)]">
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <Icon name="playlists" size="sm" className="text-gray-500" />
-              <span className="font-medium text-gray-900">{items.length}</span>
-              <span className="text-gray-600">
+              <Icon name="playlists" size="sm" className="text-[var(--foreground-tertiary)]" />
+              <span className="font-medium text-[var(--foreground)]">{items.length}</span>
+              <span className="text-[var(--foreground-secondary)]">
                 {items.length === 1 ? 'item' : 'items'}
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <Icon name="clock" size="sm" className="text-gray-500" />
-              <span className="font-medium text-gray-900">
+              <Icon name="clock" size="sm" className="text-[var(--foreground-tertiary)]" />
+              <span className="font-medium text-[var(--foreground)]">
                 {formatTotalDuration(totalDuration)}
               </span>
-              <span className="text-gray-600">total</span>
+              <span className="text-[var(--foreground-secondary)]">total</span>
             </div>
           </div>
         </div>

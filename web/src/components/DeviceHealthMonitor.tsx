@@ -23,7 +23,7 @@ interface DeviceHealthMonitorProps {
 
 const getHealthStatus = (score: number): { label: string; color: string; bgColor: string } => {
   if (score >= 90) return { label: 'Excellent', color: 'text-green-600 dark:text-green-400', bgColor: 'bg-green-100 dark:bg-green-900' };
-  if (score >= 70) return { label: 'Good', color: 'text-blue-600 dark:text-blue-400', bgColor: 'bg-blue-100 dark:bg-blue-900' };
+  if (score >= 70) return { label: 'Good', color: 'text-[#00E5A0]', bgColor: 'bg-[#00E5A0]/10' };
   if (score >= 50) return { label: 'Fair', color: 'text-yellow-600 dark:text-yellow-400', bgColor: 'bg-yellow-100 dark:bg-yellow-900' };
   return { label: 'Poor', color: 'text-red-600 dark:text-red-400', bgColor: 'bg-red-100 dark:bg-red-900' };
 };
@@ -37,12 +37,12 @@ const getMetricStatus = (value: number, thresholds: { warning: number; critical:
 const MetricBar = ({ label, value, unit, thresholds }: any) => (
   <div className="space-y-1">
     <div className="flex justify-between text-xs">
-      <span className="font-medium text-gray-700 dark:text-gray-300">{label}</span>
-      <span className="text-gray-600 dark:text-gray-400">
+      <span className="font-medium text-[var(--foreground-secondary)]">{label}</span>
+      <span className="text-[var(--foreground-secondary)]">
         {value.toFixed(1)}{unit}
       </span>
     </div>
-    <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+    <div className="w-full h-2 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
       <div
         className={`h-full ${getMetricStatus(value, thresholds)} transition-all`}
         style={{ width: `${Math.min(value, 100)}%` }}
@@ -63,22 +63,22 @@ export default function DeviceHealthMonitor({
   if (compact) {
     return (
       <div className={`flex items-center gap-2 ${className}`}>
-        <div className="text-sm font-medium text-gray-700 dark:text-gray-300">Health:</div>
+        <div className="text-sm font-medium text-[var(--foreground-secondary)]">Health:</div>
         <div className={`px-2 py-1 rounded text-xs font-semibold ${healthStatus.bgColor} ${healthStatus.color}`}>
           {health.score}%
         </div>
-        <div className="text-xs text-gray-500 dark:text-gray-400">{healthStatus.label}</div>
+        <div className="text-xs text-[var(--foreground-tertiary)]">{healthStatus.label}</div>
       </div>
     );
   }
 
   return (
-    <div className={`bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4 space-y-4 ${className}`}>
+    <div className={`bg-[var(--surface)] rounded-lg border border-[var(--border)] p-4 space-y-4 ${className}`}>
       {/* Overall Health Score */}
       <div className="flex items-start justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-50">Device Health</h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Updated {new Date(health.lastHeartbeat).toLocaleTimeString()}</p>
+          <h3 className="text-sm font-semibold text-[var(--foreground)]">Device Health</h3>
+          <p className="text-xs text-[var(--foreground-tertiary)] mt-1">Updated {new Date(health.lastHeartbeat).toLocaleTimeString()}</p>
         </div>
         <div className={`text-right ${healthStatus.color}`}>
           <div className="text-2xl font-bold">{health.score}%</div>
@@ -133,10 +133,10 @@ export default function DeviceHealthMonitor({
 
       {/* Uptime */}
       {showUptime && (
-        <div className="pt-2 border-t border-gray-200 dark:border-gray-800">
+        <div className="pt-2 border-t border-[var(--border)]">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-700 dark:text-gray-300">Uptime</span>
-            <span className="font-semibold text-gray-900 dark:text-gray-50">
+            <span className="text-[var(--foreground-secondary)]">Uptime</span>
+            <span className="font-semibold text-[var(--foreground)]">
               {health.uptime >= 24
                 ? `${(health.uptime / 24).toFixed(1)} days`
                 : `${health.uptime.toFixed(1)} hours`}
@@ -147,7 +147,7 @@ export default function DeviceHealthMonitor({
 
       {/* Health Alerts */}
       {health.score < 70 && (
-        <div className="pt-2 border-t border-gray-200 dark:border-gray-800">
+        <div className="pt-2 border-t border-[var(--border)]">
           <div className={`px-3 py-2 rounded text-xs font-medium ${healthStatus.bgColor} ${healthStatus.color} flex items-center gap-2`}>
             <Icon name="warning" size="sm" />
             <span>

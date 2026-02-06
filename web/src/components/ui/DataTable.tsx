@@ -150,7 +150,7 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps<any>>(
                         <MoreVertical className="w-4 h-4" />
                       </button>
                       {activeMenu === row && (
-                        <div className="absolute right-0 top-full mt-1 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg shadow-lg z-10">
+                        <div className="absolute right-0 top-full mt-1 bg-[var(--surface)] border border-neutral-200 dark:border-neutral-700 rounded-lg shadow-lg z-10">
                           {rowActions.map((action, i) => (
                             <button
                               key={i}

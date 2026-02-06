@@ -58,16 +58,16 @@ export default function PlaylistPreviewPanel({ items }: PlaylistPreviewPanelProp
 
   if (items.length === 0) {
     return (
-      <div className="flex flex-col h-full bg-gray-50 border-l border-gray-200">
-        <div className="p-4 border-b border-gray-200 bg-white">
-          <h3 className="text-lg font-semibold text-gray-900">Preview</h3>
+      <div className="flex flex-col h-full bg-[var(--background)] border-l border-[var(--border)]">
+        <div className="p-4 border-b border-[var(--border)] bg-[var(--surface)]">
+          <h3 className="text-lg font-semibold text-[var(--foreground)]">Preview</h3>
         </div>
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Icon name="preview" size="xl" className="text-gray-400" />
+            <div className="w-16 h-16 bg-[var(--background-tertiary)] rounded-full flex items-center justify-center mx-auto mb-4">
+              <Icon name="preview" size="xl" className="text-[var(--foreground-tertiary)]" />
             </div>
-            <p className="text-sm text-gray-500">Add items to preview</p>
+            <p className="text-sm text-[var(--foreground-tertiary)]">Add items to preview</p>
           </div>
         </div>
       </div>
@@ -82,11 +82,11 @@ export default function PlaylistPreviewPanel({ items }: PlaylistPreviewPanelProp
   const totalProgressPercent = (elapsedDuration / totalPlaylistDuration) * 100;
 
   return (
-    <div className="flex flex-col h-full bg-gray-50 border-l border-gray-200">
+    <div className="flex flex-col h-full bg-[var(--background)] border-l border-[var(--border)]">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 bg-white">
-        <h3 className="text-lg font-semibold text-gray-900">Preview</h3>
-        <p className="text-sm text-gray-600 mt-1">
+      <div className="p-4 border-b border-[var(--border)] bg-[var(--surface)]">
+        <h3 className="text-lg font-semibold text-[var(--foreground)]">Preview</h3>
+        <p className="text-sm text-[var(--foreground-secondary)] mt-1">
           {currentIndex + 1} of {items.length}
         </p>
       </div>
@@ -126,18 +126,18 @@ export default function PlaylistPreviewPanel({ items }: PlaylistPreviewPanelProp
           {/* Current Item Progress */}
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-700">
             <div
-              className="h-full bg-blue-500 transition-all duration-1000 ease-linear"
+              className="h-full bg-[#00E5A0] transition-all duration-1000 ease-linear"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
         </div>
 
         {/* Content Info */}
-        <div className="bg-white rounded-lg p-4 mb-4">
-          <div className="text-sm font-medium text-gray-900 mb-1 truncate">
+        <div className="bg-[var(--surface)] rounded-lg p-4 mb-4">
+          <div className="text-sm font-medium text-[var(--foreground)] mb-1 truncate">
             {currentItem?.content?.title || `Item ${currentIndex + 1}`}
           </div>
-          <div className="flex items-center gap-3 text-xs text-gray-500">
+          <div className="flex items-center gap-3 text-xs text-[var(--foreground-tertiary)]">
             <span className="capitalize">{currentItem?.content?.type || 'unknown'}</span>
             <span>•</span>
             <span>{timeRemaining}s remaining</span>
@@ -145,16 +145,16 @@ export default function PlaylistPreviewPanel({ items }: PlaylistPreviewPanelProp
         </div>
 
         {/* Playback Controls */}
-        <div className="bg-white rounded-lg p-4 space-y-3">
+        <div className="bg-[var(--surface)] rounded-lg p-4 space-y-3">
           {/* Total Playlist Progress */}
           <div>
-            <div className="flex justify-between text-xs text-gray-600 mb-1">
+            <div className="flex justify-between text-xs text-[var(--foreground-secondary)] mb-1">
               <span>Playlist Progress</span>
               <span>{Math.round(totalProgressPercent)}%</span>
             </div>
-            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div className="h-2 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
               <div
-                className="h-full bg-blue-600 transition-all duration-300"
+                className="h-full bg-[#00E5A0] transition-all duration-300"
                 style={{ width: `${totalProgressPercent}%` }}
               />
             </div>
@@ -165,31 +165,31 @@ export default function PlaylistPreviewPanel({ items }: PlaylistPreviewPanelProp
             <button
               onClick={goToPrev}
               disabled={items.length <= 1}
-              className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-2 bg-[var(--background-secondary)] hover:bg-[var(--surface-hover)] rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
               title="Previous"
             >
-              <Icon name="chevronLeft" size="md" className="text-gray-700" />
+              <Icon name="chevronLeft" size="md" className="text-[var(--foreground-secondary)]" />
             </button>
 
             <button
               onClick={togglePlayPause}
-              className="p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
+              className="p-3 bg-[#00E5A0] hover:bg-[#00CC8E] text-[#061A21] rounded-lg transition"
               title={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? (
-                <Icon name="clock" size="md" className="text-white" />
+                <Icon name="clock" size="md" className="text-[#061A21]" />
               ) : (
-                <Icon name="power" size="md" className="text-white" />
+                <Icon name="power" size="md" className="text-[#061A21]" />
               )}
             </button>
 
             <button
               onClick={goToNext}
               disabled={items.length <= 1}
-              className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-2 bg-[var(--background-secondary)] hover:bg-[var(--surface-hover)] rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
               title="Next"
             >
-              <Icon name="chevronRight" size="md" className="text-gray-700" />
+              <Icon name="chevronRight" size="md" className="text-[var(--foreground-secondary)]" />
             </button>
           </div>
         </div>

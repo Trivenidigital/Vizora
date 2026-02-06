@@ -63,7 +63,7 @@ export const Accordion: React.FC<AccordionProps> = ({
             {isOpen && (
               <div
                 id={`content-${item.id}`}
-                className="px-4 py-3 bg-white dark:bg-neutral-900/50 border-t border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300"
+                className="px-4 py-3 bg-[var(--surface)] border-t border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300"
               >
                 {item.content}
               </div>

@@ -48,8 +48,8 @@ export default function PlaylistPreview({ items, autoPlay = true, onClose }: Pla
 
   if (items.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64 bg-gray-100 rounded-lg">
-        <p className="text-gray-500">No items to preview</p>
+      <div className="flex items-center justify-center h-64 bg-[var(--background-secondary)] rounded-lg">
+        <p className="text-[var(--foreground-tertiary)]">No items to preview</p>
       </div>
     );
   }
@@ -90,7 +90,7 @@ export default function PlaylistPreview({ items, autoPlay = true, onClose }: Pla
       {/* Progress Bar */}
       <div className="h-1 bg-gray-700">
         <div
-          className="h-full bg-blue-500 transition-all duration-1000 ease-linear"
+          className="h-full bg-[#00E5A0] transition-all duration-1000 ease-linear"
           style={{ width: `${progressPercent}%` }}
         />
       </div>

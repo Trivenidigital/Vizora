@@ -51,49 +51,49 @@ export function ContentList({
       case 'error':
         return 'bg-red-100 text-red-800';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-[var(--background-secondary)] text-[var(--foreground)]';
     }
   };
 
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
+    <div className="bg-[var(--surface)] rounded-lg shadow overflow-hidden">
+      <table className="min-w-full divide-y divide-[var(--border)]">
+        <thead className="bg-[var(--background)]">
           <tr>
             <th className="px-6 py-3 text-left">
               <input
                 type="checkbox"
                 checked={selectedItems.size === content.length && content.length > 0}
                 onChange={onToggleSelectAll}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className="rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]"
               />
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+            <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase">
               Content
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+            <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase">
               Type
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+            <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase">
               Status
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+            <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase">
               Uploaded
             </th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+            <th className="px-6 py-3 text-right text-xs font-medium text-[var(--foreground-tertiary)] uppercase">
               Actions
             </th>
           </tr>
         </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
+        <tbody className="bg-[var(--surface)] divide-y divide-[var(--border)]">
           {content.map((item) => (
-            <tr key={item.id} className="hover:bg-gray-50 transition">
+            <tr key={item.id} className="hover:bg-[var(--surface-hover)] transition">
               <td className="px-6 py-4 whitespace-nowrap">
                 <input
                   type="checkbox"
                   checked={selectedItems.has(item.id)}
                   onChange={() => onToggleSelect(item.id)}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  className="rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]"
                   onClick={(e) => e.stopPropagation()}
                 />
               </td>
@@ -102,7 +102,7 @@ export function ContentList({
                   className="flex items-center gap-3 cursor-pointer"
                   onClick={() => onPreview(item)}
                 >
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-purple-500 rounded flex items-center justify-center flex-shrink-0 overflow-hidden">
+                  <div className="w-12 h-12 bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] rounded flex items-center justify-center flex-shrink-0 overflow-hidden">
                     {item.thumbnailUrl ? (
                       <img
                         src={item.thumbnailUrl}
@@ -119,19 +119,19 @@ export function ContentList({
                   </div>
                   <div className="min-w-0">
                     <div
-                      className="text-sm font-medium text-gray-900 truncate"
+                      className="text-sm font-medium text-[var(--foreground)] truncate"
                       title={item.title}
                     >
                       {item.title}
                     </div>
                     {item.duration && (
-                      <div className="text-xs text-gray-500">{item.duration}s</div>
+                      <div className="text-xs text-[var(--foreground-tertiary)]">{item.duration}s</div>
                     )}
                   </div>
                 </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
-                <span className="px-2 py-1 text-xs font-medium uppercase text-gray-600 bg-gray-100 rounded">
+                <span className="px-2 py-1 text-xs font-medium uppercase text-[var(--foreground-secondary)] bg-[var(--background-secondary)] rounded">
                   {item.type}
                 </span>
               </td>
@@ -144,7 +144,7 @@ export function ContentList({
                   {item.status}
                 </span>
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--foreground-tertiary)]">
                 {item.createdAt
                   ? new Date(item.createdAt).toLocaleDateString()
                   : '—'}
@@ -167,7 +167,7 @@ export function ContentList({
                   </button>
                   <button
                     onClick={() => onEdit(item)}
-                    className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded transition"
+                    className="text-[#00E5A0] hover:text-[#00CC8E] hover:bg-[#00E5A0]/5 px-2 py-1 rounded transition"
                     title="Edit"
                   >
                     <Icon name="edit" size="md" />
