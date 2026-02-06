@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vizora - Pending & Future Upgrades</title>
+  <style>
+    :root {
+      --primary: #2cb67d;
+      --primary-dark: #1e9e6b;
+      --bg: #f8f9fa;
+      --card-bg: #ffffff;
+      --text: #2d3436;
+      --text-muted: #636e72;
+      --border: #dfe6e9;
+      --green: #00b894;
+      --yellow: #fdcb6e;
+      --red: #d63031;
+      --blue: #0984e3;
+      --purple: #6c5ce7;
+      --orange: #e17055;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+      color: white;
+      padding: 3rem 2rem;
+      text-align: center;
+    }
+    .header h1 { font-size: 2.2rem; margin-bottom: 0.5rem; }
+    .header .subtitle { opacity: 0.9; font-size: 1.1rem; }
+    .header .meta { margin-top: 1rem; font-size: 0.9rem; opacity: 0.8; }
+
+    .container { max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+    .summary-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .summary-card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 1.5rem;
+      text-align: center;
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .summary-card .number { font-size: 2.5rem; font-weight: 700; }
+    .summary-card .label { font-size: 0.9rem; color: var(--text-muted); margin-top: 0.3rem; }
+    .summary-card.green .number { color: var(--green); }
+    .summary-card.yellow .number { color: #e67e22; }
+    .summary-card.red .number { color: var(--red); }
+    .summary-card.blue .number { color: var(--blue); }
+    .summary-card.purple .number { color: var(--purple); }
+
+    .section {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 1.5rem;
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .section h2 {
+      font-size: 1.5rem;
+      color: var(--primary-dark);
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid var(--primary);
+    }
+    .section h3 {
+      font-size: 1.15rem;
+      color: var(--text);
+      margin: 1.5rem 0 0.8rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.88rem;
+    }
+    th, td {
+      padding: 0.65rem 0.7rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    th {
+      background: #f1f3f5;
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      white-space: nowrap;
+    }
+    tr:hover td { background: #f8f9fa; }
+
+    .status {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .status-done { background: #e6f9f0; color: #1e9e6b; }
+    .status-partial { background: #fff3cd; color: #856404; }
+    .status-pending { background: #e3f2fd; color: #0984e3; }
+    .status-deferred { background: #f1f3f5; color: #636e72; }
+
+    .priority {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .priority-critical { background: #fde8e8; color: #d63031; }
+    .priority-high { background: #ffeee8; color: #e17055; }
+    .priority-medium { background: #fff3cd; color: #856404; }
+    .priority-low { background: #e3f2fd; color: #0984e3; }
+
+    .phase {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .phase-done { background: #e6f9f0; color: #1e9e6b; }
+    .phase-next { background: #fff3cd; color: #856404; }
+    .phase-future { background: #e8f4fd; color: #0984e3; }
+    .phase-enterprise { background: #f3e8fd; color: #6c5ce7; }
+    .phase-deferred { background: #fde8e8; color: #d63031; font-weight: 700; }
+
+    .deferred-row { background: #fff5f5; }
+    .deferred-row td { color: #636e72; text-decoration: line-through; }
+    .deferred-row td:last-child { text-decoration: none; }
+
+    .callout {
+      padding: 1rem 1.2rem;
+      border-radius: 8px;
+      margin: 1rem 0;
+      border-left: 4px solid;
+      font-size: 0.92rem;
+    }
+    .callout-info { background: #e3f2fd; border-color: #0984e3; }
+    .callout-success { background: #e6f9f0; border-color: #1e9e6b; }
+    .callout-warning { background: #fff3cd; border-color: #f39c12; }
+
+    .wave-badge {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-right: 0.3rem;
+    }
+    .wave-1 { background: #e6f9f0; color: #1e9e6b; }
+    .wave-2 { background: #e3f2fd; color: #0984e3; }
+    .wave-3 { background: #fff3cd; color: #856404; }
+    .wave-4 { background: #ffeee8; color: #e17055; }
+    .wave-5 { background: #f3e8fd; color: #6c5ce7; }
+    .wave-6 { background: #e8f4fd; color: #0077b6; }
+    .wave-7 { background: #fde8e8; color: #d63031; }
+
+    .progress-bar {
+      width: 100%;
+      height: 24px;
+      background: #e9ecef;
+      border-radius: 12px;
+      overflow: hidden;
+      margin: 1rem 0;
+    }
+    .progress-bar .fill {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+      font-size: 0.85rem;
+    }
+    .progress-bar .fill.green { background: var(--green); }
+
+    .checklist {
+      list-style: none;
+      padding: 0;
+    }
+    .checklist li {
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .checklist li:last-child { border-bottom: none; }
+    .check { color: var(--green); font-weight: bold; }
+    .pending { color: var(--blue); }
+
+    .footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    @media (max-width: 768px) {
+      .header h1 { font-size: 1.6rem; }
+      .summary-cards { grid-template-columns: 1fr 1fr; }
+      table { font-size: 0.8rem; }
+      th, td { padding: 0.4rem 0.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Vizora - Pending & Future Upgrades</h1>
+  <div class="subtitle">Implementation Status After Waves 1-7 | Roadmap for Remaining Features</div>
+  <div class="meta">
+    Last Updated: February 5, 2026 | Branch: feat/wave-7-billing
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Summary Cards -->
+  <div class="summary-cards">
+    <div class="summary-card green">
+      <div class="number">51</div>
+      <div class="label">Fully Implemented</div>
+    </div>
+    <div class="summary-card yellow">
+      <div class="number">4</div>
+      <div class="label">Partially Done</div>
+    </div>
+    <div class="summary-card purple">
+      <div class="number">207</div>
+      <div class="label">New Tests (Wave 7)</div>
+    </div>
+    <div class="summary-card red">
+      <div class="number">13</div>
+      <div class="label">Deferred (Not Implementing)</div>
+    </div>
+  </div>
+
+  <!-- Progress Overview -->
+  <div class="section">
+    <h2>Overall Progress</h2>
+
+    <div class="progress-bar">
+      <div class="fill green" style="width: 82%;">82% Complete (51/62 Core Requirements)</div>
+    </div>
+
+    <div class="callout callout-success">
+      <strong>Waves 1-7 Achievement:</strong> Closed 46 gaps from the original gap analysis, moving from 31% to 82% full coverage on core requirements. Wave 7 added complete billing infrastructure with dual payment gateway support (Stripe for US/International, Razorpay for India), subscription guards, quota enforcement, and billing UI. The platform is now ready for monetization and public launch.
+    </div>
+
+    <h3>Completed Waves Summary</h3>
+    <table>
+      <tr>
+        <th>Wave</th>
+        <th>Focus Area</th>
+        <th>Key Deliverables</th>
+        <th>Tests Added</th>
+      </tr>
+      <tr>
+        <td><span class="wave-badge wave-1">Wave 1</span></td>
+        <td>Content & Device Foundation</td>
+        <td>Tags system, playlist metadata, duplicate endpoints, device search/sort</td>
+        <td>~45</td>
+      </tr>
+      <tr>
+        <td><span class="wave-badge wave-2">Wave 2</span></td>
+        <td>Organization & Scheduling</td>
+        <td>Display groups, schedule conflicts, users module, audit log, playlist reorder</td>
+        <td>~50</td>
+      </tr>
+      <tr>
+        <td><span class="wave-badge wave-3">Wave 3</span></td>
+        <td>UX & Analytics</td>
+        <td>Calendar view, bulk operations, role guards, deterministic analytics, CSV export</td>
+        <td>~55</td>
+      </tr>
+      <tr>
+        <td><span class="wave-badge wave-4">Wave 4</span></td>
+        <td>Storage & Notifications</td>
+        <td>MinIO storage service, content folders hierarchy, in-app notifications bell</td>
+        <td>~40</td>
+      </tr>
+      <tr>
+        <td><span class="wave-badge wave-5">Wave 5</span></td>
+        <td>Playlist UX & Device Preview</td>
+        <td>3-panel playlist builder, device screenshots, view toggle, schedule duplicate API</td>
+        <td>~64</td>
+      </tr>
+      <tr>
+        <td><span class="wave-badge wave-6">Wave 6</span></td>
+        <td>Developer API & Polish</td>
+        <td>API key management, playlist undo/redo, orientation enum, quick-change dropdown, device uptime analytics, template orientation filter</td>
+        <td>~86</td>
+      </tr>
+      <tr>
+        <td><span class="wave-badge wave-7">Wave 7</span></td>
+        <td>Billing & Subscriptions</td>
+        <td>Stripe + Razorpay dual payment, BillingModule, subscription/quota guards, webhook handlers, billing UI (overview, plans, history)</td>
+        <td>207</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- Current Test Baseline -->
+  <div class="section">
+    <h2>Current Test Baseline (Post Wave 7)</h2>
+
+    <table>
+      <tr>
+        <th>Package</th>
+        <th>Passed</th>
+        <th>Failed</th>
+        <th>Total</th>
+        <th>Notes</th>
+      </tr>
+      <tr>
+        <td><strong>Middleware</strong></td>
+        <td style="color: var(--green);">1235</td>
+        <td style="color: var(--red);">2</td>
+        <td>1237</td>
+        <td>2 pre-existing flaky (pairing.service, health.service timing)</td>
+      </tr>
+      <tr>
+        <td><strong>Web</strong></td>
+        <td style="color: var(--green);">315</td>
+        <td style="color: var(--red);">2</td>
+        <td>317</td>
+        <td>2 flaky async tests in useErrorRecovery</td>
+      </tr>
+      <tr style="font-weight: bold; background: #f1f3f5;">
+        <td>Total</td>
+        <td style="color: var(--green);">1550</td>
+        <td style="color: var(--red);">4</td>
+        <td>1554</td>
+        <td>99.7% pass rate</td>
+      </tr>
+    </table>
+
+    <div class="callout callout-info">
+      <strong>Wave 7 Tests Added:</strong> 207 new tests (132 middleware + 75 web) covering BillingModule, payment providers, guards, controllers, and billing UI components.
+    </div>
+  </div>
+
+  <!-- Wave 6 Completed -->
+  <div class="section">
+    <h2>Wave 6 Completed Items</h2>
+
+    <div class="callout callout-success">
+      <strong>Wave 6 Success:</strong> Implemented 6 features with 86 new tests. All previously partial features now fully implemented.
+    </div>
+
+    <ul class="checklist">
+      <li><span class="check">&#10003;</span> <strong>Orientation enum extension</strong> - All 4 values (landscape, portrait, landscape_flipped, portrait_flipped) + DisplayOrientation type</li>
+      <li><span class="check">&#10003;</span> <strong>Playlist undo/redo</strong> - usePlaylistHistory hook with Ctrl+Z/Ctrl+Shift+Z keyboard shortcuts</li>
+      <li><span class="check">&#10003;</span> <strong>Quick-change dropdown</strong> - PlaylistQuickSelect component for inline playlist assignment on device list</li>
+      <li><span class="check">&#10003;</span> <strong>Device uptime analytics</strong> - GET /analytics/device-uptime/:id and /uptime-summary endpoints</li>
+      <li><span class="check">&#10003;</span> <strong>API key management</strong> - Full ApiKeysModule with CRUD, X-API-Key auth guard, scoped permissions, settings UI</li>
+      <li><span class="check">&#10003;</span> <strong>Template orientation filter</strong> - templateOrientation field on Content model with filtering support</li>
+    </ul>
+
+    <h3>Wave 6 New Files</h3>
+    <table>
+      <tr>
+        <th>File</th>
+        <th>Purpose</th>
+      </tr>
+      <tr>
+        <td><code>middleware/src/modules/api-keys/</code></td>
+        <td>Complete API key management module (9 files)</td>
+      </tr>
+      <tr>
+        <td><code>web/src/lib/hooks/usePlaylistHistory.ts</code></td>
+        <td>Generic undo/redo history hook</td>
+      </tr>
+      <tr>
+        <td><code>web/src/components/PlaylistQuickSelect.tsx</code></td>
+        <td>Inline playlist dropdown component</td>
+      </tr>
+      <tr>
+        <td><code>web/src/app/dashboard/settings/api-keys/page.tsx</code></td>
+        <td>API key management settings page</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- Remaining Core Gaps -->
+  <div class="section">
+    <h2>Remaining Core Gaps (6 Items) — <span style="color: #d63031; font-weight: 700;">ALL DEFERRED</span></h2>
+
+    <div class="callout callout-warning">
+      <strong>Decision:</strong> All remaining core gaps have been deferred indefinitely. These are low-priority features that do not impact core product functionality.
+    </div>
+
+    <table>
+      <tr>
+        <th>Requirement</th>
+        <th>Category</th>
+        <th>Priority</th>
+        <th>Effort</th>
+        <th>Status</th>
+      </tr>
+      <tr class="deferred-row">
+        <td>Operational schedule (auto on/off hours per device)</td>
+        <td>Screens/Devices</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td>Medium</td>
+        <td><span class="phase phase-deferred">Not Implementing</span></td>
+      </tr>
+      <tr class="deferred-row">
+        <td>Background music / audio overlay</td>
+        <td>Screens/Devices</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td>High</td>
+        <td><span class="phase phase-deferred">Not Implementing</span></td>
+      </tr>
+      <tr class="deferred-row">
+        <td>SAML SSO</td>
+        <td>Security</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td>Medium</td>
+        <td><span class="phase phase-deferred">Not Implementing</span></td>
+      </tr>
+      <tr class="deferred-row">
+        <td>Content approval workflow</td>
+        <td>Security</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td>Medium</td>
+        <td><span class="phase phase-deferred">Not Implementing</span></td>
+      </tr>
+      <tr class="deferred-row">
+        <td>Campaign management</td>
+        <td>Infrastructure</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td>High</td>
+        <td><span class="phase phase-deferred">Not Implementing</span></td>
+      </tr>
+      <tr class="deferred-row">
+        <td>Document support (PPT/Word)</td>
+        <td>Files/Assets</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td>High</td>
+        <td><span class="phase phase-deferred">Not Implementing</span></td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- Partially Implemented -->
+  <div class="section">
+    <h2>Partially Implemented (4 Items)</h2>
+
+    <table>
+      <tr>
+        <th>Requirement</th>
+        <th>Category</th>
+        <th>Current State</th>
+        <th>To Complete</th>
+      </tr>
+      <tr>
+        <td>Custom branding / white-label</td>
+        <td>Settings</td>
+        <td>Customization page exists</td>
+        <td>Implement logo upload, color theme, custom domain</td>
+      </tr>
+      <tr>
+        <td>Advanced content analytics</td>
+        <td>Analytics</td>
+        <td>Basic view counts exist</td>
+        <td>Add per-content engagement metrics, heatmaps</td>
+      </tr>
+      <tr>
+        <td>Multi-language support</td>
+        <td>Infrastructure</td>
+        <td>English only</td>
+        <td>Add i18n framework, translate UI strings</td>
+      </tr>
+      <tr>
+        <td>Offline content caching</td>
+        <td>Device Clients</td>
+        <td>Basic caching in Electron</td>
+        <td>Intelligent preloading, cache size management</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- Major Future Features -->
+  <div class="section">
+    <h2>Major Future Features (Phase 3-4)</h2>
+
+    <div class="callout callout-warning">
+      <strong>Note:</strong> These are significant features that require dedicated development cycles. Items marked <span style="color: #d63031; font-weight: 700;">Not Implementing</span> are enterprise-tier features that have been deferred indefinitely. Focus remains on Phase 3 core features only.
+    </div>
+
+    <h3>Templates & Design Studio (5 items)</h3>
+    <table>
+      <tr>
+        <th>Feature</th>
+        <th>Priority</th>
+        <th>Effort</th>
+        <th>Phase</th>
+      </tr>
+      <tr>
+        <td>Searchable template library (seed 50-100 templates)</td>
+        <td><span class="priority priority-critical">Critical</span></td>
+        <td>High</td>
+        <td><span class="phase phase-future">Phase 3</span></td>
+      </tr>
+      <tr class="deferred-row">
+        <td>Visual drag-and-drop design editor (Canva-like)</td>
+        <td><span class="priority priority-critical">Critical</span></td>
+        <td>Very High</td>
+        <td><span class="phase phase-deferred">Not Implementing</span></td>
+      </tr>
+      <tr>
+        <td>AI-powered template generation</td>
+        <td><span class="priority priority-low">Very Low</span></td>
+        <td>Medium</td>
+        <td><span class="phase phase-future">Future (TBD)</span></td>
+      </tr>
+      <tr>
+        <td>Template orientation filter</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td>Low</td>
+        <td><span class="phase phase-done">Wave 6 Done</span></td>
+      </tr>
+      <tr>
+        <td>Featured templates / seasonal carousel</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td>Low</td>
+        <td><span class="phase phase-future">Phase 3</span></td>
+      </tr>
+    </table>
+
+    <h3>Engage / Interactive Experiences (5 items)</h3>
+    <table>
+      <tr>
+        <th>Feature</th>
+        <th>Priority</th>
+        <th>Effort</th>
+        <th>Phase</th>
+      </tr>
+      <tr class="deferred-row">
+        <td>Touch screen kiosk experiences</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td>Very High</td>
+        <td><span class="phase phase-deferred">Not Implementing</span></td>
+      </tr>
+      <tr>
+        <td>QR code overlay on content</td>
+        <td><span class="priority priority-medium">Medium</span></td>
+        <td>Medium</td>
+        <td><span class="phase phase-future">Phase 3</span></td>
+      </tr>
+      <tr class="deferred-row">
+        <td>IoT sensor-triggered content</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td>High</td>
+        <td><span class="phase phase-deferred">Not Implementing</span></td>
+      </tr>
+      <tr class="deferred-row">
+        <td>Live TV overlay</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td>Very High</td>
+        <td><span class="phase phase-deferred">Not Implementing</span></td>
+      </tr>
+      <tr class="deferred-row">
+        <td>AI camera audience analytics</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td>Very High</td>
+        <td><span class="phase phase-deferred">Not Implementing</span></td>
+      </tr>
+    </table>
+
+    <h3>Integrations & Data Sources (7 items)</h3>
+    <table>
+      <tr>
+        <th>Feature</th>
+        <th>Priority</th>
+        <th>Effort</th>
+        <th>Phase</th>
+      </tr>
+      <tr>
+        <td>Widget architecture + initial widget set</td>
+        <td><span class="priority priority-high">High</span></td>
+        <td>High</td>
+        <td><span class="phase phase-future">Phase 3</span></td>
+      </tr>
+      <tr>
+        <td>Weather widget</td>
+        <td><span class="priority priority-medium">Medium</span></td>
+        <td>Low</td>
+        <td><span class="phase phase-future">Phase 3</span></td>
+      </tr>
+      <tr>
+        <td>Social media feeds (Instagram, Facebook, Twitter)</td>
+        <td><span class="priority priority-medium">Medium</span></td>
+        <td>Medium</td>
+        <td><span class="phase phase-future">Phase 3</span></td>
+      </tr>
+      <tr>
+        <td>RSS feed integration</td>
+        <td><span class="priority priority-medium">Medium</span></td>
+        <td>Medium</td>
+        <td><span class="phase phase-future">Phase 3</span></td>
+      </tr>
+      <tr class="deferred-row">
+        <td>Google Sheets / Calendar integration</td>
+        <td><span class="priority priority-medium">Medium</span></td>
+        <td>Medium</td>
+        <td><span class="phase phase-deferred">Not Implementing</span></td>
+      </tr>
+      <tr class="deferred-row">
+        <td>MS365 / Power BI / Slack / Teams</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td>High</td>
+        <td><span class="phase phase-deferred">Not Implementing</span></td>
+      </tr>
+      <tr>
+        <td>Split-screen / multi-zone layouts</td>
+        <td><span class="priority priority-high">High</span></td>
+        <td>High</td>
+        <td><span class="phase phase-future">Phase 3</span></td>
+      </tr>
+    </table>
+
+    <h3>Billing & Subscriptions (6 items) — <span style="color: #1e9e6b; font-weight: 700;">WAVE 7 COMPLETE</span></h3>
+    <div class="callout callout-success">
+      <strong>Monetization Ready:</strong> Full billing infrastructure implemented with dual payment gateway support. Platform is ready for customer sign-up and monthly subscriptions in both US and India markets.
+    </div>
+    <div class="callout callout-info">
+      <strong>Payment Gateway Implementation:</strong><br>
+      • <strong>US/International:</strong> Stripe (cards, ACH, Apple Pay, Google Pay) via StripeProvider<br>
+      • <strong>India:</strong> Razorpay (UPI, net banking, cards, wallets, EMI) via RazorpayProvider<br>
+      • PaymentProvider interface abstracts both gateways for unified subscription management<br>
+      • Webhook controllers handle payment events from both providers
+    </div>
+    <table>
+      <tr>
+        <th>Feature</th>
+        <th>Priority</th>
+        <th>Effort</th>
+        <th>Phase</th>
+      </tr>
+      <tr>
+        <td>Stripe billing integration (US/International)</td>
+        <td><span class="priority priority-critical">Critical</span></td>
+        <td>High</td>
+        <td><span class="phase phase-done">Wave 7 Done</span></td>
+      </tr>
+      <tr>
+        <td>Razorpay billing integration (India)</td>
+        <td><span class="priority priority-critical">Critical</span></td>
+        <td>High</td>
+        <td><span class="phase phase-done">Wave 7 Done</span></td>
+      </tr>
+      <tr>
+        <td>Subscription tier enforcement (SubscriptionActiveGuard)</td>
+        <td><span class="priority priority-high">High</span></td>
+        <td>Medium</td>
+        <td><span class="phase phase-done">Wave 7 Done</span></td>
+      </tr>
+      <tr>
+        <td>Plan management UI (upgrade/downgrade/cancel)</td>
+        <td><span class="priority priority-high">High</span></td>
+        <td>Medium</td>
+        <td><span class="phase phase-done">Wave 7 Done</span></td>
+      </tr>
+      <tr>
+        <td>Usage-based billing / screen quotas (QuotaGuard)</td>
+        <td><span class="priority priority-medium">Medium</span></td>
+        <td>Medium</td>
+        <td><span class="phase phase-done">Wave 7 Done</span></td>
+      </tr>
+      <tr>
+        <td>Invoice generation & history</td>
+        <td><span class="priority priority-medium">Medium</span></td>
+        <td>Medium</td>
+        <td><span class="phase phase-done">Wave 7 Done</span></td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- Wave 7 Completed -->
+  <div class="section">
+    <h2>Wave 7 Completed — Billing & Subscriptions</h2>
+
+    <div class="callout callout-success">
+      <strong>Wave 7 Success:</strong> Complete billing infrastructure implemented with 207 new tests. Dual payment gateway support for US + India markets. Platform is now monetization-ready.
+    </div>
+
+    <h3>Payment Gateway Integration</h3>
+    <ul class="checklist">
+      <li><span class="check">&#10003;</span> <strong>Stripe integration (US/International)</strong> - StripeProvider with full SDK integration, webhooks</li>
+      <li><span class="check">&#10003;</span> <strong>Razorpay integration (India)</strong> - RazorpayProvider with UPI, net banking, cards support</li>
+      <li><span class="check">&#10003;</span> <strong>Payment provider abstraction</strong> - PaymentProvider interface normalizes both gateways</li>
+    </ul>
+
+    <h3>Subscription Management</h3>
+    <ul class="checklist">
+      <li><span class="check">&#10003;</span> <strong>Subscription tier enforcement</strong> - SubscriptionActiveGuard, @RequiresSubscription decorator</li>
+      <li><span class="check">&#10003;</span> <strong>Screen quota enforcement</strong> - QuotaGuard, @CheckQuota('screen') on display creation</li>
+      <li><span class="check">&#10003;</span> <strong>Billing settings page</strong> - /dashboard/settings/billing with plan overview, quota bar</li>
+      <li><span class="check">&#10003;</span> <strong>Plan comparison page</strong> - /dashboard/settings/billing/plans with checkout flow</li>
+      <li><span class="check">&#10003;</span> <strong>Invoice history page</strong> - /dashboard/settings/billing/history with PDF downloads</li>
+    </ul>
+
+    <h3>Wave 7 New Files</h3>
+    <table>
+      <tr>
+        <th>File</th>
+        <th>Purpose</th>
+      </tr>
+      <tr>
+        <td><code>middleware/src/modules/billing/</code></td>
+        <td>Complete BillingModule (25 files)</td>
+      </tr>
+      <tr>
+        <td><code>providers/stripe.provider.ts</code></td>
+        <td>Stripe SDK integration</td>
+      </tr>
+      <tr>
+        <td><code>providers/razorpay.provider.ts</code></td>
+        <td>Razorpay SDK integration</td>
+      </tr>
+      <tr>
+        <td><code>guards/subscription-active.guard.ts</code></td>
+        <td>Active subscription enforcement</td>
+      </tr>
+      <tr>
+        <td><code>guards/quota.guard.ts</code></td>
+        <td>Screen quota enforcement</td>
+      </tr>
+      <tr>
+        <td><code>web/.../billing/</code></td>
+        <td>Billing UI (3 pages + 3 components + 4 test files)</td>
+      </tr>
+    </table>
+
+    <h3>Plan Tiers Implemented</h3>
+    <table>
+      <tr>
+        <th>Tier</th>
+        <th>Screens</th>
+        <th>USD/mo</th>
+        <th>INR/mo</th>
+      </tr>
+      <tr>
+        <td>Free</td>
+        <td>5</td>
+        <td>$0</td>
+        <td>₹0</td>
+      </tr>
+      <tr>
+        <td>Basic</td>
+        <td>25</td>
+        <td>$29</td>
+        <td>₹1,999</td>
+      </tr>
+      <tr>
+        <td>Pro</td>
+        <td>100</td>
+        <td>$99</td>
+        <td>₹6,999</td>
+      </tr>
+      <tr>
+        <td>Enterprise</td>
+        <td>Unlimited</td>
+        <td>Custom</td>
+        <td>Custom</td>
+      </tr>
+    </table>
+
+    <h3>Phase 3 (Next)</h3>
+    <ul class="checklist">
+      <li><span class="pending">[ ]</span> <strong>Template library</strong> - Searchable templates with categories</li>
+      <li><span class="pending">[ ]</span> <strong>Widget architecture</strong> - Weather, social feeds, RSS integration</li>
+      <li><span class="pending">[ ]</span> <strong>QR code overlay</strong> - Dynamic QR codes on content</li>
+      <li><span class="pending">[ ]</span> <strong>Split-screen layouts</strong> - Multi-zone display support</li>
+    </ul>
+  </div>
+
+  <!-- Branch & Commit Info -->
+  <div class="section">
+    <h2>Git History</h2>
+
+    <table>
+      <tr>
+        <th>Branch</th>
+        <th>Commit</th>
+        <th>Description</th>
+      </tr>
+      <tr>
+        <td><code>feat/wave-7-billing</code></td>
+        <td><code>b1d982d</code></td>
+        <td>Wave 7: Billing & Subscriptions (Stripe + Razorpay), guards, billing UI</td>
+      </tr>
+      <tr>
+        <td><code>feat/wave-6-enhancements</code></td>
+        <td><code>c0cb0de</code></td>
+        <td>Wave 6: API keys, undo/redo, orientation, quick-change, uptime</td>
+      </tr>
+      <tr>
+        <td><code>feat/wave-6-enhancements</code></td>
+        <td><code>19807d4</code></td>
+        <td>Schema: ApiKey model, templateOrientation field</td>
+      </tr>
+      <tr>
+        <td><code>feat/wave-5-enhancements</code></td>
+        <td><code>384c979</code></td>
+        <td>Wave 5: Playlist builder, device preview, quick wins</td>
+      </tr>
+      <tr>
+        <td><code>feat/wave-5-enhancements</code></td>
+        <td><code>fe75a5a</code></td>
+        <td>Schema: Display screenshot fields</td>
+      </tr>
+      <tr>
+        <td><code>feat/wave-4-enhancements</code></td>
+        <td><code>e456b05</code></td>
+        <td>Wave 4: MinIO storage, content folders, notifications</td>
+      </tr>
+      <tr>
+        <td><code>feat/wave-4-enhancements</code></td>
+        <td><code>dd5350f</code></td>
+        <td>Schema: Folders, notifications, content folderId</td>
+      </tr>
+      <tr>
+        <td><code>main</code></td>
+        <td><code>9669e38</code></td>
+        <td>Wave 3: Calendar, bulk ops, role guards, analytics</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- Vizora Strengths -->
+  <div class="section">
+    <h2>Vizora Competitive Strengths (Preserve These)</h2>
+
+    <div class="callout callout-success">
+      <strong>Key Differentiators:</strong> These capabilities exceed OptiSigns and should be highlighted in marketing.
+    </div>
+
+    <ul class="checklist">
+      <li><span class="check">&#10003;</span> <strong>Real-time WebSocket Architecture</strong> - Socket.IO with device/org rooms, dual persistence</li>
+      <li><span class="check">&#10003;</span> <strong>REST API with Swagger Docs (All Plans)</strong> - OptiSigns restricts API to Enterprise</li>
+      <li><span class="check">&#10003;</span> <strong>API Key Management</strong> - Programmatic access with scoped permissions (Wave 6)</li>
+      <li><span class="check">&#10003;</span> <strong>Comprehensive Security Stack</strong> - Dual JWT, CSRF, XSS sanitization, 3-tier rate limiting</li>
+      <li><span class="check">&#10003;</span> <strong>Content Expiration with Auto-Replacement</strong> - Unique feature for time-sensitive content</li>
+      <li><span class="check">&#10003;</span> <strong>File Versioning with Rollback</strong> - Full version chain with history API</li>
+      <li><span class="check">&#10003;</span> <strong>Template Data Source Security</strong> - SSRF protection, circuit breaker</li>
+      <li><span class="check">&#10003;</span> <strong>Self-Hosted Deployment Option</strong> - PM2 cluster mode, no vendor lock-in</li>
+      <li><span class="check">&#10003;</span> <strong>Multi-Tenant DB-Level Isolation</strong> - All queries scoped by organizationId</li>
+      <li><span class="check">&#10003;</span> <strong>Playlist Undo/Redo</strong> - Professional editor experience with keyboard shortcuts (Wave 6)</li>
+      <li><span class="check">&#10003;</span> <strong>Dual Payment Gateway Support</strong> - Stripe (US/Intl) + Razorpay (India) for global reach (Wave 7)</li>
+      <li><span class="check">&#10003;</span> <strong>Subscription & Quota Guards</strong> - Automatic plan enforcement with upgrade prompts (Wave 7)</li>
+    </ul>
+  </div>
+
+</div>
+
+<div class="footer">
+  <p>Vizora Pending & Future Upgrades | Generated February 5, 2026</p>
+  <p>Source: Gap Analysis Report + Waves 1-7 Implementation</p>
+</div>
+
+</body>
+</html>
