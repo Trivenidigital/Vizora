@@ -1,27 +1,27 @@
 /**
- * Semantic Color System for Vizora
+ * Semantic Color System for Vizora — Electric Horizon
  * Provides consistent color usage across the application
  * with light and dark mode variants
  */
 
 export const semanticColors = {
-  // Primary action color - main brand color
+  // Primary action color — EH neon green
   primary: {
-    light: '#0284c7', // blue-600
-    dark: '#0ea5e9', // blue-400
-    50: '#f0f9ff',
-    100: '#e0f2fe',
-    200: '#bae6fd',
-    300: '#7dd3fc',
-    400: '#38bdf8',
-    500: '#0ea5e9',
-    600: '#0284c7',
-    700: '#0369a1',
-    800: '#075985',
-    900: '#0c3d66',
+    light: '#00CC8E',
+    dark: '#00E5A0',
+    50: '#ECFDF5',
+    100: '#D1FAE5',
+    200: '#A7F3D0',
+    300: '#6EE7B7',
+    400: '#34D399',
+    500: '#00E5A0',
+    600: '#00CC8E',
+    700: '#00A876',
+    800: '#007A56',
+    900: '#064E3B',
   },
 
-  // Success state - positive actions and confirmations
+  // Success state — keep distinct from primary (slightly warmer green)
   success: {
     light: '#16a34a', // green-600
     dark: '#22c55e', // green-500
@@ -69,35 +69,35 @@ export const semanticColors = {
     900: '#7f1d1d',
   },
 
-  // Info state - informational messages
+  // Info state — EH cyan
   info: {
-    light: '#2563eb', // blue-600
-    dark: '#3b82f6', // blue-500
-    50: '#eff6ff',
-    100: '#dbeafe',
-    200: '#bfdbfe',
-    300: '#93c5fd',
-    400: '#60a5fa',
-    500: '#3b82f6',
-    600: '#2563eb',
-    700: '#1d4ed8',
-    800: '#1e40af',
-    900: '#1e3a8a',
+    light: '#0097B8',
+    dark: '#00B4D8',
+    50: '#ECFEFF',
+    100: '#CFFAFE',
+    200: '#A5F3FC',
+    300: '#67E8F9',
+    400: '#22D3EE',
+    500: '#00B4D8',
+    600: '#0097B8',
+    700: '#0E7490',
+    800: '#155E75',
+    900: '#164E63',
   },
 
-  // Neutral/Gray - backgrounds, borders, text
+  // Neutral — warm teal-gray (EH palette)
   neutral: {
-    50: '#f9fafb',
-    100: '#f3f4f6',
-    200: '#e5e7eb',
-    300: '#d1d5db',
-    400: '#9ca3af',
-    500: '#6b7280',
-    600: '#4b5563',
-    700: '#374151',
-    800: '#1f2937',
-    900: '#111827',
-    950: '#030712',
+    50: '#F0ECE8',
+    100: '#E8E3DD',
+    200: '#D1CBC5',
+    300: '#B5AEA6',
+    400: '#8A8278',
+    500: '#5A5248',
+    600: '#3D3632',
+    700: '#1B3D47',
+    800: '#122D35',
+    900: '#0A222E',
+    950: '#061A21',
   },
 };
 
