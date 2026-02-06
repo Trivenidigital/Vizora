@@ -994,49 +994,39 @@
       </tr>
     </table>
 
-    <h3>Implementation Phases</h3>
+    <h3>Wave 8 New Files</h3>
     <table>
       <tr>
-        <th>Phase</th>
-        <th>Focus</th>
-        <th>Effort</th>
-        <th>Tests</th>
+        <th>File</th>
+        <th>Purpose</th>
       </tr>
       <tr>
-        <td>Phase 1 (P0)</td>
-        <td>Schema, Plans CRUD, Basic Org List, Health</td>
-        <td>~12 hours</td>
-        <td>~50</td>
+        <td><code>middleware/src/modules/admin/</code></td>
+        <td>Complete AdminModule (70 files: controller, 10 services, 18 DTOs, guard, tests)</td>
       </tr>
       <tr>
-        <td>Phase 2 (P1a)</td>
-        <td>Promotions, Org Actions, User Management, Config</td>
-        <td>~12 hours</td>
-        <td>~50</td>
+        <td><code>services/plans.service.ts</code></td>
+        <td>Dynamic plan CRUD, pricing, quotas</td>
       </tr>
       <tr>
-        <td>Phase 3 (P1b)</td>
-        <td>Analytics, Health Dashboard, Stats Charts</td>
-        <td>~10 hours</td>
-        <td>~40</td>
+        <td><code>services/promotions.service.ts</code></td>
+        <td>Promo codes, bulk generation, redemption tracking</td>
       </tr>
       <tr>
-        <td>Phase 4 (P1c)</td>
-        <td>Billing Operations, Security Tools, Audit Log</td>
-        <td>~8 hours</td>
-        <td>~35</td>
+        <td><code>services/platform-health.service.ts</code></td>
+        <td>DB, Redis, MinIO, WebSocket health checks</td>
       </tr>
       <tr>
-        <td>Phase 5 (P2)</td>
-        <td>Announcements, Support Tools, Diagnostics</td>
-        <td>~6 hours</td>
-        <td>~25</td>
+        <td><code>services/platform-stats.service.ts</code></td>
+        <td>MRR/ARR, signups, churn analytics</td>
       </tr>
-      <tr style="font-weight: bold; background: #f1f3f5;">
-        <td>Total</td>
-        <td>Complete Admin System</td>
-        <td>~48 hours</td>
-        <td>~200 tests</td>
+      <tr>
+        <td><code>guards/super-admin.guard.ts</code></td>
+        <td>isSuperAdmin authorization</td>
+      </tr>
+      <tr>
+        <td><code>web/src/app/admin/</code></td>
+        <td>Admin UI (10 pages + 7 components + 3 test files)</td>
       </tr>
     </table>
   </div>
@@ -1050,6 +1040,11 @@
         <th>Branch</th>
         <th>Commit</th>
         <th>Description</th>
+      </tr>
+      <tr>
+        <td><code>feat/wave-8-admin</code></td>
+        <td><code>cdb08f6</code></td>
+        <td>Docs: Update Pending-Future-Upgrades.html for Wave 8 completion</td>
       </tr>
       <tr>
         <td><code>feat/wave-8-admin</code></td>
