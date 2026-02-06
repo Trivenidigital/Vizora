@@ -139,3 +139,52 @@ export interface CreateApiKeyResponse {
   key: string; // Plain key, only shown once
   apiKey: ApiKey;
 }
+
+// Billing types
+export interface SubscriptionStatus {
+  subscriptionTier: string;
+  subscriptionStatus: string;
+  screenQuota: number;
+  screensUsed: number;
+  trialEndsAt: string | null;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+  paymentProvider: string | null;
+}
+
+export interface Plan {
+  id: string;
+  name: string;
+  screenQuota: number;
+  price: number;
+  currency: string;
+  interval: string;
+  features: string[];
+  isCurrent: boolean;
+}
+
+export interface QuotaUsage {
+  screenQuota: number;
+  screensUsed: number;
+  remaining: number;
+  percentUsed: number;
+}
+
+export interface Invoice {
+  id: string;
+  amount: number;
+  currency: string;
+  status: string;
+  description: string | null;
+  createdAt: string;
+  pdfUrl: string | null;
+}
+
+export interface CheckoutResponse {
+  url: string;
+  sessionId: string;
+}
+
+export interface BillingPortalResponse {
+  url: string;
+}

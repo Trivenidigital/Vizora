@@ -1,10 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { Reflector } from '@nestjs/core';
 import { DisplaysController } from './displays.controller';
 import { DisplaysService } from './displays.service';
+import { DatabaseService } from '../database/database.service';
 
 describe('DisplaysController', () => {
   let controller: DisplaysController;
   let mockDisplaysService: jest.Mocked<DisplaysService>;
+  let mockDatabaseService: jest.Mocked<DatabaseService>;
 
   const organizationId = 'org-123';
 
@@ -25,9 +28,23 @@ describe('DisplaysController', () => {
       getLastScreenshot: jest.fn(),
     } as any;
 
+    // Mock DatabaseService for QuotaGuard
+    mockDatabaseService = {
+      organization: {
+        findUnique: jest.fn().mockResolvedValue({
+          screenQuota: 100,
+          _count: { displays: 5 },
+        }),
+      },
+    } as any;
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [DisplaysController],
-      providers: [{ provide: DisplaysService, useValue: mockDisplaysService }],
+      providers: [
+        { provide: DisplaysService, useValue: mockDisplaysService },
+        { provide: DatabaseService, useValue: mockDatabaseService },
+        Reflector,
+      ],
     }).compile();
 
     controller = module.get<DisplaysController>(DisplaysController);

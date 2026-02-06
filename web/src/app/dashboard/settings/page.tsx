@@ -187,6 +187,23 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* Billing Settings */}
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-50 mb-4">Billing</h3>
+        <div className="space-y-3">
+          <Link
+            href="/dashboard/settings/billing"
+            className="w-full px-4 py-3 text-sm bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition font-medium text-left flex items-center gap-2"
+          >
+            <Icon name="analytics" size="md" className="text-gray-600 dark:text-gray-400" />
+            Subscription & Billing
+            <span className="ml-auto text-gray-400 dark:text-gray-500">
+              <Icon name="chevronRight" size="md" />
+            </span>
+          </Link>
+        </div>
+      </div>
+
       {/* Developer Settings */}
       <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-6">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-50 mb-4">Developer</h3>
