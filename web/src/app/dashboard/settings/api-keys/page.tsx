@@ -319,7 +319,7 @@ export default function ApiKeysPage() {
  Include your API key in the <code className="bg-[var(--background-tertiary)] px-1 rounded">X-API-Key</code>{' '}
  header with each request:
  </p>
- <pre className="bg-gray-800 text-gray-100 p-4 rounded-lg overflow-x-auto">
+ <pre className="bg-[#061A21] text-[#F0ECE8] p-4 rounded-lg overflow-x-auto">
 {`curl -X GET "https://api.vizora.io/content" \\
  -H "X-API-Key: vz_live_your_api_key_here"`}
  </pre>

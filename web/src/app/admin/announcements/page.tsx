@@ -233,14 +233,14 @@ export default function AdminAnnouncementsPage() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => handleEdit(announcement)}
-                    className="p-2 text-[var(--foreground-tertiary)] hover:text-[var(--foreground-secondary)] hover:bg-white/50 dark:hover:bg-gray-800/50 rounded-lg transition"
+                    className="p-2 text-[var(--foreground-tertiary)] hover:text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] rounded-lg transition"
                     title="Edit"
                   >
                     <Edit className="w-5 h-5" />
                   </button>
                   <button
                     onClick={() => setDeletingAnnouncement(announcement)}
-                    className="p-2 text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-white/50 dark:hover:bg-gray-800/50 rounded-lg transition"
+                    className="p-2 text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-[var(--surface-hover)] rounded-lg transition"
                     title="Delete"
                   >
                     <Trash2 className="w-5 h-5" />

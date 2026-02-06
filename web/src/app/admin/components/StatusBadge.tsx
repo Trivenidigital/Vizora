@@ -30,7 +30,7 @@ const statusStyles: Record<string, { bg: string; text: string; dot: string }> = 
   inactive: {
     bg: 'bg-[var(--background-secondary)]',
     text: 'text-[var(--foreground-secondary)]',
-    dot: 'bg-gray-500',
+    dot: 'bg-[var(--foreground-tertiary)]',
   },
   suspended: {
     bg: 'bg-red-100 dark:bg-red-900/30',

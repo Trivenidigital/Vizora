@@ -73,7 +73,7 @@ export default function AdminUsersPage() {
       case 'owner':
         return 'bg-[#00E5A0]/10 text-[#00E5A0] dark:bg-[#00E5A0]/10 dark:text-[#00E5A0]';
       default:
-        return 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)] dark:bg-gray-700 dark:text-gray-300';
+        return 'bg-[var(--background-tertiary)] text-[var(--foreground-secondary)]';
     }
   };
 

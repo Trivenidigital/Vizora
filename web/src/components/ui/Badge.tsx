@@ -21,7 +21,7 @@ const variantStyles: Record<BadgeVariant, string> = {
   warning: 'bg-warning-100 dark:bg-warning-900 text-warning-800 dark:text-warning-100 border border-warning-300 dark:border-warning-700',
   error: 'bg-error-100 dark:bg-error-900 text-error-800 dark:text-error-100 border border-error-300 dark:border-error-700',
   info: 'bg-info-100 dark:bg-info-900 text-info-800 dark:text-info-100 border border-info-300 dark:border-info-700',
-  neutral: 'bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-100 border border-neutral-300 dark:border-neutral-600',
+  neutral: 'bg-[var(--surface-hover)] text-[var(--foreground)] border border-[var(--border)]',
 };
 
 const sizeStyles: Record<BadgeSize, string> = {

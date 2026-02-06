@@ -157,7 +157,7 @@ export default function AdminDashboardPage() {
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-3 h-3 rounded-full bg-gray-400" />
+                <div className="w-3 h-3 rounded-full bg-[var(--foreground-tertiary)]" />
                 <span className="text-[var(--foreground-secondary)]">Offline</span>
               </div>
               <span className="font-semibold text-[var(--foreground)]">

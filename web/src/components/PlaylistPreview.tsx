@@ -59,7 +59,7 @@ export default function PlaylistPreview({ items, autoPlay = true, onClose }: Pla
   return (
     <div className="relative bg-black rounded-lg overflow-hidden">
       {/* Content Display */}
-      <div className="relative aspect-video flex items-center justify-center bg-gray-900">
+      <div className="relative aspect-video flex items-center justify-center bg-[#061A21]">
         {currentItem?.content?.thumbnailUrl ? (
           <img
             src={currentItem.content.thumbnailUrl}
@@ -80,7 +80,7 @@ export default function PlaylistPreview({ items, autoPlay = true, onClose }: Pla
             <p className="text-lg font-medium">
               {currentItem?.content?.title || `Item ${currentIndex + 1}`}
             </p>
-            <p className="text-sm text-gray-400 mt-1">
+            <p className="text-sm text-[#8A8278] mt-1">
               {currentItem?.content?.type || 'content'}
             </p>
           </div>
@@ -88,7 +88,7 @@ export default function PlaylistPreview({ items, autoPlay = true, onClose }: Pla
       </div>
 
       {/* Progress Bar */}
-      <div className="h-1 bg-gray-700">
+      <div className="h-1 bg-[#1B3D47]">
         <div
           className="h-full bg-[#00E5A0] transition-all duration-1000 ease-linear"
           style={{ width: `${progressPercent}%` }}
@@ -96,25 +96,25 @@ export default function PlaylistPreview({ items, autoPlay = true, onClose }: Pla
       </div>
 
       {/* Controls Bar */}
-      <div className="flex items-center justify-between px-4 py-3 bg-gray-800 text-white">
+      <div className="flex items-center justify-between px-4 py-3 bg-[#081E28] text-white">
         <div className="flex items-center gap-3">
           <button
             onClick={goToPrev}
-            className="p-1 hover:bg-gray-700 rounded transition"
+            className="p-1 hover:bg-[#122D35] rounded transition"
             title="Previous"
           >
             <Icon name="chevronLeft" size="sm" className="text-white" />
           </button>
           <button
             onClick={() => setIsPlaying(!isPlaying)}
-            className="p-1 hover:bg-gray-700 rounded transition"
+            className="p-1 hover:bg-[#122D35] rounded transition"
             title={isPlaying ? 'Pause' : 'Play'}
           >
             <Icon name={isPlaying ? 'clock' : 'power'} size="sm" className="text-white" />
           </button>
           <button
             onClick={goToNext}
-            className="p-1 hover:bg-gray-700 rounded transition"
+            className="p-1 hover:bg-[#122D35] rounded transition"
             title="Next"
           >
             <Icon name="chevronRight" size="sm" className="text-white" />
@@ -125,12 +125,12 @@ export default function PlaylistPreview({ items, autoPlay = true, onClose }: Pla
           <span className="font-medium">
             {currentItem?.content?.title || `Item ${currentIndex + 1}`}
           </span>
-          <span className="text-gray-400 ml-2">
+          <span className="text-[#8A8278] ml-2">
             {currentIndex + 1} / {items.length}
           </span>
         </div>
 
-        <div className="text-sm text-gray-400">
+        <div className="text-sm text-[#8A8278]">
           {timeRemaining}s remaining
         </div>
       </div>

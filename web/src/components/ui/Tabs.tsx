@@ -35,16 +35,16 @@ export const Tabs: React.FC<TabsProps> = ({
   };
 
   const baseTabClass =
-    'relative px-4 py-2 font-medium text-sm transition-colors whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
+    'relative px-4 py-2 font-medium text-sm transition-colors whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00E5A0]';
   const inactiveClass =
-    'text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200';
+    'text-[var(--foreground-secondary)] hover:text-[var(--foreground)]';
   const activeClass =
     'text-primary-600 dark:text-primary-400';
 
   const tabListClass = {
-    underline: 'border-b border-neutral-200 dark:border-neutral-700 flex gap-0',
-    pills: 'flex gap-2 p-1 bg-neutral-100 dark:bg-neutral-800 rounded-lg',
-    bordered: 'flex gap-2 border border-neutral-200 dark:border-neutral-700 rounded-lg p-1',
+    underline: 'border-b border-[var(--border)] flex gap-0',
+    pills: 'flex gap-2 p-1 bg-[var(--surface-hover)] rounded-lg',
+    bordered: 'flex gap-2 border border-[var(--border)] rounded-lg p-1',
   };
 
   const underlineIndicator = activeTab && (

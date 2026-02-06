@@ -95,7 +95,7 @@ export default function PlaylistPreviewPanel({ items }: PlaylistPreviewPanelProp
       <div className="flex-1 flex flex-col p-4">
         <div className="relative bg-black rounded-lg overflow-hidden aspect-video mb-4">
           {/* Content Display */}
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
+          <div className="absolute inset-0 flex items-center justify-center bg-[#061A21]">
             {currentItem?.content?.thumbnailUrl ? (
               <img
                 src={currentItem.content.thumbnailUrl}
@@ -116,7 +116,7 @@ export default function PlaylistPreviewPanel({ items }: PlaylistPreviewPanelProp
                 <p className="text-base font-medium">
                   {currentItem?.content?.title || `Item ${currentIndex + 1}`}
                 </p>
-                <p className="text-xs text-gray-400 mt-1 capitalize">
+                <p className="text-xs text-[#8A8278] mt-1 capitalize">
                   {currentItem?.content?.type || 'content'}
                 </p>
               </div>
@@ -124,7 +124,7 @@ export default function PlaylistPreviewPanel({ items }: PlaylistPreviewPanelProp
           </div>
 
           {/* Current Item Progress */}
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-700">
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#1B3D47]">
             <div
               className="h-full bg-[#00E5A0] transition-all duration-1000 ease-linear"
               style={{ width: `${progressPercent}%` }}
