@@ -29,7 +29,7 @@ export default function AdminLayout({
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--background)]">
         <LoadingSpinner size="lg" />
       </div>
     );
@@ -39,17 +39,17 @@ export default function AdminLayout({
   const isSuperAdmin = user && (user as any).isSuperAdmin === true;
   if (!isSuperAdmin) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--background)]">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Access Denied</h1>
-          <p className="text-gray-600 dark:text-gray-400">You do not have permission to access this area.</p>
+          <h1 className="text-2xl font-bold text-[var(--foreground)] mb-2">Access Denied</h1>
+          <p className="text-[var(--foreground-secondary)]">You do not have permission to access this area.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
+    <div className="min-h-screen bg-[var(--background)]">
       <AdminSidebar
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
