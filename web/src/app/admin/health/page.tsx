@@ -151,15 +151,15 @@ export default function AdminHealthPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">System Health</h1>
-          <p className="mt-1 text-gray-600 dark:text-gray-400">
+          <h1 className="text-3xl font-bold text-[var(--foreground)]">System Health</h1>
+          <p className="mt-1 text-[var(--foreground-secondary)]">
             Monitor platform services and infrastructure
           </p>
         </div>
         <button
           onClick={() => loadHealth(true)}
           disabled={refreshing}
-          className="flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition disabled:opacity-50"
+          className="flex items-center gap-2 px-4 py-2 text-[var(--foreground-secondary)] bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition disabled:opacity-50"
         >
           <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
           Refresh
@@ -179,10 +179,10 @@ export default function AdminHealthPage() {
         <div className="flex items-center gap-4">
           {getStatusIcon(healthData.status)}
           <div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white capitalize">
+            <h2 className="text-xl font-semibold text-[var(--foreground)] capitalize">
               System {healthData.status}
             </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <p className="text-sm text-[var(--foreground-secondary)]">
               All services operational - Uptime: {formatUptime(healthData.uptime)}
             </p>
           </div>
@@ -223,8 +223,8 @@ export default function AdminHealthPage() {
       {/* Services Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Services Status */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-6">
+          <h3 className="text-lg font-semibold text-[var(--foreground)] mb-4 flex items-center gap-2">
             <Server className="w-5 h-5" />
             Services
           </h3>
@@ -232,15 +232,15 @@ export default function AdminHealthPage() {
             {healthData.services.map((service, index) => (
               <div
                 key={index}
-                className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50"
+                className="flex items-center justify-between p-3 rounded-lg bg-[var(--background)]"
               >
                 <div className="flex items-center gap-3">
                   {getStatusIcon(service.status)}
-                  <span className="font-medium text-gray-900 dark:text-white">{service.name}</span>
+                  <span className="font-medium text-[var(--foreground)]">{service.name}</span>
                 </div>
                 <div className="flex items-center gap-4">
                   {service.latency !== undefined && (
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                    <span className="text-sm text-[var(--foreground-tertiary)]">
                       {service.latency}ms
                     </span>
                   )}
@@ -258,18 +258,18 @@ export default function AdminHealthPage() {
         </div>
 
         {/* Infrastructure */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-6">
+          <h3 className="text-lg font-semibold text-[var(--foreground)] mb-4 flex items-center gap-2">
             <Activity className="w-5 h-5" />
             Infrastructure
           </h3>
           <div className="space-y-4">
             {/* Database */}
-            <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-900/50">
+            <div className="p-4 rounded-lg bg-[var(--background)]">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <Database className="w-5 h-5 text-blue-500" />
-                  <span className="font-medium text-gray-900 dark:text-white">PostgreSQL</span>
+                  <Database className="w-5 h-5 text-[#00E5A0]" />
+                  <span className="font-medium text-[var(--foreground)]">PostgreSQL</span>
                 </div>
                 <span
                   className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
@@ -279,15 +279,15 @@ export default function AdminHealthPage() {
                   {healthData.database.status}
                 </span>
               </div>
-              <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
+              <div className="flex items-center justify-between text-sm text-[var(--foreground-tertiary)]">
                 <span>
                   {healthData.database.connections} / {healthData.database.maxConnections} connections
                 </span>
                 <span>{healthData.database.latency}ms</span>
               </div>
-              <div className="mt-2 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div className="mt-2 h-2 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-blue-500 rounded-full transition-all"
+                  className="h-full bg-[#00E5A0] rounded-full transition-all"
                   style={{
                     width: `${(healthData.database.connections / healthData.database.maxConnections) * 100}%`,
                   }}
@@ -296,11 +296,11 @@ export default function AdminHealthPage() {
             </div>
 
             {/* Redis */}
-            <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-900/50">
+            <div className="p-4 rounded-lg bg-[var(--background)]">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <MemoryStick className="w-5 h-5 text-red-500" />
-                  <span className="font-medium text-gray-900 dark:text-white">Redis</span>
+                  <span className="font-medium text-[var(--foreground)]">Redis</span>
                 </div>
                 <span
                   className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
@@ -310,13 +310,13 @@ export default function AdminHealthPage() {
                   {healthData.redis.status}
                 </span>
               </div>
-              <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
+              <div className="flex items-center justify-between text-sm text-[var(--foreground-tertiary)]">
                 <span>
                   {formatBytes(healthData.redis.memory)} / {formatBytes(healthData.redis.maxMemory)}
                 </span>
                 <span>{healthData.redis.latency}ms</span>
               </div>
-              <div className="mt-2 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div className="mt-2 h-2 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
                 <div
                   className="h-full bg-red-500 rounded-full transition-all"
                   style={{
@@ -327,11 +327,11 @@ export default function AdminHealthPage() {
             </div>
 
             {/* Storage */}
-            <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-900/50">
+            <div className="p-4 rounded-lg bg-[var(--background)]">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <HardDrive className="w-5 h-5 text-purple-500" />
-                  <span className="font-medium text-gray-900 dark:text-white">MinIO Storage</span>
+                  <span className="font-medium text-[var(--foreground)]">MinIO Storage</span>
                 </div>
                 <span
                   className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
@@ -341,7 +341,7 @@ export default function AdminHealthPage() {
                   {healthData.storage.status}
                 </span>
               </div>
-              <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
+              <div className="flex items-center justify-between text-sm text-[var(--foreground-tertiary)]">
                 <span>
                   {formatBytes(healthData.storage.used)} / {formatBytes(healthData.storage.total)}
                 </span>
@@ -349,7 +349,7 @@ export default function AdminHealthPage() {
                   {((healthData.storage.used / healthData.storage.total) * 100).toFixed(1)}% used
                 </span>
               </div>
-              <div className="mt-2 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div className="mt-2 h-2 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
                 <div
                   className="h-full bg-purple-500 rounded-full transition-all"
                   style={{

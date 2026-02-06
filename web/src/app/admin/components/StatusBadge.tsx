@@ -28,8 +28,8 @@ const statusStyles: Record<string, { bg: string; text: string; dot: string }> = 
     dot: 'bg-green-500',
   },
   inactive: {
-    bg: 'bg-gray-100 dark:bg-gray-800',
-    text: 'text-gray-700 dark:text-gray-400',
+    bg: 'bg-[var(--background-secondary)]',
+    text: 'text-[var(--foreground-secondary)]',
     dot: 'bg-gray-500',
   },
   suspended: {
@@ -38,9 +38,9 @@ const statusStyles: Record<string, { bg: string; text: string; dot: string }> = 
     dot: 'bg-red-500',
   },
   trialing: {
-    bg: 'bg-blue-100 dark:bg-blue-900/30',
-    text: 'text-blue-700 dark:text-blue-400',
-    dot: 'bg-blue-500',
+    bg: 'bg-[#00E5A0]/10',
+    text: 'text-[#00E5A0]',
+    dot: 'bg-[#00E5A0]',
   },
   canceled: {
     bg: 'bg-yellow-100 dark:bg-yellow-900/30',
@@ -73,9 +73,9 @@ const statusStyles: Record<string, { bg: string; text: string; dot: string }> = 
     dot: 'bg-red-500',
   },
   info: {
-    bg: 'bg-blue-100 dark:bg-blue-900/30',
-    text: 'text-blue-700 dark:text-blue-400',
-    dot: 'bg-blue-500',
+    bg: 'bg-[#00E5A0]/10',
+    text: 'text-[#00E5A0]',
+    dot: 'bg-[#00E5A0]',
   },
   maintenance: {
     bg: 'bg-purple-100 dark:bg-purple-900/30',

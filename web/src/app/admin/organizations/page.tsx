@@ -81,8 +81,8 @@ export default function AdminOrganizationsPage() {
 
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Organizations</h1>
-        <p className="mt-1 text-gray-600 dark:text-gray-400">
+        <h1 className="text-3xl font-bold text-[var(--foreground)]">Organizations</h1>
+        <p className="mt-1 text-[var(--foreground-secondary)]">
           Manage customer organizations and subscriptions
         </p>
       </div>
@@ -90,19 +90,19 @@ export default function AdminOrganizationsPage() {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--foreground-tertiary)]" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search organizations..."
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
           />
         </div>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
         >
           <option value="">All Statuses</option>
           <option value="active">Active</option>
@@ -114,7 +114,7 @@ export default function AdminOrganizationsPage() {
       </div>
 
       {/* Organizations Table */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <LoadingSpinner size="lg" />
@@ -123,26 +123,26 @@ export default function AdminOrganizationsPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
-                  <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                <tr className="bg-[var(--background)] border-b border-[var(--border)]">
+                  <th className="text-left px-6 py-3 text-sm font-semibold text-[var(--foreground)]">
                     Organization
                   </th>
-                  <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                  <th className="text-left px-6 py-3 text-sm font-semibold text-[var(--foreground)]">
                     Plan
                   </th>
-                  <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                  <th className="text-left px-6 py-3 text-sm font-semibold text-[var(--foreground)]">
                     Status
                   </th>
-                  <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                  <th className="text-left px-6 py-3 text-sm font-semibold text-[var(--foreground)]">
                     Users
                   </th>
-                  <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                  <th className="text-left px-6 py-3 text-sm font-semibold text-[var(--foreground)]">
                     Screens
                   </th>
-                  <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                  <th className="text-left px-6 py-3 text-sm font-semibold text-[var(--foreground)]">
                     Created
                   </th>
-                  <th className="text-right px-6 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                  <th className="text-right px-6 py-3 text-sm font-semibold text-[var(--foreground)]">
                     Actions
                   </th>
                 </tr>
@@ -151,24 +151,24 @@ export default function AdminOrganizationsPage() {
                 {organizations.map((org) => (
                   <tr
                     key={org.id}
-                    className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900/30 transition"
+                    className="border-b border-[var(--border)] hover:bg-[var(--surface-hover)] transition"
                   >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
-                          <Building2 className="w-5 h-5 text-white" />
+                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] flex items-center justify-center">
+                          <Building2 className="w-5 h-5 text-[#061A21]" />
                         </div>
                         <div>
-                          <p className="font-medium text-gray-900 dark:text-white">{org.name}</p>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">{org.slug}</p>
+                          <p className="font-medium text-[var(--foreground)]">{org.name}</p>
+                          <p className="text-sm text-[var(--foreground-tertiary)]">{org.slug}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="font-medium text-gray-900 dark:text-white capitalize">
+                      <span className="font-medium text-[var(--foreground)] capitalize">
                         {org.subscriptionTier}
                       </span>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                      <p className="text-sm text-[var(--foreground-tertiary)]">
                         {org.screenQuota} screens
                       </p>
                     </td>
@@ -177,16 +177,16 @@ export default function AdminOrganizationsPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <Users className="w-4 h-4 text-gray-400" />
-                        <span className="text-gray-900 dark:text-white">{org._count.users}</span>
+                        <Users className="w-4 h-4 text-[var(--foreground-tertiary)]" />
+                        <span className="text-[var(--foreground)]">{org._count.users}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <Monitor className="w-4 h-4 text-gray-400" />
-                        <span className="text-gray-900 dark:text-white">
+                        <Monitor className="w-4 h-4 text-[var(--foreground-tertiary)]" />
+                        <span className="text-[var(--foreground)]">
                           {org._count.displays}
-                          <span className="text-gray-500 dark:text-gray-400">
+                          <span className="text-[var(--foreground-tertiary)]">
                             {' '}
                             / {org.screenQuota}
                           </span>
@@ -194,7 +194,7 @@ export default function AdminOrganizationsPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                      <div className="flex items-center gap-2 text-sm text-[var(--foreground-secondary)]">
                         <Calendar className="w-4 h-4" />
                         <span>{formatDate(org.createdAt)}</span>
                       </div>
@@ -203,7 +203,7 @@ export default function AdminOrganizationsPage() {
                       <div className="relative flex justify-end">
                         <button
                           onClick={() => setMenuOpen(menuOpen === org.id ? null : org.id)}
-                          className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
+                          className="p-2 text-[var(--foreground-tertiary)] hover:text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] rounded-lg transition"
                         >
                           <MoreVertical className="w-5 h-5" />
                         </button>
@@ -213,7 +213,7 @@ export default function AdminOrganizationsPage() {
                               className="fixed inset-0 z-10"
                               onClick={() => setMenuOpen(null)}
                             />
-                            <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-20">
+                            <div className="absolute right-0 top-full mt-1 w-48 bg-[var(--surface)] border border-[var(--border)] rounded-lg shadow-lg z-20">
                               {org.subscriptionStatus !== 'suspended' ? (
                                 <button
                                   onClick={() => {
@@ -246,7 +246,7 @@ export default function AdminOrganizationsPage() {
                                     setActionType('extend');
                                     setMenuOpen(null);
                                   }}
-                                  className="w-full text-left px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 flex items-center gap-2"
+                                  className="w-full text-left px-4 py-2 text-sm text-[#00E5A0] hover:bg-[#00E5A0]/5 flex items-center gap-2"
                                 >
                                   <Clock className="w-4 h-4" />
                                   Extend Trial
@@ -266,11 +266,11 @@ export default function AdminOrganizationsPage() {
 
         {!loading && organizations.length === 0 && (
           <div className="text-center py-12">
-            <Building2 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+            <Building2 className="w-12 h-12 text-[var(--foreground-tertiary)] mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-[var(--foreground)] mb-2">
               No organizations found
             </h3>
-            <p className="text-gray-600 dark:text-gray-400">
+            <p className="text-[var(--foreground-secondary)]">
               {search || statusFilter
                 ? 'Try adjusting your search or filters.'
                 : 'Organizations will appear here when customers sign up.'}
@@ -280,8 +280,8 @@ export default function AdminOrganizationsPage() {
 
         {/* Pagination Info */}
         {!loading && organizations.length > 0 && (
-          <div className="px-6 py-3 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-200 dark:border-gray-700">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+          <div className="px-6 py-3 bg-[var(--background)] border-t border-[var(--border)]">
+            <p className="text-sm text-[var(--foreground-secondary)]">
               Showing {organizations.length} of {total} organizations
             </p>
           </div>
@@ -303,18 +303,18 @@ export default function AdminOrganizationsPage() {
             : `Are you sure you want to reactivate "${actionOrg?.name}"? They will regain access to the platform.`
         }
         confirmText={actionType === 'suspend' ? 'Suspend' : 'Reactivate'}
-        type={actionType === 'suspend' ? 'danger' : 'primary'}
+        type={actionType === 'suspend' ? 'danger' : 'info'}
       />
 
       {/* Extend Trial Modal */}
       {actionType === 'extend' && actionOrg && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md p-6">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+          <div className="bg-[var(--surface)] rounded-xl shadow-xl w-full max-w-md p-6">
+            <h2 className="text-xl font-semibold text-[var(--foreground)] mb-4">
               Extend Trial for {actionOrg.name}
             </h2>
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
                 Days to extend
               </label>
               <input
@@ -323,7 +323,7 @@ export default function AdminOrganizationsPage() {
                 onChange={(e) => setExtendDays(parseInt(e.target.value) || 0)}
                 min={1}
                 max={365}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
               />
             </div>
             <div className="flex items-center justify-end gap-3">
@@ -332,13 +332,13 @@ export default function AdminOrganizationsPage() {
                   setActionOrg(null);
                   setActionType(null);
                 }}
-                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
+                className="px-4 py-2 text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] rounded-lg transition"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAction}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                className="px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition"
               >
                 Extend Trial
               </button>
