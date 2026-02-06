@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vizora Gap Analysis Report</title>
+  <style>
+    :root {
+      --primary: #2cb67d;
+      --primary-dark: #1e9e6b;
+      --bg: #f8f9fa;
+      --card-bg: #ffffff;
+      --text: #2d3436;
+      --text-muted: #636e72;
+      --border: #dfe6e9;
+      --green: #00b894;
+      --yellow: #fdcb6e;
+      --red: #d63031;
+      --blue: #0984e3;
+      --purple: #6c5ce7;
+      --orange: #e17055;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #0984e3, #6c5ce7);
+      color: white;
+      padding: 3rem 2rem;
+      text-align: center;
+    }
+    .header h1 { font-size: 2.2rem; margin-bottom: 0.5rem; }
+    .header .subtitle { opacity: 0.9; font-size: 1.1rem; }
+    .header .meta { margin-top: 1rem; font-size: 0.9rem; opacity: 0.8; }
+
+    .container { max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+    .summary-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .summary-card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 1.5rem;
+      text-align: center;
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .summary-card .number { font-size: 2.5rem; font-weight: 700; }
+    .summary-card .label { font-size: 0.9rem; color: var(--text-muted); margin-top: 0.3rem; }
+    .summary-card.green .number { color: var(--green); }
+    .summary-card.yellow .number { color: #e67e22; }
+    .summary-card.red .number { color: var(--red); }
+    .summary-card.blue .number { color: var(--blue); }
+
+    .section {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 1.5rem;
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .section h2 {
+      font-size: 1.5rem;
+      color: var(--primary-dark);
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid var(--primary);
+    }
+    .section h3 {
+      font-size: 1.15rem;
+      color: var(--text);
+      margin: 1.5rem 0 0.8rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.88rem;
+    }
+    th, td {
+      padding: 0.65rem 0.7rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    th {
+      background: #f1f3f5;
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      white-space: nowrap;
+    }
+    tr:hover td { background: #f8f9fa; }
+
+    .status {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .status-full { background: #e6f9f0; color: #1e9e6b; }
+    .status-partial { background: #fff3cd; color: #856404; }
+    .status-missing { background: #fde8e8; color: #d63031; }
+
+    .priority {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .priority-critical { background: #fde8e8; color: #d63031; }
+    .priority-high { background: #ffeee8; color: #e17055; }
+    .priority-medium { background: #fff3cd; color: #856404; }
+    .priority-low { background: #e3f2fd; color: #0984e3; }
+    .priority-na { background: #f1f3f5; color: #636e72; }
+
+    .callout {
+      padding: 1rem 1.2rem;
+      border-radius: 8px;
+      margin: 1rem 0;
+      border-left: 4px solid;
+      font-size: 0.92rem;
+    }
+    .callout-info { background: #e3f2fd; border-color: #0984e3; }
+    .callout-warning { background: #fff3cd; border-color: #f39c12; }
+    .callout-success { background: #e6f9f0; border-color: #1e9e6b; }
+    .callout-danger { background: #fde8e8; border-color: #d63031; }
+
+    .evidence { font-family: 'Consolas', monospace; font-size: 0.82rem; color: var(--blue); }
+
+    .roadmap-phase {
+      border-left: 3px solid var(--primary);
+      padding-left: 1.2rem;
+      margin: 1rem 0;
+    }
+    .roadmap-phase h4 {
+      color: var(--primary-dark);
+      margin-bottom: 0.3rem;
+    }
+    .roadmap-phase p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 0.1rem 0.4rem;
+      border-radius: 3px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      margin-right: 0.2rem;
+    }
+    .tag-quickwin { background: #e6f9f0; color: #1e9e6b; }
+    .tag-major { background: #fde8e8; color: #d63031; }
+    .tag-medium { background: #fff3cd; color: #856404; }
+
+    .toc {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 1.5rem 2rem;
+      margin-bottom: 2rem;
+      border: 1px solid var(--border);
+    }
+    .toc h2 { font-size: 1.2rem; margin-bottom: 0.8rem; color: var(--primary-dark); border: none; padding: 0; }
+    .toc ol { padding-left: 1.5rem; }
+    .toc li { margin-bottom: 0.3rem; }
+    .toc a { color: var(--blue); text-decoration: none; }
+    .toc a:hover { text-decoration: underline; }
+
+    .footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    @media (max-width: 768px) {
+      .header h1 { font-size: 1.6rem; }
+      .summary-cards { grid-template-columns: 1fr 1fr; }
+      table { font-size: 0.8rem; }
+      th, td { padding: 0.4rem 0.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Vizora vs OptiSigns &mdash; Gap Analysis Report</h1>
+  <div class="subtitle">Feature-by-Feature Competitive Audit with Implementation Status</div>
+  <div class="meta">
+    Generated: February 5, 2026 &nbsp;|&nbsp; Source: OptiSigns Analysis Report + Vizora Codebase Audit
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Summary Cards -->
+  <div class="summary-cards">
+    <div class="summary-card green">
+      <div class="number">19</div>
+      <div class="label">Fully Implemented</div>
+    </div>
+    <div class="summary-card yellow">
+      <div class="number">16</div>
+      <div class="label">Partially Implemented</div>
+    </div>
+    <div class="summary-card red">
+      <div class="number">27</div>
+      <div class="label">Missing</div>
+    </div>
+    <div class="summary-card blue">
+      <div class="number">62</div>
+      <div class="label">Total Requirements</div>
+    </div>
+  </div>
+
+  <!-- TOC -->
+  <div class="toc">
+    <h2>Table of Contents</h2>
+    <ol>
+      <li><a href="#screens">Screens / Device Management</a></li>
+      <li><a href="#assets">Files / Assets Management</a></li>
+      <li><a href="#playlists">Playlists Management</a></li>
+      <li><a href="#schedules">Schedules Management</a></li>
+      <li><a href="#templates">Templates &amp; Design Studio</a></li>
+      <li><a href="#engage">Engage (Interactive Experiences)</a></li>
+      <li><a href="#analytics">Analytics</a></li>
+      <li><a href="#settings">Account, Settings &amp; Security</a></li>
+      <li><a href="#integrations">Integrations &amp; Data Sources</a></li>
+      <li><a href="#infrastructure">Infrastructure &amp; Platform</a></li>
+      <li><a href="#roadmap">Recommended Implementation Roadmap</a></li>
+      <li><a href="#strengths">Vizora Competitive Strengths</a></li>
+    </ol>
+  </div>
+
+  <!-- ======================================== -->
+  <!-- 1. SCREENS / DEVICE MANAGEMENT -->
+  <!-- ======================================== -->
+  <div class="section" id="screens">
+    <h2>1. Screens / Device Management</h2>
+
+    <table>
+      <tr>
+        <th style="width:22%">Requirement</th>
+        <th style="width:8%">Status</th>
+        <th style="width:22%">Evidence</th>
+        <th style="width:25%">Gap Description</th>
+        <th style="width:8%">Priority</th>
+        <th style="width:15%">Suggested Action</th>
+      </tr>
+      <tr>
+        <td>Real-time online/offline status badges</td>
+        <td><span class="status status-full">&#10003; Full</span></td>
+        <td class="evidence">realtime/src/gateways/device.gateway.ts &mdash; device:status event; Redis dual persistence</td>
+        <td>Fully implemented with WebSocket rooms + dual Redis/Postgres persistence. Dashboard receives live updates.</td>
+        <td><span class="priority priority-na">N/A</span></td>
+        <td>None needed</td>
+      </tr>
+      <tr>
+        <td>Device list with search, sort, filter</td>
+        <td><span class="status status-partial">&#9888; Partial</span></td>
+        <td class="evidence">web/src/app/dashboard/devices/page.tsx; middleware displays.controller.ts &mdash; paginated GET</td>
+        <td>Pagination and basic status filter exist. Missing: advanced search by name/tag, sort by status/lastSeen, column customization.</td>
+        <td><span class="priority priority-medium">Medium</span></td>
+        <td>Add search/sort params to GET /api/displays; enhance dashboard UI with filter controls</td>
+      </tr>
+      <tr>
+        <td>Quick-change content assignment dropdown</td>
+        <td><span class="status status-partial">&#9888; Partial</span></td>
+        <td class="evidence">displays.service.ts &mdash; PATCH /api/displays/:id (currentPlaylistId)</td>
+        <td>Can assign playlist via edit. Missing: inline quick-change dropdown on device list row without opening edit modal.</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td>Add inline dropdown on device cards for quick playlist/asset assignment</td>
+      </tr>
+      <tr>
+        <td>Checkbox-based bulk selection &amp; bulk operations</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No bulk display endpoint exists</td>
+        <td>Content has bulk operations, but displays have no multi-select or bulk actions (assign playlist, move to group, delete).</td>
+        <td><span class="priority priority-medium">Medium</span></td>
+        <td>Add bulk display endpoints + multi-select UI on dashboard</td>
+      </tr>
+      <tr>
+        <td>Folder / staging area organization for screens</td>
+        <td><span class="status status-partial">&#9888; Partial</span></td>
+        <td class="evidence">schema.prisma &mdash; DisplayGroup model with DisplayGroupMember junction</td>
+        <td>Display groups exist at DB level. No folder hierarchy or "OnHold" staging area. Groups not prominently exposed in UI.</td>
+        <td><span class="priority priority-medium">Medium</span></td>
+        <td>Expose display groups in UI; add folder-like hierarchy and staging area</td>
+      </tr>
+      <tr>
+        <td>Screen orientation controls (0&deg;/90&deg;/180&deg;/270&deg;)</td>
+        <td><span class="status status-partial">&#9888; Partial</span></td>
+        <td class="evidence">schema.prisma &mdash; Display.orientation: landscape|portrait</td>
+        <td>Only landscape/portrait. Missing: 90&deg;, 180&deg;, 270&deg; rotation values. No UI control exposed.</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td><span class="tag tag-quickwin">Quick Win</span> Extend orientation enum + add UI selector</td>
+      </tr>
+      <tr>
+        <td>Operational schedule (auto on/off hours)</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No operational schedule fields in Display model</td>
+        <td>No per-device on/off scheduling. OptiSigns has expandable "Operational Schedule" per screen.</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td>Add operationalStartTime/operationalEndTime to Display model + device client enforcement</td>
+      </tr>
+      <tr>
+        <td>Background music / audio overlay per screen</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No audio-related fields or endpoints</td>
+        <td>No background music capability. OptiSigns offers OptiSound as add-on.</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td>Future enhancement &mdash; low priority, add-on territory</td>
+      </tr>
+      <tr>
+        <td>Device preview (remote screenshot / live view)</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No preview/screenshot endpoints or WebSocket events</td>
+        <td>No ability to preview what a remote screen is currently showing. OptiSigns has Preview action per screen.</td>
+        <td><span class="priority priority-high">High</span></td>
+        <td>Add screenshot command via WebSocket; device clients capture and upload frame</td>
+      </tr>
+      <tr>
+        <td>Device tagging system</td>
+        <td><span class="status status-partial">&#9888; Partial</span></td>
+        <td class="evidence">schema.prisma &mdash; DisplayTag model exists</td>
+        <td>DisplayTag junction table exists in schema but no API endpoints for display tag management exposed in controller.</td>
+        <td><span class="priority priority-medium">Medium</span></td>
+        <td><span class="tag tag-quickwin">Quick Win</span> Add tag CRUD endpoints for displays; wire to UI</td>
+      </tr>
+      <tr>
+        <td>Multi-device type support (Fire TV, Raspberry Pi, Chrome OS, LG, Samsung, etc.)</td>
+        <td><span class="status status-partial">&#9888; Partial</span></td>
+        <td class="evidence">display/ (Electron); display-android/ (Capacitor/Android TV)</td>
+        <td>Electron (Win/Mac/Linux) + Android TV. Missing: Raspberry Pi, Chrome OS, LG webOS, Samsung Tizen native clients.</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td>Long-term: web-based display client would cover most missing platforms</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ======================================== -->
+  <!-- 2. FILES / ASSETS MANAGEMENT -->
+  <!-- ======================================== -->
+  <div class="section" id="assets">
+    <h2>2. Files / Assets Management</h2>
+
+    <table>
+      <tr>
+        <th style="width:22%">Requirement</th>
+        <th style="width:8%">Status</th>
+        <th style="width:22%">Evidence</th>
+        <th style="width:25%">Gap Description</th>
+        <th style="width:8%">Priority</th>
+        <th style="width:15%">Suggested Action</th>
+      </tr>
+      <tr>
+        <td>File upload with validation</td>
+        <td><span class="status status-full">&#10003; Full</span></td>
+        <td class="evidence">content.controller.ts &mdash; POST /api/content/upload; file-validation.service.ts &mdash; magic number verification, SHA-256 hash</td>
+        <td>Robust: MIME spoofing prevention via magic numbers, hash dedup, filename sanitization, size validation.</td>
+        <td><span class="priority priority-na">N/A</span></td>
+        <td>None needed</td>
+      </tr>
+      <tr>
+        <td>Content type support (Image, Video, URL, HTML)</td>
+        <td><span class="status status-full">&#10003; Full</span></td>
+        <td class="evidence">schema.prisma &mdash; Content.type: image|video|url|html|pdf|template</td>
+        <td>Vizora supports image, video, URL, HTML, PDF, and template types. Matches and exceeds OptiSigns basic types.</td>
+        <td><span class="priority priority-na">N/A</span></td>
+        <td>None needed</td>
+      </tr>
+      <tr>
+        <td>Document support (PDF, PowerPoint, Word)</td>
+        <td><span class="status status-partial">&#9888; Partial</span></td>
+        <td class="evidence">Content type includes 'pdf'; no PPT/DOCX rendering</td>
+        <td>PDF type exists. No PowerPoint or Word file rendering. OptiSigns renders Docs natively.</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td>Convert PPT/DOCX to PDF or images on upload using LibreOffice headless</td>
+      </tr>
+      <tr>
+        <td>Grid and list view toggle</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">web/src/app/dashboard/content/page.tsx &mdash; single view mode</td>
+        <td>Content page has one layout. No toggle between grid (thumbnail) and list (detail) views.</td>
+        <td><span class="priority priority-medium">Medium</span></td>
+        <td>Add view toggle to content page with grid/list layout options</td>
+      </tr>
+      <tr>
+        <td>Folder organization for assets</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No folder model in schema.prisma for content</td>
+        <td>No folder hierarchy for content. OptiSigns has nested folders. Vizora uses tags only.</td>
+        <td><span class="priority priority-medium">Medium</span></td>
+        <td>Add ContentFolder model with parent reference; tree navigation in UI</td>
+      </tr>
+      <tr>
+        <td>Content tagging system</td>
+        <td><span class="status status-full">&#10003; Full</span></td>
+        <td class="evidence">schema.prisma &mdash; Tag + ContentTag models; content.controller.ts &mdash; bulk tag operations</td>
+        <td>Full tag CRUD with bulk operations (add/remove/replace). Tags have optional color.</td>
+        <td><span class="priority priority-na">N/A</span></td>
+        <td>None needed</td>
+      </tr>
+      <tr>
+        <td>Bulk operations (archive, delete, tag, update)</td>
+        <td><span class="status status-full">&#10003; Full</span></td>
+        <td class="evidence">content.controller.ts lines 348-405 &mdash; 6 bulk endpoints</td>
+        <td>Six bulk endpoints: update, archive, restore, delete, tags, duration. Comprehensive.</td>
+        <td><span class="priority priority-na">N/A</span></td>
+        <td>None needed</td>
+      </tr>
+      <tr>
+        <td>Content expiration with auto-replacement</td>
+        <td><span class="status status-full">&#10003; Full</span></td>
+        <td class="evidence">content.service.ts &mdash; hourly cron, replacementContentId, auto-removal from playlists</td>
+        <td>Hourly cron checks expirations. Auto-replaces or auto-removes from playlists. This is an advantage over OptiSigns.</td>
+        <td><span class="priority priority-na">N/A</span></td>
+        <td>None needed (competitive advantage)</td>
+      </tr>
+      <tr>
+        <td>File versioning / replace with backup</td>
+        <td><span class="status status-full">&#10003; Full</span></td>
+        <td class="evidence">content.service.ts &mdash; replaceFile() with previousVersionId chain</td>
+        <td>Full version chain with optional backup creation. GET /api/content/:id/versions for history. Another advantage.</td>
+        <td><span class="priority priority-na">N/A</span></td>
+        <td>None needed (competitive advantage)</td>
+      </tr>
+      <tr>
+        <td>Cloud storage (S3/MinIO) for files</td>
+        <td><span class="status status-partial">&#9888; Partial</span></td>
+        <td class="evidence">docker-compose.yml includes MinIO; content.service.ts uses local filesystem (uploads/)</td>
+        <td>MinIO is in docker-compose but content service stores to local filesystem. Not production-ready for multi-instance.</td>
+        <td><span class="priority priority-high">High</span></td>
+        <td>Integrate MinIO S3 client into content upload/serve pipeline</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ======================================== -->
+  <!-- 3. PLAYLISTS -->
+  <!-- ======================================== -->
+  <div class="section" id="playlists">
+    <h2>3. Playlists Management</h2>
+
+    <table>
+      <tr>
+        <th style="width:22%">Requirement</th>
+        <th style="width:8%">Status</th>
+        <th style="width:22%">Evidence</th>
+        <th style="width:25%">Gap Description</th>
+        <th style="width:8%">Priority</th>
+        <th style="width:15%">Suggested Action</th>
+      </tr>
+      <tr>
+        <td>Playlist CRUD with ordered items</td>
+        <td><span class="status status-full">&#10003; Full</span></td>
+        <td class="evidence">playlists.service.ts &mdash; full CRUD; PlaylistItem.order for sequencing</td>
+        <td>Create, read, update, delete playlists with ordered items. Items linked to content with optional duration override.</td>
+        <td><span class="priority priority-na">N/A</span></td>
+        <td>None needed</td>
+      </tr>
+      <tr>
+        <td>Three-panel drag-and-drop playlist builder</td>
+        <td><span class="status status-partial">&#9888; Partial</span></td>
+        <td class="evidence">web/src/app/dashboard/playlists/page.tsx</td>
+        <td>Playlist editing exists. Missing: OptiSigns' 3-panel layout (list + editor + asset browser), drag-from-asset-browser.</td>
+        <td><span class="priority priority-high">High</span></td>
+        <td>Redesign playlist page: left=list, center=editor, right=asset browser with drag-and-drop</td>
+      </tr>
+      <tr>
+        <td>Per-item duration, edit, delete controls</td>
+        <td><span class="status status-full">&#10003; Full</span></td>
+        <td class="evidence">schema.prisma &mdash; PlaylistItem.duration; API: add/remove items</td>
+        <td>Duration override per item, add/remove endpoints. Duration is configurable per playlist item.</td>
+        <td><span class="priority priority-na">N/A</span></td>
+        <td>None needed</td>
+      </tr>
+      <tr>
+        <td>Playlist metadata display (size, total time, item count)</td>
+        <td><span class="status status-partial">&#9888; Partial</span></td>
+        <td class="evidence">playlists.service.ts &mdash; includes _count.items</td>
+        <td>Item count available. Missing: total file size, total duration calculation, status color coding.</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td><span class="tag tag-quickwin">Quick Win</span> Add computed fields for totalSize, totalDuration in playlist response</td>
+      </tr>
+      <tr>
+        <td>Playlist undo/redo</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No undo/redo state management</td>
+        <td>No change history tracking for playlist edits. OptiSigns has undo/redo toolbar buttons.</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td>Client-side undo stack in playlist editor (frontend-only change)</td>
+      </tr>
+      <tr>
+        <td>Playlist preview on simulated screen</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No preview component or endpoint</td>
+        <td>No way to preview what a playlist looks like cycling through content. OptiSigns has inline preview.</td>
+        <td><span class="priority priority-high">High</span></td>
+        <td>Build playlist preview component that cycles through items with durations</td>
+      </tr>
+      <tr>
+        <td>Playlist copy/duplicate and export</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No duplicate or export endpoints</td>
+        <td>No ability to clone or export playlists. OptiSigns has copy, duplicate, and export in toolbar.</td>
+        <td><span class="priority priority-medium">Medium</span></td>
+        <td>Add POST /api/playlists/:id/duplicate endpoint + export as JSON</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ======================================== -->
+  <!-- 4. SCHEDULES -->
+  <!-- ======================================== -->
+  <div class="section" id="schedules">
+    <h2>4. Schedules Management</h2>
+
+    <table>
+      <tr>
+        <th style="width:22%">Requirement</th>
+        <th style="width:8%">Status</th>
+        <th style="width:22%">Evidence</th>
+        <th style="width:25%">Gap Description</th>
+        <th style="width:8%">Priority</th>
+        <th style="width:15%">Suggested Action</th>
+      </tr>
+      <tr>
+        <td>Recurring schedule with day-of-week targeting</td>
+        <td><span class="status status-full">&#10003; Full</span></td>
+        <td class="evidence">schema.prisma &mdash; Schedule.daysOfWeek: Int[]; schedules.service.ts &mdash; findActiveSchedules</td>
+        <td>Full recurring schedule support with day-of-week array, start/end dates, time windows, priority ordering.</td>
+        <td><span class="priority priority-na">N/A</span></td>
+        <td>None needed</td>
+      </tr>
+      <tr>
+        <td>Priority-based schedule override</td>
+        <td><span class="status status-full">&#10003; Full</span></td>
+        <td class="evidence">schema.prisma &mdash; Schedule.priority: Int; ordered by priority DESC</td>
+        <td>Higher priority schedules take precedence. Multiple schedules on same display: highest priority wins.</td>
+        <td><span class="priority priority-na">N/A</span></td>
+        <td>None needed</td>
+      </tr>
+      <tr>
+        <td>Display group targeting for schedules</td>
+        <td><span class="status status-full">&#10003; Full</span></td>
+        <td class="evidence">schema.prisma &mdash; Schedule.displayGroupId; schedules.service.ts handles both</td>
+        <td>Schedule can target individual display OR display group. Mutually exclusive enforcement in service.</td>
+        <td><span class="priority priority-na">N/A</span></td>
+        <td>None needed</td>
+      </tr>
+      <tr>
+        <td>Full calendar UI (Month/Week/Day views)</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">web/src/app/dashboard/schedules/page.tsx &mdash; form-based, no calendar</td>
+        <td>Schedule page is form-based create/edit. No visual calendar with month/week/day views. OptiSigns has full calendar.</td>
+        <td><span class="priority priority-high">High</span></td>
+        <td>Integrate calendar component (e.g., FullCalendar.js) with schedule data binding</td>
+      </tr>
+      <tr>
+        <td>Click-to-create scheduling on calendar</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No calendar UI exists</td>
+        <td>Cannot click a time slot to create a schedule. Requires calendar UI first.</td>
+        <td><span class="priority priority-high">High</span></td>
+        <td>Implement as part of calendar UI &mdash; drag-to-create time blocks</td>
+      </tr>
+      <tr>
+        <td>Schedule copy, duplicate, export</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No duplicate or export endpoints</td>
+        <td>No schedule cloning or export capabilities.</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td>Add POST /api/schedules/:id/duplicate</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ======================================== -->
+  <!-- 5. TEMPLATES & DESIGN STUDIO -->
+  <!-- ======================================== -->
+  <div class="section" id="templates">
+    <h2>5. Templates &amp; Design Studio</h2>
+
+    <div class="callout callout-danger">
+      <strong>Major Gap Area:</strong> This is the single largest competitive gap. OptiSigns offers 1000+ templates with an AI-powered design studio. Vizora has server-side Handlebars rendering only &mdash; no visual template editor, no template library, no AI designer.
+    </div>
+
+    <table>
+      <tr>
+        <th style="width:22%">Requirement</th>
+        <th style="width:8%">Status</th>
+        <th style="width:22%">Evidence</th>
+        <th style="width:25%">Gap Description</th>
+        <th style="width:8%">Priority</th>
+        <th style="width:15%">Suggested Action</th>
+      </tr>
+      <tr>
+        <td>Template rendering engine (Handlebars)</td>
+        <td><span class="status status-full">&#10003; Full</span></td>
+        <td class="evidence">template-rendering.service.ts &mdash; Handlebars with custom helpers, DOMPurify sanitization</td>
+        <td>Server-side Handlebars rendering with formatDate, formatNumber, formatCurrency, comparison helpers. XSS-safe.</td>
+        <td><span class="priority priority-na">N/A</span></td>
+        <td>None needed (solid foundation)</td>
+      </tr>
+      <tr>
+        <td>Dynamic data sources (REST API, JSON URL, manual)</td>
+        <td><span class="status status-full">&#10003; Full</span></td>
+        <td class="evidence">template-rendering.service.ts &mdash; DataSourceDto with rest_api, json_url, manual types</td>
+        <td>Templates can pull data from REST APIs, JSON URLs, or manual input. JSON path extraction, custom headers, SSRF protection.</td>
+        <td><span class="priority priority-na">N/A</span></td>
+        <td>None needed (competitive advantage)</td>
+      </tr>
+      <tr>
+        <td>Template auto-refresh on interval</td>
+        <td><span class="status status-full">&#10003; Full</span></td>
+        <td class="evidence">template-refresh.service.ts &mdash; configurable refresh intervals, circuit breaker</td>
+        <td>Templates auto-refresh external data at configured intervals with circuit breaker protection.</td>
+        <td><span class="priority priority-na">N/A</span></td>
+        <td>None needed</td>
+      </tr>
+      <tr>
+        <td>Searchable template library with 30+ categories</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No template library, no categories, no search UI</td>
+        <td>No pre-built template catalog. Users must create from scratch. OptiSigns has 1000+ templates in 30+ categories.</td>
+        <td><span class="priority priority-critical">Critical</span></td>
+        <td><span class="tag tag-major">Major Effort</span> Build template marketplace: seeded catalog, category taxonomy, search/filter, preview</td>
+      </tr>
+      <tr>
+        <td>Visual drag-and-drop design editor (Canva-like)</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No visual editor; templates are raw HTML/Handlebars</td>
+        <td>No WYSIWYG template designer. OptiSigns has a full Canva-like drag-and-drop editor. This is the biggest UX gap.</td>
+        <td><span class="priority priority-critical">Critical</span></td>
+        <td><span class="tag tag-major">Major Effort</span> Integrate or build a visual template editor (consider GrapesJS, Craft.js, or custom)</td>
+      </tr>
+      <tr>
+        <td>AI-powered template generation from text prompts</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No AI integration</td>
+        <td>OptiSigns' AI Designer generates professional designs from natural language. No equivalent in Vizora.</td>
+        <td><span class="priority priority-medium">Medium</span></td>
+        <td>Integrate LLM API (Claude/GPT) + image generation for prompt-to-template pipeline</td>
+      </tr>
+      <tr>
+        <td>Template orientation filter (Landscape/Portrait)</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No orientation metadata on templates</td>
+        <td>Templates have no orientation metadata for filtering.</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td><span class="tag tag-quickwin">Quick Win</span> Add orientation field to template content metadata</td>
+      </tr>
+      <tr>
+        <td>Featured templates / seasonal content carousel</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No featured/seasonal system</td>
+        <td>No curated or seasonal template discovery. OptiSigns surfaces seasonal content (Valentine's, Presidents' Day, etc.).</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td>Add isFeatured flag and seasonal tags to template catalog</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ======================================== -->
+  <!-- 6. ENGAGE (INTERACTIVE) -->
+  <!-- ======================================== -->
+  <div class="section" id="engage">
+    <h2>6. Engage (Interactive Experiences)</h2>
+
+    <div class="callout callout-warning">
+      <strong>Premium Feature Set:</strong> OptiSigns gates these behind the $30/screen Engage plan. These are differentiators but not required for competitive parity at the Standard tier.
+    </div>
+
+    <table>
+      <tr>
+        <th style="width:22%">Requirement</th>
+        <th style="width:8%">Status</th>
+        <th style="width:22%">Evidence</th>
+        <th style="width:25%">Gap Description</th>
+        <th style="width:8%">Priority</th>
+        <th style="width:15%">Suggested Action</th>
+      </tr>
+      <tr>
+        <td>Touch screen kiosk experiences</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No kiosk mode or touch interaction handling</td>
+        <td>No interactive kiosk builder. OptiSigns has full kiosk designer for wayfinding, catalogs, self-service.</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td>Long-term roadmap item &mdash; very high effort</td>
+      </tr>
+      <tr>
+        <td>QR code overlay on content</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No QR generation or overlay system</td>
+        <td>No QR overlay capability. Pairing uses QR codes but no content QR overlays for viewer interaction.</td>
+        <td><span class="priority priority-medium">Medium</span></td>
+        <td><span class="tag tag-medium">Medium Effort</span> QR overlay service: generate QR per content item, render as overlay layer</td>
+      </tr>
+      <tr>
+        <td>IoT sensor-triggered content (Lift &amp; Learn)</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No IoT integration</td>
+        <td>No IoT sensor integration. Very specialized feature.</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td>Defer &mdash; enterprise/niche feature</td>
+      </tr>
+      <tr>
+        <td>Live TV overlay (branded overlay on live feed)</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No live TV or overlay compositing</td>
+        <td>No ability to overlay branded content on live TV feeds.</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td>Defer &mdash; requires video compositing infrastructure</td>
+      </tr>
+      <tr>
+        <td>AI camera audience analytics</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No camera integration or demographic analysis</td>
+        <td>No audience measurement via camera. OptiSigns tracks demographics, dwell time.</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td>Defer &mdash; privacy-sensitive, high complexity</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ======================================== -->
+  <!-- 7. ANALYTICS -->
+  <!-- ======================================== -->
+  <div class="section" id="analytics">
+    <h2>7. Analytics</h2>
+
+    <table>
+      <tr>
+        <th style="width:22%">Requirement</th>
+        <th style="width:8%">Status</th>
+        <th style="width:22%">Evidence</th>
+        <th style="width:25%">Gap Description</th>
+        <th style="width:8%">Priority</th>
+        <th style="width:15%">Suggested Action</th>
+      </tr>
+      <tr>
+        <td>Content impression tracking (play count, duration)</td>
+        <td><span class="status status-partial">&#9888; Partial</span></td>
+        <td class="evidence">device.gateway.ts &mdash; content:impression event; ClickHouse in docker-compose</td>
+        <td>Devices send impression events via WebSocket. ClickHouse configured for storage. But: query API not built, no aggregation endpoints.</td>
+        <td><span class="priority priority-high">High</span></td>
+        <td>Build analytics query API: play count, duration by content/device/time range from ClickHouse</td>
+      </tr>
+      <tr>
+        <td>Proof of Play reporting with charts</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">web/src/app/dashboard/analytics/page.tsx &mdash; shows static demo metrics</td>
+        <td>Analytics page exists but shows placeholder/static data. No real playback report with time-series charts.</td>
+        <td><span class="priority priority-high">High</span></td>
+        <td>Connect analytics page to ClickHouse data; add time-series charts (Day/Week/Month)</td>
+      </tr>
+      <tr>
+        <td>Analytics filtering (by asset, device, type)</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No filter/query params on analytics</td>
+        <td>No ability to filter analytics by asset name, device, content type, or tags.</td>
+        <td><span class="priority priority-high">High</span></td>
+        <td>Add filter controls to analytics page; query params to analytics API</td>
+      </tr>
+      <tr>
+        <td>Analytics export (CSV, PDF)</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No export functionality</td>
+        <td>No ability to export analytics data. OptiSigns has Open, Save, Export controls.</td>
+        <td><span class="priority priority-medium">Medium</span></td>
+        <td>Add CSV export endpoint for analytics data</td>
+      </tr>
+      <tr>
+        <td>Device uptime and health analytics</td>
+        <td><span class="status status-partial">&#9888; Partial</span></td>
+        <td class="evidence">health.service.ts &mdash; system health; heartbeat data to ClickHouse</td>
+        <td>Health endpoint provides real-time status. Heartbeat metrics stored. But: no historical uptime percentage calculation or visualization.</td>
+        <td><span class="priority priority-medium">Medium</span></td>
+        <td>Calculate uptime from heartbeat history; add to analytics dashboard</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ======================================== -->
+  <!-- 8. SETTINGS & SECURITY -->
+  <!-- ======================================== -->
+  <div class="section" id="settings">
+    <h2>8. Account, Settings &amp; Security</h2>
+
+    <table>
+      <tr>
+        <th style="width:22%">Requirement</th>
+        <th style="width:8%">Status</th>
+        <th style="width:22%">Evidence</th>
+        <th style="width:25%">Gap Description</th>
+        <th style="width:8%">Priority</th>
+        <th style="width:15%">Suggested Action</th>
+      </tr>
+      <tr>
+        <td>Multi-tenant organization isolation</td>
+        <td><span class="status status-full">&#10003; Full</span></td>
+        <td class="evidence">schema.prisma &mdash; all models have organizationId FK; all queries filtered</td>
+        <td>Complete tenant isolation at DB level. No cross-org data leakage possible.</td>
+        <td><span class="priority priority-na">N/A</span></td>
+        <td>None needed</td>
+      </tr>
+      <tr>
+        <td>Dual JWT authentication (users + devices)</td>
+        <td><span class="status status-full">&#10003; Full</span></td>
+        <td class="evidence">auth.service.ts &mdash; JWT_SECRET + DEVICE_JWT_SECRET; httpOnly cookies</td>
+        <td>Separate secrets for user and device auth. Cookies are httpOnly, secure, sameSite. Bcrypt 14 rounds.</td>
+        <td><span class="priority priority-na">N/A</span></td>
+        <td>None needed (exceeds OptiSigns visible security)</td>
+      </tr>
+      <tr>
+        <td>XSS, CSRF, Helmet, Rate Limiting</td>
+        <td><span class="status status-full">&#10003; Full</span></td>
+        <td class="evidence">sanitize.interceptor.ts, csrf.middleware.ts, main.ts &mdash; Helmet, ThrottlerModule</td>
+        <td>Global SanitizeInterceptor, CSRF middleware, Helmet headers, 3-tier rate limiting. Comprehensive security stack.</td>
+        <td><span class="priority priority-na">N/A</span></td>
+        <td>None needed (competitive advantage)</td>
+      </tr>
+      <tr>
+        <td>Role-based access control (admin/manager/viewer)</td>
+        <td><span class="status status-partial">&#9888; Partial</span></td>
+        <td class="evidence">schema.prisma &mdash; User.role; guards/roles.guard.ts exists</td>
+        <td>Role field exists, RolesGuard implemented, @Roles decorator available. But: not consistently applied to all endpoints.</td>
+        <td><span class="priority priority-medium">Medium</span></td>
+        <td>Audit all endpoints and apply @Roles decorators consistently</td>
+      </tr>
+      <tr>
+        <td>Team workspaces and member management</td>
+        <td><span class="status status-partial">&#9888; Partial</span></td>
+        <td class="evidence">schema.prisma &mdash; Organization + User relation</td>
+        <td>Users belong to organizations. Missing: team workspace UI, member invitation flow, role management UI.</td>
+        <td><span class="priority priority-medium">Medium</span></td>
+        <td>Build team management page: invite users, change roles, remove members</td>
+      </tr>
+      <tr>
+        <td>SAML SSO</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No SAML or SSO integration</td>
+        <td>No single sign-on support. OptiSigns offers SAML SSO on Pro Plus+.</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td>Defer &mdash; enterprise feature, implement with passport-saml when needed</td>
+      </tr>
+      <tr>
+        <td>Audit log with user activity tracking</td>
+        <td><span class="status status-partial">&#9888; Partial</span></td>
+        <td class="evidence">schema.prisma &mdash; AuditLog model; auth events logged</td>
+        <td>AuditLog model exists. Auth events (login/logout) are logged. Missing: comprehensive logging of all CUD operations, audit log UI.</td>
+        <td><span class="priority priority-medium">Medium</span></td>
+        <td>Add audit logging interceptor for all mutations; build audit log viewer page</td>
+      </tr>
+      <tr>
+        <td>Approval workflow for content changes</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No approval/review system</td>
+        <td>No content approval workflow. OptiSigns has approval gates on Pro Plus+.</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td>Add content status: draft &rarr; pending_review &rarr; approved &rarr; active</td>
+      </tr>
+      <tr>
+        <td>Custom branding / white-label</td>
+        <td><span class="status status-partial">&#9888; Partial</span></td>
+        <td class="evidence">web/src/app/dashboard/settings/customization/page.tsx exists</td>
+        <td>Customization settings page exists in routing. Implementation depth unclear &mdash; likely placeholder.</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td>Implement logo upload, color theme, custom domain support</td>
+      </tr>
+      <tr>
+        <td>API keys for external integration</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No API key generation or management</td>
+        <td>No API key system for programmatic access. OptiSigns has API Keys in settings.</td>
+        <td><span class="priority priority-medium">Medium</span></td>
+        <td>Build API key CRUD, key hashing, auth guard for API key header</td>
+      </tr>
+      <tr>
+        <td>Subscription/billing/payment system</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">schema.prisma has Organization.tier, trialEndsAt, screenQuota &mdash; but no payment integration</td>
+        <td>Schema has tier/trial fields. No Stripe or payment integration. Settings page has placeholder for subscription.</td>
+        <td><span class="priority priority-medium">Medium</span></td>
+        <td>Integrate Stripe: subscription plans, payment methods, billing history, webhooks</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ======================================== -->
+  <!-- 9. INTEGRATIONS & DATA SOURCES -->
+  <!-- ======================================== -->
+  <div class="section" id="integrations">
+    <h2>9. Integrations &amp; Data Sources</h2>
+
+    <div class="callout callout-warning">
+      <strong>Significant Gap:</strong> OptiSigns offers 100+ app integrations. Vizora's template data source system (REST API, JSON URL) provides the <em>foundation</em> for integrations, but no pre-built integrations exist.
+    </div>
+
+    <table>
+      <tr>
+        <th style="width:22%">Requirement</th>
+        <th style="width:8%">Status</th>
+        <th style="width:22%">Evidence</th>
+        <th style="width:25%">Gap Description</th>
+        <th style="width:8%">Priority</th>
+        <th style="width:15%">Suggested Action</th>
+      </tr>
+      <tr>
+        <td>App/integration marketplace (100+ apps)</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No app system, no marketplace UI</td>
+        <td>No app ecosystem. OptiSigns has weather, social media, dashboards, RSS, calendars, etc. Vizora's REST API data source can power some, but no pre-built widgets.</td>
+        <td><span class="priority priority-high">High</span></td>
+        <td><span class="tag tag-major">Major Effort</span> Design app/widget architecture; build initial set of 10-15 core widgets</td>
+      </tr>
+      <tr>
+        <td>Weather widget</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No weather integration</td>
+        <td>No weather widget. Could be built as a template with REST API data source pointing to a weather API.</td>
+        <td><span class="priority priority-medium">Medium</span></td>
+        <td>Create weather template + pre-configured data source (OpenWeatherMap API)</td>
+      </tr>
+      <tr>
+        <td>Social media feeds (Instagram, Facebook, Twitter)</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No social media integration</td>
+        <td>No social media feed display. OptiSigns shows social walls, hashtag feeds.</td>
+        <td><span class="priority priority-medium">Medium</span></td>
+        <td>Build social feed widgets via platform APIs (requires OAuth setup per platform)</td>
+      </tr>
+      <tr>
+        <td>RSS feed integration</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No RSS parser or feed support</td>
+        <td>No RSS feed rendering. Template REST API data source could consume RSS-to-JSON proxies but no native support.</td>
+        <td><span class="priority priority-medium">Medium</span></td>
+        <td>Add RSS parser service; create RSS template widgets</td>
+      </tr>
+      <tr>
+        <td>Google Sheets / Calendar integration</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No Google API integration</td>
+        <td>No Google Workspace integration. OptiSigns has Google Sheets, Calendar, Slides on Pro Plus+.</td>
+        <td><span class="priority priority-medium">Medium</span></td>
+        <td>Google API OAuth + Sheets/Calendar data source adapters</td>
+      </tr>
+      <tr>
+        <td>MS365 / Power BI / Slack / Teams integration</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No Microsoft or Slack integration</td>
+        <td>No Microsoft ecosystem integration. OptiSigns has MS365, Power BI, Slack, Teams on Pro Plus+.</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td>Defer &mdash; Pro Plus tier feature, implement based on customer demand</td>
+      </tr>
+      <tr>
+        <td>Split-screen / multi-zone layouts</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No zone/layout system</td>
+        <td>No ability to divide a screen into zones showing different content simultaneously. OptiSigns has Split Screen Zones.</td>
+        <td><span class="priority priority-high">High</span></td>
+        <td>Design zone layout system: define grid zones per display, assign content per zone</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ======================================== -->
+  <!-- 10. INFRASTRUCTURE & PLATFORM -->
+  <!-- ======================================== -->
+  <div class="section" id="infrastructure">
+    <h2>10. Infrastructure &amp; Platform</h2>
+
+    <table>
+      <tr>
+        <th style="width:22%">Requirement</th>
+        <th style="width:8%">Status</th>
+        <th style="width:22%">Evidence</th>
+        <th style="width:25%">Gap Description</th>
+        <th style="width:8%">Priority</th>
+        <th style="width:15%">Suggested Action</th>
+      </tr>
+      <tr>
+        <td>WebSocket real-time infrastructure</td>
+        <td><span class="status status-full">&#10003; Full</span></td>
+        <td class="evidence">realtime/ service &mdash; Socket.IO, device/org rooms, heartbeat, impressions</td>
+        <td>Mature WebSocket infrastructure with rooms, heartbeat, impression tracking, command pipeline. Strong advantage.</td>
+        <td><span class="priority priority-na">N/A</span></td>
+        <td>None needed (competitive advantage)</td>
+      </tr>
+      <tr>
+        <td>REST API with documentation</td>
+        <td><span class="status status-full">&#10003; Full</span></td>
+        <td class="evidence">All controllers use @nestjs/swagger decorators; GET /api/docs in dev</td>
+        <td>Full Swagger/OpenAPI docs available in dev mode. All plans have API access. Advantage vs OptiSigns (GraphQL Enterprise-only).</td>
+        <td><span class="priority priority-na">N/A</span></td>
+        <td>None needed (competitive advantage)</td>
+      </tr>
+      <tr>
+        <td>Health monitoring endpoint</td>
+        <td><span class="status status-full">&#10003; Full</span></td>
+        <td class="evidence">health.service.ts &mdash; DB, Redis, Memory checks with degraded/unhealthy thresholds</td>
+        <td>Comprehensive health check: database, Redis, memory usage with status levels.</td>
+        <td><span class="priority priority-na">N/A</span></td>
+        <td>None needed</td>
+      </tr>
+      <tr>
+        <td>PM2 production deployment</td>
+        <td><span class="status status-full">&#10003; Full</span></td>
+        <td class="evidence">ecosystem.config.js &mdash; cluster mode middleware, single instance realtime</td>
+        <td>PM2 with cluster mode (2 instances middleware), memory limits, graceful shutdown. Self-hosted advantage.</td>
+        <td><span class="priority priority-na">N/A</span></td>
+        <td>None needed</td>
+      </tr>
+      <tr>
+        <td>Monitoring alerts (device offline notifications)</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No alert/notification system</td>
+        <td>No alerts when devices go offline or system degrades. OptiSigns has Monitoring Alerts in settings.</td>
+        <td><span class="priority priority-high">High</span></td>
+        <td>Build alert rules engine: device offline &gt; N minutes triggers email/webhook notification</td>
+      </tr>
+      <tr>
+        <td>Campaign management</td>
+        <td><span class="status status-missing">&#10007; Missing</span></td>
+        <td class="evidence">No campaign model or workflow</td>
+        <td>No campaign grouping for content across multiple screens/schedules. OptiSigns has Campaign Management on Pro Plus+.</td>
+        <td><span class="priority priority-low">Low</span></td>
+        <td>Add Campaign model grouping schedules + content + displays; track as unit</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ======================================== -->
+  <!-- ROADMAP -->
+  <!-- ======================================== -->
+  <div class="section" id="roadmap">
+    <h2>11. Recommended Implementation Roadmap</h2>
+
+    <div class="callout callout-info">
+      <strong>Strategy:</strong> Phase 1 closes critical gaps and quick wins. Phase 2 achieves competitive parity with OptiSigns Standard tier. Phase 3 targets differentiation. Phase 4 is enterprise/premium features.
+    </div>
+
+    <h3>Phase 1: Foundation &amp; Quick Wins (Weeks 1-3)</h3>
+    <div class="roadmap-phase">
+      <h4>Quick Wins (1-2 days each)</h4>
+      <p>1. Screen orientation enum expansion (landscape &rarr; 0/90/180/270)</p>
+      <p>2. Display tag API endpoints (schema already exists)</p>
+      <p>3. Playlist metadata computed fields (totalSize, totalDuration)</p>
+      <p>4. Template orientation metadata field</p>
+      <p>5. Playlist duplicate endpoint</p>
+      <p>6. Schedule duplicate endpoint</p>
+    </div>
+    <div class="roadmap-phase">
+      <h4>Foundation Work (1-2 weeks)</h4>
+      <p>7. MinIO/S3 integration for file storage (critical for multi-instance production)</p>
+      <p>8. Analytics query API from ClickHouse (content impressions already being stored)</p>
+      <p>9. Role-based access audit &mdash; apply @Roles guards consistently</p>
+    </div>
+
+    <h3>Phase 2: Competitive Parity with OptiSigns Standard (Weeks 4-10)</h3>
+    <div class="roadmap-phase">
+      <h4>UI/UX Enhancements</h4>
+      <p>10. Three-panel drag-and-drop playlist builder</p>
+      <p>11. Calendar-based schedule view (FullCalendar.js integration)</p>
+      <p>12. Playlist preview player component</p>
+      <p>13. Content grid/list view toggle with folder organization</p>
+      <p>14. Device search, sort, filter controls + bulk operations</p>
+    </div>
+    <div class="roadmap-phase">
+      <h4>Analytics &amp; Monitoring</h4>
+      <p>15. Proof of Play dashboard with time-series charts</p>
+      <p>16. Device offline alert notifications (email/webhook)</p>
+      <p>17. Device uptime analytics from heartbeat history</p>
+    </div>
+    <div class="roadmap-phase">
+      <h4>Team &amp; Account</h4>
+      <p>18. Team member invitation and management UI</p>
+      <p>19. Audit log viewer page</p>
+      <p>20. API key management system</p>
+    </div>
+
+    <h3>Phase 3: Differentiation &amp; Growth (Weeks 11-20)</h3>
+    <div class="roadmap-phase">
+      <h4>Template Ecosystem</h4>
+      <p>21. Template library with searchable catalog (seed 50-100 templates)</p>
+      <p>22. Visual template editor (evaluate GrapesJS, Craft.js, or Polotno)</p>
+      <p>23. AI template generation via Claude/GPT API</p>
+    </div>
+    <div class="roadmap-phase">
+      <h4>Integrations</h4>
+      <p>24. Widget architecture with standardized data source adapters</p>
+      <p>25. Weather, RSS, clock, countdown &mdash; initial widget set</p>
+      <p>26. Split-screen / multi-zone layout system</p>
+      <p>27. QR code overlay generation and placement</p>
+    </div>
+    <div class="roadmap-phase">
+      <h4>Device</h4>
+      <p>28. Remote device screenshot/preview via WebSocket command</p>
+      <p>29. Operational schedule (auto on/off) per device</p>
+    </div>
+
+    <h3>Phase 4: Enterprise &amp; Premium (Weeks 20+)</h3>
+    <div class="roadmap-phase">
+      <h4>Enterprise Features</h4>
+      <p>30. Stripe billing integration (subscription tiers, payment, invoicing)</p>
+      <p>31. SAML SSO via passport-saml</p>
+      <p>32. Content approval workflow (draft &rarr; review &rarr; approved)</p>
+      <p>33. Custom branding / white-label support</p>
+      <p>34. Campaign management (group schedules + content + displays)</p>
+      <p>35. Google Workspace / MS365 integrations</p>
+    </div>
+  </div>
+
+  <!-- ======================================== -->
+  <!-- VIZORA STRENGTHS -->
+  <!-- ======================================== -->
+  <div class="section" id="strengths">
+    <h2>12. Vizora Competitive Strengths (Keep &amp; Promote)</h2>
+
+    <div class="callout callout-success">
+      <strong>These are areas where Vizora already matches or exceeds OptiSigns.</strong> These should be highlighted in marketing and preserved during feature development.
+    </div>
+
+    <table>
+      <tr><th>Strength</th><th>Detail</th><th>OptiSigns Comparison</th></tr>
+      <tr>
+        <td><strong>Real-time WebSocket Architecture</strong></td>
+        <td>Socket.IO with device/org rooms, dual Redis+Postgres persistence, 15s heartbeat, content impressions, pending commands</td>
+        <td>OptiSigns uses generic cloud push &mdash; Vizora's architecture is more sophisticated and responsive</td>
+      </tr>
+      <tr>
+        <td><strong>REST API with Swagger Docs (All Plans)</strong></td>
+        <td>Full API documentation at /api/docs, all endpoints accessible programmatically</td>
+        <td>OptiSigns restricts GraphQL API to Enterprise tier ($45/screen/mo). Vizora offers API to all users.</td>
+      </tr>
+      <tr>
+        <td><strong>Security Stack</strong></td>
+        <td>Dual JWT (user+device), httpOnly cookies, CSRF, Helmet, XSS sanitization, 3-tier rate limiting, bcrypt-14, SHA-256 token hashing</td>
+        <td>More layers of defense than visible in OptiSigns. Token hashing in DB is notable.</td>
+      </tr>
+      <tr>
+        <td><strong>Content Expiration with Auto-Replacement</strong></td>
+        <td>Hourly cron expires content, auto-replaces with designated replacement, auto-removes from playlists</td>
+        <td>Not prominently featured in OptiSigns. Valuable for time-sensitive promotions.</td>
+      </tr>
+      <tr>
+        <td><strong>File Versioning with Rollback</strong></td>
+        <td>Replace file with backup, version chain via previousVersionId, full history API</td>
+        <td>Not visible in OptiSigns. Prevents accidental content loss.</td>
+      </tr>
+      <tr>
+        <td><strong>Template Data Source Security (SSRF Protection)</strong></td>
+        <td>Private IP blocking, cloud metadata blocking, 10s timeout, circuit breaker</td>
+        <td>Shows enterprise-grade security thinking even in template data fetching.</td>
+      </tr>
+      <tr>
+        <td><strong>Self-Hosted Deployment Option</strong></td>
+        <td>PM2 cluster mode, Docker infrastructure, no vendor lock-in</td>
+        <td>OptiSigns is cloud-only. Self-hosted is valuable for regulated industries.</td>
+      </tr>
+      <tr>
+        <td><strong>Multi-Tenant Architecture</strong></td>
+        <td>Organization-based isolation at DB level, all queries scoped, no cross-org leakage</td>
+        <td>Comparable to OptiSigns sub-accounts, but Vizora's is enforced at the database query level.</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ======================================== -->
+  <!-- STATUS SUMMARY TABLE -->
+  <!-- ======================================== -->
+  <div class="section">
+    <h2>Status Summary</h2>
+
+    <table>
+      <tr><th>Category</th><th>&#10003; Full</th><th>&#9888; Partial</th><th>&#10007; Missing</th><th>Total</th></tr>
+      <tr><td>Screens / Devices</td><td>1</td><td>5</td><td>5</td><td>11</td></tr>
+      <tr><td>Files / Assets</td><td>6</td><td>2</td><td>2</td><td>10</td></tr>
+      <tr><td>Playlists</td><td>2</td><td>2</td><td>3</td><td>7</td></tr>
+      <tr><td>Schedules</td><td>3</td><td>0</td><td>3</td><td>6</td></tr>
+      <tr><td>Templates</td><td>3</td><td>0</td><td>5</td><td>8</td></tr>
+      <tr><td>Engage</td><td>0</td><td>0</td><td>5</td><td>5</td></tr>
+      <tr><td>Analytics</td><td>0</td><td>2</td><td>3</td><td>5</td></tr>
+      <tr><td>Settings &amp; Security</td><td>3</td><td>4</td><td>4</td><td>11</td></tr>
+      <tr><td>Integrations</td><td>0</td><td>0</td><td>7</td><td>7</td></tr>
+      <tr><td>Infrastructure</td><td>4</td><td>0</td><td>2</td><td>6</td></tr>
+      <tr style="font-weight:700; background:#f1f3f5;">
+        <td>TOTAL</td><td style="color:var(--green)">19 (31%)</td><td style="color:#e67e22">16 (26%)</td><td style="color:var(--red)">27 (43%)</td><td>62</td>
+      </tr>
+    </table>
+
+    <div class="callout callout-info">
+      <strong>Key Insight:</strong> Vizora's backend infrastructure is strong (auth, WebSocket, scheduling, content management). The gaps are primarily in <strong>UI/UX richness</strong> (visual editors, calendar views, drag-and-drop builders), <strong>analytics</strong> (data is collected but not surfaced), and <strong>ecosystem breadth</strong> (templates, integrations, widgets). The good news: the foundation supports all of these.
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  <p>Vizora Gap Analysis Report &mdash; Generated February 5, 2026</p>
+  <p>Source: OptiSigns Competitive Analysis + Vizora Codebase Audit (62 requirements evaluated)</p>
+</div>
+
+</body>
+</html>
