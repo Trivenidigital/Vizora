@@ -15,35 +15,41 @@ datasource db {
 // ============================================================================
 
 model Organization {
-  id                   String   @id @default(uuid())
-  name                 String
-  slug                 String   @unique
-  logoUrl              String?
-  subscriptionTier     String   @default("free") // free, basic, pro, enterprise
-  screenQuota          Int      @default(5)
-  stripeCustomerId     String?  @unique
-  stripeSubscriptionId String?
-  billingEmail         String?
-  trialEndsAt          DateTime?
-  subscriptionStatus   String   @default("trial") // trial, active, past_due, canceled
-  settings             Json?    @db.JsonB
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  id                     String   @id @default(uuid())
+  name                   String
+  slug                   String   @unique
+  logoUrl                String?
+  subscriptionTier       String   @default("free") // free, basic, pro, enterprise
+  screenQuota            Int      @default(5)
+  stripeCustomerId       String?  @unique
+  stripeSubscriptionId   String?
+  razorpayCustomerId     String?  @unique
+  razorpaySubscriptionId String?
+  paymentProvider        String?  // 'stripe' | 'razorpay'
+  country                String?  // ISO 3166-1 alpha-2 (e.g., 'US', 'IN')
+  billingEmail           String?
+  trialEndsAt            DateTime?
+  subscriptionStatus     String   @default("trial") // trial, active, past_due, canceled
+  settings               Json?    @db.JsonB
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
-  users          User[]
-  displays       Display[]
-  content        Content[]
-  playlists      Playlist[]
-  schedules      Schedule[]
-  tags           Tag[]
-  displayGroups  DisplayGroup[]
-  auditLogs      AuditLog[]
-  contentFolders ContentFolder[]
-  notifications  Notification[]
-  apiKeys        ApiKey[]
+  users               User[]
+  displays            Display[]
+  content             Content[]
+  playlists           Playlist[]
+  schedules           Schedule[]
+  tags                Tag[]
+  displayGroups       DisplayGroup[]
+  auditLogs           AuditLog[]
+  contentFolders      ContentFolder[]
+  notifications       Notification[]
+  apiKeys             ApiKey[]
+  billingTransactions BillingTransaction[]
 
   @@index([slug])
   @@index([stripeCustomerId])
+  @@index([razorpayCustomerId])
   @@map("organizations")
 }
 
@@ -421,4 +427,27 @@ model ApiKey {
   @@index([organizationId])
   @@index([prefix])
   @@map("api_keys")
+}
+
+// ============================================================================
+// BILLING TRANSACTIONS
+// ============================================================================
+
+model BillingTransaction {
+  id                    String   @id @default(cuid())
+  organizationId        String
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  provider              String   // 'stripe' | 'razorpay'
+  providerTransactionId String
+  type                  String   // 'subscription', 'one_time', 'refund'
+  status                String   // 'pending', 'succeeded', 'failed'
+  amount                Int      // cents/paise
+  currency              String   // 'usd', 'inr'
+  description           String?
+  metadata              Json?    @db.JsonB
+  createdAt             DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([providerTransactionId])
+  @@map("billing_transactions")
 }

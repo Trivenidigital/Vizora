@@ -1,7 +1,7 @@
 // API Client for Vizora Middleware
 // Uses httpOnly cookies for secure JWT token storage
 
-import type { Display, DisplayOrientation, Content, Playlist, PlaylistItem, Schedule, PaginatedResponse, ContentFolder, AppNotification, ApiKey, CreateApiKeyResponse } from './types';
+import type { Display, DisplayOrientation, Content, Playlist, PlaylistItem, Schedule, PaginatedResponse, ContentFolder, AppNotification, ApiKey, CreateApiKeyResponse, SubscriptionStatus, Plan, QuotaUsage, Invoice, CheckoutResponse, BillingPortalResponse } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
 
@@ -916,6 +916,46 @@ class ApiClient {
     await this.request<{ success: boolean }>(`/api-keys/${id}`, {
       method: 'DELETE',
     });
+  }
+
+  // Billing
+  async getSubscriptionStatus(): Promise<SubscriptionStatus> {
+    return this.request<SubscriptionStatus>('/billing/subscription');
+  }
+
+  async getPlans(country?: string): Promise<Plan[]> {
+    const params = country ? `?country=${country}` : '';
+    return this.request<Plan[]>(`/billing/plans${params}`);
+  }
+
+  async getQuotaUsage(): Promise<QuotaUsage> {
+    return this.request<QuotaUsage>('/billing/quota');
+  }
+
+  async createCheckout(planId: string, interval: 'monthly' | 'yearly'): Promise<CheckoutResponse> {
+    return this.request<CheckoutResponse>('/billing/checkout', {
+      method: 'POST',
+      body: JSON.stringify({ planId, interval }),
+    });
+  }
+
+  async cancelSubscription(immediately = false): Promise<void> {
+    await this.request(`/billing/cancel?immediately=${immediately}`, {
+      method: 'POST',
+    });
+  }
+
+  async reactivateSubscription(): Promise<void> {
+    await this.request('/billing/reactivate', { method: 'POST' });
+  }
+
+  async getBillingPortalUrl(returnUrl: string): Promise<BillingPortalResponse> {
+    return this.request<BillingPortalResponse>(`/billing/portal?returnUrl=${encodeURIComponent(returnUrl)}`);
+  }
+
+  async getInvoices(limit?: number): Promise<Invoice[]> {
+    const params = limit ? `?limit=${limit}` : '';
+    return this.request<Invoice[]>(`/billing/invoices${params}`);
   }
 }
 

@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CheckQuota } from '../billing/decorators/check-quota.decorator';
 import { DisplaysService } from './displays.service';
 import { CreateDisplayDto } from './dto/create-display.dto';
 import { UpdateDisplayDto } from './dto/update-display.dto';
@@ -27,6 +28,7 @@ export class DisplaysController {
 
   @Post()
   @Roles('admin', 'manager')
+  @CheckQuota('screen')
   create(
     @CurrentUser('organizationId') organizationId: string,
     @Body() createDisplayDto: CreateDisplayDto,
