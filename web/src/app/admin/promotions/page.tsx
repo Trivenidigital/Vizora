@@ -127,14 +127,14 @@ export default function AdminPromotionsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Promotions</h1>
-          <p className="mt-1 text-gray-600 dark:text-gray-400">
+          <h1 className="text-3xl font-bold text-[var(--foreground)]">Promotions</h1>
+          <p className="mt-1 text-[var(--foreground-secondary)]">
             Manage discount codes and promotional offers
           </p>
         </div>
         <button
           onClick={handleCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          className="flex items-center gap-2 px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition"
         >
           <Plus className="w-5 h-5" />
           Create Promotion
@@ -142,30 +142,30 @@ export default function AdminPromotionsPage() {
       </div>
 
       {/* Promotions Table */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
-                <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+              <tr className="bg-[var(--background)] border-b border-[var(--border)]">
+                <th className="text-left px-6 py-3 text-sm font-semibold text-[var(--foreground)]">
                   Code
                 </th>
-                <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                <th className="text-left px-6 py-3 text-sm font-semibold text-[var(--foreground)]">
                   Name
                 </th>
-                <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                <th className="text-left px-6 py-3 text-sm font-semibold text-[var(--foreground)]">
                   Discount
                 </th>
-                <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                <th className="text-left px-6 py-3 text-sm font-semibold text-[var(--foreground)]">
                   Redemptions
                 </th>
-                <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                <th className="text-left px-6 py-3 text-sm font-semibold text-[var(--foreground)]">
                   Validity
                 </th>
-                <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                <th className="text-left px-6 py-3 text-sm font-semibold text-[var(--foreground)]">
                   Status
                 </th>
-                <th className="text-right px-6 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                <th className="text-right px-6 py-3 text-sm font-semibold text-[var(--foreground)]">
                   Actions
                 </th>
               </tr>
@@ -174,16 +174,16 @@ export default function AdminPromotionsPage() {
               {promotions.map((promo) => (
                 <tr
                   key={promo.id}
-                  className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900/30 transition"
+                  className="border-b border-[var(--border)] hover:bg-[var(--surface-hover)] transition"
                 >
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      <code className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-sm font-mono font-medium text-gray-900 dark:text-white">
+                      <code className="px-2 py-1 bg-[var(--background-secondary)] rounded text-sm font-mono font-medium text-[var(--foreground)]">
                         {promo.code}
                       </code>
                       <button
                         onClick={() => copyCode(promo.code)}
-                        className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition"
+                        className="p-1 text-[var(--foreground-tertiary)] hover:text-[var(--foreground-secondary)] transition"
                         title="Copy code"
                       >
                         {copiedCode === promo.code ? (
@@ -196,9 +196,9 @@ export default function AdminPromotionsPage() {
                   </td>
                   <td className="px-6 py-4">
                     <div>
-                      <p className="font-medium text-gray-900 dark:text-white">{promo.name}</p>
+                      <p className="font-medium text-[var(--foreground)]">{promo.name}</p>
                       {promo.description && (
-                        <p className="text-sm text-gray-500 dark:text-gray-400 truncate max-w-xs">
+                        <p className="text-sm text-[var(--foreground-tertiary)] truncate max-w-xs">
                           {promo.description}
                         </p>
                       )}
@@ -211,11 +211,11 @@ export default function AdminPromotionsPage() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      <Users className="w-4 h-4 text-gray-400" />
-                      <span className="text-gray-900 dark:text-white">
+                      <Users className="w-4 h-4 text-[var(--foreground-tertiary)]" />
+                      <span className="text-[var(--foreground)]">
                         {promo.currentRedemptions}
                         {promo.maxRedemptions && (
-                          <span className="text-gray-500 dark:text-gray-400">
+                          <span className="text-[var(--foreground-tertiary)]">
                             {' '}
                             / {promo.maxRedemptions}
                           </span>
@@ -224,7 +224,7 @@ export default function AdminPromotionsPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                    <div className="flex items-center gap-2 text-sm text-[var(--foreground-secondary)]">
                       <Calendar className="w-4 h-4" />
                       <span>
                         {formatDate(promo.startsAt)}
@@ -242,7 +242,7 @@ export default function AdminPromotionsPage() {
                     <div className="flex items-center justify-end gap-2">
                       <button
                         onClick={() => handleEdit(promo)}
-                        className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
+                        className="p-2 text-[var(--foreground-tertiary)] hover:text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] rounded-lg transition"
                         title="Edit"
                       >
                         <Edit className="w-4 h-4" />
@@ -264,16 +264,16 @@ export default function AdminPromotionsPage() {
 
         {promotions.length === 0 && (
           <div className="text-center py-12">
-            <Gift className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+            <Gift className="w-12 h-12 text-[var(--foreground-tertiary)] mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-[var(--foreground)] mb-2">
               No promotions yet
             </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
+            <p className="text-[var(--foreground-secondary)] mb-4">
               Create your first promotional code to attract customers.
             </p>
             <button
               onClick={handleCreate}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition"
             >
               <Plus className="w-5 h-5" />
               Create Promotion

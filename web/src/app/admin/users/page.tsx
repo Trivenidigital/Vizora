@@ -71,9 +71,9 @@ export default function AdminUsersPage() {
       case 'admin':
         return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400';
       case 'owner':
-        return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
+        return 'bg-[#00E5A0]/10 text-[#00E5A0] dark:bg-[#00E5A0]/10 dark:text-[#00E5A0]';
       default:
-        return 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300';
+        return 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)] dark:bg-gray-700 dark:text-gray-300';
     }
   };
 
@@ -83,26 +83,26 @@ export default function AdminUsersPage() {
 
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Users</h1>
-        <p className="mt-1 text-gray-600 dark:text-gray-400">
+        <h1 className="text-3xl font-bold text-[var(--foreground)]">Users</h1>
+        <p className="mt-1 text-[var(--foreground-secondary)]">
           Manage all users across organizations
         </p>
       </div>
 
       {/* Search */}
       <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--foreground-tertiary)]" />
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by name or email..."
-          className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full pl-10 pr-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
         />
       </div>
 
       {/* Users Table */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <LoadingSpinner size="lg" />
@@ -111,23 +111,23 @@ export default function AdminUsersPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
-                  <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                <tr className="bg-[var(--background)] border-b border-[var(--border)]">
+                  <th className="text-left px-6 py-3 text-sm font-semibold text-[var(--foreground)]">
                     User
                   </th>
-                  <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                  <th className="text-left px-6 py-3 text-sm font-semibold text-[var(--foreground)]">
                     Organization
                   </th>
-                  <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                  <th className="text-left px-6 py-3 text-sm font-semibold text-[var(--foreground)]">
                     Role
                   </th>
-                  <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                  <th className="text-left px-6 py-3 text-sm font-semibold text-[var(--foreground)]">
                     Status
                   </th>
-                  <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                  <th className="text-left px-6 py-3 text-sm font-semibold text-[var(--foreground)]">
                     Last Login
                   </th>
-                  <th className="text-right px-6 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                  <th className="text-right px-6 py-3 text-sm font-semibold text-[var(--foreground)]">
                     Actions
                   </th>
                 </tr>
@@ -136,26 +136,28 @@ export default function AdminUsersPage() {
                 {users.map((user) => (
                   <tr
                     key={user.id}
-                    className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900/30 transition"
+                    className="border-b border-[var(--border)] hover:bg-[var(--surface-hover)] transition"
                   >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center">
-                          <span className="text-white text-sm font-semibold">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] flex items-center justify-center">
+                          <span className="text-[#061A21] text-sm font-semibold">
                             {user.firstName[0]}
                             {user.lastName[0]}
                           </span>
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <p className="font-medium text-gray-900 dark:text-white">
+                            <p className="font-medium text-[var(--foreground)]">
                               {user.firstName} {user.lastName}
                             </p>
                             {user.isSuperAdmin && (
-                              <Shield className="w-4 h-4 text-yellow-500" title="Super Admin" />
+                              <span title="Super Admin">
+                                <Shield className="w-4 h-4 text-yellow-500" />
+                              </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400">
+                          <div className="flex items-center gap-1 text-sm text-[var(--foreground-tertiary)]">
                             <Mail className="w-3 h-3" />
                             {user.email}
                           </div>
@@ -164,8 +166,8 @@ export default function AdminUsersPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <Building2 className="w-4 h-4 text-gray-400" />
-                        <span className="text-gray-900 dark:text-white">{user.organization.name}</span>
+                        <Building2 className="w-4 h-4 text-[var(--foreground-tertiary)]" />
+                        <span className="text-[var(--foreground)]">{user.organization.name}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -181,7 +183,7 @@ export default function AdminUsersPage() {
                       <StatusBadge status={user.isActive ? 'active' : 'inactive'} size="sm" />
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                      <div className="flex items-center gap-2 text-sm text-[var(--foreground-secondary)]">
                         <Calendar className="w-4 h-4" />
                         <span>{formatDate(user.lastLoginAt)}</span>
                       </div>
@@ -224,9 +226,9 @@ export default function AdminUsersPage() {
 
         {!loading && users.length === 0 && (
           <div className="text-center py-12">
-            <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No users found</h3>
-            <p className="text-gray-600 dark:text-gray-400">
+            <Users className="w-12 h-12 text-[var(--foreground-tertiary)] mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-[var(--foreground)] mb-2">No users found</h3>
+            <p className="text-[var(--foreground-secondary)]">
               {search ? 'Try adjusting your search.' : 'Users will appear here when they sign up.'}
             </p>
           </div>
@@ -234,8 +236,8 @@ export default function AdminUsersPage() {
 
         {/* Pagination Info */}
         {!loading && users.length > 0 && (
-          <div className="px-6 py-3 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-200 dark:border-gray-700">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+          <div className="px-6 py-3 bg-[var(--background)] border-t border-[var(--border)]">
+            <p className="text-sm text-[var(--foreground-secondary)]">
               Showing {users.length} of {total} users
             </p>
           </div>
@@ -257,7 +259,7 @@ export default function AdminUsersPage() {
             : `Are you sure you want to enable "${actionUser?.email}"? They will be able to log in again.`
         }
         confirmText={actionType === 'disable' ? 'Disable' : 'Enable'}
-        type={actionType === 'disable' ? 'danger' : 'primary'}
+        type={actionType === 'disable' ? 'danger' : 'info'}
       />
     </div>
   );
