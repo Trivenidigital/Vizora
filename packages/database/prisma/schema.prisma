@@ -63,6 +63,7 @@ model User {
   role           String   @default("viewer") // admin, manager, viewer
   avatar         String?
   isActive       Boolean  @default(true)
+  isSuperAdmin   Boolean  @default(false) // Vizora platform admin (separate from org admin)
   lastLoginAt    DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -77,6 +78,7 @@ model User {
   @@index([organizationId])
   @@index([email])
   @@index([clerkUserId])
+  @@index([isSuperAdmin])
   @@map("users")
 }
 
@@ -450,4 +452,200 @@ model BillingTransaction {
   @@index([organizationId])
   @@index([providerTransactionId])
   @@map("billing_transactions")
+}
+
+// ============================================================================
+// ADMIN SYSTEM - PLAN MANAGEMENT
+// ============================================================================
+
+model Plan {
+  id                     String   @id @default(cuid())
+  slug                   String   @unique  // 'free', 'basic', 'pro', 'enterprise'
+  name                   String
+  description            String?
+
+  // Quotas
+  screenQuota            Int      // -1 for unlimited
+  storageQuotaMb         Int      @default(5000)  // Storage limit in MB
+  apiRateLimit           Int      @default(1000)  // Requests per hour
+
+  // Pricing (cents/paise, -1 for custom)
+  priceUsdMonthly        Int
+  priceUsdYearly         Int
+  priceInrMonthly        Int
+  priceInrYearly         Int
+
+  // Payment provider IDs
+  stripePriceIdMonthly   String?
+  stripePriceIdYearly    String?
+  razorpayPlanIdMonthly  String?
+  razorpayPlanIdYearly   String?
+
+  // Features
+  features               String[]  // ['analytics', 'api_access', 'priority_support']
+  featureFlags           Json?     @db.JsonB  // Detailed feature config
+
+  // Display
+  isActive               Boolean   @default(true)
+  isPublic               Boolean   @default(true)  // Show on pricing page
+  sortOrder              Int       @default(0)
+  highlightText          String?   // "Most Popular", "Best Value"
+
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  promotions             PlanPromotion[]
+
+  @@index([isActive, isPublic])
+  @@index([slug])
+  @@map("plans")
+}
+
+// ============================================================================
+// ADMIN SYSTEM - PROMOTIONS & DISCOUNTS
+// ============================================================================
+
+model Promotion {
+  id                   String    @id @default(cuid())
+  code                 String    @unique  // 'LAUNCH50', 'DIWALI2026'
+  name                 String
+  description          String?
+
+  // Discount configuration
+  discountType         String    // 'percentage' | 'fixed_amount' | 'free_months'
+  discountValue        Int       // 50 for 50%, or cents/paise, or months
+  currency             String?   // null for percentage, 'usd'/'inr' for fixed
+
+  // Limits
+  maxRedemptions       Int?      // null for unlimited
+  maxPerCustomer       Int       @default(1)
+  currentRedemptions   Int       @default(0)
+  minPurchaseAmount    Int?      // Minimum cart value
+
+  // Validity
+  startsAt             DateTime
+  expiresAt            DateTime?
+  isActive             Boolean   @default(true)
+
+  // Tracking
+  createdBy            String?   // Admin user ID
+  metadata             Json?     @db.JsonB  // Campaign tracking, UTM, etc.
+
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  applicablePlans      PlanPromotion[]
+  redemptions          PromotionRedemption[]
+
+  @@index([code])
+  @@index([isActive, startsAt, expiresAt])
+  @@map("promotions")
+}
+
+model PlanPromotion {
+  id           String    @id @default(cuid())
+  planId       String
+  plan         Plan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+  promotionId  String
+  promotion    Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, promotionId])
+  @@map("plan_promotions")
+}
+
+model PromotionRedemption {
+  id              String    @id @default(cuid())
+  promotionId     String
+  promotion       Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  organizationId  String
+  discountApplied Int       // Actual discount in cents/paise
+  redeemedAt      DateTime  @default(now())
+
+  @@index([promotionId])
+  @@index([organizationId])
+  @@map("promotion_redemptions")
+}
+
+// ============================================================================
+// ADMIN SYSTEM - SYSTEM CONFIGURATION
+// ============================================================================
+
+model SystemConfig {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       Json     @db.JsonB
+  dataType    String   @default("string")  // string, number, boolean, json
+  category    String   @default("general") // general, security, limits, features
+  description String?
+  isSecret    Boolean  @default(false)  // Hide value in UI
+  updatedAt   DateTime @updatedAt
+  updatedBy   String?  // Admin user ID
+
+  @@index([category])
+  @@map("system_configs")
+}
+
+// ============================================================================
+// ADMIN SYSTEM - ADMIN AUDIT LOG
+// ============================================================================
+
+model AdminAuditLog {
+  id             String   @id @default(cuid())
+  adminUserId    String
+  action         String   // 'plan.create', 'org.suspend', 'user.impersonate'
+  targetType     String?  // 'organization', 'user', 'plan', 'promotion'
+  targetId       String?
+  details        Json?    @db.JsonB  // Action-specific details
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime @default(now())
+
+  @@index([adminUserId])
+  @@index([action])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+  @@map("admin_audit_logs")
+}
+
+// ============================================================================
+// ADMIN SYSTEM - SYSTEM ANNOUNCEMENTS
+// ============================================================================
+
+model SystemAnnouncement {
+  id             String    @id @default(cuid())
+  title          String
+  message        String    @db.Text
+  type           String    @default("info")  // info, warning, critical, maintenance
+  targetAudience String    @default("all")   // all, admins, specific_plans
+  targetPlans    String[]  // If targetAudience is specific_plans
+  startsAt       DateTime
+  expiresAt      DateTime?
+  isActive       Boolean   @default(true)
+  isDismissible  Boolean   @default(true)
+  linkUrl        String?
+  linkText       String?
+  createdBy      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([isActive, startsAt, expiresAt])
+  @@map("system_announcements")
+}
+
+// ============================================================================
+// ADMIN SYSTEM - IP BLOCKLIST
+// ============================================================================
+
+model IpBlocklist {
+  id          String    @id @default(cuid())
+  ipAddress   String    // Can be single IP or CIDR range
+  reason      String?
+  blockedBy   String?   // Admin user ID
+  expiresAt   DateTime?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  @@unique([ipAddress])
+  @@index([isActive])
+  @@map("ip_blocklist")
 }
