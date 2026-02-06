@@ -239,7 +239,7 @@ export default function DashboardPage() {
  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
  <button
  onClick={() => router.push('/dashboard/devices/pair')}
- className="flex items-center gap-3 p-4 bg-gradient-to-br from-[#00E5A0]/5 to-[#00E5A0]/10 rounded-lg hover:from-blue-100 hover:to-blue-200 transition-all transform hover:scale-105"
+ className="flex items-center gap-3 p-4 bg-gradient-to-br from-[#00E5A0]/5 to-[#00E5A0]/10 rounded-lg hover:from-[#00E5A0]/10 hover:to-[#00B4D8]/10 transition-all transform hover:scale-105"
  >
  <Icon name="add" size="2xl" className="text-[#00E5A0]" />
  <div className="text-left">

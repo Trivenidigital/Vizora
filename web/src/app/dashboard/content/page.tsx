@@ -958,7 +958,7 @@ export default function ContentPage() {
  </td>
  <td className="px-6 py-4 whitespace-nowrap">
  <div className="flex items-center gap-3 cursor-pointer" onClick={() => handlePreview(item)}>
- <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-purple-500 rounded flex items-center justify-center flex-shrink-0 overflow-hidden">
+ <div className="w-12 h-12 bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] rounded flex items-center justify-center flex-shrink-0 overflow-hidden">
  {item.thumbnailUrl ? (
  <img src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
  ) : (
@@ -1033,7 +1033,7 @@ export default function ContentPage() {
  className="bg-[var(--surface)] rounded-lg shadow overflow-hidden hover:shadow-xl transition-all transform hover:-translate-y-1"
  >
  <div 
- className="h-48 bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center relative overflow-hidden cursor-pointer"
+ className="h-48 bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] flex items-center justify-center relative overflow-hidden cursor-pointer"
  onClick={() => handlePreview(item)}
  title="Click to preview"
  >

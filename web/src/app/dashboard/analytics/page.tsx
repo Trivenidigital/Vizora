@@ -36,10 +36,10 @@ const KPICard: React.FC<KPICardProps> = ({
  <Card.Body>
  <div className="flex items-start justify-between">
  <div className="flex-1">
- <p className="text-sm font-medium text-neutral-600 dark:text-neutral-400">
+ <p className="text-sm font-medium text-[var(--foreground-secondary)]">
  {label}
  </p>
- <p className="text-3xl font-bold text-neutral-900 dark:text-neutral-50 mt-2">
+ <p className="text-3xl font-bold text-[var(--foreground)] mt-2">
  {value}
  </p>
  {change && (
@@ -49,7 +49,7 @@ const KPICard: React.FC<KPICardProps> = ({
  ? 'text-success-600 dark:text-success-400'
  : changeType === 'negative'
  ? 'text-error-600 dark:text-error-400'
- : 'text-neutral-600 dark:text-neutral-400'
+ : 'text-[var(--foreground-secondary)]'
  }`}
  >
  {changeType === 'positive' && '↑ '}
@@ -62,7 +62,7 @@ const KPICard: React.FC<KPICardProps> = ({
  <Icon
  name={icon as any}
  size="lg"
- className="text-neutral-400 dark:text-neutral-600"
+ className="text-[var(--foreground-tertiary)]"
  />
  )}
  </div>
@@ -185,10 +185,10 @@ export default function AnalyticsPage() {
  {/* Header */}
  <div className="flex items-center justify-between">
  <div>
- <h2 className="text-3xl font-bold text-neutral-900 dark:text-neutral-50">
+ <h2 className="text-3xl font-bold text-[var(--foreground)]">
  Analytics
  </h2>
- <p className="mt-2 text-neutral-600 dark:text-neutral-400">
+ <p className="mt-2 text-[var(--foreground-secondary)]">
  Real-time performance metrics and insights
  {realtimeStatus === 'connected' && (
  <span className="ml-2 inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
@@ -207,7 +207,7 @@ export default function AnalyticsPage() {
  <button
  onClick={handleExportCSV}
  disabled={exporting}
- className="px-4 py-2 rounded-lg font-medium transition-colors bg-neutral-200 dark:bg-neutral-700 text-neutral-900 dark:text-neutral-50 hover:bg-neutral-300 dark:hover:bg-neutral-600 disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 rounded-lg font-medium transition-colors bg-[var(--background-tertiary)] text-[var(--foreground)] hover:bg-[var(--surface-hover)] disabled:opacity-50 flex items-center gap-2"
  >
  {exporting ? 'Exporting...' : 'Export CSV'}
  </button>
@@ -219,7 +219,7 @@ export default function AnalyticsPage() {
  className={`px-4 py-2 rounded-lg font-medium transition-colors capitalize ${
  dateRange === range
  ? 'bg-primary-600 dark:bg-primary-400 text-white'
- : 'bg-neutral-200 dark:bg-neutral-700 text-neutral-900 dark:text-neutral-50 hover:bg-neutral-300 dark:hover:bg-neutral-600'
+ : 'bg-[var(--background-tertiary)] text-[var(--foreground)] hover:bg-[var(--surface-hover)]'
  }`}
  >
  {range}
@@ -267,7 +267,7 @@ export default function AnalyticsPage() {
  <Card className="lg:col-span-2">
  <Card.Header>
  <div className="flex items-center justify-between">
- <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-50">
+ <h3 className="text-lg font-semibold text-[var(--foreground)]">
  Device Uptime Timeline
  </h3>
  <Badge variant="info" size="sm">
@@ -279,7 +279,7 @@ export default function AnalyticsPage() {
  {deviceMetrics.loading ? (
  <div className="h-80 flex items-center justify-center">
  <div className="animate-spin">
- <div className="w-8 h-8 border-4 border-neutral-200 dark:border-neutral-700 border-t-primary-600 dark:border-t-primary-400 rounded-full" />
+ <div className="w-8 h-8 border-4 border-[var(--border)] border-t-primary-600 dark:border-t-primary-400 rounded-full" />
  </div>
  </div>
  ) : (
@@ -301,7 +301,7 @@ export default function AnalyticsPage() {
  {/* Content Performance */}
  <Card>
  <Card.Header>
- <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-50">
+ <h3 className="text-lg font-semibold text-[var(--foreground)]">
  Content Performance
  </h3>
  </Card.Header>
@@ -309,7 +309,7 @@ export default function AnalyticsPage() {
  {contentPerformance.loading ? (
  <div className="h-80 flex items-center justify-center">
  <div className="animate-spin">
- <div className="w-8 h-8 border-4 border-neutral-200 dark:border-neutral-700 border-t-primary-600 dark:border-t-primary-400 rounded-full" />
+ <div className="w-8 h-8 border-4 border-[var(--border)] border-t-primary-600 dark:border-t-primary-400 rounded-full" />
  </div>
  </div>
  ) : (
@@ -327,7 +327,7 @@ export default function AnalyticsPage() {
  {/* Device Distribution */}
  <Card>
  <Card.Header>
- <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-50">
+ <h3 className="text-lg font-semibold text-[var(--foreground)]">
  Device Distribution
  </h3>
  </Card.Header>
@@ -335,7 +335,7 @@ export default function AnalyticsPage() {
  {deviceDistribution.loading ? (
  <div className="h-80 flex items-center justify-center">
  <div className="animate-spin">
- <div className="w-8 h-8 border-4 border-neutral-200 dark:border-neutral-700 border-t-primary-600 dark:border-t-primary-400 rounded-full" />
+ <div className="w-8 h-8 border-4 border-[var(--border)] border-t-primary-600 dark:border-t-primary-400 rounded-full" />
  </div>
  </div>
  ) : (
@@ -353,7 +353,7 @@ export default function AnalyticsPage() {
  {/* Usage Trends */}
  <Card className="lg:col-span-2">
  <Card.Header>
- <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-50">
+ <h3 className="text-lg font-semibold text-[var(--foreground)]">
  Usage Trends by Content Type
  </h3>
  </Card.Header>
@@ -361,7 +361,7 @@ export default function AnalyticsPage() {
  {usageTrends.loading ? (
  <div className="h-80 flex items-center justify-center">
  <div className="animate-spin">
- <div className="w-8 h-8 border-4 border-neutral-200 dark:border-neutral-700 border-t-primary-600 dark:border-t-primary-400 rounded-full" />
+ <div className="w-8 h-8 border-4 border-[var(--border)] border-t-primary-600 dark:border-t-primary-400 rounded-full" />
  </div>
  </div>
  ) : (
@@ -385,7 +385,7 @@ export default function AnalyticsPage() {
  {/* Bandwidth Usage */}
  <Card className="lg:col-span-2">
  <Card.Header>
- <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-50">
+ <h3 className="text-lg font-semibold text-[var(--foreground)]">
  Bandwidth Usage (24h)
  </h3>
  </Card.Header>
@@ -393,7 +393,7 @@ export default function AnalyticsPage() {
  {bandwidthUsage.loading ? (
  <div className="h-80 flex items-center justify-center">
  <div className="animate-spin">
- <div className="w-8 h-8 border-4 border-neutral-200 dark:border-neutral-700 border-t-primary-600 dark:border-t-primary-400 rounded-full" />
+ <div className="w-8 h-8 border-4 border-[var(--border)] border-t-primary-600 dark:border-t-primary-400 rounded-full" />
  </div>
  </div>
  ) : (
@@ -415,7 +415,7 @@ export default function AnalyticsPage() {
  {/* Playlist Performance */}
  <Card className="lg:col-span-2">
  <Card.Header>
- <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-50">
+ <h3 className="text-lg font-semibold text-[var(--foreground)]">
  Top Playlists by Engagement
  </h3>
  </Card.Header>
@@ -423,7 +423,7 @@ export default function AnalyticsPage() {
  {playlistPerformance.loading ? (
  <div className="h-80 flex items-center justify-center">
  <div className="animate-spin">
- <div className="w-8 h-8 border-4 border-neutral-200 dark:border-neutral-700 border-t-primary-600 dark:border-t-primary-400 rounded-full" />
+ <div className="w-8 h-8 border-4 border-[var(--border)] border-t-primary-600 dark:border-t-primary-400 rounded-full" />
  </div>
  </div>
  ) : (

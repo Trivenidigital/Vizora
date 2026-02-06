@@ -322,7 +322,7 @@ export function PlanForm({ plan, onSubmit, onCancel, isLoading = false }: PlanFo
                 type="checkbox"
                 checked={formData.isActive}
                 onChange={(e) => setFormData((p) => ({ ...p, isActive: e.target.checked }))}
-                className="w-4 h-4 rounded border-gray-300 text-[#00E5A0] focus:ring-[#00E5A0]"
+                className="w-4 h-4 rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]"
               />
               <span className="text-sm text-[var(--foreground-secondary)]">Active</span>
             </label>
@@ -331,7 +331,7 @@ export function PlanForm({ plan, onSubmit, onCancel, isLoading = false }: PlanFo
                 type="checkbox"
                 checked={formData.isPublic}
                 onChange={(e) => setFormData((p) => ({ ...p, isPublic: e.target.checked }))}
-                className="w-4 h-4 rounded border-gray-300 text-[#00E5A0] focus:ring-[#00E5A0]"
+                className="w-4 h-4 rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]"
               />
               <span className="text-sm text-[var(--foreground-secondary)]">Public</span>
             </label>

@@ -23,7 +23,7 @@ export default function Button({
 
   const variantClasses = {
     primary: 'bg-[#00E5A0] text-[#061A21] hover:bg-[#00CC8E] focus:ring-[#00E5A0]',
-    secondary: 'bg-[var(--background-tertiary)] text-[var(--foreground-secondary)] hover:bg-gray-300 focus:ring-gray-500',
+    secondary: 'bg-[var(--background-tertiary)] text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] focus:ring-[var(--border)]',
     danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
     success: 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500',
   };

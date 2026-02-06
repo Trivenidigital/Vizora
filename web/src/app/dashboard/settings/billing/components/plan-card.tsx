@@ -34,33 +34,33 @@ export function PlanCard({ plan, onSelect, isCurrentPlan, isLoading }: PlanCardP
 
   return (
     <div
-      className={`relative flex flex-col bg-white dark:bg-gray-900 rounded-xl border-2 transition-all ${
+      className={`relative flex flex-col bg-[var(--surface)] rounded-xl border-2 transition-all ${
         isCurrentPlan
-          ? 'border-blue-500 shadow-lg ring-2 ring-blue-200 dark:ring-blue-800'
-          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+          ? 'border-[#00E5A0] shadow-lg ring-2 ring-[#00E5A0]/30'
+          : 'border-[var(--border)] hover:border-[var(--border-dark)]'
       }`}
     >
       {isCurrentPlan && (
         <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-          <span className="bg-blue-600 text-white text-xs font-semibold px-3 py-1 rounded-full">
+          <span className="bg-[#00E5A0] text-[#061A21] text-xs font-semibold px-3 py-1 rounded-full">
             Current Plan
           </span>
         </div>
       )}
 
       <div className="p-6 flex-1">
-        <h3 className="text-xl font-bold text-gray-900 dark:text-gray-50">{plan.name}</h3>
+        <h3 className="text-xl font-bold text-[var(--foreground)]">{plan.name}</h3>
 
         <div className="mt-4">
           {isEnterprise ? (
-            <div className="text-2xl font-bold text-gray-900 dark:text-gray-50">Custom</div>
+            <div className="text-2xl font-bold text-[var(--foreground)]">Custom</div>
           ) : (
             <>
-              <span className="text-3xl font-bold text-gray-900 dark:text-gray-50">
+              <span className="text-3xl font-bold text-[var(--foreground)]">
                 {isFree ? 'Free' : formatPrice(plan.price, plan.currency)}
               </span>
               {!isFree && (
-                <span className="text-gray-500 dark:text-gray-400 text-sm">
+                <span className="text-[var(--foreground-tertiary)] text-sm">
                   /{plan.interval === 'yearly' ? 'year' : 'month'}
                 </span>
               )}
@@ -68,9 +68,9 @@ export function PlanCard({ plan, onSelect, isCurrentPlan, isLoading }: PlanCardP
           )}
         </div>
 
-        <div className="mt-4 pb-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-            <Icon name="devices" size="sm" className="text-gray-400" />
+        <div className="mt-4 pb-4 border-b border-[var(--border)]">
+          <div className="flex items-center gap-2 text-sm text-[var(--foreground-secondary)]">
+            <Icon name="devices" size="sm" className="text-[var(--foreground-tertiary)]" />
             <span>
               {isEnterprise
                 ? 'Unlimited screens'
@@ -81,7 +81,7 @@ export function PlanCard({ plan, onSelect, isCurrentPlan, isLoading }: PlanCardP
 
         <ul className="mt-4 space-y-3">
           {plan.features.map((feature, idx) => (
-            <li key={idx} className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400">
+            <li key={idx} className="flex items-start gap-2 text-sm text-[var(--foreground-secondary)]">
               <Icon name="check" size="sm" className="text-green-500 flex-shrink-0 mt-0.5" />
               <span>{feature}</span>
             </li>
@@ -93,14 +93,14 @@ export function PlanCard({ plan, onSelect, isCurrentPlan, isLoading }: PlanCardP
         {isEnterprise ? (
           <a
             href="mailto:sales@vizora.io?subject=Enterprise%20Plan%20Inquiry"
-            className="block w-full text-center py-3 px-4 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+            className="block w-full text-center py-3 px-4 bg-[var(--surface-hover)] text-[var(--foreground)] font-semibold rounded-lg hover:bg-[var(--border)] transition"
           >
             Contact Sales
           </a>
         ) : isCurrentPlan ? (
           <button
             disabled
-            className="w-full py-3 px-4 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 font-semibold rounded-lg cursor-not-allowed"
+            className="w-full py-3 px-4 bg-[var(--surface-hover)] text-[var(--foreground-tertiary)] font-semibold rounded-lg cursor-not-allowed"
           >
             Current Plan
           </button>
@@ -108,7 +108,7 @@ export function PlanCard({ plan, onSelect, isCurrentPlan, isLoading }: PlanCardP
           <button
             onClick={onSelect}
             disabled={isLoading}
-            className="w-full py-3 px-4 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full py-3 px-4 bg-[#00E5A0] text-[#061A21] font-semibold rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {isLoading ? (
               <>

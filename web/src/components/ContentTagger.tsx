@@ -18,7 +18,7 @@ interface ContentTaggerProps {
 }
 
 const TAG_COLORS = [
-  { name: 'blue', bg: 'bg-blue-100 dark:bg-blue-900', text: 'text-blue-800 dark:text-blue-200', border: 'border-blue-300 dark:border-blue-700' },
+  { name: 'blue', bg: 'bg-[#00B4D8]/10', text: 'text-[#00B4D8]', border: 'border-[#00B4D8]/30' },
   { name: 'red', bg: 'bg-red-100 dark:bg-red-900', text: 'text-red-800 dark:text-red-200', border: 'border-red-300 dark:border-red-700' },
   { name: 'green', bg: 'bg-green-100 dark:bg-green-900', text: 'text-green-800 dark:text-green-200', border: 'border-green-300 dark:border-green-700' },
   { name: 'purple', bg: 'bg-purple-100 dark:bg-purple-900', text: 'text-purple-800 dark:text-purple-200', border: 'border-purple-300 dark:border-purple-700' },
@@ -136,7 +136,7 @@ export default function ContentTagger({
                     setNewTagName('');
                     setSelectedColor(TAG_COLORS[0].name);
                   }}
-                  className="flex-1 px-3 py-1.5 text-sm bg-[var(--background-tertiary)] text-[var(--foreground)] rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition"
+                  className="flex-1 px-3 py-1.5 text-sm bg-[var(--background-tertiary)] text-[var(--foreground)] rounded hover:bg-[var(--surface-hover)] transition"
                 >
                   Cancel
                 </button>
