@@ -523,8 +523,11 @@ class VizoraAndroidTV {
     contentDiv.className = 'content-item';
 
     // Transform URL for Android emulator (localhost -> 10.0.2.2)
-    const contentUrl = transformContentUrl(currentItem.content.url, this.config.apiUrl);
+    // Only transform actual URLs, not raw HTML content used by html/template types
     const contentType = currentItem.content.type;
+    const contentUrl = (contentType === 'html' || contentType === 'template')
+      ? currentItem.content.url
+      : transformContentUrl(currentItem.content.url, this.config.apiUrl);
 
     switch (contentType) {
       case 'image':
@@ -703,8 +706,11 @@ class VizoraAndroidTV {
     contentDiv.className = 'content-item';
 
     // Transform URL for Android emulator
-    const contentUrl = transformContentUrl(content.url, this.config.apiUrl);
+    // Only transform actual URLs, not raw HTML content used by html/template types
     const contentType = content.type;
+    const contentUrl = (contentType === 'html' || contentType === 'template')
+      ? content.url
+      : transformContentUrl(content.url, this.config.apiUrl);
 
     console.log(`[Vizora] Rendering temporary content: ${contentType} - ${contentUrl}`);
 

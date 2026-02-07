@@ -75,11 +75,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     applyTheme(newIsDark);
   };
 
-  // Don't render until client-side hydration is complete
-  if (!isMounted) {
-    return <>{children}</>;
-  }
-
   return (
     <ThemeContext.Provider value={{ mode, isDark, setMode }}>
       {children}

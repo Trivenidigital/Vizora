@@ -51,7 +51,7 @@ async function bootstrap() {
     await app.listen(port, '0.0.0.0');
     Logger.log(`🚀 Realtime Gateway running on: http://localhost:${port}/${globalPrefix}`);
     Logger.log(`🔌 WebSocket server ready on: ws://localhost:${port}`);
-    Logger.log(`📊 Metrics available at: http://localhost:${port}/metrics`);
+    Logger.log(`📊 Metrics available at: http://localhost:${port}/internal/metrics`);
     Logger.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     Logger.log(`⚠️  Port ${port} is RESERVED for Realtime - will not start if occupied`);
   } catch (error) {

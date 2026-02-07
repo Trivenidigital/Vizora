@@ -449,7 +449,7 @@ export class DisplaysService {
     const requestId = crypto.randomUUID();
 
     // Send command to realtime service
-    const url = `${this.realtimeUrl}/internal/command`;
+    const url = `${this.realtimeUrl}/api/internal/command`;
 
     try {
       await this.circuitBreaker.executeWithFallback(

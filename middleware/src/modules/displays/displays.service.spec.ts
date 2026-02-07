@@ -527,13 +527,14 @@ describe('DisplaysService', () => {
 
       await service.saveScreenshot(
         mockDisplayId,
+        mockOrganizationId,
         'https://example.com/screenshot.png',
         1920,
         1080,
       );
 
       expect(databaseService.display.update).toHaveBeenCalledWith({
-        where: { id: mockDisplayId },
+        where: { id: mockDisplayId, organizationId: mockOrganizationId },
         data: {
           lastScreenshot: JSON.stringify({
             url: 'https://example.com/screenshot.png',
@@ -550,11 +551,12 @@ describe('DisplaysService', () => {
 
       await service.saveScreenshot(
         mockDisplayId,
+        mockOrganizationId,
         'https://example.com/screenshot.png',
       );
 
       expect(databaseService.display.update).toHaveBeenCalledWith({
-        where: { id: mockDisplayId },
+        where: { id: mockDisplayId, organizationId: mockOrganizationId },
         data: {
           lastScreenshot: JSON.stringify({
             url: 'https://example.com/screenshot.png',

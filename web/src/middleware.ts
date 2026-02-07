@@ -4,11 +4,21 @@ import type { NextRequest } from 'next/server';
 // Pages that don't require authentication
 const publicPaths = ['/login', '/register', '/'];
 
+function base64UrlDecode(str: string): string {
+  // Convert Base64url to standard Base64
+  let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+  // Add padding if needed
+  while (base64.length % 4) {
+    base64 += '=';
+  }
+  return atob(base64);
+}
+
 function isValidJwtFormat(token: string): boolean {
   const parts = token.split('.');
   if (parts.length !== 3) return false;
   try {
-    JSON.parse(atob(parts[1]));
+    JSON.parse(base64UrlDecode(parts[1]));
     return true;
   } catch {
     return false;

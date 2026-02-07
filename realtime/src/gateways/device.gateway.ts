@@ -720,9 +720,9 @@ export class DeviceGateway
       // Generate presigned URL (valid for 7 days)
       const presignedUrl = await this.storageService.getPresignedUrl(objectKey, 7 * 24 * 3600);
 
-      // Update display record in database
+      // Update display record in database (with org check for security)
       await this.databaseService.display.update({
-        where: { id: deviceId },
+        where: { id: deviceId, organizationId },
         data: {
           lastScreenshot: JSON.stringify({
             url: presignedUrl,
