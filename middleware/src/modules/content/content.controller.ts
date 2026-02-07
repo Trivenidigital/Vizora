@@ -260,20 +260,26 @@ export class ContentController {
 
     let thumbnailUrl: string;
 
-    // For MinIO-stored content, resolve the URL first
+    // For MinIO-stored content, fetch the object directly via StorageService
+    // to avoid SSRF validation blocking internal MinIO URLs
     if (content.url.startsWith(MINIO_URL_PREFIX)) {
       const objectKey = content.url.substring(MINIO_URL_PREFIX.length);
       if (!this.storageService.isMinioAvailable()) {
         throw new BadRequestException('Storage service is currently unavailable');
       }
-      // Get a presigned URL to fetch the image from MinIO
-      const presignedUrl = await this.storageService.getPresignedUrl(objectKey, 300);
-      thumbnailUrl = await this.thumbnailService.generateThumbnailFromUrl(
+      const stream = await this.storageService.getObject(objectKey);
+      const chunks: Buffer[] = [];
+      for await (const chunk of stream) {
+        chunks.push(Buffer.from(chunk));
+      }
+      const buffer = Buffer.concat(chunks);
+      thumbnailUrl = await this.thumbnailService.generateThumbnail(
         content.id,
-        presignedUrl,
+        buffer,
+        content.mimeType || 'image/jpeg',
       );
     } else {
-      // For local/external URLs, fetch directly
+      // For external URLs, fetch via URL (with SSRF protection)
       thumbnailUrl = await this.thumbnailService.generateThumbnailFromUrl(
         content.id,
         content.url,
