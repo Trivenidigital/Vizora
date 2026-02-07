@@ -1,12 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { apiClient } from '@/lib/api';
 
 export default function RegisterContent() {
-  const router = useRouter();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -33,7 +31,11 @@ export default function RegisterContent() {
       );
       // After registration, login to get token
       await apiClient.login(formData.email, formData.password);
-      router.push('/dashboard');
+      // Use window.location for a full page navigation to ensure the
+      // httpOnly auth cookie is available when Next.js middleware checks it.
+      // router.push() causes a race condition where middleware runs before
+      // the browser has processed the Set-Cookie header.
+      window.location.href = '/dashboard';
     } catch (err: any) {
       setError(err.message || 'Registration failed');
     } finally {

@@ -17,6 +17,9 @@ export interface PlanTier {
 /**
  * Base plan configurations without provider-specific IDs
  * Provider IDs are resolved at runtime via getPriceId()
+ *
+ * TODO: When changing prices here, create corresponding price objects in
+ * Stripe/Razorpay dashboards and plan migration for existing subscribers.
  */
 export const PLAN_TIERS: Record<string, PlanTier> = {
   free: {
@@ -27,27 +30,34 @@ export const PLAN_TIERS: Record<string, PlanTier> = {
       usd: { monthly: 0, yearly: 0 },
       inr: { monthly: 0, yearly: 0 },
     },
-    features: ['Basic scheduling', 'Content upload', 'Up to 5 screens'],
+    features: [
+      'Up to 5 screens',
+      '30-day free trial',
+      'Basic scheduling',
+      'Content upload',
+      '1 GB storage',
+    ],
   },
   basic: {
     id: 'basic',
     name: 'Basic',
-    screenQuota: 25,
+    screenQuota: 50,
     prices: {
       usd: {
-        monthly: 2900,
-        yearly: 29000,
+        monthly: 600, // $6/screen, stored as cents
+        yearly: 6000, // $60/screen/year (save ~17%)
       },
       inr: {
-        monthly: 199900,
-        yearly: 1999000,
+        monthly: 50000, // ₹500/screen
+        yearly: 500000,
       },
     },
     features: [
-      'Everything in Free',
+      'Up to 50 screens',
+      '$6 per screen/month',
       'Analytics dashboard',
       'Email support',
-      'Up to 25 screens',
+      '25 GB storage',
     ],
   },
   pro: {
@@ -56,19 +66,20 @@ export const PLAN_TIERS: Record<string, PlanTier> = {
     screenQuota: 100,
     prices: {
       usd: {
-        monthly: 9900,
-        yearly: 99000,
+        monthly: 800, // $8/screen, stored as cents
+        yearly: 8000, // $80/screen/year (save ~17%)
       },
       inr: {
-        monthly: 699900,
-        yearly: 6999000,
+        monthly: 65000, // ₹650/screen
+        yearly: 650000,
       },
     },
     features: [
-      'Everything in Basic',
+      'Up to 100 screens',
+      '$8 per screen/month',
       'API access',
       'Priority support',
-      'Up to 100 screens',
+      '100 GB storage',
     ],
   },
   enterprise: {

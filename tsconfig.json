@@ -4,13 +4,7 @@
   "files": [],
   "references": [
     {
-      "path": "./middleware-e2e"
-    },
-    {
       "path": "./middleware"
-    },
-    {
-      "path": "./realtime-e2e"
     },
     {
       "path": "./realtime"

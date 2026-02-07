@@ -109,6 +109,16 @@ export class ContentService {
     return new PaginatedResponse(mappedData, total, page, limit);
   }
 
+  /**
+   * Find content by ID without org filter (for device content serving)
+   */
+  async findById(id: string) {
+    const content = await this.db.content.findFirst({
+      where: { id },
+    });
+    return content;
+  }
+
   async findOne(organizationId: string, id: string) {
     const content = await this.db.content.findFirst({
       where: { id, organizationId },
