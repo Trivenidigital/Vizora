@@ -18,14 +18,14 @@ import { LoggingInterceptor } from './modules/common/interceptors/logging.interc
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // Serve static files (thumbnails) — __dirname-relative for reliability
-  // across PM2/systemd deployments with different working directories
-  app.useStaticAssets(join(__dirname, '..', 'static'), {
+  // Serve static files (thumbnails) — process.cwd() ensures consistency
+  // with ThumbnailService which writes to the same base directory
+  app.useStaticAssets(join(process.cwd(), 'static'), {
     prefix: '/static/',
   });
 
   // Serve uploaded content files
-  app.useStaticAssets(join(__dirname, '..', 'uploads'), {
+  app.useStaticAssets(join(process.cwd(), 'uploads'), {
     prefix: '/uploads/',
   });
 

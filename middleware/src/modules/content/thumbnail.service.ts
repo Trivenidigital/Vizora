@@ -7,7 +7,7 @@ import { lookup } from 'dns/promises';
 @Injectable()
 export class ThumbnailService {
   private readonly logger = new Logger(ThumbnailService.name);
-  private readonly THUMBNAIL_DIR = join(__dirname, '..', '..', '..', 'static', 'thumbnails');
+  private readonly THUMBNAIL_DIR = join(process.cwd(), 'static', 'thumbnails');
   private readonly MAX_SIZE = 300; // 300x300 max
   private readonly MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB limit
 
