@@ -41,7 +41,9 @@ export const envSchema = z.object({
     message: 'JWT_SECRET must be at least 32 characters for security' 
   }),
   JWT_EXPIRES_IN: z.string().default('7d'),
-  DEVICE_JWT_SECRET: z.string().min(32).optional(),
+  DEVICE_JWT_SECRET: z.string().min(32, {
+    message: 'DEVICE_JWT_SECRET must be at least 32 characters for security',
+  }),
   
   // Logging
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),

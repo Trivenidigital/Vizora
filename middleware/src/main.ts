@@ -16,6 +16,17 @@ import { SanitizeInterceptor } from './modules/common/interceptors/sanitize.inte
 import { LoggingInterceptor } from './modules/common/interceptors/logging.interceptor';
 
 async function bootstrap() {
+  // Validate required production environment variables
+  if (process.env.NODE_ENV === 'production') {
+    const required = ['API_BASE_URL', 'CORS_ORIGIN', 'DATABASE_URL', 'JWT_SECRET', 'DEVICE_JWT_SECRET'];
+    const missing = required.filter(key => !process.env[key]);
+    if (missing.length > 0) {
+      Logger.error(`❌ Missing required production env vars: ${missing.join(', ')}`);
+      Logger.error('Set these in your .env or deployment config before starting in production.');
+      process.exit(1);
+    }
+  }
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   // Serve static files (thumbnails) — process.cwd() ensures consistency

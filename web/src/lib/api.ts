@@ -8,8 +8,8 @@ import type { Display, DisplayOrientation, Content, Playlist, PlaylistItem, Sche
 // when explicitly configured (e.g., in production with a separate API domain).
 const API_BASE_URL =
   typeof window !== 'undefined'
-    ? '/api'
-    : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api');
+    ? '/api'  // Client-side: proxy through Next.js rewrite (same-origin cookies)
+    : (process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3000/api'));
 
 // Type definitions for API responses
 interface AuthUser {
