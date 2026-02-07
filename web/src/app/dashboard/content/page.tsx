@@ -392,8 +392,11 @@ export default function ContentPage() {
  return true;
  },
  () => {
- // Commit optimistic update
+ // Commit optimistic update and sync rendered state
  commitOptimistic(updateId);
+ setContent(prev => prev.map(item =>
+  item.id === selectedContent.id ? { ...item, title: uploadForm.title } : item
+ ));
  toast.success('Content updated successfully');
  setIsEditModalOpen(false);
  },
@@ -437,8 +440,9 @@ export default function ContentPage() {
  return true;
  },
  () => {
- // Commit optimistic deletion
+ // Commit optimistic deletion and update rendered state
  commitOptimistic(deleteId);
+ setContent(prev => prev.filter(item => item.id !== deletedContentId));
  toast.success('Content deleted successfully');
  setIsDeleteModalOpen(false);
  setSelectedContent(null);
