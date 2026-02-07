@@ -237,7 +237,8 @@ export default function ContentPage() {
  }
 
  setActionLoading(true);
- 
+ const results: Array<'success' | 'error'> = [];
+
  // Upload files sequentially
  for (let i = 0; i < uploadQueue.length; i++) {
  const item = uploadQueue[i];
@@ -267,21 +268,23 @@ export default function ContentPage() {
  }
 
  // Mark as success
- setUploadQueue(prev => prev.map((q, idx) => 
+ setUploadQueue(prev => prev.map((q, idx) =>
  idx === i ? { ...q, status: 'success' as const, progress: 100 } : q
  ));
+ results.push('success');
  } catch (error: any) {
  // Mark as error
- setUploadQueue(prev => prev.map((q, idx) => 
+ setUploadQueue(prev => prev.map((q, idx) =>
  idx === i ? { ...q, status: 'error' as const, error: error.message } : q
  ));
+ results.push('error');
  }
  }
 
  setActionLoading(false);
  
- const successCount = uploadQueue.filter(q => q.status === 'success').length;
- const errorCount = uploadQueue.filter(q => q.status === 'error').length;
+ const successCount = results.filter(r => r === 'success').length;
+ const errorCount = results.filter(r => r === 'error').length;
  
  if (errorCount === 0) {
  toast.success(`${successCount} file(s) uploaded successfully`);
@@ -600,6 +603,9 @@ export default function ContentPage() {
  // For backward compatibility, set first file to uploadForm
  if (acceptedFiles.length > 0 && !uploadForm.file) {
  const file = acceptedFiles[0];
+ if (uploadForm.url && uploadForm.url.startsWith('blob:')) {
+ URL.revokeObjectURL(uploadForm.url);
+ }
  setUploadForm(prev => ({
  ...prev,
  file,
@@ -1561,90 +1567,6 @@ export default function ContentPage() {
  </div>
  </Modal>
 
- {/* Preview Modal */}
- <Modal
- isOpen={isPreviewModalOpen}
- onClose={() => setIsPreviewModalOpen(false)}
- title={selectedContent?.title || 'Preview'}
- size="lg"
- >
- <div className="space-y-4">
- {selectedContent && (
- <>
- {selectedContent.type === 'image' && (
- <div className="flex justify-center bg-[var(--background-secondary)] rounded-lg p-4">
- <img
- src={selectedContent.url}
- alt={selectedContent.title}
- className="max-w-full max-h-[70vh] object-contain rounded"
- />
- </div>
- )}
- 
- {selectedContent.type === 'video' && (
- <div className="bg-black rounded-lg overflow-hidden">
- <video
- src={selectedContent.url}
- controls
- className="w-full max-h-[70vh]"
- autoPlay
- >
- Your browser does not support video playback.
- </video>
- </div>
- )}
- 
- {selectedContent.type === 'pdf' && (
- <div className="bg-[var(--background-secondary)] rounded-lg overflow-hidden" style={{ height: '70vh' }}>
- <iframe
- src={selectedContent.url}
- className="w-full h-full"
- title={selectedContent.title}
- />
- </div>
- )}
- 
- {selectedContent.type === 'url' && (
- <div className="space-y-4">
- <div className="bg-[#00E5A0]/5 border border-[#00E5A0]/30 rounded-lg p-4">
- <p className="text-sm text-[#00E5A0] mb-2">
- <strong>URL Content:</strong>
- </p>
- <a
- href={selectedContent.url}
- target="_blank"
- rel="noopener noreferrer"
- className="text-[#00E5A0] hover:text-[#00E5A0] underline break-all"
- >
- {selectedContent.url}
- </a>
- </div>
- <div className="bg-[var(--background-secondary)] rounded-lg overflow-hidden" style={{ height: '60vh' }}>
- <iframe
- src={selectedContent.url}
- className="w-full h-full"
- title={selectedContent.title}
- sandbox="allow-same-origin allow-scripts"
- />
- </div>
- </div>
- )}
- 
- <div className="text-sm text-[var(--foreground-secondary)] space-y-1">
- <p><strong>Type:</strong> {selectedContent.type.toUpperCase()}</p>
- {selectedContent.duration && (
- <p><strong>Duration:</strong> {selectedContent.duration}s</p>
- )}
- {selectedContent.createdAt && (
- <p><strong>Uploaded:</strong> {new Date(selectedContent.createdAt).toLocaleDateString()}</p>
- )}
- </div>
- </>
- )}
- </div>
- </Modal>
-
- {/* Preview Modal */}
  <PreviewModal
  isOpen={isPreviewModalOpen}
  onClose={() => setIsPreviewModalOpen(false)}

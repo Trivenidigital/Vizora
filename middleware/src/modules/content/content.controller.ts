@@ -60,14 +60,14 @@ export class ContentController {
   ) {
     // Validate URL if provided
     if (createContentDto.url) {
-      this.fileValidationService.validateUrl(createContentDto.url);
+      await this.fileValidationService.validateUrl(createContentDto.url);
     }
     return this.contentService.create(organizationId, createContentDto);
   }
 
   @Post('upload')
   @Roles('admin', 'manager')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 100 * 1024 * 1024 } }))
   async uploadFile(
     @CurrentUser('organizationId') organizationId: string,
     @UploadedFile() file: Express.Multer.File,
@@ -318,7 +318,7 @@ export class ContentController {
   @Post(':id/replace')
   @Roles('admin', 'manager')
   @HttpCode(HttpStatus.OK)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 100 * 1024 * 1024 } }))
   async replaceFile(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
@@ -426,15 +426,22 @@ export class ContentController {
 
   @Patch(':id/expiration')
   @Roles('admin', 'manager')
-  setExpiration(
+  async setExpiration(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
     @Body() body: { expiresAt: string; replacementContentId?: string },
   ) {
+    const expiresAtDate = new Date(body.expiresAt);
+    if (isNaN(expiresAtDate.getTime())) {
+      throw new BadRequestException('Invalid expiresAt date');
+    }
+    if (expiresAtDate <= new Date()) {
+      throw new BadRequestException('expiresAt must be in the future');
+    }
     return this.contentService.setExpiration(
       organizationId,
       id,
-      new Date(body.expiresAt),
+      expiresAtDate,
       body.replacementContentId,
     );
   }

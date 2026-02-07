@@ -26,11 +26,16 @@ const DEFAULT_CONFIG = {
 };
 
 // Transform URLs from localhost to emulator-accessible addresses (needed for Android emulator)
+// When apiUrl points to localhost/127.0.0.1, rewrite to 10.0.2.2 for emulator access.
+// When apiUrl is a real hostname, rewrite localhost references to use that hostname instead.
 function transformContentUrl(url: string, apiUrl: string): string {
   if (!url) return url;
-  // Replace localhost with 10.0.2.2 for Android emulator access
-  // Handles API (port 3000), MinIO (port 9000), and other localhost services
-  return url.replace(/http:\/\/localhost/g, 'http://10.0.2.2');
+  if (apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1')) {
+    return url.replace(/http:\/\/localhost/g, 'http://10.0.2.2')
+              .replace(/http:\/\/127\.0\.0\.1/g, 'http://10.0.2.2');
+  }
+  return url.replace(/http:\/\/localhost:\d+/g, apiUrl)
+            .replace(/http:\/\/127\.0\.0\.1:\d+/g, apiUrl);
 }
 
 interface Config {
@@ -564,13 +569,14 @@ class VizoraAndroidTV {
 
       case 'html':
       case 'template':
-        // Render pre-rendered HTML content from backend
-        const htmlContainer = document.createElement('div');
-        htmlContainer.className = 'html-content';
-        // For templates, contentUrl contains the pre-rendered HTML
-        // For html type, contentUrl is the raw HTML content
-        htmlContainer.innerHTML = contentUrl;
-        contentDiv.appendChild(htmlContainer);
+        // Use sandboxed iframe to safely render HTML content
+        const htmlIframe = document.createElement('iframe');
+        htmlIframe.sandbox.add('allow-scripts');
+        htmlIframe.srcdoc = contentUrl;
+        htmlIframe.style.width = '100%';
+        htmlIframe.style.height = '100%';
+        htmlIframe.style.border = 'none';
+        contentDiv.appendChild(htmlIframe);
         break;
 
       default:
@@ -743,11 +749,14 @@ class VizoraAndroidTV {
 
       case 'html':
       case 'template':
-        // Render pre-rendered HTML content
-        const htmlContainer = document.createElement('div');
-        htmlContainer.className = 'html-content';
-        htmlContainer.innerHTML = contentUrl;
-        contentDiv.appendChild(htmlContainer);
+        // Use sandboxed iframe to safely render HTML content
+        const tempHtmlIframe = document.createElement('iframe');
+        tempHtmlIframe.sandbox.add('allow-scripts');
+        tempHtmlIframe.srcdoc = contentUrl;
+        tempHtmlIframe.style.width = '100%';
+        tempHtmlIframe.style.height = '100%';
+        tempHtmlIframe.style.border = 'none';
+        contentDiv.appendChild(tempHtmlIframe);
         break;
 
       default:

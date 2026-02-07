@@ -144,7 +144,9 @@ export class ThumbnailService {
       }
 
       const ext = this.getExtensionFromMime(mimeType);
-      const filename = `${contentId}.${ext}`;
+      const safeId = contentId.replace(/[^a-zA-Z0-9_-]/g, '');
+      if (!safeId) throw new Error('Invalid content ID');
+      const filename = `${safeId}.${ext}`;
       const filepath = join(this.THUMBNAIL_DIR, filename);
 
       // Generate thumbnail using sharp
@@ -186,6 +188,10 @@ export class ThumbnailService {
     try {
       // Fetch image from URL
       const response = await fetch(imageUrl);
+      const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
+      if (contentLength > this.MAX_FILE_SIZE) {
+        throw new Error('Image too large for thumbnail generation');
+      }
       const arrayBuffer = await response.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 

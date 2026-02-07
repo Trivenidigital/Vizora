@@ -44,7 +44,7 @@ export class DeviceClient {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Content-Length': payload.length,
+            'Content-Length': Buffer.byteLength(payload),
           },
         };
 
@@ -212,8 +212,14 @@ export class DeviceClient {
       this.stopHeartbeat();
     });
 
-    this.socket.on('error', (error) => {
-      console.error('[DeviceClient] Realtime gateway error:', error);
+    this.socket.on('connect_error', (error) => {
+      console.error('[DeviceClient] Connection error:', error.message);
+      if (error.message.includes('unauthorized') || error.message.includes('invalid token')) {
+        console.log('[DeviceClient] Token rejected, clearing and re-entering pairing');
+        this.store?.delete('deviceToken');
+        this.socket?.disconnect();
+        this.config.onPairingRequired();
+      }
     });
 
     this.socket.on('config', (config) => {
@@ -232,7 +238,7 @@ export class DeviceClient {
     });
 
     this.socket.on('error', (error) => {
-      console.error('Socket error:', error);
+      console.error('[DeviceClient] Socket error:', error);
       this.config.onError(error);
     });
   }
@@ -429,7 +435,7 @@ export class DeviceClient {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Content-Length': payload.length,
+            'Content-Length': Buffer.byteLength(payload),
           },
         };
 

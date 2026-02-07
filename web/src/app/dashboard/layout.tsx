@@ -8,6 +8,7 @@ import Breadcrumbs from '@/components/Breadcrumbs';
 import ThemeToggle from '@/components/ThemeToggle';
 import NotificationBell from '@/components/NotificationBell';
 import { DeviceStatusProvider } from '@/lib/context/DeviceStatusContext';
+import LoadingSpinner from '@/components/LoadingSpinner';
 import { Icon } from '@/theme/icons';
 import type { IconName } from '@/theme/icons';
 
@@ -194,11 +195,8 @@ export default function DashboardLayout({
                 <span className="font-semibold">1.0.0</span>
               </div>
               <div className="flex justify-between">
-                <span>Status</span>
-                <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                  <span className="font-semibold text-green-500">Online</span>
-                </span>
+                <span>Platform</span>
+                <span className="font-semibold">Vizora</span>
               </div>
             </div>
           </div>
@@ -213,14 +211,20 @@ export default function DashboardLayout({
         )}
 
         {/* Main content */}
-        <DeviceStatusProvider user={user}>
-          <main className="flex-1 p-4 sm:p-6 lg:p-8 min-h-[calc(100vh-4rem)] overflow-x-hidden">
-            <div className="max-w-7xl mx-auto">
-              <Breadcrumbs />
-              {children}
-            </div>
-          </main>
-        </DeviceStatusProvider>
+        {authLoading ? (
+          <div className="flex-1 flex items-center justify-center">
+            <LoadingSpinner size="lg" />
+          </div>
+        ) : (
+          <DeviceStatusProvider user={user}>
+            <main id="main-content" className="flex-1 p-4 sm:p-6 lg:p-8 min-h-[calc(100vh-4rem)] overflow-x-hidden">
+              <div className="max-w-7xl mx-auto">
+                <Breadcrumbs />
+                {children}
+              </div>
+            </main>
+          </DeviceStatusProvider>
+        )}
       </div>
     </div>
   );

@@ -531,11 +531,11 @@ export class DisplaysService {
    */
   async saveScreenshot(
     displayId: string,
+    organizationId: string,
     screenshotUrl: string,
     width?: number,
     height?: number,
   ): Promise<void> {
-    // Store as JSON to include dimensions
     const metadata = JSON.stringify({
       url: screenshotUrl,
       ...(width && { width }),
@@ -543,7 +543,7 @@ export class DisplaysService {
     });
 
     await this.db.display.update({
-      where: { id: displayId },
+      where: { id: displayId, organizationId },
       data: {
         lastScreenshot: metadata,
         lastScreenshotAt: new Date(),

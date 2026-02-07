@@ -37,10 +37,10 @@ export default function PreviewModal({ isOpen, onClose, content }: PreviewModalP
       
       case 'pdf':
         return (
-          <iframe 
+          <iframe
             src={content.url}
             className="w-full h-[80vh]"
-            sandbox="allow-scripts allow-same-origin"
+            sandbox="allow-scripts allow-popups"
             title={`PDF: ${content.title}`}
           />
         );

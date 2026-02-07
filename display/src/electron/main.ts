@@ -37,6 +37,8 @@ function createWindow() {
   });
 
   // Set Content Security Policy to allow loading images from the middleware server
+  const cspApiUrl = process.env.API_URL || 'http://localhost:3000';
+  const cspWsUrl = process.env.WS_URL || 'ws://localhost:3002';
   mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
@@ -45,9 +47,9 @@ function createWindow() {
           "default-src 'self'; " +
           "script-src 'self' 'unsafe-inline'; " +
           "style-src 'self' 'unsafe-inline'; " +
-          "img-src 'self' data: http://localhost:3000 http://127.0.0.1:3000; " +
-          "connect-src 'self' http://localhost:3000 http://127.0.0.1:3000 ws://localhost:3002 ws://127.0.0.1:3002; " +
-          "media-src 'self' http://localhost:3000 http://127.0.0.1:3000; " +
+          `img-src 'self' data: ${cspApiUrl}; ` +
+          `connect-src 'self' ${cspApiUrl} ${cspWsUrl}; ` +
+          `media-src 'self' ${cspApiUrl}; ` +
           "frame-src 'self' http: https:;"
         ]
       }
@@ -72,8 +74,10 @@ function createWindow() {
     });
   }
   
-  // Always open dev tools for debugging
-  mainWindow.webContents.openDevTools();
+  // Open dev tools only in non-production environments
+  if (process.env.NODE_ENV !== 'production') {
+    mainWindow.webContents.openDevTools();
+  }
 
   // Capture console messages from renderer process
   mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {

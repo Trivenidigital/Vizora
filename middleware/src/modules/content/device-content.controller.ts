@@ -42,15 +42,19 @@ export class DeviceContentController {
   ) {}
 
   /**
-   * Verify a device JWT token from the Authorization header.
+   * Verify a device JWT token from the Authorization header or query parameter.
+   * Query parameter is needed because img.src and video.src cannot send headers.
    */
   private verifyDeviceToken(req: Request): DeviceJwtPayload {
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const queryToken = (req.query as any)?.token;
+    const token = authHeader?.startsWith('Bearer ')
+      ? authHeader.substring(7)
+      : queryToken;
+    if (!token) {
       throw new UnauthorizedException('Device authentication required');
     }
 
-    const token = authHeader.substring(7);
     try {
       const payload = this.jwtService.verify<DeviceJwtPayload>(token, {
         secret: process.env.DEVICE_JWT_SECRET,

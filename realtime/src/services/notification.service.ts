@@ -204,27 +204,17 @@ export class NotificationService implements OnModuleInit, OnModuleDestroy {
    * Helper to scan Redis keys matching a pattern
    */
   private async scanKeys(pattern: string): Promise<string[]> {
-    // This is a simplified implementation
-    // The RedisService should ideally provide a scan method
-    // For now, we'll use the keys we can access
     const keys: string[] = [];
-
-    // Try to get all potentially pending device IDs
-    // In a real implementation, you'd want to use Redis SCAN
-    // For now, we check the known device IDs from Redis status
+    let cursor = '0';
     try {
-      // Use a basic approach: we store pending keys and check them
-      // This is sufficient for moderate scale
-      const existsCheck = await this.redisService.exists(`${this.REDIS_KEY_PREFIX}__pending_list`);
-      if (!existsCheck) {
-        // No pending list, scan manually (less efficient but works)
-        // In production, you'd implement proper SCAN in RedisService
-        return keys;
-      }
-    } catch {
-      // Fallback: return empty array
+      do {
+        const result = await this.redisService.getRedis().scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+        cursor = result[0];
+        keys.push(...result[1]);
+      } while (cursor !== '0');
+    } catch (error) {
+      this.logger.warn(`Failed to scan Redis keys: ${(error as Error).message}`);
     }
-
     return keys;
   }
 

@@ -22,7 +22,7 @@ import { MetricsInterceptor } from '../interceptors/metrics.interceptor';
       isGlobal: true,
     }),
     JwtModule.register({
-      secret: process.env.DEVICE_JWT_SECRET || 'device-jwt-secret-changeme',
+      secret: process.env.DEVICE_JWT_SECRET,
       signOptions: { expiresIn: '365d' },
     }),
     ScheduleModule.forRoot(),
