@@ -64,7 +64,7 @@ import { MetricsService } from './metrics.service';
     makeCounterProvider({
       name: 'content_impressions_total',
       help: 'Total content impressions',
-      labelNames: ['content_id'],
+      labelNames: [],
     }),
     makeCounterProvider({
       name: 'content_errors_total',

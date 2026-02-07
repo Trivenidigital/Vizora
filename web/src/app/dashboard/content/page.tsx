@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { apiClient } from '@/lib/api';
 import { Content, Display, Playlist, ContentFolder } from '@/lib/types';
@@ -79,15 +79,17 @@ export default function ContentPage() {
  const [targetFolderId, setTargetFolderId] = useState<string | null>(null);
 
  // Real-time event handling
- // eslint-disable-next-line @typescript-eslint/no-unused-vars
- const { isConnected: _isConnected, isOffline: _isOffline } = useRealtimeEvents({
- enabled: true,
- onConnectionChange: (connected) => {
+ const handleConnectionChange = useCallback((connected: boolean) => {
  setRealtimeStatus(connected ? 'connected' : 'offline');
  if (connected) {
  toast.info('Real-time sync enabled');
  }
- },
+ }, [toast]);
+
+ // eslint-disable-next-line @typescript-eslint/no-unused-vars
+ const { isConnected: _isConnected, isOffline: _isOffline } = useRealtimeEvents({
+ enabled: true,
+ onConnectionChange: handleConnectionChange,
  });
 
  // Optimistic state management
@@ -290,6 +292,9 @@ export default function ContentPage() {
  toast.success(`${successCount} file(s) uploaded successfully`);
  setIsUploadModalOpen(false);
  setUploadQueue([]);
+ if (uploadForm.url.startsWith('blob:')) {
+ URL.revokeObjectURL(uploadForm.url);
+ }
  setUploadForm({ title: '', type: 'image', url: '', file: null });
  loadContent();
  } else {
@@ -333,6 +338,9 @@ export default function ContentPage() {
  
  toast.success('Content uploaded successfully');
  setIsUploadModalOpen(false);
+ if (uploadForm.url.startsWith('blob:')) {
+ URL.revokeObjectURL(uploadForm.url);
+ }
  setUploadForm({ title: '', type: 'image', url: '', file: null });
  setFormErrors({});
  loadContent();
@@ -1129,7 +1137,14 @@ export default function ContentPage() {
  {/* Upload Modal */}
  <Modal
  isOpen={isUploadModalOpen}
- onClose={() => setIsUploadModalOpen(false)}
+ onClose={() => {
+ if (uploadForm.url.startsWith('blob:')) {
+ URL.revokeObjectURL(uploadForm.url);
+ }
+ setUploadForm({ title: '', type: 'image', url: '', file: null });
+ setUploadQueue([]);
+ setIsUploadModalOpen(false);
+ }}
  title="Upload Content"
  size="lg"
  >
@@ -1320,7 +1335,14 @@ export default function ContentPage() {
  
  <div className="flex justify-end gap-3 pt-4">
  <button
- onClick={() => setIsUploadModalOpen(false)}
+ onClick={() => {
+ if (uploadForm.url.startsWith('blob:')) {
+ URL.revokeObjectURL(uploadForm.url);
+ }
+ setUploadForm({ title: '', type: 'image', url: '', file: null });
+ setUploadQueue([]);
+ setIsUploadModalOpen(false);
+ }}
  className="px-4 py-2 text-sm font-medium text-[var(--foreground-secondary)] bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition"
  >
  Cancel

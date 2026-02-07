@@ -97,7 +97,7 @@ export class MetricsService {
    * Record content impression
    */
   recordImpression(deviceId: string, contentId: string) {
-    this.contentImpressionsTotal.inc({ content_id: contentId });
+    this.contentImpressionsTotal.inc();
   }
 
   /**

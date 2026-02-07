@@ -23,8 +23,8 @@ scrape_configs:
   # Vizora Realtime Service
   - job_name: 'vizora-realtime'
     static_configs:
-      - targets: ['localhost:3001']
-    metrics_path: '/metrics'
+      - targets: ['localhost:3002']
+    metrics_path: '/internal/metrics'
     scrape_interval: 15s
     scrape_timeout: 10s
 
