@@ -42,7 +42,7 @@ interface DevicePayload {
 
 @WebSocketGateway({
   cors: {
-    origin: process.env.CORS_ORIGIN?.split(',') || '*',
+    origin: process.env.CORS_ORIGIN?.split(',').map(s => s.trim()) || ['http://localhost:3001'],
     credentials: true,
   },
   transports: ['websocket', 'polling'],
@@ -213,8 +213,15 @@ export class DeviceGateway
         this.logger.debug(`Display found: ${!!display}, hasPlaylist: ${!!display?.currentPlaylist}, playlistId: ${display?.currentPlaylistId || 'none'}`);
 
         if (display?.currentPlaylist) {
+          // Get the device token for appending to content URLs (needed for img/video src auth)
+          const deviceToken = client.handshake.auth?.token || '';
+
           // Transform playlist to the format expected by the display client
           const resolvedItems = display.currentPlaylist.items.map((item: any) => {
+            const resolvedUrl = this.resolveContentUrl(item);
+            const urlWithAuth = resolvedUrl.includes('/api/device-content/')
+              ? `${resolvedUrl}?token=${encodeURIComponent(deviceToken)}`
+              : resolvedUrl;
             return {
               id: item.id,
               contentId: item.contentId,
@@ -224,7 +231,7 @@ export class DeviceGateway
                 id: item.content.id,
                 name: item.content.name,
                 type: item.content.type,
-                url: this.resolveContentUrl(item),
+                url: urlWithAuth,
                 thumbnail: item.content.thumbnail,
                 mimeType: item.content.mimeType,
                 duration: item.content.duration,
@@ -265,59 +272,63 @@ export class DeviceGateway
   }
 
   async handleDisconnect(client: Socket) {
-    const deviceId = client.data.deviceId;
+    try {
+      const deviceId = client.data?.deviceId;
 
-    if (deviceId) {
-      // Update status in Redis
-      await this.redisService.setDeviceStatus(deviceId, {
-        status: 'offline',
-        lastHeartbeat: Date.now(),
-        socketId: null,
-        organizationId: client.data.organizationId,
-      });
-
-      // Also update in database so dashboard sees current status
-      let deviceName = deviceId;
-      try {
-        const device = await this.databaseService.display.update({
-          where: { id: deviceId },
-          data: {
-            status: 'offline',
-            lastHeartbeat: new Date(),
-          },
-          select: { nickname: true, deviceIdentifier: true },
-        });
-        deviceName = device?.nickname || device?.deviceIdentifier || deviceId;
-      } catch (dbError: unknown) {
-        const errorMessage = dbError instanceof Error ? dbError.message : 'Unknown error';
-        this.logger.warn(`Failed to update database for device ${deviceId}: ${errorMessage}`);
-      }
-
-      // Schedule an offline notification (will fire after 2 minutes if device doesn't reconnect)
-      try {
-        await this.notificationService.scheduleOfflineNotification(
-          deviceId,
-          deviceName,
-          client.data.organizationId,
-        );
-      } catch (notifError) {
-        this.logger.warn(`Failed to schedule offline notification for device ${deviceId}`);
-      }
-
-      this.logger.log(`Device disconnected: ${deviceId} (${client.id})`);
-
-      // Record metrics
-      this.metricsService.recordConnection(client.data.organizationId, 'disconnected');
-      this.metricsService.updateDeviceStatus(deviceId, 'offline');
-
-      // Notify dashboard
-      this.server
-        .to(`org:${client.data.organizationId}`)
-        .emit('device:status', {
-          deviceId,
+      if (deviceId) {
+        // Update status in Redis
+        await this.redisService.setDeviceStatus(deviceId, {
           status: 'offline',
-          timestamp: new Date().toISOString(),
+          lastHeartbeat: Date.now(),
+          socketId: null,
+          organizationId: client.data.organizationId,
         });
+
+        // Also update in database so dashboard sees current status
+        let deviceName = deviceId;
+        try {
+          const device = await this.databaseService.display.update({
+            where: { id: deviceId },
+            data: {
+              status: 'offline',
+              lastHeartbeat: new Date(),
+            },
+            select: { nickname: true, deviceIdentifier: true },
+          });
+          deviceName = device?.nickname || device?.deviceIdentifier || deviceId;
+        } catch (dbError: unknown) {
+          const errorMessage = dbError instanceof Error ? dbError.message : 'Unknown error';
+          this.logger.warn(`Failed to update database for device ${deviceId}: ${errorMessage}`);
+        }
+
+        // Schedule an offline notification (will fire after 2 minutes if device doesn't reconnect)
+        try {
+          await this.notificationService.scheduleOfflineNotification(
+            deviceId,
+            deviceName,
+            client.data.organizationId,
+          );
+        } catch (notifError) {
+          this.logger.warn(`Failed to schedule offline notification for device ${deviceId}`);
+        }
+
+        this.logger.log(`Device disconnected: ${deviceId} (${client.id})`);
+
+        // Record metrics
+        this.metricsService.recordConnection(client.data.organizationId, 'disconnected');
+        this.metricsService.updateDeviceStatus(deviceId, 'offline');
+
+        // Notify dashboard
+        this.server
+          .to(`org:${client.data.organizationId}`)
+          .emit('device:status', {
+            deviceId,
+            status: 'offline',
+            timestamp: new Date().toISOString(),
+          });
+      }
+    } catch (error) {
+      this.logger.error(`Error in handleDisconnect for ${client.data?.deviceId}: ${(error as Error).message}`);
     }
   }
 
@@ -490,16 +501,29 @@ export class DeviceGateway
 
   // Admin methods (called from API)
   async sendPlaylistUpdate(deviceId: string, playlist: Playlist): Promise<void> {
+    // Look up the device's token from its connected socket for URL auth
+    let deviceToken = '';
+    const sockets = await this.server.in(`device:${deviceId}`).fetchSockets();
+    if (sockets.length > 0) {
+      deviceToken = sockets[0].handshake.auth?.token || '';
+    }
+
     // Resolve minio:// URLs to API-served URLs before sending to device
     const resolvedPlaylist = {
       ...playlist,
-      items: (playlist.items || []).map((item: any) => ({
-        ...item,
-        content: item.content ? {
-          ...item.content,
-          url: this.resolveContentUrl(item),
-        } : item.content,
-      })),
+      items: (playlist.items || []).map((item: any) => {
+        const resolvedUrl = this.resolveContentUrl(item);
+        const urlWithAuth = resolvedUrl.includes('/api/device-content/') && deviceToken
+          ? `${resolvedUrl}?token=${encodeURIComponent(deviceToken)}`
+          : resolvedUrl;
+        return {
+          ...item,
+          content: item.content ? {
+            ...item.content,
+            url: urlWithAuth,
+          } : item.content,
+        };
+      }),
     };
 
     this.server.to(`device:${deviceId}`).emit('playlist:update', {
@@ -668,6 +692,12 @@ export class DeviceGateway
   ) {
     const deviceId = client.data.deviceId;
     const organizationId = client.data.organizationId;
+
+    // Reject oversized screenshot data (max 2MB base64)
+    if (data.imageData && data.imageData.length > 2 * 1024 * 1024) {
+      this.logger.warn(`Screenshot data too large from device ${deviceId}: ${data.imageData.length} chars`);
+      return { event: 'screenshot:error', data: { error: 'Screenshot data too large (max 2MB)' } };
+    }
 
     this.logger.log(`Screenshot received from device ${deviceId} (requestId: ${data.requestId})`);
 

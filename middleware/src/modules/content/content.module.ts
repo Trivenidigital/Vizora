@@ -14,7 +14,7 @@ import { StorageModule } from '../storage/storage.module';
     StorageModule,
     JwtModule.registerAsync({
       useFactory: () => ({
-        secret: process.env.DEVICE_JWT_SECRET || process.env.JWT_SECRET,
+        secret: process.env.DEVICE_JWT_SECRET,
       }),
     }),
   ],

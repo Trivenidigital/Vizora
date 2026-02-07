@@ -430,13 +430,14 @@ class DisplayApp {
 
       case 'html':
       case 'template':
-        // Render pre-rendered HTML content from backend
-        const htmlContainer = document.createElement('div');
-        htmlContainer.className = 'html-content';
-        // For templates, the contentSource contains the pre-rendered HTML
-        // For html type, contentSource is the raw HTML content
-        htmlContainer.innerHTML = contentSource;
-        contentDiv.appendChild(htmlContainer);
+        // Use sandboxed iframe to safely render HTML content
+        const htmlIframe = document.createElement('iframe');
+        htmlIframe.sandbox.add('allow-scripts');
+        htmlIframe.srcdoc = contentSource;
+        htmlIframe.style.width = '100%';
+        htmlIframe.style.height = '100%';
+        htmlIframe.style.border = 'none';
+        contentDiv.appendChild(htmlIframe);
         break;
 
       default:

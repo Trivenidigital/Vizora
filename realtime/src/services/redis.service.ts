@@ -100,7 +100,8 @@ export class RedisService implements OnModuleDestroy {
    */
   async setDeviceStatus(deviceId: string, status: DeviceStatus): Promise<void> {
     const key = `device:status:${deviceId}`;
-    await this.redis.setex(key, 60, JSON.stringify(status)); // 60 second TTL
+    const ttl = status.status === 'offline' ? 86400 : 60; // 24h for offline, 60s for online
+    await this.redis.setex(key, ttl, JSON.stringify(status));
   }
 
   /**
@@ -172,15 +173,16 @@ export class RedisService implements OnModuleDestroy {
   }
 
   /**
-   * Get pending commands for a device
+   * Get pending commands for a device (atomic read + delete)
    */
   async getDeviceCommands(deviceId: string): Promise<DeviceCommand[]> {
     const key = `device:commands:${deviceId}`;
-    const commands = await this.redis.lrange(key, 0, -1);
-
-    // Clear commands after retrieving
-    await this.redis.del(key);
-
+    const multi = this.redis.multi();
+    multi.lrange(key, 0, -1);
+    multi.del(key);
+    const results = await multi.exec();
+    if (!results || !results[0] || !results[0][1]) return [];
+    const commands = results[0][1] as string[];
     return commands.map((cmd) => JSON.parse(cmd) as DeviceCommand);
   }
 
@@ -350,6 +352,13 @@ export class RedisService implements OnModuleDestroy {
     if (deletedCount > 0) {
       this.logger.log(`Deleted ${deletedCount} keys matching pattern: ${pattern}`);
     }
+  }
+
+  /**
+   * Get the underlying Redis client for advanced operations
+   */
+  getRedis(): Redis {
+    return this.redis;
   }
 
   /**

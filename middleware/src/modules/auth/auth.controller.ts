@@ -206,10 +206,11 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  async getMe(@CurrentUser() user: unknown) {
+  async getMe(@CurrentUser() user: any) {
+    const { passwordHash, password, ...safeUser } = user || {};
     return {
       success: true,
-      data: { user },
+      data: { user: safeUser },
     };
   }
 }

@@ -150,12 +150,18 @@ export class RazorpayProvider implements PaymentProvider {
   }
 
   verifyWebhookSignature(payload: Buffer, signature: string): WebhookEvent {
+    if (!this.webhookSecret) {
+      throw new Error('Webhook secret not configured');
+    }
+
     const expectedSignature = crypto
       .createHmac('sha256', this.webhookSecret)
       .update(payload)
       .digest('hex');
 
-    if (signature !== expectedSignature) {
+    const sigBuffer = Buffer.from(signature, 'hex');
+    const expectedBuffer = Buffer.from(expectedSignature, 'hex');
+    if (sigBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
       throw new Error('Invalid webhook signature');
     }
 

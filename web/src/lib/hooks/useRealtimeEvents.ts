@@ -307,7 +307,6 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
     handleScheduleExecution,
     onConnectionChange,
     onSyncStateChange,
-    syncState,
     syncOfflineQueue,
   ]);
 

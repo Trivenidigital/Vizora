@@ -280,23 +280,22 @@ export class ContentService {
     });
 
     for (const content of expiredContent) {
-      if (content.replacementContentId) {
-        // Replace with replacement content in playlists
-        await this.db.playlistItem.updateMany({
-          where: { contentId: content.id },
-          data: { contentId: content.replacementContentId },
-        });
-      } else {
-        // Remove from playlists
-        await this.db.playlistItem.deleteMany({
-          where: { contentId: content.id },
-        });
-      }
+      await this.db.$transaction(async (tx) => {
+        if (content.replacementContentId) {
+          await tx.playlistItem.updateMany({
+            where: { contentId: content.id },
+            data: { contentId: content.replacementContentId },
+          });
+        } else {
+          await tx.playlistItem.deleteMany({
+            where: { contentId: content.id },
+          });
+        }
 
-      // Mark content as expired
-      await this.db.content.update({
-        where: { id: content.id },
-        data: { status: 'expired' },
+        await tx.content.update({
+          where: { id: content.id },
+          data: { status: 'expired' },
+        });
       });
     }
 

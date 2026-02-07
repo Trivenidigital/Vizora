@@ -8,7 +8,7 @@ export const envSchema = z.object({
   API_PORT: z.coerce.number().default(3000),
   
   // CORS
-  CORS_ORIGIN: z.string().default('http://localhost:3002'),
+  CORS_ORIGIN: z.string().default('http://localhost:3001'),
   
   // Database
   DATABASE_URL: z.string().url().refine(
@@ -20,7 +20,7 @@ export const envSchema = z.object({
   MONGODB_URL: z.string().url().refine(
     (url) => url.startsWith('mongodb://') || url.startsWith('mongodb+srv://'),
     { message: 'MONGODB_URL must be a valid MongoDB connection string' }
-  ),
+  ).optional(),
   
   // Redis
   REDIS_URL: z.string().url().refine(
@@ -29,10 +29,10 @@ export const envSchema = z.object({
   ),
   
   // MinIO / S3
-  MINIO_ENDPOINT: z.string().min(1),
+  MINIO_ENDPOINT: z.string().min(1).optional(),
   MINIO_PORT: z.coerce.number().default(9000),
-  MINIO_ACCESS_KEY: z.string().min(1),
-  MINIO_SECRET_KEY: z.string().min(1),
+  MINIO_ACCESS_KEY: z.string().min(1).optional(),
+  MINIO_SECRET_KEY: z.string().min(1).optional(),
   MINIO_BUCKET: z.string().min(1).default('vizora-assets'),
   MINIO_USE_SSL: z.string().transform((val) => val === 'true').default('false'),
   

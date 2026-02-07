@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, HttpStatus, HttpException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Headers, HttpStatus, HttpException, UnauthorizedException } from '@nestjs/common';
 import { DeviceGateway } from '../gateways/device.gateway';
 import { RedisService } from '../services/redis.service';
 import { DatabaseService } from '../database/database.service';
@@ -158,7 +158,11 @@ export class AppController {
   }
 
   @Post('push/playlist')
-  async pushPlaylist(@Body() data: PushPlaylistRequest): Promise<PushResponse> {
+  async pushPlaylist(@Body() data: PushPlaylistRequest, @Headers('x-internal-key') apiKey: string): Promise<PushResponse> {
+    const expectedKey = process.env.INTERNAL_API_KEY;
+    if (!expectedKey || apiKey !== expectedKey) {
+      throw new UnauthorizedException('Invalid or missing internal API key');
+    }
     await this.deviceGateway.sendPlaylistUpdate(data.deviceId, data.playlist);
     return {
       success: true,
@@ -167,7 +171,11 @@ export class AppController {
   }
 
   @Post('push/content')
-  async pushContent(@Body() data: PushContentRequest): Promise<PushResponse> {
+  async pushContent(@Body() data: PushContentRequest, @Headers('x-internal-key') apiKey: string): Promise<PushResponse> {
+    const expectedKey = process.env.INTERNAL_API_KEY;
+    if (!expectedKey || apiKey !== expectedKey) {
+      throw new UnauthorizedException('Invalid or missing internal API key');
+    }
     await this.deviceGateway.sendCommand(data.deviceId, {
       type: DeviceCommandType.PUSH_CONTENT,
       payload: {
@@ -184,7 +192,12 @@ export class AppController {
   @Post('internal/command')
   async sendCommand(
     @Body() data: { displayId: string; command: string; payload?: Record<string, unknown> },
+    @Headers('x-internal-key') apiKey: string,
   ): Promise<PushResponse> {
+    const expectedKey = process.env.INTERNAL_API_KEY;
+    if (!expectedKey || apiKey !== expectedKey) {
+      throw new UnauthorizedException('Invalid or missing internal API key');
+    }
     await this.deviceGateway.sendCommand(data.displayId, {
       type: data.command as DeviceCommandType,
       payload: data.payload,

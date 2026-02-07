@@ -42,13 +42,14 @@ const nextConfig = {
   },
   // Security headers
   async headers() {
+    const cspBackendUrl = process.env.BACKEND_URL || 'http://localhost:3000';
     return [
       {
         source: '/(.*)',
         headers: [
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: http://localhost:3000 http://127.0.0.1:3000 https:; font-src 'self' data:; connect-src 'self' http: https: ws: wss:;",
+            value: `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: ${cspBackendUrl} https:; font-src 'self' data:; connect-src 'self' ${cspBackendUrl} ws: wss: https:; media-src 'self' ${cspBackendUrl};`,
           },
           {
             key: 'X-Content-Type-Options',

@@ -4,22 +4,33 @@ import type { NextRequest } from 'next/server';
 // Pages that don't require authentication
 const publicPaths = ['/login', '/register', '/'];
 
+function isValidJwtFormat(token: string): boolean {
+  const parts = token.split('.');
+  if (parts.length !== 3) return false;
+  try {
+    JSON.parse(atob(parts[1]));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  
+
   // Allow public paths
   if (publicPaths.some(path => pathname === path || pathname.startsWith('/_next'))) {
     return NextResponse.next();
   }
-  
+
   // Check for auth token in cookies (httpOnly cookie set by backend)
   // Cookie name must match AUTH_CONSTANTS.COOKIE_NAME from middleware
   const tokenFromCookie = request.cookies.get('vizora_auth_token')?.value;
   const tokenFromHeader = request.headers.get('authorization')?.replace('Bearer ', '');
   const token = tokenFromCookie || tokenFromHeader;
-  
-  // Redirect to login if no token and trying to access protected route
-  if (!token && pathname.startsWith('/dashboard')) {
+
+  // Redirect to login if no valid token and trying to access protected route
+  if ((!token || !isValidJwtFormat(token)) && pathname.startsWith('/dashboard')) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(loginUrl);

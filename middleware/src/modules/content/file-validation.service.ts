@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import * as crypto from 'crypto';
+import { lookup } from 'dns/promises';
 
 @Injectable()
 export class FileValidationService {
@@ -182,7 +183,7 @@ export class FileValidationService {
    * Check if URL is safe (for external content)
    * Prevents SSRF attacks by blocking private/internal network addresses
    */
-  validateUrl(url: string): boolean {
+  async validateUrl(url: string): Promise<boolean> {
     let parsed: URL;
     try {
       parsed = new URL(url);
@@ -215,6 +216,18 @@ export class FileValidationService {
     // Block cloud metadata endpoints (common SSRF targets)
     if (this.isCloudMetadata(hostname)) {
       throw new BadRequestException('Cloud metadata endpoints not allowed');
+    }
+
+    try {
+      const { address } = await lookup(hostname);
+      if (this.isPrivateIp(address)) {
+        throw new BadRequestException('URL resolves to private IP address');
+      }
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to resolve hostname');
     }
 
     return true;
