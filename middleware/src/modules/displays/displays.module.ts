@@ -5,6 +5,7 @@ import { DisplaysService } from './displays.service';
 import { DisplaysController } from './displays.controller';
 import { PairingService } from './pairing.service';
 import { PairingController } from './pairing.controller';
+import { StorageModule } from '../storage/storage.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { PairingController } from './pairing.controller';
       }),
     }),
     HttpModule,
+    StorageModule,
   ],
   controllers: [DisplaysController, PairingController],
   providers: [DisplaysService, PairingService],

@@ -5,9 +5,12 @@ import { firstValueFrom } from 'rxjs';
 import * as crypto from 'crypto';
 import { DatabaseService } from '../database/database.service';
 import { CircuitBreakerService } from '../common/services/circuit-breaker.service';
+import { StorageService } from '../storage/storage.service';
 import { CreateDisplayDto } from './dto/create-display.dto';
 import { UpdateDisplayDto } from './dto/update-display.dto';
 import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
+
+const MINIO_URL_PREFIX = 'minio://';
 
 /**
  * Hash a token using SHA-256 for secure storage
@@ -38,6 +41,7 @@ export class DisplaysService {
     private readonly jwtService: JwtService,
     private readonly httpService: HttpService,
     private readonly circuitBreaker: CircuitBreakerService,
+    private readonly storageService: StorageService,
   ) {}
 
   async create(organizationId: string, createDisplayDto: CreateDisplayDto) {
@@ -324,6 +328,18 @@ export class DisplaysService {
       throw new NotFoundException('Content not found or does not belong to your organization');
     }
 
+    // Resolve minio:// URLs to presigned HTTP URLs before sending to device
+    let contentUrl = content.url;
+    if (contentUrl && contentUrl.startsWith(MINIO_URL_PREFIX) && this.storageService.isMinioAvailable()) {
+      try {
+        const objectKey = contentUrl.substring(MINIO_URL_PREFIX.length);
+        contentUrl = await this.storageService.getPresignedUrl(objectKey, 3600);
+        this.logger.log(`Resolved minio:// URL to presigned URL for content ${contentId}`);
+      } catch (error) {
+        this.logger.warn(`Failed to resolve minio:// URL for content ${contentId}: ${error.message}`);
+      }
+    }
+
     const url = `${this.realtimeUrl}/api/push/content`;
 
     // Use circuit breaker with fallback
@@ -337,7 +353,7 @@ export class DisplaysService {
               id: content.id,
               name: content.name,
               type: content.type,
-              url: content.url,
+              url: contentUrl,
               thumbnailUrl: content.thumbnail,
               mimeType: content.mimeType,
               duration: content.duration,

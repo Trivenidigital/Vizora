@@ -47,7 +47,7 @@ interface UseSocketReturn {
 
 export function useSocket(options: UseSocketOptions = {}): UseSocketReturn {
   const {
-    url = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3002',
+    url = process.env.NEXT_PUBLIC_SOCKET_URL || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3002'),
     autoConnect = true,
     reconnection = true,
     reconnectionDelay = 1000,
