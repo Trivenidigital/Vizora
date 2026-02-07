@@ -220,6 +220,19 @@ export class StorageService implements OnModuleInit {
   }
 
   /**
+   * Get an object stream from MinIO
+   * @param objectKey The key of the object
+   * @returns A readable stream of the object data
+   */
+  async getObject(objectKey: string): Promise<NodeJS.ReadableStream> {
+    if (!this.client || !this.available) {
+      throw new Error('MinIO is not available');
+    }
+
+    return this.client.getObject(this.bucket, objectKey);
+  }
+
+  /**
    * Health check for MinIO connection
    */
   async healthCheck(): Promise<{

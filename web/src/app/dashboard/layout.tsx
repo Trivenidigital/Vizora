@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import ThemeToggle from '@/components/ThemeToggle';
 import NotificationBell from '@/components/NotificationBell';
+import { DeviceStatusProvider } from '@/lib/context/DeviceStatusContext';
 import { Icon } from '@/theme/icons';
 import type { IconName } from '@/theme/icons';
 
@@ -159,9 +160,9 @@ export default function DashboardLayout({
         <aside
           className={`${
             sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-          } fixed lg:relative lg:translate-x-0 w-64 bg-[var(--surface)] min-h-[calc(100vh-4rem)] border-r border-[var(--border)] transition-transform duration-300 ease-in-out z-20`}
+          } fixed lg:relative lg:translate-x-0 w-48 bg-[var(--surface)] min-h-[calc(100vh-4rem)] border-r border-[var(--border)] transition-transform duration-300 ease-in-out z-20`}
         >
-          <nav className="p-4 space-y-1">
+          <nav className="p-2 space-y-0.5">
             {navigation.map((item) => {
               const active = isActive(item);
               return (
@@ -169,13 +170,13 @@ export default function DashboardLayout({
                   key={item.name}
                   href={item.href}
                   onClick={() => setSidebarOpen(false)}
-                  className={`flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                     active
                       ? 'bg-[#00E5A0]/10 text-[#00E5A0] border-l-2 border-[#00E5A0]'
                       : 'text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]'
                   }`}
                 >
-                  <Icon name={item.icon} size="lg" className={active ? 'text-[#00E5A0]' : 'text-[var(--foreground-tertiary)]'} />
+                  <Icon name={item.icon} size="md" className={active ? 'text-[#00E5A0]' : 'text-[var(--foreground-tertiary)]'} />
                   <span className="flex-1">{item.name}</span>
                   {active && (
                     <span className="w-2 h-2 bg-[#00E5A0] rounded-full shadow-neon-sm"></span>
@@ -186,7 +187,7 @@ export default function DashboardLayout({
           </nav>
 
           {/* Sidebar Footer */}
-          <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-[var(--border)] bg-[var(--surface-secondary)]">
+          <div className="absolute bottom-0 left-0 right-0 p-2 border-t border-[var(--border)] bg-[var(--surface-secondary)]">
             <div className="text-xs text-[var(--foreground-tertiary)] space-y-1">
               <div className="flex justify-between">
                 <span>Version</span>
@@ -212,12 +213,14 @@ export default function DashboardLayout({
         )}
 
         {/* Main content */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 min-h-[calc(100vh-4rem)] overflow-x-hidden">
-          <div className="max-w-7xl mx-auto">
-            <Breadcrumbs />
-            {children}
-          </div>
-        </main>
+        <DeviceStatusProvider user={user}>
+          <main className="flex-1 p-4 sm:p-6 lg:p-8 min-h-[calc(100vh-4rem)] overflow-x-hidden">
+            <div className="max-w-7xl mx-auto">
+              <Breadcrumbs />
+              {children}
+            </div>
+          </main>
+        </DeviceStatusProvider>
       </div>
     </div>
   );

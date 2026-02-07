@@ -1,17 +1,22 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { apiClient } from '@/lib/api';
 import { loginSchema } from '@/lib/validation';
 import Button from '@/components/Button';
 import { z } from 'zod';
 
+function isValidRedirectUrl(url: string): boolean {
+  // Must be a relative path, not protocol-relative or absolute
+  return url.startsWith('/') && !url.startsWith('//') && !url.includes('://');
+}
+
 export default function LoginContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectUrl = searchParams.get('redirect') || '/dashboard';
+  const rawRedirect = searchParams.get('redirect');
+  const redirectUrl = rawRedirect && isValidRedirectUrl(rawRedirect) ? rawRedirect : '/dashboard';
 
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -44,8 +49,12 @@ export default function LoginContent() {
     try {
       await apiClient.login(formData.email, formData.password);
       console.log('[LOGIN] Login successful, redirecting to:', redirectUrl);
-      router.push(redirectUrl);
-      console.log('[LOGIN] Router.push called');
+      // Use window.location for a full page navigation instead of router.push().
+      // router.push() does a client-side navigation where Next.js middleware
+      // may run before the browser has fully processed the Set-Cookie header
+      // from the login response, causing a redirect loop back to /login.
+      // A full navigation ensures the cookie is available when middleware checks it.
+      window.location.href = redirectUrl;
     } catch (err: any) {
       console.error('[LOGIN] Login error:', err);
       setError(err.message || 'Login failed');

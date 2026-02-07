@@ -3,37 +3,28 @@
 import { useEffect, useState } from 'react';
 import { Icon } from '@/theme/icons';
 
-type Theme = 'light' | 'dark' | 'system';
+type Theme = 'light' | 'dark';
 
 export default function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>('system');
+  const [theme, setTheme] = useState<Theme>('light');
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
     const savedTheme = localStorage.getItem('theme') as Theme | null;
-    if (savedTheme) {
+    if (savedTheme && (savedTheme === 'light' || savedTheme === 'dark')) {
       setTheme(savedTheme);
       applyTheme(savedTheme);
     } else {
-      const systemPreference = window.matchMedia('(prefers-color-scheme: dark)').matches
-        ? 'dark'
-        : 'light';
-      setTheme('system');
-      applyTheme('system', systemPreference);
+      // Default to light (or detect system preference as initial value)
+      const preferred = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      setTheme(preferred);
+      applyTheme(preferred);
     }
   }, []);
 
-  const applyTheme = (newTheme: Theme, systemPreference?: 'light' | 'dark') => {
-    const htmlElement = document.documentElement;
-
-    if (newTheme === 'system') {
-      const preference = systemPreference ||
-        (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-      htmlElement.classList.toggle('dark', preference === 'dark');
-    } else {
-      htmlElement.classList.toggle('dark', newTheme === 'dark');
-    }
+  const applyTheme = (newTheme: Theme) => {
+    document.documentElement.classList.toggle('dark', newTheme === 'dark');
   };
 
   const handleThemeChange = (newTheme: Theme) => {
@@ -47,7 +38,6 @@ export default function ThemeToggle() {
   const themes: Array<{ value: Theme; label: string; icon: string }> = [
     { value: 'light', label: 'Light', icon: 'sun' },
     { value: 'dark', label: 'Dark', icon: 'moon' },
-    { value: 'system', label: 'System', icon: 'settings' },
   ];
 
   return (

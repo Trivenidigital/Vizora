@@ -120,22 +120,32 @@ export class ContentController {
                                  file.mimetype.startsWith('image/') ? 'image' :
                                  file.mimetype === 'application/pdf' ? 'pdf' : 'url');
 
-    // For images stored locally, use the URL as thumbnail
-    // For MinIO images, thumbnail will be generated on demand
-    const thumbnailUrl = contentType === 'image' && !fileUrl.startsWith(MINIO_URL_PREFIX)
-      ? fileUrl
-      : undefined;
-
     // Create content record (fileHash stored in metadata since not in schema)
     const content = await this.contentService.create(organizationId, {
       name: name || safeFilename,
       type: contentType,
       url: fileUrl,
-      thumbnail: thumbnailUrl,
       fileSize: file.size,
       mimeType: file.mimetype,
       metadata: { fileHash: validation.hash },
     } as any);
+
+    // Generate thumbnail using the real content ID (only once, after creation)
+    if (contentType === 'image') {
+      try {
+        const thumbnailUrl = await this.thumbnailService.generateThumbnail(
+          content.id,
+          file.buffer,
+          file.mimetype,
+        );
+        await this.contentService.update(organizationId, content.id, { thumbnail: thumbnailUrl } as any);
+        content.thumbnail = thumbnailUrl;
+        this.logger.debug(`Thumbnail generated: ${thumbnailUrl}`);
+      } catch (error) {
+        this.logger.warn(`Thumbnail generation failed during upload: ${error}`);
+        // Continue without thumbnail — not a fatal error
+      }
+    }
 
     return {
       success: true,
@@ -243,16 +253,32 @@ export class ContentController {
   ) {
     // Get content
     const content = await this.contentService.findOne(organizationId, id);
-    
+
     if (content.type !== 'image') {
       return { message: 'Thumbnail generation only supported for images', thumbnail: null };
     }
 
-    // Generate thumbnail from URL
-    const thumbnailUrl = await this.thumbnailService.generateThumbnailFromUrl(
-      content.id,
-      content.url,
-    );
+    let thumbnailUrl: string;
+
+    // For MinIO-stored content, resolve the URL first
+    if (content.url.startsWith(MINIO_URL_PREFIX)) {
+      const objectKey = content.url.substring(MINIO_URL_PREFIX.length);
+      if (!this.storageService.isMinioAvailable()) {
+        throw new BadRequestException('Storage service is currently unavailable');
+      }
+      // Get a presigned URL to fetch the image from MinIO
+      const presignedUrl = await this.storageService.getPresignedUrl(objectKey, 300);
+      thumbnailUrl = await this.thumbnailService.generateThumbnailFromUrl(
+        content.id,
+        presignedUrl,
+      );
+    } else {
+      // For local/external URLs, fetch directly
+      thumbnailUrl = await this.thumbnailService.generateThumbnailFromUrl(
+        content.id,
+        content.url,
+      );
+    }
 
     // Update content with thumbnail URL
     await this.contentService.update(organizationId, id, { thumbnail: thumbnailUrl } as any);
@@ -334,9 +360,20 @@ export class ContentController {
     const contentType = file.mimetype.startsWith('video/') ? 'video' :
                        file.mimetype.startsWith('image/') ? 'image' :
                        file.mimetype === 'application/pdf' ? 'pdf' : 'url';
-    const thumbnailUrl = contentType === 'image' && !fileUrl.startsWith(MINIO_URL_PREFIX)
-      ? fileUrl
-      : undefined;
+
+    // Generate thumbnail directly from buffer for images
+    let thumbnailUrl: string | undefined;
+    if (contentType === 'image') {
+      try {
+        thumbnailUrl = await this.thumbnailService.generateThumbnail(
+          id,
+          file.buffer,
+          file.mimetype,
+        );
+      } catch (error) {
+        this.logger.warn(`Thumbnail generation failed during replace: ${error}`);
+      }
+    }
 
     const content = await this.contentService.replaceFile(
       organizationId,

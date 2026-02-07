@@ -84,6 +84,7 @@
     "@nestjs/jwt": "^10.2.0",
     "@nestjs/platform-express": "^11.0.0",
     "@nestjs/platform-socket.io": "^11.1.12",
+    "@nestjs/schedule": "^6.1.0",
     "@nestjs/websockets": "^11.1.12",
     "@sentry/nestjs": "^10.37.0",
     "@sentry/node": "^10.37.0",

@@ -2,7 +2,6 @@ import './globals.css';
 import { Space_Grotesk, JetBrains_Mono } from 'next/font/google';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { CustomizationProvider } from '@/components/providers/CustomizationProvider';
-import { DeviceStatusProvider } from '@/lib/context/DeviceStatusContext';
 import CommandPaletteWrapper from '@/components/CommandPaletteWrapper';
 import ErrorBoundary from '@/components/ErrorBoundary';
 
@@ -40,12 +39,10 @@ export default function RootLayout({
         <ErrorBoundary>
           <ThemeProvider>
             <CustomizationProvider>
-              <DeviceStatusProvider>
-                <CommandPaletteWrapper />
-                <main id="main-content">
-                  {children}
-                </main>
-              </DeviceStatusProvider>
+              <CommandPaletteWrapper />
+              <main id="main-content">
+                {children}
+              </main>
             </CustomizationProvider>
           </ThemeProvider>
         </ErrorBoundary>

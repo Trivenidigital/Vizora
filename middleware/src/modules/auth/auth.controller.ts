@@ -22,9 +22,11 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   /**
-   * Set auth token as httpOnly cookie
-   * In development, sets domain to 'localhost' to allow cross-port cookie access
-   * (frontend on 3001 can read cookies set by backend on 3000)
+   * Set auth token as httpOnly cookie.
+   *
+   * No explicit domain set — cookies are scoped to the exact origin host.
+   * This works because the Next.js frontend proxies all API calls through
+   * its own origin, making cross-port cookie sharing unnecessary.
    */
   private setAuthCookie(res: Response, token: string): void {
     const isProduction = process.env.NODE_ENV === 'production';
@@ -34,7 +36,6 @@ export class AuthController {
       sameSite: 'strict' | 'lax' | 'none';
       maxAge: number;
       path: string;
-      domain?: string;
     } = {
       httpOnly: true,
       secure: isProduction,
@@ -43,18 +44,16 @@ export class AuthController {
       path: '/',
     };
 
-    // In development, set domain to localhost to allow cross-port cookie access
-    // This enables frontend (port 3001) to access cookies set by backend (port 3000)
-    if (!isProduction) {
-      cookieOptions.domain = 'localhost';
-    }
-
     res.cookie(AUTH_CONSTANTS.COOKIE_NAME, token, cookieOptions);
   }
 
   /**
-   * Clear auth cookie on logout
-   * Must use same options as setAuthCookie for proper clearing
+   * Clear auth cookie on logout.
+   * Must use same options as setAuthCookie for proper clearing.
+   *
+   * No explicit domain set — cookies are scoped to the exact origin host.
+   * This works because the Next.js frontend proxies all API calls through
+   * its own origin, making cross-port cookie sharing unnecessary.
    */
   private clearAuthCookie(res: Response): void {
     const isProduction = process.env.NODE_ENV === 'production';
@@ -63,18 +62,12 @@ export class AuthController {
       secure: boolean;
       sameSite: 'strict' | 'lax' | 'none';
       path: string;
-      domain?: string;
     } = {
       httpOnly: true,
       secure: isProduction,
       sameSite: isProduction ? 'strict' : 'lax',
       path: '/',
     };
-
-    // Must match the domain used in setAuthCookie for proper clearing
-    if (!isProduction) {
-      cookieOptions.domain = 'localhost';
-    }
 
     res.clearCookie(AUTH_CONSTANTS.COOKIE_NAME, cookieOptions);
   }

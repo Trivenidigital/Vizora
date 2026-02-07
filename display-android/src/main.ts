@@ -25,11 +25,12 @@ const DEFAULT_CONFIG = {
   dashboardUrl: import.meta.env.VITE_DASHBOARD_URL || 'http://localhost:3001',
 };
 
-// Transform URLs from localhost to the configured API URL (needed for Android emulator)
+// Transform URLs from localhost to emulator-accessible addresses (needed for Android emulator)
 function transformContentUrl(url: string, apiUrl: string): string {
   if (!url) return url;
-  // Replace localhost:3000 with the configured API URL (e.g., 10.0.2.2:3000 for Android emulator)
-  return url.replace(/http:\/\/localhost:3000/g, apiUrl);
+  // Replace localhost with 10.0.2.2 for Android emulator access
+  // Handles API (port 3000), MinIO (port 9000), and other localhost services
+  return url.replace(/http:\/\/localhost/g, 'http://10.0.2.2');
 }
 
 interface Config {

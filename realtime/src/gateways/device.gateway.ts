@@ -64,7 +64,24 @@ export class DeviceGateway
     private metricsService: MetricsService,
     private databaseService: DatabaseService,
     private storageService: StorageService,
-  ) {}
+  ) {
+    if (!process.env.API_BASE_URL && process.env.NODE_ENV === 'production') {
+      this.logger.warn(
+        'API_BASE_URL is not set — device content URLs will default to http://localhost:3000. Set API_BASE_URL for production.',
+      );
+    }
+  }
+
+  /**
+   * Resolve minio:// URLs to API-served URLs that devices can access.
+   */
+  private resolveContentUrl(item: any): string {
+    const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:3000';
+    if (item.content?.url?.startsWith('minio://')) {
+      return `${apiBaseUrl}/api/device-content/${item.content.id}/file`;
+    }
+    return item.content?.url || '';
+  }
 
   async handleConnection(client: Socket) {
     try {
@@ -173,6 +190,7 @@ export class DeviceGateway
 
       // Fetch and send current playlist to device on connection
       try {
+        this.logger.debug(`Fetching playlist for device: ${deviceId}`);
         const display = await this.databaseService.display.findUnique({
           where: { id: deviceId },
           include: {
@@ -191,12 +209,12 @@ export class DeviceGateway
           },
         });
 
+        this.logger.debug(`Display found: ${!!display}, hasPlaylist: ${!!display?.currentPlaylist}, playlistId: ${display?.currentPlaylistId || 'none'}`);
+
         if (display?.currentPlaylist) {
           // Transform playlist to the format expected by the display client
-          const playlist = {
-            id: display.currentPlaylist.id,
-            name: display.currentPlaylist.name,
-            items: display.currentPlaylist.items.map((item: any) => ({
+          const resolvedItems = display.currentPlaylist.items.map((item: any) => {
+            return {
               id: item.id,
               contentId: item.contentId,
               duration: item.duration || 10,
@@ -205,12 +223,18 @@ export class DeviceGateway
                 id: item.content.id,
                 name: item.content.name,
                 type: item.content.type,
-                url: item.content.url,
+                url: this.resolveContentUrl(item),
                 thumbnail: item.content.thumbnail,
                 mimeType: item.content.mimeType,
                 duration: item.content.duration,
               } : null,
-            })),
+            };
+          });
+
+          const playlist = {
+            id: display.currentPlaylist.id,
+            name: display.currentPlaylist.name,
+            items: resolvedItems,
             totalDuration: display.currentPlaylist.items.reduce(
               (sum: number, item: any) => sum + (item.duration || 10),
               0
@@ -228,8 +252,8 @@ export class DeviceGateway
           this.logger.log(`Device ${deviceId} has no assigned playlist`);
         }
       } catch (playlistError: unknown) {
-        const playlistErrorMsg = playlistError instanceof Error ? playlistError.message : 'Unknown error';
-        this.logger.warn(`Failed to fetch playlist for device ${deviceId}: ${playlistErrorMsg}`);
+        const playlistErrorMsg = playlistError instanceof Error ? playlistError.stack || playlistError.message : 'Unknown error';
+        this.logger.error(`Failed to fetch playlist for device ${deviceId}: ${playlistErrorMsg}`);
         // Don't fail the connection if playlist fetch fails
       }
     } catch (error: unknown) {
@@ -465,8 +489,20 @@ export class DeviceGateway
 
   // Admin methods (called from API)
   async sendPlaylistUpdate(deviceId: string, playlist: Playlist): Promise<void> {
+    // Resolve minio:// URLs to API-served URLs before sending to device
+    const resolvedPlaylist = {
+      ...playlist,
+      items: (playlist.items || []).map((item: any) => ({
+        ...item,
+        content: item.content ? {
+          ...item.content,
+          url: this.resolveContentUrl(item),
+        } : item.content,
+      })),
+    };
+
     this.server.to(`device:${deviceId}`).emit('playlist:update', {
-      playlist,
+      playlist: resolvedPlaylist,
       timestamp: new Date().toISOString(),
     });
 
@@ -504,14 +540,23 @@ export class DeviceGateway
       return createErrorResponse('Organization ID required');
     }
 
+    // Verify the client belongs to the requested organization
+    if (client.data.organizationId !== data.organizationId) {
+      this.logger.warn(
+        `Client ${client.id} unauthorized to join org room: ${data.organizationId} (belongs to ${client.data.organizationId})`,
+      );
+      client.emit('error', {
+        message: 'Unauthorized: you do not belong to this organization',
+      });
+      return createErrorResponse('Unauthorized: organization mismatch');
+    }
+
     // Join the organization room
     await client.join(`org:${data.organizationId}`);
-    client.data.organizationId = data.organizationId;
     client.data.isDashboard = true;
 
     this.logger.log(`Dashboard client ${client.id} joined org room: ${data.organizationId}`);
 
-    // Emit confirmation
     client.emit('joined:organization', {
       organizationId: data.organizationId,
       timestamp: new Date().toISOString(),
@@ -521,7 +566,10 @@ export class DeviceGateway
   }
 
   /**
-   * Allow clients to join arbitrary rooms
+   * Allow clients to join rooms with authorization checks.
+   * - device:{id} rooms: client must be that device, or belong to the device's org
+   * - org:{id} rooms: client must belong to that organization
+   * - All other room patterns are rejected
    */
   @SubscribeMessage('join:room')
   async handleJoinRoom(
@@ -532,10 +580,55 @@ export class DeviceGateway
       return createErrorResponse('Room name required');
     }
 
-    await client.join(data.room);
-    this.logger.log(`Client ${client.id} joined room: ${data.room}`);
+    const deviceMatch = data.room.match(/^device:(.+)$/);
+    const orgMatch = data.room.match(/^org:(.+)$/);
 
-    return createSuccessResponse({ joined: true, room: data.room });
+    if (deviceMatch) {
+      const targetDeviceId = deviceMatch[1];
+      // Allow if client IS this device
+      if (client.data.deviceId === targetDeviceId) {
+        await client.join(data.room);
+        this.logger.log(`Device ${client.id} joined own room: ${data.room}`);
+        return createSuccessResponse({ joined: true, room: data.room });
+      }
+      // Allow if client belongs to the same organization as the device
+      if (client.data.organizationId) {
+        try {
+          const device = await this.databaseService.display.findUnique({
+            where: { id: targetDeviceId },
+            select: { organizationId: true },
+          });
+          if (device && device.organizationId === client.data.organizationId) {
+            await client.join(data.room);
+            this.logger.log(`Client ${client.id} joined device room: ${data.room} (same org)`);
+            return createSuccessResponse({ joined: true, room: data.room });
+          }
+        } catch (dbError: unknown) {
+          const errorMessage = dbError instanceof Error ? dbError.message : 'Unknown error';
+          this.logger.warn(`Failed to verify device org for room join: ${errorMessage}`);
+        }
+      }
+      this.logger.warn(`Client ${client.id} unauthorized to join device room: ${data.room}`);
+      client.emit('error', { message: 'Unauthorized: cannot join this device room' });
+      return createErrorResponse('Unauthorized: cannot join this device room');
+    }
+
+    if (orgMatch) {
+      const targetOrgId = orgMatch[1];
+      if (client.data.organizationId !== targetOrgId) {
+        this.logger.warn(`Client ${client.id} unauthorized to join org room: ${data.room}`);
+        client.emit('error', { message: 'Unauthorized: you do not belong to this organization' });
+        return createErrorResponse('Unauthorized: organization mismatch');
+      }
+      await client.join(data.room);
+      this.logger.log(`Client ${client.id} joined org room: ${data.room}`);
+      return createSuccessResponse({ joined: true, room: data.room });
+    }
+
+    // Reject unknown room patterns
+    this.logger.warn(`Client ${client.id} attempted to join unrecognized room: ${data.room}`);
+    client.emit('error', { message: 'Invalid room name' });
+    return createErrorResponse('Invalid room name');
   }
 
   /**

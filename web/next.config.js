@@ -18,6 +18,28 @@ const nextConfig = {
     config.devtool = false;
     return config;
   },
+  // Proxy API requests through Next.js to the backend.
+  // This makes cookies same-origin (both on port 3001) so httpOnly auth
+  // cookies set by the backend are visible to Next.js middleware.
+  async rewrites() {
+    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3000';
+    return [
+      {
+        source: '/api/:path*',
+        destination: `${backendUrl}/api/:path*`,
+      },
+      // Proxy static files (thumbnails) through Next.js so they're same-origin
+      {
+        source: '/static/:path*',
+        destination: `${backendUrl}/static/:path*`,
+      },
+      // Proxy uploaded content files through Next.js
+      {
+        source: '/uploads/:path*',
+        destination: `${backendUrl}/uploads/:path*`,
+      },
+    ];
+  },
   // Security headers
   async headers() {
     return [
