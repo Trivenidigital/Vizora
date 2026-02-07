@@ -47,9 +47,6 @@ importers:
       electron:
         specifier: ^28.3.3
         version: 28.3.3
-      next:
-        specifier: ~16.0.1
-        version: 16.0.11(@babel/core@7.28.6)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.0)(babel-plugin-macros@3.1.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(sass@1.97.3)
       optional:
         specifier: ^0.1.4
         version: 0.1.4
@@ -59,12 +56,6 @@ importers:
       passport-jwt:
         specifier: ^4.0.1
         version: 4.0.1
-      react:
-        specifier: ^19.0.0
-        version: 19.2.4
-      react-dom:
-        specifier: ^19.0.0
-        version: 19.2.4(react@19.2.4)
       reflect-metadata:
         specifier: ^0.1.13
         version: 0.1.14
@@ -369,8 +360,6 @@ importers:
         specifier: ^10.9.2
         version: 10.9.2(@swc/core@1.5.29(@swc/helpers@0.5.18))(@types/node@25.1.0)(typescript@5.9.3)
 
-  middleware-e2e: {}
-
   packages/database:
     dependencies:
       tslib:
@@ -489,8 +478,6 @@ importers:
       typescript:
         specifier: ^5.0.0
         version: 5.9.3
-
-  realtime-e2e: {}
 
   web:
     dependencies:
