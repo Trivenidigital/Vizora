@@ -10,6 +10,7 @@ RUN npm install -g pnpm@9
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY realtime/package.json ./realtime/
 COPY packages/shared/package.json ./packages/shared/
+COPY packages/database/package.json ./packages/database/
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile
@@ -17,6 +18,7 @@ RUN pnpm install --frozen-lockfile
 # Copy source code
 COPY realtime ./realtime
 COPY packages/shared ./packages/shared
+COPY packages/database/ ./packages/database/
 COPY tsconfig.base.json ./
 COPY nx.json ./
 
@@ -34,13 +36,15 @@ RUN npm install -g pnpm@9
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY realtime/package.json ./realtime/
 COPY packages/shared/package.json ./packages/shared/
+COPY packages/database/package.json ./packages/database/
 
 RUN pnpm install --prod --frozen-lockfile
 
 # Copy built application
 COPY --from=builder /app/realtime/dist ./realtime/dist
 COPY --from=builder /app/packages/shared ./packages/shared
+COPY --from=builder /app/packages/database ./packages/database
 
-EXPOSE 3001
+EXPOSE 3002
 
 CMD ["node", "realtime/dist/main.js"]
