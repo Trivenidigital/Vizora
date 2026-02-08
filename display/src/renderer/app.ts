@@ -32,6 +32,9 @@ class DisplayApp {
   private currentCode: string | null = null;
   private isPairingScreenShown = false;
   private contentStartTime: number = 0;
+  private qrOverlayConfig: any = null;
+  private zoneTimers: Map<string, NodeJS.Timeout> = new Map();
+  private zoneIndices: Map<string, number> = new Map();
 
   constructor() {
     console.log('[App] Constructor: Creating DisplayApp instance');
@@ -466,6 +469,10 @@ class DisplayApp {
         contentDiv.appendChild(htmlIframe);
         break;
 
+      case 'layout':
+        this.renderLayout(currentItem);
+        break;
+
       default:
         console.warn('Unknown content type:', currentItem.content?.type);
     }
@@ -566,9 +573,194 @@ class DisplayApp {
       case 'quit':
         window.electronAPI.quitApp();
         break;
+      case 'qr-overlay-update':
+        this.renderQrOverlay(command.config || command.payload?.config);
+        break;
       default:
         console.warn('Unknown command:', command);
     }
+  }
+
+  private renderQrOverlay(config: any) {
+    const overlay = document.getElementById('qr-overlay');
+    if (!overlay) return;
+
+    if (!config || !config.enabled) {
+      overlay.classList.add('hidden');
+      overlay.innerHTML = '';
+      this.qrOverlayConfig = null;
+      return;
+    }
+
+    this.qrOverlayConfig = config;
+    overlay.innerHTML = '';
+    overlay.className = config.position || 'bottom-right';
+    overlay.style.backgroundColor = config.backgroundColor || '#ffffff';
+    overlay.style.opacity = String(config.opacity ?? 1);
+
+    // Set custom margin if provided
+    const margin = config.margin || 16;
+    if (config.position === 'top-left') { overlay.style.top = margin + 'px'; overlay.style.left = margin + 'px'; }
+    else if (config.position === 'top-right') { overlay.style.top = margin + 'px'; overlay.style.right = margin + 'px'; }
+    else if (config.position === 'bottom-left') { overlay.style.bottom = margin + 'px'; overlay.style.left = margin + 'px'; }
+    else { overlay.style.bottom = margin + 'px'; overlay.style.right = margin + 'px'; }
+
+    // Generate QR code
+    const size = config.size || 120;
+    try {
+      const QRCode = require('qrcode');
+      const canvas = document.createElement('canvas');
+      QRCode.toCanvas(canvas, config.url, {
+        width: size,
+        margin: 1,
+        color: { dark: '#000000', light: config.backgroundColor || '#ffffff' },
+      }, (err: any) => {
+        if (err) {
+          console.error('[App] QR overlay generation failed:', err);
+          return;
+        }
+        overlay.appendChild(canvas);
+
+        // Add label if provided
+        if (config.label) {
+          const label = document.createElement('div');
+          label.className = 'qr-label';
+          label.textContent = config.label;
+          label.style.maxWidth = size + 'px';
+          overlay.appendChild(label);
+        }
+
+        overlay.classList.remove('hidden');
+      });
+    } catch (err) {
+      console.error('[App] QR code library not available:', err);
+    }
+  }
+
+  private renderLayout(content: any) {
+    const container = document.getElementById('content-container');
+    if (!container) return;
+
+    const metadata = content.metadata || content.content?.metadata;
+    if (!metadata || !metadata.zones) {
+      console.warn('[App] Layout has no zone data');
+      return;
+    }
+
+    // Cleanup any previous layout
+    this.cleanupLayout();
+
+    // Create CSS Grid container
+    const grid = document.createElement('div');
+    grid.className = 'layout-grid';
+    if (metadata.gridTemplate) {
+      grid.style.gridTemplateColumns = metadata.gridTemplate.columns || '1fr';
+      grid.style.gridTemplateRows = metadata.gridTemplate.rows || '1fr';
+    }
+    if (metadata.gap) {
+      grid.style.gap = metadata.gap + 'px';
+    }
+    if (metadata.backgroundColor) {
+      grid.style.backgroundColor = metadata.backgroundColor;
+    }
+
+    // Create zones
+    for (const zone of metadata.zones) {
+      const zoneDiv = document.createElement('div');
+      zoneDiv.className = 'layout-zone';
+      zoneDiv.id = `zone-${zone.id}`;
+      zoneDiv.style.gridArea = zone.gridArea;
+
+      // If zone has resolved content/playlist, start playing
+      if (zone.resolvedPlaylist && zone.resolvedPlaylist.items?.length > 0) {
+        this.createZonePlayer(zone.id, zone.resolvedPlaylist, zoneDiv);
+      } else if (zone.resolvedContent) {
+        this.renderZoneContent(zone.resolvedContent, zoneDiv);
+      }
+
+      grid.appendChild(zoneDiv);
+    }
+
+    container.innerHTML = '';
+    container.appendChild(grid);
+  }
+
+  private createZonePlayer(zoneId: string, playlist: any, container: HTMLElement) {
+    this.zoneIndices.set(zoneId, 0);
+
+    const playZoneItem = () => {
+      const index = this.zoneIndices.get(zoneId) || 0;
+      const items = playlist.items;
+      if (!items || items.length === 0) return;
+
+      const item = items[index % items.length];
+      if (!item || !item.content) return;
+
+      this.renderZoneContent(item.content, container);
+
+      const duration = (item.duration || item.content.duration || 10) * 1000;
+      const timer = setTimeout(() => {
+        this.zoneIndices.set(zoneId, (index + 1) % items.length);
+        playZoneItem();
+      }, duration);
+      this.zoneTimers.set(zoneId, timer);
+    };
+
+    playZoneItem();
+  }
+
+  private renderZoneContent(content: any, container: HTMLElement) {
+    container.innerHTML = '';
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'content-item active';
+
+    const contentSource = content.source || content.url;
+
+    switch (content.type) {
+      case 'image':
+        const img = document.createElement('img');
+        img.src = contentSource;
+        contentDiv.appendChild(img);
+        break;
+      case 'video':
+        const video = document.createElement('video');
+        video.src = contentSource;
+        video.autoplay = true;
+        video.muted = true; // Mute zone videos to avoid audio conflicts
+        video.loop = true;
+        contentDiv.appendChild(video);
+        break;
+      case 'html':
+      case 'template':
+        const iframe = document.createElement('iframe');
+        iframe.sandbox.add('allow-scripts');
+        iframe.srcdoc = contentSource;
+        iframe.style.width = '100%';
+        iframe.style.height = '100%';
+        iframe.style.border = 'none';
+        contentDiv.appendChild(iframe);
+        break;
+      case 'url':
+      case 'webpage':
+        const urlIframe = document.createElement('iframe');
+        urlIframe.src = contentSource;
+        urlIframe.style.width = '100%';
+        urlIframe.style.height = '100%';
+        urlIframe.style.border = 'none';
+        contentDiv.appendChild(urlIframe);
+        break;
+    }
+
+    container.appendChild(contentDiv);
+  }
+
+  private cleanupLayout() {
+    // Stop all zone timers
+    for (const [zoneId, timer] of this.zoneTimers) {
+      clearTimeout(timer);
+    }
+    this.zoneTimers.clear();
+    this.zoneIndices.clear();
   }
 
   private async preloadContent(items: any[]) {

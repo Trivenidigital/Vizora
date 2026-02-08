@@ -8,6 +8,7 @@ import { CircuitBreakerService } from '../common/services/circuit-breaker.servic
 import { StorageService } from '../storage/storage.service';
 import { CreateDisplayDto } from './dto/create-display.dto';
 import { UpdateDisplayDto } from './dto/update-display.dto';
+import { UpdateQrOverlayDto } from './dto/update-qr-overlay.dto';
 import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
 
 const MINIO_URL_PREFIX = 'minio://';
@@ -568,5 +569,36 @@ export class DisplaysService {
     });
 
     this.logger.log(`Screenshot saved for display ${displayId}: ${screenshotUrl}`);
+  }
+
+  async updateQrOverlay(organizationId: string, id: string, dto: UpdateQrOverlayDto) {
+    const display = await this.findOne(organizationId, id);
+    const metadata = (display.metadata as Record<string, any>) || {};
+    metadata.qrOverlay = {
+      enabled: dto.enabled,
+      url: dto.url,
+      position: dto.position || 'bottom-right',
+      size: dto.size || 120,
+      opacity: dto.opacity ?? 1,
+      margin: dto.margin || 16,
+      backgroundColor: dto.backgroundColor || '#ffffff',
+      label: dto.label,
+    };
+
+    return this.db.display.update({
+      where: { id },
+      data: { metadata: metadata as any },
+    });
+  }
+
+  async removeQrOverlay(organizationId: string, id: string) {
+    const display = await this.findOne(organizationId, id);
+    const metadata = (display.metadata as Record<string, any>) || {};
+    delete metadata.qrOverlay;
+
+    return this.db.display.update({
+      where: { id },
+      data: { metadata: metadata as any },
+    });
   }
 }
