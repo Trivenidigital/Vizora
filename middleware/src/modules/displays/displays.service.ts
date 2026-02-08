@@ -193,6 +193,8 @@ export class DisplaysService {
           this.httpService.post(url, {
             deviceId: displayId,
             playlist,
+          }, {
+            headers: { 'x-internal-api-key': process.env.INTERNAL_API_SECRET || '' },
           }),
         );
         this.logger.log(`Notified realtime service of playlist update for display ${displayId}`);
@@ -226,13 +228,24 @@ export class DisplaysService {
   async generatePairingToken(organizationId: string, id: string) {
     const display = await this.findOne(organizationId, id);
 
-    // Generate device JWT token
-    const pairingToken = this.jwtService.sign({
-      sub: display.id,
-      deviceIdentifier: display.deviceIdentifier,
-      organizationId: display.organizationId,
-      type: 'device',
-    });
+    // Generate device JWT token using DEVICE_JWT_SECRET (not the user JWT_SECRET)
+    const deviceSecret = process.env.DEVICE_JWT_SECRET;
+    if (!deviceSecret || deviceSecret.length < 32) {
+      throw new Error('DEVICE_JWT_SECRET must be set and be at least 32 characters');
+    }
+
+    const pairingToken = this.jwtService.sign(
+      {
+        sub: display.id,
+        deviceIdentifier: display.deviceIdentifier,
+        organizationId: display.organizationId,
+        type: 'device',
+      },
+      {
+        secret: deviceSecret,
+        algorithm: 'HS256',
+      },
+    );
 
     // Hash the token before storing in database for security
     // If database is compromised, attacker cannot use the hashed tokens
@@ -359,6 +372,8 @@ export class DisplaysService {
               duration: content.duration,
             },
             duration,
+          }, {
+            headers: { 'x-internal-api-key': process.env.INTERNAL_API_SECRET || '' },
           }),
         );
         this.logger.log(`Pushed content ${contentId} to display ${displayId} for ${duration}s`);
@@ -460,6 +475,8 @@ export class DisplaysService {
               displayId,
               command: 'screenshot',
               payload: { requestId },
+            }, {
+              headers: { 'x-internal-api-key': process.env.INTERNAL_API_SECRET || '' },
             }),
           );
           this.logger.log(`Screenshot requested for display ${displayId} (requestId: ${requestId})`);

@@ -36,9 +36,28 @@ function createWindow() {
     },
   });
 
-  // Set Content Security Policy to allow loading images from the middleware server
-  const cspApiUrl = process.env.API_URL || 'http://localhost:3000';
-  const cspWsUrl = process.env.WS_URL || 'ws://localhost:3002';
+  // Resolve server URLs: electron-store > environment variables > defaults
+  const apiUrl = (store.get('apiUrl') as string) || process.env.API_URL || 'http://localhost:3000';
+  const realtimeUrl = (store.get('realtimeUrl') as string) || process.env.REALTIME_URL || 'ws://localhost:3002';
+
+  // Extract the API domain for CSP directives
+  let cspApiOrigin: string;
+  try {
+    const parsed = new URL(apiUrl);
+    cspApiOrigin = parsed.origin;
+  } catch {
+    cspApiOrigin = 'http://localhost:3000';
+  }
+
+  let cspWsOrigin: string;
+  try {
+    const parsed = new URL(realtimeUrl);
+    cspWsOrigin = parsed.origin;
+  } catch {
+    cspWsOrigin = 'ws://localhost:3002';
+  }
+
+  // Set Content Security Policy dynamically based on configured URLs
   mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
@@ -47,10 +66,10 @@ function createWindow() {
           "default-src 'self'; " +
           "script-src 'self' 'unsafe-inline'; " +
           "style-src 'self' 'unsafe-inline'; " +
-          `img-src 'self' data: ${cspApiUrl}; ` +
-          `connect-src 'self' ${cspApiUrl} ${cspWsUrl}; ` +
-          `media-src 'self' ${cspApiUrl}; ` +
-          "frame-src 'self' http: https:;"
+          `img-src 'self' data: ${cspApiOrigin}; ` +
+          `connect-src 'self' ${cspApiOrigin} ${cspWsOrigin}; ` +
+          `media-src 'self' ${cspApiOrigin}; ` +
+          `frame-src 'self' ${cspApiOrigin} http: https:;`
         ]
       }
     });
@@ -119,8 +138,8 @@ function initializeDeviceClient() {
     store.set('deviceToken', deviceToken);
   }
 
-  const apiUrl = process.env.API_URL || 'http://localhost:3000';
-  const realtimeUrl = process.env.REALTIME_URL || 'ws://localhost:3002';
+  const apiUrl = (store.get('apiUrl') as string) || process.env.API_URL || 'http://localhost:3000';
+  const realtimeUrl = (store.get('realtimeUrl') as string) || process.env.REALTIME_URL || 'ws://localhost:3002';
 
   console.log('[Main] *** INITIALIZING DEVICE CLIENT ***');
   console.log('[Main] Device token loaded:', deviceToken ? `${deviceToken.substring(0, 20)}...` : 'NONE - WILL REQUEST PAIRING');

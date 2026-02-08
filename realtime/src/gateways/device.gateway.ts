@@ -97,6 +97,7 @@ export class DeviceGateway
       // Verify device JWT
       const payload = this.jwtService.verify<DevicePayload>(token, {
         secret: process.env.DEVICE_JWT_SECRET,
+        algorithms: ['HS256'],
       });
 
       if (payload.type !== 'device') {
@@ -213,15 +214,11 @@ export class DeviceGateway
         this.logger.debug(`Display found: ${!!display}, hasPlaylist: ${!!display?.currentPlaylist}, playlistId: ${display?.currentPlaylistId || 'none'}`);
 
         if (display?.currentPlaylist) {
-          // Get the device token for appending to content URLs (needed for img/video src auth)
-          const deviceToken = client.handshake.auth?.token || '';
-
           // Transform playlist to the format expected by the display client
+          // Content URLs use the API base path — devices authenticate via
+          // Authorization header with their stored JWT, not via URL query params
           const resolvedItems = display.currentPlaylist.items.map((item: any) => {
             const resolvedUrl = this.resolveContentUrl(item);
-            const urlWithAuth = resolvedUrl.includes('/api/device-content/')
-              ? `${resolvedUrl}?token=${encodeURIComponent(deviceToken)}`
-              : resolvedUrl;
             return {
               id: item.id,
               contentId: item.contentId,
@@ -231,7 +228,7 @@ export class DeviceGateway
                 id: item.content.id,
                 name: item.content.name,
                 type: item.content.type,
-                url: urlWithAuth,
+                url: resolvedUrl,
                 thumbnail: item.content.thumbnail,
                 mimeType: item.content.mimeType,
                 duration: item.content.duration,
@@ -501,26 +498,17 @@ export class DeviceGateway
 
   // Admin methods (called from API)
   async sendPlaylistUpdate(deviceId: string, playlist: Playlist): Promise<void> {
-    // Look up the device's token from its connected socket for URL auth
-    let deviceToken = '';
-    const sockets = await this.server.in(`device:${deviceId}`).fetchSockets();
-    if (sockets.length > 0) {
-      deviceToken = sockets[0].handshake.auth?.token || '';
-    }
-
     // Resolve minio:// URLs to API-served URLs before sending to device
+    // Devices authenticate content requests via Authorization header with their stored JWT
     const resolvedPlaylist = {
       ...playlist,
       items: (playlist.items || []).map((item: any) => {
         const resolvedUrl = this.resolveContentUrl(item);
-        const urlWithAuth = resolvedUrl.includes('/api/device-content/') && deviceToken
-          ? `${resolvedUrl}?token=${encodeURIComponent(deviceToken)}`
-          : resolvedUrl;
         return {
           ...item,
           content: item.content ? {
             ...item.content,
-            url: urlWithAuth,
+            url: resolvedUrl,
           } : item.content,
         };
       }),

@@ -8,37 +8,37 @@ describe('StatusBadge', () => {
   it('renders active status correctly', () => {
     render(<StatusBadge status="active" />);
     expect(screen.getByText('Active')).toBeInTheDocument();
-    expect(screen.getByText('Active')).toHaveClass('bg-green-100');
+    expect(screen.getByText('Active')).toHaveClass('bg-green-500/10');
   });
 
   it('renders trialing status correctly', () => {
     render(<StatusBadge status="trialing" />);
     expect(screen.getByText('Trial')).toBeInTheDocument();
-    expect(screen.getByText('Trial')).toHaveClass('bg-blue-100');
+    expect(screen.getByText('Trial')).toHaveClass('bg-[#00B4D8]/10');
   });
 
   it('renders past_due status correctly', () => {
     render(<StatusBadge status="past_due" />);
     expect(screen.getByText('Past Due')).toBeInTheDocument();
-    expect(screen.getByText('Past Due')).toHaveClass('bg-yellow-100');
+    expect(screen.getByText('Past Due')).toHaveClass('bg-yellow-500/10');
   });
 
   it('renders canceled status correctly', () => {
     render(<StatusBadge status="canceled" />);
     expect(screen.getByText('Canceled')).toBeInTheDocument();
-    expect(screen.getByText('Canceled')).toHaveClass('bg-gray-100');
+    expect(screen.getByText('Canceled')).toHaveClass('bg-[var(--surface-hover)]');
   });
 
   it('renders paid invoice status correctly', () => {
     render(<StatusBadge status="paid" />);
     expect(screen.getByText('Paid')).toBeInTheDocument();
-    expect(screen.getByText('Paid')).toHaveClass('bg-green-100');
+    expect(screen.getByText('Paid')).toHaveClass('bg-green-500/10');
   });
 
   it('renders open invoice status correctly', () => {
     render(<StatusBadge status="open" />);
     expect(screen.getByText('Open')).toBeInTheDocument();
-    expect(screen.getByText('Open')).toHaveClass('bg-yellow-100');
+    expect(screen.getByText('Open')).toHaveClass('bg-yellow-500/10');
   });
 
   it('handles unknown status gracefully', () => {
@@ -73,21 +73,21 @@ describe('QuotaBar', () => {
     expect(screen.getByText('15 remaining')).toBeInTheDocument();
   });
 
-  it('shows blue color for normal usage', () => {
+  it('shows green color for normal usage', () => {
     const { container } = render(<QuotaBar used={10} total={25} />);
-    const progressBar = container.querySelector('.bg-blue-600');
+    const progressBar = container.querySelector('.bg-\\[\\#00E5A0\\]');
     expect(progressBar).toBeInTheDocument();
   });
 
   it('shows yellow color for 75%+ usage', () => {
     const { container } = render(<QuotaBar used={80} total={100} />);
-    const progressBar = container.querySelector('.bg-yellow-600');
+    const progressBar = container.querySelector('.bg-yellow-500');
     expect(progressBar).toBeInTheDocument();
   });
 
   it('shows red color for 90%+ usage', () => {
     const { container } = render(<QuotaBar used={95} total={100} />);
-    const progressBar = container.querySelector('.bg-red-600');
+    const progressBar = container.querySelector('.bg-red-500');
     expect(progressBar).toBeInTheDocument();
   });
 
