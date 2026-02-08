@@ -1,11 +1,13 @@
 import { UnauthorizedException } from '@nestjs/common';
 import { JwtStrategy, JwtPayload } from './jwt.strategy';
 import { DatabaseService } from '../../database/database.service';
+import { RedisService } from '../../redis/redis.service';
 import { AUTH_CONSTANTS } from '../constants/auth.constants';
 
 describe('JwtStrategy', () => {
   let strategy: JwtStrategy;
   let mockDatabaseService: jest.Mocked<DatabaseService>;
+  let mockRedisService: jest.Mocked<RedisService>;
   const originalEnv = process.env;
 
   beforeEach(() => {
@@ -18,6 +20,10 @@ describe('JwtStrategy', () => {
         findUnique: jest.fn(),
       },
     } as any;
+
+    mockRedisService = {
+      exists: jest.fn().mockResolvedValue(false),
+    } as any;
   });
 
   afterEach(() => {
@@ -26,13 +32,13 @@ describe('JwtStrategy', () => {
 
   describe('constructor', () => {
     it('should create strategy with valid JWT_SECRET', () => {
-      expect(() => new JwtStrategy(mockDatabaseService)).not.toThrow();
+      expect(() => new JwtStrategy(mockDatabaseService, mockRedisService)).not.toThrow();
     });
 
     it('should throw error when JWT_SECRET is undefined', () => {
       delete process.env.JWT_SECRET;
 
-      expect(() => new JwtStrategy(mockDatabaseService)).toThrow(
+      expect(() => new JwtStrategy(mockDatabaseService, mockRedisService)).toThrow(
         `JWT_SECRET must be at least ${AUTH_CONSTANTS.MIN_JWT_SECRET_LENGTH} characters`,
       );
     });
@@ -40,7 +46,7 @@ describe('JwtStrategy', () => {
     it('should throw error when JWT_SECRET is empty', () => {
       process.env.JWT_SECRET = '';
 
-      expect(() => new JwtStrategy(mockDatabaseService)).toThrow(
+      expect(() => new JwtStrategy(mockDatabaseService, mockRedisService)).toThrow(
         `JWT_SECRET must be at least ${AUTH_CONSTANTS.MIN_JWT_SECRET_LENGTH} characters`,
       );
     });
@@ -48,7 +54,7 @@ describe('JwtStrategy', () => {
     it('should throw error when JWT_SECRET is too short', () => {
       process.env.JWT_SECRET = 'short';
 
-      expect(() => new JwtStrategy(mockDatabaseService)).toThrow(
+      expect(() => new JwtStrategy(mockDatabaseService, mockRedisService)).toThrow(
         `JWT_SECRET must be at least ${AUTH_CONSTANTS.MIN_JWT_SECRET_LENGTH} characters`,
       );
     });
@@ -56,19 +62,19 @@ describe('JwtStrategy', () => {
     it(`should accept JWT_SECRET with exactly ${AUTH_CONSTANTS.MIN_JWT_SECRET_LENGTH} characters`, () => {
       process.env.JWT_SECRET = 'a'.repeat(AUTH_CONSTANTS.MIN_JWT_SECRET_LENGTH);
 
-      expect(() => new JwtStrategy(mockDatabaseService)).not.toThrow();
+      expect(() => new JwtStrategy(mockDatabaseService, mockRedisService)).not.toThrow();
     });
 
     it(`should accept JWT_SECRET longer than ${AUTH_CONSTANTS.MIN_JWT_SECRET_LENGTH} characters`, () => {
       process.env.JWT_SECRET = 'a'.repeat(AUTH_CONSTANTS.MIN_JWT_SECRET_LENGTH + 100);
 
-      expect(() => new JwtStrategy(mockDatabaseService)).not.toThrow();
+      expect(() => new JwtStrategy(mockDatabaseService, mockRedisService)).not.toThrow();
     });
   });
 
   describe('validate', () => {
     beforeEach(() => {
-      strategy = new JwtStrategy(mockDatabaseService);
+      strategy = new JwtStrategy(mockDatabaseService, mockRedisService);
     });
 
     describe('device tokens', () => {
@@ -174,6 +180,106 @@ describe('JwtStrategy', () => {
         const result = await strategy.validate(userPayload);
 
         expect(result.organization).toEqual(userWithOrg.organization);
+      });
+    });
+
+    describe('token revocation', () => {
+      const mockUser = {
+        id: 'user-123',
+        email: 'test@example.com',
+        organizationId: 'org-123',
+        role: 'admin',
+        isActive: true,
+        organization: {
+          id: 'org-123',
+          name: 'Test Organization',
+        },
+      };
+
+      it('should throw UnauthorizedException for revoked token', async () => {
+        const payload: JwtPayload = {
+          sub: 'user-123',
+          email: 'test@example.com',
+          organizationId: 'org-123',
+          role: 'admin',
+          jti: 'revoked-jti-123',
+        };
+
+        mockRedisService.exists.mockResolvedValue(true);
+
+        await expect(strategy.validate(payload)).rejects.toThrow(UnauthorizedException);
+        await expect(strategy.validate(payload)).rejects.toThrow('Token has been revoked');
+      });
+
+      it('should not query database for revoked tokens', async () => {
+        const payload: JwtPayload = {
+          sub: 'user-123',
+          email: 'test@example.com',
+          organizationId: 'org-123',
+          role: 'admin',
+          jti: 'revoked-jti-123',
+        };
+
+        mockRedisService.exists.mockResolvedValue(true);
+
+        await strategy.validate(payload).catch(() => {});
+
+        expect(mockDatabaseService.user.findUnique).not.toHaveBeenCalled();
+      });
+
+      it('should check revocation with correct Redis key', async () => {
+        const payload: JwtPayload = {
+          sub: 'user-123',
+          email: 'test@example.com',
+          organizationId: 'org-123',
+          role: 'admin',
+          jti: 'my-jti-456',
+        };
+
+        mockRedisService.exists.mockResolvedValue(false);
+        mockDatabaseService.user.findUnique.mockResolvedValue(mockUser as any);
+
+        await strategy.validate(payload);
+
+        expect(mockRedisService.exists).toHaveBeenCalledWith('revoked_token:my-jti-456');
+      });
+
+      it('should allow valid non-revoked token with jti', async () => {
+        const payload: JwtPayload = {
+          sub: 'user-123',
+          email: 'test@example.com',
+          organizationId: 'org-123',
+          role: 'admin',
+          jti: 'valid-jti-789',
+        };
+
+        mockRedisService.exists.mockResolvedValue(false);
+        mockDatabaseService.user.findUnique.mockResolvedValue(mockUser as any);
+
+        const result = await strategy.validate(payload);
+
+        expect(result).toEqual({
+          id: mockUser.id,
+          email: mockUser.email,
+          organizationId: mockUser.organizationId,
+          role: mockUser.role,
+          organization: mockUser.organization,
+        });
+      });
+
+      it('should skip revocation check when jti is not present', async () => {
+        const payload: JwtPayload = {
+          sub: 'user-123',
+          email: 'test@example.com',
+          organizationId: 'org-123',
+          role: 'admin',
+        };
+
+        mockDatabaseService.user.findUnique.mockResolvedValue(mockUser as any);
+
+        await strategy.validate(payload);
+
+        expect(mockRedisService.exists).not.toHaveBeenCalled();
       });
     });
 
@@ -300,6 +406,7 @@ describe('extractJwtFromCookieOrHeader', () => {
 
   describe('integration with strategy', () => {
     let mockDatabaseService: jest.Mocked<DatabaseService>;
+    let mockRedisService: jest.Mocked<RedisService>;
 
     beforeEach(() => {
       process.env.JWT_SECRET = 'a'.repeat(AUTH_CONSTANTS.MIN_JWT_SECRET_LENGTH);
@@ -308,12 +415,15 @@ describe('extractJwtFromCookieOrHeader', () => {
           findUnique: jest.fn(),
         },
       } as any;
+      mockRedisService = {
+        exists: jest.fn().mockResolvedValue(false),
+      } as any;
     });
 
     it('should be configured to extract JWT from cookies and headers', () => {
       // The strategy is configured with extractJwtFromCookieOrHeader
       // This test verifies the strategy can be created with this configuration
-      const strategy = new JwtStrategy(mockDatabaseService);
+      const strategy = new JwtStrategy(mockDatabaseService, mockRedisService);
       expect(strategy).toBeDefined();
     });
   });

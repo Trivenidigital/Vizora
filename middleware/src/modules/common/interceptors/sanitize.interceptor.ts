@@ -21,9 +21,17 @@ export class SanitizeInterceptor implements NestInterceptor {
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
-    
+
     if (request.body && typeof request.body === 'object') {
       request.body = this.sanitizeObject(request.body);
+    }
+
+    if (request.query && typeof request.query === 'object') {
+      request.query = this.sanitizeObject(request.query);
+    }
+
+    if (request.params && typeof request.params === 'object') {
+      request.params = this.sanitizeObject(request.params);
     }
 
     return next.handle();

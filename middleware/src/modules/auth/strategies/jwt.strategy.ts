@@ -3,6 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { Request } from 'express';
 import { DatabaseService } from '../../database/database.service';
+import { RedisService } from '../../redis/redis.service';
 import { AUTH_CONSTANTS } from '../constants/auth.constants';
 
 export interface JwtPayload {
@@ -10,7 +11,9 @@ export interface JwtPayload {
   email: string;
   organizationId: string;
   role: string;
+  isSuperAdmin?: boolean;
   type?: string; // 'user' or 'device'
+  jti?: string; // JWT ID for token revocation
 }
 
 /**
@@ -34,7 +37,10 @@ function extractJwtFromCookieOrHeader(req: Request): string | null {
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(private databaseService: DatabaseService) {
+  constructor(
+    private databaseService: DatabaseService,
+    private redisService: RedisService,
+  ) {
     const secret = process.env.JWT_SECRET;
     if (!secret || secret.length < AUTH_CONSTANTS.MIN_JWT_SECRET_LENGTH) {
       throw new Error(
@@ -55,6 +61,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // their own auth path with DEVICE_JWT_SECRET, not the user JWT_SECRET
     if (payload.type === 'device') {
       throw new UnauthorizedException('Device tokens are not valid for user authentication');
+    }
+
+    // Check if token has been revoked
+    if (payload.jti) {
+      const isRevoked = await this.redisService.exists(`revoked_token:${payload.jti}`);
+      if (isRevoked) {
+        throw new UnauthorizedException('Token has been revoked');
+      }
     }
 
     // Validate user exists and is active

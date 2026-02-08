@@ -6,12 +6,12 @@ describe('SanitizeInterceptor', () => {
   let interceptor: SanitizeInterceptor;
   let mockExecutionContext: ExecutionContext;
   let mockCallHandler: CallHandler;
-  let mockRequest: { body: unknown };
+  let mockRequest: { body: unknown; query: unknown; params: unknown };
 
   beforeEach(() => {
     interceptor = new SanitizeInterceptor();
 
-    mockRequest = { body: {} };
+    mockRequest = { body: {}, query: {}, params: {} };
 
     mockExecutionContext = {
       switchToHttp: jest.fn().mockReturnValue({
@@ -257,6 +257,114 @@ describe('SanitizeInterceptor', () => {
         name: 'John',
         middleName: null,
       });
+    });
+  });
+
+  describe('Query Params Sanitization', () => {
+    it('should sanitize XSS in query parameters', () => {
+      mockRequest.query = {
+        search: '<script>alert("xss")</script>searchterm',
+        page: '1',
+      };
+
+      interceptor.intercept(mockExecutionContext, mockCallHandler);
+
+      expect(mockRequest.query).toEqual({
+        search: 'searchterm',
+        page: '1',
+      });
+    });
+
+    it('should strip HTML tags from query strings', () => {
+      mockRequest.query = {
+        filter: '<img src=x onerror=alert(1)>active',
+      };
+
+      interceptor.intercept(mockExecutionContext, mockCallHandler);
+
+      expect(mockRequest.query).toEqual({
+        filter: 'active',
+      });
+    });
+
+    it('should handle empty query object', () => {
+      mockRequest.query = {};
+
+      interceptor.intercept(mockExecutionContext, mockCallHandler);
+
+      expect(mockRequest.query).toEqual({});
+    });
+
+    it('should handle null query', () => {
+      mockRequest.query = null;
+
+      interceptor.intercept(mockExecutionContext, mockCallHandler);
+
+      expect(mockRequest.query).toBeNull();
+    });
+
+    it('should handle undefined query', () => {
+      mockRequest.query = undefined;
+
+      interceptor.intercept(mockExecutionContext, mockCallHandler);
+
+      expect(mockRequest.query).toBeUndefined();
+    });
+  });
+
+  describe('URL Params Sanitization', () => {
+    it('should sanitize XSS in URL parameters', () => {
+      mockRequest.params = {
+        id: '<script>alert("xss")</script>abc123',
+      };
+
+      interceptor.intercept(mockExecutionContext, mockCallHandler);
+
+      expect(mockRequest.params).toEqual({
+        id: 'abc123',
+      });
+    });
+
+    it('should strip HTML tags from URL params', () => {
+      mockRequest.params = {
+        slug: '<b>my-page</b>',
+      };
+
+      interceptor.intercept(mockExecutionContext, mockCallHandler);
+
+      expect(mockRequest.params).toEqual({
+        slug: 'my-page',
+      });
+    });
+
+    it('should handle empty params object', () => {
+      mockRequest.params = {};
+
+      interceptor.intercept(mockExecutionContext, mockCallHandler);
+
+      expect(mockRequest.params).toEqual({});
+    });
+
+    it('should handle null params', () => {
+      mockRequest.params = null;
+
+      interceptor.intercept(mockExecutionContext, mockCallHandler);
+
+      expect(mockRequest.params).toBeNull();
+    });
+  });
+
+  describe('Combined Sanitization', () => {
+    it('should sanitize body, query, and params in a single request', () => {
+      mockRequest.body = { name: '<script>evil()</script>John' };
+      mockRequest.query = { search: '<img src=x onerror=alert(1)>term' };
+      mockRequest.params = { id: '<b>abc123</b>' };
+
+      interceptor.intercept(mockExecutionContext, mockCallHandler);
+
+      expect(mockRequest.body).toEqual({ name: 'John' });
+      expect(mockRequest.query).toEqual({ search: 'term' });
+      expect(mockRequest.params).toEqual({ id: 'abc123' });
     });
   });
 

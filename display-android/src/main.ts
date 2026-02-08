@@ -83,7 +83,10 @@ class VizoraAndroidTV {
   private deviceToken: string | null = null;
   private pairingCode: string | null = null;
   private pairingCheckInterval: ReturnType<typeof setInterval> | null = null;
+  private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
   private config: Config = DEFAULT_CONFIG;
+  private startTime: number = Date.now();
+  private currentContentId: string | null = null;
 
   private currentPlaylist: Playlist | null = null;
   private currentIndex = 0;
@@ -402,6 +405,67 @@ class VizoraAndroidTV {
     }
   }
 
+  // ==================== HEARTBEAT ====================
+
+  private startHeartbeat() {
+    if (this.heartbeatInterval) {
+      return;
+    }
+
+    console.log('[Vizora] Starting heartbeat (every 15s)');
+
+    // Send first heartbeat immediately
+    this.sendHeartbeat();
+
+    this.heartbeatInterval = setInterval(() => {
+      this.sendHeartbeat();
+    }, 15000);
+  }
+
+  private stopHeartbeat() {
+    if (this.heartbeatInterval) {
+      console.log('[Vizora] Stopping heartbeat');
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
+
+  private sendHeartbeat() {
+    if (!this.socket || !this.socket.connected) {
+      return;
+    }
+
+    try {
+      const uptimeSeconds = Math.floor((Date.now() - this.startTime) / 1000);
+
+      // Use browser performance API for memory if available, otherwise defaults
+      let memoryUsage = 50; // reasonable default
+      const perfMemory = (performance as any).memory;
+      if (perfMemory && perfMemory.jsHeapSizeLimit) {
+        memoryUsage = Math.round((perfMemory.usedJSHeapSize / perfMemory.jsHeapSizeLimit) * 100 * 100) / 100;
+      }
+
+      const heartbeatData = {
+        timestamp: new Date().toISOString(),
+        metrics: {
+          cpuUsage: 0, // not available in browser/WebView context
+          memoryUsage,
+          uptime: uptimeSeconds,
+        },
+        currentContent: this.currentContentId || null,
+        status: 'online',
+      };
+
+      this.socket.emit('heartbeat', heartbeatData, (response: any) => {
+        if (response && response.commands) {
+          response.commands.forEach((cmd: any) => this.handleCommand(cmd));
+        }
+      });
+    } catch (error) {
+      console.error('[Vizora] Error sending heartbeat:', error);
+    }
+  }
+
   // ==================== REALTIME CONNECTION ====================
 
   private connectToRealtime() {
@@ -421,6 +485,7 @@ class VizoraAndroidTV {
 
     // Close existing socket if any
     if (this.socket) {
+      this.stopHeartbeat();
       this.socket.disconnect();
     }
 
@@ -439,11 +504,13 @@ class VizoraAndroidTV {
       console.log('[Vizora] Connected to realtime gateway');
       this.updateStatus('online', 'Connected');
       this.showScreen('content');
+      this.startHeartbeat();
     });
 
     this.socket.on('disconnect', (reason) => {
       console.log('[Vizora] Disconnected:', reason);
       this.updateStatus('offline', 'Disconnected');
+      this.stopHeartbeat();
     });
 
     this.socket.on('connect_error', async (error) => {
@@ -516,6 +583,17 @@ class VizoraAndroidTV {
     }
 
     console.log(`[Vizora] Playing content ${this.currentIndex + 1}/${items.length}: ${currentItem.content.name}`);
+
+    // Track current content for heartbeat reporting
+    this.currentContentId = currentItem.content.id;
+
+    // Emit content impression for analytics
+    if (this.socket?.connected) {
+      this.socket.emit('content:impression', {
+        contentId: currentItem.content.id,
+        timestamp: Date.now(),
+      });
+    }
 
     container.innerHTML = '';
 
@@ -713,6 +791,17 @@ class VizoraAndroidTV {
       : transformContentUrl(content.url, this.config.apiUrl);
 
     console.log(`[Vizora] Rendering temporary content: ${contentType} - ${contentUrl}`);
+
+    // Track current content for heartbeat reporting
+    this.currentContentId = content.id;
+
+    // Emit content impression for analytics
+    if (this.socket?.connected) {
+      this.socket.emit('content:impression', {
+        contentId: content.id,
+        timestamp: Date.now(),
+      });
+    }
 
     switch (contentType) {
       case 'image':
