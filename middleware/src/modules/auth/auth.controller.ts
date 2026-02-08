@@ -1,5 +1,5 @@
-import { Controller, Post, Body, UseGuards, Get, Res } from '@nestjs/common';
-import { Response } from 'express';
+import { Controller, Post, Body, UseGuards, Get, Res, Req } from '@nestjs/common';
+import { Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import {
   ApiTags,
@@ -183,9 +183,17 @@ export class AuthController {
   @Post('logout')
   async logout(
     @CurrentUser('id') userId: string,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.authService.logout(userId);
+    // Extract the token from cookie or Authorization header for revocation
+    const token =
+      req.cookies?.[AUTH_CONSTANTS.COOKIE_NAME] ||
+      (req.headers.authorization?.startsWith('Bearer ')
+        ? req.headers.authorization.substring(7)
+        : undefined);
+
+    const result = await this.authService.logout(userId, token);
 
     // Clear the auth cookie
     this.clearAuthCookie(res);
