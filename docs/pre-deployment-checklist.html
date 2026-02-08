@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vizora — Pre-Deployment Checklist</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --text: #1a1a2e;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --accent: #00E5A0;
+      --accent-dark: #00b37d;
+      --accent-light: #ecfdf5;
+      --surface: #f8fafc;
+      --card-bg: #ffffff;
+      --code-bg: #f1f5f9;
+      --critical: #dc2626;
+      --critical-bg: #fef2f2;
+      --high: #ea580c;
+      --high-bg: #fff7ed;
+      --medium: #d97706;
+      --medium-bg: #fffbeb;
+      --low: #3b82f6;
+      --low-bg: #eff6ff;
+      --done: #16a34a;
+      --done-bg: #f0fdf4;
+      --header-bg: #061A21;
+      --header-text: #ffffff;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--surface); color: var(--text); line-height: 1.6; }
+
+    .header { background: var(--header-bg); color: var(--header-text); padding: 2rem 0; border-bottom: 3px solid var(--accent); }
+    .header-inner { max-width: 1100px; margin: 0 auto; padding: 0 2rem; }
+    .header h1 { font-size: 2rem; font-weight: 700; }
+    .header h1 span { color: var(--accent); }
+    .header p { color: #94a3b8; margin-top: 0.5rem; font-size: 1rem; }
+    .header-meta { display: flex; gap: 2rem; margin-top: 1rem; flex-wrap: wrap; }
+    .header-meta .tag { background: rgba(0,229,160,0.15); color: var(--accent); padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.85rem; font-weight: 500; }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 2rem; }
+
+    .progress-bar { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem 2rem; margin-bottom: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .progress-bar h3 { font-size: 1rem; color: var(--muted); margin-bottom: 0.75rem; }
+    .progress-track { background: var(--code-bg); border-radius: 8px; height: 12px; overflow: hidden; }
+    .progress-fill { background: linear-gradient(90deg, var(--accent), var(--accent-dark)); height: 100%; border-radius: 8px; transition: width 0.3s; }
+    .progress-stats { display: flex; justify-content: space-between; margin-top: 0.5rem; font-size: 0.85rem; color: var(--muted); }
+
+    .section { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 1.5rem; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .section-header { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 0.75rem; cursor: pointer; user-select: none; }
+    .section-header:hover { background: var(--surface); }
+    .section-header h2 { font-size: 1.15rem; font-weight: 600; flex: 1; }
+    .section-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; }
+    .section-badge { font-size: 0.75rem; font-weight: 600; padding: 0.2rem 0.6rem; border-radius: 99px; }
+    .section-content { padding: 0; }
+
+    .checklist { list-style: none; }
+    .checklist-item { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; gap: 0.75rem; align-items: flex-start; }
+    .checklist-item:last-child { border-bottom: none; }
+    .checklist-item:hover { background: var(--surface); }
+    .checklist-item input[type="checkbox"] { width: 20px; height: 20px; margin-top: 2px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
+    .checklist-item label { cursor: pointer; flex: 1; }
+    .checklist-item .title { font-weight: 500; display: block; }
+    .checklist-item .desc { color: var(--muted); font-size: 0.9rem; margin-top: 0.25rem; display: block; }
+    .checklist-item .cmd { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 0.75rem; margin-top: 0.5rem; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.82rem; display: block; white-space: pre-wrap; word-break: break-all; color: var(--text); position: relative; }
+    .checklist-item .cmd .copy-btn { position: absolute; top: 4px; right: 4px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 2px 8px; font-size: 0.7rem; cursor: pointer; color: var(--muted); }
+    .checklist-item .cmd .copy-btn:hover { background: var(--accent-light); color: var(--accent-dark); }
+    .checklist-item input:checked + label .title { color: var(--done); text-decoration: line-through; }
+
+    .severity { font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px; vertical-align: middle; margin-left: 0.5rem; }
+    .severity.critical { background: var(--critical-bg); color: var(--critical); }
+    .severity.high { background: var(--high-bg); color: var(--high); }
+    .severity.medium { background: var(--medium-bg); color: var(--medium); }
+    .severity.done { background: var(--done-bg); color: var(--done); }
+
+    .icon-security { background: #fef2f2; color: #dc2626; }
+    .icon-infra { background: #eff6ff; color: #3b82f6; }
+    .icon-db { background: #faf5ff; color: #7c3aed; }
+    .icon-monitor { background: #ecfdf5; color: #059669; }
+    .icon-env { background: #fffbeb; color: #d97706; }
+    .icon-verify { background: #f0fdf4; color: #16a34a; }
+    .icon-app { background: #fdf4ff; color: #c026d3; }
+
+    .note-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 1rem 1.25rem; margin: 1rem 1.5rem; font-size: 0.9rem; }
+    .note-box strong { color: var(--medium); }
+
+    .audit-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .audit-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .audit-card .number { font-size: 2rem; font-weight: 700; }
+    .audit-card .label { font-size: 0.85rem; color: var(--muted); margin-top: 0.25rem; }
+    .audit-card.fixed .number { color: var(--done); }
+    .audit-card.remaining .number { color: var(--medium); }
+
+    .footer { text-align: center; padding: 2rem; color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--border); margin-top: 2rem; }
+
+    @media (max-width: 640px) {
+      .container { padding: 1rem; }
+      .header-inner { padding: 0 1rem; }
+      .checklist-item { padding: 0.75rem 1rem; }
+      .audit-summary { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <h1><span>Vizora</span> Pre-Deployment Checklist</h1>
+    <p>Pilot production deployment readiness verification</p>
+    <div class="header-meta">
+      <span class="tag">Branch: feat/electric-horizon-branding</span>
+      <span class="tag">Date: 2026-02-08</span>
+      <span class="tag">Platform: Digital Signage</span>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Audit Summary -->
+  <div class="audit-summary">
+    <div class="audit-card fixed">
+      <div class="number">46</div>
+      <div class="label">Issues Fixed (Code)</div>
+    </div>
+    <div class="audit-card fixed">
+      <div class="number">17</div>
+      <div class="label">New Files Created</div>
+    </div>
+    <div class="audit-card fixed">
+      <div class="number">54</div>
+      <div class="label">Files Modified</div>
+    </div>
+    <div class="audit-card remaining">
+      <div class="number" id="remaining-count">0</div>
+      <div class="label">Steps Remaining</div>
+    </div>
+  </div>
+
+  <!-- Progress Bar -->
+  <div class="progress-bar">
+    <h3>Deployment Progress</h3>
+    <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width: 0%"></div></div>
+    <div class="progress-stats">
+      <span id="progress-text">0 of 0 completed</span>
+      <span id="progress-pct">0%</span>
+    </div>
+  </div>
+
+  <!-- 1. Environment Setup -->
+  <div class="section">
+    <div class="section-header" onclick="toggleSection(this)">
+      <div class="section-icon icon-env">&#9881;</div>
+      <h2>1. Environment Setup</h2>
+      <span class="section-badge" style="background: var(--critical-bg); color: var(--critical);">Do First</span>
+    </div>
+    <div class="section-content">
+      <div class="note-box">
+        <strong>Important:</strong> These steps must be completed on your production server before starting any services.
+      </div>
+      <ul class="checklist">
+        <li class="checklist-item">
+          <input type="checkbox" id="c1" onchange="updateProgress()">
+          <label for="c1">
+            <span class="title">Create production .env file <span class="severity critical">required</span></span>
+            <span class="desc">Copy the production template and fill in all CHANGEME_ values with real credentials.</span>
+            <code class="cmd">cp .env.production.example .env</code>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="c2" onchange="updateProgress()">
+          <label for="c2">
+            <span class="title">Generate JWT secrets <span class="severity critical">required</span></span>
+            <span class="desc">Generate cryptographically secure secrets for user and device JWT authentication.</span>
+            <code class="cmd">openssl rand -hex 32  # Use output for JWT_SECRET
+openssl rand -hex 32  # Use output for DEVICE_JWT_SECRET</code>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="c3" onchange="updateProgress()">
+          <label for="c3">
+            <span class="title">Set infrastructure credentials <span class="severity critical">required</span></span>
+            <span class="desc">Set strong passwords for PostgreSQL, Redis, MongoDB, MinIO, and Grafana in .env. These are used by docker-compose.</span>
+            <code class="cmd"># In .env, set these values:
+POSTGRES_PASSWORD=&lt;strong-password&gt;
+REDIS_PASSWORD=&lt;strong-password&gt;
+MONGO_INITDB_ROOT_USERNAME=vizora_admin
+MONGO_INITDB_ROOT_PASSWORD=&lt;strong-password&gt;
+MINIO_ROOT_USER=vizora_admin
+MINIO_ROOT_PASSWORD=&lt;strong-password&gt;
+GF_SECURITY_ADMIN_PASSWORD=&lt;strong-password&gt;</code>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="c4" onchange="updateProgress()">
+          <label for="c4">
+            <span class="title">Configure service URLs <span class="severity critical">required</span></span>
+            <span class="desc">Set the public-facing URLs for API, WebSocket, and CORS. These must match your domain/DNS setup.</span>
+            <code class="cmd"># In .env:
+API_BASE_URL=https://yourdomain.com/api
+CORS_ORIGIN=https://yourdomain.com
+NEXT_PUBLIC_API_URL=https://yourdomain.com/api
+NEXT_PUBLIC_SOCKET_URL=https://yourdomain.com
+BACKEND_URL=http://localhost:3000</code>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="c5" onchange="updateProgress()">
+          <label for="c5">
+            <span class="title">Set NODE_ENV=production <span class="severity critical">required</span></span>
+            <span class="desc">Ensures strict rate limits, CSP headers, secure cookies, and production error handling are active.</span>
+            <code class="cmd">export NODE_ENV=production</code>
+          </label>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 2. TLS/SSL Setup -->
+  <div class="section">
+    <div class="section-header" onclick="toggleSection(this)">
+      <div class="section-icon icon-security">&#128274;</div>
+      <h2>2. TLS / SSL Certificates</h2>
+      <span class="section-badge" style="background: var(--critical-bg); color: var(--critical);">Security</span>
+    </div>
+    <div class="section-content">
+      <ul class="checklist">
+        <li class="checklist-item">
+          <input type="checkbox" id="c6" onchange="updateProgress()">
+          <label for="c6">
+            <span class="title">Install certbot <span class="severity high">required</span></span>
+            <span class="desc">Certbot automates Let's Encrypt certificate provisioning and renewal.</span>
+            <code class="cmd">sudo apt install certbot  # Ubuntu/Debian
+# or: sudo yum install certbot  # RHEL/CentOS</code>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="c7" onchange="updateProgress()">
+          <label for="c7">
+            <span class="title">Obtain SSL certificate <span class="severity high">required</span></span>
+            <span class="desc">Run the setup script to obtain a Let's Encrypt certificate. Ensure port 80 is open and DNS points to this server.</span>
+            <code class="cmd">sudo bash scripts/setup-ssl.sh yourdomain.com --email admin@yourdomain.com</code>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="c8" onchange="updateProgress()">
+          <label for="c8">
+            <span class="title">Set up certificate auto-renewal <span class="severity medium">recommended</span></span>
+            <span class="desc">Let's Encrypt certificates expire every 90 days. Add a cron job for automatic renewal.</span>
+            <code class="cmd">sudo crontab -e
+# Add: 0 3 * * * certbot renew --quiet --deploy-hook "docker restart vizora-nginx"</code>
+          </label>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 3. Infrastructure -->
+  <div class="section">
+    <div class="section-header" onclick="toggleSection(this)">
+      <div class="section-icon icon-infra">&#9889;</div>
+      <h2>3. Infrastructure Services</h2>
+      <span class="section-badge" style="background: var(--high-bg); color: var(--high);">Infrastructure</span>
+    </div>
+    <div class="section-content">
+      <ul class="checklist">
+        <li class="checklist-item">
+          <input type="checkbox" id="c9" onchange="updateProgress()">
+          <label for="c9">
+            <span class="title">Start Docker infrastructure <span class="severity critical">required</span></span>
+            <span class="desc">Start PostgreSQL, Redis, MongoDB, MinIO, ClickHouse, Grafana, and Nginx.</span>
+            <code class="cmd">cd docker && docker-compose up -d</code>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="c10" onchange="updateProgress()">
+          <label for="c10">
+            <span class="title">Verify all containers are healthy <span class="severity high">required</span></span>
+            <span class="desc">All services should show "healthy" status. Check logs if any are "unhealthy".</span>
+            <code class="cmd">docker-compose -f docker/docker-compose.yml ps
+# All should show (healthy)
+# Check logs: docker-compose -f docker/docker-compose.yml logs &lt;service-name&gt;</code>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="c11" onchange="updateProgress()">
+          <label for="c11">
+            <span class="title">Create MinIO bucket <span class="severity high">required</span></span>
+            <span class="desc">Create the storage bucket for content uploads. Access MinIO console at port 9001.</span>
+            <code class="cmd"># Via MinIO Console: http://localhost:9001
+# Or via CLI:
+docker exec vizora-minio mc alias set local http://localhost:9000 $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD
+docker exec vizora-minio mc mb local/vizora-assets</code>
+          </label>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 4. Database -->
+  <div class="section">
+    <div class="section-header" onclick="toggleSection(this)">
+      <div class="section-icon icon-db">&#128451;</div>
+      <h2>4. Database Setup</h2>
+      <span class="section-badge" style="background: var(--high-bg); color: var(--high);">Database</span>
+    </div>
+    <div class="section-content">
+      <ul class="checklist">
+        <li class="checklist-item">
+          <input type="checkbox" id="c12" onchange="updateProgress()">
+          <label for="c12">
+            <span class="title">Install dependencies <span class="severity critical">required</span></span>
+            <span class="desc">Install all Node.js packages and generate the Prisma client.</span>
+            <code class="cmd">pnpm install
+cd packages/database && npx prisma generate</code>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="c13" onchange="updateProgress()">
+          <label for="c13">
+            <span class="title">Run database migrations <span class="severity critical">required</span></span>
+            <span class="desc">Apply all Prisma migrations to create the production schema. Includes integrity fixes (unique constraints, indexes, updatedAt columns).</span>
+            <code class="cmd">cd packages/database && npx prisma migrate deploy</code>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="c14" onchange="updateProgress()">
+          <label for="c14">
+            <span class="title">Verify migration applied <span class="severity medium">recommended</span></span>
+            <span class="desc">Confirm all 6 migrations are applied, especially the schema integrity migration.</span>
+            <code class="cmd">cd packages/database && npx prisma migrate status
+# Should show: "Database schema is up to date!"</code>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="c15" onchange="updateProgress()">
+          <label for="c15">
+            <span class="title">Create initial admin user <span class="severity high">required</span></span>
+            <span class="desc">Create the first organization and admin user. You can use the API directly or a seed script.</span>
+            <code class="cmd"># Start middleware first, then register via API:
+curl -X POST https://yourdomain.com/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@company.com","password":"SecurePass123!","name":"Admin","organizationName":"My Company"}'</code>
+          </label>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 5. Backups -->
+  <div class="section">
+    <div class="section-header" onclick="toggleSection(this)">
+      <div class="section-icon icon-db">&#128190;</div>
+      <h2>5. Backup Configuration</h2>
+      <span class="section-badge" style="background: var(--critical-bg); color: var(--critical);">Critical</span>
+    </div>
+    <div class="section-content">
+      <ul class="checklist">
+        <li class="checklist-item">
+          <input type="checkbox" id="c16" onchange="updateProgress()">
+          <label for="c16">
+            <span class="title">Create backup directory <span class="severity critical">required</span></span>
+            <span class="desc">Create the directory structure for daily, weekly, and monthly backups.</span>
+            <code class="cmd">sudo mkdir -p /var/backups/vizora/{daily,weekly,monthly}
+sudo mkdir -p /var/log/vizora
+sudo chown -R $USER:$USER /var/backups/vizora /var/log/vizora</code>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="c17" onchange="updateProgress()">
+          <label for="c17">
+            <span class="title">Test backup script <span class="severity critical">required</span></span>
+            <span class="desc">Run a test backup to verify the script works with your production DATABASE_URL.</span>
+            <code class="cmd">bash scripts/backup-db.sh
+# Verify: ls -la /var/backups/vizora/daily/</code>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="c18" onchange="updateProgress()">
+          <label for="c18">
+            <span class="title">Schedule automated backups <span class="severity critical">required</span></span>
+            <span class="desc">Add cron job for daily automated backups at 2 AM.</span>
+            <code class="cmd">crontab -e
+# Add this line:
+0 2 * * * cd /path/to/vizora && bash scripts/backup-db.sh >> /var/log/vizora/backup.log 2>&1</code>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="c19" onchange="updateProgress()">
+          <label for="c19">
+            <span class="title">Test restore script <span class="severity high">required</span></span>
+            <span class="desc">Verify backup can be restored to a test database. Never test restore on production.</span>
+            <code class="cmd"># Create a test DB and restore to it:
+bash scripts/restore-db.sh /var/backups/vizora/daily/vizora_backup_*.sql.gz</code>
+          </label>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 6. Application Build & Deploy -->
+  <div class="section">
+    <div class="section-header" onclick="toggleSection(this)">
+      <div class="section-icon icon-app">&#128640;</div>
+      <h2>6. Application Build &amp; Deploy</h2>
+      <span class="section-badge" style="background: var(--high-bg); color: var(--high);">Deploy</span>
+    </div>
+    <div class="section-content">
+      <div class="note-box">
+        <strong>Build Order:</strong> NEXT_PUBLIC_* variables are baked into the Next.js client bundle at build time. Set them in .env BEFORE building.
+      </div>
+      <ul class="checklist">
+        <li class="checklist-item">
+          <input type="checkbox" id="c20" onchange="updateProgress()">
+          <label for="c20">
+            <span class="title">Build middleware API <span class="severity critical">required</span></span>
+            <span class="desc">Build the NestJS middleware service (webpack, generates dist/).</span>
+            <code class="cmd">npx nx build @vizora/middleware</code>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="c21" onchange="updateProgress()">
+          <label for="c21">
+            <span class="title">Build web dashboard <span class="severity critical">required</span></span>
+            <span class="desc">Build the Next.js frontend. NEXT_PUBLIC_* env vars must be set before this step.</span>
+            <code class="cmd">npx nx build @vizora/web</code>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="c22" onchange="updateProgress()">
+          <label for="c22">
+            <span class="title">Build realtime gateway <span class="severity critical">required</span></span>
+            <span class="desc">Build the WebSocket gateway service.</span>
+            <code class="cmd">npx nx build @vizora/realtime</code>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="c23" onchange="updateProgress()">
+          <label for="c23">
+            <span class="title">Install PM2 globally <span class="severity high">required</span></span>
+            <span class="desc">PM2 manages all Node.js services with auto-restart, clustering, and log management.</span>
+            <code class="cmd">npm install -g pm2</code>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="c24" onchange="updateProgress()">
+          <label for="c24">
+            <span class="title">Start all services via PM2 <span class="severity critical">required</span></span>
+            <span class="desc">Start middleware (2 instances, cluster mode), realtime (1 instance), and web (1 instance).</span>
+            <code class="cmd">pm2 start ecosystem.config.js --env production
+pm2 save</code>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="c25" onchange="updateProgress()">
+          <label for="c25">
+            <span class="title">Configure PM2 startup <span class="severity high">required</span></span>
+            <span class="desc">Ensure services auto-start on server reboot.</span>
+            <code class="cmd">pm2 startup
+# Follow the printed command (may require sudo)
+pm2 save</code>
+          </label>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 7. Monitoring -->
+  <div class="section">
+    <div class="section-header" onclick="toggleSection(this)">
+      <div class="section-icon icon-monitor">&#128200;</div>
+      <h2>7. Monitoring &amp; Observability</h2>
+      <span class="section-badge" style="background: var(--medium-bg); color: var(--medium);">Recommended</span>
+    </div>
+    <div class="section-content">
+      <ul class="checklist">
+        <li class="checklist-item">
+          <input type="checkbox" id="c26" onchange="updateProgress()">
+          <label for="c26">
+            <span class="title">Set up Sentry project <span class="severity high">recommended</span></span>
+            <span class="desc">Create a Sentry project for error tracking. The middleware now has Sentry integration built in. Set the DSN in .env.</span>
+            <code class="cmd"># In .env:
+SENTRY_DSN=https://your-key@sentry.io/project-id
+SENTRY_RELEASE=vizora@1.0.0</code>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="c27" onchange="updateProgress()">
+          <label for="c27">
+            <span class="title">Verify Grafana dashboards <span class="severity medium">recommended</span></span>
+            <span class="desc">Access Grafana and verify the "Vizora Platform Overview" dashboard loads with data from PostgreSQL.</span>
+            <code class="cmd"># Open: https://yourdomain.com:3003
+# Login: admin / &lt;GF_SECURITY_ADMIN_PASSWORD&gt;
+# Navigate to Dashboards > Vizora Platform Overview</code>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="c28" onchange="updateProgress()">
+          <label for="c28">
+            <span class="title">Set metrics auth token <span class="severity medium">recommended</span></span>
+            <span class="desc">Protect the Prometheus metrics endpoint from public access.</span>
+            <code class="cmd"># In .env:
+METRICS_TOKEN=$(openssl rand -hex 16)</code>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="c29" onchange="updateProgress()">
+          <label for="c29">
+            <span class="title">Install PM2 log rotation <span class="severity medium">recommended</span></span>
+            <span class="desc">Prevent log files from filling disk space.</span>
+            <code class="cmd">pm2 install pm2-logrotate
+pm2 set pm2-logrotate:max_size 50M
+pm2 set pm2-logrotate:retain 14
+pm2 set pm2-logrotate:compress true</code>
+          </label>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 8. Verification -->
+  <div class="section">
+    <div class="section-header" onclick="toggleSection(this)">
+      <div class="section-icon icon-verify">&#9989;</div>
+      <h2>8. Post-Deployment Verification</h2>
+      <span class="section-badge" style="background: var(--done-bg); color: var(--done);">Verify</span>
+    </div>
+    <div class="section-content">
+      <ul class="checklist">
+        <li class="checklist-item">
+          <input type="checkbox" id="c30" onchange="updateProgress()">
+          <label for="c30">
+            <span class="title">Health check - API <span class="severity critical">required</span></span>
+            <span class="desc">Verify the middleware API is running and all dependencies (DB, Redis, MinIO) are connected.</span>
+            <code class="cmd">curl -s https://yourdomain.com/api/health/ready | jq .
+# Status should be "healthy", all checks should pass</code>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="c31" onchange="updateProgress()">
+          <label for="c31">
+            <span class="title">Health check - Realtime <span class="severity critical">required</span></span>
+            <span class="desc">Verify the WebSocket gateway is running.</span>
+            <code class="cmd">curl -s https://yourdomain.com/api/health/live
+# Should return 200 OK</code>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="c32" onchange="updateProgress()">
+          <label for="c32">
+            <span class="title">HTTPS verification <span class="severity critical">required</span></span>
+            <span class="desc">Verify TLS is working and certificate is valid.</span>
+            <code class="cmd">curl -vI https://yourdomain.com 2>&1 | grep -E "(SSL|subject|expire|HTTP)"
+# Should show valid certificate and HTTP/2 200</code>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="c33" onchange="updateProgress()">
+          <label for="c33">
+            <span class="title">Dashboard login test <span class="severity critical">required</span></span>
+            <span class="desc">Open the web dashboard in a browser and verify you can log in with the admin account.</span>
+            <code class="cmd"># Open: https://yourdomain.com
+# Click "Login" and enter admin credentials
+# Verify dashboard loads with sidebar, header, and device list</code>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="c34" onchange="updateProgress()">
+          <label for="c34">
+            <span class="title">WebSocket connection test <span class="severity high">required</span></span>
+            <span class="desc">Verify real-time updates work. Open browser DevTools Network tab and confirm WebSocket connects.</span>
+            <code class="cmd"># In browser DevTools > Network > WS tab
+# Should see a socket.io connection to /socket.io/
+# Status should be 101 Switching Protocols</code>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="c35" onchange="updateProgress()">
+          <label for="c35">
+            <span class="title">Content upload test <span class="severity high">required</span></span>
+            <span class="desc">Upload a test image through the dashboard to verify MinIO storage and file validation work.</span>
+            <code class="cmd"># Dashboard > Content > Upload
+# Upload a test PNG or JPEG image
+# Verify it appears in the content library with thumbnail</code>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="c36" onchange="updateProgress()">
+          <label for="c36">
+            <span class="title">Security headers check <span class="severity medium">recommended</span></span>
+            <span class="desc">Verify security headers are present in responses.</span>
+            <code class="cmd">curl -sI https://yourdomain.com | grep -iE "(strict-transport|x-frame|x-content-type|x-xss|referrer-policy)"
+# Should show: HSTS, X-Frame-Options, X-Content-Type-Options, X-XSS-Protection, Referrer-Policy</code>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="c37" onchange="updateProgress()">
+          <label for="c37">
+            <span class="title">PM2 process status <span class="severity medium">recommended</span></span>
+            <span class="desc">Verify all PM2 processes are online and stable (no restart loops).</span>
+            <code class="cmd">pm2 status
+# All services should show "online" status
+# Restart count should be 0 or very low</code>
+          </label>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 9. Security Hardening Reference -->
+  <div class="section">
+    <div class="section-header" onclick="toggleSection(this)">
+      <div class="section-icon icon-security">&#128737;</div>
+      <h2>9. Audit Fixes Applied (Reference)</h2>
+      <span class="section-badge" style="background: var(--done-bg); color: var(--done);">Done</span>
+    </div>
+    <div class="section-content">
+      <div class="note-box">
+        <strong>Already fixed in code:</strong> These issues were identified during the security audit and have been resolved in the codebase. Listed here for awareness.
+      </div>
+      <ul class="checklist">
+        <li class="checklist-item">
+          <input type="checkbox" id="r1" checked disabled>
+          <label for="r1">
+            <span class="title">Device JWT hashed before database storage <span class="severity done">fixed</span></span>
+            <span class="desc">Pairing service now hashes tokens with SHA-256 before writing to DB, preventing token extraction on DB compromise.</span>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="r2" checked disabled>
+          <label for="r2">
+            <span class="title">Admin routes protected in Next.js middleware <span class="severity done">fixed</span></span>
+            <span class="desc">/admin/* paths now require auth token, preventing unauthenticated access to admin bundles.</span>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="r3" checked disabled>
+          <label for="r3">
+            <span class="title">Heartbeat endpoint requires device JWT auth <span class="severity done">fixed</span></span>
+            <span class="desc">Prevents unauthenticated users from spoofing device online status.</span>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="r4" checked disabled>
+          <label for="r4">
+            <span class="title">CSRF bypass eliminated <span class="severity done">fixed</span></span>
+            <span class="desc">Requests without CSRF cookie are now rejected (was previously allowed through).</span>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="r5" checked disabled>
+          <label for="r5">
+            <span class="title">Global exception filter prevents error leakage <span class="severity done">fixed</span></span>
+            <span class="desc">500 errors return generic message in production. Stack traces and internal details are never exposed.</span>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="r6" checked disabled>
+          <label for="r6">
+            <span class="title">Server-side request and DB query timeouts added <span class="severity done">fixed</span></span>
+            <span class="desc">30s HTTP timeout (120s for uploads), 30s PostgreSQL statement_timeout. Prevents resource exhaustion.</span>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="r7" checked disabled>
+          <label for="r7">
+            <span class="title">Database schema integrity constraints added <span class="severity done">fixed</span></span>
+            <span class="desc">Unique constraints on ApiKey.hashedKey and BillingTransaction, compound indexes, updatedAt columns, transaction wrapping.</span>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="r8" checked disabled>
+          <label for="r8">
+            <span class="title">Docker infrastructure hardened <span class="severity done">fixed</span></span>
+            <span class="desc">Parameterized credentials, restart policies, resource limits, correct ports, pinned image versions.</span>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="r9" checked disabled>
+          <label for="r9">
+            <span class="title">Frontend production console.log removed <span class="severity done">fixed</span></span>
+            <span class="desc">50+ unguarded console.log statements wrapped with NODE_ENV === 'development' check.</span>
+          </label>
+        </li>
+        <li class="checklist-item">
+          <input type="checkbox" id="r10" checked disabled>
+          <label for="r10">
+            <span class="title">Sentry error tracking integrated <span class="severity done">fixed</span></span>
+            <span class="desc">Both middleware and realtime services now have Sentry with sensitive data filtering.</span>
+          </label>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="footer">
+    Vizora Platform &mdash; Pre-Deployment Checklist &mdash; Generated 2026-02-08<br>
+    <span style="color: var(--accent);">46 code issues fixed</span> &bull; 37 deployment steps &bull; 10 audit items verified
+  </div>
+
+</div>
+
+<script>
+  function updateProgress() {
+    const checkboxes = document.querySelectorAll('.checklist-item input[type="checkbox"]:not([disabled])');
+    const total = checkboxes.length;
+    const checked = Array.from(checkboxes).filter(cb => cb.checked).length;
+    const remaining = total - checked;
+    const pct = Math.round((checked / total) * 100);
+
+    document.getElementById('progress-fill').style.width = pct + '%';
+    document.getElementById('progress-text').textContent = checked + ' of ' + total + ' completed';
+    document.getElementById('progress-pct').textContent = pct + '%';
+    document.getElementById('remaining-count').textContent = remaining;
+
+    // Save state to localStorage
+    const state = {};
+    checkboxes.forEach(cb => { state[cb.id] = cb.checked; });
+    localStorage.setItem('vizora-checklist', JSON.stringify(state));
+  }
+
+  function toggleSection(header) {
+    const content = header.nextElementSibling;
+    content.style.display = content.style.display === 'none' ? '' : 'none';
+  }
+
+  // Restore state from localStorage
+  (function() {
+    try {
+      const saved = JSON.parse(localStorage.getItem('vizora-checklist') || '{}');
+      Object.keys(saved).forEach(id => {
+        const cb = document.getElementById(id);
+        if (cb && !cb.disabled) cb.checked = saved[id];
+      });
+    } catch(e) {}
+    updateProgress();
+  })();
+</script>
+
+</body>
+</html>
