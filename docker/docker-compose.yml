@@ -132,6 +132,7 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
       clickhouse:
         condition: service_healthy
@@ -139,6 +140,37 @@ services:
       resources:
         limits:
           memory: 512M
+    networks:
+      - vizora-network
+
+  # ---------------------------------------------------------------------------
+  # Nginx Reverse Proxy — TLS termination for all Vizora services
+  # ---------------------------------------------------------------------------
+  # The application services (middleware, web, realtime) run on the host via PM2.
+  # Nginx proxies external HTTPS traffic to them.
+  #
+  # INITIAL SETUP: Generate SSL certificates before starting this service:
+  #   ./scripts/setup-ssl.sh your-domain.com
+  #
+  # On Linux hosts, uncomment extra_hosts below so host.docker.internal resolves.
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: vizora-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - certbot_webroot:/var/www/certbot:ro
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway"  # Uncomment on Linux
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     networks:
       - vizora-network
 
@@ -154,6 +186,8 @@ volumes:
   clickhouse_data:
     driver: local
   grafana_data:
+    driver: local
+  certbot_webroot:
     driver: local
 
 networks:

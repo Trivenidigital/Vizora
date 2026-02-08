@@ -106,6 +106,7 @@
     "@nestjs/schedule": "^6.1.0",
     "@nestjs/swagger": "^11.2.0",
     "@nestjs/throttler": "^6.5.0",
+    "@sentry/node": "^9.0.0",
     "@vizora/database": "workspace:*",
     "axios": "^1.7.0",
     "bcryptjs": "^3.0.3",
