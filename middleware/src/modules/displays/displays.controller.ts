@@ -7,8 +7,12 @@ import {
   Param,
   Delete,
   Query,
+  Req,
   UseGuards,
+  UnauthorizedException,
 } from '@nestjs/common';
+import type { Request } from 'express';
+import { JwtService } from '@nestjs/jwt';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CheckQuota } from '../billing/decorators/check-quota.decorator';
@@ -24,7 +28,10 @@ import { Public } from '../auth/decorators/public.decorator';
 @UseGuards(RolesGuard)
 @Controller('displays')
 export class DisplaysController {
-  constructor(private readonly displaysService: DisplaysService) {}
+  constructor(
+    private readonly displaysService: DisplaysService,
+    private readonly jwtService: JwtService,
+  ) {}
 
   @Post()
   @Roles('admin', 'manager')
@@ -99,8 +106,28 @@ export class DisplaysController {
   }
 
   @Post(':deviceId/heartbeat')
-  @Public()
-  heartbeat(@Param('deviceId') deviceId: string) {
+  @Public() // Bypass user JWT guard -- device JWT verified manually below
+  heartbeat(@Param('deviceId') deviceId: string, @Req() req: Request) {
+    // Verify device JWT to prevent unauthenticated heartbeat calls
+    const token = (req.headers.authorization as string)?.replace('Bearer ', '');
+    if (!token) {
+      throw new UnauthorizedException('Device authentication required');
+    }
+    try {
+      const payload = this.jwtService.verify(token, {
+        secret: process.env.DEVICE_JWT_SECRET,
+      });
+      if (payload.type !== 'device') {
+        throw new UnauthorizedException('Invalid token type');
+      }
+      // Validate the device is sending its own heartbeat
+      if (payload.deviceIdentifier !== deviceId && payload.sub !== deviceId) {
+        throw new UnauthorizedException('Device identity mismatch');
+      }
+    } catch (error) {
+      if (error instanceof UnauthorizedException) throw error;
+      throw new UnauthorizedException('Invalid or expired device token');
+    }
     return this.displaysService.updateHeartbeat(deviceId);
   }
 

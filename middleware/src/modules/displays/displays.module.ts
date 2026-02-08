@@ -5,18 +5,20 @@ import { DisplaysService } from './displays.service';
 import { DisplaysController } from './displays.controller';
 import { PairingService } from './pairing.service';
 import { PairingController } from './pairing.controller';
+import { StorageModule } from '../storage/storage.module';
 
 @Module({
   imports: [
     JwtModule.registerAsync({
       useFactory: () => ({
-        secret: process.env.DEVICE_JWT_SECRET || process.env.JWT_SECRET,
+        secret: process.env.DEVICE_JWT_SECRET,
         signOptions: {
           expiresIn: '30d', // Device tokens last longer
         },
       }),
     }),
     HttpModule,
+    StorageModule,
   ],
   controllers: [DisplaysController, PairingController],
   providers: [DisplaysService, PairingService],

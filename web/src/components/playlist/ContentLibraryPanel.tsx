@@ -50,20 +50,20 @@ export default function ContentLibraryPanel({ organizationId }: ContentLibraryPa
   });
 
   return (
-    <div className="flex flex-col h-full bg-gray-50 border-r border-gray-200">
+    <div className="flex flex-col h-full bg-[var(--background)] border-r border-[var(--border)]">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 bg-white">
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">Content Library</h3>
+      <div className="p-4 border-b border-[var(--border)] bg-[var(--surface)]">
+        <h3 className="text-lg font-semibold text-[var(--foreground)] mb-3">Content Library</h3>
 
         {/* Search */}
         <div className="relative mb-3">
-          <Icon name="search" size="sm" className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Icon name="search" size="sm" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--foreground-tertiary)]" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search content..."
-            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full pl-9 pr-3 py-2 text-sm border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
           />
         </div>
 
@@ -76,8 +76,8 @@ export default function ContentLibraryPanel({ organizationId }: ContentLibraryPa
               className={`
                 px-3 py-1 text-xs font-medium rounded-full transition
                 ${typeFilter === type
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  ? 'bg-[#00E5A0] text-[#061A21]'
+                  : 'bg-[var(--background-tertiary)] text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
                 }
               `}
             >
@@ -95,16 +95,16 @@ export default function ContentLibraryPanel({ organizationId }: ContentLibraryPa
           </div>
         ) : filteredContent.length === 0 ? (
           <div className="text-center py-12">
-            <div className="text-gray-400 mb-2">
-              <Icon name="content" size="2xl" className="text-gray-400 mx-auto" />
+            <div className="text-[var(--foreground-tertiary)] mb-2">
+              <Icon name="content" size="2xl" className="text-[var(--foreground-tertiary)] mx-auto" />
             </div>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-[var(--foreground-tertiary)]">
               {searchQuery ? 'No content found' : 'No content available'}
             </p>
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="text-xs text-blue-600 hover:text-blue-700 mt-2"
+                className="text-xs text-[#00E5A0] hover:text-[#00CC8E] mt-2"
               >
                 Clear search
               </button>
@@ -121,22 +121,22 @@ export default function ContentLibraryPanel({ organizationId }: ContentLibraryPa
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="p-4 border-t border-gray-200 bg-white">
+        <div className="p-4 border-t border-[var(--border)] bg-[var(--surface)]">
           <div className="flex items-center justify-between text-sm">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="px-3 py-1 text-gray-700 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-1 text-[var(--foreground-secondary)] bg-[var(--background-secondary)] rounded hover:bg-[var(--surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Previous
             </button>
-            <span className="text-gray-600">
+            <span className="text-[var(--foreground-secondary)]">
               Page {page} of {totalPages}
             </span>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
-              className="px-3 py-1 text-gray-700 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-1 text-[var(--foreground-secondary)] bg-[var(--background-secondary)] rounded hover:bg-[var(--surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Next
             </button>

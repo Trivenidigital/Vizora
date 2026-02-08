@@ -36,14 +36,14 @@ const CustomTooltip: React.FC<TooltipProps<number, string>> = ({
 }) => {
   if (active && payload && payload.length) {
     return (
-      <div className="rounded-lg border border-neutral-200 bg-white p-3 shadow-lg dark:border-neutral-700 dark:bg-neutral-800">
-        <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-50">
+      <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 shadow-lg">
+        <p className="text-sm font-semibold text-[var(--foreground)]">
           {payload[0].name}
         </p>
         <p className="text-sm" style={{ color: payload[0].fill }}>
           Value: {payload[0].value}
         </p>
-        <p className="text-xs text-neutral-500 dark:text-neutral-400">
+        <p className="text-xs text-[var(--foreground-tertiary)]">
           {((payload[0].value as number) / 100).toFixed(1)}%
         </p>
       </div>

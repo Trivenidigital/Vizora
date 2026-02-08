@@ -51,7 +51,7 @@ export default function DraggableContentItem({ content, isDragging }: DraggableC
       {...listeners}
       {...attributes}
       className={`
-        p-3 bg-white border border-gray-200 rounded-lg cursor-grab active:cursor-grabbing
+        p-3 bg-[var(--surface)] border border-[var(--border)] rounded-lg cursor-grab active:cursor-grabbing
         hover:shadow-md transition-all
         ${isDragging ? 'opacity-50 shadow-lg' : ''}
       `}
@@ -68,30 +68,30 @@ export default function DraggableContentItem({ content, isDragging }: DraggableC
             }}
           />
         ) : (
-          <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center flex-shrink-0">
-            <Icon name={getTypeIcon(content.type)} size="lg" className="text-gray-400" />
+          <div className="w-12 h-12 bg-[var(--background-secondary)] rounded flex items-center justify-center flex-shrink-0">
+            <Icon name={getTypeIcon(content.type)} size="lg" className="text-[var(--foreground-tertiary)]" />
           </div>
         )}
 
         {/* Content Info */}
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium text-gray-900 truncate">
+          <div className="text-sm font-medium text-[var(--foreground)] truncate">
             {content.title}
           </div>
           <div className="flex items-center gap-2 mt-1">
-            <span className="text-xs text-gray-500 capitalize">{content.type}</span>
+            <span className="text-xs text-[var(--foreground-tertiary)] capitalize">{content.type}</span>
             {content.duration && (
               <>
-                <span className="text-gray-300">•</span>
-                <span className="text-xs text-gray-500">{formatDuration(content.duration)}</span>
+                <span className="text-[var(--border)]">•</span>
+                <span className="text-xs text-[var(--foreground-tertiary)]">{formatDuration(content.duration)}</span>
               </>
             )}
           </div>
         </div>
 
         {/* Drag Indicator */}
-        <div className="flex-shrink-0 text-gray-400">
-          <Icon name="list" size="sm" className="text-gray-400" />
+        <div className="flex-shrink-0 text-[var(--foreground-tertiary)]">
+          <Icon name="list" size="sm" className="text-[var(--foreground-tertiary)]" />
         </div>
       </div>
     </div>

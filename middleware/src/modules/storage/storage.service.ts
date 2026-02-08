@@ -220,6 +220,19 @@ export class StorageService implements OnModuleInit {
   }
 
   /**
+   * Get an object stream from MinIO
+   * @param objectKey The key of the object
+   * @returns A readable stream of the object data
+   */
+  async getObject(objectKey: string): Promise<NodeJS.ReadableStream> {
+    if (!this.client || !this.available) {
+      throw new Error('MinIO is not available');
+    }
+
+    return this.client.getObject(this.bucket, objectKey);
+  }
+
+  /**
    * Health check for MinIO connection
    */
   async healthCheck(): Promise<{
@@ -267,9 +280,12 @@ export class StorageService implements OnModuleInit {
     return new Promise((resolve, reject) => {
       let count = 0;
       stream.on('data', (obj) => {
-        if (count < maxKeys && obj.name) {
+        if (obj.name) {
           objects.push(obj.name);
           count++;
+          if (count >= maxKeys) {
+            stream.destroy();
+          }
         }
       });
       stream.on('error', (err) => {
@@ -277,6 +293,9 @@ export class StorageService implements OnModuleInit {
         reject(err);
       });
       stream.on('end', () => {
+        resolve(objects);
+      });
+      stream.on('close', () => {
         resolve(objects);
       });
     });

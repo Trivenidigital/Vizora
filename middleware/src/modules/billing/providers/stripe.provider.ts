@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 import {
@@ -13,20 +13,29 @@ import {
 @Injectable()
 export class StripeProvider implements PaymentProvider {
   readonly name = 'stripe' as const;
-  private readonly stripe: Stripe;
+  private readonly stripe: Stripe | null = null;
   private readonly logger = new Logger(StripeProvider.name);
   private readonly webhookSecret: string;
+  private readonly isConfigured: boolean;
 
   constructor(private readonly configService: ConfigService) {
     const secretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
+    this.isConfigured = !!secretKey;
     if (!secretKey) {
-      this.logger.warn('STRIPE_SECRET_KEY not configured');
+      this.logger.warn('STRIPE_SECRET_KEY not configured - Stripe payments disabled');
+    } else {
+      this.stripe = new Stripe(secretKey, {
+        apiVersion: '2025-01-27.acacia',
+      });
     }
-    this.stripe = new Stripe(secretKey || '', {
-      apiVersion: '2025-01-27.acacia',
-    });
     this.webhookSecret =
       this.configService.get<string>('STRIPE_WEBHOOK_SECRET') || '';
+  }
+
+  private ensureConfigured(): void {
+    if (!this.stripe) {
+      throw new ServiceUnavailableException('Stripe is not configured. Set STRIPE_SECRET_KEY environment variable.');
+    }
   }
 
   async createCustomer(
@@ -34,7 +43,8 @@ export class StripeProvider implements PaymentProvider {
     name: string,
     metadata?: Record<string, any>,
   ): Promise<Customer> {
-    const customer = await this.stripe.customers.create({
+    this.ensureConfigured();
+    const customer = await this.stripe!.customers.create({
       email,
       name,
       metadata,
@@ -48,8 +58,9 @@ export class StripeProvider implements PaymentProvider {
   }
 
   async getCustomer(customerId: string): Promise<Customer | null> {
+    this.ensureConfigured();
     try {
-      const customer = await this.stripe.customers.retrieve(customerId);
+      const customer = await this.stripe!.customers.retrieve(customerId);
       if (customer.deleted) return null;
       return {
         id: customer.id,
@@ -65,7 +76,8 @@ export class StripeProvider implements PaymentProvider {
   async createCheckoutSession(
     params: CheckoutParams,
   ): Promise<{ url: string; sessionId: string }> {
-    const session = await this.stripe.checkout.sessions.create({
+    this.ensureConfigured();
+    const session = await this.stripe!.checkout.sessions.create({
       customer: params.customerId,
       mode: 'subscription',
       line_items: [{ price: params.priceId, quantity: 1 }],
@@ -77,8 +89,9 @@ export class StripeProvider implements PaymentProvider {
   }
 
   async getSubscription(subscriptionId: string): Promise<Subscription | null> {
+    this.ensureConfigured();
     try {
-      const sub = await this.stripe.subscriptions.retrieve(subscriptionId);
+      const sub = await this.stripe!.subscriptions.retrieve(subscriptionId);
       return this.mapSubscription(sub);
     } catch {
       return null;
@@ -89,8 +102,9 @@ export class StripeProvider implements PaymentProvider {
     subscriptionId: string,
     priceId: string,
   ): Promise<Subscription> {
-    const sub = await this.stripe.subscriptions.retrieve(subscriptionId);
-    const updated = await this.stripe.subscriptions.update(subscriptionId, {
+    this.ensureConfigured();
+    const sub = await this.stripe!.subscriptions.retrieve(subscriptionId);
+    const updated = await this.stripe!.subscriptions.update(subscriptionId, {
       items: [{ id: sub.items.data[0].id, price: priceId }],
       proration_behavior: 'create_prorations',
     });
@@ -101,10 +115,11 @@ export class StripeProvider implements PaymentProvider {
     subscriptionId: string,
     immediately = false,
   ): Promise<void> {
+    this.ensureConfigured();
     if (immediately) {
-      await this.stripe.subscriptions.cancel(subscriptionId);
+      await this.stripe!.subscriptions.cancel(subscriptionId);
     } else {
-      await this.stripe.subscriptions.update(subscriptionId, {
+      await this.stripe!.subscriptions.update(subscriptionId, {
         cancel_at_period_end: true,
       });
     }
@@ -114,7 +129,8 @@ export class StripeProvider implements PaymentProvider {
     customerId: string,
     returnUrl: string,
   ): Promise<{ url: string }> {
-    const session = await this.stripe.billingPortal.sessions.create({
+    this.ensureConfigured();
+    const session = await this.stripe!.billingPortal.sessions.create({
       customer: customerId,
       return_url: returnUrl,
     });
@@ -122,7 +138,8 @@ export class StripeProvider implements PaymentProvider {
   }
 
   async getInvoices(customerId: string, limit = 10): Promise<Invoice[]> {
-    const invoices = await this.stripe.invoices.list({
+    this.ensureConfigured();
+    const invoices = await this.stripe!.invoices.list({
       customer: customerId,
       limit,
     });
@@ -144,7 +161,8 @@ export class StripeProvider implements PaymentProvider {
   }
 
   verifyWebhookSignature(payload: Buffer, signature: string): WebhookEvent {
-    const event = this.stripe.webhooks.constructEvent(
+    this.ensureConfigured();
+    const event = this.stripe!.webhooks.constructEvent(
       payload,
       signature,
       this.webhookSecret,

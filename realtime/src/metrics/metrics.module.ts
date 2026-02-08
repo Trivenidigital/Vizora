@@ -10,7 +10,7 @@ import { MetricsService } from './metrics.service';
 @Module({
   imports: [
     PrometheusModule.register({
-      path: '/metrics',
+      path: '/internal/metrics',
       defaultMetrics: {
         enabled: true,
         config: {
@@ -47,29 +47,29 @@ import { MetricsService } from './metrics.service';
     makeCounterProvider({
       name: 'heartbeat_total',
       help: 'Total heartbeats received',
-      labelNames: ['device_id', 'success'],
+      labelNames: ['success'],
     }),
     makeHistogramProvider({
       name: 'heartbeat_duration_seconds',
       help: 'Heartbeat processing duration',
-      labelNames: ['device_id'],
+      labelNames: [],
       buckets: [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1],
     }),
     makeCounterProvider({
       name: 'heartbeat_errors_total',
       help: 'Total heartbeat errors',
-      labelNames: ['device_id'],
+      labelNames: [],
     }),
     // Content Metrics
     makeCounterProvider({
       name: 'content_impressions_total',
       help: 'Total content impressions',
-      labelNames: ['device_id', 'content_id'],
+      labelNames: [],
     }),
     makeCounterProvider({
       name: 'content_errors_total',
       help: 'Total content errors',
-      labelNames: ['device_id', 'error_type'],
+      labelNames: ['error_type'],
     }),
     // Device Metrics
     makeGaugeProvider({

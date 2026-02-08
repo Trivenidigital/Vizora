@@ -37,8 +37,8 @@ function FolderNode({
       <div
         className={`flex items-center py-2 px-2 rounded-md cursor-pointer transition-colors ${
           isSelected
-            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-            : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+            ? 'bg-[#00E5A0]/10 text-[#00E5A0]'
+            : 'hover:bg-[var(--surface-hover)] text-[var(--foreground-secondary)]'
         }`}
         style={{ paddingLeft: `${level * 16 + 8}px` }}
         onClick={() => onSelectFolder(folder.id)}
@@ -49,7 +49,7 @@ function FolderNode({
             e.stopPropagation();
             onToggleExpand(folder.id);
           }}
-          className={`mr-1 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-600 ${
+          className={`mr-1 p-0.5 rounded hover:bg-[var(--surface-hover)] ${
             !hasChildren ? 'invisible' : ''
           }`}
         >
@@ -70,7 +70,7 @@ function FolderNode({
         <Icon
           name={isExpanded ? 'folder' : 'folder'}
           size="md"
-          className={`mr-2 ${isSelected ? 'text-blue-600' : 'text-yellow-500'}`}
+          className={`mr-2 ${isSelected ? 'text-[#00E5A0]' : 'text-yellow-500'}`}
         />
 
         {/* Folder Name */}
@@ -78,7 +78,7 @@ function FolderNode({
 
         {/* Content Count Badge */}
         {folder.contentCount !== undefined && folder.contentCount > 0 && (
-          <span className="ml-2 px-2 py-0.5 text-xs bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 rounded-full">
+          <span className="ml-2 px-2 py-0.5 text-xs bg-[var(--background-tertiary)] text-[var(--foreground-secondary)] rounded-full">
             {folder.contentCount}
           </span>
         )}
@@ -127,8 +127,8 @@ export default function FolderTree({
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="p-3 border-b border-gray-200 dark:border-gray-700">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Folders</h3>
+      <div className="p-3 border-b border-[var(--border)]">
+        <h3 className="text-sm font-semibold text-[var(--foreground)]">Folders</h3>
       </div>
 
       {/* Folder List */}
@@ -137,12 +137,12 @@ export default function FolderTree({
         <div
           className={`flex items-center py-2 px-3 rounded-md cursor-pointer transition-colors ${
             selectedFolderId === null
-              ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-              : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+              ? 'bg-[#00E5A0]/10 text-[#00E5A0]'
+              : 'hover:bg-[var(--surface-hover)] text-[var(--foreground-secondary)]'
           }`}
           onClick={() => onSelectFolder(null)}
         >
-          <Icon name="grid" size="md" className="mr-2 text-gray-500" />
+          <Icon name="grid" size="md" className="mr-2 text-[var(--foreground-tertiary)]" />
           <span className="text-sm font-medium">All Content</span>
         </div>
 
@@ -162,7 +162,7 @@ export default function FolderTree({
             ))}
           </div>
         ) : (
-          <div className="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
+          <div className="mt-4 text-center text-sm text-[var(--foreground-tertiary)]">
             No folders yet
           </div>
         )}
@@ -170,10 +170,10 @@ export default function FolderTree({
 
       {/* New Folder Button */}
       {onCreateFolder && (
-        <div className="p-3 border-t border-gray-200 dark:border-gray-700">
+        <div className="p-3 border-t border-[var(--border)]">
           <button
             onClick={onCreateFolder}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/40 transition"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-[#00E5A0] bg-[#00E5A0]/10 rounded-md hover:bg-[#00E5A0]/20 transition"
           >
             <Icon name="add" size="sm" />
             New Folder

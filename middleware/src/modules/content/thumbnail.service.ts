@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import * as sharp from 'sharp';
+import sharp from 'sharp';
 import { promises as fs } from 'fs';
 import { join } from 'path';
+import { lookup } from 'dns/promises';
 
 @Injectable()
 export class ThumbnailService {
@@ -10,8 +11,112 @@ export class ThumbnailService {
   private readonly MAX_SIZE = 300; // 300x300 max
   private readonly MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB limit
 
+  /** Blocked internal hostname patterns */
+  private readonly BLOCKED_HOSTNAMES = [
+    'localhost',
+    '0.0.0.0',
+  ];
+
+  /** Blocked hostname suffix patterns (e.g. *.internal, *.local) */
+  private readonly BLOCKED_HOSTNAME_SUFFIXES = [
+    '.internal',
+    '.local',
+    '.localhost',
+  ];
+
   constructor() {
     this.ensureThumbnailDir();
+  }
+
+  /**
+   * Validate a URL is safe to fetch (SSRF protection).
+   * Only allows http/https, blocks private IP ranges and internal hostnames.
+   */
+  private async validateUrl(imageUrl: string): Promise<void> {
+    let parsed: URL;
+    try {
+      parsed = new URL(imageUrl);
+    } catch {
+      throw new Error(`Invalid URL: ${imageUrl}`);
+    }
+
+    // Only allow http and https schemes
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new Error(`Disallowed URL scheme: ${parsed.protocol}`);
+    }
+
+    const hostname = parsed.hostname.toLowerCase();
+
+    // Block known internal hostnames
+    if (this.BLOCKED_HOSTNAMES.includes(hostname)) {
+      throw new Error(`Blocked internal hostname: ${hostname}`);
+    }
+
+    // Block internal hostname suffixes
+    for (const suffix of this.BLOCKED_HOSTNAME_SUFFIXES) {
+      if (hostname.endsWith(suffix)) {
+        throw new Error(`Blocked internal hostname: ${hostname}`);
+      }
+    }
+
+    // Resolve hostname and check for private IP ranges
+    try {
+      const result = await lookup(hostname, { all: true });
+      const addresses = Array.isArray(result) ? result : [result];
+
+      for (const entry of addresses) {
+        const ip = entry.address;
+        if (this.isPrivateIp(ip)) {
+          throw new Error(`URL resolves to private IP address: ${ip}`);
+        }
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('URL resolves to')) {
+        throw error;
+      }
+      if (error instanceof Error && error.message.startsWith('Blocked internal')) {
+        throw error;
+      }
+      // DNS resolution failure — block the request
+      throw new Error(`Failed to resolve hostname: ${hostname}`);
+    }
+  }
+
+  /**
+   * Check if an IP address is in a private/reserved range.
+   */
+  private isPrivateIp(ip: string): boolean {
+    // IPv6 loopback
+    if (ip === '::1') return true;
+
+    // IPv6 private range fc00::/7
+    if (ip.toLowerCase().startsWith('fc') || ip.toLowerCase().startsWith('fd')) {
+      return true;
+    }
+
+    // IPv4 checks
+    const parts = ip.split('.').map(Number);
+    if (parts.length !== 4 || parts.some(p => isNaN(p))) {
+      // Not a valid IPv4 — may be IPv6; conservatively allow
+      return false;
+    }
+
+    const [a, b] = parts;
+
+    // 127.0.0.0/8 (loopback)
+    if (a === 127) return true;
+    // 10.0.0.0/8 (private)
+    if (a === 10) return true;
+    // 172.16.0.0/12 (private)
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    // 192.168.0.0/16 (private)
+    if (a === 192 && b === 168) return true;
+    // 169.254.0.0/16 (link-local)
+    if (a === 169 && b === 254) return true;
+    // 0.0.0.0
+    if (a === 0 && b === 0 && parts[2] === 0 && parts[3] === 0) return true;
+
+    return false;
   }
 
   private async ensureThumbnailDir() {
@@ -39,7 +144,9 @@ export class ThumbnailService {
       }
 
       const ext = this.getExtensionFromMime(mimeType);
-      const filename = `${contentId}.${ext}`;
+      const safeId = contentId.replace(/[^a-zA-Z0-9_-]/g, '');
+      if (!safeId) throw new Error('Invalid content ID');
+      const filename = `${safeId}.${ext}`;
       const filepath = join(this.THUMBNAIL_DIR, filename);
 
       // Generate thumbnail using sharp
@@ -62,20 +169,34 @@ export class ThumbnailService {
   }
 
   /**
-   * Generate thumbnail from URL (for already uploaded content)
+   * Generate thumbnail from URL (for already uploaded content).
+   * Validates the URL against SSRF before fetching.
    */
   async generateThumbnailFromUrl(
     contentId: string,
     imageUrl: string
   ): Promise<string> {
+    // Validate URL to prevent SSRF
+    try {
+      await this.validateUrl(imageUrl);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`SSRF validation failed for thumbnail URL (contentId: ${contentId}): ${message}`);
+      throw new Error(`URL validation failed: ${message}`);
+    }
+
     try {
       // Fetch image from URL
       const response = await fetch(imageUrl);
+      const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
+      if (contentLength > this.MAX_FILE_SIZE) {
+        throw new Error('Image too large for thumbnail generation');
+      }
       const arrayBuffer = await response.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
-      
+
       const contentType = response.headers.get('content-type') || 'image/jpeg';
-      
+
       return this.generateThumbnail(contentId, buffer, contentType);
     } catch (error) {
       this.logger.error(

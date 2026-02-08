@@ -13,7 +13,7 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [mode, setModeState] = useState<ThemeMode>('system');
+  const [mode, setModeState] = useState<ThemeMode>('dark');
   const [isDark, setIsDark] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
@@ -23,7 +23,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
     // Get saved preference
     const savedMode = localStorage.getItem('theme-mode') as ThemeMode | null;
-    const initialMode: ThemeMode = savedMode || 'system';
+    const initialMode: ThemeMode = savedMode || 'dark';
     setModeState(initialMode);
 
     // Determine if dark mode should be active
@@ -74,11 +74,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setIsDark(newIsDark);
     applyTheme(newIsDark);
   };
-
-  // Don't render until client-side hydration is complete
-  if (!isMounted) {
-    return <>{children}</>;
-  }
 
   return (
     <ThemeContext.Provider value={{ mode, isDark, setMode }}>

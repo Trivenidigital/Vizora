@@ -22,13 +22,16 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       this.client = new Redis(redisUrl, {
         maxRetriesPerRequest: 3,
         retryStrategy: (times) => {
-          if (times > 3) {
-            this.logger.warn('Redis connection retries exhausted');
-            return null; // Stop retrying
+          if (times > 10) {
+            this.logger.error('Redis max retry attempts (10) exceeded');
+            return null; // Stop retrying — triggers 'end' event
           }
-          return Math.min(times * 200, 2000); // Exponential backoff
+          const delay = Math.min(times * 200, 5000); // Exponential backoff, max 5s
+          this.logger.warn(`Redis reconnecting in ${delay}ms (attempt ${times}/10)`);
+          return delay;
         },
         lazyConnect: true, // Don't connect immediately
+        enableReadyCheck: true,
       });
 
       // Set up event handlers
@@ -45,6 +48,15 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       this.client.on('close', () => {
         this.isConnected = false;
         this.logger.warn('Redis connection closed');
+      });
+
+      this.client.on('reconnecting', () => {
+        this.logger.log('Redis reconnecting...');
+      });
+
+      this.client.on('end', () => {
+        this.isConnected = false;
+        this.logger.error('Redis connection ended (max retries exceeded or disconnected)');
       });
 
       // Attempt to connect

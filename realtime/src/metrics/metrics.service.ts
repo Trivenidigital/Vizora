@@ -85,11 +85,11 @@ export class MetricsService {
    * Record heartbeat
    */
   recordHeartbeat(deviceId: string, success: boolean, durationSeconds: number) {
-    this.heartbeatTotal.inc({ device_id: deviceId, success: success.toString() });
-    this.heartbeatDuration.observe({ device_id: deviceId }, durationSeconds);
-    
+    this.heartbeatTotal.inc({ success: success.toString() });
+    this.heartbeatDuration.observe(durationSeconds);
+
     if (!success) {
-      this.heartbeatErrorsTotal.inc({ device_id: deviceId });
+      this.heartbeatErrorsTotal.inc();
     }
   }
 
@@ -97,14 +97,14 @@ export class MetricsService {
    * Record content impression
    */
   recordImpression(deviceId: string, contentId: string) {
-    this.contentImpressionsTotal.inc({ device_id: deviceId, content_id: contentId });
+    this.contentImpressionsTotal.inc();
   }
 
   /**
    * Record content error
    */
   recordContentError(deviceId: string, errorType: string) {
-    this.contentErrorsTotal.inc({ device_id: deviceId, error_type: errorType });
+    this.contentErrorsTotal.inc({ error_type: errorType });
   }
 
   /**

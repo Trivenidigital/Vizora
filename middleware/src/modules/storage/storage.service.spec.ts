@@ -617,23 +617,36 @@ describe('StorageService', () => {
     });
 
     it('should respect maxKeys parameter', async () => {
+      const callbacks: Record<string, Function> = {};
+      let destroyed = false;
       const mockStream = {
         on: jest.fn((event: string, callback: Function) => {
-          if (event === 'data') {
-            for (let i = 0; i < 10; i++) {
-              callback({ name: `file${i}.jpg` });
-            }
-          }
-          if (event === 'end') {
-            callback();
-          }
+          callbacks[event] = callback;
           return mockStream;
+        }),
+        destroy: jest.fn(() => {
+          destroyed = true;
+          // When destroy is called, fire the close callback
+          if (callbacks['close']) {
+            callbacks['close']();
+          }
         }),
       };
       mockMinioClient.listObjects.mockReturnValue(mockStream);
 
-      const result = await service.listObjects('prefix/', 5);
+      // Start the listObjects call (it returns a promise)
+      const resultPromise = service.listObjects('prefix/', 5);
 
+      // Now simulate data events one at a time; stop when stream is destroyed
+      for (let i = 0; i < 10 && !destroyed; i++) {
+        callbacks['data']({ name: `file${i}.jpg` });
+      }
+      // If not destroyed by maxKeys, fire end
+      if (!destroyed && callbacks['end']) {
+        callbacks['end']();
+      }
+
+      const result = await resultPromise;
       expect(result.length).toBe(5);
     });
 

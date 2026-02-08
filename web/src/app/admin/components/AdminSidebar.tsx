@@ -55,13 +55,13 @@ export function AdminSidebar({ collapsed, onToggle }: AdminSidebarProps) {
     <aside
       className={`${
         collapsed ? 'w-16' : 'w-64'
-      } bg-gray-900 min-h-screen fixed left-0 top-0 z-40 transition-all duration-300 flex flex-col`}
+      } bg-[#061A21] min-h-screen fixed left-0 top-0 z-40 transition-all duration-300 flex flex-col`}
     >
       {/* Logo */}
-      <div className="h-16 flex items-center justify-between px-4 border-b border-gray-800">
+      <div className="h-16 flex items-center justify-between px-4 border-b border-[#1B3D47]">
         {!collapsed && (
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-red-500 to-orange-600 rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-gradient-to-br from-[#8B5CF6] to-[#00B4D8] rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-lg">V</span>
             </div>
             <span className="text-white font-semibold">Admin</span>
@@ -69,7 +69,7 @@ export function AdminSidebar({ collapsed, onToggle }: AdminSidebarProps) {
         )}
         <button
           onClick={onToggle}
-          className="p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white transition"
+          className="p-2 rounded-lg hover:bg-[#081E28] text-[#8A8278] hover:text-white transition"
         >
           {collapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
         </button>
@@ -86,8 +86,8 @@ export function AdminSidebar({ collapsed, onToggle }: AdminSidebarProps) {
                   href={item.href}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
                     active
-                      ? 'bg-gradient-to-r from-red-600 to-orange-600 text-white'
-                      : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                      ? 'bg-gradient-to-r from-[#8B5CF6] to-[#00B4D8] text-white'
+                      : 'text-[#8A8278] hover:bg-[#081E28] hover:text-white'
                   }`}
                   title={collapsed ? item.name : undefined}
                 >
@@ -102,10 +102,10 @@ export function AdminSidebar({ collapsed, onToggle }: AdminSidebarProps) {
 
       {/* Footer */}
       {!collapsed && (
-        <div className="p-4 border-t border-gray-800">
+        <div className="p-4 border-t border-[#1B3D47]">
           <Link
             href="/dashboard"
-            className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition"
+            className="flex items-center gap-2 text-sm text-[#8A8278] hover:text-white transition"
           >
             <ChevronLeft className="w-4 h-4" />
             Back to Dashboard

@@ -5,6 +5,7 @@ import { of } from 'rxjs';
 import { DisplaysService } from './displays.service';
 import { DatabaseService } from '../database/database.service';
 import { CircuitBreakerService } from '../common/services/circuit-breaker.service';
+import { StorageService } from '../storage/storage.service';
 import { NotFoundException, ConflictException } from '@nestjs/common';
 import { CreateDisplayDto } from './dto/create-display.dto';
 import { UpdateDisplayDto } from './dto/update-display.dto';
@@ -83,6 +84,14 @@ describe('DisplaysService', () => {
           provide: CircuitBreakerService,
           useValue: mockCircuitBreakerService,
         },
+        {
+          provide: StorageService,
+          useValue: {
+            healthCheck: jest.fn().mockResolvedValue({ healthy: true, bucket: 'vizora' }),
+            getSignedUrl: jest.fn().mockResolvedValue('https://example.com/signed'),
+            resolveUrl: jest.fn().mockImplementation((url) => url),
+          },
+        },
       ],
     }).compile();
 
@@ -105,14 +114,10 @@ describe('DisplaysService', () => {
     };
 
     it('should create a new display successfully', async () => {
-      databaseService.display.findUnique.mockResolvedValue(null);
       databaseService.display.create.mockResolvedValue(mockDisplay);
 
       const result = await service.create(mockOrganizationId, createDto);
 
-      expect(databaseService.display.findUnique).toHaveBeenCalledWith({
-        where: { deviceIdentifier: mockDeviceIdentifier },
-      });
       expect(databaseService.display.create).toHaveBeenCalledWith({
         data: {
           deviceIdentifier: mockDeviceIdentifier,
@@ -127,16 +132,15 @@ describe('DisplaysService', () => {
     });
 
     it('should throw ConflictException if device ID already exists', async () => {
-      databaseService.display.findUnique.mockResolvedValue(mockDisplay);
+      const prismaError = new Error('Unique constraint failed');
+      (prismaError as any).code = 'P2002';
+      databaseService.display.create.mockRejectedValue(prismaError);
 
       await expect(
         service.create(mockOrganizationId, createDto)
       ).rejects.toThrow(ConflictException);
 
-      expect(databaseService.display.findUnique).toHaveBeenCalledWith({
-        where: { deviceIdentifier: mockDeviceIdentifier },
-      });
-      expect(databaseService.display.create).not.toHaveBeenCalled();
+      expect(databaseService.display.create).toHaveBeenCalled();
     });
   });
 
@@ -527,13 +531,14 @@ describe('DisplaysService', () => {
 
       await service.saveScreenshot(
         mockDisplayId,
+        mockOrganizationId,
         'https://example.com/screenshot.png',
         1920,
         1080,
       );
 
       expect(databaseService.display.update).toHaveBeenCalledWith({
-        where: { id: mockDisplayId },
+        where: { id: mockDisplayId, organizationId: mockOrganizationId },
         data: {
           lastScreenshot: JSON.stringify({
             url: 'https://example.com/screenshot.png',
@@ -550,11 +555,12 @@ describe('DisplaysService', () => {
 
       await service.saveScreenshot(
         mockDisplayId,
+        mockOrganizationId,
         'https://example.com/screenshot.png',
       );
 
       expect(databaseService.display.update).toHaveBeenCalledWith({
-        where: { id: mockDisplayId },
+        where: { id: mockDisplayId, organizationId: mockOrganizationId },
         data: {
           lastScreenshot: JSON.stringify({
             url: 'https://example.com/screenshot.png',

@@ -63,8 +63,8 @@ function SeverityIcon({ severity }: { severity: 'info' | 'warning' | 'critical' 
     case 'info':
     default:
       return (
-        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-          <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#00E5A0]/10 flex items-center justify-center">
+          <svg className="w-4 h-4 text-[#00E5A0]" fill="currentColor" viewBox="0 0 20 20">
             <path
               fillRule="evenodd"
               d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
@@ -122,17 +122,17 @@ export default function NotificationDropdown({
 
   return (
     <div
-      className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden"
+      className="absolute right-0 mt-2 w-96 bg-[var(--surface)] rounded-lg shadow-lg border border-[var(--border)] z-50 overflow-hidden"
       role="menu"
       aria-label="Notifications"
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
-        <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] bg-[var(--background)]">
+        <h3 className="text-sm font-semibold text-[var(--foreground)]">Notifications</h3>
         {hasUnread && (
           <button
             onClick={handleMarkAllAsRead}
-            className="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors"
+            className="text-xs text-[#00E5A0] hover:text-[#00CC8E] font-medium transition-colors"
           >
             Mark all as read
           </button>
@@ -144,7 +144,7 @@ export default function NotificationDropdown({
         {notifications.length === 0 ? (
           <div className="px-4 py-8 text-center">
             <svg
-              className="w-12 h-12 mx-auto text-gray-300 mb-3"
+              className="w-12 h-12 mx-auto text-[var(--foreground-tertiary)] mb-3"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -156,18 +156,18 @@ export default function NotificationDropdown({
                 d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
               />
             </svg>
-            <p className="text-sm text-gray-500">No notifications</p>
+            <p className="text-sm text-[var(--foreground-tertiary)]">No notifications</p>
           </div>
         ) : (
-          <ul className="divide-y divide-gray-100">
+          <ul className="divide-y divide-[var(--border)]">
             {notifications.map((notification) => {
               const link = getNotificationLink(notification);
               const content = (
                 <div
                   className={`flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors ${
                     notification.read
-                      ? 'bg-white hover:bg-gray-50'
-                      : 'bg-blue-50 hover:bg-blue-100'
+                      ? 'bg-[var(--surface)] hover:bg-[var(--surface-hover)]'
+                      : 'bg-[#00E5A0]/10 hover:bg-[#00E5A0]/20'
                   }`}
                   onClick={() => handleNotificationClick(notification)}
                   role="menuitem"
@@ -177,25 +177,25 @@ export default function NotificationDropdown({
                     <div className="flex items-start justify-between gap-2">
                       <p
                         className={`text-sm font-medium truncate ${
-                          notification.read ? 'text-gray-900' : 'text-gray-900'
+                          notification.read ? 'text-[var(--foreground)]' : 'text-[var(--foreground)]'
                         }`}
                       >
                         {notification.title}
                       </p>
                       {!notification.read && (
-                        <span className="flex-shrink-0 w-2 h-2 mt-1.5 bg-blue-600 rounded-full" />
+                        <span className="flex-shrink-0 w-2 h-2 mt-1.5 bg-[#00E5A0] rounded-full" />
                       )}
                     </div>
-                    <p className="text-sm text-gray-600 line-clamp-2 mt-0.5">
+                    <p className="text-sm text-[var(--foreground-secondary)] line-clamp-2 mt-0.5">
                       {notification.message}
                     </p>
-                    <p className="text-xs text-gray-400 mt-1">
+                    <p className="text-xs text-[var(--foreground-tertiary)] mt-1">
                       {formatTimeAgo(notification.createdAt)}
                     </p>
                   </div>
                   <button
                     onClick={(e) => handleDismiss(e, notification.id)}
-                    className="flex-shrink-0 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded transition-colors"
+                    className="flex-shrink-0 p-1 text-[var(--foreground-tertiary)] hover:text-[var(--foreground-secondary)] hover:bg-[var(--background-tertiary)] rounded transition-colors"
                     title="Dismiss"
                   >
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">

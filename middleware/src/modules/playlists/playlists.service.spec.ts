@@ -43,13 +43,13 @@ describe('PlaylistsService', () => {
         deleteMany: jest.fn(),
         update: jest.fn(),
       },
-      $transaction: jest.fn(),
+      $transaction: jest.fn((fn) => fn(mockDatabaseService)),
       content: {
         findMany: jest.fn(),
       },
     };
 
-    service = new PlaylistsService(mockDatabaseService as DatabaseService);
+    service = new PlaylistsService(mockDatabaseService as DatabaseService, {} as any);
   });
 
   it('should be defined', () => {

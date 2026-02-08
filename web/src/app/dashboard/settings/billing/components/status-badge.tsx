@@ -5,27 +5,27 @@ interface StatusBadgeProps {
 }
 
 const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
-  active: { bg: 'bg-green-100 dark:bg-green-900', text: 'text-green-800 dark:text-green-100', label: 'Active' },
-  trialing: { bg: 'bg-blue-100 dark:bg-blue-900', text: 'text-blue-800 dark:text-blue-100', label: 'Trial' },
-  past_due: { bg: 'bg-yellow-100 dark:bg-yellow-900', text: 'text-yellow-800 dark:text-yellow-100', label: 'Past Due' },
-  canceled: { bg: 'bg-gray-100 dark:bg-gray-800', text: 'text-gray-800 dark:text-gray-100', label: 'Canceled' },
-  unpaid: { bg: 'bg-red-100 dark:bg-red-900', text: 'text-red-800 dark:text-red-100', label: 'Unpaid' },
-  incomplete: { bg: 'bg-orange-100 dark:bg-orange-900', text: 'text-orange-800 dark:text-orange-100', label: 'Incomplete' },
-  incomplete_expired: { bg: 'bg-red-100 dark:bg-red-900', text: 'text-red-800 dark:text-red-100', label: 'Expired' },
-  paused: { bg: 'bg-gray-100 dark:bg-gray-800', text: 'text-gray-800 dark:text-gray-100', label: 'Paused' },
-  free: { bg: 'bg-gray-100 dark:bg-gray-800', text: 'text-gray-800 dark:text-gray-100', label: 'Free' },
+  active: { bg: 'bg-green-500/10', text: 'text-green-500', label: 'Active' },
+  trialing: { bg: 'bg-[#00B4D8]/10', text: 'text-[#00B4D8]', label: 'Trial' },
+  past_due: { bg: 'bg-yellow-500/10', text: 'text-yellow-500', label: 'Past Due' },
+  canceled: { bg: 'bg-[var(--surface-hover)]', text: 'text-[var(--foreground-tertiary)]', label: 'Canceled' },
+  unpaid: { bg: 'bg-red-500/10', text: 'text-red-500', label: 'Unpaid' },
+  incomplete: { bg: 'bg-orange-500/10', text: 'text-orange-500', label: 'Incomplete' },
+  incomplete_expired: { bg: 'bg-red-500/10', text: 'text-red-500', label: 'Expired' },
+  paused: { bg: 'bg-[var(--surface-hover)]', text: 'text-[var(--foreground-tertiary)]', label: 'Paused' },
+  free: { bg: 'bg-[var(--surface-hover)]', text: 'text-[var(--foreground-tertiary)]', label: 'Free' },
   // Invoice statuses
-  paid: { bg: 'bg-green-100 dark:bg-green-900', text: 'text-green-800 dark:text-green-100', label: 'Paid' },
-  open: { bg: 'bg-yellow-100 dark:bg-yellow-900', text: 'text-yellow-800 dark:text-yellow-100', label: 'Open' },
-  draft: { bg: 'bg-gray-100 dark:bg-gray-800', text: 'text-gray-800 dark:text-gray-100', label: 'Draft' },
-  void: { bg: 'bg-gray-100 dark:bg-gray-800', text: 'text-gray-800 dark:text-gray-100', label: 'Void' },
-  uncollectible: { bg: 'bg-red-100 dark:bg-red-900', text: 'text-red-800 dark:text-red-100', label: 'Uncollectible' },
+  paid: { bg: 'bg-green-500/10', text: 'text-green-500', label: 'Paid' },
+  open: { bg: 'bg-yellow-500/10', text: 'text-yellow-500', label: 'Open' },
+  draft: { bg: 'bg-[var(--surface-hover)]', text: 'text-[var(--foreground-tertiary)]', label: 'Draft' },
+  void: { bg: 'bg-[var(--surface-hover)]', text: 'text-[var(--foreground-tertiary)]', label: 'Void' },
+  uncollectible: { bg: 'bg-red-500/10', text: 'text-red-500', label: 'Uncollectible' },
 };
 
 export function StatusBadge({ status }: StatusBadgeProps) {
   const config = statusConfig[status.toLowerCase()] || {
-    bg: 'bg-gray-100 dark:bg-gray-800',
-    text: 'text-gray-800 dark:text-gray-100',
+    bg: 'bg-[var(--surface-hover)]',
+    text: 'text-[var(--foreground-tertiary)]',
     label: status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' '),
   };
 

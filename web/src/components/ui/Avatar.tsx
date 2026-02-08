@@ -23,7 +23,7 @@ const sizeMap: Record<AvatarSize, string> = {
 
 const statusColor: Record<string, string> = {
   online: 'bg-success-500',
-  offline: 'bg-neutral-400',
+  offline: 'bg-[var(--foreground-tertiary)]',
   idle: 'bg-warning-500',
   busy: 'bg-error-500',
 };
@@ -60,7 +60,7 @@ export const Avatar: React.FC<AvatarProps> = ({
 
       {status && (
         <div
-          className={`absolute bottom-0 right-0 ${statusSize[size]} rounded-full border-2 border-white dark:border-neutral-900 ${statusColor[status]}`}
+          className={`absolute bottom-0 right-0 ${statusSize[size]} rounded-full border-2 border-[var(--surface)] ${statusColor[status]}`}
           aria-label={`Status: ${status}`}
         />
       )}

@@ -13,7 +13,8 @@ CREATE TABLE IF NOT EXISTS heartbeats (
   metadata String
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMM(timestamp)
-ORDER BY (organization_id, device_id, timestamp);
+ORDER BY (organization_id, device_id, timestamp)
+TTL toDateTime(timestamp) + INTERVAL 90 DAY DELETE;
 
 -- Impressions table - Content display events
 CREATE TABLE IF NOT EXISTS impressions (
@@ -27,7 +28,8 @@ CREATE TABLE IF NOT EXISTS impressions (
   metadata String
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMM(timestamp)
-ORDER BY (organization_id, device_id, timestamp);
+ORDER BY (organization_id, device_id, timestamp)
+TTL toDateTime(timestamp) + INTERVAL 90 DAY DELETE;
 
 -- Playback errors table - Error tracking
 CREATE TABLE IF NOT EXISTS playback_errors (
@@ -40,7 +42,8 @@ CREATE TABLE IF NOT EXISTS playback_errors (
   metadata String
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMM(timestamp)
-ORDER BY (organization_id, timestamp);
+ORDER BY (organization_id, timestamp)
+TTL toDateTime(timestamp) + INTERVAL 90 DAY DELETE;
 
 -- API logs table - Request/response logs
 CREATE TABLE IF NOT EXISTS api_logs (
@@ -55,4 +58,5 @@ CREATE TABLE IF NOT EXISTS api_logs (
   user_agent String
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMM(timestamp)
-ORDER BY (organization_id, timestamp);
+ORDER BY (organization_id, timestamp)
+TTL toDateTime(timestamp) + INTERVAL 90 DAY DELETE;

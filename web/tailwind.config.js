@@ -19,6 +19,24 @@ module.exports = {
         error: semanticColors.error,
         info: semanticColors.info,
         neutral: semanticColors.neutral,
+        // Electric Horizon namespace
+        eh: {
+          bg: '#061A21',
+          'bg-secondary': '#081E28',
+          'bg-tertiary': '#0A222E',
+          surface: '#0C2229',
+          'surface-secondary': '#122D35',
+          accent: '#00E5A0',
+          'accent-hover': '#00CC8E',
+          cyan: '#00B4D8',
+          violet: '#8B5CF6',
+          text: '#F0ECE8',
+          'text-secondary': '#8A8278',
+          'text-muted': '#5A5248',
+          border: '#1B3D47',
+          'border-light': '#264A55',
+          card: 'rgba(12, 34, 41, 0.6)',
+        },
       },
       spacing: {
         xs: tokens.spacing.xs,
@@ -48,6 +66,10 @@ module.exports = {
         xl: tokens.shadow.xl,
         '2xl': tokens.shadow['2xl'],
         inner: tokens.shadow.inner,
+        // Neon glow shadows
+        neon: '0 0 12px rgba(0, 229, 160, 0.25), 0 0 4px rgba(0, 229, 160, 0.1)',
+        'neon-sm': '0 0 6px rgba(0, 229, 160, 0.2)',
+        'neon-lg': '0 0 28px rgba(0, 229, 160, 0.3), 0 0 8px rgba(0, 229, 160, 0.15)',
       },
       transitionDuration: {
         fast: tokens.transition.fast,
@@ -84,6 +106,8 @@ module.exports = {
         slideDown: 'slideDown 0.3s ease-out',
         slideLeft: 'slideLeft 0.3s ease-out',
         slideRight: 'slideRight 0.3s ease-out',
+        'neon-pulse': 'neonPulse 2s ease-in-out infinite',
+        'glow-breathe': 'glowBreathe 4s ease-in-out infinite',
       },
       keyframes: {
         fadeIn: {
@@ -105,6 +129,14 @@ module.exports = {
         slideRight: {
           '0%': { transform: 'translateX(-10px)', opacity: '0' },
           '100%': { transform: 'translateX(0)', opacity: '1' },
+        },
+        neonPulse: {
+          '0%, 100%': { opacity: '1', boxShadow: '0 0 8px rgba(0,229,160,0.25)' },
+          '50%': { opacity: '0.4', boxShadow: '0 0 4px rgba(0,229,160,0.15)' },
+        },
+        glowBreathe: {
+          '0%, 100%': { opacity: '0.4' },
+          '50%': { opacity: '0.7' },
         },
       },
       borderWidth: {

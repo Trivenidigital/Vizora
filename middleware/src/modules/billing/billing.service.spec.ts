@@ -194,7 +194,7 @@ describe('BillingService', () => {
 
       const basicPlan = result.find((p) => p.id === 'basic');
       expect(basicPlan).toBeDefined();
-      expect(basicPlan?.price).toBe(2900);
+      expect(basicPlan?.price).toBe(600);
       expect(basicPlan?.currency).toBe('usd');
       expect(basicPlan?.isCurrent).toBe(false);
 
@@ -211,7 +211,7 @@ describe('BillingService', () => {
       const result = await service.getPlans('org-123', 'IN', 'monthly');
 
       const basicPlan = result.find((p) => p.id === 'basic');
-      expect(basicPlan?.price).toBe(199900);
+      expect(basicPlan?.price).toBe(50000);
       expect(basicPlan?.currency).toBe('inr');
     });
 
@@ -224,7 +224,7 @@ describe('BillingService', () => {
       const result = await service.getPlans('org-123', 'US', 'yearly');
 
       const basicPlan = result.find((p) => p.id === 'basic');
-      expect(basicPlan?.price).toBe(29000);
+      expect(basicPlan?.price).toBe(6000);
       expect(basicPlan?.interval).toBe('yearly');
     });
 

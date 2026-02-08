@@ -118,7 +118,7 @@ export function useErrorRecovery(options: UseErrorRecoveryOptions = {}) {
             newState = 'CLOSED';
             newSuccessCount = 0;
 
-            if (enableLogging) {
+            if (enableLogging && process.env.NODE_ENV === 'development') {
               console.log('[ErrorRecovery] Circuit breaker CLOSED after successful recovery');
             }
             onCircuitBreakerChange?.(false);
@@ -130,7 +130,7 @@ export function useErrorRecovery(options: UseErrorRecoveryOptions = {}) {
           if (newFailureCount >= circuitBreakerConfig.failureThreshold && prev.state === 'CLOSED') {
             newState = 'OPEN';
 
-            if (enableLogging) {
+            if (enableLogging && process.env.NODE_ENV === 'development') {
               console.log('[ErrorRecovery] Circuit breaker OPENED due to repeated failures');
             }
             onCircuitBreakerChange?.(true);
@@ -156,7 +156,7 @@ export function useErrorRecovery(options: UseErrorRecoveryOptions = {}) {
       if (prev.state === 'OPEN') {
         const timeSinceStateChange = Date.now() - prev.lastStateChangeTime;
         if (timeSinceStateChange >= circuitBreakerConfig.timeout) {
-          if (enableLogging) {
+          if (enableLogging && process.env.NODE_ENV === 'development') {
             console.log('[ErrorRecovery] Circuit breaker transitioning to HALF_OPEN');
           }
           return {
@@ -188,7 +188,7 @@ export function useErrorRecovery(options: UseErrorRecoveryOptions = {}) {
       updateCircuitBreakerState(false);
       onError?.(errorInfo);
 
-      if (enableLogging) {
+      if (enableLogging && process.env.NODE_ENV === 'development') {
         console.error('[ErrorRecovery] Error recorded:', {
           id,
           error: error instanceof Error ? error.message : error,
@@ -239,7 +239,7 @@ export function useErrorRecovery(options: UseErrorRecoveryOptions = {}) {
             updateCircuitBreakerState(true);
             onSuccess?.(result);
 
-            if (enableLogging) {
+            if (enableLogging && process.env.NODE_ENV === 'development') {
               console.log('[ErrorRecovery] Operation succeeded:', { id, retryCount });
             }
 
@@ -278,7 +278,7 @@ export function useErrorRecovery(options: UseErrorRecoveryOptions = {}) {
               nextRetryTime,
             });
 
-            if (enableLogging) {
+            if (enableLogging && process.env.NODE_ENV === 'development') {
               console.log('[ErrorRecovery] Retrying after', delay, 'ms:', {
                 id,
                 attempt: retryCount + 1,
@@ -346,7 +346,7 @@ export function useErrorRecovery(options: UseErrorRecoveryOptions = {}) {
       lastStateChangeTime: Date.now(),
     });
 
-    if (enableLogging) {
+    if (enableLogging && process.env.NODE_ENV === 'development') {
       console.log('[ErrorRecovery] Circuit breaker reset to CLOSED');
     }
 

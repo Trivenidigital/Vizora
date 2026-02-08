@@ -79,8 +79,8 @@ export default function DaySelector({
             onClick={toggleAll}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               selected.length === 7
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                ? 'bg-[#00E5A0] text-[#061A21]'
+                : 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
             }`}
           >
             All Days
@@ -90,8 +90,8 @@ export default function DaySelector({
             onClick={toggleWeekdays}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               allWeekdaysSelected
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                ? 'bg-[#00E5A0] text-[#061A21]'
+                : 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
             }`}
           >
             Weekdays
@@ -101,8 +101,8 @@ export default function DaySelector({
             onClick={toggleWeekends}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               allWeekendsSelected
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                ? 'bg-[#00E5A0] text-[#061A21]'
+                : 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
             }`}
           >
             Weekends
@@ -119,8 +119,8 @@ export default function DaySelector({
                 onClick={() => toggleDay(day.id)}
                 className={`py-3 px-2 rounded-lg font-semibold text-sm transition-all ${
                   isSelected
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                    ? 'bg-[#00E5A0] text-[#061A21] shadow-md'
+                    : 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
                 }`}
                 title={day.fullLabel}
               >
@@ -132,8 +132,8 @@ export default function DaySelector({
 
         {/* Selected Days Display */}
         {selected.length > 0 && (
-          <div className="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-            <p className="text-sm text-blue-800 dark:text-blue-200">
+          <div className="bg-[#00E5A0]/10 border border-[#00E5A0]/30 rounded-lg p-3">
+            <p className="text-sm text-[#00E5A0]">
               <span className="font-semibold">{selected.length}</span> day{selected.length !== 1 ? 's' : ''} selected:{' '}
               {selected.map(d => DAYS.find(day => day.id === d)?.fullLabel).join(', ')}
             </p>

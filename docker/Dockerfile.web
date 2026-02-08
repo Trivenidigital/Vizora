@@ -37,6 +37,6 @@ COPY --from=builder /app/web/next.config.js ./
 # Install production dependencies
 RUN npm install next react react-dom --omit=dev
 
-EXPOSE 3000
+EXPOSE 3001
 
 CMD ["npm", "start"]

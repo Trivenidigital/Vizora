@@ -105,7 +105,7 @@ export default function AdminAnnouncementsPage() {
   const getTypeStyles = (type: SystemAnnouncement['type']) => {
     switch (type) {
       case 'info':
-        return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800';
+        return 'bg-[#00E5A0]/10 text-[#00E5A0] border-[#00E5A0]/20';
       case 'warning':
         return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800';
       case 'critical':
@@ -113,7 +113,7 @@ export default function AdminAnnouncementsPage() {
       case 'maintenance':
         return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200 dark:border-purple-800';
       default:
-        return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-700';
+        return 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)] border-[var(--border)]';
     }
   };
 
@@ -147,14 +147,14 @@ export default function AdminAnnouncementsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Announcements</h1>
-          <p className="mt-1 text-gray-600 dark:text-gray-400">
+          <h1 className="text-3xl font-bold text-[var(--foreground)]">Announcements</h1>
+          <p className="mt-1 text-[var(--foreground-secondary)]">
             Manage system-wide announcements and notifications
           </p>
         </div>
         <button
           onClick={handleCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          className="flex items-center gap-2 px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition"
         >
           <Plus className="w-5 h-5" />
           Create Announcement
@@ -168,7 +168,7 @@ export default function AdminAnnouncementsPage() {
             key={announcement.id}
             className={`rounded-xl border-2 overflow-hidden ${
               !announcement.isActive || isExpired(announcement)
-                ? 'opacity-60 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50'
+                ? 'opacity-60 border-[var(--border)] bg-[var(--background)]'
                 : getTypeStyles(announcement.type)
             }`}
           >
@@ -178,7 +178,7 @@ export default function AdminAnnouncementsPage() {
                   <div
                     className={`p-2 rounded-lg ${
                       !announcement.isActive || isExpired(announcement)
-                        ? 'bg-gray-200 dark:bg-gray-700 text-gray-500'
+                        ? 'bg-[var(--background-tertiary)] text-[var(--foreground-tertiary)]'
                         : ''
                     }`}
                   >
@@ -186,16 +186,16 @@ export default function AdminAnnouncementsPage() {
                   </div>
                   <div>
                     <div className="flex items-center gap-3 mb-1">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      <h3 className="text-lg font-semibold text-[var(--foreground)]">
                         {announcement.title}
                       </h3>
                       {isScheduled(announcement) && (
-                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-[#00E5A0]/10 text-[#00E5A0]">
                           Scheduled
                         </span>
                       )}
                       {isExpired(announcement) && (
-                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400">
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-[var(--background-tertiary)] text-[var(--foreground-secondary)]">
                           Expired
                         </span>
                       )}
@@ -207,13 +207,13 @@ export default function AdminAnnouncementsPage() {
                     <p
                       className={`text-sm ${
                         !announcement.isActive || isExpired(announcement)
-                          ? 'text-gray-500 dark:text-gray-400'
+                          ? 'text-[var(--foreground-tertiary)]'
                           : ''
                       }`}
                     >
                       {announcement.message}
                     </p>
-                    <div className="flex items-center gap-4 mt-3 text-sm text-gray-500 dark:text-gray-400">
+                    <div className="flex items-center gap-4 mt-3 text-sm text-[var(--foreground-tertiary)]">
                       <div className="flex items-center gap-1">
                         <Calendar className="w-4 h-4" />
                         <span>Starts: {formatDate(announcement.startsAt)}</span>
@@ -224,7 +224,7 @@ export default function AdminAnnouncementsPage() {
                           <span>Expires: {formatDate(announcement.expiresAt)}</span>
                         </div>
                       )}
-                      <span className="px-2 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-xs capitalize">
+                      <span className="px-2 py-0.5 rounded bg-[var(--background-tertiary)] text-xs capitalize">
                         {announcement.type}
                       </span>
                     </div>
@@ -233,14 +233,14 @@ export default function AdminAnnouncementsPage() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => handleEdit(announcement)}
-                    className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-white/50 dark:hover:bg-gray-800/50 rounded-lg transition"
+                    className="p-2 text-[var(--foreground-tertiary)] hover:text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] rounded-lg transition"
                     title="Edit"
                   >
                     <Edit className="w-5 h-5" />
                   </button>
                   <button
                     onClick={() => setDeletingAnnouncement(announcement)}
-                    className="p-2 text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-white/50 dark:hover:bg-gray-800/50 rounded-lg transition"
+                    className="p-2 text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-[var(--surface-hover)] rounded-lg transition"
                     title="Delete"
                   >
                     <Trash2 className="w-5 h-5" />
@@ -253,17 +253,17 @@ export default function AdminAnnouncementsPage() {
       </div>
 
       {announcements.length === 0 && (
-        <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
-          <Megaphone className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+        <div className="text-center py-12 bg-[var(--surface)] rounded-xl border border-[var(--border)]">
+          <Megaphone className="w-12 h-12 text-[var(--foreground-tertiary)] mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-[var(--foreground)] mb-2">
             No announcements yet
           </h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
+          <p className="text-[var(--foreground-secondary)] mb-4">
             Create announcements to communicate with all users.
           </p>
           <button
             onClick={handleCreate}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition"
           >
             <Plus className="w-5 h-5" />
             Create Announcement

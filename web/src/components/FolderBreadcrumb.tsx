@@ -59,8 +59,8 @@ export default function FolderBreadcrumb({
         onClick={() => onNavigate(null)}
         className={`flex items-center gap-1 px-2 py-1 rounded-md transition ${
           currentFolderId === null
-            ? 'text-gray-900 dark:text-gray-100 font-medium'
-            : 'text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+            ? 'text-[var(--foreground)] font-medium'
+            : 'text-[#00E5A0] hover:bg-[var(--surface-hover)]'
         }`}
       >
         <Icon name="folder" size="sm" />
@@ -72,7 +72,7 @@ export default function FolderBreadcrumb({
         <div key={folder.id} className="flex items-center">
           {/* Separator */}
           <svg
-            className="w-4 h-4 text-gray-400"
+            className="w-4 h-4 text-[var(--foreground-tertiary)]"
             fill="currentColor"
             viewBox="0 0 20 20"
           >
@@ -88,8 +88,8 @@ export default function FolderBreadcrumb({
             onClick={() => onNavigate(folder.id)}
             className={`px-2 py-1 rounded-md transition ${
               index === breadcrumbPath.length - 1
-                ? 'text-gray-900 dark:text-gray-100 font-medium'
-                : 'text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                ? 'text-[var(--foreground)] font-medium'
+                : 'text-[#00E5A0] hover:bg-[var(--surface-hover)]'
             }`}
           >
             {folder.name}

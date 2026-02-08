@@ -14,6 +14,8 @@ interface PairingRequest {
   createdAt: Date;
   expiresAt: Date;
   qrCode?: string;
+  organizationId?: string;
+  plaintextToken?: string;
 }
 
 @Injectable()
@@ -129,22 +131,22 @@ export class PairingService implements OnModuleDestroy {
       throw new BadRequestException('Pairing code has expired');
     }
 
-    // Check if device has been paired
-    const display = await this.db.display.findUnique({
-      where: { deviceIdentifier: request.deviceIdentifier },
-    });
+    // Check if pairing has been completed (plaintextToken is set by completePairing)
+    // We return the plaintext token from the in-memory request, NOT from the DB,
+    // because the DB now stores only the hashed token for security.
+    if (request.plaintextToken) {
+      const display = await this.db.display.findUnique({
+        where: { deviceIdentifier: request.deviceIdentifier },
+      });
 
-    // Device is paired if it has a JWT token (regardless of online/offline status)
-    // This allows devices to receive their token immediately after web dashboard completes pairing
-    if (display && display.jwtToken) {
-      // Pairing complete! Clean up request
+      // Pairing complete! Clean up request and return plaintext token
       this.pairingRequests.delete(code);
 
       return {
         status: 'paired',
-        deviceToken: display.jwtToken,
-        displayId: display.id,
-        organizationId: display.organizationId,
+        deviceToken: request.plaintextToken,
+        displayId: display?.id,
+        organizationId: display?.organizationId,
       };
     }
 
@@ -190,6 +192,10 @@ export class PairingService implements OnModuleDestroy {
       expiresIn: '365d', // 1 year
     });
 
+    // Hash the token before storing in database for security
+    // If database is compromised, attacker cannot use the hashed tokens
+    const hashedToken = this.hashToken(jwtToken);
+
     if (display) {
       // Update existing display
       // Set status to 'pairing' - the WebSocket gateway will update to 'online' when device connects
@@ -198,7 +204,7 @@ export class PairingService implements OnModuleDestroy {
         data: {
           nickname: nickname || request.nickname,
           organizationId,
-          jwtToken,
+          jwtToken: hashedToken, // Store hash, not plaintext
           pairedAt: new Date(),
           status: 'pairing',
         },
@@ -212,7 +218,7 @@ export class PairingService implements OnModuleDestroy {
           deviceIdentifier: request.deviceIdentifier,
           nickname: nickname || request.nickname,
           organizationId,
-          jwtToken,
+          jwtToken: hashedToken, // Store hash, not plaintext
           pairedAt: new Date(),
           status: 'pairing',
           location: request.metadata?.hostname || null,
@@ -223,10 +229,12 @@ export class PairingService implements OnModuleDestroy {
 
     this.logger.log(`Device paired successfully: ${display.id} to org ${organizationId}`);
 
-    // Note: Don't delete the pairing request here.
-    // Let checkPairingStatus delete it after the device retrieves its token.
-    // This fixes the race condition where the device polls and gets 404
-    // before it can retrieve its token.
+    // Store the plaintext token in the in-memory request so checkPairingStatus
+    // can return it to the device. The DB only has the hashed token.
+    // Don't delete the pairing request here - let checkPairingStatus delete it
+    // after the device retrieves its token (fixes race condition).
+    request.plaintextToken = jwtToken;
+    request.organizationId = organizationId;
 
     return {
       success: true,
@@ -240,21 +248,55 @@ export class PairingService implements OnModuleDestroy {
   }
 
   async getActivePairings(organizationId: string) {
-    // Return active pairing requests (without device identifiers for security)
+    // Return active pairing requests filtered by organization
+    // Only show requests that have been completed for this org,
+    // or where the device already belongs to this org
     const activePairings: any[] = [];
 
     for (const [code, request] of this.pairingRequests.entries()) {
-      if (new Date() < request.expiresAt) {
+      if (new Date() >= request.expiresAt) {
+        continue;
+      }
+
+      // If pairing was completed for this org, show it
+      if (request.organizationId === organizationId) {
         activePairings.push({
           code,
           nickname: request.nickname,
           createdAt: request.createdAt,
           expiresAt: request.expiresAt,
         });
+        continue;
+      }
+
+      // If not yet paired to any org, check if device exists in this org
+      if (!request.organizationId) {
+        const display = await this.db.display.findUnique({
+          where: { deviceIdentifier: request.deviceIdentifier },
+          select: { organizationId: true },
+        });
+
+        // Show if device belongs to this org, or is brand new (no org yet)
+        if (!display || display.organizationId === organizationId) {
+          activePairings.push({
+            code,
+            nickname: request.nickname,
+            createdAt: request.createdAt,
+            expiresAt: request.expiresAt,
+          });
+        }
       }
     }
 
     return activePairings;
+  }
+
+  /**
+   * Hash a token using SHA-256 for secure storage.
+   * Matches the hashing in displays.service.ts.
+   */
+  private hashToken(token: string): string {
+    return crypto.createHash('sha256').update(token).digest('hex');
   }
 
   private generatePairingCode(): string {

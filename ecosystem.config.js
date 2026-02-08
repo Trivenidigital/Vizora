@@ -29,12 +29,11 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: 3000,
       },
-      // Graceful shutdown
-      kill_timeout: 10000, // 10 seconds to gracefully shutdown
-      wait_ready: true,
-      listen_timeout: 30000,
+      // Graceful shutdown — 30s for in-flight requests to complete
+      kill_timeout: 30000,
       // Logging
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      max_size: '50M',
       error_file: './logs/middleware-error.log',
       out_file: './logs/middleware-out.log',
       merge_logs: true,
@@ -62,10 +61,9 @@ module.exports = {
       },
       // Graceful shutdown
       kill_timeout: 15000, // 15 seconds for WebSocket connections to close
-      wait_ready: true,
-      listen_timeout: 30000,
       // Logging
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      max_size: '50M',
       error_file: './logs/realtime-error.log',
       out_file: './logs/realtime-out.log',
       merge_logs: true,
@@ -96,6 +94,7 @@ module.exports = {
       kill_timeout: 10000,
       // Logging
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      max_size: '50M',
       error_file: './logs/web-error.log',
       out_file: './logs/web-out.log',
       merge_logs: true,
@@ -115,16 +114,16 @@ module.exports = {
       repo: 'git@github.com:your-org/vizora.git',
       path: '/var/www/vizora',
       'pre-deploy-local': '',
-      'post-deploy': 'npm install && npm run build && pm2 reload ecosystem.config.js --env production',
+      'post-deploy': 'pnpm install && pnpm run build && pm2 reload ecosystem.config.js --env production',
       'pre-setup': '',
     },
     staging: {
       user: 'deploy',
       host: ['staging-server'],
       ref: 'origin/develop',
-      repo: 'git@github.com:your-org/vizora.git',
+      repo: 'git@github.com:your-org/vizora.git', // TODO: Replace with actual repo URL
       path: '/var/www/vizora-staging',
-      'post-deploy': 'npm install && npm run build && pm2 reload ecosystem.config.js --env staging',
+      'post-deploy': 'pnpm install && pnpm run build && pm2 reload ecosystem.config.js --env staging',
     },
   },
 };

@@ -25,11 +25,17 @@ const DEFAULT_CONFIG = {
   dashboardUrl: import.meta.env.VITE_DASHBOARD_URL || 'http://localhost:3001',
 };
 
-// Transform URLs from localhost to the configured API URL (needed for Android emulator)
+// Transform URLs from localhost to emulator-accessible addresses (needed for Android emulator)
+// When apiUrl points to localhost/127.0.0.1, rewrite to 10.0.2.2 for emulator access.
+// When apiUrl is a real hostname, rewrite localhost references to use that hostname instead.
 function transformContentUrl(url: string, apiUrl: string): string {
   if (!url) return url;
-  // Replace localhost:3000 with the configured API URL (e.g., 10.0.2.2:3000 for Android emulator)
-  return url.replace(/http:\/\/localhost:3000/g, apiUrl);
+  if (apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1')) {
+    return url.replace(/http:\/\/localhost/g, 'http://10.0.2.2')
+              .replace(/http:\/\/127\.0\.0\.1/g, 'http://10.0.2.2');
+  }
+  return url.replace(/http:\/\/localhost:\d+/g, apiUrl)
+            .replace(/http:\/\/127\.0\.0\.1:\d+/g, apiUrl);
 }
 
 interface Config {
@@ -517,8 +523,11 @@ class VizoraAndroidTV {
     contentDiv.className = 'content-item';
 
     // Transform URL for Android emulator (localhost -> 10.0.2.2)
-    const contentUrl = transformContentUrl(currentItem.content.url, this.config.apiUrl);
+    // Only transform actual URLs, not raw HTML content used by html/template types
     const contentType = currentItem.content.type;
+    const contentUrl = (contentType === 'html' || contentType === 'template')
+      ? currentItem.content.url
+      : transformContentUrl(currentItem.content.url, this.config.apiUrl);
 
     switch (contentType) {
       case 'image':
@@ -563,13 +572,14 @@ class VizoraAndroidTV {
 
       case 'html':
       case 'template':
-        // Render pre-rendered HTML content from backend
-        const htmlContainer = document.createElement('div');
-        htmlContainer.className = 'html-content';
-        // For templates, contentUrl contains the pre-rendered HTML
-        // For html type, contentUrl is the raw HTML content
-        htmlContainer.innerHTML = contentUrl;
-        contentDiv.appendChild(htmlContainer);
+        // Use sandboxed iframe to safely render HTML content
+        const htmlIframe = document.createElement('iframe');
+        htmlIframe.sandbox.add('allow-scripts');
+        htmlIframe.srcdoc = contentUrl;
+        htmlIframe.style.width = '100%';
+        htmlIframe.style.height = '100%';
+        htmlIframe.style.border = 'none';
+        contentDiv.appendChild(htmlIframe);
         break;
 
       default:
@@ -696,8 +706,11 @@ class VizoraAndroidTV {
     contentDiv.className = 'content-item';
 
     // Transform URL for Android emulator
-    const contentUrl = transformContentUrl(content.url, this.config.apiUrl);
+    // Only transform actual URLs, not raw HTML content used by html/template types
     const contentType = content.type;
+    const contentUrl = (contentType === 'html' || contentType === 'template')
+      ? content.url
+      : transformContentUrl(content.url, this.config.apiUrl);
 
     console.log(`[Vizora] Rendering temporary content: ${contentType} - ${contentUrl}`);
 
@@ -742,11 +755,14 @@ class VizoraAndroidTV {
 
       case 'html':
       case 'template':
-        // Render pre-rendered HTML content
-        const htmlContainer = document.createElement('div');
-        htmlContainer.className = 'html-content';
-        htmlContainer.innerHTML = contentUrl;
-        contentDiv.appendChild(htmlContainer);
+        // Use sandboxed iframe to safely render HTML content
+        const tempHtmlIframe = document.createElement('iframe');
+        tempHtmlIframe.sandbox.add('allow-scripts');
+        tempHtmlIframe.srcdoc = contentUrl;
+        tempHtmlIframe.style.width = '100%';
+        tempHtmlIframe.style.height = '100%';
+        tempHtmlIframe.style.border = 'none';
+        contentDiv.appendChild(tempHtmlIframe);
         break;
 
       default:

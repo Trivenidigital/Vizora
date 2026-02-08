@@ -2,6 +2,7 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app/app.module';
 import { IoAdapter } from '@nestjs/platform-socket.io';
+import helmet from 'helmet';
 import { initializeSentry } from './config/sentry.config';
 
 // Initialize Sentry before app starts
@@ -9,6 +10,12 @@ initializeSentry();
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // Security headers
+  app.use(helmet({
+    contentSecurityPolicy: process.env.NODE_ENV === 'production',
+    crossOriginEmbedderPolicy: false, // Allow embedding for display clients
+  }));
 
   // Enable CORS
   app.enableCors({
@@ -51,7 +58,7 @@ async function bootstrap() {
     await app.listen(port, '0.0.0.0');
     Logger.log(`🚀 Realtime Gateway running on: http://localhost:${port}/${globalPrefix}`);
     Logger.log(`🔌 WebSocket server ready on: ws://localhost:${port}`);
-    Logger.log(`📊 Metrics available at: http://localhost:${port}/metrics`);
+    Logger.log(`📊 Metrics available at: http://localhost:${port}/internal/metrics`);
     Logger.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     Logger.log(`⚠️  Port ${port} is RESERVED for Realtime - will not start if occupied`);
   } catch (error) {

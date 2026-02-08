@@ -53,15 +53,21 @@ export interface Playlist {
 export interface Schedule {
   id: string;
   name: string;
+  description?: string;
   playlistId: string;
   playlist?: Playlist;
+  displayId?: string;
   displayIds: string[];
+  displayGroupId?: string;
   displays?: Display[];
   startTime: string;
   endTime: string;
+  startDate?: string;
+  endDate?: string;
   daysOfWeek: number[];
   timezone?: string;
   isActive: boolean;
+  priority?: number;
   createdAt: Date | string;
   updatedAt: Date | string;
 }

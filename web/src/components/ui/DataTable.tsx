@@ -78,7 +78,7 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps<any>>(
       return (
         <div className="flex items-center justify-center py-8">
           <div className="animate-spin">
-            <div className="w-8 h-8 border-4 border-neutral-200 dark:border-neutral-700 border-t-primary-600 dark:border-t-primary-400 rounded-full" />
+            <div className="w-8 h-8 border-4 border-[var(--border)] border-t-primary-600 dark:border-t-primary-400 rounded-full" />
           </div>
         </div>
       );
@@ -87,7 +87,7 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps<any>>(
     if (paginatedData.length === 0) {
       return (
         <div className="flex items-center justify-center py-8">
-          <p className="text-neutral-600 dark:text-neutral-400">{emptyMessage}</p>
+          <p className="text-[var(--foreground-secondary)]">{emptyMessage}</p>
         </div>
       );
     }
@@ -97,11 +97,11 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps<any>>(
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
             <thead>
-              <tr className="border-b border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/50">
+              <tr className="border-b border-[var(--border)] bg-[var(--surface-hover)]">
                 {columns.map((col) => (
                   <th
                     key={String(col.key)}
-                    className={`px-4 py-3 text-left text-sm font-semibold text-neutral-900 dark:text-neutral-50 ${
+                    className={`px-4 py-3 text-left text-sm font-semibold text-[var(--foreground)] ${
                       col.width || ''
                     }`}
                   >
@@ -127,13 +127,13 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps<any>>(
               {paginatedData.map((row, idx) => (
                 <tr
                   key={String(row[keyField]) || idx}
-                  className="border-b border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors cursor-pointer"
+                  className="border-b border-[var(--border)] hover:bg-[var(--surface-hover)] transition-colors cursor-pointer"
                   onClick={() => onRowClick?.(row)}
                 >
                   {columns.map((col) => (
                     <td
                       key={String(col.key)}
-                      className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300"
+                      className="px-4 py-3 text-sm text-[var(--foreground-secondary)]"
                     >
                       {col.render ? col.render(row[col.key], row) : String(row[col.key])}
                     </td>
@@ -145,12 +145,12 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps<any>>(
                           e.stopPropagation();
                           setActiveMenu(activeMenu === row ? null : row);
                         }}
-                        className="hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded p-1"
+                        className="hover:bg-[var(--surface-hover)] rounded p-1"
                       >
                         <MoreVertical className="w-4 h-4" />
                       </button>
                       {activeMenu === row && (
-                        <div className="absolute right-0 top-full mt-1 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg shadow-lg z-10">
+                        <div className="absolute right-0 top-full mt-1 bg-[var(--surface)] border border-[var(--border)] rounded-lg shadow-lg z-10">
                           {rowActions.map((action, i) => (
                             <button
                               key={i}
@@ -159,7 +159,7 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps<any>>(
                                 action.onClick(row);
                                 setActiveMenu(null);
                               }}
-                              className="block w-full text-left px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700 first:rounded-t last:rounded-b transition-colors"
+                              className="block w-full text-left px-4 py-2 text-sm hover:bg-[var(--surface-hover)] first:rounded-t last:rounded-b transition-colors"
                             >
                               {action.label}
                             </button>
@@ -176,21 +176,21 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps<any>>(
 
         {pagination && totalPages > 1 && (
           <div className="flex items-center justify-between mt-4 px-4 py-3">
-            <p className="text-sm text-neutral-600 dark:text-neutral-400">
+            <p className="text-sm text-[var(--foreground-secondary)]">
               Page {currentPage + 1} of {totalPages}
             </p>
             <div className="flex gap-2">
               <button
                 onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}
                 disabled={currentPage === 0}
-                className="px-3 py-1 text-sm border border-neutral-200 dark:border-neutral-700 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-3 py-1 text-sm border border-[var(--border)] rounded hover:bg-[var(--surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Previous
               </button>
               <button
                 onClick={() => setCurrentPage(Math.min(totalPages - 1, currentPage + 1))}
                 disabled={currentPage >= totalPages - 1}
-                className="px-3 py-1 text-sm border border-neutral-200 dark:border-neutral-700 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-3 py-1 text-sm border border-[var(--border)] rounded hover:bg-[var(--surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Next
               </button>

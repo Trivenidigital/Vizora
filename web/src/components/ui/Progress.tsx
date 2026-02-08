@@ -45,7 +45,7 @@ export const Progress: React.FC<ProgressProps> = ({
   return (
     <div className={className}>
       <div
-        className={`w-full bg-neutral-200 dark:bg-neutral-700 rounded-full overflow-hidden ${sizeStyles[size]}`}
+        className={`w-full bg-[var(--background-tertiary)] rounded-full overflow-hidden ${sizeStyles[size]}`}
       >
         <div
           className={`${sizeStyles[size]} ${variantStyles[variant]} transition-all duration-500 ${
@@ -57,7 +57,7 @@ export const Progress: React.FC<ProgressProps> = ({
         />
       </div>
       {showLabel && (
-        <p className="mt-2 text-sm font-medium text-neutral-700 dark:text-neutral-300">
+        <p className="mt-2 text-sm font-medium text-[var(--foreground-secondary)]">
           {percentage.toFixed(0)}%
         </p>
       )}

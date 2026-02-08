@@ -60,14 +60,14 @@ export class ContentController {
   ) {
     // Validate URL if provided
     if (createContentDto.url) {
-      this.fileValidationService.validateUrl(createContentDto.url);
+      await this.fileValidationService.validateUrl(createContentDto.url);
     }
     return this.contentService.create(organizationId, createContentDto);
   }
 
   @Post('upload')
   @Roles('admin', 'manager')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 100 * 1024 * 1024 } }))
   async uploadFile(
     @CurrentUser('organizationId') organizationId: string,
     @UploadedFile() file: Express.Multer.File,
@@ -120,22 +120,32 @@ export class ContentController {
                                  file.mimetype.startsWith('image/') ? 'image' :
                                  file.mimetype === 'application/pdf' ? 'pdf' : 'url');
 
-    // For images stored locally, use the URL as thumbnail
-    // For MinIO images, thumbnail will be generated on demand
-    const thumbnailUrl = contentType === 'image' && !fileUrl.startsWith(MINIO_URL_PREFIX)
-      ? fileUrl
-      : undefined;
-
     // Create content record (fileHash stored in metadata since not in schema)
     const content = await this.contentService.create(organizationId, {
       name: name || safeFilename,
       type: contentType,
       url: fileUrl,
-      thumbnail: thumbnailUrl,
       fileSize: file.size,
       mimeType: file.mimetype,
       metadata: { fileHash: validation.hash },
     } as any);
+
+    // Generate thumbnail using the real content ID (only once, after creation)
+    if (contentType === 'image') {
+      try {
+        const thumbnailUrl = await this.thumbnailService.generateThumbnail(
+          content.id,
+          file.buffer,
+          file.mimetype,
+        );
+        await this.contentService.update(organizationId, content.id, { thumbnail: thumbnailUrl } as any);
+        content.thumbnail = thumbnailUrl;
+        this.logger.debug(`Thumbnail generated: ${thumbnailUrl}`);
+      } catch (error) {
+        this.logger.warn(`Thumbnail generation failed during upload: ${error}`);
+        // Continue without thumbnail — not a fatal error
+      }
+    }
 
     return {
       success: true,
@@ -156,7 +166,8 @@ export class ContentController {
     const filePath = path.join(uploadsDir, filename);
     fs.writeFileSync(filePath, buffer);
 
-    const baseUrl = process.env.API_BASE_URL || 'http://localhost:3000';
+    const baseUrl = process.env.API_BASE_URL
+      || (process.env.NODE_ENV === 'production' ? (() => { throw new Error('API_BASE_URL must be set in production'); })() : 'http://localhost:3000');
     return `${baseUrl}/uploads/${filename}`;
   }
 
@@ -243,16 +254,38 @@ export class ContentController {
   ) {
     // Get content
     const content = await this.contentService.findOne(organizationId, id);
-    
+
     if (content.type !== 'image') {
       return { message: 'Thumbnail generation only supported for images', thumbnail: null };
     }
 
-    // Generate thumbnail from URL
-    const thumbnailUrl = await this.thumbnailService.generateThumbnailFromUrl(
-      content.id,
-      content.url,
-    );
+    let thumbnailUrl: string;
+
+    // For MinIO-stored content, fetch the object directly via StorageService
+    // to avoid SSRF validation blocking internal MinIO URLs
+    if (content.url.startsWith(MINIO_URL_PREFIX)) {
+      const objectKey = content.url.substring(MINIO_URL_PREFIX.length);
+      if (!this.storageService.isMinioAvailable()) {
+        throw new BadRequestException('Storage service is currently unavailable');
+      }
+      const stream = await this.storageService.getObject(objectKey);
+      const chunks: Buffer[] = [];
+      for await (const chunk of stream) {
+        chunks.push(Buffer.from(chunk));
+      }
+      const buffer = Buffer.concat(chunks);
+      thumbnailUrl = await this.thumbnailService.generateThumbnail(
+        content.id,
+        buffer,
+        content.mimeType || 'image/jpeg',
+      );
+    } else {
+      // For external URLs, fetch via URL (with SSRF protection)
+      thumbnailUrl = await this.thumbnailService.generateThumbnailFromUrl(
+        content.id,
+        content.url,
+      );
+    }
 
     // Update content with thumbnail URL
     await this.contentService.update(organizationId, id, { thumbnail: thumbnailUrl } as any);
@@ -285,7 +318,7 @@ export class ContentController {
   @Post(':id/replace')
   @Roles('admin', 'manager')
   @HttpCode(HttpStatus.OK)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 100 * 1024 * 1024 } }))
   async replaceFile(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
@@ -334,9 +367,20 @@ export class ContentController {
     const contentType = file.mimetype.startsWith('video/') ? 'video' :
                        file.mimetype.startsWith('image/') ? 'image' :
                        file.mimetype === 'application/pdf' ? 'pdf' : 'url';
-    const thumbnailUrl = contentType === 'image' && !fileUrl.startsWith(MINIO_URL_PREFIX)
-      ? fileUrl
-      : undefined;
+
+    // Generate thumbnail directly from buffer for images
+    let thumbnailUrl: string | undefined;
+    if (contentType === 'image') {
+      try {
+        thumbnailUrl = await this.thumbnailService.generateThumbnail(
+          id,
+          file.buffer,
+          file.mimetype,
+        );
+      } catch (error) {
+        this.logger.warn(`Thumbnail generation failed during replace: ${error}`);
+      }
+    }
 
     const content = await this.contentService.replaceFile(
       organizationId,
@@ -382,15 +426,22 @@ export class ContentController {
 
   @Patch(':id/expiration')
   @Roles('admin', 'manager')
-  setExpiration(
+  async setExpiration(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
     @Body() body: { expiresAt: string; replacementContentId?: string },
   ) {
+    const expiresAtDate = new Date(body.expiresAt);
+    if (isNaN(expiresAtDate.getTime())) {
+      throw new BadRequestException('Invalid expiresAt date');
+    }
+    if (expiresAtDate <= new Date()) {
+      throw new BadRequestException('expiresAt must be in the future');
+    }
     return this.contentService.setExpiration(
       organizationId,
       id,
-      new Date(body.expiresAt),
+      expiresAtDate,
       body.replacementContentId,
     );
   }

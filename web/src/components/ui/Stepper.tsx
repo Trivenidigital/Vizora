@@ -21,8 +21,8 @@ interface StepperProps {
 
 const statusStyles: Record<StepStatus, { circle: string; label: string }> = {
   pending: {
-    circle: 'bg-neutral-200 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400',
-    label: 'text-neutral-600 dark:text-neutral-400',
+    circle: 'bg-[var(--background-tertiary)] text-[var(--foreground-secondary)]',
+    label: 'text-[var(--foreground-secondary)]',
   },
   active: {
     circle: 'bg-primary-600 dark:bg-primary-400 text-white animate-pulse',
@@ -76,7 +76,7 @@ export const Stepper: React.FC<StepperProps> = ({
                 className={`absolute top-5 left-0 w-12 h-0.5 transform translate-x-10 ${
                   step.status === 'complete'
                     ? 'bg-success-600 dark:bg-success-500'
-                    : 'bg-neutral-200 dark:bg-neutral-700'
+                    : 'bg-[var(--background-tertiary)]'
                 }`}
               />
             )}
@@ -88,7 +88,7 @@ export const Stepper: React.FC<StepperProps> = ({
               {step.label}
             </p>
             {step.description && (
-              <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
+              <p className="text-xs text-[var(--foreground-secondary)] mt-1">
                 {step.description}
               </p>
             )}

@@ -4,6 +4,11 @@
  */
 
 import 'dotenv/config';
+import { initializeSentry } from './config/sentry.config';
+
+// Initialize Sentry before NestJS bootstrap
+initializeSentry();
+
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
@@ -14,12 +19,26 @@ import cookieParser from 'cookie-parser';
 import { AppModule } from './app/app.module';
 import { SanitizeInterceptor } from './modules/common/interceptors/sanitize.interceptor';
 import { LoggingInterceptor } from './modules/common/interceptors/logging.interceptor';
+import { SentryInterceptor } from './interceptors/sentry.interceptor';
+import { AllExceptionsFilter } from './modules/common/filters/all-exceptions.filter';
 
 async function bootstrap() {
+  // Validate required production environment variables
+  if (process.env.NODE_ENV === 'production') {
+    const required = ['API_BASE_URL', 'CORS_ORIGIN', 'DATABASE_URL', 'JWT_SECRET', 'DEVICE_JWT_SECRET'];
+    const missing = required.filter(key => !process.env[key]);
+    if (missing.length > 0) {
+      Logger.error(`❌ Missing required production env vars: ${missing.join(', ')}`);
+      Logger.error('Set these in your .env or deployment config before starting in production.');
+      process.exit(1);
+    }
+  }
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // Serve static files (thumbnails)
-  app.useStaticAssets(join(__dirname, '..', 'static'), {
+  // Serve static files (thumbnails) — process.cwd() ensures consistency
+  // with ThumbnailService which writes to the same base directory
+  app.useStaticAssets(join(process.cwd(), 'static'), {
     prefix: '/static/',
   });
 
@@ -48,6 +67,17 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRF-Token'],
   });
 
+  // Global exception filter — catches all unhandled exceptions
+  app.useGlobalFilters(new AllExceptionsFilter());
+
+  // HTTP request timeout middleware
+  app.use((req: import('express').Request, _res: import('express').Response, next: import('express').NextFunction) => {
+    // File uploads get a longer timeout (120s), everything else gets 30s
+    const isUpload = req.path.includes('/content/upload') || req.method === 'POST' && req.headers['content-type']?.includes('multipart');
+    req.setTimeout(isUpload ? 120000 : 30000);
+    next();
+  });
+
   // Global validation pipe
   app.useGlobalPipes(
     new ValidationPipe({
@@ -63,9 +93,10 @@ async function bootstrap() {
   );
 
   // Global interceptors
-  // Order matters: logging first, then sanitization
+  // Order matters: logging first, then Sentry error tracking, then sanitization
   app.useGlobalInterceptors(
     new LoggingInterceptor(),
+    new SentryInterceptor(),
     new SanitizeInterceptor(),
   );
 
@@ -143,10 +174,9 @@ bootstrap().catch((err) => {
   process.exit(1);
 });
 
-// Catch unhandled rejections
+// Catch unhandled rejections — log but don't exit; let PM2 handle restarts if needed
 process.on('unhandledRejection', (reason, promise) => {
   Logger.error('🚨 Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1);
 });
 
 // Catch uncaught exceptions

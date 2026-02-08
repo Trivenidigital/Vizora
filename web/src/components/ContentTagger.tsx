@@ -18,7 +18,7 @@ interface ContentTaggerProps {
 }
 
 const TAG_COLORS = [
-  { name: 'blue', bg: 'bg-blue-100 dark:bg-blue-900', text: 'text-blue-800 dark:text-blue-200', border: 'border-blue-300 dark:border-blue-700' },
+  { name: 'blue', bg: 'bg-[#00B4D8]/10', text: 'text-[#00B4D8]', border: 'border-[#00B4D8]/30' },
   { name: 'red', bg: 'bg-red-100 dark:bg-red-900', text: 'text-red-800 dark:text-red-200', border: 'border-red-300 dark:border-red-700' },
   { name: 'green', bg: 'bg-green-100 dark:bg-green-900', text: 'text-green-800 dark:text-green-200', border: 'border-green-300 dark:border-green-700' },
   { name: 'purple', bg: 'bg-purple-100 dark:bg-purple-900', text: 'text-purple-800 dark:text-purple-200', border: 'border-purple-300 dark:border-purple-700' },
@@ -73,7 +73,7 @@ export default function ContentTagger({
                 onClick={() => handleToggleTag(tag.id)}
                 className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                   isSelected
-                    ? `${colorClasses.bg} ${colorClasses.text} ring-2 ring-offset-1 dark:ring-offset-gray-900 ring-gray-400`
+                    ? `${colorClasses.bg} ${colorClasses.text} ring-2 ring-offset-1 ring-[var(--foreground-tertiary)]`
                     : `${colorClasses.bg} ${colorClasses.text} opacity-60 hover:opacity-100`
                 }`}
               >
@@ -90,18 +90,18 @@ export default function ContentTagger({
           {!isCreating ? (
             <button
               onClick={() => setIsCreating(true)}
-              className="px-3 py-1.5 rounded-full text-xs font-medium border-2 border-dashed border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-blue-400 dark:hover:border-blue-600 hover:text-blue-600 dark:hover:text-blue-400 transition"
+              className="px-3 py-1.5 rounded-full text-xs font-medium border-2 border-dashed border-[var(--border)] text-[var(--foreground-secondary)] hover:border-[#00E5A0] hover:text-[#00E5A0] transition"
             >
               + Add Tag
             </button>
           ) : (
-            <div className="border border-gray-300 dark:border-gray-700 rounded-lg p-3 space-y-2">
+            <div className="border border-[var(--border)] rounded-lg p-3 space-y-2">
               <input
                 type="text"
                 value={newTagName}
                 onChange={e => setNewTagName(e.target.value)}
                 placeholder="Tag name (e.g., Holiday, Promotion, Q4)"
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-1.5 text-sm border border-[var(--border)] rounded bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0]"
                 autoFocus
               />
 
@@ -113,7 +113,7 @@ export default function ContentTagger({
                     onClick={() => setSelectedColor(color.name)}
                     className={`w-6 h-6 rounded-full border-2 transition ${
                       selectedColor === color.name
-                        ? 'border-gray-900 dark:border-white'
+                        ? 'border-[var(--foreground)]'
                         : 'border-transparent'
                     } ${color.bg}`}
                     title={color.name}
@@ -126,7 +126,7 @@ export default function ContentTagger({
                 <button
                   onClick={handleCreateTag}
                   disabled={!newTagName.trim()}
-                  className="flex-1 px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 transition"
+                  className="flex-1 px-3 py-1.5 text-sm bg-[#00E5A0] text-[#061A21] rounded hover:bg-[#00CC8E] disabled:opacity-50 transition"
                 >
                   Create
                 </button>
@@ -136,7 +136,7 @@ export default function ContentTagger({
                     setNewTagName('');
                     setSelectedColor(TAG_COLORS[0].name);
                   }}
-                  className="flex-1 px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-50 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition"
+                  className="flex-1 px-3 py-1.5 text-sm bg-[var(--background-tertiary)] text-[var(--foreground)] rounded hover:bg-[var(--surface-hover)] transition"
                 >
                   Cancel
                 </button>
@@ -148,7 +148,7 @@ export default function ContentTagger({
 
       {/* Selected Tags Count */}
       {selectedTags.length > 0 && (
-        <div className="text-xs text-gray-600 dark:text-gray-400">
+        <div className="text-xs text-[var(--foreground-secondary)]">
           {selectedTags.length} tag{selectedTags.length !== 1 ? 's' : ''} selected
         </div>
       )}

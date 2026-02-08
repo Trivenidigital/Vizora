@@ -85,8 +85,8 @@ export default function AdminConfigPage() {
 
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">System Configuration</h1>
-        <p className="mt-1 text-gray-600 dark:text-gray-400">
+        <h1 className="text-3xl font-bold text-[var(--foreground)]">System Configuration</h1>
+        <p className="mt-1 text-[var(--foreground-secondary)]">
           Manage platform settings and feature flags
         </p>
       </div>
@@ -94,20 +94,20 @@ export default function AdminConfigPage() {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--foreground-tertiary)]" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search configuration keys..."
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
           />
         </div>
         <div className="relative">
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="pl-10 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none"
+            className="pl-10 pr-8 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent appearance-none"
           >
             <option value="">All Categories</option>
             {categories.map((cat) => (
@@ -116,8 +116,8 @@ export default function AdminConfigPage() {
               </option>
             ))}
           </select>
-          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--foreground-tertiary)] pointer-events-none" />
+          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--foreground-tertiary)] pointer-events-none" />
         </div>
       </div>
 
@@ -128,10 +128,10 @@ export default function AdminConfigPage() {
             .sort(([a], [b]) => a.localeCompare(b))
             .map(([category, categoryConfigs]) => (
               <div key={category}>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                  <Settings className="w-5 h-5 text-gray-400" />
+                <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4 flex items-center gap-2">
+                  <Settings className="w-5 h-5 text-[var(--foreground-tertiary)]" />
                   {category}
-                  <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
+                  <span className="text-sm font-normal text-[var(--foreground-tertiary)]">
                     ({categoryConfigs.length})
                   </span>
                 </h2>
@@ -151,12 +151,12 @@ export default function AdminConfigPage() {
             ))}
         </div>
       ) : (
-        <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
-          <Settings className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+        <div className="text-center py-12 bg-[var(--surface)] rounded-xl border border-[var(--border)]">
+          <Settings className="w-12 h-12 text-[var(--foreground-tertiary)] mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-[var(--foreground)] mb-2">
             No configuration found
           </h3>
-          <p className="text-gray-600 dark:text-gray-400">
+          <p className="text-[var(--foreground-secondary)]">
             {search || categoryFilter
               ? 'Try adjusting your search or filters.'
               : 'System configuration will appear here.'}
@@ -165,8 +165,8 @@ export default function AdminConfigPage() {
       )}
 
       {/* Info */}
-      <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-        <p className="text-sm text-blue-700 dark:text-blue-400">
+      <div className="p-4 bg-[#00E5A0]/5 border border-[#00E5A0]/20 rounded-lg">
+        <p className="text-sm text-[#00E5A0]">
           <strong>Note:</strong> Changes to configuration values take effect immediately. Some
           settings may require a service restart to fully apply. Secret values are encrypted and
           not displayed in full.

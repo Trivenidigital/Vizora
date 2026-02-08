@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Razorpay from 'razorpay';
 import * as crypto from 'crypto';
@@ -14,26 +14,34 @@ import {
 @Injectable()
 export class RazorpayProvider implements PaymentProvider {
   readonly name = 'razorpay' as const;
-  private readonly razorpay: Razorpay;
+  private readonly razorpay: Razorpay | null = null;
   private readonly logger = new Logger(RazorpayProvider.name);
   private readonly webhookSecret: string;
   private readonly keyId: string;
+  private readonly isConfigured: boolean;
 
   constructor(private readonly configService: ConfigService) {
     this.keyId = this.configService.get<string>('RAZORPAY_KEY_ID') || '';
     const keySecret =
       this.configService.get<string>('RAZORPAY_KEY_SECRET') || '';
 
-    if (!this.keyId || !keySecret) {
-      this.logger.warn('Razorpay credentials not configured');
+    this.isConfigured = !!(this.keyId && keySecret);
+    if (!this.isConfigured) {
+      this.logger.warn('Razorpay credentials not configured - Razorpay payments disabled');
+    } else {
+      this.razorpay = new Razorpay({
+        key_id: this.keyId,
+        key_secret: keySecret,
+      });
     }
-
-    this.razorpay = new Razorpay({
-      key_id: this.keyId,
-      key_secret: keySecret,
-    });
     this.webhookSecret =
       this.configService.get<string>('RAZORPAY_WEBHOOK_SECRET') || '';
+  }
+
+  private ensureConfigured(): void {
+    if (!this.razorpay) {
+      throw new ServiceUnavailableException('Razorpay is not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET environment variables.');
+    }
   }
 
   async createCustomer(
@@ -41,7 +49,8 @@ export class RazorpayProvider implements PaymentProvider {
     name: string,
     metadata?: Record<string, any>,
   ): Promise<Customer> {
-    const customer = await this.razorpay.customers.create({
+    this.ensureConfigured();
+    const customer = await this.razorpay!.customers.create({
       name,
       email,
       notes: metadata || {},
@@ -55,8 +64,9 @@ export class RazorpayProvider implements PaymentProvider {
   }
 
   async getCustomer(customerId: string): Promise<Customer | null> {
+    this.ensureConfigured();
     try {
-      const customer = await this.razorpay.customers.fetch(customerId);
+      const customer = await this.razorpay!.customers.fetch(customerId);
       return {
         id: customer.id,
         email: customer.email,
@@ -71,9 +81,10 @@ export class RazorpayProvider implements PaymentProvider {
   async createCheckoutSession(
     params: CheckoutParams,
   ): Promise<{ url: string; sessionId: string }> {
+    this.ensureConfigured();
     // Razorpay uses subscriptions directly, not checkout sessions
     // Create a subscription and return the short_url for hosted checkout
-    const subscription = await this.razorpay.subscriptions.create({
+    const subscription = await this.razorpay!.subscriptions.create({
       plan_id: params.priceId,
       customer_id: params.customerId,
       total_count: 12, // 12 billing cycles
@@ -87,8 +98,9 @@ export class RazorpayProvider implements PaymentProvider {
   }
 
   async getSubscription(subscriptionId: string): Promise<Subscription | null> {
+    this.ensureConfigured();
     try {
-      const sub = await this.razorpay.subscriptions.fetch(subscriptionId);
+      const sub = await this.razorpay!.subscriptions.fetch(subscriptionId);
       return this.mapSubscription(sub);
     } catch {
       return null;
@@ -99,9 +111,10 @@ export class RazorpayProvider implements PaymentProvider {
     subscriptionId: string,
     priceId: string,
   ): Promise<Subscription> {
+    this.ensureConfigured();
     // Razorpay requires canceling and creating new subscription for plan changes
     // For now, update the plan_id (limited support in Razorpay API)
-    const sub = await this.razorpay.subscriptions.update(subscriptionId, {
+    const sub = await this.razorpay!.subscriptions.update(subscriptionId, {
       plan_id: priceId,
     });
     return this.mapSubscription(sub);
@@ -111,12 +124,14 @@ export class RazorpayProvider implements PaymentProvider {
     subscriptionId: string,
     immediately = false,
   ): Promise<void> {
-    await this.razorpay.subscriptions.cancel(subscriptionId, immediately);
+    this.ensureConfigured();
+    await this.razorpay!.subscriptions.cancel(subscriptionId, immediately);
   }
 
   async getInvoices(customerId: string, limit = 10): Promise<Invoice[]> {
+    this.ensureConfigured();
     // Razorpay uses "invoices" for subscriptions
-    const invoices = await this.razorpay.invoices.all({
+    const invoices = await this.razorpay!.invoices.all({
       customer_id: customerId,
       count: limit,
     });
@@ -135,12 +150,18 @@ export class RazorpayProvider implements PaymentProvider {
   }
 
   verifyWebhookSignature(payload: Buffer, signature: string): WebhookEvent {
+    if (!this.webhookSecret) {
+      throw new Error('Webhook secret not configured');
+    }
+
     const expectedSignature = crypto
       .createHmac('sha256', this.webhookSecret)
       .update(payload)
       .digest('hex');
 
-    if (signature !== expectedSignature) {
+    const sigBuffer = Buffer.from(signature, 'hex');
+    const expectedBuffer = Buffer.from(expectedSignature, 'hex');
+    if (sigBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
       throw new Error('Invalid webhook signature');
     }
 

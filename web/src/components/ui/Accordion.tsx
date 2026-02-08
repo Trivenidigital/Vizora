@@ -44,11 +44,11 @@ export const Accordion: React.FC<AccordionProps> = ({
         return (
           <div
             key={item.id}
-            className="border border-neutral-200 dark:border-neutral-700 rounded-lg overflow-hidden"
+            className="border border-[var(--border)] rounded-lg overflow-hidden"
           >
             <button
               onClick={() => toggleItem(item.id)}
-              className="w-full px-4 py-3 flex items-center justify-between bg-neutral-50 dark:bg-neutral-800/50 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors text-left font-medium text-neutral-900 dark:text-neutral-50"
+              className="w-full px-4 py-3 flex items-center justify-between bg-[var(--surface-hover)] hover:bg-[var(--surface-hover)] transition-colors text-left font-medium text-[var(--foreground)]"
               aria-expanded={isOpen}
               aria-controls={`content-${item.id}`}
             >
@@ -63,7 +63,7 @@ export const Accordion: React.FC<AccordionProps> = ({
             {isOpen && (
               <div
                 id={`content-${item.id}`}
-                className="px-4 py-3 bg-white dark:bg-neutral-900/50 border-t border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300"
+                className="px-4 py-3 bg-[var(--surface)] border-t border-[var(--border)] text-[var(--foreground-secondary)]"
               >
                 {item.content}
               </div>

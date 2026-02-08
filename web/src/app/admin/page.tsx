@@ -74,8 +74,8 @@ export default function AdminDashboardPage() {
 
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Admin Dashboard</h1>
-        <p className="mt-1 text-gray-600 dark:text-gray-400">
+        <h1 className="text-3xl font-bold text-[var(--foreground)]">Admin Dashboard</h1>
+        <p className="mt-1 text-[var(--foreground-secondary)]">
           Platform overview and management
         </p>
       </div>
@@ -114,16 +114,16 @@ export default function AdminDashboardPage() {
 
       {/* Quick Actions */}
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h2>
+        <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Quick Actions</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {quickActions.map((action) => (
             <Link
               key={action.name}
               href={action.href}
-              className="group bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all"
+              className="group bg-[var(--surface)] rounded-xl border border-[var(--border)] p-4 hover:shadow-md hover:border-[#00E5A0] transition-all"
             >
               <action.icon className={`w-8 h-8 text-${action.color}-500 mb-3`} />
-              <p className="font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">
+              <p className="font-medium text-[var(--foreground)] group-hover:text-[#00E5A0] transition">
                 {action.name}
               </p>
             </Link>
@@ -134,12 +134,12 @@ export default function AdminDashboardPage() {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Screen Status */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-900 dark:text-white">Screen Status</h3>
+            <h3 className="font-semibold text-[var(--foreground)]">Screen Status</h3>
             <Link
               href="/admin/health"
-              className="text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+              className="text-sm text-[#00E5A0] hover:underline flex items-center gap-1"
             >
               View Details
               <ArrowRight className="w-4 h-4" />
@@ -149,24 +149,24 @@ export default function AdminDashboardPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-3 h-3 rounded-full bg-green-500" />
-                <span className="text-gray-700 dark:text-gray-300">Online</span>
+                <span className="text-[var(--foreground-secondary)]">Online</span>
               </div>
-              <span className="font-semibold text-gray-900 dark:text-white">
+              <span className="font-semibold text-[var(--foreground)]">
                 {stats?.onlineScreens ?? 0}
               </span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-3 h-3 rounded-full bg-gray-400" />
-                <span className="text-gray-700 dark:text-gray-300">Offline</span>
+                <div className="w-3 h-3 rounded-full bg-[var(--foreground-tertiary)]" />
+                <span className="text-[var(--foreground-secondary)]">Offline</span>
               </div>
-              <span className="font-semibold text-gray-900 dark:text-white">
+              <span className="font-semibold text-[var(--foreground)]">
                 {(stats?.totalScreens ?? 0) - (stats?.onlineScreens ?? 0)}
               </span>
             </div>
-            <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+            <div className="pt-3 border-t border-[var(--border)]">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-500 dark:text-gray-400">Uptime Rate</span>
+                <span className="text-[var(--foreground-tertiary)]">Uptime Rate</span>
                 <span className="font-medium text-green-600 dark:text-green-400">
                   {stats?.totalScreens
                     ? Math.round(((stats.onlineScreens ?? 0) / stats.totalScreens) * 100)
@@ -179,12 +179,12 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Revenue Summary */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-900 dark:text-white">Revenue Summary</h3>
+            <h3 className="font-semibold text-[var(--foreground)]">Revenue Summary</h3>
             <Link
               href="/admin/analytics"
-              className="text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+              className="text-sm text-[#00E5A0] hover:underline flex items-center gap-1"
             >
               View Analytics
               <ArrowRight className="w-4 h-4" />
@@ -193,31 +193,31 @@ export default function AdminDashboardPage() {
           <div className="space-y-4">
             <div>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-sm text-gray-500 dark:text-gray-400">
+                <span className="text-sm text-[var(--foreground-tertiary)]">
                   Monthly Recurring Revenue
                 </span>
               </div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
+              <div className="text-2xl font-bold text-[var(--foreground)]">
                 {formatCurrency(stats?.mrr ?? 0)}
               </div>
             </div>
             <div>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-sm text-gray-500 dark:text-gray-400">
+                <span className="text-sm text-[var(--foreground-tertiary)]">
                   Annual Recurring Revenue
                 </span>
               </div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
+              <div className="text-2xl font-bold text-[var(--foreground)]">
                 {formatCurrency(stats?.arr ?? 0)}
               </div>
             </div>
-            <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+            <div className="pt-3 border-t border-[var(--border)]">
               <div className="flex items-center gap-2 text-sm">
                 <TrendingUp className="w-4 h-4 text-green-500" />
-                <span className="text-gray-700 dark:text-gray-300">
+                <span className="text-[var(--foreground-secondary)]">
                   Average Revenue Per Organization
                 </span>
-                <span className="ml-auto font-medium text-gray-900 dark:text-white">
+                <span className="ml-auto font-medium text-[var(--foreground)]">
                   {stats?.totalOrganizations
                     ? formatCurrency((stats.mrr ?? 0) / stats.totalOrganizations)
                     : '$0'}

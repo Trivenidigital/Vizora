@@ -100,7 +100,7 @@ export default function AdminSecurityPage() {
     if (action.includes('create') || action.includes('enable') || action.includes('unblock')) {
       return 'text-green-600 dark:text-green-400';
     }
-    return 'text-blue-600 dark:text-blue-400';
+    return 'text-[#00E5A0]';
   };
 
   if (loading) {
@@ -117,27 +117,27 @@ export default function AdminSecurityPage() {
 
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Security</h1>
-        <p className="mt-1 text-gray-600 dark:text-gray-400">
+        <h1 className="text-3xl font-bold text-[var(--foreground)]">Security</h1>
+        <p className="mt-1 text-[var(--foreground-secondary)]">
           Audit logs and IP blocking management
         </p>
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200 dark:border-gray-700">
+      <div className="border-b border-[var(--border)]">
         <nav className="flex gap-8">
           <button
             onClick={() => setActiveTab('audit')}
             className={`py-3 px-1 border-b-2 font-medium text-sm transition ${
               activeTab === 'audit'
-                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                ? 'border-[#00E5A0] text-[#00E5A0]'
+                : 'border-transparent text-[var(--foreground-tertiary)] hover:text-[var(--foreground-secondary)]'
             }`}
           >
             <div className="flex items-center gap-2">
               <Activity className="w-4 h-4" />
               Audit Logs
-              <span className="px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-xs">
+              <span className="px-2 py-0.5 rounded-full bg-[var(--background-secondary)] text-xs">
                 {auditLogs.length}
               </span>
             </div>
@@ -146,14 +146,14 @@ export default function AdminSecurityPage() {
             onClick={() => setActiveTab('blocklist')}
             className={`py-3 px-1 border-b-2 font-medium text-sm transition ${
               activeTab === 'blocklist'
-                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                ? 'border-[#00E5A0] text-[#00E5A0]'
+                : 'border-transparent text-[var(--foreground-tertiary)] hover:text-[var(--foreground-secondary)]'
             }`}
           >
             <div className="flex items-center gap-2">
               <Ban className="w-4 h-4" />
               IP Blocklist
-              <span className="px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-xs">
+              <span className="px-2 py-0.5 rounded-full bg-[var(--background-secondary)] text-xs">
                 {blocklist.filter((b) => b.isActive).length}
               </span>
             </div>
@@ -163,24 +163,24 @@ export default function AdminSecurityPage() {
 
       {/* Audit Logs Tab */}
       {activeTab === 'audit' && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
-                  <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                <tr className="bg-[var(--background)] border-b border-[var(--border)]">
+                  <th className="text-left px-6 py-3 text-sm font-semibold text-[var(--foreground)]">
                     Time
                   </th>
-                  <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                  <th className="text-left px-6 py-3 text-sm font-semibold text-[var(--foreground)]">
                     Admin
                   </th>
-                  <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                  <th className="text-left px-6 py-3 text-sm font-semibold text-[var(--foreground)]">
                     Action
                   </th>
-                  <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                  <th className="text-left px-6 py-3 text-sm font-semibold text-[var(--foreground)]">
                     Target
                   </th>
-                  <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                  <th className="text-left px-6 py-3 text-sm font-semibold text-[var(--foreground)]">
                     IP Address
                   </th>
                 </tr>
@@ -189,18 +189,18 @@ export default function AdminSecurityPage() {
                 {auditLogs.map((log) => (
                   <tr
                     key={log.id}
-                    className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900/30 transition"
+                    className="border-b border-[var(--border)] hover:bg-[var(--surface-hover)] transition"
                   >
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                      <div className="flex items-center gap-2 text-sm text-[var(--foreground-secondary)]">
                         <Clock className="w-4 h-4" />
                         {formatDate(log.createdAt)}
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-gray-400" />
-                        <span className="text-gray-900 dark:text-white text-sm">
+                        <User className="w-4 h-4 text-[var(--foreground-tertiary)]" />
+                        <span className="text-[var(--foreground)] text-sm">
                           {log.adminUserId.slice(0, 8)}...
                         </span>
                       </div>
@@ -212,18 +212,18 @@ export default function AdminSecurityPage() {
                     </td>
                     <td className="px-6 py-4">
                       {log.targetType && (
-                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                        <span className="text-sm text-[var(--foreground-secondary)]">
                           {log.targetType}
                           {log.targetId && (
-                            <span className="text-gray-400"> ({log.targetId.slice(0, 8)}...)</span>
+                            <span className="text-[var(--foreground-tertiary)]"> ({log.targetId.slice(0, 8)}...)</span>
                           )}
                         </span>
                       )}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <Globe className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                        <Globe className="w-4 h-4 text-[var(--foreground-tertiary)]" />
+                        <span className="text-sm text-[var(--foreground-secondary)]">
                           {log.ipAddress || 'N/A'}
                         </span>
                       </div>
@@ -236,11 +236,11 @@ export default function AdminSecurityPage() {
 
           {auditLogs.length === 0 && (
             <div className="text-center py-12">
-              <Activity className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+              <Activity className="w-12 h-12 text-[var(--foreground-tertiary)] mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-[var(--foreground)] mb-2">
                 No audit logs yet
               </h3>
-              <p className="text-gray-600 dark:text-gray-400">
+              <p className="text-[var(--foreground-secondary)]">
                 Admin actions will be logged here.
               </p>
             </div>
@@ -254,34 +254,34 @@ export default function AdminSecurityPage() {
           <div className="flex justify-end">
             <button
               onClick={() => setShowBlockModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+              className="flex items-center gap-2 px-4 py-2 bg-[#8B5CF6] text-white rounded-lg hover:bg-[#7C3AED] transition"
             >
               <Plus className="w-5 h-5" />
               Block IP
             </button>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
-                    <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                  <tr className="bg-[var(--background)] border-b border-[var(--border)]">
+                    <th className="text-left px-6 py-3 text-sm font-semibold text-[var(--foreground)]">
                       IP Address
                     </th>
-                    <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                    <th className="text-left px-6 py-3 text-sm font-semibold text-[var(--foreground)]">
                       Reason
                     </th>
-                    <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                    <th className="text-left px-6 py-3 text-sm font-semibold text-[var(--foreground)]">
                       Status
                     </th>
-                    <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                    <th className="text-left px-6 py-3 text-sm font-semibold text-[var(--foreground)]">
                       Blocked At
                     </th>
-                    <th className="text-left px-6 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                    <th className="text-left px-6 py-3 text-sm font-semibold text-[var(--foreground)]">
                       Expires
                     </th>
-                    <th className="text-right px-6 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                    <th className="text-right px-6 py-3 text-sm font-semibold text-[var(--foreground)]">
                       Actions
                     </th>
                   </tr>
@@ -290,18 +290,18 @@ export default function AdminSecurityPage() {
                   {blocklist.map((entry) => (
                     <tr
                       key={entry.id}
-                      className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900/30 transition"
+                      className="border-b border-[var(--border)] hover:bg-[var(--surface-hover)] transition"
                     >
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
-                          <Globe className="w-4 h-4 text-gray-400" />
-                          <code className="text-sm font-mono text-gray-900 dark:text-white">
+                          <Globe className="w-4 h-4 text-[var(--foreground-tertiary)]" />
+                          <code className="text-sm font-mono text-[var(--foreground)]">
                             {entry.ipAddress}
                           </code>
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                        <span className="text-sm text-[var(--foreground-secondary)]">
                           {entry.reason || 'No reason provided'}
                         </span>
                       </td>
@@ -312,12 +312,12 @@ export default function AdminSecurityPage() {
                         />
                       </td>
                       <td className="px-6 py-4">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                        <span className="text-sm text-[var(--foreground-secondary)]">
                           {formatDate(entry.createdAt)}
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                        <span className="text-sm text-[var(--foreground-secondary)]">
                           {entry.expiresAt ? formatDate(entry.expiresAt) : 'Never'}
                         </span>
                       </td>
@@ -340,11 +340,11 @@ export default function AdminSecurityPage() {
 
             {blocklist.length === 0 && (
               <div className="text-center py-12">
-                <Shield className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                <Shield className="w-12 h-12 text-[var(--foreground-tertiary)] mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-[var(--foreground)] mb-2">
                   No blocked IPs
                 </h3>
-                <p className="text-gray-600 dark:text-gray-400">
+                <p className="text-[var(--foreground-secondary)]">
                   Block malicious IP addresses to protect the platform.
                 </p>
               </div>
@@ -356,20 +356,20 @@ export default function AdminSecurityPage() {
       {/* Block IP Modal */}
       {showBlockModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md p-6">
+          <div className="bg-[var(--surface)] rounded-xl shadow-xl w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Block IP Address</h2>
+              <h2 className="text-xl font-semibold text-[var(--foreground)]">Block IP Address</h2>
               <button
                 onClick={() => setShowBlockModal(false)}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
+                className="p-2 hover:bg-[var(--surface-hover)] rounded-lg transition"
               >
-                <X className="w-5 h-5 text-gray-500" />
+                <X className="w-5 h-5 text-[var(--foreground-tertiary)]" />
               </button>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-1">
                   IP Address
                 </label>
                 <input
@@ -377,12 +377,12 @@ export default function AdminSecurityPage() {
                   value={blockIp}
                   onChange={(e) => setBlockIp(e.target.value)}
                   placeholder="192.168.1.1"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent font-mono"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-1">
                   Reason (optional)
                 </label>
                 <textarea
@@ -390,7 +390,7 @@ export default function AdminSecurityPage() {
                   onChange={(e) => setBlockReason(e.target.value)}
                   placeholder="Why is this IP being blocked?"
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
                 />
               </div>
             </div>
@@ -398,7 +398,7 @@ export default function AdminSecurityPage() {
             <div className="flex items-center justify-end gap-3 mt-6">
               <button
                 onClick={() => setShowBlockModal(false)}
-                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
+                className="px-4 py-2 text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] rounded-lg transition"
               >
                 Cancel
               </button>
@@ -432,7 +432,7 @@ export default function AdminSecurityPage() {
         title="Unblock IP"
         message="Are you sure you want to unblock this IP address? They will be able to access the platform again."
         confirmText="Unblock"
-        type="primary"
+        type="info"
       />
     </div>
   );

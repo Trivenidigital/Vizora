@@ -1,4 +1,4 @@
-import { IsArray, IsOptional, IsString, IsInt, IsDateString, ArrayMinSize, ValidateNested, Min } from 'class-validator';
+import { IsArray, IsOptional, IsString, IsInt, IsDateString, ArrayMinSize, ValidateNested, Min, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class BulkUpdateDto {
@@ -59,7 +59,8 @@ export class BulkTagDto {
 
   @IsOptional()
   @IsString()
-  operation?: 'add' | 'remove' | 'replace'; // Default is 'add'
+  @IsIn(['add', 'remove', 'replace'])
+  operation?: 'add' | 'remove' | 'replace';
 }
 
 export class BulkDurationDto {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState, useCallback, ReactNode } from 'react';
 import { useSocket } from '@/lib/hooks/useSocket';
 import { apiClient } from '@/lib/api';
 
@@ -27,15 +27,30 @@ interface DeviceStatusContextType {
 
 const DeviceStatusContext = createContext<DeviceStatusContextType | undefined>(undefined);
 
-export function DeviceStatusProvider({ children }: { children: ReactNode }) {
-  const { isConnected, on } = useSocket();
+interface DeviceStatusProviderProps {
+  children: ReactNode;
+  user?: { organizationId: string } | null;
+}
+
+export function DeviceStatusProvider({ children, user }: DeviceStatusProviderProps) {
+  const { isConnected, on } = useSocket({
+    autoConnect: !!user,
+    auth: user ? { organizationId: user.organizationId } : undefined,
+  });
   const [deviceStatuses, setDeviceStatuses] = useState<Record<string, DeviceStatusUpdate>>({});
-  const [subscribers, setSubscribers] = useState<Record<string, Set<Function>>>({});
+  const deviceStatusesRef = useRef<Record<string, DeviceStatusUpdate>>({});
+  const subscribersRef = useRef<Record<string, Set<(status: DeviceStatusUpdate) => void>>>({});
   const [isInitialized, setIsInitialized] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
 
-  // Initialize device statuses from API on mount
+  // Initialize device statuses from API when user is authenticated
   useEffect(() => {
+    if (!user) {
+      setIsInitialized(true);
+      setIsInitializing(false);
+      return;
+    }
+
     const initializeFromAPI = async () => {
       try {
         setIsInitializing(true);
@@ -58,52 +73,31 @@ export function DeviceStatusProvider({ children }: { children: ReactNode }) {
         initializeDeviceStatuses(updates);
         setIsInitialized(true);
       } catch (error: any) {
-        // Only log non-401 errors (401 = not authenticated yet, which is normal)
         if (error?.response?.status !== 401 && error?.status !== 401) {
           console.error('Failed to initialize device statuses from API:', error);
         }
-        // Still mark as initialized to unblock UI, even if not authenticated
         setIsInitialized(true);
       } finally {
         setIsInitializing(false);
       }
     };
 
-    // Only initialize if we're not on login/register pages
-    if (typeof window !== 'undefined') {
-      const pathname = window.location.pathname;
-      const isAuthPage = pathname.includes('/login') || pathname.includes('/register');
-
-      if (!isAuthPage) {
-        initializeFromAPI();
-      } else {
-        // On auth pages, just mark as initialized with empty state
-        setIsInitialized(true);
-        setIsInitializing(false);
-      }
-    }
-  }, []);
+    initializeFromAPI();
+  }, [user]);
 
   // Listen for device status updates from Socket.io
   useEffect(() => {
     if (!isConnected) return;
 
     const unsubscribe = on('device:status', (data: DeviceStatusUpdate) => {
-      setDeviceStatuses(prev => {
-        const updated = { ...prev, [data.deviceId]: data };
+      deviceStatusesRef.current = { ...deviceStatusesRef.current, [data.deviceId]: data };
+      setDeviceStatuses(deviceStatusesRef.current);
 
-        // Notify subscribers for this specific device
-        setSubscribers(subs => {
-          if (subs[data.deviceId]) {
-            subs[data.deviceId].forEach(callback => {
-              callback(data);
-            });
-          }
-          return subs;
-        });
-
-        return updated;
-      });
+      // Notify subscribers outside state setter to avoid side-effect anti-pattern
+      const subs = subscribersRef.current[data.deviceId];
+      if (subs) {
+        subs.forEach(callback => callback(data));
+      }
     });
 
     return unsubscribe;
@@ -114,25 +108,19 @@ export function DeviceStatusProvider({ children }: { children: ReactNode }) {
     if (!isConnected) return;
 
     const unsubscribe = on('device:status:batch', (data: DeviceStatusUpdate[]) => {
-      setDeviceStatuses(prev => {
-        const updated = { ...prev };
-        data.forEach(update => {
-          updated[update.deviceId] = update;
-        });
+      const updated = { ...deviceStatusesRef.current };
+      data.forEach(update => {
+        updated[update.deviceId] = update;
+      });
+      deviceStatusesRef.current = updated;
+      setDeviceStatuses(updated);
 
-        // Notify individual subscribers
-        setSubscribers(subs => {
-          data.forEach(update => {
-            if (subs[update.deviceId]) {
-              subs[update.deviceId].forEach(callback => {
-                callback(update);
-              });
-            }
-          });
-          return subs;
-        });
-
-        return updated;
+      // Notify subscribers outside state setter to avoid side-effect anti-pattern
+      data.forEach(update => {
+        const subs = subscribersRef.current[update.deviceId];
+        if (subs) {
+          subs.forEach(callback => callback(update));
+        }
       });
     });
 
@@ -145,6 +133,7 @@ export function DeviceStatusProvider({ children }: { children: ReactNode }) {
       statusMap[update.deviceId] = update;
     });
 
+    deviceStatusesRef.current = statusMap;
     setDeviceStatuses(statusMap);
   };
 
@@ -155,16 +144,13 @@ export function DeviceStatusProvider({ children }: { children: ReactNode }) {
       timestamp: Date.now(),
     };
 
-    setDeviceStatuses(prev => ({
-      ...prev,
-      [deviceId]: update,
-    }));
+    deviceStatusesRef.current = { ...deviceStatusesRef.current, [deviceId]: update };
+    setDeviceStatuses(deviceStatusesRef.current);
 
     // Notify subscribers
-    if (subscribers[deviceId]) {
-      subscribers[deviceId].forEach(callback => {
-        callback(update);
-      });
+    const subs = subscribersRef.current[deviceId];
+    if (subs) {
+      subs.forEach(callback => callback(update));
     }
   };
 
@@ -173,38 +159,30 @@ export function DeviceStatusProvider({ children }: { children: ReactNode }) {
   };
 
   const subscribeToDevice = useCallback((deviceId: string, callback: (update: DeviceStatusUpdate) => void) => {
-    // Add callback to subscribers
-    setSubscribers(prev => {
-      const updated = { ...prev };
-      if (!updated[deviceId]) {
-        updated[deviceId] = new Set();
-      }
-      updated[deviceId].add(callback);
-      return updated;
-    });
+    // Add callback to subscribers (ref mutation, no re-render needed)
+    if (!subscribersRef.current[deviceId]) {
+      subscribersRef.current[deviceId] = new Set();
+    }
+    subscribersRef.current[deviceId].add(callback);
 
-    // Call callback immediately with current status if available (no state update)
-    if (deviceStatuses[deviceId]) {
+    // Call callback immediately with current status if available
+    const currentStatus = deviceStatusesRef.current[deviceId];
+    if (currentStatus) {
       // Use a timeout to avoid calling setState during render
-      setTimeout(() => {
-        callback(deviceStatuses[deviceId]);
-      }, 0);
+      setTimeout(() => callback(currentStatus), 0);
     }
 
     // Return unsubscribe function
     return () => {
-      setSubscribers(prev => {
-        const updated = { ...prev };
-        if (updated[deviceId]) {
-          updated[deviceId].delete(callback);
-          if (updated[deviceId].size === 0) {
-            delete updated[deviceId];
-          }
+      const subs = subscribersRef.current[deviceId];
+      if (subs) {
+        subs.delete(callback);
+        if (subs.size === 0) {
+          delete subscribersRef.current[deviceId];
         }
-        return updated;
-      });
+      }
     };
-  }, [deviceStatuses]);
+  }, []);
 
   return (
     <DeviceStatusContext.Provider

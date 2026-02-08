@@ -5,10 +5,10 @@ import { usePathname } from 'next/navigation';
 
 export default function Breadcrumbs() {
   const pathname = usePathname();
-  
+
   // Generate breadcrumb segments
   const segments = pathname.split('/').filter(Boolean);
-  
+
   // Map segments to readable names
   const getLabel = (segment: string, index: number) => {
     const labels: Record<string, string> = {
@@ -23,32 +23,32 @@ export default function Breadcrumbs() {
     };
     return labels[segment] || segment.charAt(0).toUpperCase() + segment.slice(1);
   };
-  
+
   // Build paths
   const breadcrumbs = segments.map((segment, index) => {
     const path = '/' + segments.slice(0, index + 1).join('/');
     const label = getLabel(segment, index);
     const isLast = index === segments.length - 1;
-    
+
     return {
       label,
       path,
       isLast,
     };
   });
-  
+
   // Don't show on root dashboard
   if (pathname === '/dashboard') {
     return null;
   }
-  
+
   return (
     <nav className="flex mb-6 text-sm" aria-label="Breadcrumb">
       <ol className="inline-flex items-center space-x-1 md:space-x-3">
         <li className="inline-flex items-center">
           <Link
             href="/dashboard"
-            className="inline-flex items-center text-gray-600 hover:text-blue-600 transition"
+            className="inline-flex items-center text-[var(--foreground-secondary)] hover:text-[#00E5A0] transition"
           >
             <svg
               className="w-4 h-4 mr-2"
@@ -64,7 +64,7 @@ export default function Breadcrumbs() {
           <li key={crumb.path}>
             <div className="flex items-center">
               <svg
-                className="w-6 h-6 text-gray-400"
+                className="w-6 h-6 text-[var(--foreground-tertiary)]"
                 fill="currentColor"
                 viewBox="0 0 20 20"
               >
@@ -75,13 +75,13 @@ export default function Breadcrumbs() {
                 />
               </svg>
               {crumb.isLast ? (
-                <span className="ml-1 text-gray-900 font-medium md:ml-2">
+                <span className="ml-1 text-[var(--foreground)] font-medium md:ml-2">
                   {crumb.label}
                 </span>
               ) : (
                 <Link
                   href={crumb.path}
-                  className="ml-1 text-gray-600 hover:text-blue-600 transition md:ml-2"
+                  className="ml-1 text-[var(--foreground-secondary)] hover:text-[#00E5A0] transition md:ml-2"
                 >
                   {crumb.label}
                 </Link>

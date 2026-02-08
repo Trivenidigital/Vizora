@@ -3,7 +3,13 @@
 
 import type { Display, DisplayOrientation, Content, Playlist, PlaylistItem, Schedule, PaginatedResponse, ContentFolder, AppNotification, ApiKey, CreateApiKeyResponse, SubscriptionStatus, Plan, QuotaUsage, Invoice, CheckoutResponse, BillingPortalResponse, AdminPlan, Promotion, AdminOrganization, AdminUser, PlatformStats, SystemConfig, AdminAuditLog, SystemAnnouncement, IpBlocklistEntry } from './types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+// Use relative URL '/api' so requests go through the Next.js rewrite proxy,
+// keeping cookies same-origin. Only fall back to absolute URL for SSR or
+// when explicitly configured (e.g., in production with a separate API domain).
+const API_BASE_URL =
+  typeof window !== 'undefined'
+    ? '/api'  // Client-side: proxy through Next.js rewrite (same-origin cookies)
+    : (process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3000/api'));
 
 // Type definitions for API responses
 interface AuthUser {
@@ -152,9 +158,9 @@ class ApiClient {
         if (response.status === 401 || response.status === 403) {
           this.isAuthenticated = false;
           if (typeof window !== 'undefined') {
-            // Redirect to login with return URL
+            // Only redirect from protected routes (dashboard, admin), not public pages
             const currentPath = window.location.pathname;
-            if (!currentPath.startsWith('/login') && !currentPath.startsWith('/register')) {
+            if (currentPath.startsWith('/dashboard') || currentPath.startsWith('/admin')) {
               window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`;
             }
           }

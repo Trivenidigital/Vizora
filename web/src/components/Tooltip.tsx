@@ -33,11 +33,11 @@ export default function Tooltip({
       </div>
       {show && (
         <div
-          className={`absolute z-50 px-3 py-2 text-sm text-white bg-gray-900 rounded-lg shadow-lg whitespace-nowrap ${positionClasses[position]}`}
+          className={`absolute z-50 px-3 py-2 text-sm text-white bg-[#061A21] rounded-lg shadow-lg whitespace-nowrap ${positionClasses[position]}`}
           role="tooltip"
         >
           {content}
-          <div className="absolute w-2 h-2 bg-gray-900 transform rotate-45" />
+          <div className="absolute w-2 h-2 bg-[#061A21] transform rotate-45" />
         </div>
       )}
     </div>
@@ -47,7 +47,7 @@ export default function Tooltip({
 export function HelpIcon({ content, position }: { content: string; position?: 'top' | 'bottom' | 'left' | 'right' }) {
   return (
     <Tooltip content={content} position={position}>
-      <span className="inline-flex items-center justify-center w-4 h-4 text-xs text-gray-500 border border-gray-400 rounded-full hover:text-blue-600 hover:border-blue-600 transition">
+      <span className="inline-flex items-center justify-center w-4 h-4 text-xs text-[var(--foreground-tertiary)] border border-[var(--foreground-tertiary)] rounded-full hover:text-[#00E5A0] hover:border-[#00E5A0] transition">
         ?
       </span>
     </Tooltip>

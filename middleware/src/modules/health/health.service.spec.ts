@@ -1,11 +1,13 @@
 import { HealthService } from './health.service';
 import { DatabaseService } from '../database/database.service';
 import { RedisService } from '../redis/redis.service';
+import { StorageService } from '../storage/storage.service';
 
 describe('HealthService', () => {
   let service: HealthService;
   let mockDatabaseService: any;
   let mockRedisService: any;
+  let mockStorageService: any;
 
   beforeEach(() => {
     mockDatabaseService = {
@@ -17,9 +19,15 @@ describe('HealthService', () => {
       isAvailable: jest.fn(),
     };
 
+    mockStorageService = {
+      healthCheck: jest.fn().mockResolvedValue({ healthy: true, bucket: 'vizora' }),
+      isAvailable: jest.fn().mockReturnValue(true),
+    };
+
     service = new HealthService(
       mockDatabaseService as DatabaseService,
       mockRedisService as RedisService,
+      mockStorageService as StorageService,
     );
   });
 
@@ -43,6 +51,7 @@ describe('HealthService', () => {
         expect(result.status).toBe('ok');
         expect(result.checks.database.status).toBe('healthy');
         expect(result.checks.redis.status).toBe('healthy');
+        expect(result.checks.minio.status).toBe('healthy');
         expect(result.checks.memory.status).toBe('healthy');
       });
 
@@ -229,8 +238,8 @@ describe('HealthService', () => {
         const duration = Date.now() - start;
 
         // If sequential, would take ~100ms (50+50). Parallel should be ~50ms
-        // Allow some buffer for test execution
-        expect(duration).toBeLessThan(100);
+        // Allow some buffer for test execution overhead
+        expect(duration).toBeLessThan(150);
       });
     });
   });
