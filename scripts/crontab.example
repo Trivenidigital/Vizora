@@ -1,0 +1,39 @@
+# =============================================================================
+# Vizora Database Backup - Crontab Configuration
+# =============================================================================
+#
+# Install these entries with:
+#   crontab -e
+#
+# Or import directly:
+#   crontab scripts/crontab.example
+#
+# Prerequisites:
+#   1. Ensure /var/log/vizora/ exists:  sudo mkdir -p /var/log/vizora
+#   2. Ensure backup dir exists:        sudo mkdir -p /var/backups/vizora
+#   3. Set correct ownership on both directories
+#   4. Ensure DATABASE_URL is set in /path/to/vizora/.env
+#
+# Log rotation is handled by the backup script's built-in retention policy.
+# For log file rotation, consider adding a logrotate config for
+# /var/log/vizora/backup.log
+# =============================================================================
+
+# Environment variables (adjust paths as needed)
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# ---------------------------------------------------------------------------
+# Daily backup at 2:00 AM
+# Runs every day. The backup script handles its own retention (7 daily).
+# ---------------------------------------------------------------------------
+0 2 * * * /opt/vizora/scripts/backup-db.sh >> /var/log/vizora/backup.log 2>&1
+
+# ---------------------------------------------------------------------------
+# Weekly backup at 3:00 AM on Sundays
+# The backup script auto-promotes Sunday backups to the weekly tier,
+# so this entry is redundant if daily runs at 2 AM on Sundays.
+# Include it only if you want a separate weekly-only run (e.g., with
+# different BACKUP_DIR or additional options).
+# ---------------------------------------------------------------------------
+# 0 3 * * 0 /opt/vizora/scripts/backup-db.sh >> /var/log/vizora/backup.log 2>&1

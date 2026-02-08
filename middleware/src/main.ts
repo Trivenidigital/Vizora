@@ -4,6 +4,11 @@
  */
 
 import 'dotenv/config';
+import { initializeSentry } from './config/sentry.config';
+
+// Initialize Sentry before NestJS bootstrap
+initializeSentry();
+
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
@@ -14,6 +19,7 @@ import cookieParser from 'cookie-parser';
 import { AppModule } from './app/app.module';
 import { SanitizeInterceptor } from './modules/common/interceptors/sanitize.interceptor';
 import { LoggingInterceptor } from './modules/common/interceptors/logging.interceptor';
+import { SentryInterceptor } from './interceptors/sentry.interceptor';
 import { AllExceptionsFilter } from './modules/common/filters/all-exceptions.filter';
 
 async function bootstrap() {
@@ -87,9 +93,10 @@ async function bootstrap() {
   );
 
   // Global interceptors
-  // Order matters: logging first, then sanitization
+  // Order matters: logging first, then Sentry error tracking, then sanitization
   app.useGlobalInterceptors(
     new LoggingInterceptor(),
+    new SentryInterceptor(),
     new SanitizeInterceptor(),
   );
 
