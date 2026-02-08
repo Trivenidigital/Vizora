@@ -175,6 +175,7 @@ model Content {
   mimeType    String?
   metadata    Json?    @db.JsonB
   status      String   @default("active") // active, archived, expired
+  isGlobal    Boolean  @default(false)    // true for template library items (available to all orgs)
   templateOrientation  String?  // 'landscape' | 'portrait' | 'both' for template filtering
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -206,6 +207,7 @@ model Content {
   @@index([status])
   @@index([expiresAt])
   @@index([folderId])
+  @@index([isGlobal, type])
 }
 
 model Playlist {
