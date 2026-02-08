@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Reflector } from '@nestjs/core';
+import { JwtService } from '@nestjs/jwt';
 import { DisplaysController } from './displays.controller';
 import { DisplaysService } from './displays.service';
 import { DatabaseService } from '../database/database.service';
@@ -43,6 +44,7 @@ describe('DisplaysController', () => {
       providers: [
         { provide: DisplaysService, useValue: mockDisplaysService },
         { provide: DatabaseService, useValue: mockDatabaseService },
+        { provide: JwtService, useValue: { verify: jest.fn().mockReturnValue({ type: 'device', deviceIdentifier: 'device-123', sub: 'device-123' }), verifyAsync: jest.fn() } },
         Reflector,
       ],
     }).compile();
@@ -143,21 +145,22 @@ describe('DisplaysController', () => {
   });
 
   describe('heartbeat', () => {
-    it('should update heartbeat for a device', async () => {
+    it('should update heartbeat for a device with valid JWT', async () => {
       const expectedResult = { success: true, lastSeen: new Date().toISOString() };
       mockDisplaysService.updateHeartbeat.mockResolvedValue(expectedResult as any);
 
-      const result = await controller.heartbeat('device-123');
+      const mockReq = { headers: { authorization: 'Bearer valid-device-token' } };
+      const result = await controller.heartbeat('device-123', mockReq as any);
 
       expect(result).toEqual(expectedResult);
       expect(mockDisplaysService.updateHeartbeat).toHaveBeenCalledWith('device-123');
     });
 
-    it('should work without authentication (public endpoint)', async () => {
+    it('should work with valid device JWT (public endpoint)', async () => {
       mockDisplaysService.updateHeartbeat.mockResolvedValue({ success: true } as any);
 
-      // This is a public endpoint, so it should work without organizationId
-      const result = await controller.heartbeat('device-456');
+      const mockReq = { headers: { authorization: 'Bearer valid-device-token' } };
+      const result = await controller.heartbeat('device-123', mockReq as any);
 
       expect(result).toHaveProperty('success', true);
     });

@@ -79,13 +79,12 @@ describe('CsrfGuard', () => {
             mockReflector.getAllAndOverride.mockReturnValue(false);
           });
 
-          it('should return true when no cookie token exists (first request)', () => {
+          it('should throw ForbiddenException when no cookie token exists', () => {
             mockRequest.cookies = {};
             mockRequest.headers = {};
 
-            const result = guard.canActivate(mockExecutionContext);
-
-            expect(result).toBe(true);
+            expect(() => guard.canActivate(mockExecutionContext)).toThrow(ForbiddenException);
+            expect(() => guard.canActivate(mockExecutionContext)).toThrow('CSRF cookie missing');
           });
 
           it('should return true when cookie token and header token match', () => {
@@ -132,21 +131,19 @@ describe('CsrfGuard', () => {
         mockReflector.getAllAndOverride.mockReturnValue(false);
       });
 
-      it('should handle undefined cookies', () => {
+      it('should throw ForbiddenException for undefined cookies', () => {
         mockRequest.cookies = undefined;
 
-        const result = guard.canActivate(mockExecutionContext);
-
-        expect(result).toBe(true);
+        expect(() => guard.canActivate(mockExecutionContext)).toThrow(ForbiddenException);
+        expect(() => guard.canActivate(mockExecutionContext)).toThrow('CSRF cookie missing');
       });
 
-      it('should handle empty cookie token', () => {
+      it('should throw ForbiddenException for empty cookie token', () => {
         mockRequest.cookies[AUTH_CONSTANTS.CSRF_COOKIE_NAME] = '';
 
-        // Empty string is falsy, so should be treated as no cookie
-        const result = guard.canActivate(mockExecutionContext);
-
-        expect(result).toBe(true);
+        // Empty string is falsy, so should be treated as missing cookie
+        expect(() => guard.canActivate(mockExecutionContext)).toThrow(ForbiddenException);
+        expect(() => guard.canActivate(mockExecutionContext)).toThrow('CSRF cookie missing');
       });
     });
 

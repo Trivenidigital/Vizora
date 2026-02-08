@@ -42,8 +42,8 @@ export class CsrfGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request>();
 
     // Only check CSRF for state-changing methods
-    const safeMethodes = ['GET', 'HEAD', 'OPTIONS'];
-    if (safeMethodes.includes(request.method)) {
+    const safeMethods = ['GET', 'HEAD', 'OPTIONS'];
+    if (safeMethods.includes(request.method)) {
       return true;
     }
 

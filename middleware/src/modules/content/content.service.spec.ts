@@ -81,6 +81,7 @@ describe('ContentService', () => {
         createMany: jest.fn(),
         deleteMany: jest.fn(),
       },
+      $transaction: jest.fn((fn) => fn(mockDatabaseService)),
     };
 
     mockTemplateRendering = {
