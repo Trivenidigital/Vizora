@@ -98,7 +98,7 @@ describe('useRealtimeEvents', () => {
 
       // Simulate receiving device status update from server
       act(() => {
-        mockSocket?.simulateEvent('device:status-update', mockUpdate);
+        mockSocket?.simulateEvent('device:status', mockUpdate);
       });
 
       // Verify callback was called
@@ -118,7 +118,7 @@ describe('useRealtimeEvents', () => {
 
       // Simulate multiple status updates
       act(() => {
-        mockSocket?.simulateEvent('device:status-update', {
+        mockSocket?.simulateEvent('device:status', {
           deviceId: 'device-1',
           status: 'online',
           lastSeen: new Date().toISOString(),
@@ -126,7 +126,7 @@ describe('useRealtimeEvents', () => {
       });
 
       act(() => {
-        mockSocket?.simulateEvent('device:status-update', {
+        mockSocket?.simulateEvent('device:status', {
           deviceId: 'device-1',
           status: 'offline',
           lastSeen: new Date().toISOString(),
@@ -522,7 +522,7 @@ describe('useRealtimeEvents', () => {
 
       // Simulate event - should not trigger callback since disabled
       act(() => {
-        mockSocket?.simulateEvent('device:status-update', {
+        mockSocket?.simulateEvent('device:status', {
           deviceId: 'device-1',
           status: 'online',
           lastSeen: new Date().toISOString(),

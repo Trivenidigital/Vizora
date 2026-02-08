@@ -135,6 +135,58 @@ export class TemplateRenderingService {
         return '';
       }
     });
+
+    // Weather condition code to emoji helper
+    Handlebars.registerHelper('weatherIcon', (code: number) => {
+      if (code === undefined || code === null) return '';
+      const c = Number(code);
+      // Thunderstorm (2xx)
+      if (c >= 200 && c < 300) return '\u26C8\uFE0F';
+      // Drizzle (3xx)
+      if (c >= 300 && c < 400) return '\uD83C\uDF26\uFE0F';
+      // Rain (5xx)
+      if (c >= 500 && c < 600) {
+        if (c === 511) return '\u2744\uFE0F'; // freezing rain
+        return '\uD83C\uDF27\uFE0F';
+      }
+      // Snow (6xx)
+      if (c >= 600 && c < 700) return '\u2744\uFE0F';
+      // Atmosphere / fog / mist (7xx)
+      if (c >= 700 && c < 800) return '\uD83C\uDF2B\uFE0F';
+      // Clear (800)
+      if (c === 800) return '\u2600\uFE0F';
+      // Few clouds (801)
+      if (c === 801) return '\u26C5';
+      // Scattered / broken / overcast clouds (802-804)
+      if (c >= 802 && c <= 804) return '\u2601\uFE0F';
+      return '\uD83C\uDF24\uFE0F';
+    });
+
+    // Relative time helper (e.g., "2 hours ago")
+    Handlebars.registerHelper('relativeTime', (date: string | Date) => {
+      try {
+        const d = new Date(date);
+        if (isNaN(d.getTime())) return '';
+        const now = Date.now();
+        const diffMs = now - d.getTime();
+        const diffSec = Math.floor(diffMs / 1000);
+
+        if (diffSec < 0) return 'just now';
+        if (diffSec < 60) return 'just now';
+        const diffMin = Math.floor(diffSec / 60);
+        if (diffMin < 60) return `${diffMin} minute${diffMin !== 1 ? 's' : ''} ago`;
+        const diffHours = Math.floor(diffMin / 60);
+        if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+        const diffDays = Math.floor(diffHours / 24);
+        if (diffDays < 30) return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
+        const diffMonths = Math.floor(diffDays / 30);
+        if (diffMonths < 12) return `${diffMonths} month${diffMonths !== 1 ? 's' : ''} ago`;
+        const diffYears = Math.floor(diffMonths / 12);
+        return `${diffYears} year${diffYears !== 1 ? 's' : ''} ago`;
+      } catch {
+        return '';
+      }
+    });
   }
 
   /**

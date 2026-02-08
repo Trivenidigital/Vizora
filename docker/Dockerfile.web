@@ -37,6 +37,14 @@ COPY --from=builder /app/web/next.config.js ./
 # Install production dependencies
 RUN npm install next react react-dom --omit=dev
 
+# Create non-root user
+RUN addgroup --system --gid 1001 vizora && \
+    adduser --system --uid 1001 --ingroup vizora vizora
+RUN chown -R vizora:vizora /app
+USER vizora
+
 EXPOSE 3001
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD node -e "require('http').get('http://localhost:3001', (r) => { process.exit(r.statusCode < 400 ? 0 : 1) }).on('error', () => process.exit(1))"
 
 CMD ["npm", "start"]

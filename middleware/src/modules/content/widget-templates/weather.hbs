@@ -1,0 +1,45 @@
+<div style="font-family: 'Segoe UI', Arial, sans-serif; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); color: #fff; padding: 32px; border-radius: 16px; max-width: 480px; margin: 0 auto; box-sizing: border-box;">
+  <!-- Location header -->
+  <div style="text-align: center; margin-bottom: 24px;">
+    <div style="font-size: 14px; text-transform: uppercase; letter-spacing: 2px; opacity: 0.7;">{{location.name}}</div>
+    <div style="font-size: 11px; opacity: 0.5;">{{location.country}}</div>
+  </div>
+
+  <!-- Current conditions -->
+  <div style="display: flex; align-items: center; justify-content: center; gap: 24px; margin-bottom: 24px;">
+    <div style="font-size: 64px; line-height: 1;">{{weatherIcon current.conditionCode}}</div>
+    <div>
+      <div style="font-size: 48px; font-weight: 300; line-height: 1;">{{formatNumber current.temp 0}}&deg;</div>
+      <div style="font-size: 13px; opacity: 0.7; text-transform: capitalize;">{{current.description}}</div>
+    </div>
+  </div>
+
+  <!-- Details row -->
+  <div style="display: flex; justify-content: space-around; background: rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; margin-bottom: 24px;">
+    <div style="text-align: center;">
+      <div style="font-size: 11px; opacity: 0.6; margin-bottom: 4px;">Feels like</div>
+      <div style="font-size: 18px; font-weight: 500;">{{formatNumber current.feelsLike 0}}&deg;</div>
+    </div>
+    <div style="text-align: center;">
+      <div style="font-size: 11px; opacity: 0.6; margin-bottom: 4px;">Humidity</div>
+      <div style="font-size: 18px; font-weight: 500;">{{current.humidity}}%</div>
+    </div>
+    <div style="text-align: center;">
+      <div style="font-size: 11px; opacity: 0.6; margin-bottom: 4px;">Wind</div>
+      <div style="font-size: 18px; font-weight: 500;">{{formatNumber current.windSpeed 1}} m/s</div>
+    </div>
+  </div>
+
+  <!-- Forecast -->
+  {{#if forecast}}
+  <div style="display: flex; justify-content: space-between; gap: 8px;">
+    {{#each forecast}}
+    <div style="flex: 1; text-align: center; background: rgba(255,255,255,0.05); border-radius: 10px; padding: 12px 4px;">
+      <div style="font-size: 11px; opacity: 0.6; margin-bottom: 6px;">{{this.date}}</div>
+      <div style="font-size: 28px; margin-bottom: 4px;">{{weatherIcon this.conditionCode}}</div>
+      <div style="font-size: 14px; font-weight: 500;">{{formatNumber this.temp 0}}&deg;</div>
+    </div>
+    {{/each}}
+  </div>
+  {{/if}}
+</div>

@@ -33,7 +33,7 @@ jobs:
           node-version: '22'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm lint || echo "Linting skipped (no lint script)"
+      - run: pnpm lint
 
   test:
     runs-on: ubuntu-latest
@@ -90,7 +90,8 @@ jobs:
 
       - name: Run realtime unit tests
         working-directory: realtime
-        run: pnpm test --passWithNoTests || echo "Realtime tests skipped"
+        continue-on-error: true
+        run: pnpm test --passWithNoTests
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
@@ -143,10 +144,12 @@ jobs:
         run: npx prisma db push --schema=database/prisma/schema.prisma --skip-generate
 
       - name: Run API E2E tests
-        run: npx nx run middleware-e2e:e2e --skip-nx-cache || echo "E2E tests skipped"
+        continue-on-error: true
+        run: npx nx run middleware-e2e:e2e --skip-nx-cache
 
       - name: Run WebSocket E2E tests
-        run: npx nx run realtime-e2e:e2e --skip-nx-cache || echo "WebSocket E2E tests skipped"
+        continue-on-error: true
+        run: npx nx run realtime-e2e:e2e --skip-nx-cache
 
   build:
     runs-on: ubuntu-latest
@@ -165,10 +168,10 @@ jobs:
         run: npx nx build @vizora/middleware
         
       - name: Build web
-        run: npx nx build @vizora/web || echo "Web build skipped"
-        
+        run: npx nx build @vizora/web
+
       - name: Build realtime
-        run: npx nx build @vizora/realtime || echo "Realtime build skipped"
+        run: npx nx build @vizora/realtime
 
   security:
     runs-on: ubuntu-latest
@@ -183,4 +186,5 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - name: Security audit
-        run: pnpm audit --audit-level=high || echo "Audit warnings found"
+        continue-on-error: true
+        run: pnpm audit --audit-level=high

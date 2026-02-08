@@ -97,6 +97,7 @@ export class DeviceGateway
       // Verify device JWT
       const payload = this.jwtService.verify<DevicePayload>(token, {
         secret: process.env.DEVICE_JWT_SECRET,
+        algorithms: ['HS256'],
       });
 
       if (payload.type !== 'device') {
@@ -182,13 +183,6 @@ export class DeviceGateway
         timestamp: new Date().toISOString(),
       });
 
-      // Send initial configuration
-      client.emit('config', {
-        heartbeatInterval: 15000, // 15 seconds
-        cacheSize: 524288000, // 500MB
-        autoUpdate: true,
-      });
-
       // Fetch and send current playlist to device on connection
       try {
         this.logger.debug(`Fetching playlist for device: ${deviceId}`);
@@ -210,34 +204,51 @@ export class DeviceGateway
           },
         });
 
+        // Extract qrOverlay from display metadata for initial config
+        const displayMetadata = (display?.metadata as Record<string, any>) || {};
+
+        // Send initial configuration including qrOverlay
+        client.emit('config', {
+          heartbeatInterval: 15000, // 15 seconds
+          cacheSize: 524288000, // 500MB
+          autoUpdate: true,
+          qrOverlay: displayMetadata.qrOverlay || null,
+        });
+
         this.logger.debug(`Display found: ${!!display}, hasPlaylist: ${!!display?.currentPlaylist}, playlistId: ${display?.currentPlaylistId || 'none'}`);
 
         if (display?.currentPlaylist) {
-          // Get the device token for appending to content URLs (needed for img/video src auth)
-          const deviceToken = client.handshake.auth?.token || '';
-
           // Transform playlist to the format expected by the display client
-          const resolvedItems = display.currentPlaylist.items.map((item: any) => {
-            const resolvedUrl = this.resolveContentUrl(item);
-            const urlWithAuth = resolvedUrl.includes('/api/device-content/')
-              ? `${resolvedUrl}?token=${encodeURIComponent(deviceToken)}`
-              : resolvedUrl;
-            return {
-              id: item.id,
-              contentId: item.contentId,
-              duration: item.duration || 10,
-              order: item.order,
-              content: item.content ? {
-                id: item.content.id,
-                name: item.content.name,
-                type: item.content.type,
-                url: urlWithAuth,
-                thumbnail: item.content.thumbnail,
-                mimeType: item.content.mimeType,
-                duration: item.content.duration,
-              } : null,
-            };
-          });
+          // Content URLs use the API base path — devices authenticate via
+          // Authorization header with their stored JWT, not via URL query params
+          const resolvedItems = await Promise.all(
+            display.currentPlaylist.items.map(async (item: any) => {
+              const resolvedUrl = this.resolveContentUrl(item);
+              const baseItem = {
+                id: item.id,
+                contentId: item.contentId,
+                duration: item.duration || 10,
+                order: item.order,
+                content: item.content ? {
+                  id: item.content.id,
+                  name: item.content.name,
+                  type: item.content.type,
+                  url: resolvedUrl,
+                  thumbnail: item.content.thumbnail,
+                  mimeType: item.content.mimeType,
+                  duration: item.content.duration,
+                  metadata: item.content.metadata,
+                } : null,
+              };
+
+              // Resolve layout content inline so devices receive self-contained data
+              if (baseItem.content?.type === 'layout') {
+                baseItem.content = await this.resolveLayoutContent(baseItem.content);
+              }
+
+              return baseItem;
+            }),
+          );
 
           const playlist = {
             id: display.currentPlaylist.id,
@@ -501,26 +512,17 @@ export class DeviceGateway
 
   // Admin methods (called from API)
   async sendPlaylistUpdate(deviceId: string, playlist: Playlist): Promise<void> {
-    // Look up the device's token from its connected socket for URL auth
-    let deviceToken = '';
-    const sockets = await this.server.in(`device:${deviceId}`).fetchSockets();
-    if (sockets.length > 0) {
-      deviceToken = sockets[0].handshake.auth?.token || '';
-    }
-
     // Resolve minio:// URLs to API-served URLs before sending to device
+    // Devices authenticate content requests via Authorization header with their stored JWT
     const resolvedPlaylist = {
       ...playlist,
       items: (playlist.items || []).map((item: any) => {
         const resolvedUrl = this.resolveContentUrl(item);
-        const urlWithAuth = resolvedUrl.includes('/api/device-content/') && deviceToken
-          ? `${resolvedUrl}?token=${encodeURIComponent(deviceToken)}`
-          : resolvedUrl;
         return {
           ...item,
           content: item.content ? {
             ...item.content,
-            url: urlWithAuth,
+            url: resolvedUrl,
           } : item.content,
         };
       }),
@@ -755,5 +757,114 @@ export class DeviceGateway
       });
       return createErrorResponse('Failed to save screenshot');
     }
+  }
+
+  /**
+   * Send a QR overlay update to a specific device
+   */
+  async sendQrOverlayUpdate(deviceId: string, qrOverlay: any): Promise<void> {
+    this.server.to(`device:${deviceId}`).emit('qr-overlay:update', {
+      qrOverlay,
+      timestamp: new Date().toISOString(),
+    });
+    this.logger.log(`Sent QR overlay update to device: ${deviceId}`);
+  }
+
+  /**
+   * Resolve layout content by fetching all zone playlists and content inline.
+   * Returns a self-contained layout object that devices can render without
+   * additional API calls.
+   */
+  private async resolveLayoutContent(content: any): Promise<any> {
+    const metadata = (content.metadata as Record<string, any>) || {};
+    const zones = metadata.zones || [];
+
+    const resolvedZones = await Promise.all(
+      zones.map(async (zone: any) => {
+        const resolved: any = { ...zone };
+
+        // Resolve playlist content for zone
+        if (zone.playlistId) {
+          try {
+            const playlist = await this.databaseService.playlist.findUnique({
+              where: { id: zone.playlistId },
+              include: {
+                items: {
+                  include: { content: true },
+                  orderBy: { order: 'asc' },
+                },
+              },
+            });
+
+            if (playlist) {
+              resolved.playlist = {
+                id: playlist.id,
+                name: playlist.name,
+                items: (playlist.items || []).map((item: any) => {
+                  const resolvedUrl = this.resolveContentUrl(item);
+                  return {
+                    id: item.id,
+                    contentId: item.contentId,
+                    duration: item.duration || 10,
+                    order: item.order,
+                    content: item.content ? {
+                      id: item.content.id,
+                      name: item.content.name,
+                      type: item.content.type,
+                      url: resolvedUrl,
+                      thumbnail: item.content.thumbnail,
+                      mimeType: item.content.mimeType,
+                      duration: item.content.duration,
+                    } : null,
+                  };
+                }),
+              };
+            }
+          } catch (error) {
+            this.logger.warn(`Failed to resolve playlist ${zone.playlistId} for layout zone ${zone.id}: ${(error as Error).message}`);
+          }
+        }
+
+        // Resolve single content for zone
+        if (zone.contentId) {
+          try {
+            const zoneContent = await this.databaseService.content.findUnique({
+              where: { id: zone.contentId },
+            });
+
+            if (zoneContent) {
+              const apiBaseUrl = process.env.API_BASE_URL
+                || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3000');
+              let contentUrl = zoneContent.url || '';
+              if (contentUrl.startsWith('minio://')) {
+                contentUrl = `${apiBaseUrl}/api/device-content/${zoneContent.id}/file`;
+              }
+
+              resolved.content = {
+                id: zoneContent.id,
+                name: zoneContent.name,
+                type: zoneContent.type,
+                url: contentUrl,
+                thumbnail: zoneContent.thumbnail,
+                mimeType: zoneContent.mimeType,
+                duration: zoneContent.duration,
+              };
+            }
+          } catch (error) {
+            this.logger.warn(`Failed to resolve content ${zone.contentId} for layout zone ${zone.id}: ${(error as Error).message}`);
+          }
+        }
+
+        return resolved;
+      }),
+    );
+
+    return {
+      ...content,
+      metadata: {
+        ...metadata,
+        zones: resolvedZones,
+      },
+    };
   }
 }

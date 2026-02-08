@@ -189,4 +189,35 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       return false;
     }
   }
+
+  async incr(key: string): Promise<number> {
+    if (!this.client) return 0;
+    try {
+      return await this.client.incr(key);
+    } catch (error) {
+      this.logger.error(`Redis INCR error for key ${key}: ${error}`);
+      return 0;
+    }
+  }
+
+  async expire(key: string, ttlSeconds: number): Promise<boolean> {
+    if (!this.client) return false;
+    try {
+      await this.client.expire(key, ttlSeconds);
+      return true;
+    } catch (error) {
+      this.logger.error(`Redis EXPIRE error for key ${key}: ${error}`);
+      return false;
+    }
+  }
+
+  async ttl(key: string): Promise<number> {
+    if (!this.client) return -2;
+    try {
+      return await this.client.ttl(key);
+    } catch (error) {
+      this.logger.error(`Redis TTL error for key ${key}: ${error}`);
+      return -2;
+    }
+  }
 }

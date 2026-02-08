@@ -58,6 +58,7 @@ export class DeviceContentController {
     try {
       const payload = this.jwtService.verify<DeviceJwtPayload>(token, {
         secret: process.env.DEVICE_JWT_SECRET,
+        algorithms: ['HS256'],
       });
 
       if (payload.type !== 'device') {

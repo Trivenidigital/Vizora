@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RedisService } from './redis.service';
+import { DatabaseService } from '../database/database.service';
 import {
   HeartbeatData as HeartbeatPayload,
   ImpressionData as ImpressionPayload,
@@ -44,7 +45,10 @@ interface DeviceStats {
 export class HeartbeatService {
   private readonly logger = new Logger(HeartbeatService.name);
 
-  constructor(private redisService: RedisService) {}
+  constructor(
+    private redisService: RedisService,
+    private readonly db: DatabaseService,
+  ) {}
 
   /**
    * Process device heartbeat
@@ -80,20 +84,37 @@ export class HeartbeatService {
    */
   async logImpression(deviceId: string, data: ImpressionPayload): Promise<void> {
     try {
-      const impression: StoredImpression = {
-        deviceId,
-        ...data,
-        timestamp: Date.now(),
-      };
-
-      // Store in Redis list for batch processing
+      // Store in Redis for quick daily counters
       await this.redisService.increment(
         `stats:device:${deviceId}:impressions:${new Date().toISOString().split('T')[0]}`,
         86400, // 24 hours
       );
 
-      // TODO: Queue for ClickHouse insertion
-      // await this.queueImpressionInsert(impression);
+      // Persist to PostgreSQL
+      try {
+        const now = new Date();
+        const device = await this.db.display.findUnique({
+          where: { id: deviceId },
+          select: { organizationId: true },
+        });
+
+        if (device) {
+          await this.db.contentImpression.create({
+            data: {
+              organizationId: device.organizationId,
+              contentId: data.contentId,
+              displayId: deviceId,
+              playlistId: data.playlistId || null,
+              duration: data.duration || null,
+              completionPercentage: data.completionPercentage || null,
+              date: new Date(now.toISOString().split('T')[0]),
+              hour: now.getHours(),
+            },
+          });
+        }
+      } catch (dbError) {
+        this.logger.warn(`Failed to persist impression to DB: ${dbError}`);
+      }
 
       this.logger.debug(`Logged impression for device: ${deviceId}`);
     } catch (error) {

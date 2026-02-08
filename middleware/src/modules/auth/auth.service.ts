@@ -3,17 +3,27 @@ import {
   UnauthorizedException,
   ConflictException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { DatabaseService } from '../database/database.service';
+import { RedisService } from '../redis/redis.service';
 import * as bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
 import { RegisterDto, LoginDto } from './dto';
+import { AUTH_CONSTANTS } from './constants/auth.constants';
+
+// Account lockout constants
+const MAX_LOGIN_ATTEMPTS = 10;
+const LOCKOUT_TTL_SECONDS = 15 * 60; // 15 minutes
 
 @Injectable()
 export class AuthService {
   constructor(
     private databaseService: DatabaseService,
     private jwtService: JwtService,
+    private redisService: RedisService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -112,6 +122,18 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
+    // Check account lockout
+    const lockoutKey = `login_attempts:${dto.email}`;
+    const attemptsStr = await this.redisService.get(lockoutKey);
+    const attempts = attemptsStr ? parseInt(attemptsStr, 10) : 0;
+
+    if (attempts >= MAX_LOGIN_ATTEMPTS) {
+      throw new HttpException(
+        'Account temporarily locked due to too many failed login attempts. Try again in 15 minutes.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
     // Find user with organization
     const user = await this.databaseService.user.findUnique({
       where: { email: dto.email },
@@ -119,6 +141,8 @@ export class AuthService {
     });
 
     if (!user || !user.passwordHash) {
+      // Increment failed login attempts even for non-existent users (prevent enumeration)
+      await this.incrementLoginAttempts(lockoutKey);
       throw new UnauthorizedException('Invalid email or password');
     }
 
@@ -126,6 +150,7 @@ export class AuthService {
     const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
 
     if (!isPasswordValid) {
+      await this.incrementLoginAttempts(lockoutKey);
       throw new UnauthorizedException('Invalid email or password');
     }
 
@@ -133,6 +158,9 @@ export class AuthService {
     if (!user.isActive) {
       throw new ForbiddenException('Account is inactive. Contact support.');
     }
+
+    // Clear lockout counter on successful login
+    await this.redisService.del(lockoutKey);
 
     // Update last login timestamp
     await this.databaseService.user.update({
@@ -163,7 +191,7 @@ export class AuthService {
         },
       },
       token,
-      expiresIn: 604800, // 7 days in seconds
+      expiresIn: AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS,
     };
   }
 
@@ -185,7 +213,12 @@ export class AuthService {
     };
   }
 
-  async logout(userId: string) {
+  async logout(userId: string, token?: string) {
+    // Revoke the JWT token if provided
+    if (token) {
+      await this.revokeToken(token);
+    }
+
     // Get user to find organizationId
     const user = await this.databaseService.user.findUnique({
       where: { id: userId },
@@ -213,10 +246,53 @@ export class AuthService {
       email: user.email,
       organizationId: organization.id,
       role: user.role,
+      isSuperAdmin: user.isSuperAdmin === true,
       type: 'user',
+      jti: crypto.randomUUID(),
     };
 
     return this.jwtService.sign(payload);
+  }
+
+  private async incrementLoginAttempts(lockoutKey: string): Promise<void> {
+    const count = await this.redisService.incr(lockoutKey);
+    // Set TTL only on the first attempt (when count becomes 1)
+    if (count === 1) {
+      await this.redisService.expire(lockoutKey, LOCKOUT_TTL_SECONDS);
+    }
+  }
+
+  private async revokeToken(token: string): Promise<void> {
+    try {
+      // Decode the token to extract jti and expiration
+      const decoded = this.jwtService.decode(token) as any;
+      if (!decoded) return;
+
+      const jti = decoded.jti;
+      if (!jti) {
+        // Fallback: use token hash as identifier for tokens without jti
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        const key = `revoked_token:${tokenHash}`;
+        // Use the full token expiry as TTL since we can't determine remaining time without jti
+        await this.redisService.set(key, '1', AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS);
+        return;
+      }
+
+      const key = `revoked_token:${jti}`;
+
+      // Calculate remaining TTL from the token's exp claim
+      let ttl = AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS;
+      if (decoded.exp) {
+        const remainingSeconds = decoded.exp - Math.floor(Date.now() / 1000);
+        if (remainingSeconds > 0) {
+          ttl = remainingSeconds;
+        }
+      }
+
+      await this.redisService.set(key, '1', ttl);
+    } catch {
+      // Silently fail — if token can't be decoded, it's already invalid
+    }
   }
 
   private sanitizeUser(user: any) {

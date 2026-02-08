@@ -24,6 +24,13 @@ try {
   quitApp: () => ipcRenderer.invoke('quit-app'),
   toggleFullscreen: () => ipcRenderer.invoke('toggle-fullscreen'),
 
+  // Cache management
+  cacheDownload: (id: string, url: string, mimeType: string) =>
+    ipcRenderer.invoke('cache:download', id, url, mimeType),
+  cacheGet: (id: string) => ipcRenderer.invoke('cache:get', id),
+  cacheStats: () => ipcRenderer.invoke('cache:stats'),
+  cacheClear: () => ipcRenderer.invoke('cache:clear'),
+
   // Event listeners
   onPairingRequired: (callback: () => void) =>
     ipcRenderer.on('pairing-required', callback),

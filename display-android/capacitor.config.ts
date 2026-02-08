@@ -8,7 +8,7 @@ const config: CapacitorConfig = {
     // For development - connect to local server
     // url: 'http://YOUR_DEV_IP:3003',
     cleartext: true,
-    androidScheme: 'http', // Use http for local development to avoid mixed content issues
+    androidScheme: 'https',
   },
   plugins: {
     CapacitorHttp: {
@@ -30,9 +30,9 @@ const config: CapacitorConfig = {
   },
   android: {
     // Android TV specific configurations
-    allowMixedContent: true,
+    allowMixedContent: false,
     captureInput: true,
-    webContentsDebuggingEnabled: true, // Disable in production
+    webContentsDebuggingEnabled: false,
     backgroundColor: '#1a1a2e',
     buildOptions: {
       releaseType: 'APK',

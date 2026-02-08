@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Body, HttpStatus, HttpException } from '@nestjs/common';
+import { Controller, Get, Post, Body, HttpStatus, HttpException, UseGuards } from '@nestjs/common';
 import { DeviceGateway } from '../gateways/device.gateway';
 import { RedisService } from '../services/redis.service';
 import { DatabaseService } from '../database/database.service';
+import { InternalApiGuard } from '../guards/internal-api.guard';
 import { PushPlaylistRequest, PushContentRequest, DeviceCommandType } from '../types';
 
 interface DependencyHealth {
@@ -158,6 +159,7 @@ export class AppController {
   }
 
   @Post('push/playlist')
+  @UseGuards(InternalApiGuard)
   async pushPlaylist(@Body() data: PushPlaylistRequest): Promise<PushResponse> {
     await this.deviceGateway.sendPlaylistUpdate(data.deviceId, data.playlist);
     return {
@@ -167,6 +169,7 @@ export class AppController {
   }
 
   @Post('push/content')
+  @UseGuards(InternalApiGuard)
   async pushContent(@Body() data: PushContentRequest): Promise<PushResponse> {
     await this.deviceGateway.sendCommand(data.deviceId, {
       type: DeviceCommandType.PUSH_CONTENT,
@@ -182,6 +185,7 @@ export class AppController {
   }
 
   @Post('internal/command')
+  @UseGuards(InternalApiGuard)
   async sendCommand(
     @Body() data: { displayId: string; command: string; payload?: Record<string, unknown> },
   ): Promise<PushResponse> {

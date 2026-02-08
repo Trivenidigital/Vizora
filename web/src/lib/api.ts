@@ -1138,6 +1138,124 @@ class ApiClient {
       method: 'DELETE',
     });
   }
+
+  // ========== Template Library ==========
+
+  async searchTemplates(params?: {
+    search?: string;
+    category?: string;
+    tag?: string;
+    orientation?: string;
+    difficulty?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<any> {
+    const query = params ? new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([_, v]) => v !== undefined)) as Record<string, string>
+    ).toString() : '';
+    return this.request<any>(`/template-library${query ? `?${query}` : ''}`);
+  }
+
+  async getTemplateCategories(): Promise<any[]> {
+    return this.request<any[]>('/template-library/categories');
+  }
+
+  async getFeaturedTemplates(): Promise<any[]> {
+    return this.request<any[]>('/template-library/featured');
+  }
+
+  async getSeasonalTemplates(): Promise<any[]> {
+    return this.request<any[]>('/template-library/seasonal');
+  }
+
+  async getTemplateDetail(id: string): Promise<any> {
+    return this.request<any>(`/template-library/${id}`);
+  }
+
+  async getTemplatePreview(id: string): Promise<{ html: string }> {
+    return this.request<{ html: string }>(`/template-library/${id}/preview`);
+  }
+
+  async cloneTemplate(id: string, data?: { name?: string; description?: string }): Promise<any> {
+    return this.request<any>(`/template-library/${id}/clone`, {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    });
+  }
+
+  // ========== Widget API Methods ==========
+
+  async getWidgetTypes(): Promise<any[]> {
+    return this.request<any[]>('/content/widgets/types');
+  }
+
+  async createWidget(data: { name: string; widgetType: string; widgetConfig?: Record<string, any>; description?: string }): Promise<any> {
+    return this.request<any>('/content/widgets', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateWidget(id: string, data: any): Promise<any> {
+    return this.request<any>(`/content/widgets/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async refreshWidget(id: string): Promise<any> {
+    return this.request<any>(`/content/widgets/${id}/refresh`, {
+      method: 'POST',
+    });
+  }
+
+  // ========== Layout API Methods ==========
+
+  async getLayoutPresets(): Promise<any[]> {
+    return this.request<any[]>('/content/layouts/presets');
+  }
+
+  async createLayout(data: { name: string; layoutType: string; zones?: any[]; description?: string }): Promise<any> {
+    return this.request<any>('/content/layouts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateLayout(id: string, data: any): Promise<any> {
+    return this.request<any>(`/content/layouts/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getResolvedLayout(id: string): Promise<any> {
+    return this.request<any>(`/content/layouts/${id}/resolved`);
+  }
+
+  // ========== QR Overlay API Methods ==========
+
+  async updateQrOverlay(displayId: string, config: {
+    enabled: boolean;
+    url: string;
+    position?: string;
+    size?: number;
+    opacity?: number;
+    margin?: number;
+    backgroundColor?: string;
+    label?: string;
+  }): Promise<any> {
+    return this.request<any>(`/displays/${displayId}/qr-overlay`, {
+      method: 'PATCH',
+      body: JSON.stringify(config),
+    });
+  }
+
+  async removeQrOverlay(displayId: string): Promise<void> {
+    return this.request<void>(`/displays/${displayId}/qr-overlay`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 export const apiClient = new ApiClient(API_BASE_URL);

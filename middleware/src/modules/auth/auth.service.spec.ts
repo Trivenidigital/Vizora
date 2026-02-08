@@ -1,7 +1,8 @@
 import { JwtService } from '@nestjs/jwt';
-import { ConflictException, UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import { ConflictException, UnauthorizedException, ForbiddenException, HttpException, HttpStatus } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { DatabaseService } from '../database/database.service';
+import { RedisService } from '../redis/redis.service';
 import * as bcrypt from 'bcryptjs';
 
 // Mock bcryptjs
@@ -10,10 +11,17 @@ jest.mock('bcryptjs', () => ({
   compare: jest.fn(),
 }));
 
+// Mock crypto.randomUUID
+jest.mock('crypto', () => ({
+  ...jest.requireActual('crypto'),
+  randomUUID: jest.fn().mockReturnValue('mock-uuid-1234'),
+}));
+
 describe('AuthService', () => {
   let service: AuthService;
   let mockDatabaseService: any;
   let mockJwtService: any;
+  let mockRedisService: any;
 
   const mockUser = {
     id: 'user-123',
@@ -64,12 +72,23 @@ describe('AuthService', () => {
 
     mockJwtService = {
       sign: jest.fn().mockReturnValue('mock-jwt-token'),
+      decode: jest.fn().mockReturnValue({ jti: 'mock-jti', exp: Math.floor(Date.now() / 1000) + 604800 }),
+    };
+
+    mockRedisService = {
+      get: jest.fn().mockResolvedValue(null),
+      set: jest.fn().mockResolvedValue(true),
+      del: jest.fn().mockResolvedValue(true),
+      exists: jest.fn().mockResolvedValue(false),
+      incr: jest.fn().mockResolvedValue(1),
+      expire: jest.fn().mockResolvedValue(true),
     };
 
     // Directly instantiate the service with mocked dependencies
     service = new AuthService(
       mockDatabaseService as DatabaseService,
       mockJwtService as JwtService,
+      mockRedisService as RedisService,
     );
     
     // Reset bcrypt mocks
@@ -226,6 +245,14 @@ describe('AuthService', () => {
       await expect(service.login(loginDto)).rejects.toThrow(UnauthorizedException);
     });
 
+    it('should increment login attempts on invalid email', async () => {
+      mockDatabaseService.user.findUnique.mockResolvedValue(null);
+
+      await service.login(loginDto).catch(() => {});
+
+      expect(mockRedisService.incr).toHaveBeenCalledWith(`login_attempts:${loginDto.email}`);
+    });
+
     it('should throw UnauthorizedException for invalid password', async () => {
       mockDatabaseService.user.findUnique.mockResolvedValue({
         ...mockUser,
@@ -234,6 +261,74 @@ describe('AuthService', () => {
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
       await expect(service.login(loginDto)).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should increment login attempts on invalid password', async () => {
+      mockDatabaseService.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        organization: mockOrganization,
+      });
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+
+      await service.login(loginDto).catch(() => {});
+
+      expect(mockRedisService.incr).toHaveBeenCalledWith(`login_attempts:${loginDto.email}`);
+    });
+
+    it('should set TTL on first failed login attempt', async () => {
+      mockRedisService.incr.mockResolvedValue(1);
+      mockDatabaseService.user.findUnique.mockResolvedValue(null);
+
+      await service.login(loginDto).catch(() => {});
+
+      expect(mockRedisService.expire).toHaveBeenCalledWith(`login_attempts:${loginDto.email}`, 900);
+    });
+
+    it('should not reset TTL on subsequent failed login attempts', async () => {
+      mockRedisService.incr.mockResolvedValue(5);
+      mockDatabaseService.user.findUnique.mockResolvedValue(null);
+
+      await service.login(loginDto).catch(() => {});
+
+      expect(mockRedisService.expire).not.toHaveBeenCalled();
+    });
+
+    it('should throw HttpException 429 when account is locked', async () => {
+      mockRedisService.get.mockResolvedValue('10');
+
+      await expect(service.login(loginDto)).rejects.toThrow(HttpException);
+      try {
+        await service.login(loginDto);
+      } catch (error) {
+        expect(error).toBeInstanceOf(HttpException);
+        expect((error as HttpException).getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS);
+        expect((error as HttpException).message).toBe(
+          'Account temporarily locked due to too many failed login attempts. Try again in 15 minutes.',
+        );
+      }
+    });
+
+    it('should not check password when account is locked', async () => {
+      mockRedisService.get.mockResolvedValue('10');
+
+      await service.login(loginDto).catch(() => {});
+
+      expect(mockDatabaseService.user.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('should clear lockout counter on successful login', async () => {
+      mockRedisService.get.mockResolvedValue('3');
+      mockDatabaseService.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        organization: mockOrganization,
+      });
+      mockDatabaseService.user.update.mockResolvedValue(mockUser);
+      mockDatabaseService.auditLog.create.mockResolvedValue({});
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      await service.login(loginDto);
+
+      expect(mockRedisService.del).toHaveBeenCalledWith(`login_attempts:${loginDto.email}`);
     });
 
     it('should throw ForbiddenException for inactive user', async () => {
@@ -337,6 +432,29 @@ describe('AuthService', () => {
       expect(result).toEqual({ message: 'Logged out successfully' });
       expect(mockDatabaseService.auditLog.create).not.toHaveBeenCalled();
     });
+
+    it('should revoke token on logout when token is provided', async () => {
+      mockDatabaseService.user.findUnique.mockResolvedValue(mockUser);
+      mockDatabaseService.auditLog.create.mockResolvedValue({});
+
+      await service.logout(mockUser.id, 'mock-jwt-token');
+
+      expect(mockJwtService.decode).toHaveBeenCalledWith('mock-jwt-token');
+      expect(mockRedisService.set).toHaveBeenCalledWith(
+        'revoked_token:mock-jti',
+        '1',
+        expect.any(Number),
+      );
+    });
+
+    it('should not revoke token when no token is provided', async () => {
+      mockDatabaseService.user.findUnique.mockResolvedValue(mockUser);
+      mockDatabaseService.auditLog.create.mockResolvedValue({});
+
+      await service.logout(mockUser.id);
+
+      expect(mockJwtService.decode).not.toHaveBeenCalled();
+    });
   });
 
   describe('JWT Token Generation', () => {
@@ -363,6 +481,7 @@ describe('AuthService', () => {
           organizationId: mockOrganization.id,
           role: mockUser.role,
           type: 'user',
+          jti: 'mock-uuid-1234',
         }),
       );
     });

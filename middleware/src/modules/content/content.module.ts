@@ -8,6 +8,13 @@ import { FileValidationService } from './file-validation.service';
 import { TemplateRenderingService } from './template-rendering.service';
 import { TemplateRefreshService } from './template-refresh.service';
 import { StorageModule } from '../storage/storage.module';
+import {
+  WeatherDataSource,
+  RssDataSource,
+  InstagramDataSource,
+  TwitterDataSource,
+  FacebookDataSource,
+} from './widget-data-sources';
 
 @Module({
   imports: [
@@ -25,7 +32,12 @@ import { StorageModule } from '../storage/storage.module';
     FileValidationService,
     TemplateRenderingService,
     TemplateRefreshService,
+    WeatherDataSource,
+    RssDataSource,
+    InstagramDataSource,
+    TwitterDataSource,
+    FacebookDataSource,
   ],
-  exports: [ContentService],
+  exports: [ContentService, TemplateRenderingService],
 })
 export class ContentModule {}

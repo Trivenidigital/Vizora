@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { DatabaseService } from '../database/database.service';
 
 @Injectable()
@@ -75,80 +76,79 @@ export class AnalyticsService {
   }
 
   /**
-   * Content performance - views/engagement based on playlist usage
+   * Content performance - views/engagement from real impression data
    */
   async getContentPerformance(organizationId: string, range: string) {
-    // Get content with playlist item counts as a proxy for "views"
-    const content = await this.db.content.findMany({
-      where: { organizationId },
-      include: {
-        _count: {
-          select: { playlistItems: true },
-        },
-        playlistItems: {
-          include: {
-            playlist: {
-              include: {
-                _count: {
-                  select: { assignedDisplays: true },
-                },
-              },
-            },
-          },
-        },
+    const { startDate } = this.getDateRange(range);
+
+    const impressions = await this.db.contentImpression.groupBy({
+      by: ['contentId'],
+      where: {
+        organizationId,
+        timestamp: { gte: startDate },
       },
-      orderBy: { createdAt: 'desc' },
+      _count: { id: true },
+      _avg: { duration: true, completionPercentage: true },
+      orderBy: { _count: { id: 'desc' } },
       take: 10,
     });
 
-    return content.map(c => {
-      // Calculate estimated views: items in playlists * displays using those playlists
-      const displayCount = c.playlistItems.reduce((sum, pi) => {
-        return sum + (pi.playlist?._count?.assignedDisplays || 0);
-      }, 0);
-
-      return {
-        title: c.name,
-        views: Math.max(c._count.playlistItems * 10 + displayCount * 50, c._count.playlistItems),
-        engagement: Math.min(100, 50 + c._count.playlistItems * 10),
-        shares: c._count.playlistItems,
-      };
+    const contentIds = impressions.map(i => i.contentId);
+    const contents = await this.db.content.findMany({
+      where: { id: { in: contentIds } },
+      select: { id: true, name: true },
     });
+    const contentMap = new Map(contents.map(c => [c.id, c.name]));
+
+    return impressions.map(i => ({
+      title: contentMap.get(i.contentId) || 'Unknown',
+      views: i._count.id,
+      engagement: Math.round(i._avg.completionPercentage || 0),
+      shares: 0,
+    }));
   }
 
   /**
-   * Usage trends - content by type over time
+   * Usage trends - real daily impression counts by content type
    */
   async getUsageTrends(organizationId: string, range: string) {
     const { startDate } = this.getDateRange(range);
     const days = this.getRangeDays(range);
 
-    // Count content by type
-    const contentByType = await this.db.content.groupBy({
-      by: ['type'],
-      where: { organizationId },
-      _count: { id: true },
+    const impressions = await this.db.contentImpression.findMany({
+      where: {
+        organizationId,
+        timestamp: { gte: startDate },
+      },
+      select: {
+        date: true,
+        content: { select: { type: true } },
+      },
     });
 
-    const typeCounts: Record<string, number> = {};
-    contentByType.forEach(c => {
-      typeCounts[c.type] = c._count.id;
-    });
+    // Group by date and type
+    const dailyData = new Map<string, Record<string, number>>();
+    for (const imp of impressions) {
+      const dateStr = imp.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      if (!dailyData.has(dateStr)) {
+        dailyData.set(dateStr, { video: 0, image: 0, text: 0, interactive: 0 });
+      }
+      const dayData = dailyData.get(dateStr)!;
+      const type = imp.content?.type;
+      if (type === 'video') dayData.video++;
+      else if (type === 'image') dayData.image++;
+      else if (type === 'html') dayData.text++;
+      else if (type === 'url') dayData.interactive++;
+    }
 
-    // Generate trend data
+    // Generate data points for all days in range
     const dataPoints = [];
     for (let i = 0; i < Math.min(days, 30); i++) {
       const date = new Date();
       date.setDate(date.getDate() - (days - 1 - i));
       const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-
-      dataPoints.push({
-        date: dateStr,
-        video: (typeCounts['video'] || 0) * 25,
-        image: (typeCounts['image'] || 0) * 19,
-        text: (typeCounts['html'] || 0) * 12.5,
-        interactive: (typeCounts['url'] || 0) * 10,
-      });
+      const data = dailyData.get(dateStr) || { video: 0, image: 0, text: 0, interactive: 0 };
+      dataPoints.push({ date: dateStr, ...data });
     }
 
     return dataPoints;
@@ -225,43 +225,57 @@ export class AnalyticsService {
   }
 
   /**
-   * Playlist performance - based on assignments and item count
+   * Playlist performance - real impression data grouped by playlist
    */
   async getPlaylistPerformance(organizationId: string, range: string) {
-    const playlists = await this.db.playlist.findMany({
-      where: { organizationId },
-      include: {
-        _count: {
-          select: {
-            items: true,
-            assignedDisplays: true,
-            schedules: true,
-          },
-        },
+    const { startDate } = this.getDateRange(range);
+
+    const impressions = await this.db.contentImpression.groupBy({
+      by: ['playlistId'],
+      where: {
+        organizationId,
+        playlistId: { not: null },
+        timestamp: { gte: startDate },
       },
-      orderBy: { updatedAt: 'desc' },
-      take: 10,
+      _count: { id: true },
+      _avg: { completionPercentage: true },
     });
 
-    return playlists.map(p => ({
-      name: p.name,
-      plays: p._count.assignedDisplays * 24 + p._count.schedules * 12,
-      engagement: Math.min(100, 40 + p._count.items * 5 + p._count.assignedDisplays * 10),
-      uniqueDevices: p._count.assignedDisplays,
-      views: p._count.assignedDisplays * 24 + p._count.schedules * 12,
-      completion: Math.min(100, 60 + p._count.items * 3),
-    }));
+    const playlistIds = impressions.map(i => i.playlistId).filter(Boolean) as string[];
+    const playlists = await this.db.playlist.findMany({
+      where: { id: { in: playlistIds } },
+      include: { _count: { select: { assignedDisplays: true } } },
+    });
+    const playlistMap = new Map(playlists.map(p => [p.id, p]));
+
+    return impressions.map(i => {
+      const playlist = playlistMap.get(i.playlistId!);
+      return {
+        name: playlist?.name || 'Unknown',
+        plays: i._count.id,
+        engagement: Math.round(i._avg.completionPercentage || 0),
+        uniqueDevices: (playlist as any)?._count?.assignedDisplays || 0,
+        views: i._count.id,
+        completion: Math.round(i._avg.completionPercentage || 0),
+      };
+    });
   }
 
   /**
    * Summary KPI data
    */
   async getSummary(organizationId: string) {
-    const [totalDevices, onlineDevices, totalContent, totalPlaylists] = await Promise.all([
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const [totalDevices, onlineDevices, totalContent, totalPlaylists, totalImpressions] = await Promise.all([
       this.db.display.count({ where: { organizationId } }),
       this.db.display.count({ where: { organizationId, status: 'online' } }),
       this.db.content.count({ where: { organizationId } }),
       this.db.playlist.count({ where: { organizationId } }),
+      this.db.contentImpression.count({
+        where: { organizationId, timestamp: { gte: thirtyDaysAgo } },
+      }),
     ]);
 
     const contentSize = await this.db.content.aggregate({
@@ -280,6 +294,59 @@ export class AnalyticsService {
       totalPlaylists,
       totalContentSize: contentSize._sum.fileSize || 0,
       uptimePercent: parseFloat(uptimePercent),
+      totalImpressions,
+    };
+  }
+
+  /**
+   * Per-content detailed metrics
+   */
+  async getContentMetrics(organizationId: string, contentId: string, range: string) {
+    const { startDate } = this.getDateRange(range);
+
+    const [totalViews, avgMetrics, dailyTrend, topDevices] = await Promise.all([
+      this.db.contentImpression.count({
+        where: { organizationId, contentId, timestamp: { gte: startDate } },
+      }),
+      this.db.contentImpression.aggregate({
+        where: { organizationId, contentId, timestamp: { gte: startDate } },
+        _avg: { duration: true, completionPercentage: true },
+      }),
+      this.db.contentImpression.groupBy({
+        by: ['date'],
+        where: { organizationId, contentId, timestamp: { gte: startDate } },
+        _count: { id: true },
+        orderBy: { date: 'asc' },
+      }),
+      this.db.contentImpression.groupBy({
+        by: ['displayId'],
+        where: { organizationId, contentId, timestamp: { gte: startDate } },
+        _count: { id: true },
+        orderBy: { _count: { id: 'desc' } },
+        take: 5,
+      }),
+    ]);
+
+    const deviceIds = topDevices.map(d => d.displayId);
+    const devices = await this.db.display.findMany({
+      where: { id: { in: deviceIds } },
+      select: { id: true, nickname: true },
+    });
+    const deviceMap = new Map(devices.map(d => [d.id, d.nickname || 'Unnamed']));
+
+    return {
+      totalViews,
+      avgDuration: Math.round(avgMetrics._avg.duration || 0),
+      avgCompletion: Math.round(avgMetrics._avg.completionPercentage || 0),
+      dailyTrend: dailyTrend.map(d => ({
+        date: d.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        views: d._count.id,
+      })),
+      topDevices: topDevices.map(d => ({
+        deviceId: d.displayId,
+        deviceName: deviceMap.get(d.displayId) || 'Unknown',
+        views: d._count.id,
+      })),
     };
   }
 
@@ -376,6 +443,24 @@ export class AnalyticsService {
         uptimePercent,
       })),
     };
+  }
+
+  /**
+   * Cleanup old impressions (older than 90 days) - runs daily at 2 AM
+   */
+  @Cron('0 2 * * *')
+  async cleanupOldImpressions() {
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+    try {
+      const result = await this.db.contentImpression.deleteMany({
+        where: { timestamp: { lt: ninetyDaysAgo } },
+      });
+      this.logger.log(`Cleaned up ${result.count} old impressions`);
+    } catch (error) {
+      this.logger.error('Failed to cleanup old impressions:', error);
+    }
   }
 
   /**

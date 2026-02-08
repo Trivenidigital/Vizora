@@ -1,0 +1,59 @@
+<div style="font-family: 'Segoe UI', Arial, sans-serif; background: #1a1a2e; color: #e0e0e0; padding: 24px; border-radius: 12px; box-sizing: border-box;">
+  <!-- Profile header -->
+  <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.08);">
+    {{#if profileImage}}
+    <img src="{{profileImage}}" alt="" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover;" />
+    {{/if}}
+    {{#if pageImage}}
+    <img src="{{pageImage}}" alt="" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover;" />
+    {{/if}}
+    <div>
+      <div style="font-size: 16px; font-weight: 600; color: #fff;">{{#if username}}{{username}}{{else}}{{pageName}}{{/if}}</div>
+      <div style="font-size: 12px; opacity: 0.5; text-transform: capitalize;">{{platform}}</div>
+    </div>
+  </div>
+
+  <!-- Masonry-like wall using CSS columns -->
+  <div style="column-count: 2; column-gap: 16px;">
+    {{#each posts}}
+    <div style="break-inside: avoid; margin-bottom: 16px; background: rgba(255,255,255,0.05); border-radius: 12px; overflow: hidden;">
+      {{#if this.imageUrl}}
+      <div style="width: 100%; overflow: hidden;">
+        <img src="{{this.imageUrl}}" alt="" style="width: 100%; display: block;" />
+      </div>
+      {{/if}}
+      <div style="padding: 14px;">
+        {{#if this.author}}
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+          {{#if this.author.avatar}}
+          <img src="{{this.author.avatar}}" alt="" style="width: 24px; height: 24px; border-radius: 50%;" />
+          {{/if}}
+          <span style="font-size: 13px; font-weight: 600; color: #fff;">{{this.author.name}}</span>
+          {{#if this.author.handle}}
+          <span style="font-size: 12px; opacity: 0.5;">{{this.author.handle}}</span>
+          {{/if}}
+        </div>
+        {{/if}}
+
+        {{#if this.text}}
+        <div style="font-size: 14px; line-height: 1.5; margin-bottom: 10px;">{{this.text}}</div>
+        {{/if}}
+        {{#if this.caption}}
+        <div style="font-size: 14px; line-height: 1.5; margin-bottom: 10px;">{{this.caption}}</div>
+        {{/if}}
+
+        <div style="display: flex; gap: 16px; font-size: 12px; opacity: 0.6; flex-wrap: wrap;">
+          {{#if this.likes}}<span>&#10084; {{this.likes}}</span>{{/if}}
+          {{#if this.comments}}<span>&#128172; {{this.comments}}</span>{{/if}}
+          {{#if this.shares}}<span>&#8634; {{this.shares}}</span>{{/if}}
+          {{#if this.retweets}}<span>&#8634; {{this.retweets}}</span>{{/if}}
+          {{#if this.replies}}<span>&#128172; {{this.replies}}</span>{{/if}}
+        </div>
+        {{#if this.timestamp}}
+        <div style="font-size: 11px; opacity: 0.4; margin-top: 8px;">{{relativeTime this.timestamp}}</div>
+        {{/if}}
+      </div>
+    </div>
+    {{/each}}
+  </div>
+</div>
