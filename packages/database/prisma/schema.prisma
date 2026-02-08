@@ -46,6 +46,7 @@ model Organization {
   notifications       Notification[]
   apiKeys             ApiKey[]
   billingTransactions BillingTransaction[]
+  impressions         ContentImpression[]
 
   @@index([slug])
   @@index([stripeCustomerId])
@@ -117,6 +118,7 @@ model Display {
   tags                  DisplayTag[]
   groups                DisplayGroupMember[]
   auditLogs             AuditLog[]
+  impressions           ContentImpression[]
 
   @@index([organizationId])
   @@index([deviceIdentifier])
@@ -197,6 +199,7 @@ model Content {
 
   playlistItems  PlaylistItem[]
   tags           ContentTag[]
+  impressions    ContentImpression[]
 
   @@index([organizationId])
   @@index([type])
@@ -219,6 +222,7 @@ model Playlist {
   items              PlaylistItem[]
   schedules          Schedule[]
   assignedDisplays   Display[]      @relation("DisplayCurrentPlaylist")
+  impressions        ContentImpression[]
 
   @@index([organizationId])
 }
@@ -238,6 +242,33 @@ model PlaylistItem {
   @@unique([playlistId, order])
   @@index([playlistId])
   @@index([contentId])
+}
+
+// ============================================================================
+// CONTENT IMPRESSIONS (ANALYTICS)
+// ============================================================================
+
+model ContentImpression {
+  id                   String    @id @default(cuid())
+  organizationId       String
+  contentId            String
+  displayId            String
+  playlistId           String?
+  duration             Int?
+  completionPercentage Int?
+  timestamp            DateTime  @default(now())
+  date                 DateTime  @db.Date
+  hour                 Int
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  content      Content      @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  display      Display      @relation(fields: [displayId], references: [id], onDelete: Cascade)
+  playlist     Playlist?    @relation(fields: [playlistId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, date])
+  @@index([contentId, date])
+  @@index([displayId, date])
+  @@map("content_impressions")
 }
 
 // ============================================================================

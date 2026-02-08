@@ -10,6 +10,10 @@ declare global {
       getDeviceInfo: () => Promise<any>;
       quitApp: () => Promise<void>;
       toggleFullscreen: () => Promise<void>;
+      cacheDownload: (id: string, url: string, mimeType: string) => Promise<{ success: boolean; path: string | null }>;
+      cacheGet: (id: string) => Promise<{ path: string | null }>;
+      cacheStats: () => Promise<{ itemCount: number; totalSizeMB: number; maxSizeMB: number }>;
+      cacheClear: () => Promise<{ success: boolean }>;
       onPairingRequired: (callback: () => void) => void;
       onPaired: (callback: (event: any, token: string) => void) => void;
       onPlaylistUpdate: (callback: (event: any, playlist: any) => void) => void;
@@ -27,6 +31,7 @@ class DisplayApp {
   private pairingCheckInterval: NodeJS.Timeout | null = null;
   private currentCode: string | null = null;
   private isPairingScreenShown = false;
+  private contentStartTime: number = 0;
 
   constructor() {
     console.log('[App] Constructor: Creating DisplayApp instance');
@@ -372,10 +377,12 @@ class DisplayApp {
     // Start playing new playlist
     if (playlist.items && playlist.items.length > 0) {
       this.playContent();
+      // Preload next items in background
+      this.preloadContent(playlist.items.slice(0, Math.min(5, playlist.items.length)));
     }
   }
 
-  private playContent() {
+  private async playContent() {
     if (!this.currentPlaylist || !this.currentPlaylist.items) {
       return;
     }
@@ -400,7 +407,26 @@ class DisplayApp {
     const startTime = Date.now();
 
     // Support both 'source' and 'url' field names for compatibility
-    const contentSource = currentItem.content?.source || currentItem.content?.url;
+    let contentSource = currentItem.content?.source || currentItem.content?.url;
+
+    // Check cache for image/video content
+    if (currentItem.content?.type === 'image' || currentItem.content?.type === 'video') {
+      try {
+        const contentId = currentItem.content._id || currentItem.content.id;
+        const cached = await window.electronAPI.cacheGet(contentId);
+        if (cached.path) {
+          contentSource = cached.path;
+          console.log('[App] Using cached content:', cached.path);
+        } else {
+          // Background download for future use
+          const mimeType = currentItem.content.mimeType || (currentItem.content.type === 'video' ? 'video/mp4' : 'image/jpeg');
+          window.electronAPI.cacheDownload(contentId, contentSource, mimeType)
+            .catch(err => console.warn('[App] Background cache failed:', err));
+        }
+      } catch (err) {
+        console.warn('[App] Cache check failed:', err);
+      }
+    }
 
     switch (currentItem.content?.type) {
       case 'image':
@@ -448,35 +474,56 @@ class DisplayApp {
     container.innerHTML = '';
     container.appendChild(contentDiv);
 
-    // Log impression
+    // Record start time for duration tracking
+    this.contentStartTime = Date.now();
+    const expectedDuration = (currentItem.duration || 10) * 1000;
+
+    // Log initial impression
     window.electronAPI.logImpression({
       contentId: currentItem.content?._id,
       playlistId: this.currentPlaylist._id,
-      timestamp: startTime,
+      timestamp: this.contentStartTime,
     });
 
     // Schedule next content (if not video)
     if (currentItem.content?.type !== 'video') {
-      const duration = (currentItem.duration || 10) * 1000; // Convert to ms
-
       this.playbackTimer = setTimeout(() => {
-        // Log completion
+        const actualDurationMs = Date.now() - this.contentStartTime;
+        const completionPercentage = Math.min(100, Math.round((actualDurationMs / expectedDuration) * 100));
+
+        // Log completion with duration and completion data
         window.electronAPI.logImpression({
           contentId: currentItem.content?._id,
           playlistId: this.currentPlaylist._id,
-          duration: Date.now() - startTime,
-          completed: true,
+          duration: Math.round(actualDurationMs / 1000),
+          completionPercentage,
           timestamp: Date.now(),
         });
 
         this.nextContent();
-      }, duration);
+      }, expectedDuration);
     }
   }
 
   private nextContent() {
     if (!this.currentPlaylist || !this.currentPlaylist.items) {
       return;
+    }
+
+    // Log completion for video content (timer-based content already logs in the timeout)
+    const currentItem = this.currentPlaylist.items[this.currentIndex];
+    if (currentItem?.content?.type === 'video' && this.contentStartTime > 0) {
+      const actualDurationMs = Date.now() - this.contentStartTime;
+      const expectedDuration = (currentItem.duration || currentItem.content?.duration || 30) * 1000;
+      const completionPercentage = Math.min(100, Math.round((actualDurationMs / expectedDuration) * 100));
+
+      window.electronAPI.logImpression({
+        contentId: currentItem.content?._id,
+        playlistId: this.currentPlaylist._id,
+        duration: Math.round(actualDurationMs / 1000),
+        completionPercentage,
+        timestamp: Date.now(),
+      });
     }
 
     this.currentIndex++;
@@ -521,6 +568,28 @@ class DisplayApp {
         break;
       default:
         console.warn('Unknown command:', command);
+    }
+  }
+
+  private async preloadContent(items: any[]) {
+    for (const item of items) {
+      if (!item.content) continue;
+      const type = item.content.type;
+      if (type !== 'image' && type !== 'video') continue;
+
+      const contentUrl = item.content.source || item.content.url;
+      const contentId = item.content._id || item.content.id;
+      const mimeType = item.content.mimeType || (type === 'video' ? 'video/mp4' : 'image/jpeg');
+
+      try {
+        const cached = await window.electronAPI.cacheGet(contentId);
+        if (!cached.path) {
+          console.log('[App] Preloading content:', contentId);
+          await window.electronAPI.cacheDownload(contentId, contentUrl, mimeType);
+        }
+      } catch (err) {
+        console.warn('[App] Preload failed for', contentId, err);
+      }
     }
   }
 

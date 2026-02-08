@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useCustomization } from '@/components/providers/CustomizationProvider';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -9,9 +9,12 @@ import Button from '@/components/Button';
 export const dynamic = 'force-dynamic';
 
 export default function CustomizationPage() {
- const { brandConfig, updateBrandConfig } = useCustomization();
+ const { brandConfig, updateBrandConfig, organizationId } = useCustomization();
  const [formData, setFormData] = useState(brandConfig);
  const [saveSuccess, setSaveSuccess] = useState(false);
+ const [logoUploading, setLogoUploading] = useState(false);
+ const [logoUploadError, setLogoUploadError] = useState<string | null>(null);
+ const fileInputRef = useRef<HTMLInputElement>(null);
 
  const handleInputChange = (
  e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -31,6 +34,50 @@ export default function CustomizationPage() {
 
  const handleReset = () => {
  setFormData(brandConfig);
+ };
+
+ const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+ const file = e.target.files?.[0];
+ if (!file || !organizationId) return;
+
+ const allowedTypes = ['image/png', 'image/jpeg', 'image/svg+xml'];
+ if (!allowedTypes.includes(file.type)) {
+   setLogoUploadError('Only PNG, JPEG, and SVG files are allowed');
+   return;
+ }
+
+ if (file.size > 2 * 1024 * 1024) {
+   setLogoUploadError('File size must be under 2MB');
+   return;
+ }
+
+ setLogoUploading(true);
+ setLogoUploadError(null);
+
+ try {
+   const formDataUpload = new FormData();
+   formDataUpload.append('file', file);
+
+   const res = await fetch(`/api/organizations/${organizationId}/branding/logo`, {
+     method: 'POST',
+     credentials: 'include',
+     body: formDataUpload,
+   });
+
+   if (!res.ok) {
+     const err = await res.json().catch(() => ({}));
+     throw new Error(err.message || 'Upload failed');
+   }
+
+   const result = await res.json();
+   setFormData((prev) => ({ ...prev, logo: result.logoUrl }));
+   updateBrandConfig({ logo: result.logoUrl });
+ } catch (err: any) {
+   setLogoUploadError(err.message || 'Failed to upload logo');
+ } finally {
+   setLogoUploading(false);
+   if (fileInputRef.current) fileInputRef.current.value = '';
+ }
  };
 
  return (
@@ -81,7 +128,32 @@ export default function CustomizationPage() {
 
  <div>
  <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
- Logo URL
+ Upload Logo
+ </label>
+ <div className="flex gap-3 items-center">
+ <input
+ ref={fileInputRef}
+ type="file"
+ accept="image/png,image/jpeg,image/svg+xml"
+ onChange={handleLogoUpload}
+ className="flex-1 text-sm text-[var(--foreground)] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[var(--surface-hover)] file:text-[var(--foreground)] hover:file:bg-[var(--border)]"
+ disabled={logoUploading || !organizationId}
+ />
+ {logoUploading && (
+   <span className="text-sm text-[var(--foreground-secondary)]">Uploading...</span>
+ )}
+ </div>
+ {logoUploadError && (
+   <p className="text-xs text-red-500 mt-1">{logoUploadError}</p>
+ )}
+ <p className="text-xs text-[var(--foreground-secondary)] mt-1">
+ PNG, JPEG, or SVG. Max 2MB.
+ </p>
+ </div>
+
+ <div>
+ <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
+ Logo URL (manual)
  </label>
  <input
  type="url"
