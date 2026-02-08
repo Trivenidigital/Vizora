@@ -31,6 +31,8 @@ import { ReplaceFileDto } from './dto/replace-file.dto';
 import { CreateTemplateDto } from './dto/create-template.dto';
 import { UpdateTemplateDto } from './dto/update-template.dto';
 import { PreviewTemplateDto } from './dto/preview-template.dto';
+import { CreateLayoutDto } from './dto/create-layout.dto';
+import { CreateWidgetDto } from './dto/create-widget.dto';
 import { BulkUpdateDto, BulkArchiveDto, BulkRestoreDto, BulkDeleteDto, BulkTagDto, BulkDurationDto } from './dto/bulk-operations.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -510,6 +512,80 @@ export class ContentController {
     @Param('id') id: string,
   ) {
     return this.contentService.triggerTemplateRefresh(organizationId, id);
+  }
+
+  // ============================================================================
+  // LAYOUTS
+  // ============================================================================
+
+  @Get('layouts/presets')
+  getLayoutPresets() {
+    return this.contentService.getLayoutPresets();
+  }
+
+  @Post('layouts')
+  @Roles('admin', 'manager')
+  createLayout(
+    @CurrentUser('organizationId') organizationId: string,
+    @Body() dto: CreateLayoutDto,
+  ) {
+    return this.contentService.createLayout(organizationId, dto);
+  }
+
+  @Patch('layouts/:id')
+  @Roles('admin', 'manager')
+  updateLayout(
+    @CurrentUser('organizationId') organizationId: string,
+    @Param('id') id: string,
+    @Body() dto: Partial<CreateLayoutDto>,
+  ) {
+    return this.contentService.updateLayout(organizationId, id, dto);
+  }
+
+  @Get('layouts/:id/resolved')
+  getResolvedLayout(
+    @CurrentUser('organizationId') organizationId: string,
+    @Param('id') id: string,
+  ) {
+    return this.contentService.getResolvedLayout(organizationId, id);
+  }
+
+  // ============================================================================
+  // WIDGETS
+  // ============================================================================
+
+  @Get('widgets/types')
+  getWidgetTypes() {
+    return this.contentService.getWidgetTypes();
+  }
+
+  @Post('widgets')
+  @Roles('admin', 'manager')
+  createWidget(
+    @CurrentUser('organizationId') organizationId: string,
+    @Body() dto: CreateWidgetDto,
+  ) {
+    return this.contentService.createWidget(organizationId, dto);
+  }
+
+  @Patch('widgets/:id')
+  @Roles('admin', 'manager')
+  updateWidget(
+    @CurrentUser('organizationId') organizationId: string,
+    @Param('id') id: string,
+    @Body() dto: Partial<CreateWidgetDto>,
+  ) {
+    return this.contentService.updateWidget(organizationId, id, dto);
+  }
+
+  @Post('widgets/:id/refresh')
+  @Roles('admin', 'manager')
+  @HttpCode(HttpStatus.OK)
+  refreshWidget(
+    @CurrentUser('organizationId') organizationId: string,
+    @Param('id') id: string,
+  ) {
+    return this.contentService.refreshWidget(organizationId, id);
   }
 
   // ============================================================================

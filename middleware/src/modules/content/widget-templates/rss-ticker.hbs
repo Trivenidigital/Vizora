@@ -1,0 +1,17 @@
+<div style="font-family: 'Segoe UI', Arial, sans-serif; background: #1a1a2e; color: #e0e0e0; overflow: hidden; border-radius: 8px; padding: 0; position: relative; height: 48px; line-height: 48px;">
+  <div style="display: inline-block; white-space: nowrap; animation: vizora-ticker 30s linear infinite; padding-left: 100%;">
+    {{#each items}}
+    <span style="display: inline-block; padding: 0 32px;">
+      <span style="color: #64b5f6; font-weight: 600; margin-right: 8px;">&#9679;</span>
+      <span style="font-size: 16px; font-weight: 500; color: #fff;">{{this.title}}</span>
+      {{#if this.pubDate}}
+      <span style="font-size: 12px; opacity: 0.5; margin-left: 12px;">{{relativeTime this.pubDate}}</span>
+      {{/if}}
+    </span>
+    {{/each}}
+  </div>
+  <!-- CSS animation via inline style tag is not allowed in templates, so we use a keyframe workaround via the animation property. The animation name vizora-ticker is defined here as a data attribute for runtime injection. -->
+  <div style="position: absolute; top: 0; left: 0; width: 0; height: 0; overflow: hidden;">
+    <!-- The display client should inject: @keyframes vizora-ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } } -->
+  </div>
+</div>

@@ -101,6 +101,11 @@ class VizoraAndroidTV {
   private temporaryContentTimer: ReturnType<typeof setTimeout> | null = null;
   private savedPlaylistState: { playlist: Playlist; index: number } | null = null;
 
+  // QR overlay and multi-zone layout state
+  private qrOverlayConfig: any = null;
+  private zoneTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
+  private zoneIndices: Map<string, number> = new Map();
+
   constructor() {
     this.init();
   }
@@ -532,6 +537,9 @@ class VizoraAndroidTV {
 
     this.socket.on('config', (config) => {
       console.log('[Vizora] Received config:', config);
+      if (config.qrOverlay) {
+        this.renderQrOverlay(config.qrOverlay);
+      }
     });
 
     this.socket.on('playlist:update', (data) => {
@@ -542,6 +550,11 @@ class VizoraAndroidTV {
     this.socket.on('command', (command) => {
       console.log('[Vizora] Received command:', command);
       this.handleCommand(command);
+    });
+
+    this.socket.on('qr-overlay:update', (data) => {
+      console.log('[Vizora] Received QR overlay update:', data);
+      this.renderQrOverlay(data.qrOverlay);
     });
   }
 
@@ -688,6 +701,10 @@ class VizoraAndroidTV {
         contentDiv.appendChild(htmlIframe);
         break;
 
+      case 'layout':
+        this.renderLayout(currentItem);
+        return; // renderLayout handles its own container
+
       default:
         console.warn('[Vizora] Unknown content type:', contentType);
         this.nextContent();
@@ -811,6 +828,10 @@ class VizoraAndroidTV {
           const duration = (command.payload.duration as number) || 30;
           this.handleContentPush(content, duration);
         }
+        break;
+
+      case 'qr-overlay-update':
+        this.renderQrOverlay(command.payload?.config);
         break;
 
       default:
@@ -966,6 +987,173 @@ class VizoraAndroidTV {
         container.innerHTML = '';
       }
     }
+  }
+
+  // ==================== QR OVERLAY ====================
+
+  private async renderQrOverlay(config: any) {
+    const overlay = document.getElementById('qr-overlay');
+    if (!overlay) return;
+
+    if (!config || !config.enabled) {
+      overlay.classList.add('hidden');
+      overlay.innerHTML = '';
+      this.qrOverlayConfig = null;
+      return;
+    }
+
+    this.qrOverlayConfig = config;
+    overlay.innerHTML = '';
+    overlay.className = config.position || 'bottom-right';
+    overlay.style.backgroundColor = config.backgroundColor || '#ffffff';
+    overlay.style.opacity = String(config.opacity ?? 1);
+
+    const margin = config.margin || 16;
+    overlay.style.position = 'fixed';
+    overlay.style.zIndex = '100';
+    // Reset all positions first
+    overlay.style.top = 'auto';
+    overlay.style.bottom = 'auto';
+    overlay.style.left = 'auto';
+    overlay.style.right = 'auto';
+
+    if (config.position === 'top-left') { overlay.style.top = margin + 'px'; overlay.style.left = margin + 'px'; }
+    else if (config.position === 'top-right') { overlay.style.top = margin + 'px'; overlay.style.right = margin + 'px'; }
+    else if (config.position === 'bottom-left') { overlay.style.bottom = margin + 'px'; overlay.style.left = margin + 'px'; }
+    else { overlay.style.bottom = margin + 'px'; overlay.style.right = margin + 'px'; }
+
+    const size = config.size || 120;
+    try {
+      const QRCode = await import('qrcode');
+      const canvas = document.createElement('canvas');
+      await QRCode.toCanvas(canvas, config.url, {
+        width: size,
+        margin: 1,
+        color: { dark: '#000000', light: config.backgroundColor || '#ffffff' },
+      });
+      overlay.appendChild(canvas);
+
+      if (config.label) {
+        const label = document.createElement('div');
+        label.style.cssText = 'font-size:10px;color:#333;text-align:center;max-width:' + size + 'px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+        label.textContent = config.label;
+        overlay.appendChild(label);
+      }
+
+      overlay.classList.remove('hidden');
+    } catch (err) {
+      console.error('[Vizora] QR code generation failed:', err);
+    }
+  }
+
+  // ==================== MULTI-ZONE LAYOUT ====================
+
+  private renderLayout(content: any) {
+    const container = document.getElementById('content-container');
+    if (!container) return;
+
+    const metadata = content.metadata || content.content?.metadata;
+    if (!metadata || !metadata.zones) return;
+
+    this.cleanupLayout();
+
+    const grid = document.createElement('div');
+    grid.style.cssText = 'width:100%;height:100%;display:grid;overflow:hidden;';
+    if (metadata.gridTemplate) {
+      grid.style.gridTemplateColumns = metadata.gridTemplate.columns || '1fr';
+      grid.style.gridTemplateRows = metadata.gridTemplate.rows || '1fr';
+    }
+    if (metadata.gap) grid.style.gap = metadata.gap + 'px';
+    if (metadata.backgroundColor) grid.style.backgroundColor = metadata.backgroundColor;
+
+    for (const zone of metadata.zones) {
+      const zoneDiv = document.createElement('div');
+      zoneDiv.style.cssText = 'position:relative;overflow:hidden;grid-area:' + zone.gridArea + ';';
+
+      if (zone.resolvedPlaylist?.items?.length > 0) {
+        this.createZonePlayer(zone.id, zone.resolvedPlaylist, zoneDiv);
+      } else if (zone.resolvedContent) {
+        this.renderZoneContent(zone.resolvedContent, zoneDiv);
+      }
+
+      grid.appendChild(zoneDiv);
+    }
+
+    container.innerHTML = '';
+    container.appendChild(grid);
+  }
+
+  private createZonePlayer(zoneId: string, playlist: any, container: HTMLElement) {
+    this.zoneIndices.set(zoneId, 0);
+
+    const playZoneItem = () => {
+      const index = this.zoneIndices.get(zoneId) || 0;
+      const items = playlist.items;
+      if (!items || items.length === 0) return;
+      const item = items[index % items.length];
+      if (!item?.content) return;
+
+      this.renderZoneContent(item.content, container);
+      const duration = (item.duration || item.content.duration || 10) * 1000;
+      const timer = setTimeout(() => {
+        this.zoneIndices.set(zoneId, (index + 1) % items.length);
+        playZoneItem();
+      }, duration);
+      this.zoneTimers.set(zoneId, timer);
+    };
+
+    playZoneItem();
+  }
+
+  private renderZoneContent(content: any, container: HTMLElement) {
+    container.innerHTML = '';
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'content-item';
+
+    const contentType = content.type;
+    const contentUrl = (contentType === 'html' || contentType === 'template')
+      ? content.url
+      : transformContentUrl(content.url, this.config.apiUrl);
+
+    switch (contentType) {
+      case 'image':
+        const img = document.createElement('img');
+        img.src = contentUrl;
+        contentDiv.appendChild(img);
+        break;
+      case 'video':
+        const video = document.createElement('video');
+        video.src = contentUrl;
+        video.autoplay = true;
+        video.muted = true;
+        video.loop = true;
+        video.playsInline = true;
+        contentDiv.appendChild(video);
+        break;
+      case 'html':
+      case 'template':
+        const iframe = document.createElement('iframe');
+        iframe.sandbox.add('allow-scripts');
+        iframe.srcdoc = content.url;
+        iframe.style.cssText = 'width:100%;height:100%;border:none;';
+        contentDiv.appendChild(iframe);
+        break;
+      case 'url':
+      case 'webpage':
+        const urlIframe = document.createElement('iframe');
+        urlIframe.src = contentUrl;
+        urlIframe.style.cssText = 'width:100%;height:100%;border:none;';
+        contentDiv.appendChild(urlIframe);
+        break;
+    }
+
+    container.appendChild(contentDiv);
+  }
+
+  private cleanupLayout() {
+    for (const [, timer] of this.zoneTimers) clearTimeout(timer);
+    this.zoneTimers.clear();
+    this.zoneIndices.clear();
   }
 
   // ==================== UI HELPERS ====================
