@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, screen } from 'electron';
 import * as path from 'path';
 import { DeviceClient } from './device-client';
+import { CacheManager } from './cache-manager';
 import Store from 'electron-store';
 
 const store = new Store({
@@ -13,6 +14,7 @@ const store = new Store({
 });
 let mainWindow: BrowserWindow | null = null;
 let deviceClient: DeviceClient | null = null;
+let cacheManager: CacheManager | null = null;
 
 function createWindow() {
   const primaryDisplay = screen.getPrimaryDisplay();
@@ -35,6 +37,8 @@ function createWindow() {
       sandbox: true, // Enable sandbox for security
     },
   });
+
+  cacheManager = new CacheManager();
 
   // Resolve server URLs: electron-store > environment variables > defaults
   const apiUrl = (store.get('apiUrl') as string) || process.env.API_URL || 'http://localhost:3000';
@@ -66,9 +70,9 @@ function createWindow() {
           "default-src 'self'; " +
           "script-src 'self' 'unsafe-inline'; " +
           "style-src 'self' 'unsafe-inline'; " +
-          `img-src 'self' data: ${cspApiOrigin}; ` +
+          `img-src 'self' data: file: ${cspApiOrigin}; ` +
           `connect-src 'self' ${cspApiOrigin} ${cspWsOrigin}; ` +
-          `media-src 'self' ${cspApiOrigin}; ` +
+          `media-src 'self' file: ${cspApiOrigin}; ` +
           `frame-src 'self' ${cspApiOrigin} http: https:;`
         ]
       }
@@ -161,6 +165,9 @@ function initializeDeviceClient() {
       mainWindow?.webContents.send('playlist-update', playlist);
     },
     onCommand: (command) => {
+      if (command.type === 'clear_cache') {
+        cacheManager?.clearCache();
+      }
       mainWindow?.webContents.send('command', command);
     },
     onError: (error) => {
@@ -258,6 +265,35 @@ ipcMain.handle('toggle-fullscreen', async () => {
   if (mainWindow) {
     mainWindow.setFullScreen(!mainWindow.isFullScreen());
   }
+});
+
+// Cache management IPC handlers
+ipcMain.handle('cache:download', async (event, id: string, url: string, mimeType: string) => {
+  try {
+    const localPath = await cacheManager?.downloadContent(id, url, mimeType);
+    return { success: true, path: localPath };
+  } catch (error) {
+    console.error('Failed to cache content:', error);
+    return { success: false, path: null };
+  }
+});
+
+ipcMain.handle('cache:get', async (event, id: string) => {
+  try {
+    const localPath = cacheManager?.getCachedPath(id);
+    return { path: localPath };
+  } catch (error) {
+    return { path: null };
+  }
+});
+
+ipcMain.handle('cache:stats', async () => {
+  return cacheManager?.getCacheStats() || { itemCount: 0, totalSizeMB: 0, maxSizeMB: 500 };
+});
+
+ipcMain.handle('cache:clear', async () => {
+  cacheManager?.clearCache();
+  return { success: true };
 });
 
 // App lifecycle

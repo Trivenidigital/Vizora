@@ -17,6 +17,7 @@ import { Preferences } from '@capacitor/preferences';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { CapacitorHttp, HttpResponse } from '@capacitor/core';
 import { io, Socket } from 'socket.io-client';
+import { AndroidCacheManager } from './cache-manager';
 
 // Configuration - can be overridden via URL params or stored preferences
 const DEFAULT_CONFIG = {
@@ -87,11 +88,13 @@ class VizoraAndroidTV {
   private config: Config = DEFAULT_CONFIG;
   private startTime: number = Date.now();
   private currentContentId: string | null = null;
+  private contentStartTime: number = 0;
 
   private currentPlaylist: Playlist | null = null;
   private currentIndex = 0;
   private playbackTimer: ReturnType<typeof setTimeout> | null = null;
   private isOnline = true;
+  private cacheManager = new AndroidCacheManager();
 
   // Temporary content push state
   private temporaryContent: PushContent | null = null;
@@ -561,12 +564,14 @@ class VizoraAndroidTV {
     if (playlist.items && playlist.items.length > 0) {
       this.showScreen('content');
       this.playContent();
+      // Preload upcoming content
+      this.preloadContent(playlist.items.slice(0, 5));
     } else {
       console.log('[Vizora] Playlist is empty');
     }
   }
 
-  private playContent() {
+  private async playContent() {
     if (!this.currentPlaylist || !this.currentPlaylist.items) {
       return;
     }
@@ -586,11 +591,13 @@ class VizoraAndroidTV {
 
     // Track current content for heartbeat reporting
     this.currentContentId = currentItem.content.id;
+    this.contentStartTime = Date.now();
 
     // Emit content impression for analytics
     if (this.socket?.connected) {
       this.socket.emit('content:impression', {
         contentId: currentItem.content.id,
+        playlistId: this.currentPlaylist.id,
         timestamp: Date.now(),
       });
     }
@@ -603,17 +610,38 @@ class VizoraAndroidTV {
     // Transform URL for Android emulator (localhost -> 10.0.2.2)
     // Only transform actual URLs, not raw HTML content used by html/template types
     const contentType = currentItem.content.type;
-    const contentUrl = (contentType === 'html' || contentType === 'template')
+    let contentUrl = (contentType === 'html' || contentType === 'template')
       ? currentItem.content.url
       : transformContentUrl(currentItem.content.url, this.config.apiUrl);
+
+    // Check cache for media content
+    let resolvedUrl = contentUrl;
+    if (contentType === 'image' || contentType === 'video') {
+      try {
+        const cachedUri = await this.cacheManager.getCachedUri(currentItem.content.id);
+        if (cachedUri) {
+          resolvedUrl = cachedUri;
+          console.log('[Vizora] Using cached content:', cachedUri);
+        } else {
+          // Background download
+          this.cacheManager.downloadContent(
+            currentItem.content.id,
+            contentUrl,
+            currentItem.content.mimeType || (contentType === 'video' ? 'video/mp4' : 'image/jpeg')
+          ).catch(err => console.warn('[Vizora] Background cache failed:', err));
+        }
+      } catch (err) {
+        console.warn('[Vizora] Cache check failed:', err);
+      }
+    }
 
     switch (contentType) {
       case 'image':
         const img = document.createElement('img');
-        img.src = contentUrl;
+        img.src = resolvedUrl;
         img.alt = currentItem.content.name;
         img.onerror = () => {
-          console.error('[Vizora] Image load failed:', contentUrl);
+          console.error('[Vizora] Image load failed:', resolvedUrl);
           this.nextContent();
         };
         contentDiv.appendChild(img);
@@ -621,7 +649,7 @@ class VizoraAndroidTV {
 
       case 'video':
         const video = document.createElement('video');
-        video.src = contentUrl;
+        video.src = resolvedUrl;
         video.autoplay = true;
         video.muted = false;
         video.playsInline = true;
@@ -629,7 +657,7 @@ class VizoraAndroidTV {
         video.setAttribute('x5-video-player-type', 'h5');
         video.setAttribute('x5-video-player-fullscreen', 'true');
         video.onerror = () => {
-          console.error('[Vizora] Video load failed:', contentUrl);
+          console.error('[Vizora] Video load failed:', resolvedUrl);
           this.nextContent();
         };
         video.onended = () => this.nextContent();
@@ -669,14 +697,43 @@ class VizoraAndroidTV {
     container.appendChild(contentDiv);
 
     if (contentType !== 'video') {
-      const duration = (currentItem.duration || 10) * 1000;
-      this.playbackTimer = setTimeout(() => this.nextContent(), duration);
+      const expectedDuration = (currentItem.duration || 10) * 1000;
+      this.playbackTimer = setTimeout(() => {
+        // Emit completion impression with duration data
+        if (this.socket?.connected && this.contentStartTime > 0) {
+          const actualDurationMs = Date.now() - this.contentStartTime;
+          const completionPercentage = Math.min(100, Math.round((actualDurationMs / expectedDuration) * 100));
+          this.socket.emit('content:impression', {
+            contentId: currentItem.content!.id,
+            playlistId: this.currentPlaylist?.id,
+            duration: Math.round(actualDurationMs / 1000),
+            completionPercentage,
+            timestamp: Date.now(),
+          });
+        }
+        this.nextContent();
+      }, expectedDuration);
     }
   }
 
   private nextContent() {
     if (!this.currentPlaylist || !this.currentPlaylist.items) {
       return;
+    }
+
+    // Log completion for video content
+    const currentItem = this.currentPlaylist.items[this.currentIndex];
+    if (currentItem?.content?.type === 'video' && this.contentStartTime > 0 && this.socket?.connected) {
+      const actualDurationMs = Date.now() - this.contentStartTime;
+      const expectedDuration = (currentItem.duration || currentItem.content.duration || 30) * 1000;
+      const completionPercentage = Math.min(100, Math.round((actualDurationMs / expectedDuration) * 100));
+      this.socket.emit('content:impression', {
+        contentId: currentItem.content.id,
+        playlistId: this.currentPlaylist.id,
+        duration: Math.round(actualDurationMs / 1000),
+        completionPercentage,
+        timestamp: Date.now(),
+      });
     }
 
     this.currentIndex++;
@@ -693,6 +750,28 @@ class VizoraAndroidTV {
     this.playContent();
   }
 
+  private async preloadContent(items: PlaylistItem[]) {
+    for (const item of items) {
+      if (!item.content) continue;
+      const type = item.content.type;
+      if (type !== 'image' && type !== 'video') continue;
+
+      const contentUrl = transformContentUrl(item.content.url, this.config.apiUrl);
+      try {
+        const cached = await this.cacheManager.getCachedUri(item.content.id);
+        if (!cached) {
+          await this.cacheManager.downloadContent(
+            item.content.id,
+            contentUrl,
+            item.content.mimeType || (type === 'video' ? 'video/mp4' : 'image/jpeg')
+          );
+        }
+      } catch (err) {
+        console.warn('[Vizora] Preload failed:', item.content.id, err);
+      }
+    }
+  }
+
   // ==================== COMMANDS ====================
 
   private async handleCommand(command: { type: string; payload?: Record<string, unknown>; [key: string]: unknown }) {
@@ -702,6 +781,7 @@ class VizoraAndroidTV {
         break;
 
       case 'clear_cache':
+        await this.cacheManager.clearCache();
         await Preferences.clear();
         window.location.reload();
         break;

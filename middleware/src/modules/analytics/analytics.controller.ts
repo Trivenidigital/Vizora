@@ -79,6 +79,16 @@ export class AnalyticsController {
     return this.analyticsService.exportAnalytics(organizationId, range);
   }
 
+  @Get('content/:contentId/metrics')
+  @Roles('admin', 'manager')
+  getContentMetrics(
+    @CurrentUser('organizationId') organizationId: string,
+    @Param('contentId') contentId: string,
+    @Query('range') range: string = 'month',
+  ) {
+    return this.analyticsService.getContentMetrics(organizationId, contentId, range);
+  }
+
   @Get('device-uptime/:deviceId')
   @Roles('admin', 'manager', 'viewer')
   getDeviceUptime(

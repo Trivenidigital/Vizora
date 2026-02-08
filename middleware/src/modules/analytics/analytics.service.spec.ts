@@ -23,6 +23,13 @@ describe('AnalyticsService', () => {
         findMany: jest.fn().mockResolvedValue([]),
         count: jest.fn().mockResolvedValue(0),
       },
+      contentImpression: {
+        groupBy: jest.fn().mockResolvedValue([]),
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+        aggregate: jest.fn().mockResolvedValue({ _avg: { duration: 0, completionPercentage: 0 } }),
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
     };
 
     service = new AnalyticsService(mockDb as DatabaseService);
@@ -63,32 +70,39 @@ describe('AnalyticsService', () => {
   });
 
   describe('getContentPerformance', () => {
-    it('should return empty array when no content', async () => {
+    it('should return empty array when no impressions', async () => {
       const result = await service.getContentPerformance('org-123', 'month');
       expect(result).toEqual([]);
     });
 
-    it('should return content with views', async () => {
-      mockDb.content.findMany.mockResolvedValue([
+    it('should return content with views from impressions', async () => {
+      mockDb.contentImpression.groupBy.mockResolvedValue([
         {
-          name: 'Test Content',
-          _count: { playlistItems: 3 },
-          playlistItems: [{ playlist: { _count: { assignedDisplays: 2 } } }],
+          contentId: 'content-1',
+          _count: { id: 15 },
+          _avg: { duration: 30, completionPercentage: 85 },
         },
+      ]);
+      mockDb.content.findMany.mockResolvedValue([
+        { id: 'content-1', name: 'Test Content' },
       ]);
 
       const result = await service.getContentPerformance('org-123', 'month');
       expect(result).toHaveLength(1);
       expect(result[0].title).toBe('Test Content');
-      expect(result[0].views).toBeGreaterThan(0);
+      expect(result[0].views).toBe(15);
+      expect(result[0].engagement).toBe(85);
     });
   });
 
   describe('getUsageTrends', () => {
     it('should return trend data points', async () => {
-      mockDb.content.groupBy.mockResolvedValue([
-        { type: 'video', _count: { id: 5 } },
-        { type: 'image', _count: { id: 3 } },
+      // getUsageTrends now uses contentImpression.findMany with content relation
+      const today = new Date();
+      mockDb.contentImpression.findMany.mockResolvedValue([
+        { date: today, content: { type: 'video' } },
+        { date: today, content: { type: 'video' } },
+        { date: today, content: { type: 'image' } },
       ]);
 
       const result = await service.getUsageTrends('org-123', 'week');
@@ -157,23 +171,31 @@ describe('AnalyticsService', () => {
   });
 
   describe('getPlaylistPerformance', () => {
-    it('should return empty array when no playlists', async () => {
+    it('should return empty array when no playlist impressions', async () => {
       const result = await service.getPlaylistPerformance('org-123', 'month');
       expect(result).toEqual([]);
     });
 
-    it('should return playlist stats', async () => {
+    it('should return playlist stats from impressions', async () => {
+      mockDb.contentImpression.groupBy.mockResolvedValue([
+        {
+          playlistId: 'playlist-1',
+          _count: { id: 20 },
+          _avg: { completionPercentage: 75 },
+        },
+      ]);
       mockDb.playlist.findMany.mockResolvedValue([
         {
+          id: 'playlist-1',
           name: 'Test Playlist',
-          _count: { items: 5, assignedDisplays: 3, schedules: 2 },
+          _count: { assignedDisplays: 3 },
         },
       ]);
 
       const result = await service.getPlaylistPerformance('org-123', 'month');
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('Test Playlist');
-      expect(result[0].plays).toBeGreaterThan(0);
+      expect(result[0].plays).toBe(20);
       expect(result[0].uniqueDevices).toBe(3);
     });
   });
@@ -188,6 +210,7 @@ describe('AnalyticsService', () => {
       expect(result.totalContent).toBe(0);
       expect(result.totalPlaylists).toBe(0);
       expect(result.uptimePercent).toBe(0);
+      expect(result.totalImpressions).toBe(0);
     });
 
     it('should return KPI summary', async () => {
@@ -196,6 +219,7 @@ describe('AnalyticsService', () => {
         .mockResolvedValueOnce(8); // online
       mockDb.content.count.mockResolvedValue(50);
       mockDb.playlist.count.mockResolvedValue(5);
+      mockDb.contentImpression.count.mockResolvedValue(1200);
       mockDb.content.aggregate.mockResolvedValue({ _sum: { fileSize: 1024000 } });
 
       const result = await service.getSummary('org-123');
@@ -205,6 +229,7 @@ describe('AnalyticsService', () => {
       expect(result.totalContent).toBe(50);
       expect(result.totalPlaylists).toBe(5);
       expect(result.totalContentSize).toBe(1024000);
+      expect(result.totalImpressions).toBe(1200);
     });
   });
 
@@ -221,9 +246,10 @@ describe('AnalyticsService', () => {
     });
 
     it('getUsageTrends should return same values on repeated calls', async () => {
-      mockDb.content.groupBy.mockResolvedValue([
-        { type: 'video', _count: { id: 5 } },
-        { type: 'image', _count: { id: 3 } },
+      const today = new Date();
+      mockDb.contentImpression.findMany.mockResolvedValue([
+        { date: today, content: { type: 'video' } },
+        { date: today, content: { type: 'image' } },
       ]);
 
       const result1 = await service.getUsageTrends('org-123', 'week');
@@ -242,15 +268,18 @@ describe('AnalyticsService', () => {
       expect(result1).toEqual(result2);
     });
 
-    it('getUsageTrends should use fixed multipliers', async () => {
-      mockDb.content.groupBy.mockResolvedValue([
-        { type: 'video', _count: { id: 1 } },
+    it('getUsageTrends should count real impressions by type', async () => {
+      const today = new Date();
+      const todayStr = today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      mockDb.contentImpression.findMany.mockResolvedValue([
+        { date: today, content: { type: 'video' } },
       ]);
 
       const result = await service.getUsageTrends('org-123', 'week');
-      // With 1 video content, each day should have video = 1 * 25 = 25
-      expect(result[0].video).toBe(25);
-      expect(result[0].image).toBe(0);
+      // Find today's entry in the results
+      const todayEntry = result.find((r: any) => r.date === todayStr);
+      expect(todayEntry?.video).toBe(1);
+      expect(todayEntry?.image).toBe(0);
     });
 
     it('getBandwidthUsage current should equal average', async () => {
@@ -417,6 +446,9 @@ describe('AnalyticsService', () => {
       mockDb.content.count.mockResolvedValue(0);
       mockDb.playlist.findMany.mockResolvedValue([]);
       mockDb.playlist.count.mockResolvedValue(0);
+      mockDb.contentImpression.groupBy.mockResolvedValue([]);
+      mockDb.contentImpression.findMany.mockResolvedValue([]);
+      mockDb.contentImpression.count.mockResolvedValue(0);
 
       const result = await service.exportAnalytics('org-123', 'month');
 
@@ -440,6 +472,9 @@ describe('AnalyticsService', () => {
       mockDb.content.count.mockResolvedValue(0);
       mockDb.playlist.findMany.mockResolvedValue([]);
       mockDb.playlist.count.mockResolvedValue(0);
+      mockDb.contentImpression.groupBy.mockResolvedValue([]);
+      mockDb.contentImpression.findMany.mockResolvedValue([]);
+      mockDb.contentImpression.count.mockResolvedValue(0);
 
       const weekResult = await service.exportAnalytics('org-123', 'week');
       expect(weekResult.deviceMetrics.length).toBe(7);
@@ -457,6 +492,9 @@ describe('AnalyticsService', () => {
       mockDb.content.count.mockResolvedValue(0);
       mockDb.playlist.findMany.mockResolvedValue([]);
       mockDb.playlist.count.mockResolvedValue(0);
+      mockDb.contentImpression.groupBy.mockResolvedValue([]);
+      mockDb.contentImpression.findMany.mockResolvedValue([]);
+      mockDb.contentImpression.count.mockResolvedValue(0);
 
       const result = await service.exportAnalytics('org-123', 'month');
 
