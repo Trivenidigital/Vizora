@@ -28,7 +28,9 @@
     "swc-loader": "0.1.15",
     "tslib": "^2.3.0",
     "typescript": "~5.9.2",
-    "webpack-cli": "^5.1.4"
+    "webpack-cli": "^5.1.4",
+    "electron": "^28.3.3",
+    "@types/passport-jwt": "^4.0.1"
   },
   "dependencies": {
     "@nestjs/axios": "^4.0.1",
@@ -40,10 +42,8 @@
     "@nestjs/platform-socket.io": "^11.1.12",
     "@nestjs/throttler": "^6.5.0",
     "@nestjs/websockets": "^11.1.12",
-    "@types/passport-jwt": "^4.0.1",
     "axios": "^1.13.3",
     "dotenv": "^17.2.3",
-    "electron": "^28.3.3",
     "optional": "^0.1.4",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
