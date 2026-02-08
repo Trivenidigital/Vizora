@@ -331,7 +331,14 @@ describe('useOptimisticState', () => {
   });
 
   describe('Logging', () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+
+    afterEach(() => {
+      process.env.NODE_ENV = originalNodeEnv;
+    });
+
     it('should log optimistic updates when enabled', () => {
+      process.env.NODE_ENV = 'development';
       const consoleSpy = jest.spyOn(console, 'log');
 
       const { result } = renderHook(() =>
@@ -352,6 +359,7 @@ describe('useOptimisticState', () => {
     });
 
     it('should not log when disabled', () => {
+      process.env.NODE_ENV = 'development';
       const consoleSpy = jest.spyOn(console, 'log');
 
       const { result } = renderHook(() =>

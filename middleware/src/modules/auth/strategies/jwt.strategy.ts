@@ -46,18 +46,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       jwtFromRequest: extractJwtFromCookieOrHeader,
       ignoreExpiration: false,
       secretOrKey: secret,
+      algorithms: ['HS256'],
     });
   }
 
   async validate(payload: JwtPayload) {
-    // For device JWTs, skip user validation
+    // Reject device tokens in user authentication — devices must use
+    // their own auth path with DEVICE_JWT_SECRET, not the user JWT_SECRET
     if (payload.type === 'device') {
-      return {
-        id: payload.sub,
-        deviceId: payload.sub,
-        organizationId: payload.organizationId,
-        type: 'device',
-      };
+      throw new UnauthorizedException('Device tokens are not valid for user authentication');
     }
 
     // Validate user exists and is active

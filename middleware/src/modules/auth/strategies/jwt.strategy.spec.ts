@@ -80,19 +80,15 @@ describe('JwtStrategy', () => {
         type: 'device',
       };
 
-      it('should return device user object for device tokens', async () => {
-        const result = await strategy.validate(devicePayload);
-
-        expect(result).toEqual({
-          id: 'device-123',
-          deviceId: 'device-123',
-          organizationId: 'org-123',
-          type: 'device',
-        });
+      it('should reject device tokens with UnauthorizedException', async () => {
+        await expect(strategy.validate(devicePayload)).rejects.toThrow(UnauthorizedException);
+        await expect(strategy.validate(devicePayload)).rejects.toThrow(
+          'Device tokens are not valid for user authentication',
+        );
       });
 
       it('should not query database for device tokens', async () => {
-        await strategy.validate(devicePayload);
+        await strategy.validate(devicePayload).catch(() => {});
 
         expect(mockDatabaseService.user.findUnique).not.toHaveBeenCalled();
       });
