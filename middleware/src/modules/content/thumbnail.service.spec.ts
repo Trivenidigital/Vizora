@@ -1,18 +1,19 @@
 import { promises as fs } from 'fs';
 
-// Mock sharp module - the service uses `import * as sharp from 'sharp'`
+// Mock sharp module - the service uses `import sharp from 'sharp'` (default import)
 const mockToFile = jest.fn().mockResolvedValue(undefined);
 const mockResize = jest.fn().mockReturnValue({ toFile: mockToFile });
 
-// When using `import * as sharp`, sharp is the function itself (the namespace's default)
 jest.mock('sharp', () => {
   const mockSharpFn = jest.fn().mockImplementation(() => ({
     resize: mockResize,
     toFile: mockToFile,
   }));
-  // For `import * as sharp`, return the function directly but also attach __esModule
-  mockSharpFn.__esModule = true;
-  return mockSharpFn;
+  // For `import sharp from 'sharp'` (default import via __esModule)
+  return {
+    __esModule: true,
+    default: mockSharpFn,
+  };
 });
 
 // Mock fs
@@ -25,7 +26,7 @@ jest.mock('fs', () => ({
 
 // Now import the service
 import { ThumbnailService } from './thumbnail.service';
-import * as sharp from 'sharp';
+import sharp from 'sharp';
 
 // Mock fetch
 global.fetch = jest.fn();

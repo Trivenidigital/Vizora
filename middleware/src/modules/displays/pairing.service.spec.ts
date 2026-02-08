@@ -208,16 +208,28 @@ describe('PairingService', () => {
         metadata: {},
       });
 
+      // completePairing sets plaintextToken on the in-memory request
+      mockDatabaseService.display.findUnique.mockResolvedValue(null);
+      mockDatabaseService.display.create.mockResolvedValue({
+        id: 'display-id',
+        nickname: 'Test',
+        deviceIdentifier: 'device-paired',
+        status: 'pairing',
+        organizationId: 'org-123',
+      } as any);
+
+      await service.completePairing('org-123', 'user-123', { code: pairingResult.code });
+
+      // Now checkPairingStatus reads the plaintext token from memory
       mockDatabaseService.display.findUnique.mockResolvedValue({
         id: 'display-id',
-        jwtToken: 'device-jwt-token',
         organizationId: 'org-123',
       } as any);
 
       const status = await service.checkPairingStatus(pairingResult.code);
 
       expect(status.status).toBe('paired');
-      expect(status.deviceToken).toBe('device-jwt-token');
+      expect(status.deviceToken).toBe('mock-jwt-token'); // plaintext token from jwtService.sign mock
       expect(status.displayId).toBe('display-id');
       expect(status.organizationId).toBe('org-123');
     });
@@ -229,9 +241,21 @@ describe('PairingService', () => {
         metadata: {},
       });
 
+      // completePairing sets plaintextToken on the in-memory request
+      mockDatabaseService.display.findUnique.mockResolvedValue(null);
+      mockDatabaseService.display.create.mockResolvedValue({
+        id: 'display-id',
+        nickname: 'Test',
+        deviceIdentifier: 'device-cleanup',
+        status: 'pairing',
+        organizationId: 'org-123',
+      } as any);
+
+      await service.completePairing('org-123', 'user-123', { code: pairingResult.code });
+
+      // Now checkPairingStatus should return paired and clean up
       mockDatabaseService.display.findUnique.mockResolvedValue({
         id: 'display-id',
-        jwtToken: 'device-jwt-token',
         organizationId: 'org-123',
       } as any);
 
@@ -357,7 +381,7 @@ describe('PairingService', () => {
       );
     });
 
-    it('should clean up pairing request after completion', async () => {
+    it('should clean up pairing request after device retrieves token', async () => {
       mockDatabaseService.display.findUnique.mockResolvedValue(null);
 
       const pairingResult = await service.requestPairingCode({
@@ -375,7 +399,17 @@ describe('PairingService', () => {
 
       await service.completePairing(organizationId, userId, { code: pairingResult.code });
 
-      // Code should no longer exist
+      // After completePairing, the request still exists (has plaintextToken set)
+      // checkPairingStatus will return paired and THEN clean up
+      mockDatabaseService.display.findUnique.mockResolvedValue({
+        id: 'new-id',
+        organizationId: 'org-123',
+      } as any);
+
+      const status = await service.checkPairingStatus(pairingResult.code);
+      expect(status.status).toBe('paired');
+
+      // NOW the code should be cleaned up
       await expect(service.checkPairingStatus(pairingResult.code)).rejects.toThrow(
         NotFoundException,
       );

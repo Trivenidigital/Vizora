@@ -38,6 +38,7 @@ describe('PromotionsService', () => {
         findFirst: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
         delete: jest.fn(),
       },
       planPromotion: {
@@ -48,7 +49,7 @@ describe('PromotionsService', () => {
         findMany: jest.fn(),
         create: jest.fn(),
       },
-      $transaction: jest.fn(),
+      $transaction: jest.fn((fn) => fn(mockDb)),
     };
 
     service = new PromotionsService(mockDb as DatabaseService);
@@ -335,24 +336,35 @@ describe('PromotionsService', () => {
 
   describe('redeem', () => {
     it('should create redemption and increment counter', async () => {
-      mockDb.promotion.findUnique
-        .mockResolvedValueOnce({ ...mockPromotion, applicablePlans: [], redemptions: [] })
-        .mockResolvedValueOnce(mockPromotion);
-      mockDb.$transaction.mockResolvedValue([
-        { id: 'redemption-1', promotionId: 'promo-123', organizationId: 'org-123', discountApplied: 2499 },
-        { id: 'promo-123', currentRedemptions: 11 },
-      ]);
+      // Inside the transaction, findUnique is called to validate
+      mockDb.promotion.findUnique.mockResolvedValue({
+        ...mockPromotion,
+        redemptions: [],
+      });
+      mockDb.promotion.updateMany.mockResolvedValue({ count: 1 });
+      mockDb.promotionRedemption.create.mockResolvedValue({
+        id: 'redemption-1',
+        promotionId: 'promo-123',
+        organizationId: 'org-123',
+        discountApplied: 2499,
+      });
 
       const result = await service.redeem('LAUNCH50', 'org-123', 2499);
 
       expect(result.promotionId).toBe('promo-123');
       expect(result.discountApplied).toBe(2499);
+      expect(mockDb.promotion.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ id: 'promo-123' }),
+          data: { currentRedemptions: { increment: 1 } },
+        }),
+      );
     });
 
     it('should throw BadRequestException for invalid code', async () => {
       mockDb.promotion.findUnique.mockResolvedValue(null);
 
-      await expect(service.redeem('INVALID', 'org-123', 1000)).rejects.toThrow(BadRequestException);
+      await expect(service.redeem('INVALID', 'org-123', 1000)).rejects.toThrow(NotFoundException);
     });
   });
 

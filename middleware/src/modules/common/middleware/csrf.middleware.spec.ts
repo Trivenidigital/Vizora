@@ -174,12 +174,18 @@ describe('CsrfMiddleware', () => {
       mockRequest.path = '/api/protected';
     });
 
-    it('should allow requests when no cookie token exists', () => {
+    it('should reject requests when no cookie token exists', () => {
       mockRequest.cookies = {};
 
       middleware.use(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockNext).toHaveBeenCalled();
+      expect(mockNext).not.toHaveBeenCalled();
+      expect(mockResponse.status).toHaveBeenCalledWith(403);
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        statusCode: 403,
+        message: 'CSRF cookie missing',
+        error: 'Forbidden',
+      });
     });
 
     it('should allow requests when tokens match', () => {

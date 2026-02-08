@@ -55,7 +55,8 @@ describe('ContentController', () => {
     } as any;
 
     mockThumbnailService = {
-      generateThumbnailFromUrl: jest.fn(),
+      generateThumbnail: jest.fn().mockResolvedValue('/static/thumbnails/thumb-123.jpg'),
+      generateThumbnailFromUrl: jest.fn().mockResolvedValue('/static/thumbnails/thumb-url-123.jpg'),
     } as any;
 
     mockFileValidationService = {
@@ -253,10 +254,17 @@ describe('ContentController', () => {
     it('should set thumbnail for image content', async () => {
       await controller.uploadFile(organizationId, mockFile);
 
-      expect(mockContentService.create).toHaveBeenCalledWith(
+      // Thumbnail is now generated after content creation and applied via update
+      expect(mockThumbnailService.generateThumbnail).toHaveBeenCalledWith(
+        'content-123',
+        mockFile.buffer,
+        mockFile.mimetype,
+      );
+      expect(mockContentService.update).toHaveBeenCalledWith(
         organizationId,
+        'content-123',
         expect.objectContaining({
-          thumbnail: expect.stringContaining('uploads/'),
+          thumbnail: expect.any(String),
         }),
       );
     });
@@ -580,11 +588,16 @@ describe('ContentController', () => {
     it('should set thumbnail for image files', async () => {
       await controller.replaceFile(organizationId, 'content-123', mockFile, {});
 
+      expect(mockThumbnailService.generateThumbnail).toHaveBeenCalledWith(
+        'content-123',
+        mockFile.buffer,
+        mockFile.mimetype,
+      );
       expect(mockContentService.replaceFile).toHaveBeenCalledWith(
         organizationId,
         'content-123',
         expect.any(String),
-        expect.objectContaining({ thumbnail: expect.stringContaining('uploads/') }),
+        expect.objectContaining({ thumbnail: expect.any(String) }),
       );
     });
   });
@@ -623,13 +636,13 @@ describe('ContentController', () => {
 
   describe('setExpiration', () => {
     it('should set expiration date', async () => {
-      const expectedResult = { id: 'content-123', expiresAt: '2025-12-31T00:00:00Z' };
+      const expectedResult = { id: 'content-123', expiresAt: '2099-12-31T00:00:00Z' };
       mockContentService.setExpiration.mockResolvedValue(expectedResult as any);
 
       const result = await controller.setExpiration(
         organizationId,
         'content-123',
-        { expiresAt: '2025-12-31T00:00:00Z' },
+        { expiresAt: '2099-12-31T00:00:00Z' },
       );
 
       expect(result).toEqual(expectedResult);
@@ -644,7 +657,7 @@ describe('ContentController', () => {
     it('should set expiration with replacement content', async () => {
       const expectedResult = {
         id: 'content-123',
-        expiresAt: '2025-12-31T00:00:00Z',
+        expiresAt: '2099-12-31T00:00:00Z',
         replacementContentId: 'replacement-123',
       };
       mockContentService.setExpiration.mockResolvedValue(expectedResult as any);
@@ -652,7 +665,7 @@ describe('ContentController', () => {
       const result = await controller.setExpiration(
         organizationId,
         'content-123',
-        { expiresAt: '2025-12-31T00:00:00Z', replacementContentId: 'replacement-123' },
+        { expiresAt: '2099-12-31T00:00:00Z', replacementContentId: 'replacement-123' },
       );
 
       expect(result).toEqual(expectedResult);

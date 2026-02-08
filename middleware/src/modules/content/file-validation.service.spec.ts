@@ -1,6 +1,28 @@
 import { BadRequestException } from '@nestjs/common';
 import { FileValidationService } from './file-validation.service';
 
+// Mock dns/promises to avoid real DNS lookups in tests
+jest.mock('dns/promises', () => ({
+  lookup: jest.fn().mockImplementation((hostname: string) => {
+    // If hostname is already an IP address, return it directly (mimics real DNS behavior)
+    const ipRegex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
+    if (ipRegex.test(hostname)) {
+      return Promise.resolve({ address: hostname, family: 4 });
+    }
+    // Simulate public IP resolution for known test domains
+    const publicDomains: Record<string, string> = {
+      'www.google.com': '142.250.80.46',
+      'example.com': '93.184.216.34',
+      'api.example.com': '93.184.216.34',
+    };
+    if (publicDomains[hostname]) {
+      return Promise.resolve({ address: publicDomains[hostname], family: 4 });
+    }
+    // Let unknown hostname lookups fail
+    return Promise.reject(new Error(`getaddrinfo ENOTFOUND ${hostname}`));
+  }),
+}));
+
 describe('FileValidationService', () => {
   let service: FileValidationService;
 

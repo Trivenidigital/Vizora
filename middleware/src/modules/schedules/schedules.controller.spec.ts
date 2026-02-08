@@ -1,12 +1,21 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { SchedulesController } from './schedules.controller';
 import { SchedulesService } from './schedules.service';
 
 describe('SchedulesController', () => {
   let controller: SchedulesController;
   let mockSchedulesService: jest.Mocked<SchedulesService>;
+  let mockJwtService: any;
 
   const organizationId = 'org-123';
+
+  const createMockRequest = (token?: string) => ({
+    headers: {
+      authorization: token ? `Bearer ${token}` : undefined,
+    },
+  });
 
   beforeEach(async () => {
     mockSchedulesService = {
@@ -20,9 +29,18 @@ describe('SchedulesController', () => {
       remove: jest.fn(),
     } as any;
 
+    mockJwtService = {
+      verify: jest.fn().mockReturnValue({ type: 'device', sub: 'device-123' }),
+      verifyAsync: jest.fn().mockResolvedValue({ type: 'device', sub: 'device-123' }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [SchedulesController],
-      providers: [{ provide: SchedulesService, useValue: mockSchedulesService }],
+      providers: [
+        { provide: SchedulesService, useValue: mockSchedulesService },
+        { provide: JwtService, useValue: mockJwtService },
+        { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('test-secret') } },
+      ],
     }).compile();
 
     controller = module.get<SchedulesController>(SchedulesController);
@@ -165,23 +183,28 @@ describe('SchedulesController', () => {
   });
 
   describe('findActiveSchedules', () => {
-    it('should return active schedules for a display (public endpoint)', async () => {
+    it('should return active schedules for a display with valid device JWT', async () => {
       const expectedResult = [
         { id: 'schedule-1', playlistId: 'playlist-1' },
         { id: 'schedule-2', playlistId: 'playlist-2' },
       ];
       mockSchedulesService.findActiveSchedules.mockResolvedValue(expectedResult as any);
 
-      const result = await controller.findActiveSchedules('display-123');
+      const mockReq = createMockRequest('valid-device-token');
+      const result = await controller.findActiveSchedules('display-123', mockReq as any);
 
       expect(result).toEqual(expectedResult);
       expect(mockSchedulesService.findActiveSchedules).toHaveBeenCalledWith('display-123');
+      expect(mockJwtService.verify).toHaveBeenCalledWith('valid-device-token', {
+        secret: process.env.DEVICE_JWT_SECRET,
+      });
     });
 
-    it('should work without authentication (public endpoint)', async () => {
+    it('should work with valid device JWT (public endpoint)', async () => {
       mockSchedulesService.findActiveSchedules.mockResolvedValue([]);
 
-      const result = await controller.findActiveSchedules('display-456');
+      const mockReq = createMockRequest('valid-device-token');
+      const result = await controller.findActiveSchedules('display-456', mockReq as any);
 
       expect(result).toEqual([]);
     });
