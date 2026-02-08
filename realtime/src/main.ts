@@ -2,6 +2,7 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app/app.module';
 import { IoAdapter } from '@nestjs/platform-socket.io';
+import helmet from 'helmet';
 import { initializeSentry } from './config/sentry.config';
 
 // Initialize Sentry before app starts
@@ -9,6 +10,12 @@ initializeSentry();
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // Security headers
+  app.use(helmet({
+    contentSecurityPolicy: process.env.NODE_ENV === 'production',
+    crossOriginEmbedderPolicy: false, // Allow embedding for display clients
+  }));
 
   // Enable CORS
   app.enableCors({

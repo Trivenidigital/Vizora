@@ -14,6 +14,8 @@ function base64UrlDecode(str: string): string {
   return atob(base64);
 }
 
+// Format-only check: verifies the token looks like a JWT (3 base64url parts with valid JSON payload).
+// This does NOT verify the signature — real validation happens server-side in the middleware API.
 function isValidJwtFormat(token: string): boolean {
   const parts = token.split('.');
   if (parts.length !== 3) return false;
@@ -40,7 +42,7 @@ export function middleware(request: NextRequest) {
   const token = tokenFromCookie || tokenFromHeader;
 
   // Redirect to login if no valid token and trying to access protected route
-  if ((!token || !isValidJwtFormat(token)) && pathname.startsWith('/dashboard')) {
+  if ((!token || !isValidJwtFormat(token)) && (pathname.startsWith('/dashboard') || pathname.startsWith('/admin'))) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(loginUrl);

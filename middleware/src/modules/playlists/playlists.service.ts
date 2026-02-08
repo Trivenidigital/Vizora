@@ -177,37 +177,50 @@ export class PlaylistsService {
 
     const { items, ...playlistData } = updatePlaylistDto;
 
-    if (items) {
-      await this.db.playlistItem.deleteMany({
-        where: { playlistId: id },
-      });
-    }
+    const updatedPlaylist = items
+      ? await this.db.$transaction(async (tx) => {
+          await tx.playlistItem.deleteMany({
+            where: { playlistId: id },
+          });
 
-    const updatedPlaylist = await this.db.playlist.update({
-      where: { id },
-      data: {
-        ...playlistData,
-        items: items
-          ? {
-              create: items.map((item, index) => ({
-                contentId: item.contentId,
-                order: item.order ?? index,
-                duration: item.duration,
-              })),
-            }
-          : undefined,
-      },
-      include: {
-        items: {
+          return tx.playlist.update({
+            where: { id },
+            data: {
+              ...playlistData,
+              items: {
+                create: items.map((item, index) => ({
+                  contentId: item.contentId,
+                  order: item.order ?? index,
+                  duration: item.duration,
+                })),
+              },
+            },
+            include: {
+              items: {
+                include: {
+                  content: true,
+                },
+                orderBy: {
+                  order: 'asc',
+                },
+              },
+            },
+          });
+        })
+      : await this.db.playlist.update({
+          where: { id },
+          data: playlistData,
           include: {
-            content: true,
+            items: {
+              include: {
+                content: true,
+              },
+              orderBy: {
+                order: 'asc',
+              },
+            },
           },
-          orderBy: {
-            order: 'asc',
-          },
-        },
-      },
-    });
+        });
 
     // Notify all displays using this playlist
     this.notifyDisplaysOfPlaylistUpdate(id, updatedPlaylist).catch(error => {

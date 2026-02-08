@@ -46,23 +46,23 @@ export class DisplaysService {
 
   async create(organizationId: string, createDisplayDto: CreateDisplayDto) {
     const { deviceId, name, ...rest } = createDisplayDto;
-    
-    const existing = await this.db.display.findUnique({
-      where: { deviceIdentifier: deviceId },
-    });
 
-    if (existing) {
-      throw new ConflictException('Display with this device ID already exists');
+    try {
+      return await this.db.display.create({
+        data: {
+          ...rest,
+          deviceIdentifier: deviceId,
+          nickname: name,
+          organizationId,
+        },
+      });
+    } catch (error) {
+      // Handle unique constraint violation (race condition on deviceIdentifier)
+      if (error.code === 'P2002') {
+        throw new ConflictException('Display with this device ID already exists');
+      }
+      throw error;
     }
-
-    return this.db.display.create({
-      data: {
-        ...rest,
-        deviceIdentifier: deviceId,
-        nickname: name,
-        organizationId,
-      },
-    });
   }
 
   async findAll(organizationId: string, pagination: PaginationDto) {

@@ -25,7 +25,7 @@ export default function Error({
         <p className="text-[var(--foreground-secondary)] mb-6">
           We apologize for the inconvenience. An unexpected error occurred.
         </p>
-        {error.message && (
+        {process.env.NODE_ENV === 'development' && error.message && (
           <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-left">
             <p className="text-sm text-red-500 font-mono break-words">
               {error.message}

@@ -130,7 +130,9 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     if (!isConnected) return;
 
     const unsubscribe = on('notification:new', (data: any) => {
-      console.log('[Notifications] Received new notification:', data);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Notifications] Received new notification:', data);
+      }
       // Increment unread count
       setUnreadCount((prev) => prev + 1);
       // Fetch fresh notifications to get the full notification object

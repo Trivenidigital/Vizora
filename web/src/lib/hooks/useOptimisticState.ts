@@ -47,7 +47,7 @@ export function useOptimisticState<T>(
         setPendingUpdates((prev) => new Map(prev).set(id, update));
         updateQueueRef.current.push(update);
 
-        if (enableLogging) {
+        if (enableLogging && process.env.NODE_ENV === 'development') {
           console.log('[OptimisticState] Applied optimistic update:', id, {
             previous: prevState,
             optimistic: optimisticState,
@@ -67,7 +67,7 @@ export function useOptimisticState<T>(
       const update = updated.get(id);
 
       if (update) {
-        if (enableLogging) {
+        if (enableLogging && process.env.NODE_ENV === 'development') {
           console.log('[OptimisticState] Committed update:', id);
         }
         onCommit?.(update);
@@ -88,7 +88,7 @@ export function useOptimisticState<T>(
         if (update) {
           setState(fallbackState ?? update.previousState);
 
-          if (enableLogging) {
+          if (enableLogging && process.env.NODE_ENV === 'development') {
             console.log('[OptimisticState] Rolled back update:', id, {
               previousState: update.previousState,
             });
@@ -116,7 +116,7 @@ export function useOptimisticState<T>(
       if (originalState) {
         setState(originalState);
 
-        if (enableLogging) {
+        if (enableLogging && process.env.NODE_ENV === 'development') {
           console.log('[OptimisticState] Rolled back all updates:', prev.size);
         }
 
@@ -147,7 +147,7 @@ export function useOptimisticState<T>(
           setPendingUpdates((prev) => new Map(prev).set(id, update));
           updateQueueRef.current.push(update);
 
-          if (enableLogging) {
+          if (enableLogging && process.env.NODE_ENV === 'development') {
             console.log('[OptimisticState] Batched update:', id);
           }
         });

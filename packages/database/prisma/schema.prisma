@@ -398,6 +398,7 @@ model Notification {
   userId         String?
   user           User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
   createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@index([organizationId, read])
   @@index([organizationId, createdAt])
@@ -413,7 +414,7 @@ model ApiKey {
   id             String    @id @default(cuid())
   name           String    // User-friendly name
   prefix         String    // First 8 chars for identification (e.g., "vz_live_")
-  hashedKey      String    // SHA-256 hash of full key
+  hashedKey      String    @unique // SHA-256 hash of full key
   lastUsedAt     DateTime?
   expiresAt      DateTime?
   revokedAt      DateTime?
@@ -428,6 +429,7 @@ model ApiKey {
 
   @@index([organizationId])
   @@index([prefix])
+  @@index([prefix, hashedKey])
   @@map("api_keys")
 }
 
@@ -448,7 +450,9 @@ model BillingTransaction {
   description           String?
   metadata              Json?    @db.JsonB
   createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
+  @@unique([provider, providerTransactionId])
   @@index([organizationId])
   @@index([providerTransactionId])
   @@map("billing_transactions")

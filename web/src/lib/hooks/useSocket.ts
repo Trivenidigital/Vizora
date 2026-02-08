@@ -91,7 +91,9 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketReturn {
       setConnectionError(null);
       // Clear exhaustion on successful connect
       reconnectExhaustedFor.delete(url);
-      console.log('[Socket] Connected:', socket.id);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Socket] Connected:', socket.id);
+      }
 
       // Join organization room if organizationId is provided
       if (auth?.organizationId) {
@@ -101,7 +103,9 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketReturn {
 
     socket.on('disconnect', (reason) => {
       setIsConnected(false);
-      console.log('[Socket] Disconnected:', reason);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Socket] Disconnected:', reason);
+      }
     });
 
     socket.on('connect_error', (error) => {
@@ -109,12 +113,16 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketReturn {
       // Only log the first connect_error per socket instance
       if (!hasLoggedErrorRef.current) {
         hasLoggedErrorRef.current = true;
-        console.warn('[Socket] Connection error (retrying):', error.message);
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[Socket] Connection error (retrying):', error.message);
+        }
       }
     });
 
     socket.on('error', (error) => {
-      console.error('[Socket] Error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[Socket] Error:', error);
+      }
     });
 
     // Generic message handler for testing
@@ -124,13 +132,17 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketReturn {
 
     // Handle organization room join confirmation
     socket.on('joined:organization', (data) => {
-      console.log('[Socket] Joined organization room:', data.organizationId);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Socket] Joined organization room:', data.organizationId);
+      }
     });
 
     // Handle reconnection exhaustion - log once and stop retrying (auto-recovers after cooldown)
     socket.io.on('reconnect_failed', () => {
       markReconnectExhausted(url);
-      console.warn('[Socket] Reconnection exhausted for', url, '— will retry after cooldown');
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[Socket] Reconnection exhausted for', url, '— will retry after cooldown');
+      }
     });
 
     return () => {

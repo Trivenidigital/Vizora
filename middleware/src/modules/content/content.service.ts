@@ -189,38 +189,39 @@ export class ContentService {
     const existingContent = await this.findOne(organizationId, id);
 
     if (options.keepBackup) {
-      // Create a backup version before replacing
-      const backupContent = await this.db.content.create({
-        data: {
-          name: `${existingContent.name} (v${existingContent.versionNumber})`,
-          description: existingContent.description,
-          type: existingContent.type,
-          url: existingContent.url,
-          thumbnail: existingContent.thumbnail,
-          duration: existingContent.duration,
-          fileSize: existingContent.fileSize,
-          mimeType: existingContent.mimeType,
-          metadata: existingContent.metadata,
-          status: 'archived',
-          organizationId,
-          versionNumber: existingContent.versionNumber,
-          previousVersionId: existingContent.previousVersionId,
-        },
-      });
+      // Create backup and update original in a transaction to prevent data loss
+      const updatedContent = await this.db.$transaction(async (tx) => {
+        const backupContent = await tx.content.create({
+          data: {
+            name: `${existingContent.name} (v${existingContent.versionNumber})`,
+            description: existingContent.description,
+            type: existingContent.type,
+            url: existingContent.url,
+            thumbnail: existingContent.thumbnail,
+            duration: existingContent.duration,
+            fileSize: existingContent.fileSize,
+            mimeType: existingContent.mimeType,
+            metadata: existingContent.metadata,
+            status: 'archived',
+            organizationId,
+            versionNumber: existingContent.versionNumber,
+            previousVersionId: existingContent.previousVersionId,
+          },
+        });
 
-      // Update the current content with new file and link to backup
-      const updatedContent = await this.db.content.update({
-        where: { id },
-        data: {
-          url: newUrl,
-          name: options.name || existingContent.name,
-          thumbnail: options.thumbnail,
-          fileSize: options.fileSize,
-          mimeType: options.mimeType,
-          versionNumber: existingContent.versionNumber + 1,
-          previousVersionId: backupContent.id,
-          updatedAt: new Date(),
-        },
+        return tx.content.update({
+          where: { id },
+          data: {
+            url: newUrl,
+            name: options.name || existingContent.name,
+            thumbnail: options.thumbnail,
+            fileSize: options.fileSize,
+            mimeType: options.mimeType,
+            versionNumber: existingContent.versionNumber + 1,
+            previousVersionId: backupContent.id,
+            updatedAt: new Date(),
+          },
+        });
       });
 
       return this.mapContentResponse(updatedContent);

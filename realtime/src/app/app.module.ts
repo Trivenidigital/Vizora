@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -15,6 +15,7 @@ import { NotificationService } from '../services/notification.service';
 import { MetricsModule } from '../metrics/metrics.module';
 import { SentryInterceptor } from '../interceptors/sentry.interceptor';
 import { MetricsInterceptor } from '../interceptors/metrics.interceptor';
+import { MetricsAuthMiddleware } from '../metrics/metrics-auth.middleware';
 
 @Module({
   imports: [
@@ -48,4 +49,8 @@ import { MetricsInterceptor } from '../interceptors/metrics.interceptor';
     },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(MetricsAuthMiddleware).forRoutes('internal/metrics');
+  }
+}

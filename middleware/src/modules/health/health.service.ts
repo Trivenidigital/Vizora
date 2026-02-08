@@ -1,6 +1,7 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { RedisService } from '../redis/redis.service';
+import { StorageService } from '../storage/storage.service';
 
 interface HealthCheck {
   status: 'healthy' | 'unhealthy' | 'degraded';
@@ -17,6 +18,7 @@ interface HealthResponse {
   checks: {
     database: HealthCheck;
     redis: HealthCheck;
+    minio: HealthCheck;
     memory: HealthCheck;
   };
 }
@@ -28,16 +30,18 @@ export class HealthService {
   constructor(
     private readonly db: DatabaseService,
     @Optional() private readonly redis?: RedisService,
+    @Optional() private readonly storage?: StorageService,
   ) {}
 
   async check(): Promise<HealthResponse> {
-    const [database, redis, memory] = await Promise.all([
+    const [database, redis, minio, memory] = await Promise.all([
       this.checkDatabase(),
       this.checkRedis(),
+      this.checkMinio(),
       Promise.resolve(this.checkMemory()),
     ]);
 
-    const checks = { database, redis, memory };
+    const checks = { database, redis, minio, memory };
 
     // Determine overall status
     const statuses = Object.values(checks).map(c => c.status);
@@ -121,6 +125,44 @@ export class HealthService {
         responseTime: Date.now() - start,
         error: error instanceof Error ? error.message : 'Redis check failed',
         details: { connected: false },
+      };
+    }
+  }
+
+  private async checkMinio(): Promise<HealthCheck> {
+    const start = Date.now();
+
+    if (!this.storage) {
+      return {
+        status: 'degraded',
+        responseTime: 0,
+        error: 'Storage service not configured',
+        details: { configured: false },
+      };
+    }
+
+    try {
+      const result = await this.storage.healthCheck();
+
+      if (result.healthy) {
+        return {
+          status: 'healthy',
+          responseTime: Date.now() - start,
+          details: { bucket: result.bucket },
+        };
+      }
+
+      return {
+        status: 'unhealthy',
+        responseTime: Date.now() - start,
+        error: result.error || 'MinIO health check failed',
+        details: { bucket: result.bucket },
+      };
+    } catch (error) {
+      return {
+        status: 'unhealthy',
+        responseTime: Date.now() - start,
+        error: error instanceof Error ? error.message : 'MinIO check failed',
       };
     }
   }
