@@ -12,12 +12,12 @@ export class DatabaseService extends PrismaClient implements OnModuleInit, OnMod
     // Configure connection pool via DATABASE_URL query params or environment
     // PostgreSQL pool settings: ?connection_limit=10&pool_timeout=30
     const connectionUrl = process.env.DATABASE_URL || '';
+    const separator = connectionUrl.includes('?') ? '&' : '?';
     const hasPoolConfig = connectionUrl.includes('connection_limit');
 
-    // Add default pool config if not specified
-    const finalUrl = hasPoolConfig
-      ? connectionUrl
-      : `${connectionUrl}${connectionUrl.includes('?') ? '&' : '?'}connection_limit=10&pool_timeout=30`;
+    // Add statement_timeout and default pool config if not specified
+    const poolParams = hasPoolConfig ? '' : '&connection_limit=10&pool_timeout=30';
+    const finalUrl = `${connectionUrl}${separator}statement_timeout=30000${poolParams}`;
 
     super({
       datasources: {

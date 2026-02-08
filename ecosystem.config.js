@@ -29,8 +29,8 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: 3000,
       },
-      // Graceful shutdown
-      kill_timeout: 10000, // 10 seconds to gracefully shutdown
+      // Graceful shutdown — 30s for in-flight requests to complete
+      kill_timeout: 30000,
       // Logging
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       max_size: '50M',

@@ -66,9 +66,15 @@ export class CsrfMiddleware implements NestMiddleware {
     ] as string;
     const tokenFromCookie = req.cookies?.[AUTH_CONSTANTS.CSRF_COOKIE_NAME];
 
-    // If no cookie token, allow the request (first request scenario)
+    // If no cookie token exists on a state-changing request, reject it.
+    // The CSRF cookie should have been set on a prior GET request.
+    // This prevents bypass by stripping the cookie.
     if (!tokenFromCookie) {
-      return next();
+      return res.status(403).json({
+        statusCode: 403,
+        message: 'CSRF cookie missing',
+        error: 'Forbidden',
+      });
     }
 
     // Validate header token matches cookie token

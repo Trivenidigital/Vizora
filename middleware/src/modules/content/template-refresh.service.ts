@@ -53,7 +53,7 @@ export class TemplateRefreshService {
 
         if (now >= nextRefresh) {
           try {
-            await this.refreshTemplate(template.id);
+            await this.refreshTemplate(template.id, template);
             processed++;
             this.logger.debug(`Refreshed template: ${template.name} (${template.id})`);
           } catch (error) {
@@ -78,8 +78,8 @@ export class TemplateRefreshService {
   /**
    * Refresh a single template by ID
    */
-  async refreshTemplate(contentId: string): Promise<void> {
-    const content = await this.db.content.findUnique({
+  async refreshTemplate(contentId: string, prefetchedContent?: any): Promise<void> {
+    const content = prefetchedContent ?? await this.db.content.findUnique({
       where: { id: contentId },
     });
 

@@ -15,12 +15,14 @@ export function useDeviceMetrics(dateRange: DateRange = 'month') {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isMockData, setIsMockData] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
+        setIsMockData(false);
 
         // Map date range to days
         const daysMap: Record<DateRange, number> = {
@@ -39,10 +41,13 @@ export function useDeviceMetrics(dateRange: DateRange = 'month') {
           }
         } catch (apiError) {
           // Fall through to mock data if API not available
-          console.log('Analytics API not available, using mock data');
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Analytics API not available, using mock data');
+          }
         }
 
         // Generate mock data if API unavailable
+        setIsMockData(true);
         const mockData = Array.from({ length: days }, (_, i) => ({
           date: new Date(Date.now() - (days - 1 - i) * 24 * 60 * 60 * 1000).toLocaleDateString(
             'en-US',
@@ -65,7 +70,7 @@ export function useDeviceMetrics(dateRange: DateRange = 'month') {
     fetchData();
   }, [dateRange]);
 
-  return { data, loading, error, dateRange };
+  return { data, loading, error, dateRange, isMockData };
 }
 
 /**
@@ -75,12 +80,14 @@ export function useContentPerformance(dateRange: DateRange = 'month') {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isMockData, setIsMockData] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
+        setIsMockData(false);
 
         // Try to fetch from API
         try {
@@ -90,10 +97,13 @@ export function useContentPerformance(dateRange: DateRange = 'month') {
             return;
           }
         } catch (apiError) {
-          console.log('Content performance API not available, using mock data');
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Content performance API not available, using mock data');
+          }
         }
 
         // Mock data fallback
+        setIsMockData(true);
         const mockData = [
           { title: 'Welcome Video', views: 1240, engagement: 87, shares: 45 },
           { title: 'Product Demo', views: 980, engagement: 76, shares: 32 },
@@ -115,7 +125,7 @@ export function useContentPerformance(dateRange: DateRange = 'month') {
     fetchData();
   }, [dateRange]);
 
-  return { data, loading, error, dateRange };
+  return { data, loading, error, dateRange, isMockData };
 }
 
 /**
@@ -125,12 +135,14 @@ export function useUsageTrends(dateRange: DateRange = 'month') {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isMockData, setIsMockData] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
+        setIsMockData(false);
 
         const daysMap: Record<DateRange, number> = {
           week: 7,
@@ -147,10 +159,13 @@ export function useUsageTrends(dateRange: DateRange = 'month') {
             return;
           }
         } catch (apiError) {
-          console.log('Usage trends API not available, using mock data');
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Usage trends API not available, using mock data');
+          }
         }
 
         // Mock data fallback
+        setIsMockData(true);
         const mockData = Array.from({ length: days }, (_, i) => ({
           date: new Date(Date.now() - (days - 1 - i) * 24 * 60 * 60 * 1000).toLocaleDateString(
             'en-US',
@@ -174,7 +189,7 @@ export function useUsageTrends(dateRange: DateRange = 'month') {
     fetchData();
   }, [dateRange]);
 
-  return { data, loading, error, dateRange };
+  return { data, loading, error, dateRange, isMockData };
 }
 
 /**
@@ -184,12 +199,14 @@ export function useDeviceDistribution() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isMockData, setIsMockData] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
+        setIsMockData(false);
 
         // Try to fetch from API
         try {
@@ -199,10 +216,13 @@ export function useDeviceDistribution() {
             return;
           }
         } catch (apiError) {
-          console.log('Device distribution API not available, using mock data');
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Device distribution API not available, using mock data');
+          }
         }
 
         // Mock data fallback
+        setIsMockData(true);
         const mockData = [
           { name: 'Smartphones', value: 35, color: '#3B82F6' },
           { name: 'Tablets', value: 25, color: '#8B5CF6' },
@@ -223,7 +243,7 @@ export function useDeviceDistribution() {
     fetchData();
   }, []);
 
-  return { data, loading, error };
+  return { data, loading, error, isMockData };
 }
 
 /**
@@ -233,12 +253,14 @@ export function useBandwidthUsage(dateRange: DateRange = 'month') {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isMockData, setIsMockData] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
+        setIsMockData(false);
 
         const daysMap: Record<DateRange, number> = {
           week: 7,
@@ -255,10 +277,13 @@ export function useBandwidthUsage(dateRange: DateRange = 'month') {
             return;
           }
         } catch (apiError) {
-          console.log('Bandwidth usage API not available, using mock data');
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Bandwidth usage API not available, using mock data');
+          }
         }
 
         // Mock data fallback
+        setIsMockData(true);
         const mockData = Array.from({ length: days }, (_, i) => ({
           date: new Date(Date.now() - (days - 1 - i) * 24 * 60 * 60 * 1000).toLocaleDateString(
             'en-US',
@@ -281,7 +306,7 @@ export function useBandwidthUsage(dateRange: DateRange = 'month') {
     fetchData();
   }, [dateRange]);
 
-  return { data, loading, error, dateRange };
+  return { data, loading, error, dateRange, isMockData };
 }
 
 /**
@@ -291,12 +316,14 @@ export function usePlaylistPerformance(dateRange: DateRange = 'month') {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isMockData, setIsMockData] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
+        setIsMockData(false);
 
         // Try to fetch from API
         try {
@@ -306,10 +333,13 @@ export function usePlaylistPerformance(dateRange: DateRange = 'month') {
             return;
           }
         } catch (apiError) {
-          console.log('Playlist performance API not available, using mock data');
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Playlist performance API not available, using mock data');
+          }
         }
 
         // Mock data fallback
+        setIsMockData(true);
         const mockData = [
           { name: 'Morning Promotions', plays: 234, engagement: 87, uniqueDevices: 12 },
           { name: 'Lunch Specials', plays: 189, engagement: 92, uniqueDevices: 10 },
@@ -330,5 +360,5 @@ export function usePlaylistPerformance(dateRange: DateRange = 'month') {
     fetchData();
   }, [dateRange]);
 
-  return { data, loading, error, dateRange };
+  return { data, loading, error, dateRange, isMockData };
 }

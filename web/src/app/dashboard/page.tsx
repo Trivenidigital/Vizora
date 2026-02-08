@@ -71,7 +71,9 @@ export default function DashboardPage() {
  // Log any failures for debugging
  results.forEach((result, index) => {
  if (result.status === 'rejected') {
+ if (process.env.NODE_ENV === 'development') {
  console.warn(`API call ${index + 1} failed:`, result.reason);
+ }
  }
  });
 

@@ -48,7 +48,9 @@ export default function LoginContent() {
 
     try {
       await apiClient.login(formData.email, formData.password);
-      console.log('[LOGIN] Login successful, redirecting to:', redirectUrl);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[LOGIN] Login successful, redirecting to:', redirectUrl);
+      }
       // Use window.location for a full page navigation instead of router.push().
       // router.push() does a client-side navigation where Next.js middleware
       // may run before the browser has fully processed the Set-Cookie header

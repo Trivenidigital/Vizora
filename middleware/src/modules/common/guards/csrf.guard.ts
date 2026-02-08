@@ -51,10 +51,11 @@ export class CsrfGuard implements CanActivate {
     const cookieToken = request.cookies?.[AUTH_CONSTANTS.CSRF_COOKIE_NAME];
     const headerToken = request.headers[AUTH_CONSTANTS.CSRF_HEADER_NAME.toLowerCase()] as string;
 
-    // If no cookie token exists, this might be the first request - allow it
-    // The token will be set in the response
+    // If no cookie token exists on a state-changing request, reject it.
+    // The CSRF cookie should have been set on a prior GET request.
+    // This prevents bypass by stripping the cookie.
     if (!cookieToken) {
-      return true;
+      throw new ForbiddenException('CSRF cookie missing');
     }
 
     // Validate that header token matches cookie token

@@ -14,6 +14,7 @@ import cookieParser from 'cookie-parser';
 import { AppModule } from './app/app.module';
 import { SanitizeInterceptor } from './modules/common/interceptors/sanitize.interceptor';
 import { LoggingInterceptor } from './modules/common/interceptors/logging.interceptor';
+import { AllExceptionsFilter } from './modules/common/filters/all-exceptions.filter';
 
 async function bootstrap() {
   // Validate required production environment variables
@@ -58,6 +59,17 @@ async function bootstrap() {
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRF-Token'],
+  });
+
+  // Global exception filter — catches all unhandled exceptions
+  app.useGlobalFilters(new AllExceptionsFilter());
+
+  // HTTP request timeout middleware
+  app.use((req: import('express').Request, _res: import('express').Response, next: import('express').NextFunction) => {
+    // File uploads get a longer timeout (120s), everything else gets 30s
+    const isUpload = req.path.includes('/content/upload') || req.method === 'POST' && req.headers['content-type']?.includes('multipart');
+    req.setTimeout(isUpload ? 120000 : 30000);
+    next();
   });
 
   // Global validation pipe
@@ -155,10 +167,9 @@ bootstrap().catch((err) => {
   process.exit(1);
 });
 
-// Catch unhandled rejections
+// Catch unhandled rejections — log but don't exit; let PM2 handle restarts if needed
 process.on('unhandledRejection', (reason, promise) => {
   Logger.error('🚨 Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1);
 });
 
 // Catch uncaught exceptions

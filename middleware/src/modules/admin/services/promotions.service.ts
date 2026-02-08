@@ -304,36 +304,63 @@ export class PromotionsService {
    * Redeem a promotion code
    */
   async redeem(code: string, organizationId: string, discountApplied: number) {
-    // Validate first
-    const validation = await this.validate(code, undefined, organizationId);
-    if (!validation.valid) {
-      throw new BadRequestException(validation.error);
-    }
+    const redemption = await this.db.$transaction(async (tx) => {
+      // Re-validate inside transaction to prevent race conditions
+      const promotion = await tx.promotion.findUnique({
+        where: { code: code.toUpperCase() },
+        include: {
+          redemptions: {
+            where: { organizationId },
+          },
+        },
+      });
 
-    const promotion = await this.db.promotion.findUnique({
-      where: { code: code.toUpperCase() },
-    });
+      if (!promotion) {
+        throw new NotFoundException(`Promotion with code '${code}' not found`);
+      }
 
-    if (!promotion) {
-      throw new NotFoundException(`Promotion with code '${code}' not found`);
-    }
+      if (!promotion.isActive) {
+        throw new BadRequestException('Promotion is no longer active');
+      }
 
-    // Create redemption record and increment counter
-    const [redemption] = await this.db.$transaction([
-      this.db.promotionRedemption.create({
+      const now = new Date();
+      if (promotion.startsAt > now) {
+        throw new BadRequestException('Promotion has not started yet');
+      }
+      if (promotion.expiresAt && promotion.expiresAt < now) {
+        throw new BadRequestException('Promotion has expired');
+      }
+
+      // Check per-customer limit
+      if (promotion.redemptions.length >= promotion.maxPerCustomer) {
+        throw new BadRequestException('You have already used this promotion');
+      }
+
+      // Atomically increment counter with a WHERE guard against exceeding maxRedemptions
+      const updateResult = await tx.promotion.updateMany({
+        where: {
+          id: promotion.id,
+          ...(promotion.maxRedemptions !== null
+            ? { currentRedemptions: { lt: promotion.maxRedemptions } }
+            : {}),
+        },
+        data: {
+          currentRedemptions: { increment: 1 },
+        },
+      });
+
+      if (updateResult.count === 0) {
+        throw new BadRequestException('Promotion redemption limit reached');
+      }
+
+      return tx.promotionRedemption.create({
         data: {
           promotionId: promotion.id,
           organizationId,
           discountApplied,
         },
-      }),
-      this.db.promotion.update({
-        where: { id: promotion.id },
-        data: {
-          currentRedemptions: { increment: 1 },
-        },
-      }),
-    ]);
+      });
+    });
 
     this.logger.log(`Redeemed promotion ${code} for org ${organizationId}, discount: ${discountApplied}`);
     return redemption;
