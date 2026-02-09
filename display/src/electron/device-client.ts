@@ -333,13 +333,40 @@ export class DeviceClient {
   private handleCommand(command: any) {
     switch (command.type) {
       case 'reload':
-        // Reload the renderer
+        console.log('[DeviceClient] Executing reload command');
+        try {
+          const { BrowserWindow } = require('electron');
+          const mainWindow = BrowserWindow.getAllWindows()[0];
+          if (mainWindow) {
+            mainWindow.reload();
+            console.log('[DeviceClient] Reload complete');
+          } else {
+            console.warn('[DeviceClient] No window found for reload');
+          }
+        } catch (err) {
+          console.error('[DeviceClient] Reload failed:', err);
+        }
         break;
       case 'clear_cache':
-        // Clear content cache
+        console.log('[DeviceClient] Executing clear_cache command');
+        try {
+          const { session } = require('electron');
+          session.defaultSession.clearCache().then(() => {
+            console.log('[DeviceClient] Cache cleared successfully');
+          }).catch((err: any) => {
+            console.error('[DeviceClient] Cache clear failed:', err);
+          });
+        } catch (err) {
+          console.error('[DeviceClient] clear_cache failed:', err);
+        }
         break;
       case 'update':
-        // Trigger app update
+        console.log('[DeviceClient] Update command received');
+        // Stub for autoUpdater integration
+        // In production, this would trigger electron-updater:
+        // const { autoUpdater } = require('electron-updater');
+        // autoUpdater.checkForUpdatesAndNotify();
+        console.log('[DeviceClient] Auto-update not yet configured. Update payload:', command.payload);
         break;
       default:
         console.warn('Unknown command type:', command.type);

@@ -64,7 +64,6 @@ export default function DevicesPage() {
  )
  );
  setRealtimeStatus('connected');
- console.log('[DevicesPage] Device status updated:', update);
  }, []);
 
  // Memoized callback for connection changes

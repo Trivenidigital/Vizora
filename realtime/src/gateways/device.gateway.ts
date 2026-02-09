@@ -23,6 +23,7 @@ import {
   ContentImpressionDto,
   ContentErrorDto,
   PlaylistRequestDto,
+  ScreenshotResponseDto,
   createSuccessResponse,
   createErrorResponse,
 } from './dto';
@@ -38,6 +39,7 @@ interface DevicePayload {
   deviceIdentifier: string;
   organizationId: string;
   type: 'device';
+  jti?: string;
 }
 
 @WebSocketGateway({
@@ -46,6 +48,9 @@ interface DevicePayload {
     credentials: true,
   },
   transports: ['websocket', 'polling'],
+  pingInterval: 25000,
+  pingTimeout: 20000,
+  maxHttpBufferSize: 2 * 1024 * 1024,
 })
 export class DeviceGateway
   implements OnGatewayConnection, OnGatewayDisconnect
@@ -54,6 +59,15 @@ export class DeviceGateway
   server: Server;
 
   private readonly logger = new Logger(DeviceGateway.name);
+
+  // 2.1: In-memory device status cache to avoid redundant DB writes
+  private readonly deviceStatusCache: Map<string, string> = new Map();
+
+  // 2.4: Connection rate limiting per IP
+  private readonly connectionAttempts: Map<string, { count: number; resetAt: number }> = new Map();
+
+  // 2.5: Device socket deduplication (deviceId -> socketId)
+  private readonly deviceSockets: Map<string, string> = new Map();
 
   constructor(
     private jwtService: JwtService,
@@ -70,6 +84,9 @@ export class DeviceGateway
         'API_BASE_URL is not set — device content URLs will default to http://localhost:3000. Set API_BASE_URL for production.',
       );
     }
+
+    // Periodically clean up expired rate limit entries (every 60s)
+    setInterval(() => this.cleanupRateLimitEntries(), 60000);
   }
 
   /**
@@ -84,8 +101,42 @@ export class DeviceGateway
     return item.content?.url || '';
   }
 
+  /**
+   * Clean up expired rate limit entries
+   */
+  private cleanupRateLimitEntries(): void {
+    const now = Date.now();
+    for (const [ip, entry] of this.connectionAttempts) {
+      if (now > entry.resetAt) {
+        this.connectionAttempts.delete(ip);
+      }
+    }
+  }
+
   async handleConnection(client: Socket) {
     try {
+      // 2.4: Connection rate limiting
+      const clientIp = client.handshake.address;
+      const now = Date.now();
+      const rateEntry = this.connectionAttempts.get(clientIp);
+
+      if (rateEntry) {
+        if (now > rateEntry.resetAt) {
+          // Reset window
+          this.connectionAttempts.set(clientIp, { count: 1, resetAt: now + 60000 });
+        } else {
+          rateEntry.count++;
+          if (rateEntry.count > 10) {
+            this.logger.warn(`Connection rate limited for IP: ${clientIp}`);
+            client.emit('error', { message: 'rate_limited' });
+            client.disconnect();
+            return;
+          }
+        }
+      } else {
+        this.connectionAttempts.set(clientIp, { count: 1, resetAt: now + 60000 });
+      }
+
       const token = client.handshake.auth.token;
 
       if (!token) {
@@ -106,7 +157,28 @@ export class DeviceGateway
         return;
       }
 
+      // Check if the token has been revoked
+      if (payload.jti) {
+        const isRevoked = await this.redisService.exists(`revoked_token:${payload.jti}`);
+        if (isRevoked) {
+          this.logger.warn(`Connection rejected: Token revoked (jti: ${payload.jti})`);
+          client.disconnect();
+          return;
+        }
+      }
+
       const deviceId = payload.sub;
+
+      // 2.5: Device socket deduplication - disconnect old socket if device already connected
+      const existingSocketId = this.deviceSockets.get(deviceId);
+      if (existingSocketId) {
+        const existingSocket = this.server?.sockets?.sockets?.get(existingSocketId);
+        if (existingSocket) {
+          this.logger.log(`Disconnecting stale socket ${existingSocketId} for device ${deviceId}`);
+          existingSocket.disconnect(true);
+        }
+      }
+      this.deviceSockets.set(deviceId, client.id);
 
       // Store device info in socket data
       client.data.deviceId = deviceId;
@@ -126,20 +198,23 @@ export class DeviceGateway
         organizationId: payload.organizationId,
       });
 
-      // Also update in database so dashboard sees current status
-      try {
-        await this.databaseService.display.update({
-          where: { id: deviceId },
-          data: {
-            status: 'online',
-            lastHeartbeat: new Date(),
-          },
-        });
-      } catch (dbError: unknown) {
-        const errorMessage = dbError instanceof Error ? dbError.message : 'Unknown error';
-        this.logger.warn(`Failed to update database for device ${deviceId}: ${errorMessage}`);
-        // Don't fail the connection if database update fails
+      // 2.1: Only write to DB if status actually changed
+      const previousStatus = this.deviceStatusCache.get(deviceId);
+      if (previousStatus !== 'online') {
+        try {
+          await this.databaseService.display.update({
+            where: { id: deviceId },
+            data: {
+              status: 'online',
+              lastHeartbeat: new Date(),
+            },
+          });
+        } catch (dbError: unknown) {
+          const errorMessage = dbError instanceof Error ? dbError.message : 'Unknown error';
+          this.logger.warn(`Failed to update database for device ${deviceId}: ${errorMessage}`);
+        }
       }
+      this.deviceStatusCache.set(deviceId, 'online');
 
       this.logger.log(`Device connected: ${deviceId} (${client.id})`);
 
@@ -174,7 +249,7 @@ export class DeviceGateway
 
       // Record metrics
       this.metricsService.recordConnection(payload.organizationId, 'connected');
-      this.metricsService.updateDeviceStatus(deviceId, 'online');
+      this.metricsService.updateDeviceStatus(deviceId, payload.organizationId, 'online');
 
       // Notify dashboard about device online status
       this.server.to(`org:${payload.organizationId}`).emit('device:status', {
@@ -287,6 +362,14 @@ export class DeviceGateway
       const deviceId = client.data?.deviceId;
 
       if (deviceId) {
+        // 2.5: Only process disconnect if this socket is still the active one for the device
+        const activeSocketId = this.deviceSockets.get(deviceId);
+        if (activeSocketId && activeSocketId !== client.id) {
+          this.logger.debug(`Ignoring disconnect for stale socket ${client.id} (device ${deviceId}, active: ${activeSocketId})`);
+          return;
+        }
+        this.deviceSockets.delete(deviceId);
+
         // Update status in Redis
         await this.redisService.setDeviceStatus(deviceId, {
           status: 'offline',
@@ -295,7 +378,8 @@ export class DeviceGateway
           organizationId: client.data.organizationId,
         });
 
-        // Also update in database so dashboard sees current status
+        // 2.1: Update DB on disconnect (status transition)
+        this.deviceStatusCache.set(deviceId, 'offline');
         let deviceName = deviceId;
         try {
           const device = await this.databaseService.display.update({
@@ -327,7 +411,7 @@ export class DeviceGateway
 
         // Record metrics
         this.metricsService.recordConnection(client.data.organizationId, 'disconnected');
-        this.metricsService.updateDeviceStatus(deviceId, 'offline');
+        this.metricsService.updateDeviceStatus(deviceId, client.data.organizationId, 'offline');
 
         // Notify dashboard
         this.server
@@ -338,8 +422,9 @@ export class DeviceGateway
             timestamp: new Date().toISOString(),
           });
       }
-    } catch (error) {
-      this.logger.error(`Error in handleDisconnect for ${client.data?.deviceId}: ${(error as Error).message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Error in handleDisconnect for ${client.data?.deviceId}: ${errorMessage}`);
     }
   }
 
@@ -353,7 +438,7 @@ export class DeviceGateway
     const startTime = Date.now();
 
     try {
-      // Update heartbeat in Redis
+      // Update heartbeat in Redis (cheap, always do this)
       await this.redisService.setDeviceStatus(deviceId, {
         status: 'online',
         lastHeartbeat: Date.now(),
@@ -363,19 +448,22 @@ export class DeviceGateway
         currentContent: data.currentContent,
       });
 
-      // Also update database so dashboard shows current status
-      try {
-        await this.databaseService.display.update({
-          where: { id: deviceId },
-          data: {
-            status: 'online',
-            lastHeartbeat: new Date(),
-          },
-        });
-      } catch (dbError: unknown) {
-        const errorMessage = dbError instanceof Error ? dbError.message : 'Unknown error';
-        this.logger.warn(`Failed to update database for device ${deviceId}: ${errorMessage}`);
-        // Don't fail the heartbeat if database update fails
+      // 2.1: Only write to DB when status transitions (e.g., offline -> online)
+      const previousStatus = this.deviceStatusCache.get(deviceId);
+      if (previousStatus !== 'online') {
+        try {
+          await this.databaseService.display.update({
+            where: { id: deviceId },
+            data: {
+              status: 'online',
+              lastHeartbeat: new Date(),
+            },
+          });
+        } catch (dbError: unknown) {
+          const errorMessage = dbError instanceof Error ? dbError.message : 'Unknown error';
+          this.logger.warn(`Failed to update database for device ${deviceId}: ${errorMessage}`);
+        }
+        this.deviceStatusCache.set(deviceId, 'online');
       }
 
       // Process heartbeat (store in ClickHouse, etc.)
@@ -384,7 +472,7 @@ export class DeviceGateway
       // Update device metrics if available
       if (data.metrics) {
         this.metricsService.updateDeviceMetrics(
-          deviceId,
+          client.data.organizationId,
           data.metrics.cpuUsage || 0,
           data.metrics.memoryUsage || 0,
         );
@@ -681,16 +769,10 @@ export class DeviceGateway
    * Device sends base64-encoded image data which we upload to MinIO
    */
   @SubscribeMessage('screenshot:response')
+  @UsePipes(new WsValidationPipe())
   async handleScreenshotResponse(
     @ConnectedSocket() client: Socket,
-    @MessageBody()
-    data: {
-      requestId: string;
-      imageData: string;
-      width: number;
-      height: number;
-      timestamp: string;
-    },
+    @MessageBody() data: ScreenshotResponseDto,
   ) {
     const deviceId = client.data.deviceId;
     const organizationId = client.data.organizationId;
@@ -820,8 +902,9 @@ export class DeviceGateway
                 }),
               };
             }
-          } catch (error) {
-            this.logger.warn(`Failed to resolve playlist ${zone.playlistId} for layout zone ${zone.id}: ${(error as Error).message}`);
+          } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            this.logger.warn(`Failed to resolve playlist ${zone.playlistId} for layout zone ${zone.id}: ${errorMessage}`);
           }
         }
 
@@ -850,8 +933,9 @@ export class DeviceGateway
                 duration: zoneContent.duration,
               };
             }
-          } catch (error) {
-            this.logger.warn(`Failed to resolve content ${zone.contentId} for layout zone ${zone.id}: ${(error as Error).message}`);
+          } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            this.logger.warn(`Failed to resolve content ${zone.contentId} for layout zone ${zone.id}: ${errorMessage}`);
           }
         }
 

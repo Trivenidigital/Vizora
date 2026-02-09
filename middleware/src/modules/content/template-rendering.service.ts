@@ -207,7 +207,8 @@ export class TemplateRenderingService {
       // Render with data
       const rendered = template(data || {});
 
-      return rendered;
+      // Sanitize the rendered output to prevent XSS
+      return this.sanitizeHtml(rendered);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Template rendering failed: ${message}`);

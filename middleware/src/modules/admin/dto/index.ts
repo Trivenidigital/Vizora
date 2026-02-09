@@ -27,6 +27,9 @@ export * from './config/bulk-config.dto';
 export * from './security/block-ip.dto';
 export * from './security/audit-log-filters.dto';
 
+// Billing
+export * from './billing/billing-filters.dto';
+
 // Announcements
 export * from './announcements/create-announcement.dto';
 export * from './announcements/update-announcement.dto';

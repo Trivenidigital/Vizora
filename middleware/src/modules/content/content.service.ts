@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Prisma } from '@vizora/database';
 import { DatabaseService } from '../database/database.service';
 import { CreateContentDto } from './dto/create-content.dto';
 import { UpdateContentDto } from './dto/update-content.dto';
@@ -12,13 +13,7 @@ import { TemplateRenderingService } from './template-rendering.service';
 import { CreateLayoutDto } from './dto/create-layout.dto';
 import { CreateWidgetDto } from './dto/create-widget.dto';
 import { LAYOUT_PRESETS } from './layout-presets';
-import {
-  WeatherDataSource,
-  RssDataSource,
-  InstagramDataSource,
-  TwitterDataSource,
-  FacebookDataSource,
-} from './widget-data-sources';
+import { DataSourceRegistryService } from './data-source-registry.service';
 import type { WidgetDataSource } from './widget-data-sources';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -65,31 +60,11 @@ export interface WidgetMetadata {
 export class ContentService {
   private readonly logger = new Logger(ContentService.name);
 
-  /** Registry of widget data sources keyed by type */
-  private readonly widgetDataSources: Map<string, WidgetDataSource>;
-
   constructor(
     private readonly db: DatabaseService,
     private readonly templateRendering: TemplateRenderingService,
-    private readonly weatherDataSource: WeatherDataSource,
-    private readonly rssDataSource: RssDataSource,
-    private readonly instagramDataSource: InstagramDataSource,
-    private readonly twitterDataSource: TwitterDataSource,
-    private readonly facebookDataSource: FacebookDataSource,
-  ) {
-    // Build data-source registry
-    this.widgetDataSources = new Map<string, WidgetDataSource>();
-    const sources: WidgetDataSource[] = [
-      this.weatherDataSource,
-      this.rssDataSource,
-      this.instagramDataSource,
-      this.twitterDataSource,
-      this.facebookDataSource,
-    ];
-    for (const source of sources) {
-      this.widgetDataSources.set(source.type, source);
-    }
-  }
+    private readonly dataSourceRegistry: DataSourceRegistryService,
+  ) {}
 
   // Map database content to API response format
   private mapContentResponse(content: any) {
@@ -628,7 +603,7 @@ export class ContentService {
         type: 'template',
         url: '', // Templates don't have a URL
         duration: dto.duration || 30,
-        metadata: metadata as any,
+        metadata: metadata as Prisma.InputJsonValue,
         organizationId,
       },
     });
@@ -705,7 +680,7 @@ export class ContentService {
         name: dto.name,
         description: dto.description,
         duration: dto.duration,
-        metadata: metadata as any,
+        metadata: metadata as Prisma.InputJsonValue,
       },
     });
 
@@ -800,7 +775,7 @@ export class ContentService {
       const updated = await this.db.content.update({
         where: { id },
         data: {
-          metadata: updatedMetadata as any,
+          metadata: updatedMetadata as Prisma.InputJsonValue,
         },
       });
 
@@ -820,7 +795,7 @@ export class ContentService {
       await this.db.content.update({
         where: { id },
         data: {
-          metadata: updatedMetadata as any,
+          metadata: updatedMetadata as Prisma.InputJsonValue,
         },
       });
 
@@ -864,7 +839,7 @@ export class ContentService {
         description: dto.description,
         type: 'layout',
         url: '',
-        metadata: metadata as any,
+        metadata: metadata as Prisma.InputJsonValue,
         organizationId,
       },
     });
@@ -897,7 +872,7 @@ export class ContentService {
       data: {
         name: dto.name,
         description: dto.description,
-        metadata: metadata as any,
+        metadata: metadata as Prisma.InputJsonValue,
       },
     });
 
@@ -1001,7 +976,7 @@ export class ContentService {
       defaultTemplate: string;
     }> = [];
 
-    for (const [, source] of this.widgetDataSources) {
+    for (const [, source] of this.dataSourceRegistry.getAll()) {
       types.push({
         type: source.type,
         configSchema: source.getConfigSchema(),
@@ -1017,8 +992,10 @@ export class ContentService {
    * Create a widget as a Content record with type='template' and widget metadata.
    */
   async createWidget(organizationId: string, dto: CreateWidgetDto) {
-    const source = this.widgetDataSources.get(dto.widgetType);
-    if (!source) {
+    let source: WidgetDataSource;
+    try {
+      source = this.dataSourceRegistry.get(dto.widgetType);
+    } catch {
       throw new BadRequestException(`Unknown widget type: ${dto.widgetType}`);
     }
 
@@ -1060,7 +1037,7 @@ export class ContentService {
         type: 'template',
         url: '',
         duration: dto.duration || 30,
-        metadata: widgetMeta as any,
+        metadata: widgetMeta as Prisma.InputJsonValue,
         organizationId,
       },
     });
@@ -1082,8 +1059,10 @@ export class ContentService {
     const widgetType = dto.widgetType || existingMeta.widgetType;
     const widgetConfig = dto.widgetConfig || existingMeta.widgetConfig;
 
-    const source = this.widgetDataSources.get(widgetType);
-    if (!source) {
+    let source: WidgetDataSource;
+    try {
+      source = this.dataSourceRegistry.get(widgetType);
+    } catch {
       throw new BadRequestException(`Unknown widget type: ${widgetType}`);
     }
 
@@ -1126,7 +1105,7 @@ export class ContentService {
         name: dto.name ?? existing.name,
         description: dto.description ?? existing.description,
         duration: dto.duration ?? existing.duration,
-        metadata: widgetMeta as any,
+        metadata: widgetMeta as Prisma.InputJsonValue,
       },
     });
 
@@ -1144,8 +1123,10 @@ export class ContentService {
       throw new BadRequestException('Content is not a widget');
     }
 
-    const source = this.widgetDataSources.get(existingMeta.widgetType);
-    if (!source) {
+    let source: WidgetDataSource;
+    try {
+      source = this.dataSourceRegistry.get(existingMeta.widgetType);
+    } catch {
       throw new BadRequestException(`Unknown widget type: ${existingMeta.widgetType}`);
     }
 
@@ -1165,7 +1146,7 @@ export class ContentService {
       const content = await this.db.content.update({
         where: { id },
         data: {
-          metadata: widgetMeta as any,
+          metadata: widgetMeta as Prisma.InputJsonValue,
         },
       });
 
@@ -1181,7 +1162,7 @@ export class ContentService {
       await this.db.content.update({
         where: { id },
         data: {
-          metadata: widgetMeta as any,
+          metadata: widgetMeta as Prisma.InputJsonValue,
         },
       });
 

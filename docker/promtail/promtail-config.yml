@@ -1,0 +1,54 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: vizora-pm2-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: vizora
+          __path__: /app/logs/*.log
+
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [+-]\d{4})\s+(?P<content>.*)$'
+      - labels:
+          timestamp:
+      - timestamp:
+          source: timestamp
+          format: '2006-01-02 15:04:05 -0700'
+
+  - job_name: vizora-middleware
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: vizora-middleware
+          service: middleware
+          __path__: /app/logs/middleware-*.log
+
+  - job_name: vizora-realtime
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: vizora-realtime
+          service: realtime
+          __path__: /app/logs/realtime-*.log
+
+  - job_name: vizora-web
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: vizora-web
+          service: web
+          __path__: /app/logs/web-*.log

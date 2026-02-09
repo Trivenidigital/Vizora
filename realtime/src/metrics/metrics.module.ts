@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { 
+import {
   PrometheusModule,
   makeCounterProvider,
   makeGaugeProvider,
@@ -71,21 +71,21 @@ import { MetricsService } from './metrics.service';
       help: 'Total content errors',
       labelNames: ['error_type'],
     }),
-    // Device Metrics
+    // Device Metrics - aggregated by organization to prevent cardinality explosion
     makeGaugeProvider({
-      name: 'device_status',
-      help: 'Device status (1=online, 0=offline, -1=error)',
-      labelNames: ['device_id'],
+      name: 'devices_online',
+      help: 'Number of online devices per organization',
+      labelNames: ['organization_id'],
     }),
     makeGaugeProvider({
-      name: 'device_cpu_usage',
-      help: 'Device CPU usage percentage',
-      labelNames: ['device_id'],
+      name: 'device_cpu_usage_avg',
+      help: 'Average device CPU usage per organization',
+      labelNames: ['organization_id'],
     }),
     makeGaugeProvider({
-      name: 'device_memory_usage',
-      help: 'Device memory usage percentage',
-      labelNames: ['device_id'],
+      name: 'device_memory_usage_avg',
+      help: 'Average device memory usage per organization',
+      labelNames: ['organization_id'],
     }),
     // HTTP Metrics
     makeCounterProvider({

@@ -109,7 +109,7 @@ export class OrganizationsService {
   async getBranding(orgId: string) {
     const org = await this.db.organization.findUnique({ where: { id: orgId } });
     if (!org) throw new NotFoundException('Organization not found');
-    const settings = (org.settings as any) || {};
+    const settings = (org.settings as Record<string, unknown>) || {};
     return settings.branding || {
       name: org.name,
       logoUrl: org.logoUrl,
@@ -128,7 +128,7 @@ export class OrganizationsService {
     if (brandingDto.customCSS) {
       brandingDto.customCSS = this.sanitizeCSS(brandingDto.customCSS);
     }
-    const currentSettings = (org.settings as any) || {};
+    const currentSettings = (org.settings as Record<string, unknown>) || {};
     return this.db.organization.update({
       where: { id: orgId },
       data: {

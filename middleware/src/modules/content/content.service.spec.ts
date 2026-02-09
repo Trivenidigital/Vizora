@@ -10,12 +10,14 @@ import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { ContentService, TemplateMetadata } from './content.service';
 import { DatabaseService } from '../database/database.service';
 import { TemplateRenderingService } from './template-rendering.service';
+import { DataSourceRegistryService } from './data-source-registry.service';
 import { CreateTemplateDto } from './dto/create-template.dto';
 
 describe('ContentService', () => {
   let service: ContentService;
   let mockDatabaseService: any;
   let mockTemplateRendering: jest.Mocked<TemplateRenderingService>;
+  let mockDataSourceRegistry: jest.Mocked<DataSourceRegistryService>;
 
   const mockContent = {
     id: 'content-123',
@@ -92,9 +94,29 @@ describe('ContentService', () => {
       processTemplate: jest.fn(),
     } as any;
 
+    mockDataSourceRegistry = {
+      get: jest.fn().mockReturnValue({
+        type: 'weather',
+        fetchData: jest.fn().mockResolvedValue({ temperature: 72 }),
+        getConfigSchema: jest.fn().mockReturnValue({}),
+        getDefaultTemplate: jest.fn().mockReturnValue('weather'),
+        getSampleData: jest.fn().mockReturnValue({ temperature: 72 }),
+      }),
+      getAll: jest.fn().mockReturnValue([
+        ['weather', {
+          type: 'weather',
+          fetchData: jest.fn().mockResolvedValue({ temperature: 72 }),
+          getConfigSchema: jest.fn().mockReturnValue({}),
+          getDefaultTemplate: jest.fn().mockReturnValue('weather'),
+          getSampleData: jest.fn().mockReturnValue({ temperature: 72 }),
+        }],
+      ]),
+    } as any;
+
     service = new ContentService(
       mockDatabaseService as DatabaseService,
       mockTemplateRendering,
+      mockDataSourceRegistry,
     );
   });
 

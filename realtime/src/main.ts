@@ -1,7 +1,7 @@
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app/app.module';
-import { IoAdapter } from '@nestjs/platform-socket.io';
+import { RedisIoAdapter } from './adapters/redis-io.adapter';
 import helmet from 'helmet';
 import { initializeSentry } from './config/sentry.config';
 
@@ -35,8 +35,10 @@ async function bootstrap() {
     }),
   );
 
-  // Use Socket.IO adapter
-  app.useWebSocketAdapter(new IoAdapter(app));
+  // Use Redis-backed Socket.IO adapter for horizontal scaling
+  const redisIoAdapter = new RedisIoAdapter(app);
+  await redisIoAdapter.connectToRedis();
+  app.useWebSocketAdapter(redisIoAdapter);
 
   const globalPrefix = 'api';
   app.setGlobalPrefix(globalPrefix);

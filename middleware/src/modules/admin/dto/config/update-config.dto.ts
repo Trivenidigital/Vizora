@@ -7,7 +7,7 @@ export class UpdateConfigDto {
   @IsString()
   @IsOptional()
   @IsIn(['string', 'number', 'boolean', 'json'])
-  dataType?: string;
+  dataType?: 'string' | 'number' | 'boolean' | 'json';
 
   @IsString()
   @IsOptional()

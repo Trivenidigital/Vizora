@@ -9,6 +9,13 @@ import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { Request, Response } from 'express';
 
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id?: string;
+    organizationId?: string;
+  };
+}
+
 interface LogMetadata {
   requestId: string;
   method: string;
@@ -27,7 +34,7 @@ export class LoggingInterceptor implements NestInterceptor {
   private readonly logger = new Logger('HTTP');
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    const request = context.switchToHttp().getRequest<Request>();
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const response = context.switchToHttp().getResponse<Response>();
 
     const requestId = this.generateRequestId();
@@ -42,8 +49,8 @@ export class LoggingInterceptor implements NestInterceptor {
       url: request.url,
       ip: request.ip || request.socket?.remoteAddress || 'unknown',
       userAgent: request.headers['user-agent'] || 'unknown',
-      userId: (request as any).user?.id,
-      organizationId: (request as any).user?.organizationId,
+      userId: request.user?.id,
+      organizationId: request.user?.organizationId,
     };
 
     // Log incoming request (debug level in production)

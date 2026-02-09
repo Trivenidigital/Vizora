@@ -1,6 +1,19 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { DatabaseService } from '../database/database.service';
+import type {
+  DeviceMetricDataPoint,
+  ContentPerformanceItem,
+  UsageTrendDataPoint,
+  DeviceDistributionItem,
+  BandwidthDataPoint,
+  PlaylistPerformanceItem,
+  AnalyticsSummary,
+  ContentMetrics,
+  DeviceUptimeResult,
+  UptimeSummaryResult,
+  ExportAnalyticsResult,
+} from './dto/analytics-response.dto';
 
 @Injectable()
 export class AnalyticsService {
@@ -29,7 +42,7 @@ export class AnalyticsService {
    * Device metrics - tracks device online/offline status over time
    * Uses Display table heartbeat data
    */
-  async getDeviceMetrics(organizationId: string, range: string) {
+  async getDeviceMetrics(organizationId: string, range: string): Promise<DeviceMetricDataPoint[]> {
     const { startDate } = this.getDateRange(range);
     const days = this.getRangeDays(range);
 
@@ -78,7 +91,7 @@ export class AnalyticsService {
   /**
    * Content performance - views/engagement from real impression data
    */
-  async getContentPerformance(organizationId: string, range: string) {
+  async getContentPerformance(organizationId: string, range: string): Promise<ContentPerformanceItem[]> {
     const { startDate } = this.getDateRange(range);
 
     const impressions = await this.db.contentImpression.groupBy({
@@ -111,7 +124,7 @@ export class AnalyticsService {
   /**
    * Usage trends - real daily impression counts by content type
    */
-  async getUsageTrends(organizationId: string, range: string) {
+  async getUsageTrends(organizationId: string, range: string): Promise<UsageTrendDataPoint[]> {
     const { startDate } = this.getDateRange(range);
     const days = this.getRangeDays(range);
 
@@ -157,7 +170,7 @@ export class AnalyticsService {
   /**
    * Device distribution - by status/type
    */
-  async getDeviceDistribution(organizationId: string) {
+  async getDeviceDistribution(organizationId: string): Promise<DeviceDistributionItem[]> {
     const displays = await this.db.display.findMany({
       where: { organizationId },
       select: {
@@ -192,7 +205,7 @@ export class AnalyticsService {
   /**
    * Bandwidth usage - estimated from content file sizes and device count
    */
-  async getBandwidthUsage(organizationId: string, range: string) {
+  async getBandwidthUsage(organizationId: string, range: string): Promise<BandwidthDataPoint[]> {
     const days = this.getRangeDays(range);
 
     const [contentStats, deviceCount] = await Promise.all([
@@ -227,7 +240,7 @@ export class AnalyticsService {
   /**
    * Playlist performance - real impression data grouped by playlist
    */
-  async getPlaylistPerformance(organizationId: string, range: string) {
+  async getPlaylistPerformance(organizationId: string, range: string): Promise<PlaylistPerformanceItem[]> {
     const { startDate } = this.getDateRange(range);
 
     const impressions = await this.db.contentImpression.groupBy({
@@ -254,7 +267,7 @@ export class AnalyticsService {
         name: playlist?.name || 'Unknown',
         plays: i._count.id,
         engagement: Math.round(i._avg.completionPercentage || 0),
-        uniqueDevices: (playlist as any)?._count?.assignedDisplays || 0,
+        uniqueDevices: playlist?._count?.assignedDisplays || 0,
         views: i._count.id,
         completion: Math.round(i._avg.completionPercentage || 0),
       };
@@ -264,7 +277,7 @@ export class AnalyticsService {
   /**
    * Summary KPI data
    */
-  async getSummary(organizationId: string) {
+  async getSummary(organizationId: string): Promise<AnalyticsSummary> {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -301,7 +314,7 @@ export class AnalyticsService {
   /**
    * Per-content detailed metrics
    */
-  async getContentMetrics(organizationId: string, contentId: string, range: string) {
+  async getContentMetrics(organizationId: string, contentId: string, range: string): Promise<ContentMetrics> {
     const { startDate } = this.getDateRange(range);
 
     const [totalViews, avgMetrics, dailyTrend, topDevices] = await Promise.all([
@@ -358,13 +371,7 @@ export class AnalyticsService {
     organizationId: string,
     deviceId: string,
     days: number = 30,
-  ): Promise<{
-    deviceId: string;
-    uptimePercent: number;
-    totalOnlineMinutes: number;
-    totalOfflineMinutes: number;
-    lastHeartbeat: Date | null;
-  }> {
+  ): Promise<DeviceUptimeResult> {
     // Get device from DB
     const device = await this.db.display.findFirst({
       where: { id: deviceId, organizationId },
@@ -400,13 +407,7 @@ export class AnalyticsService {
   async getUptimeSummary(
     organizationId: string,
     days: number = 30,
-  ): Promise<{
-    avgUptimePercent: number;
-    deviceCount: number;
-    onlineCount: number;
-    offlineCount: number;
-    devices: Array<{ id: string; nickname: string; uptimePercent: number }>;
-  }> {
+  ): Promise<UptimeSummaryResult> {
     const devices = await this.db.display.findMany({
       where: { organizationId },
       select: { id: true, nickname: true, status: true, lastHeartbeat: true },
@@ -466,7 +467,7 @@ export class AnalyticsService {
   /**
    * Export all analytics data combined
    */
-  async exportAnalytics(organizationId: string, range: string = 'month') {
+  async exportAnalytics(organizationId: string, range: string = 'month'): Promise<ExportAnalyticsResult> {
     const [
       summary,
       deviceMetrics,

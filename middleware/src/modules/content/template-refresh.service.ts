@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@vizora/database';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { DatabaseService } from '../database/database.service';
 import { TemplateRenderingService } from './template-rendering.service';
@@ -124,7 +125,7 @@ export class TemplateRefreshService {
       await this.db.content.update({
         where: { id: contentId },
         data: {
-          metadata: updatedMetadata as any,
+          metadata: updatedMetadata as unknown as Prisma.InputJsonValue,
         },
       });
 
@@ -145,7 +146,7 @@ export class TemplateRefreshService {
       await this.db.content.update({
         where: { id: contentId },
         data: {
-          metadata: updatedMetadata as any,
+          metadata: updatedMetadata as unknown as Prisma.InputJsonValue,
         },
       });
 

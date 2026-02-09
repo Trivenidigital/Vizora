@@ -54,6 +54,10 @@ interface SyncState {
 
 export interface UseRealtimeEventsOptions {
   enabled?: boolean;
+  auth?: {
+    token?: string;
+    organizationId?: string;
+  };
   onDeviceStatusChange?: (update: DeviceStatusUpdate) => void;
   onPlaylistChange?: (update: PlaylistUpdate) => void;
   onHealthAlert?: (alert: HealthAlert) => void;
@@ -67,6 +71,7 @@ export interface UseRealtimeEventsOptions {
 export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
   const {
     enabled = true,
+    auth,
     onDeviceStatusChange,
     onPlaylistChange,
     onHealthAlert,
@@ -77,7 +82,7 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
     retryAttempts = 3,
   } = options;
 
-  const { socket, isConnected, on } = useSocket();
+  const { socket, isConnected, on } = useSocket({ auth });
   const [isOffline, setIsOffline] = useState(false);
   const [syncState, setSyncState] = useState<SyncState>({
     lastSyncTime: Date.now(),

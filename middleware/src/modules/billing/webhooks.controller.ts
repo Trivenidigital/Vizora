@@ -9,12 +9,14 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 import { BillingService } from './billing.service';
+import { Public } from '../auth/decorators/public.decorator';
 
 @Controller('webhooks')
 export class WebhooksController {
   constructor(private readonly billingService: BillingService) {}
 
   @Post('stripe')
+  @Public()
   @HttpCode(HttpStatus.OK)
   async handleStripeWebhook(
     @Req() req: RawBodyRequest<Request>,
@@ -28,6 +30,7 @@ export class WebhooksController {
   }
 
   @Post('razorpay')
+  @Public()
   @HttpCode(HttpStatus.OK)
   async handleRazorpayWebhook(
     @Req() req: RawBodyRequest<Request>,

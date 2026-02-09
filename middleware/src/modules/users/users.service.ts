@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Prisma } from '@vizora/database';
 import { DatabaseService } from '../database/database.service';
 import { InviteUserDto } from './dto/invite-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -152,7 +153,7 @@ export class UsersService {
         action: 'user_updated',
         entityType: 'user',
         entityId: id,
-        changes: dto as any,
+        changes: dto as unknown as Prisma.InputJsonValue,
       },
     });
 

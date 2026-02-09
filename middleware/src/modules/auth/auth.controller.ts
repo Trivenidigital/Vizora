@@ -157,9 +157,15 @@ export class AuthController {
   @Post('refresh')
   async refresh(
     @CurrentUser('id') userId: string,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.authService.refresh(userId);
+    // Extract the current token so it can be revoked
+    const currentToken =
+      req.cookies?.[AUTH_CONSTANTS.COOKIE_NAME] ||
+      req.headers.authorization?.replace('Bearer ', '');
+
+    const result = await this.authService.refresh(userId, currentToken);
 
     // Set new httpOnly cookie with refreshed JWT token
     this.setAuthCookie(res, result.token);

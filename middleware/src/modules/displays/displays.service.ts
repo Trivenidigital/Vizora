@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
+import { Prisma } from '@vizora/database';
 import { JwtService } from '@nestjs/jwt';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
@@ -587,7 +588,7 @@ export class DisplaysService {
 
     return this.db.display.update({
       where: { id },
-      data: { metadata: metadata as any },
+      data: { metadata: metadata as Prisma.InputJsonValue },
     });
   }
 
@@ -598,7 +599,7 @@ export class DisplaysService {
 
     return this.db.display.update({
       where: { id },
-      data: { metadata: metadata as any },
+      data: { metadata: metadata as Prisma.InputJsonValue },
     });
   }
 }

@@ -153,7 +153,6 @@ export default function PlaylistsPage() {
  break;
  }
 
- console.log('[PlaylistsPage] Playlist update:', update);
  },
  onConnectionChange: (isConnected) => {
  setRealtimeStatus(isConnected ? 'connected' : 'offline');

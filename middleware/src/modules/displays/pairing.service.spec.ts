@@ -459,7 +459,7 @@ describe('PairingService', () => {
           organizationId,
           type: 'device',
         }),
-        expect.objectContaining({ expiresIn: '365d' }),
+        expect.objectContaining({ expiresIn: '90d' }),
       );
     });
 

@@ -1,7 +1,7 @@
 // WebSocket Message DTOs
 // These DTOs provide type-safe validation for WebSocket message payloads
 
-import { IsString, IsNumber, IsOptional, IsObject, ValidateNested, Min, Max, IsEnum, IsBoolean, IsArray } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsObject, ValidateNested, Min, Max, MaxLength, IsEnum, IsBoolean, IsArray } from 'class-validator';
 import { Type } from 'class-transformer';
 
 /**
@@ -157,6 +157,30 @@ export class PlaylistRequestDto {
   @IsOptional()
   @IsString()
   lastKnownVersion?: string;
+}
+
+/**
+ * Screenshot response from device
+ */
+export class ScreenshotResponseDto {
+  @IsString()
+  requestId: string;
+
+  @IsString()
+  @MaxLength(5242880)
+  imageData: string;
+
+  @IsNumber()
+  @Min(1)
+  width: number;
+
+  @IsNumber()
+  @Min(1)
+  height: number;
+
+  @IsOptional()
+  @IsString()
+  timestamp?: string;
 }
 
 /**

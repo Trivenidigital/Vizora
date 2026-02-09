@@ -106,8 +106,6 @@ export default function SchedulesPage() {
  const { isConnected } = useRealtimeEvents({
  enabled: true,
  onScheduleExecution: (execution) => {
- console.log('[SchedulesPage] Schedule execution:', execution);
-
  // Track execution in history
  setExecutionHistory((prev) => ({
  ...prev,

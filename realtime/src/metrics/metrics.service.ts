@@ -35,17 +35,17 @@ export class MetricsService {
     @InjectMetric('content_errors_total')
     public contentErrorsTotal: Counter<string>,
 
-    // Device Metrics
-    @InjectMetric('device_status')
-    public deviceStatus: Gauge<string>,
+    // Device Metrics - aggregated by organization (not per-device to avoid cardinality explosion)
+    @InjectMetric('devices_online')
+    public devicesOnline: Gauge<string>,
 
-    @InjectMetric('device_cpu_usage')
-    public deviceCpuUsage: Gauge<string>,
+    @InjectMetric('device_cpu_usage_avg')
+    public deviceCpuUsageAvg: Gauge<string>,
 
-    @InjectMetric('device_memory_usage')
-    public deviceMemoryUsage: Gauge<string>,
+    @InjectMetric('device_memory_usage_avg')
+    public deviceMemoryUsageAvg: Gauge<string>,
 
-    // API Metrics
+    // HTTP Metrics
     @InjectMetric('http_requests_total')
     public httpRequestsTotal: Counter<string>,
 
@@ -65,7 +65,7 @@ export class MetricsService {
    */
   recordConnection(organizationId: string, status: 'connected' | 'disconnected') {
     this.wsConnectionsTotal.inc({ organization_id: organizationId, status });
-    
+
     if (status === 'connected') {
       this.wsConnectionsActive.inc({ organization_id: organizationId });
     } else {
@@ -108,19 +108,22 @@ export class MetricsService {
   }
 
   /**
-   * Update device status
+   * Update device status - aggregated per organization
    */
-  updateDeviceStatus(deviceId: string, status: 'online' | 'offline' | 'error') {
-    const statusValue = status === 'online' ? 1 : status === 'offline' ? 0 : -1;
-    this.deviceStatus.set({ device_id: deviceId }, statusValue);
+  updateDeviceStatus(deviceId: string, organizationId: string, status: 'online' | 'offline' | 'error') {
+    if (status === 'online') {
+      this.devicesOnline.inc({ organization_id: organizationId });
+    } else {
+      this.devicesOnline.dec({ organization_id: organizationId });
+    }
   }
 
   /**
-   * Update device metrics
+   * Update device metrics - aggregated per organization
    */
-  updateDeviceMetrics(deviceId: string, cpuUsage: number, memoryUsage: number) {
-    this.deviceCpuUsage.set({ device_id: deviceId }, cpuUsage);
-    this.deviceMemoryUsage.set({ device_id: deviceId }, memoryUsage);
+  updateDeviceMetrics(organizationId: string, cpuUsage: number, memoryUsage: number) {
+    this.deviceCpuUsageAvg.set({ organization_id: organizationId }, cpuUsage);
+    this.deviceMemoryUsageAvg.set({ organization_id: organizationId }, memoryUsage);
   }
 
   /**

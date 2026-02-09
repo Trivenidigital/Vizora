@@ -1,4 +1,4 @@
-import * as Sentry from '@sentry/node';
+import * as Sentry from '@sentry/nestjs';
 
 export function initializeSentry() {
   if (!process.env.SENTRY_DSN) {
