@@ -195,7 +195,7 @@ export class AuthService {
     };
   }
 
-  async refresh(userId: string) {
+  async refresh(userId: string, currentToken?: string) {
     const user = await this.databaseService.user.findUnique({
       where: { id: userId },
       include: { organization: true },
@@ -203,6 +203,11 @@ export class AuthService {
 
     if (!user || !user.isActive) {
       throw new UnauthorizedException('User not found or inactive');
+    }
+
+    // Revoke the current token before issuing a new one
+    if (currentToken) {
+      await this.revokeToken(currentToken);
     }
 
     const token = this.generateToken(user, user.organization);
@@ -265,7 +270,7 @@ export class AuthService {
   private async revokeToken(token: string): Promise<void> {
     try {
       // Decode the token to extract jti and expiration
-      const decoded = this.jwtService.decode(token) as any;
+      const decoded = this.jwtService.decode(token) as Record<string, unknown> | null;
       if (!decoded) return;
 
       const jti = decoded.jti;
@@ -283,7 +288,7 @@ export class AuthService {
       // Calculate remaining TTL from the token's exp claim
       let ttl = AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS;
       if (decoded.exp) {
-        const remainingSeconds = decoded.exp - Math.floor(Date.now() / 1000);
+        const remainingSeconds = Number(decoded.exp) - Math.floor(Date.now() / 1000);
         if (remainingSeconds > 0) {
           ttl = remainingSeconds;
         }

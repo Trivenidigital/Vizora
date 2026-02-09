@@ -36,9 +36,12 @@ export const envSchema = z.object({
   MINIO_BUCKET: z.string().min(1).default('vizora-assets'),
   MINIO_USE_SSL: z.string().transform((val) => val === 'true').default('false'),
   
+  // Sentry (optional)
+  SENTRY_DSN: z.string().url().optional(),
+
   // JWT Authentication
-  JWT_SECRET: z.string().min(32, { 
-    message: 'JWT_SECRET must be at least 32 characters for security' 
+  JWT_SECRET: z.string().min(32, {
+    message: 'JWT_SECRET must be at least 32 characters for security'
   }),
   JWT_EXPIRES_IN: z.string().default('7d'),
   DEVICE_JWT_SECRET: z.string().min(32, {
@@ -47,6 +50,24 @@ export const envSchema = z.object({
   
   // Logging
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+}).superRefine((data, ctx) => {
+  // In production, MinIO credentials must be set and not be the default 'minioadmin'
+  if (data.NODE_ENV === 'production') {
+    if (!data.MINIO_ACCESS_KEY || data.MINIO_ACCESS_KEY === 'minioadmin') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'MINIO_ACCESS_KEY must be set and not equal to "minioadmin" in production',
+        path: ['MINIO_ACCESS_KEY'],
+      });
+    }
+    if (!data.MINIO_SECRET_KEY || data.MINIO_SECRET_KEY === 'minioadmin') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'MINIO_SECRET_KEY must be set and not equal to "minioadmin" in production',
+        path: ['MINIO_SECRET_KEY'],
+      });
+    }
+  }
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

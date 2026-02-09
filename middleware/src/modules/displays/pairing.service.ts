@@ -242,7 +242,7 @@ export class PairingService implements OnModuleDestroy {
     }
 
     const jwtToken = this.jwtService.sign(devicePayload, {
-      expiresIn: '365d', // 1 year
+      expiresIn: '90d',
       secret: deviceSecret,
       algorithm: 'HS256',
     });

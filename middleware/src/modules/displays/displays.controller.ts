@@ -159,7 +159,7 @@ export class DisplaysController {
     return this.displaysService.addTags(organizationId, id, body.tagIds);
   }
 
-  @Delete(':id/tags')
+  @Post(':id/tags/remove')
   @Roles('admin')
   removeTags(
     @CurrentUser('organizationId') organizationId: string,

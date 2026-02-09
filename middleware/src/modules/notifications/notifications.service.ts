@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Prisma } from '@vizora/database';
 import { DatabaseService } from '../database/database.service';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
@@ -24,7 +25,7 @@ export class NotificationsService {
         message: data.message,
         type: data.type || 'system',
         severity: data.severity || 'info',
-        metadata: data.metadata as any,
+        metadata: (data.metadata ?? undefined) as Prisma.InputJsonValue | undefined,
         organizationId: data.organizationId,
         userId: data.userId,
       },

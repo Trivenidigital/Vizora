@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Prisma } from '@vizora/database';
 import { DatabaseService } from '../database/database.service';
 import { TemplateRenderingService } from '../content/template-rendering.service';
 import { SearchTemplatesDto } from './dto/search-templates.dto';
@@ -89,14 +90,14 @@ export class TemplateLibraryService {
     let filtered = data;
     if (difficulty) {
       filtered = filtered.filter((item) => {
-        const meta = item.metadata as any;
+        const meta = item.metadata as Record<string, unknown> | null;
         return meta?.difficulty === difficulty;
       });
     }
     if (tag) {
       filtered = filtered.filter((item) => {
-        const meta = item.metadata as any;
-        return meta?.libraryTags?.includes(tag);
+        const meta = item.metadata as Record<string, unknown> | null;
+        return (meta?.libraryTags as string[] | undefined)?.includes(tag);
       });
     }
 
@@ -116,8 +117,8 @@ export class TemplateLibraryService {
 
     const categoryCounts: Record<string, number> = {};
     for (const template of templates) {
-      const meta = template.metadata as any;
-      const category = meta?.category || 'general';
+      const meta = template.metadata as Record<string, unknown> | null;
+      const category = (meta?.category as string) || 'general';
       categoryCounts[category] = (categoryCounts[category] || 0) + 1;
     }
 
@@ -176,7 +177,7 @@ export class TemplateLibraryService {
       throw new NotFoundException('Template not found in library');
     }
 
-    const metadata = template.metadata as any;
+    const metadata = template.metadata as Record<string, unknown> | null;
 
     // Create a copy in the user's org (not global)
     const cloned = await this.db.content.create({
@@ -216,7 +217,7 @@ export class TemplateLibraryService {
 
     // Filter featured via metadata
     const featured = templates.filter((t) => {
-      const meta = t.metadata as any;
+      const meta = t.metadata as Record<string, unknown> | null;
       return meta?.isFeatured === true;
     });
 
@@ -240,10 +241,10 @@ export class TemplateLibraryService {
 
     // Filter by seasonal date range
     const seasonal = templates.filter((t) => {
-      const meta = t.metadata as any;
+      const meta = t.metadata as Record<string, unknown> | null;
       if (!meta?.seasonalStart) return false;
-      const start = meta.seasonalStart;
-      const end = meta.seasonalEnd || '2099-12-31';
+      const start = meta.seasonalStart as string;
+      const end = (meta.seasonalEnd as string) || '2099-12-31';
       return now >= start && now <= end;
     });
 
@@ -262,12 +263,12 @@ export class TemplateLibraryService {
       throw new NotFoundException('Template not found in library');
     }
 
-    const metadata = (template.metadata as any) || {};
+    const metadata = (template.metadata as Record<string, unknown>) || {};
     metadata.isFeatured = isFeatured;
 
     const updated = await this.db.content.update({
       where: { id },
-      data: { metadata: metadata as any },
+      data: { metadata: metadata as Prisma.InputJsonValue },
     });
 
     return this.mapTemplateResponse(updated);
@@ -276,8 +277,8 @@ export class TemplateLibraryService {
   /**
    * Map database record to API response
    */
-  private mapTemplateResponse(content: any) {
-    const metadata = content.metadata as any;
+  private mapTemplateResponse(content: { id: string; name: string; description: string | null; type: string; duration: number; templateOrientation: string | null; metadata: Prisma.JsonValue; createdAt: Date; updatedAt: Date }) {
+    const metadata = content.metadata as Record<string, unknown> | null;
     return {
       id: content.id,
       name: content.name,

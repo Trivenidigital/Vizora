@@ -47,7 +47,7 @@ export class DeviceContentController {
    */
   private verifyDeviceToken(req: Request): DeviceJwtPayload {
     const authHeader = req.headers.authorization;
-    const queryToken = (req.query as any)?.token;
+    const queryToken = (req.query as Record<string, string | undefined>)?.token;
     const token = authHeader?.startsWith('Bearer ')
       ? authHeader.substring(7)
       : queryToken;
@@ -108,7 +108,7 @@ export class DeviceContentController {
         'Content-Type': content.mimeType || 'application/octet-stream',
         'Cache-Control': 'public, max-age=86400',
       });
-      return new StreamableFile(stream as any);
+      return new StreamableFile(stream as NodeJS.ReadableStream);
     }
 
     // For non-MinIO URLs, redirect

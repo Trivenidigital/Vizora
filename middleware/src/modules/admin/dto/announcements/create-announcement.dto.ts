@@ -12,12 +12,12 @@ export class CreateAnnouncementDto {
   @IsString()
   @IsOptional()
   @IsIn(['info', 'warning', 'critical', 'maintenance'])
-  type?: string;
+  type?: 'info' | 'warning' | 'critical' | 'maintenance';
 
   @IsString()
   @IsOptional()
   @IsIn(['all', 'admins', 'specific_plans'])
-  targetAudience?: string;
+  targetAudience?: 'all' | 'admins' | 'specific_plans';
 
   @IsArray()
   @IsString({ each: true })

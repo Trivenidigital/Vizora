@@ -3,16 +3,25 @@ import {
   NestInterceptor,
   ExecutionContext,
   CallHandler,
+  SetMetadata,
 } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import sanitizeHtml from 'sanitize-html';
+
+export const SKIP_OUTPUT_SANITIZE_KEY = 'skipOutputSanitize';
+export const SkipOutputSanitize = () => SetMetadata(SKIP_OUTPUT_SANITIZE_KEY, true);
 
 /**
  * Interceptor to sanitize all string inputs in request body
- * Prevents XSS attacks by stripping dangerous HTML
+ * and all string outputs in response data.
+ * Prevents XSS attacks by stripping dangerous HTML.
  */
 @Injectable()
 export class SanitizeInterceptor implements NestInterceptor {
+  constructor(private readonly reflector?: Reflector) {}
+
   private readonly sanitizeOptions: sanitizeHtml.IOptions = {
     allowedTags: [], // Strip all HTML tags
     allowedAttributes: {},
@@ -34,7 +43,25 @@ export class SanitizeInterceptor implements NestInterceptor {
       request.params = this.sanitizeObject(request.params);
     }
 
-    return next.handle();
+    // Check if output sanitization should be skipped
+    const skipOutput = this.reflector?.getAllAndOverride<boolean>(
+      SKIP_OUTPUT_SANITIZE_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+
+    if (skipOutput) {
+      return next.handle();
+    }
+
+    // Sanitize output
+    return next.handle().pipe(
+      map((data) => {
+        if (data && typeof data === 'object') {
+          return this.sanitizeObject(data);
+        }
+        return data;
+      }),
+    );
   }
 
   private sanitizeObject(obj: any): any {

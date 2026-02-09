@@ -43,8 +43,6 @@ export default function HealthMonitoringPage() {
  useRealtimeEvents({
  enabled: true,
  onHealthAlert: (alert) => {
- console.log('[HealthPage] Health alert received:', alert);
-
  // Add to active alerts
  setActiveAlerts((prev) => ({
  ...prev,

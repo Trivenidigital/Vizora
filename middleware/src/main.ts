@@ -10,7 +10,7 @@ import { initializeSentry } from './config/sentry.config';
 initializeSentry();
 
 import { Logger, ValidationPipe } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { join } from 'path';
@@ -56,10 +56,11 @@ async function bootstrap() {
     crossOriginEmbedderPolicy: false, // Allow embedding for display clients
   }));
 
-  // CORS configuration
+  // CORS configuration - staging mirrors production restrictions
   const corsOrigins = process.env.CORS_ORIGIN?.split(',').map(o => o.trim()) || [];
+  const isRestrictedEnv = process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging';
   app.enableCors({
-    origin: process.env.NODE_ENV === 'production'
+    origin: isRestrictedEnv
       ? corsOrigins
       : true, // Allow all in development
     credentials: true,
@@ -85,7 +86,7 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
       transform: true,
       transformOptions: {
-        enableImplicitConversion: true,
+        enableImplicitConversion: false,
       },
       // Disable detailed errors in production
       disableErrorMessages: process.env.NODE_ENV === 'production',
@@ -94,10 +95,11 @@ async function bootstrap() {
 
   // Global interceptors
   // Order matters: logging first, then Sentry error tracking, then sanitization
+  const reflector = app.get(Reflector);
   app.useGlobalInterceptors(
     new LoggingInterceptor(),
     new SentryInterceptor(),
-    new SanitizeInterceptor(),
+    new SanitizeInterceptor(reflector),
   );
 
   const globalPrefix = 'api';
@@ -161,6 +163,20 @@ async function bootstrap() {
     Logger.log(`🚀 Middleware API running on: http://localhost:${port}/${globalPrefix}`);
     Logger.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     Logger.log(`⚠️  Port ${port} is RESERVED for Middleware - will not start if occupied`);
+
+    // Warn about default credentials in non-development environments
+    if (process.env.NODE_ENV !== 'development') {
+      const minioAccessKey = process.env.MINIO_ACCESS_KEY || process.env.AWS_ACCESS_KEY_ID || '';
+      const minioSecretKey = process.env.MINIO_SECRET_KEY || process.env.AWS_SECRET_ACCESS_KEY || '';
+      if (minioAccessKey === 'minioadmin' || minioSecretKey === 'minioadmin') {
+        Logger.warn('WARNING: MinIO is using default credentials (minioadmin). Change these for production use.');
+      }
+
+      const dbUrl = process.env.DATABASE_URL || '';
+      if (dbUrl.includes('postgres:postgres')) {
+        Logger.warn('WARNING: DATABASE_URL contains default PostgreSQL credentials (postgres:postgres). Change these for production use.');
+      }
+    }
   } catch (error) {
     Logger.error(`❌ FATAL: Cannot bind to port ${port}`);
     Logger.error(`Another process is using port ${port}. Stop it first.`);
