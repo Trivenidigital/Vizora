@@ -1,4 +1,4 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, Logger, Optional, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Razorpay from 'razorpay';
 import * as crypto from 'crypto';
@@ -10,6 +10,12 @@ import {
   Invoice,
   WebhookEvent,
 } from './payment-provider.interface';
+import { CircuitBreakerService } from '../../common/services/circuit-breaker.service';
+
+const RAZORPAY_CIRCUIT_CONFIG = {
+  failureThreshold: 3,
+  resetTimeout: 10000,
+};
 
 @Injectable()
 export class RazorpayProvider implements PaymentProvider {
@@ -20,7 +26,10 @@ export class RazorpayProvider implements PaymentProvider {
   private readonly keyId: string;
   private readonly isConfigured: boolean;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    @Optional() private readonly circuitBreaker?: CircuitBreakerService,
+  ) {
     this.keyId = this.configService.get<string>('RAZORPAY_KEY_ID') || '';
     const keySecret =
       this.configService.get<string>('RAZORPAY_KEY_SECRET') || '';
@@ -44,17 +53,26 @@ export class RazorpayProvider implements PaymentProvider {
     }
   }
 
+  private async withCircuitBreaker<T>(fn: () => Promise<T>): Promise<T> {
+    if (!this.circuitBreaker) {
+      return fn();
+    }
+    return this.circuitBreaker.execute('razorpay-api', fn, RAZORPAY_CIRCUIT_CONFIG);
+  }
+
   async createCustomer(
     email: string,
     name: string,
     metadata?: Record<string, any>,
   ): Promise<Customer> {
     this.ensureConfigured();
-    const customer = await this.razorpay!.customers.create({
-      name,
-      email,
-      notes: metadata || {},
-    });
+    const customer = await this.withCircuitBreaker(() =>
+      this.razorpay!.customers.create({
+        name,
+        email,
+        notes: metadata || {},
+      }),
+    );
     return {
       id: customer.id,
       email: customer.email,
@@ -66,7 +84,9 @@ export class RazorpayProvider implements PaymentProvider {
   async getCustomer(customerId: string): Promise<Customer | null> {
     this.ensureConfigured();
     try {
-      const customer = await this.razorpay!.customers.fetch(customerId);
+      const customer = await this.withCircuitBreaker(() =>
+        this.razorpay!.customers.fetch(customerId),
+      );
       return {
         id: customer.id,
         email: customer.email,
@@ -82,14 +102,14 @@ export class RazorpayProvider implements PaymentProvider {
     params: CheckoutParams,
   ): Promise<{ url: string; sessionId: string }> {
     this.ensureConfigured();
-    // Razorpay uses subscriptions directly, not checkout sessions
-    // Create a subscription and return the short_url for hosted checkout
-    const subscription = await this.razorpay!.subscriptions.create({
-      plan_id: params.priceId,
-      customer_id: params.customerId,
-      total_count: 12, // 12 billing cycles
-      notes: params.metadata || {},
-    });
+    const subscription = await this.withCircuitBreaker(() =>
+      this.razorpay!.subscriptions.create({
+        plan_id: params.priceId,
+        customer_id: params.customerId,
+        total_count: 12,
+        notes: params.metadata || {},
+      }),
+    );
 
     return {
       url: subscription.short_url,
@@ -100,7 +120,9 @@ export class RazorpayProvider implements PaymentProvider {
   async getSubscription(subscriptionId: string): Promise<Subscription | null> {
     this.ensureConfigured();
     try {
-      const sub = await this.razorpay!.subscriptions.fetch(subscriptionId);
+      const sub = await this.withCircuitBreaker(() =>
+        this.razorpay!.subscriptions.fetch(subscriptionId),
+      );
       return this.mapSubscription(sub);
     } catch {
       return null;
@@ -112,11 +134,11 @@ export class RazorpayProvider implements PaymentProvider {
     priceId: string,
   ): Promise<Subscription> {
     this.ensureConfigured();
-    // Razorpay requires canceling and creating new subscription for plan changes
-    // For now, update the plan_id (limited support in Razorpay API)
-    const sub = await this.razorpay!.subscriptions.update(subscriptionId, {
-      plan_id: priceId,
-    });
+    const sub = await this.withCircuitBreaker(() =>
+      this.razorpay!.subscriptions.update(subscriptionId, {
+        plan_id: priceId,
+      }),
+    );
     return this.mapSubscription(sub);
   }
 
@@ -125,22 +147,25 @@ export class RazorpayProvider implements PaymentProvider {
     immediately = false,
   ): Promise<void> {
     this.ensureConfigured();
-    await this.razorpay!.subscriptions.cancel(subscriptionId, immediately);
+    await this.withCircuitBreaker(() =>
+      this.razorpay!.subscriptions.cancel(subscriptionId, immediately),
+    );
   }
 
   async getInvoices(customerId: string, limit = 10): Promise<Invoice[]> {
     this.ensureConfigured();
-    // Razorpay uses "invoices" for subscriptions
-    const invoices = await this.razorpay!.invoices.all({
-      customer_id: customerId,
-      count: limit,
-    });
+    const invoices = await this.withCircuitBreaker(() =>
+      this.razorpay!.invoices.all({
+        customer_id: customerId,
+        count: limit,
+      }),
+    );
 
     return (invoices.items || []).map((inv: any) => ({
       id: inv.id,
       customerId: inv.customer_id,
       subscriptionId: inv.subscription_id || null,
-      amount: inv.amount, // Razorpay amount is in paise
+      amount: inv.amount,
       currency: inv.currency,
       status: this.mapInvoiceStatus(inv.status),
       description: inv.description || null,

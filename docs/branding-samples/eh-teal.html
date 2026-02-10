@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vizora — Electric Horizon: Deep Teal</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-primary: #060E10;
+    --bg-secondary: #0C1618;
+    --bg-tertiary: #142022;
+    --border: #1E3035;
+    --border-accent: rgba(0, 229, 160, 0.35);
+    --text-primary: #E6F0F2;
+    --text-secondary: #708890;
+    --text-tertiary: #48606A;
+    --accent: #00E5A0;
+    --accent-hover: #00CC8E;
+    --accent-glow: rgba(0, 229, 160, 0.18);
+    --accent-glow-strong: rgba(0, 229, 160, 0.3);
+    --cyan: #00B4D8;
+    --violet: #8B5CF6;
+    --success: #00E5A0;
+    --warning: #FFB800;
+    --error: #FF4D6A;
+    --gradient: linear-gradient(135deg, #00E5A0, #00B4D8);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Variant Banner */
+  .variant-banner {
+    background: linear-gradient(90deg, var(--accent-glow), rgba(0,180,216,0.1));
+    border-bottom: 1px solid var(--border-accent);
+    padding: 8px 2rem;
+    text-align: center;
+    font-size: 0.7rem;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+  }
+
+  .section-label {
+    text-align: center;
+    padding: 3rem 2rem 1rem;
+    border-top: 1px solid var(--border);
+  }
+  .section-label h2 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    background: var(--gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: 700;
+  }
+  .section-label p {
+    font-size: 0.85rem;
+    color: var(--text-tertiary);
+    margin-top: 0.25rem;
+  }
+
+  /* ========== NAV ========== */
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    background: rgba(6, 14, 16, 0.85);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .nav-logo {
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    background: var(--gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .nav-links {
+    display: flex;
+    gap: 2rem;
+    list-style: none;
+  }
+  .nav-links a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: color 0.15s;
+  }
+  .nav-links a:hover { color: var(--text-primary); }
+  .nav-actions { display: flex; gap: 0.75rem; align-items: center; }
+
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+  .btn-ghost:hover {
+    color: var(--accent);
+    border-color: var(--border-accent);
+  }
+  .btn-neon {
+    background: var(--accent);
+    border: none;
+    color: var(--bg-primary);
+    padding: 6px 16px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+  }
+  .btn-neon:hover {
+    background: var(--accent-hover);
+    box-shadow: 0 0 28px var(--accent-glow-strong);
+  }
+
+  /* ========== HERO ========== */
+  .hero {
+    min-height: 92vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 4rem 2rem;
+    position: relative;
+    overflow: hidden;
+  }
+  /* Gradient orbs — teal-tinted with enhanced green glow */
+  .hero::before {
+    content: '';
+    position: absolute;
+    width: 700px;
+    height: 700px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,229,160,0.12) 0%, rgba(0,60,50,0.06) 40%, transparent 65%);
+    top: -200px;
+    right: -200px;
+    pointer-events: none;
+  }
+  .hero::after {
+    content: '';
+    position: absolute;
+    width: 500px;
+    height: 500px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,180,216,0.08) 0%, rgba(0,60,50,0.04) 40%, transparent 65%);
+    bottom: -100px;
+    left: -100px;
+    pointer-events: none;
+  }
+  /* Grid background — teal-shifted border */
+  .hero-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(30,48,53,0.3) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(30,48,53,0.3) 1px, transparent 1px);
+    background-size: 60px 60px;
+    mask-image: radial-gradient(ellipse at center, black 30%, transparent 70%);
+    -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 4px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--border-accent);
+    background: var(--accent-glow);
+    font-size: 0.75rem;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 2rem;
+    position: relative;
+    z-index: 1;
+  }
+  .hero-badge .pulse {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: neon-pulse 2s ease-in-out infinite;
+    box-shadow: 0 0 10px var(--accent-glow-strong);
+  }
+  @keyframes neon-pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 10px var(--accent-glow-strong); }
+    50% { opacity: 0.4; box-shadow: 0 0 5px var(--accent-glow); }
+  }
+
+  .hero h1 {
+    font-size: 3.8rem;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    line-height: 1.05;
+    max-width: 700px;
+    margin-bottom: 1.25rem;
+    position: relative;
+    z-index: 1;
+  }
+  .hero h1 .neon-text {
+    background: var(--gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .hero p {
+    font-size: 1.05rem;
+    color: var(--text-secondary);
+    max-width: 500px;
+    margin-bottom: 2.5rem;
+    position: relative;
+    z-index: 1;
+  }
+  .hero-actions {
+    display: flex;
+    gap: 0.75rem;
+    position: relative;
+    z-index: 1;
+  }
+  .hero .btn-neon { padding: 10px 24px; font-size: 0.9rem; }
+  .hero .btn-ghost { padding: 10px 24px; font-size: 0.9rem; }
+
+  /* ========== DASHBOARD MOCKUP ========== */
+  .dashboard-mockup {
+    max-width: 900px;
+    margin: 3rem auto 0;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg-secondary);
+    overflow: hidden;
+    box-shadow: 0 0 80px rgba(0, 229, 160, 0.06), 0 0 160px rgba(0, 180, 216, 0.04);
+    position: relative;
+    z-index: 1;
+  }
+  .mockup-topbar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(90deg, var(--accent-glow), transparent);
+  }
+  .mockup-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+  }
+  .mockup-body { display: flex; min-height: 360px; }
+  .mockup-sidebar {
+    width: 180px;
+    border-right: 1px solid var(--border);
+    padding: 12px 0;
+  }
+  .sidebar-section {
+    padding: 0 12px;
+    margin-bottom: 4px;
+  }
+  .sidebar-section-label {
+    font-size: 0.55rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-tertiary);
+    padding: 8px 6px 4px;
+  }
+  .sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    border-radius: 5px;
+    cursor: default;
+    transition: all 0.15s;
+  }
+  .sidebar-item:hover { color: var(--text-primary); background: var(--bg-tertiary); }
+  .sidebar-item.active {
+    color: var(--accent);
+    background: var(--accent-glow);
+    border-left: 2px solid var(--accent);
+  }
+  .sidebar-icon {
+    width: 14px; height: 14px; border-radius: 3px;
+    background: var(--bg-tertiary); border: 1px solid var(--border);
+  }
+  .sidebar-item.active .sidebar-icon {
+    background: var(--accent-glow);
+    border-color: var(--accent);
+    box-shadow: 0 0 8px var(--accent-glow);
+  }
+
+  .mockup-main { flex: 1; padding: 16px 20px; }
+  .mockup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .mockup-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .mockup-subtitle {
+    font-size: 0.7rem;
+    color: var(--text-tertiary);
+    font-family: 'JetBrains Mono', monospace;
+    margin-top: 2px;
+  }
+
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .stat-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    transition: border-color 0.2s;
+  }
+  .stat-card:hover { border-color: var(--border-accent); }
+  .stat-label {
+    font-size: 0.6rem;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .stat-value {
+    font-size: 1.3rem;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .stat-value .neon { color: var(--accent); }
+  .stat-change {
+    font-size: 0.6rem;
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+    margin-top: 2px;
+  }
+
+  /* Fleet Grid */
+  .fleet-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .fleet-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    transition: all 0.25s;
+  }
+  .fleet-card:hover {
+    border-color: var(--border-accent);
+    box-shadow: 0 0 18px rgba(0, 229, 160, 0.08);
+  }
+  .fleet-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .fleet-name { font-size: 0.72rem; font-weight: 600; }
+  .fleet-status {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+  }
+  .fleet-status.on {
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent-glow-strong);
+    animation: neon-pulse 2s ease-in-out infinite;
+  }
+  .fleet-status.off { background: var(--error); }
+  .fleet-content {
+    font-size: 0.6rem;
+    color: var(--text-tertiary);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .fleet-thumb {
+    height: 40px;
+    border-radius: 4px;
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+  }
+  .fleet-thumb.t1 { background: linear-gradient(135deg, #061a18, #0d2825); border: 1px solid rgba(0,229,160,0.12); }
+  .fleet-thumb.t2 { background: linear-gradient(135deg, #060f18, #0d1825); border: 1px solid rgba(0,180,216,0.12); }
+  .fleet-thumb.t3 { background: linear-gradient(135deg, #100a1a, #1a1025); border: 1px solid rgba(139,92,246,0.1); }
+
+  /* ========== SHOWCASE ========== */
+  .showcase { max-width: 900px; margin: 0 auto; padding: 2rem; }
+  .showcase-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+  }
+  .showcase-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.5rem;
+    transition: border-color 0.2s;
+  }
+  .showcase-card:hover { border-color: rgba(0,229,160,0.18); }
+  .showcase-card h3 {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-tertiary);
+    margin-bottom: 1rem;
+    font-weight: 700;
+  }
+
+  .btn-row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+  .btn-sm {
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    font-family: inherit;
+    transition: all 0.2s;
+  }
+  .btn-sm.neon { background: var(--accent); color: var(--bg-primary); }
+  .btn-sm.neon:hover { box-shadow: 0 0 24px var(--accent-glow-strong); }
+  .btn-sm.cyan { background: transparent; border: 1px solid rgba(0,180,216,0.4); color: var(--cyan); }
+  .btn-sm.cyan:hover { border-color: var(--cyan); background: rgba(0,180,216,0.1); }
+  .btn-sm.violet { background: transparent; border: 1px solid rgba(139,92,246,0.4); color: var(--violet); }
+  .btn-sm.violet:hover { border-color: var(--violet); background: rgba(139,92,246,0.1); }
+  .btn-sm.danger { background: transparent; border: 1px solid rgba(255,77,106,0.3); color: var(--error); }
+  .btn-sm.danger:hover { background: rgba(255,77,106,0.1); }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+  .badge .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .badge.online {
+    background: var(--accent-glow);
+    color: var(--accent);
+    border: 1px solid rgba(0,229,160,0.25);
+  }
+  .badge.online .dot {
+    background: var(--accent);
+    box-shadow: 0 0 6px var(--accent);
+    animation: neon-pulse 2s ease-in-out infinite;
+  }
+  .badge.offline { background: rgba(255,77,106,0.12); color: var(--error); border: 1px solid rgba(255,77,106,0.2); }
+  .badge.offline .dot { background: var(--error); }
+  .badge.warning { background: rgba(255,184,0,0.12); color: var(--warning); border: 1px solid rgba(255,184,0,0.2); }
+  .badge.warning .dot { background: var(--warning); }
+  .badge.syncing { background: rgba(0,180,216,0.12); color: var(--cyan); border: 1px solid rgba(0,180,216,0.2); }
+  .badge.syncing .dot { background: var(--cyan); }
+
+  .form-group { margin-bottom: 0.75rem; }
+  .form-label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .form-input {
+    width: 100%;
+    padding: 8px 12px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 0.8rem;
+    font-family: inherit;
+    outline: none;
+    transition: all 0.2s;
+  }
+  .form-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+  .form-input::placeholder { color: var(--text-tertiary); }
+  .form-input.mono {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--accent);
+  }
+
+  .toast {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.78rem;
+    margin-top: 0.5rem;
+    border-left: 3px solid transparent;
+  }
+  .toast.success { border-left-color: var(--accent); }
+  .toast.error { border-left-color: var(--error); }
+  .toast.warning { border-left-color: var(--warning); }
+  .toast-icon { font-size: 1rem; }
+  .toast-text { color: var(--text-secondary); }
+  .toast-text strong { color: var(--text-primary); }
+
+  /* Table */
+  table.data-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+  .data-table th {
+    text-align: left;
+    padding: 8px 12px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-bottom: 1px solid var(--border);
+  }
+  .data-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-secondary);
+  }
+  .data-table tr:hover td {
+    background: var(--accent-glow);
+  }
+  .data-table .name { color: var(--text-primary); font-weight: 600; }
+  .data-table .mono {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--text-tertiary);
+  }
+
+  /* Device Cards */
+  .device-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+  }
+  .device-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    transition: all 0.25s;
+  }
+  .device-card:hover {
+    border-color: var(--border-accent);
+    box-shadow: 0 0 24px rgba(0,229,160,0.08);
+  }
+  .device-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .device-name { font-size: 0.88rem; font-weight: 600; }
+  .device-location {
+    font-size: 0.68rem;
+    color: var(--text-tertiary);
+    font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 8px;
+  }
+  .device-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+  .device-content { font-size: 0.7rem; color: var(--text-secondary); }
+  .device-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--text-tertiary);
+  }
+
+  /* Network Topology */
+  .topology {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    margin-top: 1rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .topology-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(30,48,53,0.15) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(30,48,53,0.15) 1px, transparent 1px);
+    background-size: 30px 30px;
+    pointer-events: none;
+  }
+  .topo-nodes {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    position: relative;
+    z-index: 1;
+  }
+  .topo-node {
+    text-align: center;
+    width: 120px;
+  }
+  .topo-circle {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    margin: 0 auto 6px;
+    border: 1px solid var(--border);
+  }
+  .topo-circle.cloud {
+    background: var(--accent-glow);
+    border-color: var(--border-accent);
+    box-shadow: 0 0 20px var(--accent-glow);
+  }
+  .topo-circle.edge {
+    background: rgba(0,180,216,0.1);
+    border-color: rgba(0,180,216,0.3);
+    box-shadow: 0 0 14px rgba(0,180,216,0.12);
+  }
+  .topo-circle.device {
+    background: rgba(139,92,246,0.1);
+    border-color: rgba(139,92,246,0.3);
+    box-shadow: 0 0 14px rgba(139,92,246,0.12);
+  }
+  .topo-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+  .topo-sub {
+    font-size: 0.55rem;
+    color: var(--text-tertiary);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .topo-line {
+    width: 60px;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--cyan));
+    position: relative;
+    margin-bottom: 20px;
+  }
+  .topo-line::after {
+    content: '';
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    top: -3px;
+    right: -4px;
+    animation: flow 1.5s ease-in-out infinite;
+    box-shadow: 0 0 8px var(--accent);
+  }
+  @keyframes flow {
+    0% { right: calc(100% - 4px); opacity: 0; }
+    20% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { right: -4px; opacity: 0; }
+  }
+  .topo-line2::after {
+    background: var(--cyan);
+    box-shadow: 0 0 8px var(--cyan);
+    animation-delay: 0.5s;
+  }
+
+  /* Terminal */
+  .terminal {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: 1rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+  }
+  .terminal-bar {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-secondary);
+  }
+  .terminal-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .terminal-dot.r { background: #FF4D6A; }
+  .terminal-dot.y { background: #FFB800; }
+  .terminal-dot.g { background: #00E5A0; }
+  .terminal-title { font-size: 0.6rem; color: var(--text-tertiary); margin-left: 8px; }
+  .terminal-body { padding: 12px 16px; line-height: 1.8; }
+  .term-prompt { color: var(--accent); }
+  .term-cmd { color: var(--text-primary); }
+  .term-output { color: var(--text-tertiary); }
+  .term-success { color: var(--accent); }
+  .term-cyan { color: var(--cyan); }
+  .term-violet { color: var(--violet); }
+
+  /* Chart mockup */
+  .chart-area {
+    margin-top: 1rem;
+    height: 120px;
+    position: relative;
+    overflow: hidden;
+    border-radius: 6px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+  }
+  .chart-line {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 100%;
+  }
+  .chart-svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .footer {
+    border-top: 1px solid var(--border);
+    padding: 2rem;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    margin-top: 4rem;
+  }
+
+  @media (max-width: 768px) {
+    .hero h1 { font-size: 2.4rem; }
+    .showcase-grid { grid-template-columns: 1fr; }
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+    .fleet-grid { grid-template-columns: repeat(2, 1fr); }
+    .mockup-sidebar { display: none; }
+    .device-grid { grid-template-columns: 1fr; }
+    .topo-nodes { flex-direction: column; }
+    .topo-line { width: 2px; height: 40px; margin: 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- VARIANT BANNER -->
+<div class="variant-banner">
+  Electric Horizon &mdash; Deep Teal &mdash; Background: #060E10 / #0C1618 / #142022
+</div>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-logo">VIZORA</div>
+  <ul class="nav-links">
+    <li><a href="#">Features</a></li>
+    <li><a href="#">Docs</a></li>
+    <li><a href="#">Pricing</a></li>
+  </ul>
+  <div class="nav-actions">
+    <button class="btn-ghost">Login</button>
+    <button class="btn-neon">Get Started</button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-badge"><span class="pulse"></span> Live fleet monitoring</div>
+  <h1>Command <span class="neon-text">every screen</span> from one place</h1>
+  <p>Real-time digital signage infrastructure. Push content, monitor devices, and orchestrate displays across every location.</p>
+  <div class="hero-actions">
+    <button class="btn-neon">Deploy Free &rarr;</button>
+    <button class="btn-ghost">View Docs</button>
+  </div>
+
+  <div class="dashboard-mockup">
+    <div class="mockup-topbar">
+      <div class="mockup-dot"></div>
+      <div class="mockup-dot"></div>
+      <div class="mockup-dot"></div>
+    </div>
+    <div class="mockup-body">
+      <div class="mockup-sidebar">
+        <div class="sidebar-section">
+          <div class="sidebar-section-label">Fleet</div>
+          <div class="sidebar-item active"><div class="sidebar-icon"></div> Displays</div>
+          <div class="sidebar-item"><div class="sidebar-icon"></div> Groups</div>
+          <div class="sidebar-item"><div class="sidebar-icon"></div> Map</div>
+        </div>
+        <div class="sidebar-section">
+          <div class="sidebar-section-label">Content</div>
+          <div class="sidebar-item"><div class="sidebar-icon"></div> Library</div>
+          <div class="sidebar-item"><div class="sidebar-icon"></div> Playlists</div>
+          <div class="sidebar-item"><div class="sidebar-icon"></div> Templates</div>
+        </div>
+        <div class="sidebar-section">
+          <div class="sidebar-section-label">Operations</div>
+          <div class="sidebar-item"><div class="sidebar-icon"></div> Schedules</div>
+          <div class="sidebar-item"><div class="sidebar-icon"></div> Analytics</div>
+          <div class="sidebar-item"><div class="sidebar-icon"></div> Alerts</div>
+        </div>
+      </div>
+      <div class="mockup-main">
+        <div class="mockup-header">
+          <div>
+            <div class="mockup-title">Fleet Overview</div>
+            <div class="mockup-subtitle">24 devices &bull; 22 online &bull; 2 offline</div>
+          </div>
+          <button class="btn-sm neon">+ Pair Device</button>
+        </div>
+        <div class="stats-row">
+          <div class="stat-card"><div class="stat-label">Online</div><div class="stat-value"><span class="neon">22</span>/24</div><div class="stat-change">91.6% uptime</div></div>
+          <div class="stat-card"><div class="stat-label">Content</div><div class="stat-value">148</div><div class="stat-change">+12 today</div></div>
+          <div class="stat-card"><div class="stat-label">Bandwidth</div><div class="stat-value">2.4<span style="font-size:0.7rem;color:var(--text-tertiary)">GB</span></div><div class="stat-change">48% of quota</div></div>
+          <div class="stat-card"><div class="stat-label">Alerts</div><div class="stat-value" style="color:var(--warning)">2</div><div class="stat-change" style="color:var(--warning)">2 devices offline</div></div>
+        </div>
+        <div class="fleet-grid">
+          <div class="fleet-card">
+            <div class="fleet-top"><span class="fleet-name">Lobby Main</span><span class="fleet-status on"></span></div>
+            <div class="fleet-content">HQ-F1 &bull; Holiday Campaign</div>
+            <div class="fleet-thumb t1">&#x1F3A8;</div>
+          </div>
+          <div class="fleet-card">
+            <div class="fleet-top"><span class="fleet-name">Cafeteria</span><span class="fleet-status on"></span></div>
+            <div class="fleet-content">HQ-F2 &bull; Daily Specials</div>
+            <div class="fleet-thumb t2">&#x1F37D;</div>
+          </div>
+          <div class="fleet-card">
+            <div class="fleet-top"><span class="fleet-name">Store Window</span><span class="fleet-status off"></span></div>
+            <div class="fleet-content">RETAIL-DT &bull; Summer Sale</div>
+            <div class="fleet-thumb t3">&#x1F6CD;</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COMPONENTS -->
+<div class="section-label">
+  <h2>Component Samples</h2>
+  <p>Buttons, badges, forms, tables, device cards, network topology, terminal, and charts</p>
+</div>
+
+<div class="showcase">
+  <div class="showcase-grid">
+    <div class="showcase-card">
+      <h3>Buttons</h3>
+      <div class="btn-row">
+        <button class="btn-sm neon">Primary</button>
+        <button class="btn-sm cyan">Secondary</button>
+        <button class="btn-sm violet">Tertiary</button>
+        <button class="btn-sm danger">Delete</button>
+      </div>
+    </div>
+
+    <div class="showcase-card">
+      <h3>Status Badges</h3>
+      <div class="btn-row">
+        <span class="badge online"><span class="dot"></span> Online</span>
+        <span class="badge offline"><span class="dot"></span> Offline</span>
+        <span class="badge warning"><span class="dot"></span> Alert</span>
+        <span class="badge syncing"><span class="dot"></span> Syncing</span>
+      </div>
+    </div>
+
+    <div class="showcase-card">
+      <h3>Form Inputs</h3>
+      <div class="form-group">
+        <label class="form-label">Display Name</label>
+        <input class="form-input" type="text" placeholder="e.g. Lobby Screen #1" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Device ID</label>
+        <input class="form-input mono" type="text" value="dsp_7xk29mf04q" readonly />
+      </div>
+    </div>
+
+    <div class="showcase-card">
+      <h3>Notifications</h3>
+      <div class="toast success">
+        <span class="toast-icon">&#x26A1;</span>
+        <span class="toast-text"><strong>Pushed</strong> to 12 displays</span>
+      </div>
+      <div class="toast error">
+        <span class="toast-icon">&#x1F534;</span>
+        <span class="toast-text"><strong>Offline</strong> &mdash; Lobby East disconnected</span>
+      </div>
+      <div class="toast warning">
+        <span class="toast-icon">&#x26A0;</span>
+        <span class="toast-text"><strong>Alert</strong> &mdash; 2 schedule conflicts detected</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="showcase-card" style="margin-top:1.5rem;">
+    <h3>Data Table &mdash; Device Fleet</h3>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Display</th>
+          <th>Status</th>
+          <th>Content</th>
+          <th>Location</th>
+          <th>Last Ping</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="name">Lobby Main</td>
+          <td><span class="badge online"><span class="dot"></span> Online</span></td>
+          <td>Holiday Campaign</td>
+          <td class="mono">HQ-F1-ENT</td>
+          <td class="mono">32s ago</td>
+        </tr>
+        <tr>
+          <td class="name">Cafeteria Menu</td>
+          <td><span class="badge online"><span class="dot"></span> Online</span></td>
+          <td>Daily Specials</td>
+          <td class="mono">HQ-F2-CAF</td>
+          <td class="mono">18s ago</td>
+        </tr>
+        <tr>
+          <td class="name">Store Window</td>
+          <td><span class="badge offline"><span class="dot"></span> Offline</span></td>
+          <td>Summer Sale</td>
+          <td class="mono">RETAIL-DT</td>
+          <td class="mono">3h 14m ago</td>
+        </tr>
+        <tr>
+          <td class="name">Meeting Room A</td>
+          <td><span class="badge syncing"><span class="dot"></span> Syncing</span></td>
+          <td>Room Schedule</td>
+          <td class="mono">HQ-F3-MR1</td>
+          <td class="mono">4s ago</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Device Cards -->
+  <div class="showcase-card" style="margin-top:1.5rem;">
+    <h3>Device Cards</h3>
+    <div class="device-grid">
+      <div class="device-card">
+        <div class="device-top">
+          <span class="device-name">Lobby Main</span>
+          <span class="badge online"><span class="dot"></span> Online</span>
+        </div>
+        <div class="device-location">HQ-F1-ENT &bull; 192.168.1.42</div>
+        <div class="device-bottom">
+          <span class="device-content">&#x25B6; Holiday Campaign</span>
+          <span class="device-time">ping 32s</span>
+        </div>
+      </div>
+      <div class="device-card">
+        <div class="device-top">
+          <span class="device-name">Store Window</span>
+          <span class="badge offline"><span class="dot"></span> Offline</span>
+        </div>
+        <div class="device-location">RETAIL-DT &bull; 10.0.2.18</div>
+        <div class="device-bottom">
+          <span class="device-content">&#x25B6; Summer Sale</span>
+          <span class="device-time">last 3h 14m</span>
+        </div>
+      </div>
+      <div class="device-card">
+        <div class="device-top">
+          <span class="device-name">Cafeteria</span>
+          <span class="badge online"><span class="dot"></span> Online</span>
+        </div>
+        <div class="device-location">HQ-F2-CAF &bull; 192.168.1.87</div>
+        <div class="device-bottom">
+          <span class="device-content">&#x25B6; Daily Specials</span>
+          <span class="device-time">ping 18s</span>
+        </div>
+      </div>
+      <div class="device-card">
+        <div class="device-top">
+          <span class="device-name">Meeting Room A</span>
+          <span class="badge syncing"><span class="dot"></span> Syncing</span>
+        </div>
+        <div class="device-location">HQ-F3-MR1 &bull; 192.168.1.103</div>
+        <div class="device-bottom">
+          <span class="device-content">&#x21BB; Room Schedule</span>
+          <span class="device-time">syncing...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Network Topology -->
+  <div class="showcase-card" style="margin-top:1.5rem;">
+    <h3>Network Topology &mdash; Data Flow</h3>
+    <div class="topology">
+      <div class="topology-grid"></div>
+      <div class="topo-nodes">
+        <div class="topo-node">
+          <div class="topo-circle cloud">&#x2601;</div>
+          <div class="topo-label">Vizora Cloud</div>
+          <div class="topo-sub">api.vizora.io</div>
+        </div>
+        <div class="topo-line"></div>
+        <div class="topo-node">
+          <div class="topo-circle edge">&#x26A1;</div>
+          <div class="topo-label">Edge Gateway</div>
+          <div class="topo-sub">ws://realtime:3002</div>
+        </div>
+        <div class="topo-line topo-line2"></div>
+        <div class="topo-node">
+          <div class="topo-circle device">&#x1F5A5;</div>
+          <div class="topo-label">Display Fleet</div>
+          <div class="topo-sub">24 devices online</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Terminal -->
+  <div class="showcase-card" style="margin-top:1.5rem;">
+    <h3>Terminal / API Console</h3>
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="terminal-dot r"></div>
+        <div class="terminal-dot y"></div>
+        <div class="terminal-dot g"></div>
+        <span class="terminal-title">vizora-cli &mdash; bash</span>
+      </div>
+      <div class="terminal-body">
+        <div><span class="term-prompt">$</span> <span class="term-cmd">vizora devices list --org=acme-corp</span></div>
+        <div class="term-output">&nbsp;</div>
+        <div><span class="term-cyan">ID</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="term-cyan">NAME</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="term-cyan">STATUS</span>&nbsp;&nbsp;<span class="term-cyan">LOCATION</span></div>
+        <div><span class="term-output">dsp_7xk29mf04q</span>&nbsp;&nbsp;Lobby Main&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="term-success">online</span>&nbsp;&nbsp;HQ-F1-ENT</div>
+        <div><span class="term-output">dsp_3ab82kp19r</span>&nbsp;&nbsp;Store Window&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--error)">offline</span>&nbsp;&nbsp;RETAIL-DT</div>
+        <div><span class="term-output">dsp_9qw45tn78s</span>&nbsp;&nbsp;Cafeteria&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="term-success">online</span>&nbsp;&nbsp;HQ-F2-CAF</div>
+        <div class="term-output">&nbsp;</div>
+        <div><span class="term-prompt">$</span> <span class="term-cmd">vizora push --content=holiday-campaign --target=group:lobby</span></div>
+        <div><span class="term-success">&#x2714; Content pushed to 4 devices in group "lobby"</span></div>
+        <div class="term-output">&nbsp;</div>
+        <div><span class="term-prompt">$</span> <span class="term-cmd" style="animation: blink 1s step-end infinite;">_</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart -->
+  <div class="showcase-card" style="margin-top:1.5rem;">
+    <h3>Analytics &mdash; Device Uptime (7 days)</h3>
+    <div class="chart-area">
+      <svg class="chart-svg" viewBox="0 0 400 120" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#00E5A0" stop-opacity="0.35"/>
+            <stop offset="100%" stop-color="#00E5A0" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#00E5A0"/>
+            <stop offset="100%" stop-color="#00B4D8"/>
+          </linearGradient>
+        </defs>
+        <!-- Grid lines -->
+        <line x1="0" y1="30" x2="400" y2="30" stroke="#1E3035" stroke-width="0.5"/>
+        <line x1="0" y1="60" x2="400" y2="60" stroke="#1E3035" stroke-width="0.5"/>
+        <line x1="0" y1="90" x2="400" y2="90" stroke="#1E3035" stroke-width="0.5"/>
+        <!-- Area -->
+        <path d="M0,80 Q50,75 100,40 T200,30 T300,25 T400,20 L400,120 L0,120 Z" fill="url(#chartGrad)"/>
+        <!-- Line -->
+        <path d="M0,80 Q50,75 100,40 T200,30 T300,25 T400,20" fill="none" stroke="url(#lineGrad)" stroke-width="2"/>
+        <!-- Data points -->
+        <circle cx="0" cy="80" r="3" fill="#00E5A0"/>
+        <circle cx="100" cy="40" r="3" fill="#00E5A0"/>
+        <circle cx="200" cy="30" r="3" fill="#00E5A0"/>
+        <circle cx="300" cy="25" r="3" fill="#00B4D8"/>
+        <circle cx="400" cy="20" r="3" fill="#00B4D8"/>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  Electric Horizon: Deep Teal Variant &mdash; Background #060E10 / #0C1618 / #142022 &mdash; Vizora Brand Exploration
+</div>
+
+<style>
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+</style>
+
+</body>
+</html>

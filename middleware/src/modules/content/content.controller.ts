@@ -154,12 +154,14 @@ export class ContentController {
    */
   private async saveFileLocally(filename: string, buffer: Buffer): Promise<string> {
     const uploadsDir = path.join(process.cwd(), 'uploads');
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
+    try {
+      await fs.promises.access(uploadsDir);
+    } catch {
+      await fs.promises.mkdir(uploadsDir, { recursive: true });
     }
 
     const filePath = path.join(uploadsDir, filename);
-    fs.writeFileSync(filePath, buffer);
+    await fs.promises.writeFile(filePath, buffer);
 
     const baseUrl = process.env.API_BASE_URL
       || (process.env.NODE_ENV === 'production' ? (() => { throw new Error('API_BASE_URL must be set in production'); })() : 'http://localhost:3000');

@@ -1,4 +1,5 @@
 import { ConfigService } from '@nestjs/config';
+import { CircuitBreakerService } from '../common/services/circuit-breaker.service';
 import { StorageService } from './storage.service';
 
 // Mock the minio module
@@ -21,6 +22,7 @@ jest.mock('minio', () => {
 describe('StorageService', () => {
   let service: StorageService;
   let mockConfigService: jest.Mocked<ConfigService>;
+  let mockCircuitBreaker: jest.Mocked<CircuitBreakerService>;
   let mockMinioClient: any;
 
   const defaultConfig = {
@@ -57,7 +59,16 @@ describe('StorageService', () => {
     };
     Minio.Client.mockImplementation(() => mockMinioClient);
 
-    service = new StorageService(mockConfigService);
+    mockCircuitBreaker = {
+      execute: jest.fn((name, fn) => fn()),
+      executeWithFallback: jest.fn((name, fn, fallback) => fn()),
+      getCircuitState: jest.fn(),
+      getCircuitStats: jest.fn(),
+      resetCircuit: jest.fn(),
+      getCircuitNames: jest.fn(),
+    } as any;
+
+    service = new StorageService(mockConfigService, mockCircuitBreaker);
   });
 
   describe('initialization', () => {
@@ -106,7 +117,7 @@ describe('StorageService', () => {
         return defaultConfig[key];
       });
 
-      const serviceWithIncompleteConfig = new StorageService(mockConfigService);
+      const serviceWithIncompleteConfig = new StorageService(mockConfigService, mockCircuitBreaker);
       await serviceWithIncompleteConfig.onModuleInit();
 
       expect(serviceWithIncompleteConfig.isMinioAvailable()).toBe(false);
@@ -118,7 +129,7 @@ describe('StorageService', () => {
         return defaultConfig[key];
       });
 
-      const serviceWithMissingKey = new StorageService(mockConfigService);
+      const serviceWithMissingKey = new StorageService(mockConfigService, mockCircuitBreaker);
       await serviceWithMissingKey.onModuleInit();
 
       expect(serviceWithMissingKey.isMinioAvailable()).toBe(false);
@@ -130,7 +141,7 @@ describe('StorageService', () => {
         return defaultConfig[key];
       });
 
-      const serviceWithMissingSecret = new StorageService(mockConfigService);
+      const serviceWithMissingSecret = new StorageService(mockConfigService, mockCircuitBreaker);
       await serviceWithMissingSecret.onModuleInit();
 
       expect(serviceWithMissingSecret.isMinioAvailable()).toBe(false);
@@ -143,7 +154,7 @@ describe('StorageService', () => {
       });
 
       const Minio = require('minio');
-      const serviceWithSSL = new StorageService(mockConfigService);
+      const serviceWithSSL = new StorageService(mockConfigService, mockCircuitBreaker);
       await serviceWithSSL.onModuleInit();
 
       expect(Minio.Client).toHaveBeenCalledWith(
@@ -160,7 +171,7 @@ describe('StorageService', () => {
       });
 
       const Minio = require('minio');
-      const serviceWithDefaultPort = new StorageService(mockConfigService);
+      const serviceWithDefaultPort = new StorageService(mockConfigService, mockCircuitBreaker);
       await serviceWithDefaultPort.onModuleInit();
 
       expect(Minio.Client).toHaveBeenCalledWith(
@@ -176,7 +187,7 @@ describe('StorageService', () => {
         return defaultConfig[key];
       });
 
-      const serviceWithDefaultBucket = new StorageService(mockConfigService);
+      const serviceWithDefaultBucket = new StorageService(mockConfigService, mockCircuitBreaker);
       expect(serviceWithDefaultBucket.getBucket()).toBe('vizora-content');
     });
   });
@@ -275,7 +286,7 @@ describe('StorageService', () => {
 
     it('should throw error when MinIO is not available', async () => {
       mockMinioClient.bucketExists.mockRejectedValue(new Error('Connection failed'));
-      const serviceUnavailable = new StorageService(mockConfigService);
+      const serviceUnavailable = new StorageService(mockConfigService, mockCircuitBreaker);
       await serviceUnavailable.onModuleInit();
 
       const buffer = Buffer.from('test content');
@@ -290,7 +301,7 @@ describe('StorageService', () => {
       const buffer = Buffer.from('test content');
       await expect(
         service.uploadFile(buffer, 'test-key', 'image/jpeg'),
-      ).rejects.toThrow('MinIO upload failed: Upload failed');
+      ).rejects.toThrow('Upload failed');
     });
 
     it('should upload file with different mime types', async () => {
@@ -364,7 +375,7 @@ describe('StorageService', () => {
 
     it('should throw error when MinIO is not available', async () => {
       mockMinioClient.bucketExists.mockRejectedValue(new Error('Connection failed'));
-      const serviceUnavailable = new StorageService(mockConfigService);
+      const serviceUnavailable = new StorageService(mockConfigService, mockCircuitBreaker);
       await serviceUnavailable.onModuleInit();
 
       await expect(
@@ -377,7 +388,7 @@ describe('StorageService', () => {
 
       await expect(
         service.getPresignedUrl('nonexistent-key'),
-      ).rejects.toThrow('Failed to generate presigned URL: Key not found');
+      ).rejects.toThrow('Key not found');
     });
 
     it('should handle zero expiry', async () => {
@@ -417,7 +428,7 @@ describe('StorageService', () => {
 
     it('should throw error when MinIO is not available', async () => {
       mockMinioClient.bucketExists.mockRejectedValue(new Error('Connection failed'));
-      const serviceUnavailable = new StorageService(mockConfigService);
+      const serviceUnavailable = new StorageService(mockConfigService, mockCircuitBreaker);
       await serviceUnavailable.onModuleInit();
 
       await expect(
@@ -430,13 +441,13 @@ describe('StorageService', () => {
 
       await expect(
         service.deleteFile('test-key'),
-      ).rejects.toThrow('MinIO delete failed: Delete denied');
+      ).rejects.toThrow('Delete denied');
     });
 
     it('should handle deleting non-existent file', async () => {
       mockMinioClient.removeObject.mockRejectedValue(new Error('Not Found'));
 
-      await expect(service.deleteFile('nonexistent')).rejects.toThrow('MinIO delete failed');
+      await expect(service.deleteFile('nonexistent')).rejects.toThrow('Not Found');
     });
   });
 
@@ -463,7 +474,7 @@ describe('StorageService', () => {
 
     it('should return false when MinIO is not available', async () => {
       mockMinioClient.bucketExists.mockRejectedValue(new Error('Connection failed'));
-      const serviceUnavailable = new StorageService(mockConfigService);
+      const serviceUnavailable = new StorageService(mockConfigService, mockCircuitBreaker);
       await serviceUnavailable.onModuleInit();
 
       const result = await serviceUnavailable.fileExists('test-key');
@@ -512,7 +523,7 @@ describe('StorageService', () => {
 
     it('should return null when MinIO is not available', async () => {
       mockMinioClient.bucketExists.mockRejectedValue(new Error('Connection failed'));
-      const serviceUnavailable = new StorageService(mockConfigService);
+      const serviceUnavailable = new StorageService(mockConfigService, mockCircuitBreaker);
       await serviceUnavailable.onModuleInit();
 
       const result = await serviceUnavailable.getFileMetadata('test-key');
@@ -652,7 +663,7 @@ describe('StorageService', () => {
 
     it('should return empty array when MinIO is not available', async () => {
       mockMinioClient.bucketExists.mockRejectedValue(new Error('Connection failed'));
-      const serviceUnavailable = new StorageService(mockConfigService);
+      const serviceUnavailable = new StorageService(mockConfigService, mockCircuitBreaker);
       await serviceUnavailable.onModuleInit();
 
       const result = await serviceUnavailable.listObjects('prefix/');
@@ -714,7 +725,7 @@ describe('StorageService', () => {
 
     it('should throw error when MinIO is not available', async () => {
       mockMinioClient.bucketExists.mockRejectedValue(new Error('Connection failed'));
-      const serviceUnavailable = new StorageService(mockConfigService);
+      const serviceUnavailable = new StorageService(mockConfigService, mockCircuitBreaker);
       await serviceUnavailable.onModuleInit();
 
       await expect(
@@ -727,7 +738,7 @@ describe('StorageService', () => {
 
       await expect(
         service.copyFile('nonexistent', 'dest'),
-      ).rejects.toThrow('MinIO copy failed: Source not found');
+      ).rejects.toThrow('Source not found');
     });
   });
 
@@ -742,7 +753,7 @@ describe('StorageService', () => {
         return defaultConfig[key];
       });
 
-      const serviceWithCustomBucket = new StorageService(mockConfigService);
+      const serviceWithCustomBucket = new StorageService(mockConfigService, mockCircuitBreaker);
       expect(serviceWithCustomBucket.getBucket()).toBe('custom-bucket');
     });
   });
@@ -758,7 +769,7 @@ describe('StorageService', () => {
       const buffer = Buffer.from('test');
       await expect(
         service.uploadFile(buffer, 'key', 'image/jpeg'),
-      ).rejects.toThrow('MinIO upload failed: Unknown error');
+      ).rejects.toBe('string error');
     });
 
     it('should handle unknown error types in presigned URL', async () => {
@@ -766,7 +777,7 @@ describe('StorageService', () => {
 
       await expect(
         service.getPresignedUrl('key'),
-      ).rejects.toThrow('Failed to generate presigned URL: Unknown error');
+      ).rejects.toBeNull();
     });
 
     it('should handle unknown error types in delete', async () => {
@@ -774,7 +785,7 @@ describe('StorageService', () => {
 
       await expect(
         service.deleteFile('key'),
-      ).rejects.toThrow('MinIO delete failed: Unknown error');
+      ).rejects.toBeUndefined();
     });
 
     it('should handle unknown error types in copy', async () => {
@@ -782,7 +793,7 @@ describe('StorageService', () => {
 
       await expect(
         service.copyFile('source', 'dest'),
-      ).rejects.toThrow('MinIO copy failed: Unknown error');
+      ).rejects.toBe(42);
     });
   });
 });

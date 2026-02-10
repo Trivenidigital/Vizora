@@ -8,8 +8,8 @@ import type { Display, DisplayOrientation, Content, Playlist, PlaylistItem, Sche
 // when explicitly configured (e.g., in production with a separate API domain).
 const API_BASE_URL =
   typeof window !== 'undefined'
-    ? '/api'  // Client-side: proxy through Next.js rewrite (same-origin cookies)
-    : (process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3000/api'));
+    ? '/api/v1'  // Client-side: proxy through Next.js rewrite (same-origin cookies)
+    : (process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3000/api/v1'));
 
 // Type definitions for API responses
 interface AuthUser {
@@ -52,8 +52,8 @@ interface ScheduleData {
   displayGroupId?: string;
   startDate: string;
   endDate?: string;
-  startTime?: string;
-  endTime?: string;
+  startTime?: string | number;
+  endTime?: string | number;
   daysOfWeek: number[];  // 0-6 (Sunday-Saturday)
   priority?: number;
   isActive?: boolean;

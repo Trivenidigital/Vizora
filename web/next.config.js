@@ -25,8 +25,13 @@ const nextConfig = {
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:3000';
     return [
       {
+        source: '/api/v1/:path*',
+        destination: `${backendUrl}/api/v1/:path*`,
+      },
+      // Backwards compatibility: redirect old /api/ to /api/v1/
+      {
         source: '/api/:path*',
-        destination: `${backendUrl}/api/:path*`,
+        destination: `${backendUrl}/api/v1/:path*`,
       },
       // Proxy static files (thumbnails) through Next.js so they're same-origin
       {

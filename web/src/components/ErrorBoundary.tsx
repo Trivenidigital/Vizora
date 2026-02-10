@@ -1,6 +1,7 @@
 'use client';
 
 import React, { ReactNode } from 'react';
+import { logError } from '@/lib/error-handler';
 
 interface Props {
   children: ReactNode;
@@ -29,13 +30,8 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   override componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    // Log to error tracking service (Sentry, LogRocket, etc.)
-    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
-      console.error('Error Boundary caught:', error, errorInfo);
-      // TODO: Send to error tracking service
-    } else {
-      console.error('[DEV] Error Boundary:', error, errorInfo);
-    }
+    // Report to centralized error handler (includes Sentry when configured)
+    logError(error, `ErrorBoundary: ${errorInfo.componentStack?.slice(0, 200) || 'unknown'}`);
   }
 
   handleReset = () => {

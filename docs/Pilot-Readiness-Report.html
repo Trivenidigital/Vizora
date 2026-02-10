@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vizora Pilot Readiness Report</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --surface2: #334155;
+    --border: #475569;
+    --text: #e2e8f0;
+    --text-muted: #94a3b8;
+    --accent: #3b82f6;
+    --accent-light: #60a5fa;
+    --green: #22c55e;
+    --green-bg: rgba(34,197,94,0.12);
+    --yellow: #eab308;
+    --yellow-bg: rgba(234,179,8,0.12);
+    --red: #ef4444;
+    --red-bg: rgba(239,68,68,0.12);
+    --orange: #f97316;
+    --orange-bg: rgba(249,115,22,0.12);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 0;
+  }
+  .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+
+  /* Header */
+  .header {
+    background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
+    border-bottom: 2px solid var(--accent);
+    padding: 3rem 2rem;
+    text-align: center;
+  }
+  .header h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 0.5rem;
+  }
+  .header .subtitle {
+    font-size: 1.1rem;
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+  }
+  .header .meta {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    flex-wrap: wrap;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+  .header .meta span { display: flex; align-items: center; gap: 0.4rem; }
+
+  /* Verdict Banner */
+  .verdict-banner {
+    background: linear-gradient(135deg, var(--yellow-bg), rgba(234,179,8,0.04));
+    border: 2px solid var(--yellow);
+    border-radius: 12px;
+    padding: 2rem;
+    margin: 2rem 0;
+    text-align: center;
+  }
+  .verdict-banner h2 {
+    font-size: 1.8rem;
+    color: var(--yellow);
+    margin-bottom: 0.5rem;
+  }
+  .verdict-banner p { color: var(--text-muted); font-size: 1rem; }
+
+  /* Score Cards */
+  .score-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin: 2rem 0;
+  }
+  .score-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.5rem;
+    text-align: center;
+  }
+  .score-card .label { font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+  .score-card .value { font-size: 2rem; font-weight: 700; }
+  .score-card .detail { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.3rem; }
+  .text-green { color: var(--green); }
+  .text-yellow { color: var(--yellow); }
+  .text-red { color: var(--red); }
+  .text-orange { color: var(--orange); }
+  .text-accent { color: var(--accent-light); }
+
+  /* Sections */
+  .section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 2rem;
+    margin: 1.5rem 0;
+  }
+  .section h2 {
+    font-size: 1.4rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border);
+    color: #fff;
+  }
+  .section h3 {
+    font-size: 1.1rem;
+    margin: 1.5rem 0 0.75rem;
+    color: var(--accent-light);
+  }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+  }
+  th {
+    background: var(--surface2);
+    color: var(--text);
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid var(--border);
+  }
+  td {
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid rgba(71,85,105,0.5);
+    vertical-align: top;
+  }
+  tr:hover td { background: rgba(59,130,246,0.04); }
+
+  /* Badges */
+  .badge {
+    display: inline-block;
+    padding: 0.15rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .badge-critical { background: var(--red-bg); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
+  .badge-high { background: var(--orange-bg); color: var(--orange); border: 1px solid rgba(249,115,22,0.3); }
+  .badge-medium { background: var(--yellow-bg); color: var(--yellow); border: 1px solid rgba(234,179,8,0.3); }
+  .badge-low { background: rgba(59,130,246,0.12); color: var(--accent-light); border: 1px solid rgba(59,130,246,0.3); }
+  .badge-pass { background: var(--green-bg); color: var(--green); border: 1px solid rgba(34,197,94,0.3); }
+  .badge-warn { background: var(--yellow-bg); color: var(--yellow); border: 1px solid rgba(234,179,8,0.3); }
+  .badge-fail { background: var(--red-bg); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
+
+  /* Rating bars */
+  .rating-row { display: flex; align-items: center; gap: 1rem; margin: 0.5rem 0; }
+  .rating-label { width: 180px; font-size: 0.9rem; color: var(--text-muted); }
+  .rating-bar { flex: 1; height: 8px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+  .rating-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+  .rating-value { width: 40px; text-align: right; font-size: 0.85rem; font-weight: 600; }
+
+  /* Lists */
+  ul { padding-left: 1.5rem; }
+  li { margin: 0.4rem 0; }
+  .strength-list li { color: var(--green); }
+  .strength-list li span { color: var(--text); }
+  .risk-list li { color: var(--orange); }
+  .risk-list li span { color: var(--text); }
+
+  /* Action items */
+  .action-item {
+    display: flex;
+    gap: 1rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid rgba(71,85,105,0.3);
+    align-items: flex-start;
+  }
+  .action-item:last-child { border-bottom: none; }
+  .action-num {
+    background: var(--surface2);
+    color: var(--text-muted);
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  .action-content { flex: 1; }
+  .action-content .title { font-weight: 600; color: var(--text); }
+  .action-content .desc { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem; }
+  .action-effort { font-size: 0.8rem; color: var(--text-muted); white-space: nowrap; }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    border-top: 1px solid var(--border);
+    margin-top: 2rem;
+  }
+
+  @media (max-width: 768px) {
+    .container { padding: 1rem; }
+    .header h1 { font-size: 1.8rem; }
+    .score-grid { grid-template-columns: repeat(2, 1fr); }
+    .header .meta { flex-direction: column; align-items: center; gap: 0.5rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Vizora Pilot Readiness Report</h1>
+  <p class="subtitle">Comprehensive Platform Review &mdash; Pre-Pilot Go-Live Assessment</p>
+  <div class="meta">
+    <span>Date: February 9, 2026</span>
+    <span>Branch: feat/phase-3-major-features</span>
+    <span>Review Team: 5 Specialized Agents</span>
+    <span>Model: Claude Opus 4.6</span>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- VERDICT -->
+<div class="verdict-banner">
+  <h2>CONDITIONAL GO FOR PILOT</h2>
+  <p>The platform is architecturally sound and production-grade in design. 8 must-fix items (est. 6-8 hours) should be addressed before pilot launch. No critical security vulnerabilities. No blocking architectural defects.</p>
+</div>
+
+<!-- SCORE CARDS -->
+<div class="score-grid">
+  <div class="score-card">
+    <div class="label">Security Rating</div>
+    <div class="value text-green">B+</div>
+    <div class="detail">0 Critical / 1 High / 6 Medium</div>
+  </div>
+  <div class="score-card">
+    <div class="label">Test Pass Rate</div>
+    <div class="value text-yellow">94.3%</div>
+    <div class="detail">1735/1819 passed (84 fixable failures)</div>
+  </div>
+  <div class="score-card">
+    <div class="label">Architecture</div>
+    <div class="value text-green">Good</div>
+    <div class="detail">2 Critical / 9 Important / 11 Suggestions</div>
+  </div>
+  <div class="score-card">
+    <div class="label">Deployment</div>
+    <div class="value text-yellow">Conditional</div>
+    <div class="detail">9/12 areas ready, 2 need attention</div>
+  </div>
+  <div class="score-card">
+    <div class="label">Realtime System</div>
+    <div class="value text-yellow">Pilot Ready</div>
+    <div class="detail">3 P0 / 5 P1 scalability items</div>
+  </div>
+</div>
+
+<!-- EXECUTIVE SUMMARY -->
+<div class="section">
+  <h2>Executive Summary</h2>
+  <p>Five specialized review agents conducted an independent, parallel assessment of the Vizora digital signage platform across security, testing, architecture, deployment readiness, and WebSocket/realtime systems. This report consolidates all findings into a unified pilot readiness assessment.</p>
+
+  <h3>Platform Strengths</h3>
+  <ul class="strength-list">
+    <li><span><strong>Defense-in-depth security:</strong> Dual JWT auth (user + device), CSRF with timing-safe comparison, XSS sanitization, SSRF protection, magic number file validation, account lockout, JTI token revocation</span></li>
+    <li><span><strong>Zero SQL injection surface:</strong> All queries use Prisma parameterized queries. No raw SQL with user input found anywhere.</span></li>
+    <li><span><strong>Well-structured monorepo:</strong> 21 properly encapsulated NestJS modules, Nx build orchestration, pnpm workspaces</span></li>
+    <li><span><strong>Production-grade infrastructure:</strong> PM2 with cluster mode, Nginx with TLS 1.2/1.3, HSTS, OCSP stapling, automated DB backups</span></li>
+    <li><span><strong>Comprehensive health checks:</strong> Liveness + readiness probes checking DB, Redis, MinIO, and memory with graceful degradation</span></li>
+    <li><span><strong>Solid realtime architecture:</strong> Room-based device/org isolation, dual persistence (Redis + PostgreSQL), infinite reconnection for signage devices</span></li>
+    <li><span><strong>Strong environment validation:</strong> Zod-based config validation, minimum secret lengths, startup checks with exit on misconfiguration</span></li>
+  </ul>
+
+  <h3>Key Risks for Pilot</h3>
+  <ul class="risk-list">
+    <li><span><strong>84 test failures</strong> in content.service.spec.ts (single root cause: constructor dependency mismatch)</span></li>
+    <li><span><strong>Zero unit tests</strong> for the entire realtime service</span></li>
+    <li><span><strong>Heartbeat DB writes every 15s per device</strong> &mdash; won't scale past ~50 devices</span></li>
+    <li><span><strong>Prometheus server missing</strong> from Docker Compose &mdash; metrics emitted but not collected</span></li>
+    <li><span><strong>Webhook auth bug:</strong> Stripe/Razorpay webhooks blocked by global JWT guard</span></li>
+    <li><span><strong>No WebSocket token revocation check</strong> &mdash; revoked device tokens still accepted</span></li>
+  </ul>
+</div>
+
+<!-- TEST RESULTS -->
+<div class="section">
+  <h2>1. Test Results</h2>
+
+  <table>
+    <thead>
+      <tr><th>Suite</th><th>Passed</th><th>Failed</th><th>Total</th><th>Status</th><th>Notes</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Middleware Unit</td>
+        <td>1,390</td>
+        <td>84</td>
+        <td>1,474</td>
+        <td><span class="badge badge-warn">DEGRADED</span></td>
+        <td>All 84 failures in content.service.spec.ts &mdash; constructor dep mismatch (~10-line fix)</td>
+      </tr>
+      <tr>
+        <td>Web Unit</td>
+        <td>345</td>
+        <td>0</td>
+        <td>345</td>
+        <td><span class="badge badge-pass">PASS</span></td>
+        <td>23 test suites, 100% pass rate</td>
+      </tr>
+      <tr>
+        <td>Middleware E2E</td>
+        <td>0</td>
+        <td>58</td>
+        <td>58</td>
+        <td><span class="badge badge-fail">INFRA</span></td>
+        <td>PostgreSQL not running &mdash; infrastructure dependency, not code defect</td>
+      </tr>
+      <tr>
+        <td>Realtime E2E</td>
+        <td>0</td>
+        <td>25</td>
+        <td>25</td>
+        <td><span class="badge badge-fail">INFRA</span></td>
+        <td>Same database infrastructure dependency</td>
+      </tr>
+      <tr>
+        <td>Realtime Unit</td>
+        <td colspan="3">None exist</td>
+        <td><span class="badge badge-fail">MISSING</span></td>
+        <td>Zero test coverage for realtime gateway</td>
+      </tr>
+      <tr>
+        <td>Display Unit</td>
+        <td colspan="3">None exist</td>
+        <td><span class="badge badge-fail">MISSING</span></td>
+        <td>Zero test coverage for display clients</td>
+      </tr>
+      <tr>
+        <td>Playwright E2E</td>
+        <td colspan="3">Not executed</td>
+        <td><span class="badge badge-low">SKIPPED</span></td>
+        <td>Requires all services running (24 spec files)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Coverage</h3>
+  <div class="rating-row">
+    <span class="rating-label">Middleware Statements</span>
+    <div class="rating-bar"><div class="rating-fill" style="width:68.5%;background:var(--yellow)"></div></div>
+    <span class="rating-value text-yellow">68.5%</span>
+  </div>
+  <div class="rating-row">
+    <span class="rating-label">Middleware Branches</span>
+    <div class="rating-bar"><div class="rating-fill" style="width:58%;background:var(--orange)"></div></div>
+    <span class="rating-value text-orange">58%</span>
+  </div>
+  <div class="rating-row">
+    <span class="rating-label">Web Statements</span>
+    <div class="rating-bar"><div class="rating-fill" style="width:23%;background:var(--red)"></div></div>
+    <span class="rating-value text-red">23%</span>
+  </div>
+  <div class="rating-row">
+    <span class="rating-label">Realtime</span>
+    <div class="rating-bar"><div class="rating-fill" style="width:0%;background:var(--red)"></div></div>
+    <span class="rating-value text-red">0%</span>
+  </div>
+</div>
+
+<!-- SECURITY -->
+<div class="section">
+  <h2>2. Security Assessment</h2>
+  <p style="margin-bottom:1rem;color:var(--text-muted)">Overall Rating: <strong class="text-green">B+</strong> &mdash; Strong fundamentals with actionable improvements needed. Zero critical vulnerabilities.</p>
+
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Severity</th><th>Finding</th><th>Location</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>F-10</td>
+        <td><span class="badge badge-high">HIGH</span></td>
+        <td>Real secrets in .env files (dev only, not committed to git)</td>
+        <td>.env, middleware/.env</td>
+      </tr>
+      <tr>
+        <td>F-1</td>
+        <td><span class="badge badge-medium">MEDIUM</span></td>
+        <td>Device JWT 365-day expiry too long</td>
+        <td>pairing.service.ts:247</td>
+      </tr>
+      <tr>
+        <td>F-3</td>
+        <td><span class="badge badge-medium">MEDIUM</span></td>
+        <td>Template library endpoints accessible to all roles</td>
+        <td>template-library.controller.ts:27-54</td>
+      </tr>
+      <tr>
+        <td>F-4</td>
+        <td><span class="badge badge-medium">MEDIUM</span></td>
+        <td>Webhook endpoints blocked by global JWT guard (bug)</td>
+        <td>webhooks.controller.ts:13-42</td>
+      </tr>
+      <tr>
+        <td>F-11</td>
+        <td><span class="badge badge-medium">MEDIUM</span></td>
+        <td>MinIO default credentials in development</td>
+        <td>.env:27-28</td>
+      </tr>
+      <tr>
+        <td>F-13</td>
+        <td><span class="badge badge-medium">MEDIUM</span></td>
+        <td>CORS allows all origins when NODE_ENV != production</td>
+        <td>main.ts:62-63</td>
+      </tr>
+      <tr>
+        <td>F-14</td>
+        <td><span class="badge badge-medium">MEDIUM</span></td>
+        <td>No token revocation check on WebSocket connection</td>
+        <td>device.gateway.ts:87-107</td>
+      </tr>
+      <tr>
+        <td>F-2</td>
+        <td><span class="badge badge-low">LOW</span></td>
+        <td>Token refresh does not revoke previous token</td>
+        <td>auth.service.ts:198-214</td>
+      </tr>
+      <tr>
+        <td>F-5</td>
+        <td><span class="badge badge-low">LOW</span></td>
+        <td>enableImplicitConversion in ValidationPipe</td>
+        <td>main.ts:88</td>
+      </tr>
+      <tr>
+        <td>F-6</td>
+        <td><span class="badge badge-low">LOW</span></td>
+        <td>SanitizeInterceptor does not sanitize response output</td>
+        <td>sanitize.interceptor.ts</td>
+      </tr>
+      <tr>
+        <td>F-7</td>
+        <td><span class="badge badge-low">LOW</span></td>
+        <td>Widget renderTemplate() skips DOMPurify sanitization</td>
+        <td>template-rendering.service.ts:199</td>
+      </tr>
+      <tr>
+        <td>F-8</td>
+        <td><span class="badge badge-low">LOW</span></td>
+        <td>No tests verify production rate limits</td>
+        <td>app.module.ts:37-75</td>
+      </tr>
+      <tr>
+        <td>F-9</td>
+        <td><span class="badge badge-low">LOW</span></td>
+        <td>No automated dependency vulnerability scanning</td>
+        <td>Project-wide</td>
+      </tr>
+      <tr>
+        <td>F-12</td>
+        <td><span class="badge badge-low">LOW</span></td>
+        <td>Default PostgreSQL credentials in development</td>
+        <td>.env:14</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Security Strengths</h3>
+  <ul class="strength-list">
+    <li><span>Dual JWT architecture with separate user/device secrets, HS256 pinning, 32-char minimum</span></li>
+    <li><span>CSRF double-submit cookie with crypto.timingSafeEqual()</span></li>
+    <li><span>Zero raw SQL &mdash; all Prisma parameterized queries</span></li>
+    <li><span>SSRF protection with DNS resolution checks and private IP blocking</span></li>
+    <li><span>File upload magic number verification + suspicious content scanning</span></li>
+    <li><span>JTI-based token revocation with Redis TTL</span></li>
+    <li><span>Organization data isolation on all queries</span></li>
+    <li><span>Account lockout (10 failed attempts, 15-min lockout) with anti-enumeration</span></li>
+    <li><span>Bcrypt with 14 rounds, strong password policy enforced</span></li>
+    <li><span>Device token hashed (SHA-256) in database</span></li>
+  </ul>
+</div>
+
+<!-- ARCHITECTURE -->
+<div class="section">
+  <h2>3. Architecture & Code Quality</h2>
+
+  <h3>Critical Issues</h3>
+  <table>
+    <thead>
+      <tr><th>#</th><th>Severity</th><th>Issue</th><th>Impact</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td><span class="badge badge-critical">CRITICAL</span></td>
+        <td>content/:id/expiration endpoint accepts raw body instead of validated DTO</td>
+        <td>Bypasses ValidationPipe &mdash; unvalidated input reaches service layer</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td><span class="badge badge-critical">CRITICAL</span></td>
+        <td>No loading.tsx files in web app &mdash; zero streaming/suspense loading states</td>
+        <td>Users see blank pages during route transitions</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Important Issues (9)</h3>
+  <table>
+    <thead>
+      <tr><th>Issue</th><th>Detail</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>ContentController too large</td><td>654 lines handling content + templates + layouts + widgets + bulk ops</td></tr>
+      <tr><td>ContentService 7 injections</td><td>Should use registry pattern for data source dependencies</td></tr>
+      <tr><td>Sentry version mismatch</td><td>Middleware (v9) vs Realtime (v10) &mdash; different APIs and behaviors</td></tr>
+      <tr><td>Jest version mismatch</td><td>Middleware uses Jest 30 with ts-jest 29 &mdash; compatibility risk</td></tr>
+      <tr><td>428 <code>as any</code> assertions</td><td>Widespread type safety bypasses in middleware source</td></tr>
+      <tr><td>46 console.log statements</td><td>Unguarded in web frontend &mdash; will leak to production</td></tr>
+      <tr><td>DELETE uses @Body</td><td>Display tags DELETE endpoint uses body (unreliable across HTTP clients)</td></tr>
+      <tr><td>Analytics returns Promise&lt;any&gt;</td><td>All analytics API methods have no type safety</td></tr>
+      <tr><td>Unsafe error cast</td><td>handleDisconnect uses <code>(error as Error).message</code></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- REALTIME -->
+<div class="section">
+  <h2>4. Realtime / WebSocket System</h2>
+
+  <h3>P0 &mdash; Must Fix Before Production (acceptable for small pilot)</h3>
+  <table>
+    <thead>
+      <tr><th>Issue</th><th>Risk</th><th>Impact</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>DB write on every heartbeat (15s/device)</td>
+        <td><span class="badge badge-high">HIGH</span></td>
+        <td>~400 DB writes/min with 100 devices. Redis should suffice; DB only on status transitions.</td>
+      </tr>
+      <tr>
+        <td>Unbounded Prometheus cardinality on device_id labels</td>
+        <td><span class="badge badge-high">HIGH</span></td>
+        <td>Every unique device creates permanent time series. Memory growth over time.</td>
+      </tr>
+      <tr>
+        <td>Zero unit tests for realtime service</td>
+        <td><span class="badge badge-high">HIGH</span></td>
+        <td>No safety net for regressions in 870-line gateway.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>P1 &mdash; Should Fix Before Scaling</h3>
+  <table>
+    <thead>
+      <tr><th>Issue</th><th>Risk</th><th>Notes</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>No connection rate limiting</td><td><span class="badge badge-medium">MEDIUM</span></td><td>Vulnerable to connection flood attacks</td></tr>
+      <tr><td>Disconnect/reconnect race condition</td><td><span class="badge badge-medium">MEDIUM</span></td><td>Status flip-flop on rapid reconnect</td></tr>
+      <tr><td>No Redis adapter for Socket.IO</td><td><span class="badge badge-medium">MEDIUM</span></td><td>Blocks horizontal scaling to multiple instances</td></tr>
+      <tr><td>Screenshot response lacks DTO validation</td><td><span class="badge badge-medium">MEDIUM</span></td><td>Potential crash on malformed data</td></tr>
+      <tr><td>useRealtimeEvents creates unauthenticated socket</td><td><span class="badge badge-medium">MEDIUM</span></td><td>Dashboard WebSocket may fail to connect</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Realtime Strengths</h3>
+  <ul class="strength-list">
+    <li><span>Solid JWT device auth with separate secret and HS256 pinning</span></li>
+    <li><span>Comprehensive room authorization (device/org/unknown pattern handling)</span></li>
+    <li><span>Dual persistence pattern with non-blocking DB failures</span></li>
+    <li><span>Prometheus metrics, Sentry, structured logging, health/liveness/readiness</span></li>
+    <li><span>Timing-safe API key comparison on internal guard</span></li>
+    <li><span>Electron client: infinite reconnection + re-pairing on token rejection</span></li>
+    <li><span>Delayed offline notification (2-min) avoids false alarms</span></li>
+  </ul>
+</div>
+
+<!-- DEPLOYMENT -->
+<div class="section">
+  <h2>5. Deployment Readiness</h2>
+
+  <table>
+    <thead>
+      <tr><th>Area</th><th>Status</th><th>Key Notes</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>PM2 Configuration</td><td><span class="badge badge-pass">READY</span></td><td>Cluster mode, memory limits, exponential backoff, graceful shutdown</td></tr>
+      <tr><td>Docker Infrastructure</td><td><span class="badge badge-warn">ATTENTION</span></td><td>Prometheus missing, no Nginx/Grafana health checks, test compose missing</td></tr>
+      <tr><td>Build Scripts</td><td><span class="badge badge-pass">READY</span></td><td>Nx targets configured, webpack production builds, prune optimization</td></tr>
+      <tr><td>Database Migrations</td><td><span class="badge badge-pass">READY</span></td><td>8 migrations, 21 models, comprehensive indexes</td></tr>
+      <tr><td>Health Checks</td><td><span class="badge badge-pass">READY</span></td><td>DB, Redis, MinIO, memory checks with graceful degradation</td></tr>
+      <tr><td>Environment Config</td><td><span class="badge badge-pass">READY</span></td><td>Zod validation, startup checks, excellent production template</td></tr>
+      <tr><td>Monitoring & Logging</td><td><span class="badge badge-warn">ATTENTION</span></td><td>Metrics emitted but Prometheus server missing; no alerting rules</td></tr>
+      <tr><td>Service Communication</td><td><span class="badge badge-pass">READY</span></td><td>Strict port enforcement, Nginx upstream pooling</td></tr>
+      <tr><td>SSL/TLS</td><td><span class="badge badge-pass">READY</span></td><td>Let's Encrypt, TLS 1.2/1.3, HSTS, OCSP, modern ciphers</td></tr>
+      <tr><td>Backup & Recovery</td><td><span class="badge badge-pass">READY</span></td><td>Automated PostgreSQL backup with 3-tier rotation</td></tr>
+      <tr><td>Error Tracking</td><td><span class="badge badge-pass">READY</span></td><td>Sentry with sensitive data scrubbing</td></tr>
+      <tr><td>Security Hardening</td><td><span class="badge badge-pass">READY</span></td><td>Helmet, CORS, CSRF, rate limiting, XSS sanitization</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- RISK MATRIX -->
+<div class="section">
+  <h2>6. Risk Matrix</h2>
+
+  <table>
+    <thead>
+      <tr><th>Risk</th><th>Likelihood</th><th>Impact</th><th>Severity</th><th>Mitigation</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Content service test failures mask real regressions</td>
+        <td>High</td>
+        <td>Medium</td>
+        <td><span class="badge badge-high">HIGH</span></td>
+        <td>Fix constructor dep mismatch (~10 lines)</td>
+      </tr>
+      <tr>
+        <td>Heartbeat DB writes cause performance degradation at scale</td>
+        <td>Medium</td>
+        <td>High</td>
+        <td><span class="badge badge-high">HIGH</span></td>
+        <td>Write to DB only on status transitions, not every heartbeat</td>
+      </tr>
+      <tr>
+        <td>Revoked device token used to connect via WebSocket</td>
+        <td>Low</td>
+        <td>High</td>
+        <td><span class="badge badge-medium">MEDIUM</span></td>
+        <td>Add Redis revocation check in handleConnection</td>
+      </tr>
+      <tr>
+        <td>Monitoring blind spot (no Prometheus scraping)</td>
+        <td>High</td>
+        <td>Medium</td>
+        <td><span class="badge badge-high">HIGH</span></td>
+        <td>Add Prometheus container to docker-compose.yml</td>
+      </tr>
+      <tr>
+        <td>Webhook payment events silently rejected</td>
+        <td>High</td>
+        <td>High</td>
+        <td><span class="badge badge-high">HIGH</span></td>
+        <td>Add @Public() to webhook endpoints, verify signatures</td>
+      </tr>
+      <tr>
+        <td>Unvalidated input on content expiration endpoint</td>
+        <td>Medium</td>
+        <td>Medium</td>
+        <td><span class="badge badge-medium">MEDIUM</span></td>
+        <td>Add DTO with class-validator decorators</td>
+      </tr>
+      <tr>
+        <td>console.log leaks in production frontend</td>
+        <td>High</td>
+        <td>Low</td>
+        <td><span class="badge badge-medium">MEDIUM</span></td>
+        <td>Remove or gate behind NODE_ENV check</td>
+      </tr>
+      <tr>
+        <td>Single Nginx instance (no HA)</td>
+        <td>Low</td>
+        <td>High</td>
+        <td><span class="badge badge-medium">MEDIUM</span></td>
+        <td>Acceptable for pilot; add redundancy for GA</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ACTION PLAN -->
+<div class="section">
+  <h2>7. Prioritized Action Plan</h2>
+
+  <h3>Must-Fix Before Pilot Launch (est. 6-8 hours)</h3>
+
+  <div class="action-item">
+    <div class="action-num">1</div>
+    <div class="action-content">
+      <div class="title">Fix content.service.spec.ts constructor dependencies</div>
+      <div class="desc">Update test mock to include widget data source dependencies. Unblocks 84 failing tests.</div>
+    </div>
+    <div class="action-effort">~30 min</div>
+  </div>
+
+  <div class="action-item">
+    <div class="action-num">2</div>
+    <div class="action-content">
+      <div class="title">Add @Public() decorator to webhook endpoints + signature verification</div>
+      <div class="desc">Stripe/Razorpay webhooks are silently blocked by global JWT guard (F-4). Either fix or disable billing module.</div>
+    </div>
+    <div class="action-effort">~1 hr</div>
+  </div>
+
+  <div class="action-item">
+    <div class="action-num">3</div>
+    <div class="action-content">
+      <div class="title">Add WebSocket token revocation check</div>
+      <div class="desc">Check Redis revocation list in handleConnection() before accepting device WebSocket connections (F-14).</div>
+    </div>
+    <div class="action-effort">~30 min</div>
+  </div>
+
+  <div class="action-item">
+    <div class="action-num">4</div>
+    <div class="action-content">
+      <div class="title">Add Prometheus container to docker-compose.yml</div>
+      <div class="desc">Realtime gateway emits metrics but nothing scrapes them. Grafana dashboards show no data.</div>
+    </div>
+    <div class="action-effort">~1-2 hrs</div>
+  </div>
+
+  <div class="action-item">
+    <div class="action-num">5</div>
+    <div class="action-content">
+      <div class="title">Add validated DTO for content/:id/expiration endpoint</div>
+      <div class="desc">Currently accepts raw body, bypassing ValidationPipe. Add DTO with class-validator decorators.</div>
+    </div>
+    <div class="action-effort">~30 min</div>
+  </div>
+
+  <div class="action-item">
+    <div class="action-num">6</div>
+    <div class="action-content">
+      <div class="title">Fix/create docker-compose.test.yml for E2E tests</div>
+      <div class="desc">Referenced by middleware E2E test scripts but file doesn't exist. Blocks E2E test pipeline.</div>
+    </div>
+    <div class="action-effort">~1 hr</div>
+  </div>
+
+  <div class="action-item">
+    <div class="action-num">7</div>
+    <div class="action-content">
+      <div class="title">Define root build script / fix PM2 post-deploy hook</div>
+      <div class="desc">PM2 deploy references <code>pnpm run build</code> but no root build script exists.</div>
+    </div>
+    <div class="action-effort">~15 min</div>
+  </div>
+
+  <div class="action-item">
+    <div class="action-num">8</div>
+    <div class="action-content">
+      <div class="title">Rotate development secrets and update PM2 deploy targets</div>
+      <div class="desc">Replace placeholder server hostnames and git repo URL. Verify .env.test has no real secrets.</div>
+    </div>
+    <div class="action-effort">~30 min</div>
+  </div>
+
+  <h3>Should-Fix Before Scaling (est. 8-12 hours)</h3>
+
+  <div class="action-item">
+    <div class="action-num">9</div>
+    <div class="action-content">
+      <div class="title">Optimize heartbeat: DB writes only on status transitions</div>
+      <div class="desc">Currently writes to PostgreSQL every 15s per device. Redis alone should handle heartbeats.</div>
+    </div>
+    <div class="action-effort">~2 hrs</div>
+  </div>
+
+  <div class="action-item">
+    <div class="action-num">10</div>
+    <div class="action-content">
+      <div class="title">Fix Prometheus metric cardinality (remove device_id labels)</div>
+      <div class="desc">Replace per-device gauges with aggregated org-level metrics.</div>
+    </div>
+    <div class="action-effort">~2 hrs</div>
+  </div>
+
+  <div class="action-item">
+    <div class="action-num">11</div>
+    <div class="action-content">
+      <div class="title">Add loading.tsx files for web app route transitions</div>
+      <div class="desc">Zero streaming/suspense loading states. Users see blank pages during navigation.</div>
+    </div>
+    <div class="action-effort">~2-3 hrs</div>
+  </div>
+
+  <div class="action-item">
+    <div class="action-num">12</div>
+    <div class="action-content">
+      <div class="title">Add basic unit tests for realtime service</div>
+      <div class="desc">At minimum: WsValidationPipe, RedisService, handleConnection auth logic.</div>
+    </div>
+    <div class="action-effort">~3-4 hrs</div>
+  </div>
+
+  <div class="action-item">
+    <div class="action-num">13</div>
+    <div class="action-content">
+      <div class="title">Reduce device JWT expiry to 30-90 days with refresh mechanism</div>
+      <div class="desc">Currently 365-day expiry. Compromised tokens remain valid too long.</div>
+    </div>
+    <div class="action-effort">~2 hrs</div>
+  </div>
+
+  <div class="action-item">
+    <div class="action-num">14</div>
+    <div class="action-content">
+      <div class="title">Remove 46 console.log statements from web frontend</div>
+      <div class="desc">Unguarded console.log calls will leak to production browser consoles.</div>
+    </div>
+    <div class="action-effort">~1 hr</div>
+  </div>
+
+  <div class="action-item">
+    <div class="action-num">15</div>
+    <div class="action-content">
+      <div class="title">Add connection deduplication for devices</div>
+      <div class="desc">Disconnect existing socket when same device reconnects to prevent race conditions.</div>
+    </div>
+    <div class="action-effort">~1 hr</div>
+  </div>
+</div>
+
+<!-- REVIEW METHODOLOGY -->
+<div class="section">
+  <h2>8. Review Methodology</h2>
+  <p style="margin-bottom:1rem;color:var(--text-muted)">This assessment was conducted by 5 specialized AI review agents working in parallel, each with a focused domain of responsibility:</p>
+
+  <table>
+    <thead>
+      <tr><th>Agent</th><th>Scope</th><th>Key Activities</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>test-runner</strong></td>
+        <td>Test execution & coverage</td>
+        <td>Ran all available test suites via MCP tools; collected pass/fail counts, coverage metrics</td>
+      </tr>
+      <tr>
+        <td><strong>security-reviewer</strong></td>
+        <td>Security audit</td>
+        <td>Reviewed auth, JWT, CSRF, XSS, rate limiting, SSRF, file uploads, secrets, headers, OWASP Top 10</td>
+      </tr>
+      <tr>
+        <td><strong>arch-reviewer</strong></td>
+        <td>Architecture & code quality</td>
+        <td>Reviewed schema, modules, error handling, API design, frontend, dependencies, code patterns</td>
+      </tr>
+      <tr>
+        <td><strong>deploy-reviewer</strong></td>
+        <td>Deployment readiness</td>
+        <td>Reviewed PM2, Docker, builds, migrations, health checks, env config, monitoring, SSL, backups</td>
+      </tr>
+      <tr>
+        <td><strong>realtime-reviewer</strong></td>
+        <td>WebSocket & realtime</td>
+        <td>Deep review of gateway, connection lifecycle, rooms, dual persistence, events, clients, scalability</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p style="margin-top:1rem;color:var(--text-muted)">Individual detailed reports are available in the <code>tasks/</code> directory: <code>test-results.md</code>, <code>security-review.md</code>, <code>architecture-review.md</code>, <code>deployment-review.md</code>, <code>realtime-review.md</code></p>
+</div>
+
+</div>
+
+<div class="footer">
+  Vizora Pilot Readiness Report &mdash; Generated February 9, 2026 &mdash; Claude Opus 4.6 Multi-Agent Review Team<br>
+  Detailed findings in: tasks/test-results.md | tasks/security-review.md | tasks/architecture-review.md | tasks/deployment-review.md | tasks/realtime-review.md
+</div>
+
+</body>
+</html>

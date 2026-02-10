@@ -1,5 +1,6 @@
-import { SanitizeInterceptor } from './sanitize.interceptor';
+import { SanitizeInterceptor, SKIP_OUTPUT_SANITIZE_KEY } from './sanitize.interceptor';
 import { ExecutionContext, CallHandler } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { of } from 'rxjs';
 
 describe('SanitizeInterceptor', () => {
@@ -388,6 +389,199 @@ describe('SanitizeInterceptor', () => {
         expect(response).toEqual(expectedResponse);
         done();
       });
+    });
+  });
+
+  describe('Output Sanitization', () => {
+    it('should sanitize HTML in response objects', (done) => {
+      mockCallHandler.handle = jest.fn().mockReturnValue(
+        of({ name: '<script>alert("xss")</script>John' }),
+      );
+
+      const result$ = interceptor.intercept(mockExecutionContext, mockCallHandler);
+
+      result$.subscribe((response) => {
+        expect(response.name).toBe('John');
+        done();
+      });
+    });
+
+    it('should sanitize nested response objects', (done) => {
+      mockCallHandler.handle = jest.fn().mockReturnValue(
+        of({
+          user: { name: '<b>Bold</b> Name' },
+        }),
+      );
+
+      const result$ = interceptor.intercept(mockExecutionContext, mockCallHandler);
+
+      result$.subscribe((response) => {
+        expect(response.user.name).toBe('Bold Name');
+        done();
+      });
+    });
+
+    it('should pass through non-object response data', (done) => {
+      mockCallHandler.handle = jest.fn().mockReturnValue(of('plain string'));
+
+      const result$ = interceptor.intercept(mockExecutionContext, mockCallHandler);
+
+      result$.subscribe((response) => {
+        expect(response).toBe('plain string');
+        done();
+      });
+    });
+
+    it('should pass through null response data', (done) => {
+      mockCallHandler.handle = jest.fn().mockReturnValue(of(null));
+
+      const result$ = interceptor.intercept(mockExecutionContext, mockCallHandler);
+
+      result$.subscribe((response) => {
+        expect(response).toBeNull();
+        done();
+      });
+    });
+
+    it('should preserve templateHtml fields in responses', (done) => {
+      const htmlContent = '<div class="template"><p>Hello</p></div>';
+      mockCallHandler.handle = jest.fn().mockReturnValue(
+        of({ name: '<b>Test</b>', templateHtml: htmlContent }),
+      );
+
+      const result$ = interceptor.intercept(mockExecutionContext, mockCallHandler);
+
+      result$.subscribe((response) => {
+        expect(response.name).toBe('Test');
+        expect(response.templateHtml).toBe(htmlContent);
+        done();
+      });
+    });
+
+    it('should preserve htmlContent fields in responses', (done) => {
+      const html = '<div>Preserved HTML</div>';
+      mockCallHandler.handle = jest.fn().mockReturnValue(
+        of({ htmlContent: html }),
+      );
+
+      const result$ = interceptor.intercept(mockExecutionContext, mockCallHandler);
+
+      result$.subscribe((response) => {
+        expect(response.htmlContent).toBe(html);
+        done();
+      });
+    });
+
+    it('should preserve customCss fields in responses', (done) => {
+      const css = '.class { color: red; }';
+      mockCallHandler.handle = jest.fn().mockReturnValue(
+        of({ customCss: css }),
+      );
+
+      const result$ = interceptor.intercept(mockExecutionContext, mockCallHandler);
+
+      result$.subscribe((response) => {
+        expect(response.customCss).toBe(css);
+        done();
+      });
+    });
+
+    it('should sanitize arrays in response', (done) => {
+      mockCallHandler.handle = jest.fn().mockReturnValue(
+        of([{ name: '<script>evil()</script>Item' }]),
+      );
+
+      const result$ = interceptor.intercept(mockExecutionContext, mockCallHandler);
+
+      result$.subscribe((response) => {
+        expect(response[0].name).toBe('Item');
+        done();
+      });
+    });
+  });
+
+  describe('SkipOutputSanitize decorator', () => {
+    it('should skip output sanitization when @SkipOutputSanitize is applied', (done) => {
+      const mockReflector = {
+        getAllAndOverride: jest.fn().mockReturnValue(true),
+      };
+      const interceptorWithReflector = new SanitizeInterceptor(mockReflector as unknown as Reflector);
+
+      const contextWithHandler = {
+        switchToHttp: jest.fn().mockReturnValue({
+          getRequest: jest.fn().mockReturnValue(mockRequest),
+        }),
+        getHandler: jest.fn(),
+        getClass: jest.fn(),
+      } as unknown as ExecutionContext;
+
+      const responseWithHtml = { name: '<b>Bold</b>' };
+      const handler = {
+        handle: jest.fn().mockReturnValue(of(responseWithHtml)),
+      };
+
+      const result$ = interceptorWithReflector.intercept(contextWithHandler, handler);
+
+      result$.subscribe((response) => {
+        // Should NOT sanitize output
+        expect(response).toEqual({ name: '<b>Bold</b>' });
+        done();
+      });
+    });
+
+    it('should check reflector with correct metadata key', () => {
+      const mockReflector = {
+        getAllAndOverride: jest.fn().mockReturnValue(false),
+      };
+      const interceptorWithReflector = new SanitizeInterceptor(mockReflector as unknown as Reflector);
+
+      const contextWithHandler = {
+        switchToHttp: jest.fn().mockReturnValue({
+          getRequest: jest.fn().mockReturnValue(mockRequest),
+        }),
+        getHandler: jest.fn().mockReturnValue('handlerRef'),
+        getClass: jest.fn().mockReturnValue('classRef'),
+      } as unknown as ExecutionContext;
+
+      interceptorWithReflector.intercept(contextWithHandler, mockCallHandler);
+
+      expect(mockReflector.getAllAndOverride).toHaveBeenCalledWith(
+        SKIP_OUTPUT_SANITIZE_KEY,
+        ['handlerRef', 'classRef'],
+      );
+    });
+  });
+
+  describe('Template HTML fields in input', () => {
+    it('should preserve templateHtml in request body', () => {
+      const html = '<div class="widget"><h1>Welcome</h1></div>';
+      mockRequest.body = {
+        name: '<b>Test</b>',
+        templateHtml: html,
+      };
+
+      interceptor.intercept(mockExecutionContext, mockCallHandler);
+
+      expect(mockRequest.body.templateHtml).toBe(html);
+      expect(mockRequest.body.name).toBe('Test');
+    });
+
+    it('should preserve htmlContent in request body', () => {
+      const html = '<p>Rich content</p>';
+      mockRequest.body = { htmlContent: html };
+
+      interceptor.intercept(mockExecutionContext, mockCallHandler);
+
+      expect(mockRequest.body.htmlContent).toBe(html);
+    });
+
+    it('should preserve customCss in request body', () => {
+      const css = 'body { background: blue; }';
+      mockRequest.body = { customCss: css };
+
+      interceptor.intercept(mockExecutionContext, mockCallHandler);
+
+      expect(mockRequest.body.customCss).toBe(css);
     });
   });
 });

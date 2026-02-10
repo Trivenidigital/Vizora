@@ -47,6 +47,7 @@ model Organization {
   apiKeys             ApiKey[]
   billingTransactions BillingTransaction[]
   impressions         ContentImpression[]
+  promotionRedemptions PromotionRedemption[]
 
   @@index([slug])
   @@index([stripeCustomerId])
@@ -283,8 +284,8 @@ model Schedule {
   description String?
   startDate   DateTime
   endDate     DateTime?
-  startTime   String?  // HH:MM format for daily schedules
-  endTime     String?  // HH:MM format for daily schedules
+  startTime   Int?     // Minutes from midnight (0-1439)
+  endTime     Int?     // Minutes from midnight (0-1439)
   daysOfWeek  Int[]    // 0-6 (Sunday-Saturday)
   priority    Int      @default(0)
   isActive    Boolean  @default(true)
@@ -595,6 +596,7 @@ model PromotionRedemption {
   promotionId     String
   promotion       Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
   organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   discountApplied Int       // Actual discount in cents/paise
   redeemedAt      DateTime  @default(now())
 

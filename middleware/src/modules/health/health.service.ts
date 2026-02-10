@@ -1,7 +1,8 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { RedisService } from '../redis/redis.service';
 import { StorageService } from '../storage/storage.service';
+import { CircuitBreakerService } from '../common/services/circuit-breaker.service';
 
 interface HealthCheck {
   status: 'healthy' | 'unhealthy' | 'degraded';
@@ -23,12 +24,19 @@ interface HealthResponse {
   };
 }
 
+const HEALTH_CIRCUIT_CONFIG = {
+  failureThreshold: 3,
+  resetTimeout: 10000,
+};
+
 @Injectable()
 export class HealthService {
   private readonly startTime = Date.now();
+  private readonly logger = new Logger(HealthService.name);
 
   constructor(
     private readonly db: DatabaseService,
+    @Optional() private readonly circuitBreaker?: CircuitBreakerService,
     @Optional() private readonly redis?: RedisService,
     @Optional() private readonly storage?: StorageService,
   ) {}
@@ -74,6 +82,33 @@ export class HealthService {
 
   private async checkDatabase(): Promise<HealthCheck> {
     const start = Date.now();
+
+    if (!this.circuitBreaker) {
+      return this.checkDatabaseDirect(start);
+    }
+
+    return this.circuitBreaker.executeWithFallback(
+      'health-database',
+      async () => {
+        await this.db.$queryRaw`SELECT 1`;
+        return {
+          status: 'healthy' as const,
+          responseTime: Date.now() - start,
+        };
+      },
+      (error) => {
+        this.logger.warn(`Database health check failed (circuit breaker): ${error?.message}`);
+        return {
+          status: 'unhealthy' as const,
+          responseTime: Date.now() - start,
+          error: error?.message || 'Database connection failed',
+        };
+      },
+      HEALTH_CIRCUIT_CONFIG,
+    );
+  }
+
+  private async checkDatabaseDirect(start: number): Promise<HealthCheck> {
     try {
       await this.db.$queryRaw`SELECT 1`;
       return {
@@ -102,8 +137,43 @@ export class HealthService {
       };
     }
 
+    if (!this.circuitBreaker) {
+      return this.checkRedisDirect(start);
+    }
+
+    return this.circuitBreaker.executeWithFallback(
+      'health-redis',
+      async () => {
+        const result = await this.redis!.healthCheck();
+
+        if (result.healthy) {
+          return {
+            status: 'healthy' as const,
+            responseTime: result.responseTime,
+            details: { connected: true },
+          };
+        }
+
+        // Unhealthy result is still a "success" from circuit breaker perspective
+        // but we want to track it as failure, so throw
+        throw new Error(result.error || 'Redis health check failed');
+      },
+      (error) => {
+        this.logger.warn(`Redis health check failed (circuit breaker): ${error?.message}`);
+        return {
+          status: 'unhealthy' as const,
+          responseTime: Date.now() - start,
+          error: error?.message || 'Redis check failed',
+          details: { connected: false },
+        };
+      },
+      HEALTH_CIRCUIT_CONFIG,
+    );
+  }
+
+  private async checkRedisDirect(start: number): Promise<HealthCheck> {
     try {
-      const result = await this.redis.healthCheck();
+      const result = await this.redis!.healthCheck();
 
       if (result.healthy) {
         return {

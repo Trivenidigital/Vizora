@@ -124,8 +124,8 @@ services:
     container_name: vizora-grafana
     restart: unless-stopped
     environment:
-      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:?Set GRAFANA_ADMIN_USER in .env}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env}
       GF_INSTALL_PLUGINS: grafana-clickhouse-datasource
     ports:
       - "3003:3000"
@@ -133,6 +133,11 @@ services:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     depends_on:
       clickhouse:
         condition: service_healthy
@@ -163,6 +168,35 @@ services:
       - vizora-network
 
   # ---------------------------------------------------------------------------
+  # Application Service Scaling Strategy
+  # ---------------------------------------------------------------------------
+  # Middleware API and Web Dashboard can be horizontally scaled behind Nginx.
+  # Realtime Gateway MUST stay single-instance for WebSocket state consistency.
+  #
+  # To scale when services are containerized (instead of host PM2), set
+  # deploy.replicas on middleware and web services and use Docker service
+  # names in the upstream blocks of nginx.conf.
+  #
+  # Example (add to a containerized middleware service):
+  #   deploy:
+  #     replicas: 2
+  #     resources:
+  #       limits:
+  #         memory: 512M
+  #
+  # Example (add to a containerized web service):
+  #   deploy:
+  #     replicas: 2
+  #     resources:
+  #       limits:
+  #         memory: 512M
+  #
+  # Realtime gateway — do NOT scale beyond 1 replica:
+  #   deploy:
+  #     replicas: 1
+  # ---------------------------------------------------------------------------
+
+  # ---------------------------------------------------------------------------
   # Nginx Reverse Proxy — TLS termination for all Vizora services
   # ---------------------------------------------------------------------------
   # The application services (middleware, web, realtime) run on the host via PM2.
@@ -176,7 +210,7 @@ services:
     build:
       context: ./nginx
       dockerfile: Dockerfile
-    container_name: vizora-nginx
+    # container_name omitted — required for deploy.replicas > 1
     restart: unless-stopped
     ports:
       - "80:80"
@@ -184,9 +218,19 @@ services:
     volumes:
       - /etc/letsencrypt:/etc/letsencrypt:ro
       - certbot_webroot:/var/www/certbot:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:80/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     # extra_hosts:
     #   - "host.docker.internal:host-gateway"  # Uncomment on Linux
+    # In production, deploy behind an external load balancer (cloud ALB/NLB)
+    # which distributes traffic across the replicas. The host port binding
+    # below is for local development; with replicas > 1 Docker Compose will
+    # warn in non-swarm mode but a single-node dev setup still works.
     deploy:
+      replicas: 2
       resources:
         limits:
           memory: 256M

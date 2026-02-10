@@ -19,6 +19,7 @@ import cookieParser from 'cookie-parser';
 import { AppModule } from './app/app.module';
 import { SanitizeInterceptor } from './modules/common/interceptors/sanitize.interceptor';
 import { LoggingInterceptor } from './modules/common/interceptors/logging.interceptor';
+import { ResponseEnvelopeInterceptor } from './modules/common/interceptors/response-envelope.interceptor';
 import { SentryInterceptor } from './interceptors/sentry.interceptor';
 import { AllExceptionsFilter } from './modules/common/filters/all-exceptions.filter';
 
@@ -94,15 +95,16 @@ async function bootstrap() {
   );
 
   // Global interceptors
-  // Order matters: logging first, then Sentry error tracking, then sanitization
+  // Order matters: logging first, then Sentry error tracking, then sanitization, then envelope
   const reflector = app.get(Reflector);
   app.useGlobalInterceptors(
     new LoggingInterceptor(),
     new SentryInterceptor(),
     new SanitizeInterceptor(reflector),
+    new ResponseEnvelopeInterceptor(reflector),
   );
 
-  const globalPrefix = 'api';
+  const globalPrefix = 'api/v1';
   app.setGlobalPrefix(globalPrefix);
 
   // Swagger API Documentation (only in development)

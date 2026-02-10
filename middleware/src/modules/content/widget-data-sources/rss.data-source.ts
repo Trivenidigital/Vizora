@@ -1,5 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { CircuitBreakerService } from '../../common/services/circuit-breaker.service';
 import { WidgetDataSource } from './widget-data-source.interface';
+
+const RSS_CIRCUIT_CONFIG = {
+  failureThreshold: 3,
+  resetTimeout: 30000, // 30 seconds
+  successThreshold: 2,
+  failureWindow: 60000,
+};
 
 /**
  * RSS / Atom feed widget data source.
@@ -15,6 +23,8 @@ export class RssDataSource implements WidgetDataSource {
 
   private readonly REQUEST_TIMEOUT = 15000;
 
+  constructor(private readonly circuitBreaker: CircuitBreakerService) {}
+
   async fetchData(config: Record<string, any>): Promise<Record<string, any>> {
     const feedUrl = config.feedUrl;
     if (!feedUrl) {
@@ -24,34 +34,39 @@ export class RssDataSource implements WidgetDataSource {
 
     const maxItems = config.maxItems ?? 10;
 
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), this.REQUEST_TIMEOUT);
+    return this.circuitBreaker.executeWithFallback(
+      'rss-feed',
+      async () => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), this.REQUEST_TIMEOUT);
 
-      let xml: string;
-      try {
-        const res = await fetch(feedUrl, {
-          headers: {
-            'Accept': 'application/rss+xml, application/atom+xml, application/xml, text/xml',
-            'User-Agent': 'Vizora-Widget/1.0',
-          },
-          signal: controller.signal,
-        });
+        let xml: string;
+        try {
+          const res = await fetch(feedUrl, {
+            headers: {
+              'Accept': 'application/rss+xml, application/atom+xml, application/xml, text/xml',
+              'User-Agent': 'Vizora-Widget/1.0',
+            },
+            signal: controller.signal,
+          });
 
-        if (!res.ok) {
-          throw new Error(`Feed returned HTTP ${res.status}`);
+          if (!res.ok) {
+            throw new Error(`Feed returned HTTP ${res.status}`);
+          }
+
+          xml = await res.text();
+        } finally {
+          clearTimeout(timeoutId);
         }
 
-        xml = await res.text();
-      } finally {
-        clearTimeout(timeoutId);
-      }
-
-      return this.parseXml(xml, maxItems);
-    } catch (error) {
-      this.logger.error(`RSS fetch failed, returning sample data: ${error}`);
-      return this.getSampleData();
-    }
+        return this.parseXml(xml, maxItems);
+      },
+      () => {
+        this.logger.warn('RSS feed circuit open or failed, returning sample data');
+        return this.getSampleData();
+      },
+      RSS_CIRCUIT_CONFIG,
+    );
   }
 
   // -----------------------------------------------------------------------

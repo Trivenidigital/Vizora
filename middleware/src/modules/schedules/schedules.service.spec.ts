@@ -23,8 +23,8 @@ describe('SchedulesService', () => {
     displayGroupId: null,
     startDate: new Date('2026-01-27T00:00:00Z'),
     endDate: new Date('2026-12-31T23:59:59Z'),
-    startTime: '09:00',
-    endTime: '17:00',
+    startTime: 540,  // 09:00 in minutes from midnight
+    endTime: 1020,   // 17:00 in minutes from midnight
     daysOfWeek: [1, 2, 3, 4, 5], // Monday-Friday
     priority: 5,
     isActive: true,
@@ -70,8 +70,8 @@ describe('SchedulesService', () => {
       displayId: mockDisplayId,
       startDate: '2026-01-27T00:00:00Z',
       endDate: '2026-12-31T23:59:59Z',
-      startTime: '09:00',
-      endTime: '17:00',
+      startTime: 540,   // 09:00
+      endTime: 1020,     // 17:00
       daysOfWeek: [1, 2, 3, 4, 5],
       priority: 5,
       isActive: true,
@@ -476,8 +476,8 @@ describe('SchedulesService', () => {
       const result = await service.checkConflicts('org-123', {
         displayId: 'display-1',
         daysOfWeek: [1, 2, 3],
-        startTime: '09:00',
-        endTime: '10:00',
+        startTime: 540,   // 09:00
+        endTime: 600,     // 10:00
       });
 
       expect(result.hasConflicts).toBe(false);
@@ -489,8 +489,8 @@ describe('SchedulesService', () => {
         {
           id: 'schedule-1',
           name: 'Existing Schedule',
-          startTime: '09:30',
-          endTime: '10:30',
+          startTime: 570,   // 09:30
+          endTime: 630,     // 10:30
           daysOfWeek: [1, 2],
           playlist: { id: 'p-1', name: 'Playlist 1' },
           display: { id: 'display-1', nickname: 'Display 1' },
@@ -501,8 +501,8 @@ describe('SchedulesService', () => {
       const result = await service.checkConflicts('org-123', {
         displayId: 'display-1',
         daysOfWeek: [1, 2, 3],
-        startTime: '09:00',
-        endTime: '10:00',
+        startTime: 540,   // 09:00
+        endTime: 600,     // 10:00
       });
 
       expect(result.hasConflicts).toBe(true);
@@ -515,8 +515,8 @@ describe('SchedulesService', () => {
         {
           id: 'schedule-1',
           name: 'Earlier Schedule',
-          startTime: '07:00',
-          endTime: '08:00',
+          startTime: 420,   // 07:00
+          endTime: 480,     // 08:00
           daysOfWeek: [1, 2],
           playlist: { id: 'p-1', name: 'Playlist 1' },
           display: { id: 'display-1', nickname: 'Display 1' },
@@ -527,8 +527,8 @@ describe('SchedulesService', () => {
       const result = await service.checkConflicts('org-123', {
         displayId: 'display-1',
         daysOfWeek: [1, 2, 3],
-        startTime: '09:00',
-        endTime: '10:00',
+        startTime: 540,   // 09:00
+        endTime: 600,     // 10:00
       });
 
       expect(result.hasConflicts).toBe(false);
@@ -540,8 +540,8 @@ describe('SchedulesService', () => {
       await service.checkConflicts('org-123', {
         displayId: 'display-1',
         daysOfWeek: [1],
-        startTime: '09:00',
-        endTime: '10:00',
+        startTime: 540,   // 09:00
+        endTime: 600,     // 10:00
         excludeScheduleId: 'schedule-1',
       });
 
@@ -571,8 +571,8 @@ describe('SchedulesService', () => {
       const result = await service.checkConflicts('org-123', {
         displayId: 'display-1',
         daysOfWeek: [1, 2, 3],
-        startTime: '09:00',
-        endTime: '10:00',
+        startTime: 540,   // 09:00
+        endTime: 600,     // 10:00
       });
 
       expect(result.hasConflicts).toBe(true);
@@ -580,13 +580,13 @@ describe('SchedulesService', () => {
       expect(result.conflicts[0].name).toBe('All Day Schedule');
     });
 
-    it('should not flag adjacent time slots as conflicts (10:00 end vs 10:00 start)', async () => {
+    it('should not flag adjacent time slots as conflicts (600 end vs 600 start)', async () => {
       databaseService.schedule.findMany.mockResolvedValue([
         {
           id: 'schedule-1',
           name: 'Morning Schedule',
-          startTime: '10:00',
-          endTime: '11:00',
+          startTime: 600,   // 10:00
+          endTime: 660,     // 11:00
           daysOfWeek: [1, 2],
           playlist: { id: 'p-1', name: 'Playlist 1' },
           display: { id: 'display-1', nickname: 'Display 1' },
@@ -597,8 +597,8 @@ describe('SchedulesService', () => {
       const result = await service.checkConflicts('org-123', {
         displayId: 'display-1',
         daysOfWeek: [1, 2],
-        startTime: '09:00',
-        endTime: '10:00',
+        startTime: 540,   // 09:00
+        endTime: 600,     // 10:00
       });
 
       expect(result.hasConflicts).toBe(false);
@@ -610,8 +610,8 @@ describe('SchedulesService', () => {
         {
           id: 'schedule-1',
           name: 'Morning Meeting',
-          startTime: '09:00',
-          endTime: '10:00',
+          startTime: 540,   // 09:00
+          endTime: 600,     // 10:00
           daysOfWeek: [1],
           playlist: { id: 'p-1', name: 'Playlist 1' },
           display: { id: 'display-1', nickname: 'Display 1' },
@@ -620,8 +620,8 @@ describe('SchedulesService', () => {
         {
           id: 'schedule-2',
           name: 'Training Session',
-          startTime: '09:30',
-          endTime: '10:30',
+          startTime: 570,   // 09:30
+          endTime: 630,     // 10:30
           daysOfWeek: [1],
           playlist: { id: 'p-2', name: 'Playlist 2' },
           display: { id: 'display-1', nickname: 'Display 1' },
@@ -632,8 +632,8 @@ describe('SchedulesService', () => {
       const result = await service.checkConflicts('org-123', {
         displayId: 'display-1',
         daysOfWeek: [1],
-        startTime: '09:00',
-        endTime: '10:00',
+        startTime: 540,   // 09:00
+        endTime: 600,     // 10:00
       });
 
       expect(result.hasConflicts).toBe(true);
@@ -646,8 +646,8 @@ describe('SchedulesService', () => {
       await service.checkConflicts('org-123', {
         displayGroupId: 'group-1',
         daysOfWeek: [1, 2],
-        startTime: '09:00',
-        endTime: '10:00',
+        startTime: 540,   // 09:00
+        endTime: 600,     // 10:00
       });
 
       expect(databaseService.schedule.findMany).toHaveBeenCalledWith(
@@ -664,8 +664,8 @@ describe('SchedulesService', () => {
         {
           id: 'schedule-1',
           name: 'Timed Schedule',
-          startTime: '09:00',
-          endTime: '17:00',
+          startTime: 540,   // 09:00
+          endTime: 1020,    // 17:00
           daysOfWeek: [1, 2, 3, 4, 5],
           playlist: { id: 'p-1', name: 'Playlist 1' },
           display: { id: 'display-1', nickname: 'Display 1' },

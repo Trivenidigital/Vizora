@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vizora — Brand Direction Samples</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', -apple-system, system-ui, sans-serif;
+    background: #09090B;
+    color: #FAFAFA;
+    min-height: 100vh;
+    padding: 3rem 2rem;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page-header {
+    text-align: center;
+    max-width: 600px;
+    margin: 0 auto 3rem;
+  }
+  h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin-bottom: 0.5rem;
+  }
+  .subtitle {
+    color: #71717A;
+    font-size: 0.95rem;
+    line-height: 1.6;
+  }
+
+  /* Section Headers */
+  .section-header {
+    max-width: 1100px;
+    margin: 0 auto 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  .section-header h2 {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+  }
+  .section-header.pd h2 { color: #7C5CFC; }
+  .section-header.eh h2 { color: #00E5A0; }
+  .section-header .line {
+    flex: 1;
+    height: 1px;
+    background: #27272A;
+  }
+  .section-header .count {
+    font-size: 0.65rem;
+    color: #52525B;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.25rem;
+    max-width: 1100px;
+    width: 100%;
+    margin: 0 auto 3.5rem;
+  }
+
+  .card {
+    background: #131316;
+    border: 1px solid #27272A;
+    border-radius: 12px;
+    overflow: hidden;
+    transition: all 0.3s;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+  }
+  .card:hover {
+    border-color: #3F3F46;
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+  }
+
+  .card-preview {
+    height: 140px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Mini mockup shared styles */
+  .mini-mock {
+    width: 75%;
+    height: 65%;
+    border-radius: 6px;
+    position: relative;
+    z-index: 1;
+    overflow: hidden;
+  }
+  .mini-mock-bar {
+    height: 14px;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    padding: 0 6px;
+  }
+  .mini-mock-dot { width: 4px; height: 4px; border-radius: 50%; }
+  .mini-mock-body {
+    display: flex;
+    height: calc(100% - 14px);
+  }
+  .mini-mock-side {
+    width: 28%;
+    padding: 4px;
+  }
+  .mini-mock-nav {
+    height: 6px;
+    border-radius: 2px;
+    margin-bottom: 3px;
+  }
+  .mini-mock-content {
+    flex: 1;
+    padding: 4px;
+  }
+  .mini-mock-stat {
+    display: flex;
+    gap: 3px;
+    margin-bottom: 4px;
+  }
+  .mini-mock-stat-item {
+    flex: 1;
+    height: 16px;
+    border-radius: 2px;
+  }
+  .mini-mock-cards {
+    display: flex;
+    gap: 3px;
+  }
+  .mini-mock-card-item {
+    flex: 1;
+    height: 28px;
+    border-radius: 2px;
+  }
+
+  /* ===== Precision Dark Previews ===== */
+
+  /* PD Original Black */
+  .preview-pd-black {
+    background: #09090B;
+  }
+  .preview-pd-black::before {
+    content: '';
+    position: absolute;
+    width: 160px; height: 160px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(124,92,252,0.12) 0%, transparent 70%);
+    top: -40px; right: -40px;
+  }
+  .preview-pd-black .mini-mock { background: #131316; border: 1px solid #27272A; }
+  .preview-pd-black .mini-mock-bar { border-bottom: 1px solid #27272A; }
+  .preview-pd-black .mini-mock-dot { background: #27272A; }
+  .preview-pd-black .mini-mock-side { border-right: 1px solid #27272A; }
+  .preview-pd-black .mini-mock-nav { background: #1C1C1F; }
+  .preview-pd-black .mini-mock-nav.active { background: rgba(124,92,252,0.25); border-left: 2px solid #7C5CFC; }
+  .preview-pd-black .mini-mock-stat-item { background: #09090B; border: 1px solid #27272A; }
+  .preview-pd-black .mini-mock-card-item:nth-child(1) { background: linear-gradient(135deg, #1e1b4b, #312e81); border: 1px solid #27272A; }
+  .preview-pd-black .mini-mock-card-item:nth-child(2) { background: linear-gradient(135deg, #1a2e05, #365314); border: 1px solid #27272A; }
+  .preview-pd-black .mini-mock-card-item:nth-child(3) { background: linear-gradient(135deg, #172554, #1e3a5f); border: 1px solid #27272A; }
+
+  /* PD Deep Navy */
+  .preview-pd-navy {
+    background: #080C18;
+  }
+  .preview-pd-navy::before {
+    content: '';
+    position: absolute;
+    width: 160px; height: 160px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(124,92,252,0.1) 0%, rgba(20,40,100,0.08) 40%, transparent 70%);
+    top: -40px; right: -40px;
+  }
+  .preview-pd-navy .mini-mock { background: #0E1425; border: 1px solid #1E2A4A; }
+  .preview-pd-navy .mini-mock-bar { border-bottom: 1px solid #1E2A4A; }
+  .preview-pd-navy .mini-mock-dot { background: #1E2A4A; }
+  .preview-pd-navy .mini-mock-side { border-right: 1px solid #1E2A4A; }
+  .preview-pd-navy .mini-mock-nav { background: #161E35; }
+  .preview-pd-navy .mini-mock-nav.active { background: rgba(124,92,252,0.2); border-left: 2px solid #7C5CFC; }
+  .preview-pd-navy .mini-mock-stat-item { background: #080C18; border: 1px solid #1E2A4A; }
+  .preview-pd-navy .mini-mock-card-item:nth-child(1) { background: linear-gradient(135deg, #1a1845, #2a2670); border: 1px solid #1E2A4A; }
+  .preview-pd-navy .mini-mock-card-item:nth-child(2) { background: linear-gradient(135deg, #152a0a, #2a4518); border: 1px solid #1E2A4A; }
+  .preview-pd-navy .mini-mock-card-item:nth-child(3) { background: linear-gradient(135deg, #152250, #1e3560); border: 1px solid #1E2A4A; }
+
+  /* PD Warm Charcoal */
+  .preview-pd-charcoal {
+    background: #0E0C0A;
+  }
+  .preview-pd-charcoal::before {
+    content: '';
+    position: absolute;
+    width: 160px; height: 160px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(124,92,252,0.1) 0%, rgba(60,40,20,0.08) 40%, transparent 70%);
+    top: -40px; right: -40px;
+  }
+  .preview-pd-charcoal .mini-mock { background: #161412; border: 1px solid #2A2420; }
+  .preview-pd-charcoal .mini-mock-bar { border-bottom: 1px solid #2A2420; }
+  .preview-pd-charcoal .mini-mock-dot { background: #2A2420; }
+  .preview-pd-charcoal .mini-mock-side { border-right: 1px solid #2A2420; }
+  .preview-pd-charcoal .mini-mock-nav { background: #201D1A; }
+  .preview-pd-charcoal .mini-mock-nav.active { background: rgba(124,92,252,0.2); border-left: 2px solid #7C5CFC; }
+  .preview-pd-charcoal .mini-mock-stat-item { background: #0E0C0A; border: 1px solid #2A2420; }
+  .preview-pd-charcoal .mini-mock-card-item:nth-child(1) { background: linear-gradient(135deg, #1e1b4b, #312e81); border: 1px solid #2A2420; }
+  .preview-pd-charcoal .mini-mock-card-item:nth-child(2) { background: linear-gradient(135deg, #1a2e05, #365314); border: 1px solid #2A2420; }
+  .preview-pd-charcoal .mini-mock-card-item:nth-child(3) { background: linear-gradient(135deg, #172554, #1e3a5f); border: 1px solid #2A2420; }
+
+  /* PD Deep Plum */
+  .preview-pd-plum {
+    background: #100A14;
+  }
+  .preview-pd-plum::before {
+    content: '';
+    position: absolute;
+    width: 160px; height: 160px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(124,92,252,0.15) 0%, rgba(60,20,80,0.08) 40%, transparent 70%);
+    top: -40px; right: -40px;
+  }
+  .preview-pd-plum .mini-mock { background: #18101E; border: 1px solid #2E2040; }
+  .preview-pd-plum .mini-mock-bar { border-bottom: 1px solid #2E2040; }
+  .preview-pd-plum .mini-mock-dot { background: #2E2040; }
+  .preview-pd-plum .mini-mock-side { border-right: 1px solid #2E2040; }
+  .preview-pd-plum .mini-mock-nav { background: #221830; }
+  .preview-pd-plum .mini-mock-nav.active { background: rgba(124,92,252,0.25); border-left: 2px solid #7C5CFC; }
+  .preview-pd-plum .mini-mock-stat-item { background: #100A14; border: 1px solid #2E2040; }
+  .preview-pd-plum .mini-mock-card-item:nth-child(1) { background: linear-gradient(135deg, #241845, #3a2870); border: 1px solid #2E2040; }
+  .preview-pd-plum .mini-mock-card-item:nth-child(2) { background: linear-gradient(135deg, #1a2e05, #365314); border: 1px solid #2E2040; }
+  .preview-pd-plum .mini-mock-card-item:nth-child(3) { background: linear-gradient(135deg, #1a1850, #2a2560); border: 1px solid #2E2040; }
+
+  /* ===== Electric Horizon Previews ===== */
+
+  /* EH Original Black */
+  .preview-eh-black {
+    background: #0A0A0F;
+    position: relative;
+  }
+  .preview-eh-black::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(42,42,58,0.2) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(42,42,58,0.2) 1px, transparent 1px);
+    background-size: 20px 20px;
+    mask-image: radial-gradient(ellipse at center, black 20%, transparent 70%);
+    -webkit-mask-image: radial-gradient(ellipse at center, black 20%, transparent 70%);
+  }
+  .preview-eh-black::after {
+    content: '';
+    position: absolute;
+    width: 180px; height: 180px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,229,160,0.1) 0%, transparent 65%);
+    top: -60px; right: -60px;
+  }
+  .preview-eh-black .mini-mock { background: #12121A; border: 1px solid #2A2A3A; }
+  .preview-eh-black .mini-mock-bar { border-bottom: 1px solid #2A2A3A; background: linear-gradient(90deg, rgba(0,229,160,0.06), transparent); }
+  .preview-eh-black .mini-mock-dot { background: #2A2A3A; }
+  .preview-eh-black .mini-mock-side { border-right: 1px solid #2A2A3A; }
+  .preview-eh-black .mini-mock-nav { background: #1A1A25; }
+  .preview-eh-black .mini-mock-nav.active { background: rgba(0,229,160,0.12); border-left: 2px solid #00E5A0; }
+  .preview-eh-black .mini-mock-stat-item { background: #0A0A0F; border: 1px solid #2A2A3A; }
+  .preview-eh-black .mini-mock-card-item:nth-child(1) { background: linear-gradient(135deg, #0a1a15, #0d2818); border: 1px solid rgba(0,229,160,0.1); }
+  .preview-eh-black .mini-mock-card-item:nth-child(2) { background: linear-gradient(135deg, #0a0f1a, #0d1528); border: 1px solid rgba(0,180,216,0.1); }
+  .preview-eh-black .mini-mock-card-item:nth-child(3) { background: linear-gradient(135deg, #120a1a, #1a0d28); border: 1px solid rgba(139,92,246,0.1); }
+
+  /* EH Deep Navy */
+  .preview-eh-navy {
+    background: #080C18;
+    position: relative;
+  }
+  .preview-eh-navy::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(34,48,88,0.2) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(34,48,88,0.2) 1px, transparent 1px);
+    background-size: 20px 20px;
+    mask-image: radial-gradient(ellipse at center, black 20%, transparent 70%);
+    -webkit-mask-image: radial-gradient(ellipse at center, black 20%, transparent 70%);
+  }
+  .preview-eh-navy::after {
+    content: '';
+    position: absolute;
+    width: 180px; height: 180px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,229,160,0.08) 0%, rgba(20,40,100,0.06) 40%, transparent 65%);
+    top: -60px; right: -60px;
+  }
+  .preview-eh-navy .mini-mock { background: #0E1425; border: 1px solid #223058; }
+  .preview-eh-navy .mini-mock-bar { border-bottom: 1px solid #223058; background: linear-gradient(90deg, rgba(0,229,160,0.06), transparent); }
+  .preview-eh-navy .mini-mock-dot { background: #223058; }
+  .preview-eh-navy .mini-mock-side { border-right: 1px solid #223058; }
+  .preview-eh-navy .mini-mock-nav { background: #161E35; }
+  .preview-eh-navy .mini-mock-nav.active { background: rgba(0,229,160,0.12); border-left: 2px solid #00E5A0; }
+  .preview-eh-navy .mini-mock-stat-item { background: #080C18; border: 1px solid #223058; }
+  .preview-eh-navy .mini-mock-card-item:nth-child(1) { background: linear-gradient(135deg, #081a20, #0d2838); border: 1px solid rgba(0,229,160,0.1); }
+  .preview-eh-navy .mini-mock-card-item:nth-child(2) { background: linear-gradient(135deg, #080f20, #0d1538); border: 1px solid rgba(0,180,216,0.1); }
+  .preview-eh-navy .mini-mock-card-item:nth-child(3) { background: linear-gradient(135deg, #100a20, #1a0d38); border: 1px solid rgba(139,92,246,0.1); }
+
+  /* EH Warm Charcoal */
+  .preview-eh-charcoal {
+    background: #0E0C0A;
+    position: relative;
+  }
+  .preview-eh-charcoal::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(48,42,36,0.2) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(48,42,36,0.2) 1px, transparent 1px);
+    background-size: 20px 20px;
+    mask-image: radial-gradient(ellipse at center, black 20%, transparent 70%);
+    -webkit-mask-image: radial-gradient(ellipse at center, black 20%, transparent 70%);
+  }
+  .preview-eh-charcoal::after {
+    content: '';
+    position: absolute;
+    width: 180px; height: 180px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,229,160,0.08) 0%, rgba(80,60,30,0.06) 40%, transparent 65%);
+    top: -60px; right: -60px;
+  }
+  .preview-eh-charcoal .mini-mock { background: #161412; border: 1px solid #302A24; }
+  .preview-eh-charcoal .mini-mock-bar { border-bottom: 1px solid #302A24; background: linear-gradient(90deg, rgba(0,229,160,0.06), transparent); }
+  .preview-eh-charcoal .mini-mock-dot { background: #302A24; }
+  .preview-eh-charcoal .mini-mock-side { border-right: 1px solid #302A24; }
+  .preview-eh-charcoal .mini-mock-nav { background: #201D1A; }
+  .preview-eh-charcoal .mini-mock-nav.active { background: rgba(0,229,160,0.12); border-left: 2px solid #00E5A0; }
+  .preview-eh-charcoal .mini-mock-stat-item { background: #0E0C0A; border: 1px solid #302A24; }
+  .preview-eh-charcoal .mini-mock-card-item:nth-child(1) { background: linear-gradient(135deg, #1a1510, #281e0d); border: 1px solid rgba(0,229,160,0.1); }
+  .preview-eh-charcoal .mini-mock-card-item:nth-child(2) { background: linear-gradient(135deg, #14120e, #201a12); border: 1px solid rgba(0,180,216,0.1); }
+  .preview-eh-charcoal .mini-mock-card-item:nth-child(3) { background: linear-gradient(135deg, #1a140e, #28200d); border: 1px solid rgba(139,92,246,0.1); }
+
+  /* EH Deep Teal */
+  .preview-eh-teal {
+    background: #060E10;
+    position: relative;
+  }
+  .preview-eh-teal::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(30,48,53,0.2) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(30,48,53,0.2) 1px, transparent 1px);
+    background-size: 20px 20px;
+    mask-image: radial-gradient(ellipse at center, black 20%, transparent 70%);
+    -webkit-mask-image: radial-gradient(ellipse at center, black 20%, transparent 70%);
+  }
+  .preview-eh-teal::after {
+    content: '';
+    position: absolute;
+    width: 180px; height: 180px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,229,160,0.12) 0%, rgba(0,60,50,0.06) 40%, transparent 65%);
+    top: -60px; right: -60px;
+  }
+  .preview-eh-teal .mini-mock { background: #0C1618; border: 1px solid #1E3035; }
+  .preview-eh-teal .mini-mock-bar { border-bottom: 1px solid #1E3035; background: linear-gradient(90deg, rgba(0,229,160,0.08), transparent); }
+  .preview-eh-teal .mini-mock-dot { background: #1E3035; }
+  .preview-eh-teal .mini-mock-side { border-right: 1px solid #1E3035; }
+  .preview-eh-teal .mini-mock-nav { background: #142022; }
+  .preview-eh-teal .mini-mock-nav.active { background: rgba(0,229,160,0.15); border-left: 2px solid #00E5A0; }
+  .preview-eh-teal .mini-mock-stat-item { background: #060E10; border: 1px solid #1E3035; }
+  .preview-eh-teal .mini-mock-card-item:nth-child(1) { background: linear-gradient(135deg, #061a18, #0d2825); border: 1px solid rgba(0,229,160,0.12); }
+  .preview-eh-teal .mini-mock-card-item:nth-child(2) { background: linear-gradient(135deg, #060f18, #0d1825); border: 1px solid rgba(0,180,216,0.12); }
+  .preview-eh-teal .mini-mock-card-item:nth-child(3) { background: linear-gradient(135deg, #100a1a, #1a1025); border: 1px solid rgba(139,92,246,0.1); }
+
+  .card-body { padding: 1rem 1.25rem 1.25rem; }
+  .card-label {
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.35rem;
+  }
+  .card-label.pd { color: #7C5CFC; }
+  .card-label.eh { color: #00E5A0; }
+  .card-title {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+    letter-spacing: -0.01em;
+  }
+  .card-hex {
+    font-size: 0.65rem;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    color: #52525B;
+    margin-bottom: 0.5rem;
+    letter-spacing: 0.01em;
+  }
+  .card-desc {
+    font-size: 0.78rem;
+    color: #A1A1AA;
+    line-height: 1.5;
+    margin-bottom: 0.75rem;
+  }
+  .card-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    transition: gap 0.15s;
+  }
+  .card:hover .card-cta { gap: 10px; }
+  .card-cta.pd { color: #7C5CFC; }
+  .card-cta.eh { color: #00E5A0; }
+
+  .footer {
+    margin-top: 2rem;
+    font-size: 0.75rem;
+    color: #52525B;
+    text-align: center;
+  }
+
+  @media (max-width: 1000px) {
+    .grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 560px) {
+    .grid { grid-template-columns: 1fr; max-width: 400px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>Vizora Brand Directions</h1>
+  <p class="subtitle">Eight design variations across two directions. Click each to view a full sample with landing page, dashboard mockup, and component library.</p>
+</div>
+
+<!-- ===== SECTION 1: PRECISION DARK ===== -->
+<div class="section-header pd">
+  <h2>Precision Dark</h2>
+  <div class="line"></div>
+  <div class="count">4 variants</div>
+</div>
+
+<div class="grid">
+  <!-- PD Original Black -->
+  <a href="01-precision-dark.html" class="card">
+    <div class="card-preview preview-pd-black">
+      <div class="mini-mock">
+        <div class="mini-mock-bar"><div class="mini-mock-dot"></div><div class="mini-mock-dot"></div><div class="mini-mock-dot"></div></div>
+        <div class="mini-mock-body">
+          <div class="mini-mock-side">
+            <div class="mini-mock-nav active"></div>
+            <div class="mini-mock-nav"></div>
+            <div class="mini-mock-nav"></div>
+          </div>
+          <div class="mini-mock-content">
+            <div class="mini-mock-stat"><div class="mini-mock-stat-item"></div><div class="mini-mock-stat-item"></div><div class="mini-mock-stat-item"></div></div>
+            <div class="mini-mock-cards"><div class="mini-mock-card-item"></div><div class="mini-mock-card-item"></div><div class="mini-mock-card-item"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="card-label pd">Original</div>
+      <div class="card-title">Original Black</div>
+      <div class="card-hex">#09090B / #131316 / #1C1C1F</div>
+      <div class="card-desc">Pure dark monochromatic base. Dense data without visual noise.</div>
+      <span class="card-cta pd">View Sample &rarr;</span>
+    </div>
+  </a>
+
+  <!-- PD Deep Navy -->
+  <a href="pd-navy.html" class="card">
+    <div class="card-preview preview-pd-navy">
+      <div class="mini-mock">
+        <div class="mini-mock-bar"><div class="mini-mock-dot"></div><div class="mini-mock-dot"></div><div class="mini-mock-dot"></div></div>
+        <div class="mini-mock-body">
+          <div class="mini-mock-side">
+            <div class="mini-mock-nav active"></div>
+            <div class="mini-mock-nav"></div>
+            <div class="mini-mock-nav"></div>
+          </div>
+          <div class="mini-mock-content">
+            <div class="mini-mock-stat"><div class="mini-mock-stat-item"></div><div class="mini-mock-stat-item"></div><div class="mini-mock-stat-item"></div></div>
+            <div class="mini-mock-cards"><div class="mini-mock-card-item"></div><div class="mini-mock-card-item"></div><div class="mini-mock-card-item"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="card-label pd">Variant</div>
+      <div class="card-title">Deep Navy</div>
+      <div class="card-hex">#080C18 / #0E1425 / #161E35</div>
+      <div class="card-desc">Cool blue-shifted backgrounds with a professional, corporate depth.</div>
+      <span class="card-cta pd">View Sample &rarr;</span>
+    </div>
+  </a>
+
+  <!-- PD Warm Charcoal -->
+  <a href="pd-charcoal.html" class="card">
+    <div class="card-preview preview-pd-charcoal">
+      <div class="mini-mock">
+        <div class="mini-mock-bar"><div class="mini-mock-dot"></div><div class="mini-mock-dot"></div><div class="mini-mock-dot"></div></div>
+        <div class="mini-mock-body">
+          <div class="mini-mock-side">
+            <div class="mini-mock-nav active"></div>
+            <div class="mini-mock-nav"></div>
+            <div class="mini-mock-nav"></div>
+          </div>
+          <div class="mini-mock-content">
+            <div class="mini-mock-stat"><div class="mini-mock-stat-item"></div><div class="mini-mock-stat-item"></div><div class="mini-mock-stat-item"></div></div>
+            <div class="mini-mock-cards"><div class="mini-mock-card-item"></div><div class="mini-mock-card-item"></div><div class="mini-mock-card-item"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="card-label pd">Variant</div>
+      <div class="card-title">Warm Charcoal</div>
+      <div class="card-hex">#0E0C0A / #161412 / #201D1A</div>
+      <div class="card-desc">Warm-toned backgrounds with amber undertones for an inviting feel.</div>
+      <span class="card-cta pd">View Sample &rarr;</span>
+    </div>
+  </a>
+
+  <!-- PD Deep Plum -->
+  <a href="pd-plum.html" class="card">
+    <div class="card-preview preview-pd-plum">
+      <div class="mini-mock">
+        <div class="mini-mock-bar"><div class="mini-mock-dot"></div><div class="mini-mock-dot"></div><div class="mini-mock-dot"></div></div>
+        <div class="mini-mock-body">
+          <div class="mini-mock-side">
+            <div class="mini-mock-nav active"></div>
+            <div class="mini-mock-nav"></div>
+            <div class="mini-mock-nav"></div>
+          </div>
+          <div class="mini-mock-content">
+            <div class="mini-mock-stat"><div class="mini-mock-stat-item"></div><div class="mini-mock-stat-item"></div><div class="mini-mock-stat-item"></div></div>
+            <div class="mini-mock-cards"><div class="mini-mock-card-item"></div><div class="mini-mock-card-item"></div><div class="mini-mock-card-item"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="card-label pd">Variant</div>
+      <div class="card-title">Deep Plum</div>
+      <div class="card-hex">#100A14 / #18101E / #221830</div>
+      <div class="card-desc">Rich purple undertones that complement the violet accent naturally.</div>
+      <span class="card-cta pd">View Sample &rarr;</span>
+    </div>
+  </a>
+</div>
+
+<!-- ===== SECTION 2: ELECTRIC HORIZON ===== -->
+<div class="section-header eh">
+  <h2>Electric Horizon</h2>
+  <div class="line"></div>
+  <div class="count">4 variants</div>
+</div>
+
+<div class="grid">
+  <!-- EH Original Black -->
+  <a href="03-electric-horizon.html" class="card">
+    <div class="card-preview preview-eh-black">
+      <div class="mini-mock">
+        <div class="mini-mock-bar"><div class="mini-mock-dot"></div><div class="mini-mock-dot"></div><div class="mini-mock-dot"></div></div>
+        <div class="mini-mock-body">
+          <div class="mini-mock-side">
+            <div class="mini-mock-nav active"></div>
+            <div class="mini-mock-nav"></div>
+            <div class="mini-mock-nav"></div>
+          </div>
+          <div class="mini-mock-content">
+            <div class="mini-mock-stat"><div class="mini-mock-stat-item"></div><div class="mini-mock-stat-item"></div><div class="mini-mock-stat-item"></div></div>
+            <div class="mini-mock-cards"><div class="mini-mock-card-item"></div><div class="mini-mock-card-item"></div><div class="mini-mock-card-item"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="card-label eh">Original</div>
+      <div class="card-title">Original Black</div>
+      <div class="card-hex">#0A0A0F / #12121A / #1A1A25</div>
+      <div class="card-desc">Neon mission-control aesthetic with grid backgrounds and pulsing status.</div>
+      <span class="card-cta eh">View Sample &rarr;</span>
+    </div>
+  </a>
+
+  <!-- EH Deep Navy -->
+  <a href="eh-navy.html" class="card">
+    <div class="card-preview preview-eh-navy">
+      <div class="mini-mock">
+        <div class="mini-mock-bar"><div class="mini-mock-dot"></div><div class="mini-mock-dot"></div><div class="mini-mock-dot"></div></div>
+        <div class="mini-mock-body">
+          <div class="mini-mock-side">
+            <div class="mini-mock-nav active"></div>
+            <div class="mini-mock-nav"></div>
+            <div class="mini-mock-nav"></div>
+          </div>
+          <div class="mini-mock-content">
+            <div class="mini-mock-stat"><div class="mini-mock-stat-item"></div><div class="mini-mock-stat-item"></div><div class="mini-mock-stat-item"></div></div>
+            <div class="mini-mock-cards"><div class="mini-mock-card-item"></div><div class="mini-mock-card-item"></div><div class="mini-mock-card-item"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="card-label eh">Variant</div>
+      <div class="card-title">Deep Navy</div>
+      <div class="card-hex">#080C18 / #0E1425 / #161E35</div>
+      <div class="card-desc">Blue-shifted backgrounds add a spacefaring depth to the neon accents.</div>
+      <span class="card-cta eh">View Sample &rarr;</span>
+    </div>
+  </a>
+
+  <!-- EH Warm Charcoal -->
+  <a href="eh-charcoal.html" class="card">
+    <div class="card-preview preview-eh-charcoal">
+      <div class="mini-mock">
+        <div class="mini-mock-bar"><div class="mini-mock-dot"></div><div class="mini-mock-dot"></div><div class="mini-mock-dot"></div></div>
+        <div class="mini-mock-body">
+          <div class="mini-mock-side">
+            <div class="mini-mock-nav active"></div>
+            <div class="mini-mock-nav"></div>
+            <div class="mini-mock-nav"></div>
+          </div>
+          <div class="mini-mock-content">
+            <div class="mini-mock-stat"><div class="mini-mock-stat-item"></div><div class="mini-mock-stat-item"></div><div class="mini-mock-stat-item"></div></div>
+            <div class="mini-mock-cards"><div class="mini-mock-card-item"></div><div class="mini-mock-card-item"></div><div class="mini-mock-card-item"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="card-label eh">Variant</div>
+      <div class="card-title">Warm Charcoal</div>
+      <div class="card-hex">#0E0C0A / #161412 / #201D1A</div>
+      <div class="card-desc">Warm earthy undertones create contrast with the cool neon green accent.</div>
+      <span class="card-cta eh">View Sample &rarr;</span>
+    </div>
+  </a>
+
+  <!-- EH Deep Teal -->
+  <a href="eh-teal.html" class="card">
+    <div class="card-preview preview-eh-teal">
+      <div class="mini-mock">
+        <div class="mini-mock-bar"><div class="mini-mock-dot"></div><div class="mini-mock-dot"></div><div class="mini-mock-dot"></div></div>
+        <div class="mini-mock-body">
+          <div class="mini-mock-side">
+            <div class="mini-mock-nav active"></div>
+            <div class="mini-mock-nav"></div>
+            <div class="mini-mock-nav"></div>
+          </div>
+          <div class="mini-mock-content">
+            <div class="mini-mock-stat"><div class="mini-mock-stat-item"></div><div class="mini-mock-stat-item"></div><div class="mini-mock-stat-item"></div></div>
+            <div class="mini-mock-cards"><div class="mini-mock-card-item"></div><div class="mini-mock-card-item"></div><div class="mini-mock-card-item"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="card-label eh">Variant</div>
+      <div class="card-title">Deep Teal</div>
+      <div class="card-hex">#060E10 / #0C1618 / #142022</div>
+      <div class="card-desc">Teal backgrounds make the neon green accent glow with enhanced intensity.</div>
+      <span class="card-cta eh">View Sample &rarr;</span>
+    </div>
+  </a>
+</div>
+
+<div class="footer">
+  Vizora Brand Exploration &mdash; 8 Variants &mdash; February 2026
+</div>
+
+</body>
+</html>
