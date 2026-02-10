@@ -1,6 +1,14 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { CircuitBreakerService } from '../common/services/circuit-breaker.service';
 import * as Minio from 'minio';
+
+const MINIO_CIRCUIT_CONFIG = {
+  failureThreshold: 3,
+  resetTimeout: 15000, // 15 seconds
+  successThreshold: 2,
+  failureWindow: 60000,
+};
 
 @Injectable()
 export class StorageService implements OnModuleInit {
@@ -9,7 +17,10 @@ export class StorageService implements OnModuleInit {
   private bucket: string;
   private available = false;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly circuitBreaker: CircuitBreakerService,
+  ) {
     this.bucket = this.configService.get<string>('MINIO_BUCKET') || 'vizora-content';
   }
 
@@ -95,24 +106,24 @@ export class StorageService implements OnModuleInit {
       throw new Error('MinIO is not available');
     }
 
-    try {
-      await this.client.putObject(
-        this.bucket,
-        objectKey,
-        buffer,
-        buffer.length,
-        {
-          'Content-Type': mimeType,
-        },
-      );
+    return this.circuitBreaker.execute(
+      'minio-upload',
+      async () => {
+        await this.client!.putObject(
+          this.bucket,
+          objectKey,
+          buffer,
+          buffer.length,
+          {
+            'Content-Type': mimeType,
+          },
+        );
 
-      this.logger.debug(`File uploaded to MinIO: ${objectKey}`);
-      return objectKey;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to upload file to MinIO: ${errorMessage}`);
-      throw new Error(`MinIO upload failed: ${errorMessage}`);
-    }
+        this.logger.debug(`File uploaded to MinIO: ${objectKey}`);
+        return objectKey;
+      },
+      MINIO_CIRCUIT_CONFIG,
+    );
   }
 
   /**
@@ -126,20 +137,20 @@ export class StorageService implements OnModuleInit {
       throw new Error('MinIO is not available');
     }
 
-    try {
-      const url = await this.client.presignedGetObject(
-        this.bucket,
-        objectKey,
-        expirySeconds,
-      );
+    return this.circuitBreaker.execute(
+      'minio-presigned-url',
+      async () => {
+        const url = await this.client!.presignedGetObject(
+          this.bucket,
+          objectKey,
+          expirySeconds,
+        );
 
-      this.logger.debug(`Generated presigned URL for: ${objectKey} (expires in ${expirySeconds}s)`);
-      return url;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to generate presigned URL: ${errorMessage}`);
-      throw new Error(`Failed to generate presigned URL: ${errorMessage}`);
-    }
+        this.logger.debug(`Generated presigned URL for: ${objectKey} (expires in ${expirySeconds}s)`);
+        return url;
+      },
+      MINIO_CIRCUIT_CONFIG,
+    );
   }
 
   /**
@@ -151,14 +162,14 @@ export class StorageService implements OnModuleInit {
       throw new Error('MinIO is not available');
     }
 
-    try {
-      await this.client.removeObject(this.bucket, objectKey);
-      this.logger.debug(`File deleted from MinIO: ${objectKey}`);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to delete file from MinIO: ${errorMessage}`);
-      throw new Error(`MinIO delete failed: ${errorMessage}`);
-    }
+    return this.circuitBreaker.execute(
+      'minio-delete',
+      async () => {
+        await this.client!.removeObject(this.bucket, objectKey);
+        this.logger.debug(`File deleted from MinIO: ${objectKey}`);
+      },
+      MINIO_CIRCUIT_CONFIG,
+    );
   }
 
   /**
@@ -229,7 +240,11 @@ export class StorageService implements OnModuleInit {
       throw new Error('MinIO is not available');
     }
 
-    return this.client.getObject(this.bucket, objectKey);
+    return this.circuitBreaker.execute(
+      'minio-get-object',
+      () => this.client!.getObject(this.bucket, objectKey),
+      MINIO_CIRCUIT_CONFIG,
+    );
   }
 
   /**
@@ -311,19 +326,19 @@ export class StorageService implements OnModuleInit {
       throw new Error('MinIO is not available');
     }
 
-    try {
-      const conditions = new Minio.CopyConditions();
-      await this.client.copyObject(
-        this.bucket,
-        destKey,
-        `/${this.bucket}/${sourceKey}`,
-        conditions,
-      );
-      this.logger.debug(`File copied: ${sourceKey} -> ${destKey}`);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to copy file: ${errorMessage}`);
-      throw new Error(`MinIO copy failed: ${errorMessage}`);
-    }
+    return this.circuitBreaker.execute(
+      'minio-copy',
+      async () => {
+        const conditions = new Minio.CopyConditions();
+        await this.client!.copyObject(
+          this.bucket,
+          destKey,
+          `/${this.bucket}/${sourceKey}`,
+          conditions,
+        );
+        this.logger.debug(`File copied: ${sourceKey} -> ${destKey}`);
+      },
+      MINIO_CIRCUIT_CONFIG,
+    );
   }
 }

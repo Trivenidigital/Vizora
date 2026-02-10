@@ -22,6 +22,8 @@ export const SkipOutputSanitize = () => SetMetadata(SKIP_OUTPUT_SANITIZE_KEY, tr
 export class SanitizeInterceptor implements NestInterceptor {
   constructor(private readonly reflector?: Reflector) {}
 
+  private readonly templateHtmlFields = ['templateHtml', 'htmlContent', 'customCss'];
+
   private readonly sanitizeOptions: sanitizeHtml.IOptions = {
     allowedTags: [], // Strip all HTML tags
     allowedAttributes: {},
@@ -82,6 +84,9 @@ export class SanitizeInterceptor implements NestInterceptor {
       for (const [key, value] of Object.entries(obj)) {
         // Skip password fields - don't sanitize them
         if (key.toLowerCase().includes('password')) {
+          sanitized[key] = value;
+        } else if (this.templateHtmlFields.includes(key)) {
+          // Skip sanitization for template HTML fields that need to preserve HTML
           sanitized[key] = value;
         } else {
           sanitized[key] = this.sanitizeObject(value);

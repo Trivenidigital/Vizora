@@ -1,4 +1,4 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, Logger, Optional, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 import {
@@ -9,6 +9,12 @@ import {
   Invoice,
   WebhookEvent,
 } from './payment-provider.interface';
+import { CircuitBreakerService } from '../../common/services/circuit-breaker.service';
+
+const STRIPE_CIRCUIT_CONFIG = {
+  failureThreshold: 3,
+  resetTimeout: 10000,
+};
 
 @Injectable()
 export class StripeProvider implements PaymentProvider {
@@ -18,7 +24,10 @@ export class StripeProvider implements PaymentProvider {
   private readonly webhookSecret: string;
   private readonly isConfigured: boolean;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    @Optional() private readonly circuitBreaker?: CircuitBreakerService,
+  ) {
     const secretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
     this.isConfigured = !!secretKey;
     if (!secretKey) {
@@ -38,17 +47,22 @@ export class StripeProvider implements PaymentProvider {
     }
   }
 
+  private async withCircuitBreaker<T>(fn: () => Promise<T>): Promise<T> {
+    if (!this.circuitBreaker) {
+      return fn();
+    }
+    return this.circuitBreaker.execute('stripe-api', fn, STRIPE_CIRCUIT_CONFIG);
+  }
+
   async createCustomer(
     email: string,
     name: string,
     metadata?: Record<string, any>,
   ): Promise<Customer> {
     this.ensureConfigured();
-    const customer = await this.stripe!.customers.create({
-      email,
-      name,
-      metadata,
-    });
+    const customer = await this.withCircuitBreaker(() =>
+      this.stripe!.customers.create({ email, name, metadata }),
+    );
     return {
       id: customer.id,
       email: customer.email || email,
@@ -60,7 +74,9 @@ export class StripeProvider implements PaymentProvider {
   async getCustomer(customerId: string): Promise<Customer | null> {
     this.ensureConfigured();
     try {
-      const customer = await this.stripe!.customers.retrieve(customerId);
+      const customer = await this.withCircuitBreaker(() =>
+        this.stripe!.customers.retrieve(customerId),
+      );
       if (customer.deleted) return null;
       return {
         id: customer.id,
@@ -77,21 +93,25 @@ export class StripeProvider implements PaymentProvider {
     params: CheckoutParams,
   ): Promise<{ url: string; sessionId: string }> {
     this.ensureConfigured();
-    const session = await this.stripe!.checkout.sessions.create({
-      customer: params.customerId,
-      mode: 'subscription',
-      line_items: [{ price: params.priceId, quantity: 1 }],
-      success_url: params.successUrl,
-      cancel_url: params.cancelUrl,
-      metadata: params.metadata,
-    });
+    const session = await this.withCircuitBreaker(() =>
+      this.stripe!.checkout.sessions.create({
+        customer: params.customerId,
+        mode: 'subscription',
+        line_items: [{ price: params.priceId, quantity: 1 }],
+        success_url: params.successUrl,
+        cancel_url: params.cancelUrl,
+        metadata: params.metadata,
+      }),
+    );
     return { url: session.url!, sessionId: session.id };
   }
 
   async getSubscription(subscriptionId: string): Promise<Subscription | null> {
     this.ensureConfigured();
     try {
-      const sub = await this.stripe!.subscriptions.retrieve(subscriptionId);
+      const sub = await this.withCircuitBreaker(() =>
+        this.stripe!.subscriptions.retrieve(subscriptionId),
+      );
       return this.mapSubscription(sub);
     } catch {
       return null;
@@ -103,11 +123,15 @@ export class StripeProvider implements PaymentProvider {
     priceId: string,
   ): Promise<Subscription> {
     this.ensureConfigured();
-    const sub = await this.stripe!.subscriptions.retrieve(subscriptionId);
-    const updated = await this.stripe!.subscriptions.update(subscriptionId, {
-      items: [{ id: sub.items.data[0].id, price: priceId }],
-      proration_behavior: 'create_prorations',
-    });
+    const sub = await this.withCircuitBreaker(() =>
+      this.stripe!.subscriptions.retrieve(subscriptionId),
+    );
+    const updated = await this.withCircuitBreaker(() =>
+      this.stripe!.subscriptions.update(subscriptionId, {
+        items: [{ id: sub.items.data[0].id, price: priceId }],
+        proration_behavior: 'create_prorations',
+      }),
+    );
     return this.mapSubscription(updated);
   }
 
@@ -117,11 +141,15 @@ export class StripeProvider implements PaymentProvider {
   ): Promise<void> {
     this.ensureConfigured();
     if (immediately) {
-      await this.stripe!.subscriptions.cancel(subscriptionId);
+      await this.withCircuitBreaker(() =>
+        this.stripe!.subscriptions.cancel(subscriptionId),
+      );
     } else {
-      await this.stripe!.subscriptions.update(subscriptionId, {
-        cancel_at_period_end: true,
-      });
+      await this.withCircuitBreaker(() =>
+        this.stripe!.subscriptions.update(subscriptionId, {
+          cancel_at_period_end: true,
+        }),
+      );
     }
   }
 
@@ -130,19 +158,20 @@ export class StripeProvider implements PaymentProvider {
     returnUrl: string,
   ): Promise<{ url: string }> {
     this.ensureConfigured();
-    const session = await this.stripe!.billingPortal.sessions.create({
-      customer: customerId,
-      return_url: returnUrl,
-    });
+    const session = await this.withCircuitBreaker(() =>
+      this.stripe!.billingPortal.sessions.create({
+        customer: customerId,
+        return_url: returnUrl,
+      }),
+    );
     return { url: session.url };
   }
 
   async getInvoices(customerId: string, limit = 10): Promise<Invoice[]> {
     this.ensureConfigured();
-    const invoices = await this.stripe!.invoices.list({
-      customer: customerId,
-      limit,
-    });
+    const invoices = await this.withCircuitBreaker(() =>
+      this.stripe!.invoices.list({ customer: customerId, limit }),
+    );
     return invoices.data.map((inv) => ({
       id: inv.id,
       customerId:

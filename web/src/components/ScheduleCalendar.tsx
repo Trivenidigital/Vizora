@@ -22,8 +22,8 @@ interface Schedule {
   id: string;
   name: string;
   description?: string;
-  startTime?: string;  // HH:MM
-  endTime?: string;    // HH:MM
+  startTime?: string | number;  // HH:MM string or minutes from midnight
+  endTime?: string | number;    // HH:MM string or minutes from midnight
   daysOfWeek: number[];  // 0-6 (Sunday-Saturday)
   startDate?: string;
   endDate?: string;
@@ -109,8 +109,14 @@ export default function ScheduleCalendar({
             resource: schedule,
           });
         } else {
-          const [startH, startM] = (schedule.startTime || '09:00').split(':').map(Number);
-          const [endH, endM] = (schedule.endTime || '10:00').split(':').map(Number);
+          const startVal = schedule.startTime ?? '09:00';
+          const [startH, startM] = typeof startVal === 'number'
+            ? [Math.floor(startVal / 60), startVal % 60]
+            : startVal.split(':').map(Number);
+          const endVal = schedule.endTime ?? '10:00';
+          const [endH, endM] = typeof endVal === 'number'
+            ? [Math.floor(endVal / 60), endVal % 60]
+            : endVal.split(':').map(Number);
 
           const eventStart = setMinutes(setHours(new Date(date), startH), startM);
           const eventEnd = setMinutes(setHours(new Date(date), endH), endM);

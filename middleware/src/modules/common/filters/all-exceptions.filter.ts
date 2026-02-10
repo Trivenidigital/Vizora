@@ -13,6 +13,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
 
   catch(exception: unknown, host: ArgumentsHost): void {
+    if (host.getType() === 'ws') {
+      return;
+    }
+
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();

@@ -23,7 +23,10 @@ describe('Toast', () => {
   });
 
   afterEach(() => {
-    jest.runOnlyPendingTimers();
+    // Wrap pending timer cleanup in act to avoid act() warnings
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
     jest.useRealTimers();
   });
 
@@ -86,7 +89,9 @@ describe('Toast', () => {
       const onClose = jest.fn();
       render(<Toast {...defaultProps} onClose={onClose} />);
 
-      fireEvent.click(screen.getByRole('button'));
+      act(() => {
+        fireEvent.click(screen.getByRole('button'));
+      });
 
       // Wait for the animation delay
       act(() => {
@@ -149,7 +154,9 @@ describe('Toast', () => {
       render(<Toast {...defaultProps} onClose={onClose} />);
 
       // Click close button
-      fireEvent.click(screen.getByRole('button'));
+      act(() => {
+        fireEvent.click(screen.getByRole('button'));
+      });
 
       // Should have hidden animation classes immediately
       expect(screen.getByRole('alert').className).toContain('translate-x-full');

@@ -16,12 +16,16 @@ export class CheckConflictsDto {
   daysOfWeek: number[];
 
   @IsOptional()
-  @IsString()
-  startTime?: string;
+  @IsInt()
+  @Min(0)
+  @Max(1439)
+  startTime?: number; // Minutes from midnight (0-1439)
 
   @IsOptional()
-  @IsString()
-  endTime?: string;
+  @IsInt()
+  @Min(0)
+  @Max(1439)
+  endTime?: number; // Minutes from midnight (0-1439)
 
   @IsOptional()
   @IsString()

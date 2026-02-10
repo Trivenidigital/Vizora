@@ -176,6 +176,25 @@ sha256sum "$DAILY_DIR/$BACKUP_FILENAME" > "$DAILY_DIR/$BACKUP_FILENAME.sha256"
 log_info "Checksum written: $DAILY_DIR/$BACKUP_FILENAME.sha256"
 
 # ---------------------------------------------------------------------------
+# Optional: Off-site S3 Upload
+# ---------------------------------------------------------------------------
+# Set BACKUP_S3_BUCKET (e.g. s3://my-vizora-backups) to enable off-site copies.
+
+if [[ -n "${BACKUP_S3_BUCKET:-}" ]]; then
+    if command -v aws &>/dev/null; then
+        log_info "Uploading backup to S3: ${BACKUP_S3_BUCKET}..."
+        if aws s3 cp "$DAILY_DIR/$BACKUP_FILENAME" "${BACKUP_S3_BUCKET}/daily/$BACKUP_FILENAME" \
+            && aws s3 cp "$DAILY_DIR/$BACKUP_FILENAME.sha256" "${BACKUP_S3_BUCKET}/daily/$BACKUP_FILENAME.sha256"; then
+            log_info "S3 upload complete."
+        else
+            log_error "S3 upload failed. Local backup is still intact."
+        fi
+    else
+        log_info "BACKUP_S3_BUCKET is set but 'aws' CLI is not installed. Skipping S3 upload."
+    fi
+fi
+
+# ---------------------------------------------------------------------------
 # Rotation: Promote to weekly (Sundays) and monthly (1st of month)
 # ---------------------------------------------------------------------------
 

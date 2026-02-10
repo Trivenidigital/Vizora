@@ -24,6 +24,9 @@ import {
   ContentErrorDto,
   PlaylistRequestDto,
   ScreenshotResponseDto,
+  JoinOrganizationDto,
+  JoinRoomDto,
+  LeaveRoomDto,
   createSuccessResponse,
   createErrorResponse,
 } from './dto';
@@ -115,246 +118,310 @@ export class DeviceGateway
 
   async handleConnection(client: Socket) {
     try {
-      // 2.4: Connection rate limiting
-      const clientIp = client.handshake.address;
-      const now = Date.now();
-      const rateEntry = this.connectionAttempts.get(clientIp);
-
-      if (rateEntry) {
-        if (now > rateEntry.resetAt) {
-          // Reset window
-          this.connectionAttempts.set(clientIp, { count: 1, resetAt: now + 60000 });
-        } else {
-          rateEntry.count++;
-          if (rateEntry.count > 10) {
-            this.logger.warn(`Connection rate limited for IP: ${clientIp}`);
-            client.emit('error', { message: 'rate_limited' });
-            client.disconnect();
-            return;
-          }
-        }
-      } else {
-        this.connectionAttempts.set(clientIp, { count: 1, resetAt: now + 60000 });
-      }
-
-      const token = client.handshake.auth.token;
-
-      if (!token) {
-        this.logger.warn('Connection rejected: No token provided');
-        client.disconnect();
+      // Step 1: Rate limiting
+      if (!this.validateConnectionRate(client)) {
         return;
       }
 
-      // Verify device JWT
-      const payload = this.jwtService.verify<DevicePayload>(token, {
-        secret: process.env.DEVICE_JWT_SECRET,
-        algorithms: ['HS256'],
-      });
-
-      if (payload.type !== 'device') {
-        this.logger.warn('Connection rejected: Invalid token type');
-        client.disconnect();
+      // Step 2: Authentication (JWT verify + revocation + dedup)
+      const payload = await this.authenticateConnection(client);
+      if (!payload) {
         return;
-      }
-
-      // Check if the token has been revoked
-      if (payload.jti) {
-        const isRevoked = await this.redisService.exists(`revoked_token:${payload.jti}`);
-        if (isRevoked) {
-          this.logger.warn(`Connection rejected: Token revoked (jti: ${payload.jti})`);
-          client.disconnect();
-          return;
-        }
       }
 
       const deviceId = payload.sub;
+      const orgId = payload.organizationId;
 
-      // 2.5: Device socket deduplication - disconnect old socket if device already connected
-      const existingSocketId = this.deviceSockets.get(deviceId);
-      if (existingSocketId) {
-        const existingSocket = this.server?.sockets?.sockets?.get(existingSocketId);
-        if (existingSocket) {
-          this.logger.log(`Disconnecting stale socket ${existingSocketId} for device ${deviceId}`);
-          existingSocket.disconnect(true);
-        }
-      }
-      this.deviceSockets.set(deviceId, client.id);
-
-      // Store device info in socket data
-      client.data.deviceId = deviceId;
-      client.data.organizationId = payload.organizationId;
-      client.data.deviceIdentifier = payload.deviceIdentifier;
-
-      // Join device-specific room
-      await client.join(`device:${deviceId}`);
-      // Join organization room
-      await client.join(`org:${payload.organizationId}`);
-
-      // Update device status in Redis
-      await this.redisService.setDeviceStatus(deviceId, {
-        status: 'online',
-        lastHeartbeat: Date.now(),
-        socketId: client.id,
-        organizationId: payload.organizationId,
+      // Step 3: Verify device exists in database (B.1)
+      const deviceExists = await this.databaseService.display.findUnique({
+        where: { id: deviceId },
+        select: { id: true },
       });
-
-      // 2.1: Only write to DB if status actually changed
-      const previousStatus = this.deviceStatusCache.get(deviceId);
-      if (previousStatus !== 'online') {
-        try {
-          await this.databaseService.display.update({
-            where: { id: deviceId },
-            data: {
-              status: 'online',
-              lastHeartbeat: new Date(),
-            },
-          });
-        } catch (dbError: unknown) {
-          const errorMessage = dbError instanceof Error ? dbError.message : 'Unknown error';
-          this.logger.warn(`Failed to update database for device ${deviceId}: ${errorMessage}`);
-        }
-      }
-      this.deviceStatusCache.set(deviceId, 'online');
-
-      this.logger.log(`Device connected: ${deviceId} (${client.id})`);
-
-      // Cancel any pending offline notification for this device
-      const wasOfflineLong = await this.notificationService.wasDeviceOfflineLong(deviceId);
-      await this.notificationService.cancelOfflineNotification(deviceId);
-
-      // If the device was offline for > 2 minutes, create an "online" notification
-      if (wasOfflineLong) {
-        try {
-          const device = await this.databaseService.display.findUnique({
-            where: { id: deviceId },
-            select: { nickname: true, deviceIdentifier: true },
-          });
-          const deviceName = device?.nickname || device?.deviceIdentifier || deviceId;
-          await this.notificationService.createOnlineNotification(
-            deviceId,
-            deviceName,
-            payload.organizationId,
-          );
-          // Emit notification to dashboard
-          this.server.to(`org:${payload.organizationId}`).emit('notification:new', {
-            type: 'device_online',
-            deviceId,
-            deviceName,
-            timestamp: new Date().toISOString(),
-          });
-        } catch (notifError) {
-          this.logger.warn(`Failed to create online notification for device ${deviceId}`);
-        }
+      if (!deviceExists) {
+        this.logger.warn(`Connection rejected: Device not found in database (id: ${deviceId})`);
+        client.emit('error', { message: 'device_not_found' });
+        client.disconnect();
+        return;
       }
 
-      // Record metrics
-      this.metricsService.recordConnection(payload.organizationId, 'connected');
-      this.metricsService.updateDeviceStatus(deviceId, payload.organizationId, 'online');
+      // Step 4: Room joins + Redis status
+      await this.setupDeviceRooms(client, deviceId, orgId);
 
-      // Notify dashboard about device online status
-      this.server.to(`org:${payload.organizationId}`).emit('device:status', {
-        deviceId,
-        status: 'online',
-        timestamp: new Date().toISOString(),
-      });
+      // Step 5: Send initial state (playlist, config, pending commands)
+      await this.sendInitialState(client, deviceId, orgId);
 
-      // Fetch and send current playlist to device on connection
-      try {
-        this.logger.debug(`Fetching playlist for device: ${deviceId}`);
-        const display = await this.databaseService.display.findUnique({
-          where: { id: deviceId },
-          include: {
-            currentPlaylist: {
-              include: {
-                items: {
-                  include: {
-                    content: true,
-                  },
-                  orderBy: {
-                    order: 'asc',
-                  },
-                },
-              },
-            },
-          },
-        });
-
-        // Extract qrOverlay from display metadata for initial config
-        const displayMetadata = (display?.metadata as Record<string, any>) || {};
-
-        // Send initial configuration including qrOverlay
-        client.emit('config', {
-          heartbeatInterval: 15000, // 15 seconds
-          cacheSize: 524288000, // 500MB
-          autoUpdate: true,
-          qrOverlay: displayMetadata.qrOverlay || null,
-        });
-
-        this.logger.debug(`Display found: ${!!display}, hasPlaylist: ${!!display?.currentPlaylist}, playlistId: ${display?.currentPlaylistId || 'none'}`);
-
-        if (display?.currentPlaylist) {
-          // Transform playlist to the format expected by the display client
-          // Content URLs use the API base path — devices authenticate via
-          // Authorization header with their stored JWT, not via URL query params
-          const resolvedItems = await Promise.all(
-            display.currentPlaylist.items.map(async (item: any) => {
-              const resolvedUrl = this.resolveContentUrl(item);
-              const baseItem = {
-                id: item.id,
-                contentId: item.contentId,
-                duration: item.duration || 10,
-                order: item.order,
-                content: item.content ? {
-                  id: item.content.id,
-                  name: item.content.name,
-                  type: item.content.type,
-                  url: resolvedUrl,
-                  thumbnail: item.content.thumbnail,
-                  mimeType: item.content.mimeType,
-                  duration: item.content.duration,
-                  metadata: item.content.metadata,
-                } : null,
-              };
-
-              // Resolve layout content inline so devices receive self-contained data
-              if (baseItem.content?.type === 'layout') {
-                baseItem.content = await this.resolveLayoutContent(baseItem.content);
-              }
-
-              return baseItem;
-            }),
-          );
-
-          const playlist = {
-            id: display.currentPlaylist.id,
-            name: display.currentPlaylist.name,
-            items: resolvedItems,
-            totalDuration: display.currentPlaylist.items.reduce(
-              (sum: number, item: any) => sum + (item.duration || 10),
-              0
-            ),
-            loopPlaylist: true,
-          };
-
-          client.emit('playlist:update', {
-            playlist,
-            timestamp: new Date().toISOString(),
-          });
-
-          this.logger.log(`Sent current playlist to device: ${deviceId} (playlist: ${display.currentPlaylist.name})`);
-        } else {
-          this.logger.log(`Device ${deviceId} has no assigned playlist`);
-        }
-      } catch (playlistError: unknown) {
-        const playlistErrorMsg = playlistError instanceof Error ? playlistError.stack || playlistError.message : 'Unknown error';
-        this.logger.error(`Failed to fetch playlist for device ${deviceId}: ${playlistErrorMsg}`);
-        // Don't fail the connection if playlist fetch fails
-      }
+      // Step 6: Status broadcast + metrics + notifications
+      await this.broadcastDeviceOnline(client, deviceId, orgId);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Connection error: ${errorMessage}`);
       client.disconnect();
     }
+  }
+
+  /**
+   * Validate connection rate limiting for the client IP.
+   * Returns true if the connection is allowed, false if rate-limited.
+   */
+  private validateConnectionRate(client: Socket): boolean {
+    const clientIp = client.handshake.address;
+    const now = Date.now();
+    const rateEntry = this.connectionAttempts.get(clientIp);
+
+    if (rateEntry) {
+      if (now > rateEntry.resetAt) {
+        // Reset window
+        this.connectionAttempts.set(clientIp, { count: 1, resetAt: now + 60000 });
+      } else {
+        rateEntry.count++;
+        if (rateEntry.count > 10) {
+          this.logger.warn(`Connection rate limited for IP: ${clientIp}`);
+          client.emit('error', { message: 'rate_limited' });
+          client.disconnect();
+          return false;
+        }
+      }
+    } else {
+      this.connectionAttempts.set(clientIp, { count: 1, resetAt: now + 60000 });
+    }
+
+    return true;
+  }
+
+  /**
+   * Authenticate the connection: verify JWT, check revocation, deduplicate sockets.
+   * Returns the device payload on success, or null if connection was rejected.
+   */
+  private async authenticateConnection(client: Socket): Promise<DevicePayload | null> {
+    const token = client.handshake.auth.token;
+
+    if (!token) {
+      this.logger.warn('Connection rejected: No token provided');
+      client.disconnect();
+      return null;
+    }
+
+    // Verify device JWT
+    const payload = this.jwtService.verify<DevicePayload>(token, {
+      secret: process.env.DEVICE_JWT_SECRET,
+      algorithms: ['HS256'],
+    });
+
+    if (payload.type !== 'device') {
+      this.logger.warn('Connection rejected: Invalid token type');
+      client.disconnect();
+      return null;
+    }
+
+    // Check if the token has been revoked
+    if (payload.jti) {
+      const isRevoked = await this.redisService.exists(`revoked_token:${payload.jti}`);
+      if (isRevoked) {
+        this.logger.warn(`Connection rejected: Token revoked (jti: ${payload.jti})`);
+        client.disconnect();
+        return null;
+      }
+    }
+
+    const deviceId = payload.sub;
+
+    // 2.5: Device socket deduplication - disconnect old socket if device already connected
+    const existingSocketId = this.deviceSockets.get(deviceId);
+    if (existingSocketId) {
+      const existingSocket = this.server?.sockets?.sockets?.get(existingSocketId);
+      if (existingSocket) {
+        this.logger.log(`Disconnecting stale socket ${existingSocketId} for device ${deviceId}`);
+        existingSocket.disconnect(true);
+      }
+    }
+    this.deviceSockets.set(deviceId, client.id);
+
+    // Store device info in socket data
+    client.data.deviceId = deviceId;
+    client.data.organizationId = payload.organizationId;
+    client.data.deviceIdentifier = payload.deviceIdentifier;
+
+    return payload;
+  }
+
+  /**
+   * Join device and organization rooms, update Redis and DB status.
+   */
+  private async setupDeviceRooms(client: Socket, deviceId: string, orgId: string): Promise<void> {
+    // Join device-specific room
+    await client.join(`device:${deviceId}`);
+    // Join organization room
+    await client.join(`org:${orgId}`);
+
+    // Update device status in Redis
+    await this.redisService.setDeviceStatus(deviceId, {
+      status: 'online',
+      lastHeartbeat: Date.now(),
+      socketId: client.id,
+      organizationId: orgId,
+    });
+
+    // 2.1: Only write to DB if status actually changed
+    const previousStatus = this.deviceStatusCache.get(deviceId);
+    if (previousStatus !== 'online') {
+      try {
+        await this.databaseService.display.update({
+          where: { id: deviceId },
+          data: {
+            status: 'online',
+            lastHeartbeat: new Date(),
+          },
+        });
+      } catch (dbError: unknown) {
+        const errorMessage = dbError instanceof Error ? dbError.message : 'Unknown error';
+        this.logger.warn(`Failed to update database for device ${deviceId}: ${errorMessage}`);
+      }
+    }
+    this.deviceStatusCache.set(deviceId, 'online');
+
+    this.logger.log(`Device connected: ${deviceId} (${client.id})`);
+  }
+
+  /**
+   * Send initial state to the device: config, playlist, pending commands.
+   */
+  private async sendInitialState(client: Socket, deviceId: string, orgId: string): Promise<void> {
+    try {
+      this.logger.debug(`Fetching playlist for device: ${deviceId}`);
+      const display = await this.databaseService.display.findUnique({
+        where: { id: deviceId },
+        include: {
+          currentPlaylist: {
+            include: {
+              items: {
+                include: {
+                  content: true,
+                },
+                orderBy: {
+                  order: 'asc',
+                },
+              },
+            },
+          },
+        },
+      });
+
+      // Extract qrOverlay from display metadata for initial config
+      const displayMetadata = (display?.metadata as Record<string, any>) || {};
+
+      // Send initial configuration including qrOverlay
+      client.emit('config', {
+        heartbeatInterval: 15000, // 15 seconds
+        cacheSize: 524288000, // 500MB
+        autoUpdate: true,
+        qrOverlay: displayMetadata.qrOverlay || null,
+      });
+
+      this.logger.debug(`Display found: ${!!display}, hasPlaylist: ${!!display?.currentPlaylist}, playlistId: ${display?.currentPlaylistId || 'none'}`);
+
+      if (display?.currentPlaylist) {
+        // Transform playlist to the format expected by the display client
+        // Content URLs use the API base path — devices authenticate via
+        // Authorization header with their stored JWT, not via URL query params
+        const resolvedItems = await Promise.all(
+          display.currentPlaylist.items.map(async (item: any) => {
+            const resolvedUrl = this.resolveContentUrl(item);
+            const baseItem = {
+              id: item.id,
+              contentId: item.contentId,
+              duration: item.duration || 10,
+              order: item.order,
+              content: item.content ? {
+                id: item.content.id,
+                name: item.content.name,
+                type: item.content.type,
+                url: resolvedUrl,
+                thumbnail: item.content.thumbnail,
+                mimeType: item.content.mimeType,
+                duration: item.content.duration,
+                metadata: item.content.metadata,
+              } : null,
+            };
+
+            // Resolve layout content inline so devices receive self-contained data
+            if (baseItem.content?.type === 'layout') {
+              baseItem.content = await this.resolveLayoutContent(baseItem.content);
+            }
+
+            return baseItem;
+          }),
+        );
+
+        const playlist = {
+          id: display.currentPlaylist.id,
+          name: display.currentPlaylist.name,
+          items: resolvedItems,
+          totalDuration: display.currentPlaylist.items.reduce(
+            (sum: number, item: any) => sum + (item.duration || 10),
+            0
+          ),
+          loopPlaylist: true,
+        };
+
+        client.emit('playlist:update', {
+          playlist,
+          timestamp: new Date().toISOString(),
+        });
+
+        this.logger.log(`Sent current playlist to device: ${deviceId} (playlist: ${display.currentPlaylist.name})`);
+      } else {
+        this.logger.log(`Device ${deviceId} has no assigned playlist`);
+      }
+    } catch (playlistError: unknown) {
+      const playlistErrorMsg = playlistError instanceof Error ? playlistError.stack || playlistError.message : 'Unknown error';
+      this.logger.error(`Failed to fetch playlist for device ${deviceId}: ${playlistErrorMsg}`);
+      // Don't fail the connection if playlist fetch fails
+    }
+  }
+
+  /**
+   * Broadcast device online status, handle notifications, and record metrics.
+   */
+  private async broadcastDeviceOnline(client: Socket, deviceId: string, orgId: string): Promise<void> {
+    // Cancel any pending offline notification for this device
+    const wasOfflineLong = await this.notificationService.wasDeviceOfflineLong(deviceId);
+    await this.notificationService.cancelOfflineNotification(deviceId);
+
+    // If the device was offline for > 2 minutes, create an "online" notification
+    if (wasOfflineLong) {
+      try {
+        const device = await this.databaseService.display.findUnique({
+          where: { id: deviceId },
+          select: { nickname: true, deviceIdentifier: true },
+        });
+        const deviceName = device?.nickname || device?.deviceIdentifier || deviceId;
+        await this.notificationService.createOnlineNotification(
+          deviceId,
+          deviceName,
+          orgId,
+        );
+        // Emit notification to dashboard
+        this.server.to(`org:${orgId}`).emit('notification:new', {
+          type: 'device_online',
+          deviceId,
+          deviceName,
+          timestamp: new Date().toISOString(),
+        });
+      } catch (notifError) {
+        this.logger.warn(`Failed to create online notification for device ${deviceId}`);
+      }
+    }
+
+    // Record metrics
+    this.metricsService.recordConnection(orgId, 'connected');
+    this.metricsService.updateDeviceStatus(deviceId, orgId, 'online');
+
+    // Notify dashboard about device online status
+    this.server.to(`org:${orgId}`).emit('device:status', {
+      deviceId,
+      status: 'online',
+      timestamp: new Date().toISOString(),
+    });
   }
 
   async handleDisconnect(client: Socket) {
@@ -647,9 +714,10 @@ export class DeviceGateway
    * This enables them to receive device status updates
    */
   @SubscribeMessage('join:organization')
+  @UsePipes(new WsValidationPipe())
   async handleJoinOrganization(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { organizationId: string },
+    @MessageBody() data: JoinOrganizationDto,
   ) {
     if (!data?.organizationId) {
       return createErrorResponse('Organization ID required');
@@ -687,9 +755,10 @@ export class DeviceGateway
    * - All other room patterns are rejected
    */
   @SubscribeMessage('join:room')
+  @UsePipes(new WsValidationPipe())
   async handleJoinRoom(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { room: string },
+    @MessageBody() data: JoinRoomDto,
   ) {
     if (!data?.room) {
       return createErrorResponse('Room name required');
@@ -747,15 +816,22 @@ export class DeviceGateway
   }
 
   /**
-   * Allow clients to leave rooms
+   * Allow clients to leave rooms with authorization check
    */
   @SubscribeMessage('leave:room')
+  @UsePipes(new WsValidationPipe())
   async handleLeaveRoom(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { room: string },
+    @MessageBody() data: LeaveRoomDto,
   ) {
     if (!data?.room) {
       return createErrorResponse('Room name required');
+    }
+
+    // B.3: Verify client is actually a member of the room before leaving
+    if (!client.rooms.has(data.room)) {
+      this.logger.warn(`Client ${client.id} attempted to leave room they are not in: ${data.room}`);
+      return createErrorResponse('Not a member of this room');
     }
 
     await client.leave(data.room);
@@ -780,7 +856,13 @@ export class DeviceGateway
     // Reject oversized screenshot data (max 2MB base64)
     if (data.imageData && data.imageData.length > 2 * 1024 * 1024) {
       this.logger.warn(`Screenshot data too large from device ${deviceId}: ${data.imageData.length} chars`);
-      return { event: 'screenshot:error', data: { error: 'Screenshot data too large (max 2MB)' } };
+      return createErrorResponse('Screenshot data too large (max 2MB)');
+    }
+
+    // B.5: Validate base64 format before attempting decode
+    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(data.imageData)) {
+      this.logger.warn(`Invalid base64 format in screenshot from device ${deviceId}`);
+      return createErrorResponse('Invalid base64 format');
     }
 
     this.logger.log(`Screenshot received from device ${deviceId} (requestId: ${data.requestId})`);
@@ -794,6 +876,17 @@ export class DeviceGateway
 
       // Convert base64 to buffer
       const imageBuffer = Buffer.from(data.imageData, 'base64');
+
+      // B.4: Validate PNG/JPEG magic numbers
+      const pngMagic = [0x89, 0x50, 0x4e, 0x47];
+      const jpegMagic = [0xff, 0xd8, 0xff];
+      const isPng = imageBuffer.length >= 4 && pngMagic.every((b, i) => imageBuffer[i] === b);
+      const isJpeg = imageBuffer.length >= 3 && jpegMagic.every((b, i) => imageBuffer[i] === b);
+
+      if (!isPng && !isJpeg) {
+        this.logger.warn(`Screenshot from device ${deviceId} has invalid image format (not PNG or JPEG)`);
+        return createErrorResponse('Invalid image format: only PNG and JPEG are accepted');
+      }
 
       // Generate object key
       const objectKey = this.storageService.generateScreenshotKey(organizationId, deviceId);

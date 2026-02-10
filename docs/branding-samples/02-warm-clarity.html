@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vizora — Direction 2: Warm Clarity (Stripe + Notion)</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-primary: #FFFFFF;
+    --bg-secondary: #F9FAFB;
+    --bg-warm: #FEF7F0;
+    --bg-accent-light: #EEF2FF;
+    --border: #E5E7EB;
+    --border-strong: #D1D5DB;
+    --text-primary: #111827;
+    --text-secondary: #6B7280;
+    --text-tertiary: #9CA3AF;
+    --accent: #6366F1;
+    --accent-end: #8B5CF6;
+    --accent-warm: #F59E0B;
+    --success: #10B981;
+    --warning: #F59E0B;
+    --error: #EF4444;
+    --info: #6366F1;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'DM Sans', -apple-system, system-ui, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .section-label {
+    text-align: center;
+    padding: 3rem 2rem 1rem;
+    border-top: 1px solid var(--border);
+  }
+  .section-label h2 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.5rem;
+    font-weight: 400;
+    color: var(--text-primary);
+  }
+  .section-label p {
+    font-size: 0.85rem;
+    color: var(--text-tertiary);
+    margin-top: 0.25rem;
+  }
+
+  /* ========== NAV ========== */
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(255,255,255,0.9);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .nav-logo {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.3rem;
+    color: var(--text-primary);
+  }
+  .nav-logo span { color: var(--accent); }
+  .nav-links {
+    display: flex;
+    gap: 2rem;
+    list-style: none;
+  }
+  .nav-links a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: color 0.15s;
+  }
+  .nav-links a:hover { color: var(--text-primary); }
+  .nav-actions { display: flex; gap: 0.75rem; align-items: center; }
+
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+  .btn-ghost:hover {
+    color: var(--text-primary);
+    border-color: var(--border-strong);
+    background: var(--bg-secondary);
+  }
+  .btn-gradient {
+    background: linear-gradient(135deg, var(--accent), var(--accent-end));
+    border: none;
+    color: #fff;
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
+  }
+  .btn-gradient:hover {
+    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.35);
+    transform: translateY(-1px);
+  }
+
+  /* ========== HERO ========== */
+  .hero {
+    min-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 4rem 2rem;
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(180deg, #FFFFFF 0%, var(--bg-warm) 50%, #FFFFFF 100%);
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    width: 500px;
+    height: 500px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%);
+    top: -80px;
+    right: -80px;
+  }
+  .hero::after {
+    content: '';
+    position: absolute;
+    width: 400px;
+    height: 400px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(245,158,11,0.06) 0%, transparent 70%);
+    bottom: 40px;
+    left: -80px;
+  }
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 5px 14px;
+    border-radius: 999px;
+    background: var(--bg-accent-light);
+    font-size: 0.75rem;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 2rem;
+  }
+  .hero h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 3.5rem;
+    font-weight: 400;
+    line-height: 1.15;
+    max-width: 680px;
+    margin-bottom: 1.25rem;
+    color: var(--text-primary);
+  }
+  .hero h1 .highlight {
+    background: linear-gradient(135deg, var(--accent), var(--accent-end));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .hero p {
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+    max-width: 500px;
+    margin-bottom: 2.5rem;
+  }
+  .hero-actions {
+    display: flex;
+    gap: 0.75rem;
+    z-index: 1;
+    position: relative;
+  }
+  .hero .btn-gradient { padding: 12px 28px; font-size: 0.9rem; }
+  .hero .btn-ghost { padding: 12px 28px; font-size: 0.9rem; }
+
+  /* ========== DASHBOARD MOCKUP ========== */
+  .dashboard-mockup {
+    max-width: 880px;
+    margin: 3rem auto 0;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--bg-primary);
+    overflow: hidden;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
+    position: relative;
+    z-index: 1;
+  }
+  .mockup-topbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-secondary);
+  }
+  .mockup-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+  .mockup-dot:nth-child(1) { background: #FF5F57; }
+  .mockup-dot:nth-child(2) { background: #FEBC2E; }
+  .mockup-dot:nth-child(3) { background: #28C840; }
+
+  .mockup-body { display: flex; min-height: 340px; }
+  .mockup-sidebar {
+    width: 190px;
+    border-right: 1px solid var(--border);
+    padding: 14px 0;
+    background: var(--bg-secondary);
+  }
+  .sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 18px;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    cursor: default;
+    transition: all 0.15s;
+    font-weight: 500;
+  }
+  .sidebar-item:hover { color: var(--text-primary); background: var(--bg-primary); }
+  .sidebar-item.active {
+    color: var(--accent);
+    background: var(--bg-accent-light);
+    border-left: 3px solid var(--accent);
+    font-weight: 600;
+  }
+  .sidebar-icon {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    background: var(--border);
+  }
+  .sidebar-item.active .sidebar-icon {
+    background: rgba(99,102,241,0.3);
+  }
+
+  .mockup-main {
+    flex: 1;
+    padding: 18px 22px;
+  }
+  .mockup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .mockup-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.1rem;
+    font-weight: 400;
+  }
+  .mockup-subtitle {
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    margin-top: 2px;
+  }
+
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .stat-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .stat-label {
+    font-size: 0.65rem;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+  .stat-value {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+  .stat-change {
+    font-size: 0.65rem;
+    color: var(--success);
+    font-weight: 500;
+    margin-top: 2px;
+  }
+
+  .content-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .content-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    transition: all 0.2s;
+  }
+  .content-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    transform: translateY(-1px);
+  }
+  .content-thumb {
+    height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+  }
+  .content-thumb.img { background: linear-gradient(135deg, #EEF2FF, #E0E7FF); }
+  .content-thumb.vid { background: linear-gradient(135deg, #ECFDF5, #D1FAE5); }
+  .content-thumb.url { background: linear-gradient(135deg, #FEF7F0, #FDE68A40); }
+  .content-info { padding: 10px 12px; }
+  .content-name { font-size: 0.78rem; font-weight: 600; color: var(--text-primary); }
+  .content-meta {
+    font-size: 0.65rem;
+    color: var(--text-tertiary);
+    margin-top: 3px;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* ========== SHOWCASE ========== */
+  .showcase { max-width: 900px; margin: 0 auto; padding: 2rem; }
+  .showcase-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+  }
+  .showcase-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .showcase-card h3 {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-tertiary);
+    margin-bottom: 1rem;
+    font-weight: 600;
+  }
+
+  .btn-row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+  .btn-sm {
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+  .btn-sm.grad { background: linear-gradient(135deg, var(--accent), var(--accent-end)); color: #fff; box-shadow: 0 1px 4px rgba(99,102,241,0.2); }
+  .btn-sm.grad:hover { box-shadow: 0 3px 12px rgba(99,102,241,0.3); transform: translateY(-1px); }
+  .btn-sm.outline { background: #fff; border: 1px solid var(--border); color: var(--text-primary); }
+  .btn-sm.outline:hover { border-color: var(--border-strong); background: var(--bg-secondary); }
+  .btn-sm.text { background: none; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+  .btn-sm.warm { background: var(--bg-warm); color: #B45309; border: 1px solid #FDE68A; }
+  .btn-sm.warm:hover { background: #FEF3C7; }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+  .badge .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .badge.online { background: #ECFDF5; color: #059669; }
+  .badge.online .dot { background: #10B981; }
+  .badge.offline { background: #FEF2F2; color: #DC2626; }
+  .badge.offline .dot { background: #EF4444; }
+  .badge.warning { background: #FFFBEB; color: #D97706; }
+  .badge.warning .dot { background: #F59E0B; }
+  .badge.info { background: #EEF2FF; color: #4F46E5; }
+  .badge.info .dot { background: #6366F1; }
+
+  .form-group { margin-bottom: 0.75rem; }
+  .form-label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 5px;
+  }
+  .form-input {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    font-family: inherit;
+    outline: none;
+    transition: all 0.15s;
+  }
+  .form-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+  }
+  .form-input::placeholder { color: var(--text-tertiary); }
+  .form-helper { font-size: 0.7rem; color: var(--text-tertiary); margin-top: 3px; }
+
+  table.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+  }
+  .data-table th {
+    text-align: left;
+    padding: 10px 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+  }
+  .data-table td {
+    padding: 12px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-secondary);
+  }
+  .data-table tr:hover td { background: var(--bg-accent-light); }
+  .data-table .name { color: var(--text-primary); font-weight: 600; }
+
+  .device-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+  }
+  .device-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    transition: all 0.2s;
+  }
+  .device-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    transform: translateY(-1px);
+  }
+  .device-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .device-name { font-size: 0.9rem; font-weight: 600; }
+  .device-location {
+    font-size: 0.72rem;
+    color: var(--text-tertiary);
+    margin-bottom: 10px;
+  }
+  .device-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+  .device-content { font-size: 0.72rem; color: var(--text-secondary); }
+  .device-time { font-size: 0.68rem; color: var(--text-tertiary); }
+
+  .toast {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.8rem;
+    margin-top: 0.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border-left: 4px solid transparent;
+  }
+  .toast.success { border-left-color: var(--success); }
+  .toast.error { border-left-color: var(--error); }
+  .toast.warning { border-left-color: var(--warning); }
+  .toast-icon { font-size: 1.1rem; }
+  .toast-text { color: var(--text-secondary); }
+  .toast-text strong { color: var(--text-primary); }
+
+  /* Calendar */
+  .calendar {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    margin-top: 0.75rem;
+  }
+  .cal-header {
+    font-size: 0.6rem;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    text-align: center;
+    padding: 6px;
+    text-transform: uppercase;
+  }
+  .cal-day {
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 4px;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    background: var(--bg-secondary);
+    gap: 2px;
+  }
+  .cal-day.today { background: var(--bg-accent-light); color: var(--accent); font-weight: 600; }
+  .cal-event {
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--accent);
+  }
+  .cal-event.warm { background: var(--accent-warm); }
+  .cal-event.green { background: var(--success); }
+
+  .footer {
+    border-top: 1px solid var(--border);
+    padding: 2rem;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    margin-top: 4rem;
+    background: var(--bg-secondary);
+  }
+
+  @media (max-width: 768px) {
+    .hero h1 { font-size: 2.2rem; }
+    .showcase-grid { grid-template-columns: 1fr; }
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+    .mockup-sidebar { display: none; }
+    .device-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-logo">Vizora<span>.</span></div>
+  <ul class="nav-links">
+    <li><a href="#">Features</a></li>
+    <li><a href="#">How It Works</a></li>
+    <li><a href="#">Pricing</a></li>
+  </ul>
+  <div class="nav-actions">
+    <button class="btn-ghost">Login</button>
+    <button class="btn-gradient">Get Started Free</button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge">&#10024; New: Timezone-aware scheduling is here</div>
+  <h1>Beautiful content on <span class="highlight">every screen</span></h1>
+  <p>The digital signage platform that feels like a creative workspace. Upload, organize, schedule, and display — all from one elegant dashboard.</p>
+  <div class="hero-actions">
+    <button class="btn-gradient">Start Free &rarr;</button>
+    <button class="btn-ghost">Watch a Demo</button>
+  </div>
+
+  <div class="dashboard-mockup">
+    <div class="mockup-topbar">
+      <div class="mockup-dot"></div>
+      <div class="mockup-dot"></div>
+      <div class="mockup-dot"></div>
+    </div>
+    <div class="mockup-body">
+      <div class="mockup-sidebar">
+        <div class="sidebar-item active"><div class="sidebar-icon"></div> Dashboard</div>
+        <div class="sidebar-item"><div class="sidebar-icon"></div> Displays</div>
+        <div class="sidebar-item"><div class="sidebar-icon"></div> Content</div>
+        <div class="sidebar-item"><div class="sidebar-icon"></div> Playlists</div>
+        <div class="sidebar-item"><div class="sidebar-icon"></div> Schedules</div>
+        <div class="sidebar-item"><div class="sidebar-icon"></div> Analytics</div>
+        <div class="sidebar-item"><div class="sidebar-icon"></div> Settings</div>
+      </div>
+      <div class="mockup-main">
+        <div class="mockup-header">
+          <div>
+            <div class="mockup-title">Good morning, Sarah</div>
+            <div class="mockup-subtitle">Here's what's happening across your displays</div>
+          </div>
+          <button class="btn-sm grad">+ Upload Content</button>
+        </div>
+        <div class="stats-row">
+          <div class="stat-card"><div class="stat-label">Active Displays</div><div class="stat-value">18</div><div class="stat-change">&#x2191; 2 this week</div></div>
+          <div class="stat-card"><div class="stat-label">Content Items</div><div class="stat-value">94</div><div class="stat-change">&#x2191; 8 today</div></div>
+          <div class="stat-card"><div class="stat-label">Uptime</div><div class="stat-value">99.9%</div><div class="stat-change">All healthy</div></div>
+          <div class="stat-card"><div class="stat-label">Storage</div><div class="stat-value">1.8 GB</div><div class="stat-change">36% of 5 GB</div></div>
+        </div>
+        <div class="content-grid">
+          <div class="content-card">
+            <div class="content-thumb img">&#x1F3A8;</div>
+            <div class="content-info">
+              <div class="content-name">Spring Campaign</div>
+              <div class="content-meta"><span>Image</span><span>2h ago</span></div>
+            </div>
+          </div>
+          <div class="content-card">
+            <div class="content-thumb vid">&#x1F3AC;</div>
+            <div class="content-info">
+              <div class="content-name">Welcome Video</div>
+              <div class="content-meta"><span>Video</span><span>1d ago</span></div>
+            </div>
+          </div>
+          <div class="content-card">
+            <div class="content-thumb url">&#x1F4CB;</div>
+            <div class="content-info">
+              <div class="content-name">Daily Menu</div>
+              <div class="content-meta"><span>Template</span><span>3d ago</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COMPONENTS -->
+<div class="section-label">
+  <h2>Component Samples</h2>
+  <p>Buttons, badges, forms, tables, device cards, calendar, and toasts</p>
+</div>
+
+<div class="showcase">
+  <div class="showcase-grid">
+    <div class="showcase-card">
+      <h3>Buttons</h3>
+      <div class="btn-row">
+        <button class="btn-sm grad">Primary</button>
+        <button class="btn-sm outline">Secondary</button>
+        <button class="btn-sm text">Text Link</button>
+        <button class="btn-sm warm">Upgrade</button>
+      </div>
+    </div>
+
+    <div class="showcase-card">
+      <h3>Status Badges</h3>
+      <div class="btn-row">
+        <span class="badge online"><span class="dot"></span> Online</span>
+        <span class="badge offline"><span class="dot"></span> Offline</span>
+        <span class="badge warning"><span class="dot"></span> Expiring</span>
+        <span class="badge info"><span class="dot"></span> Syncing</span>
+      </div>
+    </div>
+
+    <div class="showcase-card">
+      <h3>Form Inputs</h3>
+      <div class="form-group">
+        <label class="form-label">Display Name</label>
+        <input class="form-input" type="text" placeholder="e.g. Lobby Screen #1" />
+        <div class="form-helper">Give your display a friendly name for easy identification.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Location</label>
+        <input class="form-input" type="text" placeholder="e.g. Main Building, Floor 1" />
+      </div>
+    </div>
+
+    <div class="showcase-card">
+      <h3>Notifications</h3>
+      <div class="toast success">
+        <span class="toast-icon">&#x2705;</span>
+        <span class="toast-text"><strong>Content uploaded!</strong> Spring Campaign is ready.</span>
+      </div>
+      <div class="toast error">
+        <span class="toast-icon">&#x1F534;</span>
+        <span class="toast-text"><strong>Display offline</strong> — Lobby East lost connection.</span>
+      </div>
+      <div class="toast warning">
+        <span class="toast-icon">&#x26A0;</span>
+        <span class="toast-text"><strong>Content expiring</strong> in 2 days on 3 displays.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="showcase-card" style="margin-top:1.5rem;">
+    <h3>Data Table — Device Fleet</h3>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Display</th>
+          <th>Status</th>
+          <th>Content</th>
+          <th>Location</th>
+          <th>Last Seen</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="name">Lobby Main</td>
+          <td><span class="badge online"><span class="dot"></span> Online</span></td>
+          <td>Spring Campaign</td>
+          <td>HQ — Floor 1</td>
+          <td>2 min ago</td>
+        </tr>
+        <tr>
+          <td class="name">Cafeteria Menu</td>
+          <td><span class="badge online"><span class="dot"></span> Online</span></td>
+          <td>Daily Specials</td>
+          <td>HQ — Floor 2</td>
+          <td>1 min ago</td>
+        </tr>
+        <tr>
+          <td class="name">Store Window</td>
+          <td><span class="badge offline"><span class="dot"></span> Offline</span></td>
+          <td>Sale Banner</td>
+          <td>Retail — Downtown</td>
+          <td>3h ago</td>
+        </tr>
+        <tr>
+          <td class="name">Meeting Room A</td>
+          <td><span class="badge warning"><span class="dot"></span> Expiring</span></td>
+          <td>Room Schedule</td>
+          <td>HQ — Floor 3</td>
+          <td>30s ago</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Device Cards -->
+  <div class="showcase-card" style="margin-top:1.5rem;">
+    <h3>Device Cards</h3>
+    <div class="device-grid">
+      <div class="device-card">
+        <div class="device-top">
+          <span class="device-name">Lobby Main</span>
+          <span class="badge online"><span class="dot"></span> Online</span>
+        </div>
+        <div class="device-location">HQ Building — Floor 1, Entrance</div>
+        <div class="device-bottom">
+          <span class="device-content">&#x25B6; Spring Campaign</span>
+          <span class="device-time">last seen 2 min ago</span>
+        </div>
+      </div>
+      <div class="device-card">
+        <div class="device-top">
+          <span class="device-name">Store Window</span>
+          <span class="badge offline"><span class="dot"></span> Offline</span>
+        </div>
+        <div class="device-location">Retail — Downtown Branch</div>
+        <div class="device-bottom">
+          <span class="device-content">&#x25B6; Sale Banner</span>
+          <span class="device-time">last seen 3h ago</span>
+        </div>
+      </div>
+      <div class="device-card">
+        <div class="device-top">
+          <span class="device-name">Cafeteria Menu</span>
+          <span class="badge online"><span class="dot"></span> Online</span>
+        </div>
+        <div class="device-location">HQ Building — Floor 2, Cafe</div>
+        <div class="device-bottom">
+          <span class="device-content">&#x25B6; Daily Specials</span>
+          <span class="device-time">last seen 1 min ago</span>
+        </div>
+      </div>
+      <div class="device-card">
+        <div class="device-top">
+          <span class="device-name">Meeting Room A</span>
+          <span class="badge warning"><span class="dot"></span> Expiring</span>
+        </div>
+        <div class="device-location">HQ Building — Floor 3</div>
+        <div class="device-bottom">
+          <span class="device-content">&#x25B6; Room Schedule</span>
+          <span class="device-time">content exp. 2 days</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Calendar -->
+  <div class="showcase-card" style="margin-top:1.5rem;">
+    <h3>Schedule Calendar</h3>
+    <div class="calendar">
+      <div class="cal-header">Mon</div>
+      <div class="cal-header">Tue</div>
+      <div class="cal-header">Wed</div>
+      <div class="cal-header">Thu</div>
+      <div class="cal-header">Fri</div>
+      <div class="cal-header">Sat</div>
+      <div class="cal-header">Sun</div>
+      <div class="cal-day">3</div>
+      <div class="cal-day">4 <div class="cal-event"></div></div>
+      <div class="cal-day">5 <div class="cal-event"></div></div>
+      <div class="cal-day today">6 <div class="cal-event"></div><div class="cal-event warm"></div></div>
+      <div class="cal-day">7 <div class="cal-event"></div></div>
+      <div class="cal-day">8</div>
+      <div class="cal-day">9</div>
+      <div class="cal-day">10 <div class="cal-event green"></div></div>
+      <div class="cal-day">11 <div class="cal-event green"></div></div>
+      <div class="cal-day">12</div>
+      <div class="cal-day">13 <div class="cal-event warm"></div></div>
+      <div class="cal-day">14 <div class="cal-event warm"></div></div>
+      <div class="cal-day">15</div>
+      <div class="cal-day">16</div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  Direction 2: Warm Clarity &mdash; Inspired by Stripe + Notion &mdash; Vizora Brand Exploration
+</div>
+
+</body>
+</html>

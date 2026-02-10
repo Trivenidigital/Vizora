@@ -24,6 +24,8 @@ CRON_BLOCK="# --- BEGIN VIZORA BACKUPS ---
 0 4 * * 0 ${SCRIPT_DIR}/backup-minio.sh >> /var/log/vizora/backup-minio.log 2>&1
 # Weekly ClickHouse backup on Sunday at 5:00 AM
 0 5 * * 0 ${SCRIPT_DIR}/backup-clickhouse.sh >> /var/log/vizora/backup-clickhouse.log 2>&1
+# Daily cleanup of old ContentImpression records at 1:00 AM
+0 1 * * * cd ${SCRIPT_DIR}/.. && npx ts-node ${SCRIPT_DIR}/cleanup-impressions.ts >> /var/log/vizora/cleanup-impressions.log 2>&1
 # --- END VIZORA BACKUPS ---"
 
 # Ensure log directory exists

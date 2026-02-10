@@ -23,8 +23,52 @@
 - **Webhook endpoints need @Public()** — Without it, the global JWT guard blocks Stripe/Razorpay callbacks. Easy to miss
 - **Console.log in hooks** — Dev-guard ALL console.log in frontend hooks or they leak to production browser consoles
 
+## Deferred Items (Phase 2 - 2026-02-09)
+
+13 items were deferred from the remaining pending items fix sprint. These need separate sprints:
+
+### Test Coverage (5 items — separate test sprint)
+- Web dashboard at 23% coverage
+- Middleware branch coverage at 58% (target 80%)
+- Display client has 0% test coverage
+- React act() warnings in Toast tests
+- More realtime edge case tests needed
+
+### Infrastructure Decisions (3 items — needs architecture review)
+- Nginx HA (single instance, no redundancy)
+- Service mesh / circuit breaker (needs Consul/Istio evaluation)
+- Android TV WebSocket integration (not yet built, separate feature)
+
+### Large Migrations (3 items — risk too high for sprint)
+- RSC migration: 49 client pages need rewriting to React Server Components
+- Schedule.startTime/endTime String→Int: data migration risk for existing records
+- CPU delta measurement: needs device firmware changes
+
+### Acceptable As-Is (2 items)
+- Display.jwtToken as @db.Text (appropriate for JWT storage)
+- PlaylistItem @@unique([playlistId, order]) reorder friction (correct constraint)
+
 ### Verification Reminders
 - Always run `pnpm --filter @vizora/middleware test` after architecture changes
 - Check TypeScript compilation with `npx tsc --noEmit` after major refactors
 - The 3 pre-existing test failures (auth.controller, pairing.service) existed before our changes — don't chase those
 - E2E tests require Docker (PostgreSQL + Redis) — can't run without infrastructure
+
+## Session: 2026-02-09 - Verification & Memory Update
+
+### Windows/Bash Gotchas
+- **`tail` pipe buffering blocks background tasks** — `command 2>&1 | tail -30` in a background bash task will buffer indefinitely and appear empty. Always run without piping: `command 2>&1`, then read the output file
+- **Windows paths in bash** — `cd C:\projects\vizora\web` fails in Git Bash. Use Unix-style: `cd /c/projects/vizora/web`
+- **Nx build wrapper vs direct build** — `npx nx build @vizora/web` can fail due to Nx project graph issues while `cd web && npx next build` succeeds. For web, prefer direct `next build` for verification
+
+### Pre-Existing Test Failures (Do Not Chase)
+- **Middleware**: auth.controller, pairing.service (3 tests) — existed before pilot readiness sprint
+- **Realtime**: 1 suite fails (Prisma generate issue in test env)
+- **Web admin tests**: `organizations-page.test.tsx` (10 tests), `admin-dashboard.test.tsx` (5 tests) — async Client Component rendered in jsdom, renders empty `<div />`. Root cause: pages are async server-component-style but marked `'use client'`. Tied to RSC migration deferral
+- **Web**: All other 40+ suites pass
+
+### Build Verification Results (2026-02-09)
+- Middleware: builds via `npx nx build @vizora/middleware`
+- Realtime: builds via `npx nx build @vizora/realtime`
+- Web: builds via `npx nx build @vizora/web` (35 routes, Turbopack)
+- **Root cause of prior nx build failure**: `display-android` directory was not in `pnpm-workspace.yaml` but Nx auto-discovered it, breaking the project graph. Fix: add `display-android` to workspace packages

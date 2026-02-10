@@ -5,7 +5,10 @@ export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   
   // API Configuration
-  API_PORT: z.coerce.number().default(3000),
+  MIDDLEWARE_PORT: z.coerce.number().default(3000),
+
+  // Security
+  BCRYPT_ROUNDS: z.coerce.number().min(10).max(15).default(12),
   
   // CORS
   CORS_ORIGIN: z.string().default('http://localhost:3001'),

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { Icon } from '@/theme/icons';
 import type { IconName } from '@/theme/icons';
 
@@ -15,15 +15,23 @@ interface ToastProps {
 
 export default function Toast({ message, type, onClose, duration = 5000 }: ToastProps) {
   const [isVisible, setIsVisible] = useState(true);
+  const animationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const startClose = useCallback(() => {
+    setIsVisible(false);
+    animationTimerRef.current = setTimeout(onClose, 300);
+  }, [onClose]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsVisible(false);
-      setTimeout(onClose, 300);
-    }, duration);
+    const timer = setTimeout(startClose, duration);
 
-    return () => clearTimeout(timer);
-  }, [duration, onClose]);
+    return () => {
+      clearTimeout(timer);
+      if (animationTimerRef.current) {
+        clearTimeout(animationTimerRef.current);
+      }
+    };
+  }, [duration, startClose]);
 
   const colors = {
     success: 'bg-success-500 text-white',
@@ -53,10 +61,7 @@ export default function Toast({ message, type, onClose, duration = 5000 }: Toast
       <Icon name={icons[type]} size="md" className="text-white" />
       <span className="font-medium">{message}</span>
       <button
-        onClick={() => {
-          setIsVisible(false);
-          setTimeout(onClose, 300);
-        }}
+        onClick={startClose}
         className="ml-4 hover:opacity-75 transition"
       >
         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">

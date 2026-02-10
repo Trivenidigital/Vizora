@@ -1,5 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { CircuitBreakerService } from '../../common/services/circuit-breaker.service';
 import { WidgetDataSource } from './widget-data-source.interface';
+
+const WEATHER_CIRCUIT_CONFIG = {
+  failureThreshold: 3,
+  resetTimeout: 30000, // 30 seconds
+  successThreshold: 2,
+  failureWindow: 60000,
+};
 
 /**
  * Weather widget data source.
@@ -14,6 +22,8 @@ export class WeatherDataSource implements WidgetDataSource {
   readonly type = 'weather';
 
   private readonly REQUEST_TIMEOUT = 10000;
+
+  constructor(private readonly circuitBreaker: CircuitBreakerService) {}
 
   /**
    * Fetch weather data from OpenWeatherMap.
@@ -33,94 +43,99 @@ export class WeatherDataSource implements WidgetDataSource {
     const showForecast = config.showForecast ?? true;
     const forecastDays = config.forecastDays ?? 5;
 
-    try {
-      // --- current weather ---
-      const currentUrl =
-        `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(location)}&units=${units}&appid=${apiKey}`;
+    return this.circuitBreaker.executeWithFallback(
+      'openweathermap-api',
+      async () => {
+        // --- current weather ---
+        const currentUrl =
+          `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(location)}&units=${units}&appid=${apiKey}`;
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), this.REQUEST_TIMEOUT);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), this.REQUEST_TIMEOUT);
 
-      let currentData: any;
-      try {
-        const res = await fetch(currentUrl, {
-          headers: { 'User-Agent': 'Vizora-Widget/1.0' },
-          signal: controller.signal,
-        });
-
-        if (!res.ok) {
-          throw new Error(`OpenWeatherMap current weather API returned ${res.status}`);
-        }
-        currentData = await res.json();
-      } finally {
-        clearTimeout(timeoutId);
-      }
-
-      const result: Record<string, any> = {
-        current: {
-          temp: currentData.main?.temp,
-          feelsLike: currentData.main?.feels_like,
-          humidity: currentData.main?.humidity,
-          windSpeed: currentData.wind?.speed,
-          description: currentData.weather?.[0]?.description,
-          icon: currentData.weather?.[0]?.icon,
-          conditionCode: currentData.weather?.[0]?.id,
-        },
-        location: {
-          name: currentData.name,
-          country: currentData.sys?.country,
-        },
-      };
-
-      // --- forecast (optional) ---
-      if (showForecast) {
+        let currentData: any;
         try {
-          const forecastUrl =
-            `https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(location)}&units=${units}&cnt=${forecastDays * 8}&appid=${apiKey}`;
+          const res = await fetch(currentUrl, {
+            headers: { 'User-Agent': 'Vizora-Widget/1.0' },
+            signal: controller.signal,
+          });
 
-          const fc = new AbortController();
-          const fcTimeout = setTimeout(() => fc.abort(), this.REQUEST_TIMEOUT);
-
-          try {
-            const fRes = await fetch(forecastUrl, {
-              headers: { 'User-Agent': 'Vizora-Widget/1.0' },
-              signal: fc.signal,
-            });
-
-            if (fRes.ok) {
-              const forecastData = await fRes.json();
-              // Group by day (take one entry per day at noon if available)
-              const dailyMap = new Map<string, any>();
-              for (const entry of forecastData.list || []) {
-                const date = entry.dt_txt?.split(' ')[0];
-                if (date && !dailyMap.has(date)) {
-                  dailyMap.set(date, {
-                    date,
-                    temp: entry.main?.temp,
-                    tempMin: entry.main?.temp_min,
-                    tempMax: entry.main?.temp_max,
-                    description: entry.weather?.[0]?.description,
-                    icon: entry.weather?.[0]?.icon,
-                    conditionCode: entry.weather?.[0]?.id,
-                  });
-                }
-              }
-              result.forecast = Array.from(dailyMap.values()).slice(0, forecastDays);
-            }
-          } finally {
-            clearTimeout(fcTimeout);
+          if (!res.ok) {
+            throw new Error(`OpenWeatherMap current weather API returned ${res.status}`);
           }
-        } catch (forecastError) {
-          this.logger.warn(`Failed to fetch forecast: ${forecastError}`);
-          result.forecast = [];
+          currentData = await res.json();
+        } finally {
+          clearTimeout(timeoutId);
         }
-      }
 
-      return result;
-    } catch (error) {
-      this.logger.error(`Weather API fetch failed, returning sample data: ${error}`);
-      return this.getSampleData();
-    }
+        const result: Record<string, any> = {
+          current: {
+            temp: currentData.main?.temp,
+            feelsLike: currentData.main?.feels_like,
+            humidity: currentData.main?.humidity,
+            windSpeed: currentData.wind?.speed,
+            description: currentData.weather?.[0]?.description,
+            icon: currentData.weather?.[0]?.icon,
+            conditionCode: currentData.weather?.[0]?.id,
+          },
+          location: {
+            name: currentData.name,
+            country: currentData.sys?.country,
+          },
+        };
+
+        // --- forecast (optional) ---
+        if (showForecast) {
+          try {
+            const forecastUrl =
+              `https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(location)}&units=${units}&cnt=${forecastDays * 8}&appid=${apiKey}`;
+
+            const fc = new AbortController();
+            const fcTimeout = setTimeout(() => fc.abort(), this.REQUEST_TIMEOUT);
+
+            try {
+              const fRes = await fetch(forecastUrl, {
+                headers: { 'User-Agent': 'Vizora-Widget/1.0' },
+                signal: fc.signal,
+              });
+
+              if (fRes.ok) {
+                const forecastData = await fRes.json();
+                // Group by day (take one entry per day at noon if available)
+                const dailyMap = new Map<string, any>();
+                for (const entry of forecastData.list || []) {
+                  const date = entry.dt_txt?.split(' ')[0];
+                  if (date && !dailyMap.has(date)) {
+                    dailyMap.set(date, {
+                      date,
+                      temp: entry.main?.temp,
+                      tempMin: entry.main?.temp_min,
+                      tempMax: entry.main?.temp_max,
+                      description: entry.weather?.[0]?.description,
+                      icon: entry.weather?.[0]?.icon,
+                      conditionCode: entry.weather?.[0]?.id,
+                    });
+                  }
+                }
+                result.forecast = Array.from(dailyMap.values()).slice(0, forecastDays);
+              }
+            } finally {
+              clearTimeout(fcTimeout);
+            }
+          } catch (forecastError) {
+            this.logger.warn(`Failed to fetch forecast: ${forecastError}`);
+            result.forecast = [];
+          }
+        }
+
+        return result;
+      },
+      () => {
+        this.logger.warn('Weather API circuit open or failed, returning sample data');
+        return this.getSampleData();
+      },
+      WEATHER_CIRCUIT_CONFIG,
+    );
   }
 
   getConfigSchema(): Record<string, any> {
