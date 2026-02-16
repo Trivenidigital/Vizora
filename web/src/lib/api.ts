@@ -174,6 +174,10 @@ class ApiClient {
       if (process.env.NODE_ENV === 'development') {
         console.log('[API] Response received');
       }
+      // Auto-unwrap response envelope { success, data } from middleware
+      if (data && typeof data === 'object' && 'success' in data && 'data' in data) {
+        return data.data as T;
+      }
       return data;
     } catch (error) {
       clearTimeout(timeoutId);
@@ -198,17 +202,14 @@ class ApiClient {
     if (process.env.NODE_ENV === 'development') {
       console.log('[API] Login called');
     }
-    const response = await this.request<{
-      success: boolean;
-      data: LoginResponse;
-    }>('/auth/login', {
+    const response = await this.request<LoginResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
 
     // Mark as authenticated - token is in httpOnly cookie
     this.isAuthenticated = true;
-    return response.data;
+    return response;
   }
 
   async register(
@@ -221,10 +222,7 @@ class ApiClient {
     if (process.env.NODE_ENV === 'development') {
       console.log('[API] Register called');
     }
-    const response = await this.request<{
-      success: boolean;
-      data: RegisterResponse;
-    }>('/auth/register', {
+    const response = await this.request<RegisterResponse>('/auth/register', {
       method: 'POST',
       body: JSON.stringify({
         email,
@@ -237,7 +235,7 @@ class ApiClient {
 
     // Mark as authenticated - token is in httpOnly cookie
     this.isAuthenticated = true;
-    return response.data;
+    return response;
   }
 
   async logout(): Promise<void> {
@@ -245,21 +243,25 @@ class ApiClient {
   }
 
   async refreshToken(): Promise<{ expiresIn: number }> {
-    const response = await this.request<{
-      success: boolean;
-      data: { expiresIn: number };
-    }>('/auth/refresh', {
+    return this.request<{ expiresIn: number }>('/auth/refresh', {
       method: 'POST',
     });
-    return response.data;
   }
 
   async getCurrentUser(): Promise<AuthUser> {
-    const response = await this.request<{
-      success: boolean;
-      data: { user: AuthUser };
-    }>('/auth/me');
-    return response.data.user;
+    const response = await this.request<{ user: AuthUser }>('/auth/me');
+    return response.user;
+  }
+
+  async getOrganization(): Promise<Organization> {
+    return this.request<Organization>('/organizations/current');
+  }
+
+  async changePassword(data: { currentPassword: string; newPassword: string }): Promise<void> {
+    await this.request<void>('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   }
 
   // Displays
@@ -1151,7 +1153,11 @@ class ApiClient {
     limit?: number;
   }): Promise<any> {
     const query = params ? new URLSearchParams(
-      Object.fromEntries(Object.entries(params).filter(([_, v]) => v !== undefined)) as Record<string, string>
+      Object.fromEntries(
+        Object.entries(params)
+          .filter(([_, v]) => v !== undefined && v !== '')
+          .map(([k, v]) => [k, String(v)])
+      )
     ).toString() : '';
     return this.request<any>(`/template-library${query ? `?${query}` : ''}`);
   }

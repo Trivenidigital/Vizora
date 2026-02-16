@@ -7,7 +7,9 @@ interface QuotaBarProps {
 }
 
 export function QuotaBar({ used, total, label }: QuotaBarProps) {
-  const percentage = total > 0 ? Math.min((used / total) * 100, 100) : 0;
+  const safeUsed = Number(used) || 0;
+  const safeTotal = Number(total) || 0;
+  const percentage = safeTotal > 0 ? Math.min((safeUsed / safeTotal) * 100, 100) : 0;
 
   // Determine color based on usage
   let barColor = 'bg-[#00E5A0]';
@@ -23,7 +25,7 @@ export function QuotaBar({ used, total, label }: QuotaBarProps) {
         <div className="flex justify-between items-center text-sm">
           <span className="text-[var(--foreground-secondary)]">{label}</span>
           <span className="font-medium text-[var(--foreground)]">
-            {used} / {total} screens
+            {safeUsed} / {safeTotal} screens
           </span>
         </div>
       )}
@@ -35,7 +37,7 @@ export function QuotaBar({ used, total, label }: QuotaBarProps) {
       </div>
       <div className="flex justify-between text-xs text-[var(--foreground-tertiary)]">
         <span>{percentage.toFixed(0)}% used</span>
-        <span>{total - used} remaining</span>
+        <span>{safeTotal - safeUsed} remaining</span>
       </div>
     </div>
   );
