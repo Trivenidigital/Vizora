@@ -362,7 +362,16 @@ export default function LayoutsPage() {
                     <p className="text-xs text-[var(--foreground-tertiary)] mt-1">{preset.zones} zone{preset.zones > 1 ? 's' : ''}</p>
                     <p className="text-xs text-[var(--foreground-secondary)] mt-1 line-clamp-2">{preset.description}</p>
                   </div>
-                  <button className="mt-3 w-full py-1.5 text-xs font-medium rounded border border-[#00E5A0] text-[#00E5A0] group-hover:bg-[#00E5A0] group-hover:text-[#061A21] transition">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedPreset(preset);
+                      setLayoutName('');
+                      setLayoutDescription('');
+                      setIsCreateModalOpen(true);
+                    }}
+                    className="mt-3 w-full py-1.5 text-xs font-medium rounded border border-[#00E5A0] text-[#00E5A0] group-hover:bg-[#00E5A0] group-hover:text-[#061A21] transition"
+                  >
                     Use Preset
                   </button>
                 </div>

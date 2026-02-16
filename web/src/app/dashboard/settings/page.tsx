@@ -1,15 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { apiClient } from '@/lib/api';
 import { Icon } from '@/theme/icons';
 import { useTheme } from '@/components/providers/ThemeProvider';
 import { semanticColors } from '@/theme/colors';
+import Modal from '@/components/Modal';
+import { useToast } from '@/lib/hooks/useToast';
 
 export const dynamic = 'force-dynamic';
 
 export default function SettingsPage() {
  const { mode, setMode } = useTheme();
+ const toast = useToast();
  const [settings, setSettings] = useState({
  organizationName: 'My Organization',
  email: 'admin@vizora.com',
@@ -17,6 +21,53 @@ export default function SettingsPage() {
  defaultDuration: 30,
  notifications: true,
  });
+
+ // Change password modal state
+ const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+ const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+ const [passwordLoading, setPasswordLoading] = useState(false);
+
+ // Fetch real settings on mount
+ useEffect(() => {
+   async function loadSettings() {
+     try {
+       const user = await apiClient.getCurrentUser();
+       setSettings(prev => ({
+         ...prev,
+         email: user.email || prev.email,
+         organizationName: user.organization?.name || prev.organizationName,
+       }));
+     } catch (err) {
+       console.error('Failed to load settings:', err);
+     }
+   }
+   loadSettings();
+ }, []);
+
+ const handleChangePassword = async () => {
+   if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+     toast.error('New passwords do not match');
+     return;
+   }
+   if (passwordForm.newPassword.length < 8) {
+     toast.error('New password must be at least 8 characters');
+     return;
+   }
+   setPasswordLoading(true);
+   try {
+     await apiClient.changePassword({
+       currentPassword: passwordForm.currentPassword,
+       newPassword: passwordForm.newPassword,
+     });
+     toast.success('Password changed successfully');
+     setShowChangePasswordModal(false);
+     setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+   } catch (error: any) {
+     toast.error(error.message || 'Failed to change password');
+   } finally {
+     setPasswordLoading(false);
+   }
+ };
 
  return (
  <div className="space-y-6">
@@ -225,7 +276,10 @@ export default function SettingsPage() {
  <div className="bg-[var(--surface)] rounded-lg shadow-md p-6">
  <h3 className="text-lg font-semibold text-[var(--foreground)] mb-4">Account</h3>
  <div className="space-y-3">
- <button className="w-full px-4 py-3 text-sm bg-[#00E5A0]/5 dark:bg-[#00E5A0]/10 text-[#00E5A0] dark:text-[#00E5A0] rounded-lg hover:bg-[#00E5A0]/10 dark:hover:bg-[#00E5A0]/10 transition font-medium text-left flex items-center gap-2">
+ <button
+   onClick={() => setShowChangePasswordModal(true)}
+   className="w-full px-4 py-3 text-sm bg-[#00E5A0]/5 dark:bg-[#00E5A0]/10 text-[#00E5A0] dark:text-[#00E5A0] rounded-lg hover:bg-[#00E5A0]/10 dark:hover:bg-[#00E5A0]/10 transition font-medium text-left flex items-center gap-2"
+ >
  <Icon name="settings" size="md" className="text-[#00E5A0] dark:text-[#00E5A0]" />
  Change Password
  </button>
@@ -246,6 +300,65 @@ export default function SettingsPage() {
  Save Changes
  </button>
  </div>
+
+ {/* Change Password Modal */}
+ <Modal
+   isOpen={showChangePasswordModal}
+   onClose={() => {
+     setShowChangePasswordModal(false);
+     setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+   }}
+   title="Change Password"
+ >
+   <div className="space-y-4">
+     <div>
+       <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-1">Current Password</label>
+       <input
+         type="password"
+         value={passwordForm.currentPassword}
+         onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+         className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+       />
+     </div>
+     <div>
+       <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-1">New Password</label>
+       <input
+         type="password"
+         value={passwordForm.newPassword}
+         onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+         className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+       />
+     </div>
+     <div>
+       <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-1">Confirm New Password</label>
+       <input
+         type="password"
+         value={passwordForm.confirmPassword}
+         onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+         className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+       />
+     </div>
+     <div className="flex justify-end gap-3 pt-4">
+       <button
+         onClick={() => {
+           setShowChangePasswordModal(false);
+           setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+         }}
+         className="px-4 py-2 text-sm font-medium text-[var(--foreground-secondary)] bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition"
+       >
+         Cancel
+       </button>
+       <button
+         onClick={handleChangePassword}
+         disabled={passwordLoading || !passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword}
+         className="px-4 py-2 text-sm font-medium bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50"
+       >
+         {passwordLoading ? 'Changing...' : 'Change Password'}
+       </button>
+     </div>
+   </div>
+ </Modal>
+ <toast.ToastContainer />
  </div>
  );
 }

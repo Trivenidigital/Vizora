@@ -443,7 +443,13 @@ export default function WidgetsPage() {
                   <div className="p-4">
                     <h4 className="text-lg font-semibold text-[var(--foreground)] mb-1">{wType.name}</h4>
                     <p className="text-sm text-[var(--foreground-secondary)] mb-4">{wType.description}</p>
-                    <button className="w-full py-2 text-sm font-medium rounded-lg border-2 border-[#00E5A0] text-[#00E5A0] hover:bg-[#00E5A0] hover:text-[#061A21] transition flex items-center justify-center gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openWizard(wType);
+                      }}
+                      className="w-full py-2 text-sm font-medium rounded-lg border-2 border-[#00E5A0] text-[#00E5A0] hover:bg-[#00E5A0] hover:text-[#061A21] transition flex items-center justify-center gap-2"
+                    >
                       <Icon name="add" size="sm" />
                       Create {wType.name} Widget
                     </button>
