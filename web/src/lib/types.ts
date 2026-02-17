@@ -311,3 +311,192 @@ export interface IpBlocklistEntry {
   expiresAt: string | null;
   createdAt: string;
 }
+
+// Analytics types
+export interface AnalyticsSummary {
+  totalDevices: number;
+  onlineDevices: number;
+  totalContent: number;
+  totalPlaylists: number;
+  totalImpressions: number;
+  avgUptimePercent: number;
+}
+
+export interface DeviceMetric {
+  date: string;
+  onlineCount: number;
+  offlineCount: number;
+  avgUptime: number;
+}
+
+export interface ContentPerformance {
+  contentId: string;
+  name: string;
+  type: string;
+  impressions: number;
+  avgDuration: number;
+}
+
+export interface UsageTrend {
+  date: string;
+  impressions: number;
+  activeDevices: number;
+  contentUploads: number;
+}
+
+export interface DeviceDistribution {
+  status: string;
+  count: number;
+  percentage: number;
+}
+
+export interface BandwidthUsage {
+  date: string;
+  bytesTransferred: number;
+  requestCount: number;
+}
+
+export interface PlaylistPerformance {
+  playlistId: string;
+  name: string;
+  impressions: number;
+  deviceCount: number;
+}
+
+export interface AnalyticsExport {
+  data: Record<string, unknown>;
+  exportedAt: string;
+  format: string;
+}
+
+// Team / User types
+export interface User {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  isActive: boolean;
+  lastLoginAt: string | null;
+  createdAt: string;
+}
+
+export interface AuditLog {
+  id: string;
+  action: string;
+  entityType: string | null;
+  entityId: string | null;
+  userId: string;
+  user?: { firstName: string; lastName: string; email: string };
+  details: Record<string, unknown> | null;
+  ipAddress: string | null;
+  createdAt: string;
+}
+
+// Template Library types
+export interface TemplateCategory {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  templateCount: number;
+}
+
+export interface TemplateSearchResult {
+  data: TemplateSummary[];
+  meta: { total: number; page: number; limit: number; totalPages: number };
+}
+
+export interface TemplateSummary {
+  id: string;
+  name: string;
+  description: string | null;
+  category: string;
+  thumbnail: string | null;
+  orientation: string;
+  difficulty: string;
+  tags: string[];
+  isFeatured: boolean;
+}
+
+export interface TemplateDetail extends TemplateSummary {
+  templateHtml: string;
+  customCss: string | null;
+  variables: Record<string, unknown>[];
+  previewUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Widget types
+export interface WidgetType {
+  type: string;
+  name: string;
+  description: string;
+  configSchema: Record<string, unknown>;
+}
+
+export interface Widget {
+  id: string;
+  name: string;
+  widgetType: string;
+  widgetConfig: Record<string, unknown>;
+  description: string | null;
+  lastRefreshedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Layout types
+export interface LayoutPreset {
+  type: string;
+  name: string;
+  description: string;
+  zones: LayoutZone[];
+}
+
+export interface LayoutZone {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  label?: string;
+}
+
+export interface Layout {
+  id: string;
+  name: string;
+  layoutType: string;
+  description: string | null;
+  zones: LayoutZone[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ResolvedLayout extends Layout {
+  resolvedZones: Array<LayoutZone & {
+    content?: Content;
+    playlist?: Playlist;
+  }>;
+}
+
+// QR Overlay
+export interface QrOverlayConfig {
+  enabled: boolean;
+  url: string;
+  position?: string;
+  size?: number;
+  opacity?: number;
+  margin?: number;
+  backgroundColor?: string;
+  label?: string;
+}
+
+// Platform Health
+export interface PlatformHealth {
+  status: string;
+  services: Record<string, { status: string; latency?: number }>;
+  uptime: number;
+  timestamp: string;
+}
