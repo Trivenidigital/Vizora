@@ -30,6 +30,7 @@ module.exports = {
     },
   },
   testEnvironment: 'node',
+  detectOpenHandles: true,
   moduleNameMapper: {
     '^@vizora/database$': '<rootDir>/../test/__mocks__/database.ts',
   },

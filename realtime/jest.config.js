@@ -7,7 +7,7 @@ module.exports = {
   rootDir: '.',
   testTimeout: 15000,
   forceExit: true,
-  detectOpenHandles: false,
+  detectOpenHandles: true,
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/**/*.spec.ts',
