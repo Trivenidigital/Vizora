@@ -72,6 +72,9 @@ export class DeviceGateway
   // 2.5: Device socket deduplication (deviceId -> socketId)
   private readonly deviceSockets: Map<string, string> = new Map();
 
+  // Per-message rate limiting: socketId -> { count, resetAt }
+  private readonly messageRates: Map<string, { count: number; resetAt: number }> = new Map();
+
   constructor(
     private jwtService: JwtService,
     private redisService: RedisService,
@@ -90,6 +93,8 @@ export class DeviceGateway
 
     // Periodically clean up expired rate limit entries (every 60s)
     setInterval(() => this.cleanupRateLimitEntries(), 60000);
+    // Periodically clean up expired message rate limit entries (every 60s)
+    setInterval(() => this.cleanupMessageRateLimits(), 60000);
   }
 
   /**
@@ -102,6 +107,46 @@ export class DeviceGateway
       return `${apiBaseUrl}/api/device-content/${item.content.id}/file`;
     }
     return item.content?.url || '';
+  }
+
+  /**
+   * Check per-message rate limit for a socket.
+   * Returns true if the message is allowed, false if rate-limited.
+   * Limit: 60 messages per minute per socket.
+   */
+  private checkMessageRateLimit(client: Socket): boolean {
+    const now = Date.now();
+    const entry = this.messageRates.get(client.id);
+
+    if (entry) {
+      if (now > entry.resetAt) {
+        this.messageRates.set(client.id, { count: 1, resetAt: now + 60000 });
+      } else {
+        entry.count++;
+        if (entry.count > 60) {
+          this.logger.warn(`Message rate limit exceeded for socket ${client.id} (device: ${client.data?.deviceId})`);
+          client.emit('error', { message: 'rate_limited', detail: 'Too many messages. Please slow down.' });
+          client.disconnect();
+          return false;
+        }
+      }
+    } else {
+      this.messageRates.set(client.id, { count: 1, resetAt: now + 60000 });
+    }
+
+    return true;
+  }
+
+  /**
+   * Clean up expired message rate limit entries
+   */
+  private cleanupMessageRateLimits(): void {
+    const now = Date.now();
+    for (const [socketId, entry] of this.messageRates) {
+      if (now > entry.resetAt) {
+        this.messageRates.delete(socketId);
+      }
+    }
   }
 
   /**
@@ -425,6 +470,9 @@ export class DeviceGateway
   }
 
   async handleDisconnect(client: Socket) {
+    // Clean up per-message rate limit entry for this socket
+    this.messageRates.delete(client.id);
+
     try {
       const deviceId = client.data?.deviceId;
 
@@ -501,6 +549,7 @@ export class DeviceGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: HeartbeatMessageDto,
   ) {
+    if (!this.checkMessageRateLimit(client)) return createErrorResponse('rate_limited');
     const deviceId = client.data.deviceId;
     const startTime = Date.now();
 
@@ -579,6 +628,7 @@ export class DeviceGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: ContentImpressionDto,
   ) {
+    if (!this.checkMessageRateLimit(client)) return createErrorResponse('rate_limited');
     const deviceId = client.data.deviceId;
 
     try {
@@ -605,6 +655,7 @@ export class DeviceGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: ContentErrorDto,
   ) {
+    if (!this.checkMessageRateLimit(client)) return createErrorResponse('rate_limited');
     const deviceId = client.data.deviceId;
 
     this.logger.warn(`Content error on ${deviceId}: ${data.errorType} - ${data.contentId}`);
@@ -648,6 +699,7 @@ export class DeviceGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: PlaylistRequestDto,
   ) {
+    if (!this.checkMessageRateLimit(client)) return createErrorResponse('rate_limited');
     const deviceId = client.data.deviceId;
 
     try {
@@ -719,6 +771,7 @@ export class DeviceGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: JoinOrganizationDto,
   ) {
+    if (!this.checkMessageRateLimit(client)) return createErrorResponse('rate_limited');
     if (!data?.organizationId) {
       return createErrorResponse('Organization ID required');
     }
@@ -760,6 +813,7 @@ export class DeviceGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: JoinRoomDto,
   ) {
+    if (!this.checkMessageRateLimit(client)) return createErrorResponse('rate_limited');
     if (!data?.room) {
       return createErrorResponse('Room name required');
     }
@@ -824,6 +878,7 @@ export class DeviceGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: LeaveRoomDto,
   ) {
+    if (!this.checkMessageRateLimit(client)) return createErrorResponse('rate_limited');
     if (!data?.room) {
       return createErrorResponse('Room name required');
     }
@@ -850,6 +905,7 @@ export class DeviceGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: ScreenshotResponseDto,
   ) {
+    if (!this.checkMessageRateLimit(client)) return createErrorResponse('rate_limited');
     const deviceId = client.data.deviceId;
     const organizationId = client.data.organizationId;
 

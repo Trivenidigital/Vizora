@@ -122,7 +122,7 @@ export class AuthController {
   @Post('login')
   @Throttle({
     default: {
-      limit: process.env.NODE_ENV === 'production' ? 5 : 1000,
+      limit: process.env.NODE_ENV === 'production' ? 3 : 1000,
       ttl: 60000
     }
   })

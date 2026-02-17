@@ -9,6 +9,17 @@ import { initializeSentry } from './config/sentry.config';
 initializeSentry();
 
 async function bootstrap() {
+  // Validate required production environment variables
+  if (process.env.NODE_ENV === 'production') {
+    const required = ['DATABASE_URL', 'REDIS_URL', 'DEVICE_JWT_SECRET', 'INTERNAL_API_SECRET'];
+    const missing = required.filter(key => !process.env[key]);
+    if (missing.length > 0) {
+      Logger.error(`❌ Missing required production env vars: ${missing.join(', ')}`);
+      Logger.error('Set these in your .env or deployment config before starting in production.');
+      process.exit(1);
+    }
+  }
+
   const app = await NestFactory.create(AppModule);
 
   // Security headers
