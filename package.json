@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
-    "build": "nx run-many --target=build --all",
+    "build": "nx build @vizora/middleware && nx build @vizora/realtime && cd web && npx next build",
     "build:middleware": "nx build @vizora/middleware",
     "build:web": "nx build @vizora/web",
     "build:realtime": "nx build @vizora/realtime",
