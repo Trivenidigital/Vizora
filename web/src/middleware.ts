@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // Pages that don't require authentication
-const publicPaths = ['/login', '/register', '/'];
+const publicPaths = ['/login', '/register', '/', '/display'];
 
 function base64UrlDecode(str: string): string {
   // Convert Base64url to standard Base64

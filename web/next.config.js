@@ -48,9 +48,32 @@ const nextConfig = {
   // Security headers
   async headers() {
     const cspBackendUrl = process.env.BACKEND_URL || 'http://localhost:3000';
+    const realtimeUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3002';
     return [
+      // Relaxed CSP for /display route — needs iframes, external media, WebSocket
       {
-        source: '/(.*)',
+        source: '/display',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: ${cspBackendUrl} https: http:; font-src 'self' data:; connect-src 'self' ${cspBackendUrl} ${realtimeUrl} ws: wss: https: http:; media-src 'self' blob: ${cspBackendUrl} https: http:; frame-src 'self' https: http:;`,
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'X-XSS-Protection',
+            value: '1; mode=block',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
+          },
+        ],
+      },
+      {
+        source: '/((?!display).*)',
         headers: [
           {
             key: 'Content-Security-Policy',
