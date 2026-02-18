@@ -66,6 +66,7 @@ export class SanitizeInterceptor implements NestInterceptor {
     disallowedTagsMode: 'discard',
   };
 
+
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
 
@@ -151,6 +152,7 @@ export class SanitizeInterceptor implements NestInterceptor {
   private sanitizeTemplateHtml(html: string): string {
     return sanitizeHtml(html, this.templateSanitizeOptions);
   }
+
 
   private sanitizeString(str: string): string {
     // First strip HTML tags

@@ -179,6 +179,7 @@ class ApiClient {
       await this.ensureCsrfToken();
     }
 
+
     // Include CSRF token for state-changing requests
     const csrfToken = getCsrfToken();
     const headers: HeadersInit = {

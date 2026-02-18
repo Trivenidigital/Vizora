@@ -75,6 +75,7 @@ export class DeviceGateway
   // Per-message rate limiting: socketId -> { count, resetAt }
   private readonly messageRates: Map<string, { count: number; resetAt: number }> = new Map();
 
+
   constructor(
     private jwtService: JwtService,
     private redisService: RedisService,
@@ -472,6 +473,7 @@ export class DeviceGateway
   async handleDisconnect(client: Socket) {
     // Clean up per-message rate limit entry for this socket
     this.messageRates.delete(client.id);
+
 
     try {
       const deviceId = client.data?.deviceId;
