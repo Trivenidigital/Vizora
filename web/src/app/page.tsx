@@ -166,11 +166,72 @@ function FAQItem({ q, a }: { q: string; a: string }) {
 export default function Index() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [activeFeatureTab, setActiveFeatureTab] = useState('realtime');
+  const [showStickyBar, setShowStickyBar] = useState(false);
+  const heroRef = useRef<HTMLElement>(null);
+  const finalCtaRef = useRef<HTMLElement>(null);
+  const footerRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 60);
     window.addEventListener('scroll', fn, { passive: true });
     return () => window.removeEventListener('scroll', fn);
+  }, []);
+
+  // IntersectionObserver for feature tab auto-highlighting
+  useEffect(() => {
+    const ids = ['feature-realtime', 'feature-content', 'feature-scheduling'];
+    const observers: IntersectionObserver[] = [];
+    ids.forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const observer = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) {
+            setActiveFeatureTab(id.replace('feature-', ''));
+          }
+        },
+        { threshold: 0.3, rootMargin: '-80px 0px -40% 0px' },
+      );
+      observer.observe(el);
+      observers.push(observer);
+    });
+    return () => observers.forEach((o) => o.disconnect());
+  }, []);
+
+  // Sticky bottom CTA bar visibility
+  useEffect(() => {
+    const hero = heroRef.current;
+    const finalCta = finalCtaRef.current;
+    const footer = footerRef.current;
+    if (!hero) return;
+
+    let heroVisible = true;
+    let bottomVisible = false;
+
+    const heroObserver = new IntersectionObserver(
+      ([entry]) => {
+        heroVisible = entry.isIntersecting;
+        setShowStickyBar(!heroVisible && !bottomVisible);
+      },
+      { threshold: 0.1 },
+    );
+    heroObserver.observe(hero);
+
+    const bottomObserver = new IntersectionObserver(
+      ([entry]) => {
+        bottomVisible = entry.isIntersecting;
+        setShowStickyBar(!heroVisible && !bottomVisible);
+      },
+      { threshold: 0.1 },
+    );
+    if (finalCta) bottomObserver.observe(finalCta);
+    if (footer) bottomObserver.observe(footer);
+
+    return () => {
+      heroObserver.disconnect();
+      bottomObserver.disconnect();
+    };
   }, []);
 
   const nav = useCallback((id: string) => {
@@ -283,7 +344,7 @@ export default function Index() {
       </nav>
 
       {/* ─── 2. Hero ─── */}
-      <section className="relative min-h-screen flex items-center justify-center px-6 pt-14">
+      <section ref={heroRef} className="relative min-h-screen flex items-center justify-center px-6 pt-14">
         {/* Grid background */}
         <div
           className="absolute inset-0 pointer-events-none"
@@ -350,13 +411,14 @@ export default function Index() {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-8">
               <Link
                 href="/register"
-                className="eh-btn-neon inline-flex items-center gap-2 px-7 py-2.5 rounded-md text-[0.9rem]"
+                className="eh-btn-neon inline-flex items-center gap-2 px-8 py-3.5 rounded-md text-base"
+                style={{ boxShadow: '0 0 24px rgba(0,229,160,0.25), 0 0 48px rgba(0,229,160,0.1)' }}
               >
                 Start Free Trial <ArrowRight size={15} />
               </Link>
               <button
                 onClick={() => scrollTo('how-it-works')}
-                className="eh-btn-ghost inline-flex items-center gap-2 px-7 py-2.5 rounded-md text-[0.9rem]"
+                className="eh-btn-ghost inline-flex items-center gap-2 px-7 py-3.5 rounded-md text-[0.9rem]"
               >
                 <Play size={14} /> Watch Demo
               </button>
@@ -381,8 +443,9 @@ export default function Index() {
 
           {/* Dashboard Mockup */}
           <Reveal delay={200}>
+            <div className="overflow-x-auto sm:overflow-visible">
             <div
-              className="relative mx-auto max-w-[920px] rounded-xl overflow-hidden"
+              className="relative mx-auto max-w-[920px] min-w-[480px] sm:min-w-0 rounded-xl overflow-hidden"
               style={{
                 background: '#0C2229',
                 border: '1px solid #1B3D47',
@@ -518,6 +581,7 @@ export default function Index() {
                 </div>
               </div>
             </div>
+            </div>
           </Reveal>
         </div>
       </section>
@@ -552,7 +616,7 @@ export default function Index() {
       <section className="py-12 px-6">
         <Reveal>
           <div
-            className="max-w-5xl mx-auto grid grid-cols-2 lg:grid-cols-4 gap-6 py-10 px-8 rounded-2xl"
+            className="max-w-5xl mx-auto grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 py-10 px-6 sm:px-8 rounded-2xl"
             style={{
               background: 'linear-gradient(135deg, rgba(0,229,160,0.04) 0%, rgba(0,180,216,0.03) 100%)',
               border: '1px solid rgba(0,229,160,0.1)',
@@ -565,7 +629,7 @@ export default function Index() {
               { value: 45, suffix: '+', label: 'Countries', icon: Globe },
             ].map((stat, i) => (
               <div key={stat.label} className="text-center">
-                <stat.icon size={20} className="mx-auto mb-3" style={{ color: '#00E5A0', opacity: 0.7 }} />
+                <stat.icon size={18} className="mx-auto mb-3 sm:w-5 sm:h-5" style={{ color: '#00E5A0', opacity: 0.7 }} />
                 <div className="text-2xl sm:text-3xl font-bold mb-1" style={{ color: '#F0ECE8' }}>
                   {typeof stat.value === 'number' && stat.value >= 100 ? (
                     <AnimatedStat value={stat.value} suffix={stat.suffix} />
@@ -603,8 +667,41 @@ export default function Index() {
             </div>
           </Reveal>
 
+          {/* Feature Tab Navigation */}
+          <div className="sticky top-14 z-20 -mx-6 px-6 py-3 mb-8" style={{
+            background: 'rgba(6, 26, 33, 0.92)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            borderBottom: '1px solid rgba(27,61,71,0.5)',
+          }}>
+            <div className="flex items-center justify-center gap-2">
+              {[
+                { id: 'realtime', label: 'Real-time Control' },
+                { id: 'content', label: 'Content Management' },
+                { id: 'scheduling', label: 'Scheduling & Analytics' },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => scrollTo(`feature-${tab.id}`)}
+                  className="px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200"
+                  style={activeFeatureTab === tab.id ? {
+                    background: 'rgba(0,229,160,0.15)',
+                    color: '#00E5A0',
+                    border: '1px solid rgba(0,229,160,0.3)',
+                  } : {
+                    background: 'transparent',
+                    color: '#8A8278',
+                    border: '1px solid transparent',
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Showcase 1: Real-time Fleet Command */}
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center mb-28">
+          <div id="feature-realtime" className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center mb-28 scroll-mt-32">
             <Reveal>
               <div>
                 <div className="inline-flex items-center gap-2 mb-4">
@@ -686,7 +783,7 @@ export default function Index() {
           </div>
 
           {/* Showcase 2: Content Management (reversed) */}
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center mb-28">
+          <div id="feature-content" className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center mb-28 scroll-mt-32">
             <Reveal delay={150} className="order-2 lg:order-1">
               <div className="eh-card rounded-xl p-5 relative overflow-hidden">
                 {/* Content library mockup */}
@@ -770,7 +867,7 @@ export default function Index() {
           </div>
 
           {/* Showcase 3: Scheduling & Analytics */}
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+          <div id="feature-scheduling" className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center mb-28 scroll-mt-32">
             <Reveal>
               <div>
                 <div className="inline-flex items-center gap-2 mb-4">
@@ -844,17 +941,12 @@ export default function Index() {
               </div>
             </Reveal>
           </div>
-        </div>
-      </section>
-
-      {/* ─── 6. More Features Grid ─── */}
-      <section className="py-20 px-6">
-        <div className="max-w-5xl mx-auto">
+          {/* More Capabilities */}
           <Reveal>
-            <div className="text-center mb-14">
-              <h2 className="text-2xl sm:text-3xl font-bold mb-3" style={{ letterSpacing: '-0.03em' }}>
-                And so much more
-              </h2>
+            <div className="text-center mb-10 mt-4">
+              <h3 className="text-2xl sm:text-3xl font-bold mb-3" style={{ letterSpacing: '-0.03em' }}>
+                More capabilities
+              </h3>
               <p style={{ color: '#8A8278' }} className="text-sm">
                 Every tool you need to manage signage at scale.
               </p>
@@ -885,6 +977,33 @@ export default function Index() {
             ))}
           </div>
         </div>
+      </section>
+
+      {/* ─── Mid-page CTA Banner ─── */}
+      <section className="py-16 px-6">
+        <Reveal>
+          <div
+            className="max-w-4xl mx-auto rounded-2xl p-8 sm:p-12 text-center relative overflow-hidden"
+            style={{
+              background: 'linear-gradient(135deg, rgba(0,229,160,0.08) 0%, rgba(0,180,216,0.05) 50%, rgba(139,92,246,0.04) 100%)',
+              border: '1px solid rgba(0,229,160,0.12)',
+            }}
+          >
+            <h2 className="text-xl sm:text-2xl font-bold mb-3" style={{ letterSpacing: '-0.02em' }}>
+              Ready to see it in action?
+            </h2>
+            <p className="text-sm mb-6 max-w-md mx-auto" style={{ color: '#8A8278' }}>
+              Start your free trial today. No credit card required, no strings attached.
+            </p>
+            <Link
+              href="/register"
+              className="eh-btn-neon inline-flex items-center gap-2 px-8 py-3 rounded-md text-[0.9rem]"
+              style={{ boxShadow: '0 0 20px rgba(0,229,160,0.2)' }}
+            >
+              Start Free Trial <ArrowRight size={15} />
+            </Link>
+          </div>
+        </Reveal>
       </section>
 
       {/* ─── 7. Industry Solutions ─── */}
@@ -1052,9 +1171,24 @@ export default function Index() {
               <h2 className="text-3xl sm:text-4xl font-bold mb-4" style={{ letterSpacing: '-0.03em' }}>
                 Loved by teams everywhere
               </h2>
-              <p style={{ color: '#8A8278' }}>
+              <p style={{ color: '#8A8278' }} className="mb-6">
                 See why organizations choose Vizora for their digital signage.
               </p>
+              {/* Aggregate rating badge */}
+              <div className="inline-flex items-center gap-3 px-5 py-2.5 rounded-full"
+                style={{
+                  background: 'rgba(0,229,160,0.06)',
+                  border: '1px solid rgba(0,229,160,0.15)',
+                }}
+              >
+                <div className="flex gap-0.5">
+                  {Array.from({ length: 5 }).map((_, j) => (
+                    <Star key={j} size={14} fill="#00E5A0" style={{ color: '#00E5A0' }} />
+                  ))}
+                </div>
+                <span className="text-sm font-semibold" style={{ color: '#F0ECE8' }}>4.9/5</span>
+                <span className="text-xs" style={{ color: '#8A8278' }}>from 200+ reviews</span>
+              </div>
             </div>
           </Reveal>
 
@@ -1077,6 +1211,24 @@ export default function Index() {
                 name: 'Dr. Emily Rodriguez',
                 role: 'Communications Director',
                 company: 'BrightPath University',
+              },
+              {
+                quote: 'Managing digital menu boards across 85 locations used to be a nightmare. With Vizora, we update pricing and specials across every restaurant in seconds. It paid for itself in the first month.',
+                name: 'James Park',
+                role: 'Regional Manager',
+                company: 'Urban Eats Group',
+              },
+              {
+                quote: 'Deploying Vizora across our 12 offices was seamless. The device pairing is dead simple, and centralized content management means our IT team spends zero time on signage maintenance.',
+                name: 'Lisa Thompson',
+                role: 'IT Systems Administrator',
+                company: 'NovaTech Solutions',
+              },
+              {
+                quote: 'Our production floor KPI dashboards update in real-time now. Shift managers can see output metrics the moment they change. The WebSocket architecture makes all the difference for manufacturing.',
+                name: 'Robert Hernandez',
+                role: 'Operations Lead',
+                company: 'Apex Logistics',
               },
             ].map((testimonial, i) => (
               <Reveal key={testimonial.name} delay={i * 100}>
@@ -1121,10 +1273,10 @@ export default function Index() {
             </div>
           </Reveal>
 
-          <div className="grid md:grid-cols-4 gap-5 items-start">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-5 items-start">
             {/* Free */}
             <Reveal delay={0}>
-              <div className="eh-card rounded-xl p-5 sm:p-6">
+              <div className="eh-card rounded-xl p-4 sm:p-6">
                 <h3 className="text-lg font-semibold mb-1">Free Trial</h3>
                 <p className="text-xs mb-4" style={{ color: '#5A5248' }}>Perfect for getting started</p>
                 <div className="flex items-baseline gap-1 mb-6">
@@ -1147,7 +1299,7 @@ export default function Index() {
 
             {/* Basic */}
             <Reveal delay={100}>
-              <div className="eh-card rounded-xl p-5 sm:p-6">
+              <div className="eh-card rounded-xl p-4 sm:p-6">
                 <h3 className="text-lg font-semibold mb-1">Basic</h3>
                 <p className="text-xs mb-4" style={{ color: '#5A5248' }}>Up to 50 screens</p>
                 <div className="flex items-baseline gap-1 mb-6">
@@ -1171,7 +1323,7 @@ export default function Index() {
             {/* Pro */}
             <Reveal delay={150}>
               <div
-                className="relative eh-card rounded-xl p-5 sm:p-6"
+                className="relative eh-card rounded-xl p-4 sm:p-6"
                 style={{
                   borderColor: 'rgba(0,229,160,0.3)',
                   boxShadow: '0 0 40px rgba(0,229,160,0.06)',
@@ -1197,15 +1349,18 @@ export default function Index() {
                     </li>
                   ))}
                 </ul>
-                <Link href="/register" className="eh-btn-neon block w-full text-center text-sm font-semibold py-2.5 rounded-md">
+                <Link href="/register" className="eh-btn-neon block w-full text-center text-sm font-semibold py-3 rounded-md"
+                  style={{ boxShadow: '0 0 20px rgba(0,229,160,0.15)' }}
+                >
                   Get Started
                 </Link>
+                <p className="text-[0.65rem] text-center mt-2" style={{ color: '#5A5248' }}>30-day free trial included</p>
               </div>
             </Reveal>
 
             {/* Enterprise */}
             <Reveal delay={200}>
-              <div className="eh-card rounded-xl p-5 sm:p-6">
+              <div className="eh-card rounded-xl p-4 sm:p-6">
                 <h3 className="text-lg font-semibold mb-1">Enterprise</h3>
                 <p className="text-xs mb-4" style={{ color: '#5A5248' }}>For large organizations</p>
                 <div className="flex items-baseline gap-1 mb-6">
@@ -1274,7 +1429,7 @@ export default function Index() {
       </section>
 
       {/* ─── 13. Final CTA ─── */}
-      <section className="py-28 sm:py-32 px-6">
+      <section ref={finalCtaRef} className="py-28 sm:py-32 px-6">
         <Reveal>
           <div
             className="max-w-4xl mx-auto rounded-2xl p-10 sm:p-16 text-center relative overflow-hidden"
@@ -1326,8 +1481,38 @@ export default function Index() {
         </Reveal>
       </section>
 
+      {/* ─── Sticky Bottom CTA Bar ─── */}
+      <div
+        className="fixed bottom-0 left-0 right-0 z-40 transition-all duration-300"
+        style={{
+          transform: showStickyBar ? 'translateY(0)' : 'translateY(100%)',
+          background: 'rgba(6, 26, 33, 0.95)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          borderTop: '1px solid #1B3D47',
+          boxShadow: '0 -4px 20px rgba(0,0,0,0.3)',
+        }}
+      >
+        <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between gap-4">
+          <span className="hidden sm:block text-xs" style={{ color: '#8A8278' }}>
+            30-day free trial &middot; No credit card required
+          </span>
+          <div className="flex items-center gap-3 ml-auto">
+            <span className="sm:hidden text-[0.7rem]" style={{ color: '#8A8278' }}>
+              30-day free, no card
+            </span>
+            <Link
+              href="/register"
+              className="eh-btn-neon inline-flex items-center gap-2 px-5 py-2 rounded-md text-sm font-medium"
+            >
+              Start Free Trial <ArrowRight size={14} />
+            </Link>
+          </div>
+        </div>
+      </div>
+
       {/* ─── 14. Footer ─── */}
-      <footer className="pt-16 pb-8 px-6" style={{ borderTop: '1px solid #1B3D47' }}>
+      <footer ref={footerRef} className="pt-16 pb-8 px-6" style={{ borderTop: '1px solid #1B3D47' }}>
         <div className="max-w-6xl mx-auto">
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
             {/* Brand */}
