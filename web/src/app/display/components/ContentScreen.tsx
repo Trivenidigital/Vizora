@@ -8,6 +8,20 @@ interface ContentScreenProps {
   temporaryContent: PushContent | null;
   onVideoEnded: () => void;
   onContentError?: (contentId: string, errorType: string, errorMessage: string) => void;
+  deviceToken?: string;
+}
+
+/**
+ * Append device JWT token to device-content API URLs for authentication.
+ * img/video src attributes can't send Authorization headers, so we use query params.
+ */
+function authenticateUrl(url: string, token?: string): string {
+  if (!token || !url) return url;
+  if (url.includes('/device-content/') && url.includes('/file')) {
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}token=${encodeURIComponent(token)}`;
+  }
+  return url;
 }
 
 export function ContentScreen({
@@ -15,6 +29,7 @@ export function ContentScreen({
   temporaryContent,
   onVideoEnded,
   onContentError,
+  deviceToken,
 }: ContentScreenProps) {
   // Temporary pushed content takes priority
   if (temporaryContent) {
@@ -22,7 +37,7 @@ export function ContentScreen({
       <div style={styles.container}>
         <ContentRenderer
           type={temporaryContent.type}
-          url={temporaryContent.url}
+          url={authenticateUrl(temporaryContent.url, deviceToken)}
           name={temporaryContent.name}
           onEnded={onVideoEnded}
           onError={(errType, errMsg) => onContentError?.(temporaryContent.id, errType, errMsg)}
@@ -37,7 +52,7 @@ export function ContentScreen({
       <div style={styles.container}>
         <ContentRenderer
           type={currentItem.content.type}
-          url={currentItem.content.url}
+          url={authenticateUrl(currentItem.content.url, deviceToken)}
           name={currentItem.content.name}
           metadata={currentItem.content.metadata}
           onEnded={onVideoEnded}

@@ -171,10 +171,18 @@ export class AppController {
   @Post('push/content')
   @UseGuards(InternalApiGuard)
   async pushContent(@Body() data: PushContentRequest): Promise<PushResponse> {
+    // Resolve minio:// URLs to public API endpoints before sending to device
+    const content = { ...data.content };
+    if (content.url && content.url.startsWith('minio://')) {
+      const apiBaseUrl = process.env.API_BASE_URL
+        || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3000');
+      content.url = `${apiBaseUrl}/api/v1/device-content/${content.id}/file`;
+    }
+
     await this.deviceGateway.sendCommand(data.deviceId, {
       type: DeviceCommandType.PUSH_CONTENT,
       payload: {
-        content: data.content,
+        content,
         duration: data.duration || 30,
       },
     });

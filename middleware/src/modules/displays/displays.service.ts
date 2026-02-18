@@ -343,17 +343,9 @@ export class DisplaysService {
       throw new NotFoundException('Content not found or does not belong to your organization');
     }
 
-    // Resolve minio:// URLs to presigned HTTP URLs before sending to device
-    let contentUrl = content.url;
-    if (contentUrl && contentUrl.startsWith(MINIO_URL_PREFIX) && this.storageService.isMinioAvailable()) {
-      try {
-        const objectKey = contentUrl.substring(MINIO_URL_PREFIX.length);
-        contentUrl = await this.storageService.getPresignedUrl(objectKey, 3600);
-        this.logger.log(`Resolved minio:// URL to presigned URL for content ${contentId}`);
-      } catch (error) {
-        this.logger.warn(`Failed to resolve minio:// URL for content ${contentId}: ${error.message}`);
-      }
-    }
+    // Send raw URL — the realtime gateway resolves minio:// URLs to
+    // public API endpoints before forwarding to display clients.
+    const contentUrl = content.url;
 
     const url = `${this.realtimeUrl}/api/push/content`;
 

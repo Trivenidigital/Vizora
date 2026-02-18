@@ -105,7 +105,7 @@ export class DeviceGateway
     const apiBaseUrl = process.env.API_BASE_URL
       || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3000');
     if (item.content?.url?.startsWith('minio://')) {
-      return `${apiBaseUrl}/api/device-content/${item.content.id}/file`;
+      return `${apiBaseUrl}/api/v1/device-content/${item.content.id}/file`;
     }
     return item.content?.url || '';
   }

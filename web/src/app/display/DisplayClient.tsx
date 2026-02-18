@@ -200,6 +200,7 @@ export function DisplayClient() {
         temporaryContent={player.temporaryContent}
         onVideoEnded={player.handleVideoEnded}
         onContentError={handleContentError}
+        deviceToken={credentials.deviceToken}
       />
       <StatusBar status={connection.status} />
       <FullscreenButton isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
