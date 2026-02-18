@@ -587,7 +587,7 @@ export default function Index() {
       </section>
 
       {/* ─── 3. Trusted By ─── */}
-      <section className="py-16 px-6">
+      <section className="py-10 px-6">
         <div className="max-w-5xl mx-auto text-center">
           <p className="text-[0.65rem] uppercase tracking-[0.12em] font-bold mb-8" style={{ color: '#5A5248' }}>
             Trusted by forward-thinking teams worldwide
@@ -613,7 +613,7 @@ export default function Index() {
       </section>
 
       {/* ─── 4. Stats Bar ─── */}
-      <section className="py-12 px-6">
+      <section className="py-8 px-6">
         <Reveal>
           <div
             className="max-w-5xl mx-auto grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 py-10 px-6 sm:px-8 rounded-2xl"
@@ -647,10 +647,10 @@ export default function Index() {
       </section>
 
       {/* ─── 5. Feature Showcases (Alternating) ─── */}
-      <section id="features" className="py-28 sm:py-32 px-6">
+      <section id="features" className="py-16 sm:py-20 px-6">
         <div className="max-w-6xl mx-auto">
           <Reveal>
-            <div className="text-center mb-20">
+            <div className="text-center mb-12">
               <span className="inline-block text-xs font-bold uppercase tracking-[0.15em] mb-4 px-3 py-1 rounded-full"
                 style={{ color: '#00E5A0', background: 'rgba(0,229,160,0.08)', border: '1px solid rgba(0,229,160,0.15)' }}>
                 Platform
@@ -980,7 +980,7 @@ export default function Index() {
       </section>
 
       {/* ─── Mid-page CTA Banner ─── */}
-      <section className="py-16 px-6">
+      <section className="py-10 px-6">
         <Reveal>
           <div
             className="max-w-4xl mx-auto rounded-2xl p-8 sm:p-12 text-center relative overflow-hidden"
@@ -1007,7 +1007,7 @@ export default function Index() {
       </section>
 
       {/* ─── 7. Industry Solutions ─── */}
-      <section id="solutions" className="py-28 sm:py-32 px-6">
+      <section id="solutions" className="py-16 sm:py-20 px-6">
         <div className="max-w-5xl mx-auto">
           <Reveal>
             <div className="text-center mb-16">
@@ -1051,7 +1051,7 @@ export default function Index() {
       </section>
 
       {/* ─── 8. Security & Trust ─── */}
-      <section className="py-28 sm:py-32 px-6">
+      <section className="py-16 sm:py-20 px-6">
         <div className="max-w-5xl mx-auto">
           <Reveal>
             <div className="text-center mb-16">
@@ -1111,7 +1111,7 @@ export default function Index() {
       </section>
 
       {/* ─── 9. How It Works ─── */}
-      <section id="how-it-works" className="py-28 sm:py-32 px-6">
+      <section id="how-it-works" className="py-16 sm:py-20 px-6">
         <div className="max-w-5xl mx-auto">
           <Reveal>
             <div className="text-center mb-16">
@@ -1164,7 +1164,7 @@ export default function Index() {
       </section>
 
       {/* ─── 10. Testimonials ─── */}
-      <section className="py-28 sm:py-32 px-6">
+      <section className="py-16 sm:py-20 px-6">
         <div className="max-w-5xl mx-auto">
           <Reveal>
             <div className="text-center mb-16">
@@ -1256,7 +1256,7 @@ export default function Index() {
       </section>
 
       {/* ─── 11. Pricing ─── */}
-      <section id="pricing" className="py-28 sm:py-32 px-6">
+      <section id="pricing" className="py-16 sm:py-20 px-6">
         <div className="max-w-5xl mx-auto">
           <Reveal>
             <div className="text-center mb-16">
@@ -1384,7 +1384,7 @@ export default function Index() {
       </section>
 
       {/* ─── 12. FAQ ─── */}
-      <section id="faq" className="py-28 sm:py-32 px-6">
+      <section id="faq" className="py-16 sm:py-20 px-6">
         <div className="max-w-3xl mx-auto">
           <Reveal>
             <div className="text-center mb-14">
@@ -1429,7 +1429,7 @@ export default function Index() {
       </section>
 
       {/* ─── 13. Final CTA ─── */}
-      <section ref={finalCtaRef} className="py-28 sm:py-32 px-6">
+      <section ref={finalCtaRef} className="py-16 sm:py-20 px-6">
         <Reveal>
           <div
             className="max-w-4xl mx-auto rounded-2xl p-10 sm:p-16 text-center relative overflow-hidden"
@@ -1512,7 +1512,7 @@ export default function Index() {
       </div>
 
       {/* ─── 14. Footer ─── */}
-      <footer ref={footerRef} className="pt-16 pb-8 px-6" style={{ borderTop: '1px solid #1B3D47' }}>
+      <footer ref={footerRef} className="pt-12 pb-8 px-6" style={{ borderTop: '1px solid #1B3D47' }}>
         <div className="max-w-6xl mx-auto">
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
             {/* Brand */}
