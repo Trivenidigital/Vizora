@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, HttpStatus, HttpException, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, HttpStatus, HttpException, UseGuards, Logger } from '@nestjs/common';
 import { DeviceGateway } from '../gateways/device.gateway';
 import { RedisService } from '../services/redis.service';
 import { DatabaseService } from '../database/database.service';
@@ -37,6 +37,8 @@ interface PushResponse {
 
 @Controller()
 export class AppController {
+  private readonly logger = new Logger(AppController.name);
+
   constructor(
     private readonly deviceGateway: DeviceGateway,
     private readonly redisService: RedisService,
