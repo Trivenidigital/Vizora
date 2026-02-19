@@ -14,6 +14,8 @@ import {
 import type { Request, Response } from 'express';
 import { JwtService } from '@nestjs/jwt';
 import { Public } from '../auth/decorators/public.decorator';
+import { SkipEnvelope } from '../common/interceptors/response-envelope.interceptor';
+import { SkipOutputSanitize } from '../common/interceptors/sanitize.interceptor';
 import { ContentService } from './content.service';
 import { StorageService } from '../storage/storage.service';
 
@@ -78,7 +80,9 @@ export class DeviceContentController {
    * Content IDs are CUIDs (unguessable), providing baseline access control.
    */
   @Get(':id/file')
-  @Public() // Bypass user JWT guard
+  @Public()
+  @SkipEnvelope()
+  @SkipOutputSanitize()
   async serveFile(
     @Param('id') id: string,
     @Req() req: Request,
