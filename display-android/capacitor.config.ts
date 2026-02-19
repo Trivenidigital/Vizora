@@ -1,5 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
+const isDev = process.env.NODE_ENV !== 'production';
+
 const config: CapacitorConfig = {
   appId: 'com.vizora.display',
   appName: 'Vizora Display',
@@ -30,9 +32,9 @@ const config: CapacitorConfig = {
   },
   android: {
     // Android TV specific configurations
-    allowMixedContent: false,
+    allowMixedContent: isDev, // Allow ws:// from https:// in development only
     captureInput: true,
-    webContentsDebuggingEnabled: false,
+    webContentsDebuggingEnabled: isDev, // Chrome DevTools debugging in development only
     backgroundColor: '#1a1a2e',
     buildOptions: {
       releaseType: 'APK',
