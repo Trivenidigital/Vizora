@@ -69,7 +69,7 @@ export default function AdminHealthClient({ initialHealth }: AdminHealthClientPr
         setLoading(true);
       }
       const data = await apiClient.getPlatformHealth();
-      setHealth(data);
+      setHealth(data as unknown as HealthStatus);
     } catch (error: any) {
       toast.error(error.message || 'Failed to load health status');
     } finally {
