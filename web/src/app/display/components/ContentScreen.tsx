@@ -31,13 +31,27 @@ export function ContentScreen({
   onContentError,
   deviceToken,
 }: ContentScreenProps) {
+  // Debug: log what we're rendering (temporary)
+  if (temporaryContent) {
+    console.log('[Vizora Debug] temporaryContent:', JSON.stringify(temporaryContent));
+    console.log('[Vizora Debug] authenticated URL:', authenticateUrl(temporaryContent.url, deviceToken));
+  }
+  if (currentItem?.content) {
+    console.log('[Vizora Debug] currentItem.content:', JSON.stringify(currentItem.content));
+    console.log('[Vizora Debug] authenticated URL:', authenticateUrl(currentItem.content.url, deviceToken));
+  }
+
   // Temporary pushed content takes priority
   if (temporaryContent) {
+    const resolvedUrl = authenticateUrl(temporaryContent.url, deviceToken);
     return (
       <div style={styles.container}>
+        <div style={{ position: 'absolute', top: 0, left: 0, zIndex: 9999, background: 'rgba(0,0,0,0.8)', color: '#0f0', fontSize: '12px', padding: '8px', maxWidth: '100vw', wordBreak: 'break-all' as const }}>
+          DEBUG: type={temporaryContent.type} | url={resolvedUrl}
+        </div>
         <ContentRenderer
           type={temporaryContent.type}
-          url={authenticateUrl(temporaryContent.url, deviceToken)}
+          url={resolvedUrl}
           name={temporaryContent.name}
           onEnded={onVideoEnded}
           onError={(errType, errMsg) => onContentError?.(temporaryContent.id, errType, errMsg)}
