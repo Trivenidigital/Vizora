@@ -3,7 +3,7 @@
 import React from 'react';
 import { X } from 'lucide-react';
 
-type BadgeVariant = 'primary' | 'success' | 'warning' | 'error' | 'info' | 'neutral';
+type BadgeVariant = 'primary' | 'success' | 'warning' | 'error' | 'info' | 'neutral' | 'amber';
 type BadgeSize = 'sm' | 'md' | 'lg';
 
 interface BadgeProps {
@@ -22,6 +22,7 @@ const variantStyles: Record<BadgeVariant, string> = {
   error: 'bg-error-100 dark:bg-error-900 text-error-800 dark:text-error-100 border border-error-300 dark:border-error-700',
   info: 'bg-info-100 dark:bg-info-900 text-info-800 dark:text-info-100 border border-info-300 dark:border-info-700',
   neutral: 'bg-[var(--surface-hover)] text-[var(--foreground)] border border-[var(--border)]',
+  amber: 'bg-[var(--warning-lightest)] text-[var(--warning)] border border-[var(--warning-lighter)]',
 };
 
 const sizeStyles: Record<BadgeSize, string> = {

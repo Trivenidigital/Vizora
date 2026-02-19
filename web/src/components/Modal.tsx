@@ -65,7 +65,7 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' }:
         >
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-[var(--border)]">
-            <h3 id="modal-title" className="text-xl font-semibold text-[var(--foreground)]">{title}</h3>
+            <h3 id="modal-title" className="text-xl font-semibold text-[var(--foreground)] eh-heading">{title}</h3>
             <button
               ref={closeButtonRef}
               onClick={onClose}

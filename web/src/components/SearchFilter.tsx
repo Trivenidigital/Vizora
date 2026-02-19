@@ -23,7 +23,7 @@ export default function SearchFilter({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="w-full pl-10 pr-10 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] placeholder-[var(--foreground-tertiary)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent transition-all duration-200"
+          className="w-full pl-10 pr-10 py-2.5 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] placeholder-[var(--foreground-tertiary)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent transition-all duration-200"
           autoComplete="off"
         />
         <svg

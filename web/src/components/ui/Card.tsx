@@ -24,7 +24,7 @@ interface CardFooterProps {
 
 const CardRoot: React.FC<CardProps> = ({ children, className }) => (
   <div
-    className={`bg-[var(--surface)] rounded-lg border border-[var(--border)] shadow-sm hover:shadow-md transition-shadow ${
+    className={`bg-[var(--surface)] rounded-lg border border-[var(--border)] shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] ${
       className || ''
     }`}
   >
