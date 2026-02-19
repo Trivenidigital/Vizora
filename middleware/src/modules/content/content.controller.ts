@@ -143,7 +143,6 @@ export class ContentController {
     }
 
     return {
-      success: true,
       content,
       fileHash: validation.hash,
     };
@@ -393,7 +392,6 @@ export class ContentController {
     );
 
     return {
-      success: true,
       content,
       fileHash: validation.hash,
     };

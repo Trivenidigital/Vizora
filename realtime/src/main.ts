@@ -74,6 +74,10 @@ async function bootstrap() {
 
   try {
     await app.listen(port, '0.0.0.0');
+    // Signal PM2 that the app is ready to accept traffic
+    if (typeof process.send === 'function') {
+      process.send('ready');
+    }
     Logger.log(`🚀 Realtime Gateway running on: http://localhost:${port}/${globalPrefix}`);
     Logger.log(`🔌 WebSocket server ready on: ws://localhost:${port}`);
     Logger.log(`📊 Metrics available at: http://localhost:${port}/internal/metrics`);

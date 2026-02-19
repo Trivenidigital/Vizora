@@ -182,7 +182,6 @@ describe('ContentController', () => {
     it('should upload file successfully', async () => {
       const result = await controller.uploadFile(organizationId, mockFile);
 
-      expect(result).toHaveProperty('success', true);
       expect(result).toHaveProperty('content');
       expect(result).toHaveProperty('fileHash', 'abc123hash');
     });
@@ -429,7 +428,6 @@ describe('ContentController', () => {
         { keepBackup: true },
       );
 
-      expect(result.success).toBe(true);
       expect(result.content).toBeDefined();
       expect(result.fileHash).toBe('newHash123');
     });

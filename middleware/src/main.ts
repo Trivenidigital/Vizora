@@ -162,6 +162,10 @@ async function bootstrap() {
 
   try {
     await app.listen(port, '0.0.0.0');
+    // Signal PM2 that the app is ready to accept traffic
+    if (typeof process.send === 'function') {
+      process.send('ready');
+    }
     Logger.log(`🚀 Middleware API running on: http://localhost:${port}/${globalPrefix}`);
     Logger.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     Logger.log(`⚠️  Port ${port} is RESERVED for Middleware - will not start if occupied`);

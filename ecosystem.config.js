@@ -29,6 +29,9 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: 3000,
       },
+      // Wait for app to signal readiness before accepting traffic
+      wait_ready: true,
+      listen_timeout: 30000,
       // Graceful shutdown — 30s for in-flight requests to complete
       kill_timeout: 30000,
       // Logging
@@ -59,6 +62,9 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: 3002,
       },
+      // Wait for app to signal readiness before accepting traffic
+      wait_ready: true,
+      listen_timeout: 30000,
       // Graceful shutdown
       kill_timeout: 15000, // 15 seconds for WebSocket connections to close
       // Logging

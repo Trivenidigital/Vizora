@@ -129,13 +129,21 @@ export class StripeProvider implements PaymentProvider {
     const sub = await this.withCircuitBreaker(() =>
       this.stripe!.subscriptions.retrieve(subscriptionId),
     );
-    const updated = await this.withCircuitBreaker(() =>
-      this.stripe!.subscriptions.update(subscriptionId, {
-        items: [{ id: sub.items.data[0].id, price: priceId }],
-        proration_behavior: 'create_prorations',
-      }),
-    );
-    return this.mapSubscription(updated);
+    try {
+      const updated = await this.withCircuitBreaker(() =>
+        this.stripe!.subscriptions.update(subscriptionId, {
+          items: [{ id: sub.items.data[0].id, price: priceId }],
+          proration_behavior: 'create_prorations',
+        }),
+      );
+      return this.mapSubscription(updated);
+    } catch (error) {
+      this.logger.error(
+        `Failed to update subscription ${subscriptionId} after retrieving it. Manual reconciliation may be needed.`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw error;
+    }
   }
 
   async cancelSubscription(

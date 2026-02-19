@@ -232,7 +232,7 @@ export class CacheManager {
     return mimeMap[mimeType] || 'bin';
   }
 
-  private downloadFile(url: string, destPath: string): Promise<void> {
+  private downloadFile(url: string, destPath: string, maxRedirects = 5): Promise<void> {
     return new Promise((resolve, reject) => {
       // Fix localhost for IPv4
       const fixedUrl = url.replace(/localhost/g, '127.0.0.1');
@@ -241,12 +241,17 @@ export class CacheManager {
       const file = fs.createWriteStream(destPath);
       protocol.get(fixedUrl, (response) => {
         if (response.statusCode === 301 || response.statusCode === 302) {
-          // Follow redirect
+          // Follow redirect with depth limit
           const redirectUrl = response.headers.location;
-          if (redirectUrl) {
+          if (redirectUrl && maxRedirects > 0) {
             file.close();
             try { fs.unlinkSync(destPath); } catch {}
-            this.downloadFile(redirectUrl, destPath).then(resolve).catch(reject);
+            this.downloadFile(redirectUrl, destPath, maxRedirects - 1).then(resolve).catch(reject);
+            return;
+          } else if (maxRedirects <= 0) {
+            file.close();
+            try { fs.unlinkSync(destPath); } catch {}
+            reject(new Error('Too many redirects'));
             return;
           }
         }

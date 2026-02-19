@@ -151,12 +151,12 @@ export class OrganizationsService {
       });
       return { logoUrl, objectKey };
     } else {
-      const fs = require('fs');
-      const path = require('path');
+      const fs = await import('fs');
+      const path = await import('path');
       const uploadsDir = path.join(process.cwd(), 'uploads', 'branding');
-      if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+      await fs.promises.mkdir(uploadsDir, { recursive: true });
       const filePath = path.join(uploadsDir, `${orgId}-logo.${ext}`);
-      fs.writeFileSync(filePath, file.buffer);
+      await fs.promises.writeFile(filePath, file.buffer);
       const baseUrl = process.env.API_BASE_URL || 'http://localhost:3000';
       const logoUrl = `${baseUrl}/uploads/branding/${orgId}-logo.${ext}`;
       await this.db.organization.update({
