@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ContentType } from '../lib/types';
 import { LayoutRenderer } from './LayoutRenderer';
 import type { LayoutMetadata } from '../lib/types';
@@ -14,8 +14,53 @@ interface ContentRendererProps {
   onError?: (errorType: string, errorMessage: string) => void;
 }
 
+/**
+ * Fetch an image URL via JavaScript and return a blob URL.
+ * This bypasses browser caching/header issues with <img src>.
+ */
+function useBlobUrl(url: string, enabled: boolean) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!enabled || !url) return;
+
+    let revoked = false;
+    const controller = new AbortController();
+
+    fetch(url, { signal: controller.signal })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.blob();
+      })
+      .then((blob) => {
+        if (revoked) return;
+        const objectUrl = URL.createObjectURL(blob);
+        setBlobUrl(objectUrl);
+        setError(null);
+      })
+      .catch((err) => {
+        if (revoked) return;
+        setError(err.message || 'fetch failed');
+      });
+
+    return () => {
+      revoked = true;
+      controller.abort();
+      setBlobUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+    };
+  }, [url, enabled]);
+
+  return { blobUrl, error };
+}
+
 export function ContentRenderer({ type, url, name, metadata, onEnded, onError }: ContentRendererProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const isImage = type === 'image';
+  const { blobUrl, error: fetchError } = useBlobUrl(url, isImage);
 
   // Attempt autoplay when video mounts
   useEffect(() => {
@@ -30,15 +75,36 @@ export function ContentRenderer({ type, url, name, metadata, onEnded, onError }:
     }
   }, [type, url]);
 
+  // Report fetch errors for images
+  useEffect(() => {
+    if (isImage && fetchError) {
+      onError?.('load_error', `Image fetch failed: ${fetchError} (url: ${url})`);
+    }
+  }, [isImage, fetchError, url, onError]);
+
   switch (type) {
     case 'image':
+      if (fetchError) {
+        return (
+          <div style={{ ...styles.image, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ff6b6b', fontSize: '14px', padding: '20px', textAlign: 'center' as const }}>
+            Image load error: {fetchError}<br />URL: {url?.substring(0, 80)}...
+          </div>
+        );
+      }
+      if (!blobUrl) {
+        return (
+          <div style={{ ...styles.image, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: '40px', height: '40px', border: '3px solid rgba(0,229,160,0.2)', borderTopColor: '#00E5A0', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+          </div>
+        );
+      }
       return (
         <img
-          src={url}
+          src={blobUrl}
           alt={name || 'Display content'}
           style={styles.image}
           onError={() => {
-            onError?.('load_error', `Image failed to load: ${url}`);
+            onError?.('load_error', `Image blob failed to render`);
             onEnded?.();
           }}
         />
