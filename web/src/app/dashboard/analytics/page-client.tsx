@@ -117,7 +117,7 @@ export default function AnalyticsClient() {
  const handleExportCSV = async () => {
  try {
  setExporting(true);
- const data = await apiClient.exportAnalytics(dateRange);
+ const data = await apiClient.exportAnalytics(dateRange) as any;
 
  // Build CSV sections
  const sections: string[] = [];
