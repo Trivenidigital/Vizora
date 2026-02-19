@@ -190,7 +190,7 @@ export default function LayoutEditorPage({ params }: { params: Promise<{ id: str
           gridArea: z.gridArea,
           contentId: z.contentId || null,
           playlistId: z.playlistId || null,
-        })),
+        })) as any,
       });
       toast.success('Layout saved successfully');
     } catch (error: any) {
