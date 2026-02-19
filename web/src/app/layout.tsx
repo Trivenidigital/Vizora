@@ -1,5 +1,5 @@
 import './globals.css';
-import { Space_Grotesk, JetBrains_Mono } from 'next/font/google';
+import { Sora, DM_Sans, JetBrains_Mono } from 'next/font/google';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { CustomizationProvider } from '@/components/providers/CustomizationProvider';
 import CommandPaletteWrapper from '@/components/CommandPaletteWrapper';
@@ -7,8 +7,9 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 
 import type { Viewport } from 'next';
 
-const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-space' });
-const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono' });
+const sora = Sora({ subsets: ['latin'], variable: '--font-sora', display: 'swap' });
+const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-dm', display: 'swap' });
+const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono', display: 'swap' });
 
 export const metadata = {
   title: 'Vizora - Digital Signage Platform',
@@ -31,8 +32,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${spaceGrotesk.variable} ${jetbrainsMono.variable}`}>
-      <body className={`${spaceGrotesk.className} min-h-screen bg-[var(--background)] text-[var(--foreground)]`}>
+    <html lang="en" suppressHydrationWarning className={`${sora.variable} ${dmSans.variable} ${jetbrainsMono.variable}`}>
+      <body className={`${dmSans.className} min-h-screen bg-[var(--background)] text-[var(--foreground)]`}>
         <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-0 focus:left-0 focus:z-50 focus:p-4 focus:bg-[#00E5A0] focus:text-[#061A21]">
           Skip to main content
         </a>

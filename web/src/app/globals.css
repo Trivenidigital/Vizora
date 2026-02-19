@@ -48,13 +48,17 @@
     --info-lighter: #A5F3FC;
     --info-lightest: #ECFEFF;
 
+    /* Accent Colors */
+    --accent-warm: #F59E0B;
+    --accent-warm-light: #FBBF24;
+
     /* Utility Colors */
     --gray-50: #F0ECE8;
     --gray-100: #E8E3DD;
     --gray-200: #D1CBC5;
     --gray-300: #B5AEA6;
-    --gray-400: #8A8278;
-    --gray-500: #5A5248;
+    --gray-400: #9A958E;
+    --gray-500: #6B655D;
     --gray-600: #3D3632;
     --gray-700: #1B3D47;
     --gray-800: #122D35;
@@ -87,7 +91,7 @@
     --background-tertiary: #0A222E;
     --foreground: #F0ECE8;
     --foreground-secondary: #B5AEA6;
-    --foreground-tertiary: #8A8278;
+    --foreground-tertiary: #9A958E;
 
     /* Surface and Cards */
     --surface: #0C2229;
@@ -125,13 +129,17 @@
     --info-lighter: #67E8F9;
     --info-lightest: #CFFAFE;
 
+    /* Accent Colors */
+    --accent-warm: #F59E0B;
+    --accent-warm-light: #FBBF24;
+
     /* Utility Colors - Dark */
     --gray-50: #F0ECE8;
     --gray-100: #E8E3DD;
     --gray-200: #D1CBC5;
     --gray-300: #B5AEA6;
-    --gray-400: #8A8278;
-    --gray-500: #5A5248;
+    --gray-400: #9A958E;
+    --gray-500: #6B655D;
     --gray-600: #3D3632;
     --gray-700: #1B3D47;
     --gray-800: #122D35;
@@ -160,7 +168,6 @@ html.dark {
 body {
   background-color: var(--background);
   color: var(--foreground);
-  transition: background-color var(--transition-normal), color var(--transition-normal);
 }
 
 /* Default focus ring styles */
@@ -169,19 +176,14 @@ body {
   outline-offset: var(--focus-ring-offset);
 }
 
-/* Smooth transitions for theme switching */
-* {
-  transition-property: background-color, border-color, color;
-  transition-duration: var(--transition-normal);
-}
-
 /* ── Electric Horizon Global Utilities ── */
 
 .eh-reveal {
   opacity: 0;
-  transform: translateY(20px);
-  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  transform: translateY(24px);
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.8s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  will-change: transform, opacity;
 }
 .eh-visible {
   opacity: 1;
@@ -195,41 +197,53 @@ body {
   background-clip: text;
 }
 
+.eh-heading {
+  font-family: var(--font-sora), sans-serif;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+}
+
 .eh-btn-neon {
   background: #00E5A0;
   color: #061A21;
   font-weight: 600;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 .eh-btn-neon:hover {
   background: #00CC8E;
   box-shadow: 0 0 28px rgba(0, 229, 160, 0.3);
+  transform: translateY(-1px);
+}
+.eh-btn-neon:active {
+  transform: translateY(0);
 }
 
 .eh-btn-ghost {
   border: 1px solid #1B3D47;
-  color: #8A8278;
+  color: #9A958E;
   transition: all 0.2s ease;
 }
 .eh-btn-ghost:hover {
   color: #00E5A0;
   border-color: rgba(0, 229, 160, 0.3);
+  background: rgba(0, 229, 160, 0.04);
 }
 
 .eh-card {
   background: rgba(12, 34, 41, 0.6);
   border: 1px solid #1B3D47;
-  transition: transform 0.25s ease, border-color 0.25s ease,
-    box-shadow 0.25s ease !important;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.3s ease, box-shadow 0.3s ease !important;
 }
 .eh-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-3px);
   border-color: rgba(0, 229, 160, 0.2);
-  box-shadow: 0 8px 32px rgba(0, 229, 160, 0.06);
+  box-shadow: 0 12px 40px rgba(0, 229, 160, 0.06);
 }
 
 .eh-nav-link {
   position: relative;
+  transition: color 0.2s ease;
 }
 .eh-nav-link::after {
   content: '';
@@ -245,6 +259,19 @@ body {
   width: 100%;
 }
 
+/* Grain overlay for atmospheric backgrounds */
+.eh-grain::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.03;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+}
+
+/* Animations */
 @keyframes eh-neon-pulse {
   0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(0,229,160,0.25); }
   50% { opacity: 0.4; box-shadow: 0 0 4px rgba(0,229,160,0.15); }
@@ -264,4 +291,22 @@ body {
 @keyframes eh-slide-in-right {
   from { opacity: 0; transform: translateX(30px); }
   to { opacity: 1; transform: translateX(0); }
+}
+@keyframes eh-progress-fill {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+@keyframes eh-status-cycle {
+  0%, 85%, 100% { opacity: 1; }
+  90% { opacity: 0.3; }
+  95% { opacity: 0.8; }
+}
+@keyframes eh-upload-bar {
+  0% { width: 0%; }
+  70% { width: 85%; }
+  100% { width: 100%; }
+}
+@keyframes eh-subtle-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
 }
