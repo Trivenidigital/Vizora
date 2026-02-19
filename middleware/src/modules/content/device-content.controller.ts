@@ -4,7 +4,6 @@ import {
   Param,
   Req,
   Res,
-  StreamableFile,
   NotFoundException,
   BadRequestException,
   ForbiddenException,
@@ -86,8 +85,8 @@ export class DeviceContentController {
   async serveFile(
     @Param('id') id: string,
     @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<StreamableFile | void> {
+    @Res() res: Response,
+  ): Promise<void> {
     const content = await this.contentService.findById(id);
 
     if (!content || !content.url) {
@@ -117,7 +116,14 @@ export class DeviceContentController {
         'Content-Type': content.mimeType || 'application/octet-stream',
         'Cache-Control': 'public, max-age=86400',
       });
-      return new StreamableFile(stream as NodeJS.ReadableStream);
+
+      // Pipe directly to response to bypass all NestJS interceptors
+      await new Promise<void>((resolve, reject) => {
+        (stream as NodeJS.ReadableStream).pipe(res);
+        (stream as NodeJS.ReadableStream).on('end', resolve);
+        (stream as NodeJS.ReadableStream).on('error', reject);
+      });
+      return;
     }
 
     // For non-MinIO URLs, redirect
