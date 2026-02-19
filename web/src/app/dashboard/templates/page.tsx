@@ -169,7 +169,7 @@ export default function TemplateLibraryPage() {
       {/* Page Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-bold text-[var(--foreground)]">Template Library</h2>
+          <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Template Library</h2>
           <p className="mt-2 text-[var(--foreground-secondary)]">
             Browse and clone professionally designed templates for your displays
           </p>
@@ -178,11 +178,11 @@ export default function TemplateLibraryPage() {
 
       {/* Featured Carousel */}
       {!featuredLoading && featuredTemplates.length > 0 && (
-        <div className="bg-[var(--surface)] rounded-lg shadow p-6">
+        <div className="bg-[var(--surface)] rounded-lg shadow p-6 border border-[rgba(0,229,160,0.15)]">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-[var(--foreground)] flex items-center gap-2">
               <Icon name="power" size="md" className="text-[#00E5A0]" />
-              Featured Templates
+              <span className="eh-gradient">Featured Templates</span>
             </h3>
             <div className="flex gap-2">
               <button
@@ -211,7 +211,7 @@ export default function TemplateLibraryPage() {
               <Link
                 key={template.id}
                 href={`/dashboard/templates/${template.id}`}
-                className="flex-shrink-0 w-72 bg-[var(--background)] rounded-lg overflow-hidden border border-[var(--border)] hover:border-[#00E5A0] hover:shadow-lg transition-all group"
+                className="flex-shrink-0 w-72 bg-[var(--background)] rounded-lg overflow-hidden border border-[var(--border)] hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300 group"
               >
                 <div className="h-40 bg-gradient-to-br from-[#00E5A0]/20 to-[#00B4D8]/20 flex items-center justify-center relative overflow-hidden">
                   {template.thumbnailUrl ? (
@@ -227,7 +227,7 @@ export default function TemplateLibraryPage() {
                     Featured
                   </span>
                 </div>
-                <div className="p-3">
+                <div className="p-5">
                   <h4 className="font-semibold text-[var(--foreground)] text-sm truncate">{template.name}</h4>
                   <p className="text-xs text-[var(--foreground-tertiary)] mt-1 line-clamp-2">
                     {template.description || 'No description'}
@@ -360,7 +360,7 @@ export default function TemplateLibraryPage() {
                   setSelectedCategory('');
                   setPage(1);
                 }}
-                className={`w-full text-left px-3 py-2 rounded-lg text-sm transition ${
+                className={`w-full text-left px-4 py-2 rounded-lg text-sm transition ${
                   !selectedCategory
                     ? 'bg-[#00E5A0]/10 text-[#00E5A0] font-medium'
                     : 'text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]'
@@ -378,7 +378,7 @@ export default function TemplateLibraryPage() {
                     setSelectedCategory(cat.name);
                     setPage(1);
                   }}
-                  className={`w-full text-left px-3 py-2 rounded-lg text-sm transition ${
+                  className={`w-full text-left px-4 py-2 rounded-lg text-sm transition ${
                     selectedCategory === cat.name
                       ? 'bg-[#00E5A0]/10 text-[#00E5A0] font-medium'
                       : 'text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]'
@@ -443,7 +443,7 @@ export default function TemplateLibraryPage() {
                   <Link
                     key={template.id}
                     href={`/dashboard/templates/${template.id}`}
-                    className="bg-[var(--surface)] rounded-lg shadow overflow-hidden hover:shadow-xl transition-all transform hover:-translate-y-1 group border border-transparent hover:border-[#00E5A0]/30"
+                    className="bg-[var(--surface)] rounded-lg shadow overflow-hidden hover:shadow-md hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] transition-all duration-300 group border border-transparent"
                   >
                     {/* Thumbnail / Preview */}
                     <div className="h-48 bg-gradient-to-br from-[#00E5A0]/10 to-[#00B4D8]/10 flex items-center justify-center relative overflow-hidden">
@@ -472,7 +472,7 @@ export default function TemplateLibraryPage() {
                     </div>
 
                     {/* Info */}
-                    <div className="p-4">
+                    <div className="p-5">
                       <h3 className="font-semibold text-[var(--foreground)] mb-1 truncate group-hover:text-[#00E5A0] transition-colors">
                         {template.name}
                       </h3>

@@ -32,24 +32,24 @@ const KPICard: React.FC<KPICardProps> = ({
  changeType = 'neutral',
  icon,
 }) => (
- <Card className="hover:shadow-lg transition-shadow">
- <Card.Body>
+ <Card>
+ <Card.Body className="p-6">
  <div className="flex items-start justify-between">
  <div className="flex-1">
  <p className="text-sm font-medium text-[var(--foreground-secondary)]">
  {label}
  </p>
- <p className="text-3xl font-bold text-[var(--foreground)] mt-2">
+ <p className="text-3xl font-bold font-[var(--font-sora)] text-[var(--foreground)] mt-2">
  {value}
  </p>
  {change && (
  <p
  className={`text-sm mt-2 ${
  changeType === 'positive'
- ? 'text-success-600 dark:text-success-400'
+ ? 'text-[var(--success)]'
  : changeType === 'negative'
- ? 'text-error-600 dark:text-error-400'
- : 'text-[var(--foreground-secondary)]'
+ ? 'text-[var(--error)]'
+ : 'text-[var(--accent-warm)]'
  }`}
  >
  {changeType === 'positive' && '↑ '}
@@ -185,7 +185,7 @@ export default function AnalyticsClient() {
  {/* Header */}
  <div className="flex items-center justify-between">
  <div>
- <h2 className="text-3xl font-bold text-[var(--foreground)]">
+ <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">
  Analytics
  </h2>
  <p className="mt-2 text-[var(--foreground-secondary)]">
@@ -230,7 +230,7 @@ export default function AnalyticsClient() {
  </div>
 
  {/* KPI Cards */}
- <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+ <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
  <KPICard
  label="Total Devices"
  value={summary ? String(summary.totalDevices) : '---'}

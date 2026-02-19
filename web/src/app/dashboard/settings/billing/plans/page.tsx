@@ -67,7 +67,7 @@ export default function PlansPage() {
  <Icon name="chevronLeft" size="lg" className="text-[var(--foreground-secondary)]" />
  </Link>
  <div>
- <h2 className="text-3xl font-bold text-[var(--foreground)]">Choose a Plan</h2>
+ <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Choose a Plan</h2>
  <p className="mt-1 text-[var(--foreground-secondary)]">
  Select the plan that best fits your needs
  </p>
@@ -92,7 +92,7 @@ export default function PlansPage() {
  <Icon name="chevronLeft" size="lg" className="text-[var(--foreground-secondary)]" />
  </Link>
  <div>
- <h2 className="text-3xl font-bold text-[var(--foreground)]">Choose a Plan</h2>
+ <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Choose a Plan</h2>
  <p className="mt-1 text-[var(--foreground-secondary)]">
  Select the plan that best fits your needs
  </p>

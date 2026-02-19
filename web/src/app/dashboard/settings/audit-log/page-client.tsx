@@ -195,7 +195,7 @@ export default function AuditLogClient() {
 
  <div className="flex justify-between items-center">
  <div>
- <h2 className="text-3xl font-bold text-[var(--foreground)]">Audit Log</h2>
+ <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Audit Log</h2>
  <p className="mt-2 text-[var(--foreground-secondary)]">
  Track all actions performed in your organization ({total} entries)
  </p>
@@ -314,25 +314,25 @@ export default function AuditLogClient() {
  <table className="min-w-full divide-y divide-[var(--border)]">
  <thead className="bg-[var(--background)]">
  <tr>
- <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
+ <th className="px-4 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
  Timestamp
  </th>
- <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
+ <th className="px-4 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
  User
  </th>
- <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
+ <th className="px-4 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
  Action
  </th>
- <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
+ <th className="px-4 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
  Entity Type
  </th>
- <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
+ <th className="px-4 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
  Entity ID
  </th>
- <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
+ <th className="px-4 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
  Changes
  </th>
- <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
+ <th className="px-4 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
  IP Address
  </th>
  </tr>
@@ -341,30 +341,30 @@ export default function AuditLogClient() {
  {logs.map((log) => (
  <React.Fragment key={log.id}>
  <tr className="hover:bg-[var(--surface-hover)] transition">
- <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--foreground-tertiary)]">
+ <td className="px-4 py-3 whitespace-nowrap text-sm text-[var(--foreground-tertiary)]">
  {formatTimestamp(log.createdAt)}
  </td>
- <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--foreground)]">
+ <td className="px-4 py-3 whitespace-nowrap text-sm text-[var(--foreground)]">
  {log.user ? (
  <span>{log.user.firstName} {log.user.lastName}</span>
  ) : (
  <span className="text-[var(--foreground-tertiary)] italic">System</span>
  )}
  </td>
- <td className="px-6 py-4 whitespace-nowrap">
+ <td className="px-4 py-3 whitespace-nowrap">
  <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getActionBadgeColor(log.action)}`}>
  {formatActionLabel(log.action)}
  </span>
  </td>
- <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--foreground-secondary)] capitalize">
+ <td className="px-4 py-3 whitespace-nowrap text-sm text-[var(--foreground-secondary)] capitalize">
  {log.entityType}
  </td>
- <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--foreground-tertiary)] font-mono text-xs">
+ <td className="px-4 py-3 whitespace-nowrap text-sm text-[var(--foreground-tertiary)] font-mono text-xs">
  {log.entityId && log.entityId.length > 12
  ? `${log.entityId.substring(0, 12)}...`
  : log.entityId || '—'}
  </td>
- <td className="px-6 py-4 whitespace-nowrap text-sm">
+ <td className="px-4 py-3 whitespace-nowrap text-sm">
  {log.changes ? (
  <button
  onClick={() => toggleRow(log.id)}
@@ -380,13 +380,13 @@ export default function AuditLogClient() {
  <span className="text-[var(--foreground-tertiary)] text-xs">--</span>
  )}
  </td>
- <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--foreground-tertiary)] font-mono text-xs">
+ <td className="px-4 py-3 whitespace-nowrap text-sm text-[var(--foreground-tertiary)] font-mono text-xs">
  {log.ipAddress || '--'}
  </td>
  </tr>
  {expandedRows.has(log.id) && log.changes && (
  <tr>
- <td colSpan={7} className="px-6 py-3 bg-[var(--background)]">
+ <td colSpan={7} className="px-4 py-3 bg-[var(--background)]">
  <div className="text-xs">
  <p className="font-medium text-[var(--foreground-secondary)] mb-1">Changes:</p>
  <pre className="bg-[var(--background-secondary)] p-3 rounded-lg overflow-x-auto text-[var(--foreground)] font-mono">

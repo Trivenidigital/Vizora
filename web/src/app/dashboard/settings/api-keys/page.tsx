@@ -150,7 +150,7 @@ export default function ApiKeysPage() {
 
  <div className="flex justify-between items-center">
  <div>
- <h2 className="text-3xl font-bold text-[var(--foreground)]">API Keys</h2>
+ <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">API Keys</h2>
  <p className="mt-2 text-[var(--foreground-secondary)]">
  Manage API keys for programmatic access to your Vizora organization
  </p>
@@ -219,25 +219,25 @@ export default function ApiKeysPage() {
  <table className="min-w-full divide-y divide-[var(--border)]">
  <thead className="bg-[var(--background)]">
  <tr>
- <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
+ <th className="px-4 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
  Name
  </th>
- <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
+ <th className="px-4 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
  Key Prefix
  </th>
- <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
+ <th className="px-4 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
  Scopes
  </th>
- <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
+ <th className="px-4 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
  Created
  </th>
- <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
+ <th className="px-4 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
  Last Used
  </th>
- <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
+ <th className="px-4 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
  Expires
  </th>
- <th className="px-6 py-3 text-right text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
+ <th className="px-4 py-3 text-right text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
  Actions
  </th>
  </tr>
@@ -248,18 +248,18 @@ export default function ApiKeysPage() {
  key={key.id}
  className={`hover:bg-[var(--surface-hover)] transition ${isExpired(key.expiresAt) ? 'opacity-50' : ''}`}
  >
- <td className="px-6 py-4 whitespace-nowrap">
+ <td className="px-4 py-3 whitespace-nowrap">
  <div className="flex items-center gap-2">
  <Icon name="key" size="md" className="text-[var(--foreground-tertiary)]" />
  <span className="text-sm font-medium text-[var(--foreground)]">{key.name}</span>
  </div>
  </td>
- <td className="px-6 py-4 whitespace-nowrap">
+ <td className="px-4 py-3 whitespace-nowrap">
  <code className="text-sm text-[var(--foreground-secondary)] bg-[var(--background-secondary)] px-2 py-1 rounded">
  {key.prefix}...
  </code>
  </td>
- <td className="px-6 py-4">
+ <td className="px-4 py-3">
  <div className="flex flex-wrap gap-1">
  {key.scopes.slice(0, 3).map((scope) => (
  <span
@@ -276,13 +276,13 @@ export default function ApiKeysPage() {
  )}
  </div>
  </td>
- <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--foreground-tertiary)]">
+ <td className="px-4 py-3 whitespace-nowrap text-sm text-[var(--foreground-tertiary)]">
  {formatDate(key.createdAt)}
  </td>
- <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--foreground-tertiary)]">
+ <td className="px-4 py-3 whitespace-nowrap text-sm text-[var(--foreground-tertiary)]">
  {formatDate(key.lastUsedAt)}
  </td>
- <td className="px-6 py-4 whitespace-nowrap">
+ <td className="px-4 py-3 whitespace-nowrap">
  {key.expiresAt ? (
  <span
  className={`text-sm ${isExpired(key.expiresAt) ? 'text-red-600' : 'text-[var(--foreground-tertiary)]'}`}
@@ -293,7 +293,7 @@ export default function ApiKeysPage() {
  <span className="text-sm text-[var(--foreground-tertiary)]">Never</span>
  )}
  </td>
- <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+ <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
  <button
  onClick={() => handleRevokeClick(key)}
  className="text-red-600 hover:text-red-800 hover:bg-red-50 px-3 py-1 rounded transition"

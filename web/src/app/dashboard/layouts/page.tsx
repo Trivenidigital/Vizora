@@ -262,7 +262,7 @@ export default function LayoutsPage() {
       {/* Page Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-bold text-[var(--foreground)]">Layouts</h2>
+          <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Layouts</h2>
           <p className="mt-2 text-[var(--foreground-secondary)]">
             Create multi-zone display layouts to show multiple content items simultaneously.
           </p>
@@ -295,9 +295,9 @@ export default function LayoutsPage() {
                 {layouts.map((layout) => (
                   <div
                     key={layout.id}
-                    className="bg-[var(--surface)] rounded-lg shadow border border-[var(--border)] overflow-hidden hover:shadow-lg transition-shadow"
+                    className="bg-[var(--surface)] rounded-lg shadow border border-[var(--border)] overflow-hidden hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300"
                   >
-                    <div className="p-4">
+                    <div className="p-5">
                       <LayoutPreviewGrid type={layout.layoutType} />
                       <div className="mt-3">
                         <h4 className="font-semibold text-[var(--foreground)] mb-1">{layout.name}</h4>
@@ -348,7 +348,7 @@ export default function LayoutsPage() {
               {presets.map((preset) => (
                 <div
                   key={preset.type}
-                  className="bg-[var(--surface)] rounded-lg border border-[var(--border)] p-4 hover:border-[#00E5A0] hover:shadow-md transition cursor-pointer group"
+                  className="bg-[var(--surface)] rounded-lg border border-[var(--border)] p-5 hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300 cursor-pointer group"
                   onClick={() => {
                     setSelectedPreset(preset);
                     setLayoutName('');

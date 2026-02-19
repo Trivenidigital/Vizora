@@ -577,13 +577,13 @@ export default function ContentClient() {
  const getStatusColor = (status: string) => {
  switch (status) {
  case 'ready':
- return 'bg-green-100 text-green-800';
+ return 'bg-[rgba(0,229,160,0.1)] text-[#00E5A0]';
  case 'processing':
- return 'bg-yellow-100 text-yellow-800';
+ return 'bg-[rgba(245,158,11,0.1)] text-[var(--accent-warm)]';
  case 'error':
- return 'bg-red-100 text-red-800';
+ return 'bg-[rgba(220,38,38,0.1)] text-[var(--error)]';
  default:
- return 'bg-[var(--background-secondary)] text-[var(--foreground)]';
+ return 'bg-[var(--surface-secondary)] text-[var(--foreground)]';
  }
  };
 
@@ -678,7 +678,7 @@ export default function ContentClient() {
  return (
  <div className="flex h-full">
  {/* Folder Sidebar */}
- <div className="w-64 flex-shrink-0 bg-[var(--surface)] border-r border-[var(--border)]">
+ <div className="w-64 flex-shrink-0 bg-[var(--surface)] border-r border-[var(--border)] pr-4">
  <FolderTree
  folders={folders}
  selectedFolderId={selectedFolderId}
@@ -693,7 +693,7 @@ export default function ContentClient() {
 
  <div className="flex justify-between items-center">
  <div>
- <h2 className="text-3xl font-bold text-[var(--foreground)]">Content Library</h2>
+ <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Content Library</h2>
  <p className="mt-2 text-[var(--foreground-secondary)]">
  Manage your media assets ({content.length} items)
  {realtimeStatus === 'connected' && (
@@ -741,7 +741,7 @@ export default function ContentClient() {
  )}
 
  {/* Tag Filter */}
- <div className="bg-[var(--surface)] rounded-lg shadow p-4">
+ <div className="bg-[var(--surface)] rounded-lg shadow p-5">
  <button
  onClick={() => setShowTagFilter(!showTagFilter)}
  className="flex items-center gap-2 text-sm font-medium text-[var(--foreground-secondary)] mb-3"
@@ -777,7 +777,7 @@ export default function ContentClient() {
  </div>
 
  {/* Filter Tabs */}
- <div className="bg-[var(--surface)] rounded-lg shadow p-4 space-y-3">
+ <div className="bg-[var(--surface)] rounded-lg shadow p-5 space-y-3">
  <div className="flex items-center justify-between">
  <div className="flex gap-2 flex-wrap">
  {['all', 'image', 'video', 'pdf', 'url'].map((type) => (
@@ -822,7 +822,7 @@ export default function ContentClient() {
  </div>
 
  {/* Advanced Filters Panel */}
- {showAdvancedFilters && (
+ <div className={`overflow-hidden transition-all duration-300 ease-in-out ${showAdvancedFilters ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
  <div className="pt-3 border-t border-[var(--border)] grid grid-cols-1 md:grid-cols-2 gap-4">
  <div>
  <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
@@ -855,7 +855,7 @@ export default function ContentClient() {
  </select>
  </div>
  </div>
- )}
+ </div>
 
  {/* Active Filters Indicator */}
  {hasActiveFilters && (
@@ -1049,10 +1049,10 @@ export default function ContentClient() {
  {filteredContent.map((item) => (
  <div
  key={item.id}
- className="bg-[var(--surface)] rounded-lg shadow overflow-hidden hover:shadow-xl transition-all transform hover:-translate-y-1"
+ className="bg-[var(--surface)] rounded-lg shadow overflow-hidden border border-[var(--border)] hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300"
  >
- <div 
- className="h-48 bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] flex items-center justify-center relative overflow-hidden cursor-pointer"
+ <div
+ className="aspect-video bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] flex items-center justify-center relative overflow-hidden cursor-pointer"
  onClick={() => handlePreview(item)}
  title="Click to preview"
  >
@@ -1086,8 +1086,8 @@ export default function ContentClient() {
  {item.status}
  </span>
  </div>
- <div className="p-4">
- <h3 className="font-semibold text-[var(--foreground)] mb-2 truncate" title={item.title}>
+ <div className="p-5">
+ <h3 className="text-base font-semibold text-[var(--foreground)] mb-2 truncate" title={item.title}>
  {item.title}
  </h3>
  <div className="flex items-center justify-between text-sm text-[var(--foreground-tertiary)] mb-2">
@@ -1099,7 +1099,7 @@ export default function ContentClient() {
  Uploaded {new Date(item.createdAt).toLocaleDateString()}
  </div>
  )}
- <div className="grid grid-cols-2 gap-2">
+ <div className="grid grid-cols-2 gap-3">
  <button
  onClick={() => handlePushToDevice(item)}
  className="text-sm bg-green-50 text-green-600 py-2 rounded hover:bg-green-100 transition font-medium flex items-center justify-center gap-1"

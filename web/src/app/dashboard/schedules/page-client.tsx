@@ -445,7 +445,7 @@ export default function SchedulesClient() {
  {/* Header */}
  <div className="flex justify-between items-center">
  <div>
- <h2 className="text-3xl font-bold text-[var(--foreground)]">Schedules</h2>
+ <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Schedules</h2>
  <p className="mt-2 text-[var(--foreground-secondary)]">
  Automate content playback with schedules ({schedules.length} total)
  </p>
@@ -525,7 +525,7 @@ export default function SchedulesClient() {
  {schedules.map(schedule => (
  <div
  key={schedule.id}
- className="bg-[var(--surface)] rounded-lg shadow-md p-6 hover:shadow-lg transition border-l-4 border-[#00E5A0]"
+ className="bg-[var(--surface)] rounded-lg border border-[var(--border)] border-l-4 border-l-[#00E5A0] shadow-md p-6 hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:border-l-[#00E5A0] hover:shadow-md transition-all duration-300"
  >
  <div className="flex items-start justify-between">
  <div className="flex items-start gap-4 flex-1">

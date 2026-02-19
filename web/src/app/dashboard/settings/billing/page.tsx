@@ -102,7 +102,7 @@ export default function BillingPage() {
  return (
  <div className="space-y-6">
  <div>
- <h2 className="text-3xl font-bold text-[var(--foreground)]">Billing</h2>
+ <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Billing</h2>
  <p className="mt-2 text-[var(--foreground-secondary)]">
  Manage your subscription and billing details
  </p>
@@ -120,7 +120,7 @@ export default function BillingPage() {
 
  <div className="flex justify-between items-start">
  <div>
- <h2 className="text-3xl font-bold text-[var(--foreground)]">Billing</h2>
+ <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Billing</h2>
  <p className="mt-2 text-[var(--foreground-secondary)]">
  Manage your subscription and billing details
  </p>

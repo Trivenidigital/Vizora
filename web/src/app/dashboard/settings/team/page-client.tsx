@@ -169,7 +169,7 @@ export default function TeamClient() {
 
  <div className="flex justify-between items-center">
  <div>
- <h2 className="text-3xl font-bold text-[var(--foreground)]">Team Management</h2>
+ <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Team Management</h2>
  <p className="mt-2 text-[var(--foreground-secondary)]">
  Manage team members and their roles
  </p>
@@ -240,22 +240,22 @@ export default function TeamClient() {
  <table className="min-w-full divide-y divide-[var(--border)]">
  <thead className="bg-[var(--background)]">
  <tr>
- <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
+ <th className="px-4 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
  Name
  </th>
- <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
+ <th className="px-4 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
  Email
  </th>
- <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
+ <th className="px-4 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
  Role
  </th>
- <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
+ <th className="px-4 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
  Status
  </th>
- <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
+ <th className="px-4 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
  Last Login
  </th>
- <th className="px-6 py-3 text-right text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
+ <th className="px-4 py-3 text-right text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
  Actions
  </th>
  </tr>
@@ -263,7 +263,7 @@ export default function TeamClient() {
  <tbody className="bg-[var(--surface)] divide-y divide-[var(--border)]">
  {users.map((user) => (
  <tr key={user.id} className="hover:bg-[var(--surface-hover)] transition">
- <td className="px-6 py-4 whitespace-nowrap">
+ <td className="px-4 py-3 whitespace-nowrap">
  <div className="flex items-center gap-3">
  <div className="w-8 h-8 bg-[#00E5A0]/10 rounded-full flex items-center justify-center text-[#00E5A0] font-semibold text-sm">
  {user.firstName.charAt(0)}{user.lastName.charAt(0)}
@@ -273,23 +273,23 @@ export default function TeamClient() {
  </span>
  </div>
  </td>
- <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--foreground-secondary)]">
+ <td className="px-4 py-3 whitespace-nowrap text-sm text-[var(--foreground-secondary)]">
  {user.email}
  </td>
- <td className="px-6 py-4 whitespace-nowrap">
+ <td className="px-4 py-3 whitespace-nowrap">
  <span className={`px-2 py-1 text-xs font-semibold rounded-full capitalize ${getRoleBadgeColor(user.role)}`}>
  {user.role}
  </span>
  </td>
- <td className="px-6 py-4 whitespace-nowrap">
+ <td className="px-4 py-3 whitespace-nowrap">
  <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeColor(user.isActive)}`}>
  {user.isActive ? 'Active' : 'Inactive'}
  </span>
  </td>
- <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--foreground-tertiary)]">
+ <td className="px-4 py-3 whitespace-nowrap text-sm text-[var(--foreground-tertiary)]">
  {formatDate(user.lastLoginAt)}
  </td>
- <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+ <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
  <div className="flex justify-end gap-2">
  <button
  onClick={() => handleEditRole(user)}

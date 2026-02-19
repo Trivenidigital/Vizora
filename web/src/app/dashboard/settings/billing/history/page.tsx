@@ -67,7 +67,7 @@ export default function InvoiceHistoryPage() {
  <Icon name="chevronLeft" size="lg" className="text-[var(--foreground-secondary)]" />
  </Link>
  <div>
- <h2 className="text-3xl font-bold text-[var(--foreground)]">Invoice History</h2>
+ <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Invoice History</h2>
  <p className="mt-1 text-[var(--foreground-secondary)]">
  View and download your past invoices
  </p>
@@ -92,7 +92,7 @@ export default function InvoiceHistoryPage() {
  <Icon name="chevronLeft" size="lg" className="text-[var(--foreground-secondary)]" />
  </Link>
  <div>
- <h2 className="text-3xl font-bold text-[var(--foreground)]">Invoice History</h2>
+ <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Invoice History</h2>
  <p className="mt-1 text-[var(--foreground-secondary)]">
  View and download your past invoices
  </p>
@@ -110,19 +110,19 @@ export default function InvoiceHistoryPage() {
  <table className="min-w-full divide-y divide-[var(--border)]">
  <thead className="bg-[var(--background)]">
  <tr>
- <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
+ <th className="px-4 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
  Date
  </th>
- <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
+ <th className="px-4 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
  Description
  </th>
- <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
+ <th className="px-4 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
  Amount
  </th>
- <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
+ <th className="px-4 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
  Status
  </th>
- <th className="px-6 py-3 text-right text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
+ <th className="px-4 py-3 text-right text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">
  Invoice
  </th>
  </tr>
@@ -130,19 +130,19 @@ export default function InvoiceHistoryPage() {
  <tbody className="bg-[var(--surface)] divide-y divide-[var(--border)]">
  {invoices.map((invoice) => (
  <tr key={invoice.id} className="hover:bg-[var(--surface-hover)] transition">
- <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--foreground)]">
+ <td className="px-4 py-3 whitespace-nowrap text-sm text-[var(--foreground)]">
  {formatDate(invoice.createdAt)}
  </td>
- <td className="px-6 py-4 text-sm text-[var(--foreground-secondary)]">
+ <td className="px-4 py-3 text-sm text-[var(--foreground-secondary)]">
  {invoice.description || 'Subscription payment'}
  </td>
- <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--foreground)]">
+ <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-[var(--foreground)]">
  {formatAmount(invoice.amount, invoice.currency)}
  </td>
- <td className="px-6 py-4 whitespace-nowrap">
+ <td className="px-4 py-3 whitespace-nowrap">
  <StatusBadge status={invoice.status} />
  </td>
- <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+ <td className="px-4 py-3 whitespace-nowrap text-right text-sm">
  {invoice.pdfUrl ? (
  <a
  href={invoice.pdfUrl}

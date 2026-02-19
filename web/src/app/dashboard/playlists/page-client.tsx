@@ -58,13 +58,13 @@ function SortablePlaylistItem({ item, idx, onRemove, onDurationChange }: {
  <div
  ref={setNodeRef}
  style={style}
- className="flex items-center justify-between p-3 bg-[var(--background)] rounded-lg hover:bg-[var(--surface-hover)] transition"
+ className="flex items-center justify-between p-3 bg-[var(--background)] rounded-lg hover:bg-[var(--surface-hover)] transition-all duration-300"
  >
  <div className="flex items-center gap-3 flex-1">
  <button
  {...attributes}
  {...listeners}
- className="cursor-grab active:cursor-grabbing text-[var(--foreground-tertiary)] hover:text-[var(--foreground-secondary)]"
+ className="cursor-grab active:cursor-grabbing p-2 text-[var(--foreground-tertiary)] hover:text-[var(--foreground-secondary)]"
  >
  <Icon name="list" size="sm" className="text-[var(--foreground-tertiary)]" />
  </button>
@@ -348,7 +348,7 @@ export default function PlaylistsClient() {
 
  <div className="flex justify-between items-center">
  <div>
- <h2 className="text-3xl font-bold text-[var(--foreground)]">Playlists</h2>
+ <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Playlists</h2>
  <p className="mt-2 text-[var(--foreground-secondary)]">
  Create and manage content playlists ({playlists.length} total)
  </p>
@@ -400,13 +400,13 @@ export default function PlaylistsClient() {
  .map((playlist) => (
  <div
  key={playlist.id}
- className="bg-[var(--surface)] rounded-lg shadow hover:shadow-lg transition-all p-6"
+ className="bg-[var(--surface)] rounded-lg border border-[var(--border)] shadow hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300 p-6"
  >
  <div className="flex items-start justify-between mb-4">
  <div className="flex items-start gap-4 flex-1">
  {/* Visual Thumbnail Grid */}
  {playlistThumbnails[playlist.id] && playlistThumbnails[playlist.id].length > 0 ? (
- <div className="grid grid-cols-2 gap-1 w-20 h-20 rounded overflow-hidden flex-shrink-0 bg-[var(--background-tertiary)]">
+ <div className="grid grid-cols-2 gap-1 w-20 h-20 rounded-md overflow-hidden flex-shrink-0 bg-[var(--background-tertiary)]">
  {playlistThumbnails[playlist.id].map((url, i) => (
  <img
  key={i}

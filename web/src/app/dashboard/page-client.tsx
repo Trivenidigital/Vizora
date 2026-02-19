@@ -165,7 +165,7 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  return (
  <div className="space-y-6">
  <div>
- <h2 className="text-3xl font-bold text-[var(--foreground)]">Dashboard Overview</h2>
+ <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Dashboard Overview</h2>
  <p className="mt-2 text-[var(--foreground-secondary)]">
  Welcome to your Vizora dashboard. Here's what's happening.
  </p>
@@ -193,14 +193,14 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  {/* Stats Grid */}
  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
  <div
- className="bg-[var(--surface)] p-6 rounded-lg shadow-md hover:shadow-xl transition-all cursor-pointer transform hover:-translate-y-1"
+ className="bg-[var(--surface)] p-6 rounded-lg border border-[var(--border)] hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300 cursor-pointer animate-[fadeIn_0.3s_ease-out]"
  onClick={() => router.push('/dashboard/devices')}
  >
  <div className="flex items-center justify-between mb-4">
  <p className="text-sm font-medium text-[var(--foreground-secondary)]">Total Devices</p>
  <Icon name="devices" size="2xl" className="text-[var(--foreground-secondary)]" />
  </div>
- <p className="text-4xl font-bold text-[var(--foreground)] mb-2">{stats.devices.total}</p>
+ <p className="text-4xl font-bold text-[var(--foreground)] font-[var(--font-sora)] mb-2">{stats.devices.total}</p>
  <div className="flex items-center gap-2">
  <span className="w-2 h-2 bg-success-500 rounded-full"></span>
  <p className="text-sm text-success-600 dark:text-success-400 font-medium">
@@ -210,14 +210,14 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  </div>
 
  <div
- className="bg-[var(--surface)] p-6 rounded-lg shadow-md hover:shadow-xl transition-all cursor-pointer transform hover:-translate-y-1"
+ className="bg-[var(--surface)] p-6 rounded-lg border border-[var(--border)] hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300 cursor-pointer animate-[fadeIn_0.4s_ease-out]"
  onClick={() => router.push('/dashboard/content')}
  >
  <div className="flex items-center justify-between mb-4">
  <p className="text-sm font-medium text-[var(--foreground-secondary)]">Content Items</p>
  <Icon name="content" size="2xl" className="text-[var(--foreground-secondary)]" />
  </div>
- <p className="text-4xl font-bold text-[var(--foreground)] mb-2">{stats.content.total}</p>
+ <p className="text-4xl font-bold text-[var(--foreground)] font-[var(--font-sora)] mb-2">{stats.content.total}</p>
  <p className="text-sm text-[var(--foreground-tertiary)]">
  {stats.content.processing > 0
  ? `${stats.content.processing} processing`
@@ -226,20 +226,20 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  </div>
 
  <div
- className="bg-[var(--surface)] p-6 rounded-lg shadow-md hover:shadow-xl transition-all cursor-pointer transform hover:-translate-y-1"
+ className="bg-[var(--surface)] p-6 rounded-lg border border-[var(--border)] hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300 cursor-pointer animate-[fadeIn_0.5s_ease-out]"
  onClick={() => router.push('/dashboard/playlists')}
  >
  <div className="flex items-center justify-between mb-4">
  <p className="text-sm font-medium text-[var(--foreground-secondary)]">Playlists</p>
  <Icon name="playlists" size="2xl" className="text-[var(--foreground-secondary)]" />
  </div>
- <p className="text-4xl font-bold text-[var(--foreground)] mb-2">{stats.playlists.total}</p>
+ <p className="text-4xl font-bold text-[var(--foreground)] font-[var(--font-sora)] mb-2">{stats.playlists.total}</p>
  <p className="text-sm text-[var(--foreground-tertiary)]">
  {stats.playlists.active} active
  </p>
  </div>
 
- <div className="bg-gradient-to-br from-primary-500 to-purple-600 dark:from-primary-600 dark:to-purple-700 p-6 rounded-lg shadow-md hover:shadow-xl transition-all transform hover:-translate-y-1 text-white">
+ <div className="bg-gradient-to-br from-primary-500 to-purple-600 dark:from-primary-600 dark:to-purple-700 p-6 rounded-lg border border-[var(--border)] hover:-translate-y-[2px] hover:shadow-md transition-all duration-300 text-white animate-[fadeIn_0.6s_ease-out]">
  <div className="flex items-center justify-between mb-4">
  <p className="text-sm font-medium text-primary-100">System Status</p>
  <Icon name="power" size="2xl" className="text-primary-200" />
@@ -253,9 +253,9 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  </div>
 
  {/* Quick Actions */}
- <div className="bg-[var(--surface)] rounded-lg shadow-md p-6">
+ <div className="bg-[var(--surface)] rounded-lg border border-[var(--border)] p-6">
  <div className="flex items-center gap-2 mb-4">
- <h3 className="text-lg font-semibold text-[var(--foreground)]">Quick Actions</h3>
+ <h3 className="text-lg font-semibold text-[var(--foreground)] eh-heading">Quick Actions</h3>
  <HelpIcon content="Common tasks to get started quickly" position="right" />
  </div>
  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -306,14 +306,14 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  </div>
 
  {/* Recent Activity */}
- <div className="bg-[var(--surface)] rounded-lg shadow p-6">
- <h3 className="text-lg font-semibold text-[var(--foreground)] mb-4">Recent Activity</h3>
+ <div className="bg-[var(--surface)] rounded-lg border border-[var(--border)] p-6">
+ <h3 className="text-lg font-semibold text-[var(--foreground)] eh-heading mb-4">Recent Activity</h3>
  {recentActivity.length > 0 ? (
  <div className="space-y-3">
  {recentActivity.map((item, idx) => (
  <div
  key={idx}
- className="flex items-center gap-3 p-3 bg-[var(--background)] rounded-lg hover:bg-[var(--surface-hover)] transition"
+ className="flex items-center gap-3 px-4 py-3 bg-[var(--background)] rounded-lg hover:bg-[var(--surface-hover)] transition-all duration-200"
  >
  <Icon name={item.iconName || 'overview'} size="lg" className="text-[var(--foreground-secondary)]" />
  <div className="flex-1 min-w-0">
@@ -343,9 +343,9 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  </div>
 
  {/* Storage Usage */}
- <div className="bg-[var(--surface)] rounded-lg shadow p-6">
+ <div className="bg-[var(--surface)] rounded-lg border border-[var(--border)] p-6">
  <div className="flex items-center justify-between mb-4">
- <h3 className="text-lg font-semibold text-[var(--foreground)]">Storage Usage</h3>
+ <h3 className="text-lg font-semibold text-[var(--foreground)] eh-heading">Storage Usage</h3>
  <Icon name="storage" size="xl" className="text-[var(--foreground-secondary)]" />
  </div>
  <div className="space-y-3">

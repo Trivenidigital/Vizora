@@ -346,7 +346,7 @@ export default function WidgetsPage() {
       {/* Page Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-bold text-[var(--foreground)]">Widgets</h2>
+          <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Widgets</h2>
           <p className="mt-2 text-[var(--foreground-secondary)]">
             Add dynamic data widgets like weather, RSS feeds, clocks, and more to your displays.
           </p>
@@ -378,10 +378,10 @@ export default function WidgetsPage() {
                 {myWidgets.map((widget) => (
                   <div
                     key={widget.id}
-                    className="bg-[var(--surface)] rounded-lg shadow border border-[var(--border)] overflow-hidden hover:shadow-lg transition-shadow"
+                    className="bg-[var(--surface)] rounded-lg shadow border border-[var(--border)] overflow-hidden hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300"
                   >
                     <div className={`h-2 bg-gradient-to-r ${getColorForType(widget.widgetType)}`} />
-                    <div className="p-4">
+                    <div className="p-5">
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center gap-3">
                           <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${getColorForType(widget.widgetType)} flex items-center justify-center`}>
@@ -433,14 +433,14 @@ export default function WidgetsPage() {
               {widgetTypes.map((wType) => (
                 <div
                   key={wType.type}
-                  className="bg-[var(--surface)] rounded-lg shadow overflow-hidden hover:shadow-xl transition-all transform hover:-translate-y-1 border border-[var(--border)] cursor-pointer group"
+                  className="bg-[var(--surface)] rounded-lg shadow overflow-hidden hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300 border border-[var(--border)] cursor-pointer group"
                   onClick={() => openWizard(wType)}
                 >
                   <div className={`h-32 bg-gradient-to-br ${getColorForType(wType.type)} flex items-center justify-center relative`}>
                     <Icon name={getIconForType(wType.type)} size="4xl" className="text-white/80 group-hover:text-white transition" />
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition" />
                   </div>
-                  <div className="p-4">
+                  <div className="p-5">
                     <h4 className="text-lg font-semibold text-[var(--foreground)] mb-1">{wType.name}</h4>
                     <p className="text-sm text-[var(--foreground-secondary)] mb-4">{wType.description}</p>
                     <button
@@ -543,7 +543,7 @@ export default function WidgetsPage() {
             {selectedType.configSchema && Object.keys(selectedType.configSchema).length > 0 && (
               <div className="border-t border-[var(--border)] pt-4">
                 <h4 className="text-sm font-semibold text-[var(--foreground)] mb-3">Widget Configuration</h4>
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {Object.entries(selectedType.configSchema).map(([key, schema]) =>
                     renderConfigField(key, schema, widgetConfig[key], (k, v) =>
                       setWidgetConfig((prev) => ({ ...prev, [k]: v }))
@@ -657,7 +657,7 @@ export default function WidgetsPage() {
               if (!typeInfo?.configSchema) return <p className="text-[var(--foreground-secondary)]">No configurable settings for this widget type.</p>;
 
               return (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {Object.entries(typeInfo.configSchema).map(([key, schema]) =>
                     renderConfigField(key, schema, editConfig[key], (k, v) =>
                       setEditConfig((prev) => ({ ...prev, [k]: v }))

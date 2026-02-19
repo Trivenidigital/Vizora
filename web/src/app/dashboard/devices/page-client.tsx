@@ -402,7 +402,7 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  <div className="flex justify-between items-center">
  <div>
  <div className="flex items-center gap-2">
- <h2 className="text-3xl font-bold text-[var(--foreground)]">Devices</h2>
+ <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Devices</h2>
  <div
  className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 ${
  realtimeStatus === 'connected'
@@ -498,15 +498,15 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  </div>
  )}
  {selectedDeviceIds.size > 0 && (
- <div className="bg-[#00E5A0]/5 dark:bg-[#00E5A0]/10 border border-[#00E5A0]/30 dark:border-[#00E5A0] rounded-lg p-3 flex items-center justify-between">
+ <div className="bg-[#00E5A0]/5 dark:bg-[#00E5A0]/10 border border-[#00E5A0]/30 dark:border-[#00E5A0] rounded-lg p-4 flex items-center justify-between">
  <span className="text-sm font-medium text-[#00E5A0] dark:text-[#00E5A0]">
  {selectedDeviceIds.size} device{selectedDeviceIds.size !== 1 ? 's' : ''} selected
  </span>
- <div className="flex gap-2">
- <button onClick={() => setIsBulkPlaylistModalOpen(true)} className="px-3 py-1.5 text-sm bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition font-medium">Assign Playlist</button>
- <button onClick={() => setIsBulkGroupModalOpen(true)} className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium">Add to Group</button>
- <button onClick={handleBulkDelete} disabled={actionLoading} className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium disabled:opacity-50">Delete Selected</button>
- <button onClick={() => setSelectedDeviceIds(new Set())} className="px-3 py-1.5 text-sm text-[var(--foreground-secondary)] hover:text-[var(--foreground)] transition">Clear</button>
+ <div className="flex gap-4 items-center">
+ <button onClick={() => setIsBulkPlaylistModalOpen(true)} className="px-4 py-2 text-sm bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition font-medium">Assign Playlist</button>
+ <button onClick={() => setIsBulkGroupModalOpen(true)} className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium">Add to Group</button>
+ <button onClick={handleBulkDelete} disabled={actionLoading} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium disabled:opacity-50">Delete Selected</button>
+ <button onClick={() => setSelectedDeviceIds(new Set())} className="px-4 py-2 text-sm text-[var(--foreground-secondary)] hover:text-[var(--foreground)] transition">Clear</button>
  </div>
  </div>
  )}
