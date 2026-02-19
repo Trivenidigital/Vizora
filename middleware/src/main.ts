@@ -87,7 +87,7 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
       transform: true,
       transformOptions: {
-        enableImplicitConversion: false,
+        enableImplicitConversion: true,
       },
       // Disable detailed errors in production
       disableErrorMessages: process.env.NODE_ENV === 'production',

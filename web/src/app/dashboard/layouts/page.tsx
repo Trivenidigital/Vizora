@@ -359,7 +359,7 @@ export default function LayoutsPage() {
                   <LayoutPreviewGrid type={preset.type} />
                   <div className="mt-3">
                     <h4 className="font-semibold text-[var(--foreground)] text-sm">{preset.name}</h4>
-                    <p className="text-xs text-[var(--foreground-tertiary)] mt-1">{preset.zones} zone{preset.zones > 1 ? 's' : ''}</p>
+                    <p className="text-xs text-[var(--foreground-tertiary)] mt-1">{Array.isArray(preset.zones) ? preset.zones.length : preset.zones} zone{(Array.isArray(preset.zones) ? preset.zones.length : preset.zones) > 1 ? 's' : ''}</p>
                     <p className="text-xs text-[var(--foreground-secondary)] mt-1 line-clamp-2">{preset.description}</p>
                   </div>
                   <button
@@ -415,7 +415,7 @@ export default function LayoutsPage() {
                   <div>
                     <div className="font-medium text-[var(--foreground)]">{preset.name}</div>
                     <div className="text-xs text-[var(--foreground-tertiary)]">
-                      {preset.zones} zone{preset.zones > 1 ? 's' : ''} -- {preset.description}
+                      {Array.isArray(preset.zones) ? preset.zones.length : preset.zones} zone{(Array.isArray(preset.zones) ? preset.zones.length : preset.zones) > 1 ? 's' : ''} -- {preset.description}
                     </div>
                   </div>
                 </button>
@@ -430,7 +430,7 @@ export default function LayoutsPage() {
                 </div>
                 <div>
                   <div className="font-medium text-[var(--foreground)]">{selectedPreset.name}</div>
-                  <div className="text-xs text-[var(--foreground-tertiary)]">{selectedPreset.zones} zones</div>
+                  <div className="text-xs text-[var(--foreground-tertiary)]">{Array.isArray(selectedPreset.zones) ? selectedPreset.zones.length : selectedPreset.zones} zones</div>
                 </div>
                 <button
                   onClick={() => setSelectedPreset(null)}

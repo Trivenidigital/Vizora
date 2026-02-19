@@ -44,12 +44,15 @@ export function CustomizationProvider({ children }: { children: React.ReactNode 
       try {
         const orgRes = await fetch('/api/organizations/current', { credentials: 'include' });
         if (!orgRes.ok) return;
-        const org = await orgRes.json();
+        const orgJson = await orgRes.json();
+        const org = orgJson?.data ?? orgJson;
+        if (!org?.id) return;
         setOrganizationId(org.id);
 
         const brandingRes = await fetch(`/api/organizations/${org.id}/branding`, { credentials: 'include' });
         if (!brandingRes.ok) return;
-        const branding = await brandingRes.json();
+        const brandingJson = await brandingRes.json();
+        const branding = brandingJson?.data ?? brandingJson;
 
         // Map API branding to BrandConfig
         const apiConfig: BrandConfig = {
