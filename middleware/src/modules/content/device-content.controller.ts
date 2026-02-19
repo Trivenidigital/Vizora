@@ -112,17 +112,21 @@ export class DeviceContentController {
       }
 
       const stream = await this.storageService.getObject(objectKey);
+
+      // Buffer the entire file to send with Content-Length.
+      // Chunked streaming was causing truncated responses via nginx.
+      const chunks: Buffer[] = [];
+      for await (const chunk of stream as AsyncIterable<Buffer>) {
+        chunks.push(chunk);
+      }
+      const buffer = Buffer.concat(chunks);
+
       res.set({
         'Content-Type': content.mimeType || 'application/octet-stream',
+        'Content-Length': String(buffer.length),
         'Cache-Control': 'public, max-age=86400',
       });
-
-      // Pipe directly to response to bypass all NestJS interceptors
-      await new Promise<void>((resolve, reject) => {
-        (stream as NodeJS.ReadableStream).pipe(res);
-        (stream as NodeJS.ReadableStream).on('end', resolve);
-        (stream as NodeJS.ReadableStream).on('error', reject);
-      });
+      res.end(buffer);
       return;
     }
 
