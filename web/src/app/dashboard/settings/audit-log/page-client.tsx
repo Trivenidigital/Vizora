@@ -2,29 +2,12 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '@/lib/api';
+import { AuditLog } from '@/lib/types';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import EmptyState from '@/components/EmptyState';
 import { useToast } from '@/lib/hooks/useToast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { Icon } from '@/theme/icons';
-
-interface AuditLogEntry {
- id: string;
- action: string;
- entityType: string;
- entityId: string;
- changes: Record<string, any> | null;
- ipAddress: string | null;
- userAgent: string | null;
- createdAt: string;
- userId: string | null;
- user: {
- id: string;
- email: string;
- firstName: string;
- lastName: string;
- } | null;
-}
 
 interface FilterUser {
  id: string;
@@ -63,7 +46,7 @@ const ENTITY_TYPE_OPTIONS = [
 
 export default function AuditLogClient() {
  const toast = useToast();
- const [logs, setLogs] = useState<AuditLogEntry[]>([]);
+ const [logs, setLogs] = useState<AuditLog[]>([]);
  const [loading, setLoading] = useState(true);
  const [page, setPage] = useState(1);
  const [totalPages, setTotalPages] = useState(1);
@@ -377,9 +360,9 @@ export default function AuditLogClient() {
  {log.entityType}
  </td>
  <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--foreground-tertiary)] font-mono text-xs">
- {log.entityId.length > 12
+ {log.entityId && log.entityId.length > 12
  ? `${log.entityId.substring(0, 12)}...`
- : log.entityId}
+ : log.entityId || '—'}
  </td>
  <td className="px-6 py-4 whitespace-nowrap text-sm">
  {log.changes ? (

@@ -75,7 +75,7 @@ interface WidgetType {
   type: string;
   name: string;
   description: string;
-  icon: string;
+  icon?: string;
   configSchema: Record<string, any>;
 }
 

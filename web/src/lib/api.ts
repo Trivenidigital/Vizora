@@ -11,7 +11,7 @@ import type {
   BandwidthUsage, PlaylistPerformance, AnalyticsExport,
   User, AuditLog, DisplayGroup,
   TemplateSearchResult, TemplateCategory, TemplateSummary, TemplateDetail,
-  WidgetType, Widget, LayoutPreset, Layout, ResolvedLayout, QrOverlayConfig,
+  WidgetType, Widget, LayoutPreset, LayoutZone, Layout, ResolvedLayout, QrOverlayConfig,
   PlatformHealth,
 } from './types';
 
@@ -815,8 +815,8 @@ class ApiClient {
     return this.request<PaginatedResponse<User>>(`/users${query ? `?${query}` : ''}`);
   }
 
-  async inviteUser(data: { email: string; firstName: string; lastName: string; role: string }): Promise<User> {
-    return this.request<User>('/users/invite', {
+  async inviteUser(data: { email: string; firstName: string; lastName: string; role: string }): Promise<User & { tempPassword?: string }> {
+    return this.request<User & { tempPassword?: string }>('/users/invite', {
       method: 'POST',
       body: JSON.stringify(data),
     });

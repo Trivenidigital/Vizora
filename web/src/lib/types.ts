@@ -379,6 +379,7 @@ export interface User {
   isActive: boolean;
   lastLoginAt: string | null;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface AuditLog {
@@ -386,10 +387,11 @@ export interface AuditLog {
   action: string;
   entityType: string | null;
   entityId: string | null;
-  userId: string;
-  user?: { firstName: string; lastName: string; email: string };
-  details: Record<string, unknown> | null;
+  userId: string | null;
+  user?: { id: string; firstName: string; lastName: string; email: string } | null;
+  changes: Record<string, unknown> | null;
   ipAddress: string | null;
+  userAgent: string | null;
   createdAt: string;
 }
 

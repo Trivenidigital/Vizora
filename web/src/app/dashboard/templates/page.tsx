@@ -10,19 +10,24 @@ import { Icon } from '@/theme/icons';
 interface TemplateItem {
   id: string;
   name: string;
-  description?: string;
+  description?: string | null;
   category?: string;
   tags?: string[];
   orientation?: string;
   difficulty?: string;
-  thumbnailUrl?: string;
+  thumbnailUrl?: string | null;
+  thumbnail?: string | null;
   isFeatured?: boolean;
   createdAt?: string;
 }
 
 interface CategoryItem {
+  id?: string;
   name: string;
-  count: number;
+  slug?: string;
+  description?: string | null;
+  count?: number;
+  templateCount?: number;
 }
 
 export default function TemplateLibraryPage() {
@@ -100,9 +105,10 @@ export default function TemplateLibraryPage() {
       if (selectedDifficulty) params.difficulty = selectedDifficulty;
       if (selectedOrientation) params.orientation = selectedOrientation;
 
-      const response = await apiClient.searchTemplates(params);
-      setTemplates(response.data || response || []);
-      setTotalCount(response.total || response.length || 0);
+      const response = await apiClient.searchTemplates(params) as any;
+      const items = response.data || response || [];
+      setTemplates(items);
+      setTotalCount(response.meta?.total || items.length || 0);
     } catch (err: any) {
       setError(err.message || 'Failed to load templates');
       setTemplates([]);

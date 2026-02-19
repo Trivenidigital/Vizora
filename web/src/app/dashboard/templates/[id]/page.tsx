@@ -10,17 +10,21 @@ import { Icon } from '@/theme/icons';
 interface TemplateDetail {
   id: string;
   name: string;
-  description?: string;
+  description?: string | null;
   category?: string;
   tags?: string[];
   orientation?: string;
   difficulty?: string;
-  thumbnailUrl?: string;
+  thumbnailUrl?: string | null;
+  thumbnail?: string | null;
   isFeatured?: boolean;
   sampleData?: Record<string, any>;
   htmlTemplate?: string;
+  templateHtml?: string;
   cssTemplate?: string;
-  variables?: Array<{ name: string; type: string; description?: string; defaultValue?: any }>;
+  customCss?: string | null;
+  variables?: Array<{ name: string; type: string; description?: string; defaultValue?: any }> | Record<string, unknown>[];
+  previewUrl?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -317,7 +321,7 @@ export default function TemplateDetailPage() {
                 Template Variables
               </h3>
               <div className="space-y-3">
-                {template.variables.map((variable) => (
+                {(template.variables as Array<{ name: string; type: string; description?: string; defaultValue?: any }>).map((variable) => (
                   <div key={variable.name} className="p-3 bg-[var(--background)] rounded-lg border border-[var(--border)]">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm font-medium text-[var(--foreground)]">{variable.name}</span>

@@ -142,7 +142,7 @@ interface LayoutPreset {
   type: string;
   name: string;
   description: string;
-  zones: number;
+  zones: number | { id: string; x: number; y: number; width: number; height: number; label?: string }[];
 }
 
 interface Layout {

@@ -78,7 +78,7 @@ export default function TeamClient() {
  const result = await apiClient.inviteUser(inviteForm);
  toast.success(`${inviteForm.firstName} ${inviteForm.lastName} has been invited`);
  setIsInviteModalOpen(false);
- setTempPasswordInfo({ email: inviteForm.email, password: result.tempPassword });
+ setTempPasswordInfo({ email: inviteForm.email, password: result.tempPassword || '' });
  setInviteForm({ email: '', firstName: '', lastName: '', role: 'viewer' });
  loadUsers();
  } catch (error: any) {
