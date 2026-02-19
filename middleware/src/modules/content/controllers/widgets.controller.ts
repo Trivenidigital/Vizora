@@ -21,6 +21,7 @@ export class WidgetsController {
   constructor(private readonly contentService: ContentService) {}
 
   @Get('types')
+  @Roles('admin', 'manager', 'viewer')
   getWidgetTypes() {
     return this.contentService.getWidgetTypes();
   }

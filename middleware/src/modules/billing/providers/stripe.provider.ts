@@ -103,7 +103,10 @@ export class StripeProvider implements PaymentProvider {
         metadata: params.metadata,
       }),
     );
-    return { url: session.url!, sessionId: session.id };
+    if (!session.url) {
+      throw new ServiceUnavailableException('Stripe checkout session did not return a URL');
+    }
+    return { url: session.url, sessionId: session.id };
   }
 
   async getSubscription(subscriptionId: string): Promise<Subscription | null> {

@@ -1071,7 +1071,7 @@ export class DeviceGateway
                 || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3000');
               let contentUrl = zoneContent.url || '';
               if (contentUrl.startsWith('minio://')) {
-                contentUrl = `${apiBaseUrl}/api/device-content/${zoneContent.id}/file`;
+                contentUrl = `${apiBaseUrl}/api/v1/device-content/${zoneContent.id}/file`;
               }
 
               resolved.content = {

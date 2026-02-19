@@ -19,6 +19,7 @@ export class LayoutsController {
   constructor(private readonly contentService: ContentService) {}
 
   @Get('presets')
+  @Roles('admin', 'manager', 'viewer')
   getLayoutPresets() {
     return this.contentService.getLayoutPresets();
   }
@@ -43,6 +44,7 @@ export class LayoutsController {
   }
 
   @Get(':id/resolved')
+  @Roles('admin', 'manager', 'viewer')
   getResolvedLayout(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
