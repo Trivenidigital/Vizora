@@ -295,8 +295,9 @@ export class AuthService {
       }
 
       await this.redisService.set(key, '1', ttl);
-    } catch {
-      // Silently fail — if token can't be decoded, it's already invalid
+    } catch (error) {
+      // Log warning — Redis failures mean the token won't be revoked
+      this.logger.warn(`Failed to revoke token: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

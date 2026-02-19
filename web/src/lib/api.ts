@@ -126,7 +126,8 @@ class ApiClient {
       return;
     }
     if (!this.csrfInitPromise) {
-      this.csrfInitPromise = fetch(`${this.baseUrl}/../health`, {
+      const healthUrl = typeof window !== 'undefined' ? '/api/v1/health' : `${this.baseUrl}/health`;
+      this.csrfInitPromise = fetch(healthUrl, {
         method: 'GET',
         credentials: 'include',
       })
@@ -135,7 +136,7 @@ class ApiClient {
         })
         .catch(() => {
           // Non-fatal: CSRF cookie may already be set by other means
-          this.csrfInitialized = true;
+          this.csrfInitPromise = null;
         });
     }
     await this.csrfInitPromise;

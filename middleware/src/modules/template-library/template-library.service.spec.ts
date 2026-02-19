@@ -78,11 +78,13 @@ describe('TemplateLibraryService', () => {
       mockDb.content.findMany.mockResolvedValue([]);
       mockDb.content.count.mockResolvedValue(0);
 
-      await service.search({ page: 2, limit: 10 });
+      const result = await service.search({ page: 2, limit: 10 });
 
       expect(mockDb.content.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ skip: 10, take: 10 }),
+        expect.objectContaining({ take: 500 }),
       );
+      expect(result.meta.page).toBe(2);
+      expect(result.meta.limit).toBe(10);
     });
 
     it('should filter by orientation', async () => {

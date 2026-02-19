@@ -84,6 +84,8 @@ export class OrganizationsController {
 
   // Get branding config for organization
   @Get(':id/branding')
+  @UseGuards(RolesGuard)
+  @Roles('admin', 'manager', 'viewer')
   async getBranding(
     @CurrentUser('organizationId') userOrgId: string,
     @Param('id') id: string,

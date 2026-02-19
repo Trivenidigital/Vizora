@@ -29,9 +29,14 @@ async function bootstrap() {
   }));
 
   // Enable CORS
+  const corsOrigin = process.env.CORS_ORIGIN?.split(',').map(s => s.trim());
+  if (!corsOrigin && process.env.NODE_ENV === 'production') {
+    Logger.warn('⚠️  CORS_ORIGIN is not set — defaulting to localhost origins. Set CORS_ORIGIN for production.');
+  }
   app.enableCors({
-    origin: process.env.CORS_ORIGIN?.split(',') || [
+    origin: corsOrigin || [
       'http://localhost:3000',
+      'http://localhost:3001',
       'http://localhost:3002',
       'http://localhost:4200',
     ],

@@ -53,8 +53,8 @@ export class TemplatesController {
   @Post('validate')
   @Roles('admin', 'manager')
   @HttpCode(HttpStatus.OK)
-  validateTemplate(@Body() body: { templateHtml: string }) {
-    return this.contentService.validateTemplateHtml(body.templateHtml);
+  validateTemplate(@Body('templateHtml') templateHtml: string) {
+    return this.contentService.validateTemplateHtml(templateHtml);
   }
 
   @Get(':id/rendered')

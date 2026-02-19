@@ -79,14 +79,13 @@ export class TemplateLibraryService {
     const [data, total] = await Promise.all([
       this.db.content.findMany({
         where,
-        skip,
-        take: limit,
         orderBy: { createdAt: 'desc' },
+        take: 500, // Bounded fetch to prevent OOM
       }),
       this.db.content.count({ where }),
     ]);
 
-    // Post-filter by difficulty and tag (JSONB fields not easily filtered via Prisma)
+    // Post-filter by difficulty and tag (JSONB fields)
     let filtered = data;
     if (difficulty) {
       filtered = filtered.filter((item) => {
@@ -101,9 +100,10 @@ export class TemplateLibraryService {
       });
     }
 
-    // Map response
-    const mappedData = filtered.map((item) => this.mapTemplateResponse(item));
-    return new PaginatedResponse(mappedData, total, page, limit);
+    // Apply pagination to filtered results
+    const paginatedData = filtered.slice(skip, skip + limit);
+    const mappedData = paginatedData.map((item) => this.mapTemplateResponse(item));
+    return new PaginatedResponse(mappedData, filtered.length, page, limit);
   }
 
   /**
@@ -212,7 +212,7 @@ export class TemplateLibraryService {
         status: 'active',
       },
       orderBy: { createdAt: 'desc' },
-      take: 50,
+      take: 200,
     });
 
     // Filter featured via metadata
@@ -237,14 +237,12 @@ export class TemplateLibraryService {
         status: 'active',
       },
       orderBy: { createdAt: 'desc' },
+      take: 200,
     });
-
-    // Filter by seasonal date range
     const seasonal = templates.filter((t) => {
       const meta = t.metadata as Record<string, unknown> | null;
-      if (!meta?.seasonalStart) return false;
-      const start = meta.seasonalStart as string;
-      const end = (meta.seasonalEnd as string) || '2099-12-31';
+      const start = meta?.seasonalStart as string;
+      const end = (meta?.seasonalEnd as string) || '2099-12-31';
       return now >= start && now <= end;
     });
 

@@ -326,6 +326,15 @@ export class AnalyticsService {
    * Per-content detailed metrics
    */
   async getContentMetrics(organizationId: string, contentId: string, range: string): Promise<ContentMetrics> {
+    // Verify content exists and belongs to the organization
+    const content = await this.db.content.findFirst({
+      where: { id: contentId, organizationId },
+      select: { id: true },
+    });
+    if (!content) {
+      throw new NotFoundException(`Content ${contentId} not found`);
+    }
+
     const { startDate } = this.getDateRange(range);
 
     const [totalViews, avgMetrics, dailyTrend, topDevices] = await Promise.all([
@@ -466,10 +475,28 @@ export class AnalyticsService {
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
     try {
-      const result = await this.db.contentImpression.deleteMany({
-        where: { timestamp: { lt: ninetyDaysAgo } },
-      });
-      this.logger.log(`Cleaned up ${result.count} old impressions`);
+      const batchSize = 10000;
+      let totalDeleted = 0;
+      let batchDeleted: number;
+
+      do {
+        // Find IDs to delete in batches to avoid long-running transactions
+        const batch = await this.db.contentImpression.findMany({
+          where: { timestamp: { lt: ninetyDaysAgo } },
+          select: { id: true },
+          take: batchSize,
+        });
+
+        if (batch.length === 0) break;
+
+        const result = await this.db.contentImpression.deleteMany({
+          where: { id: { in: batch.map(b => b.id) } },
+        });
+        batchDeleted = result.count;
+        totalDeleted += batchDeleted;
+      } while (batchDeleted === batchSize);
+
+      this.logger.log(`Cleaned up ${totalDeleted} old impressions`);
     } catch (error) {
       this.logger.error('Failed to cleanup old impressions:', error);
     }

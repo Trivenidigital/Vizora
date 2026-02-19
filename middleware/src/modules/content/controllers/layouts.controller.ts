@@ -11,6 +11,7 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { ContentService } from '../content.service';
 import { CreateLayoutDto } from '../dto/create-layout.dto';
+import { UpdateLayoutDto } from '../dto/update-layout.dto';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 
 @UseGuards(RolesGuard)
@@ -38,7 +39,7 @@ export class LayoutsController {
   updateLayout(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
-    @Body() dto: Partial<CreateLayoutDto>,
+    @Body() dto: UpdateLayoutDto,
   ) {
     return this.contentService.updateLayout(organizationId, id, dto);
   }

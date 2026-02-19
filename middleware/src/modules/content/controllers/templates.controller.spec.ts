@@ -179,9 +179,7 @@ describe('TemplatesController', () => {
       const validationResult = { valid: true, errors: [] };
       mockContentService.validateTemplateHtml.mockResolvedValue(validationResult as any);
 
-      const result = await controller.validateTemplate({
-        templateHtml: '<h1>{{title}}</h1>',
-      });
+      const result = await controller.validateTemplate('<h1>{{title}}</h1>');
 
       expect(result).toEqual(validationResult);
       expect(mockContentService.validateTemplateHtml).toHaveBeenCalledWith('<h1>{{title}}</h1>');
@@ -194,9 +192,7 @@ describe('TemplatesController', () => {
       };
       mockContentService.validateTemplateHtml.mockResolvedValue(validationResult as any);
 
-      const result = await controller.validateTemplate({
-        templateHtml: '<div>{{unclosed}',
-      });
+      const result = await controller.validateTemplate('<div>{{unclosed}');
 
       expect(result).toEqual(validationResult);
     });
@@ -207,7 +203,7 @@ describe('TemplatesController', () => {
       );
 
       await expect(
-        controller.validateTemplate({ templateHtml: '<div></div>' }),
+        controller.validateTemplate('<div></div>'),
       ).rejects.toThrow('Validation service unavailable');
     });
   });

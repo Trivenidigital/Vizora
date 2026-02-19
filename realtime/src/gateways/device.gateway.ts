@@ -75,6 +75,8 @@ export class DeviceGateway
   // Per-message rate limiting: socketId -> { count, resetAt }
   private readonly messageRates: Map<string, { count: number; resetAt: number }> = new Map();
 
+  // Interval handles for cleanup (stored for proper teardown)
+  private cleanupIntervals: ReturnType<typeof setInterval>[] = [];
 
   constructor(
     private jwtService: JwtService,
@@ -93,9 +95,16 @@ export class DeviceGateway
     }
 
     // Periodically clean up expired rate limit entries (every 60s)
-    setInterval(() => this.cleanupRateLimitEntries(), 60000);
+    this.cleanupIntervals.push(setInterval(() => this.cleanupRateLimitEntries(), 60000));
     // Periodically clean up expired message rate limit entries (every 60s)
-    setInterval(() => this.cleanupMessageRateLimits(), 60000);
+    this.cleanupIntervals.push(setInterval(() => this.cleanupMessageRateLimits(), 60000));
+  }
+
+  onModuleDestroy() {
+    for (const interval of this.cleanupIntervals) {
+      clearInterval(interval);
+    }
+    this.cleanupIntervals = [];
   }
 
   /**
@@ -495,8 +504,8 @@ export class DeviceGateway
           organizationId: client.data.organizationId,
         });
 
-        // 2.1: Update DB on disconnect (status transition)
-        this.deviceStatusCache.set(deviceId, 'offline');
+        // 2.1: Update DB on disconnect (status transition) and clean up cache
+        this.deviceStatusCache.delete(deviceId);
         let deviceName = deviceId;
         try {
           const device = await this.databaseService.display.update({
