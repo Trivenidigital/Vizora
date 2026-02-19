@@ -46,6 +46,8 @@ model Organization {
   notifications       Notification[]
   apiKeys             ApiKey[]
   billingTransactions BillingTransaction[]
+  impressions         ContentImpression[]
+  promotionRedemptions PromotionRedemption[]
 
   @@index([slug])
   @@index([stripeCustomerId])
@@ -117,6 +119,7 @@ model Display {
   tags                  DisplayTag[]
   groups                DisplayGroupMember[]
   auditLogs             AuditLog[]
+  impressions           ContentImpression[]
 
   @@index([organizationId])
   @@index([deviceIdentifier])
@@ -173,6 +176,7 @@ model Content {
   mimeType    String?
   metadata    Json?    @db.JsonB
   status      String   @default("active") // active, archived, expired
+  isGlobal    Boolean  @default(false)    // true for template library items (available to all orgs)
   templateOrientation  String?  // 'landscape' | 'portrait' | 'both' for template filtering
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -197,12 +201,14 @@ model Content {
 
   playlistItems  PlaylistItem[]
   tags           ContentTag[]
+  impressions    ContentImpression[]
 
   @@index([organizationId])
   @@index([type])
   @@index([status])
   @@index([expiresAt])
   @@index([folderId])
+  @@index([isGlobal, type])
 }
 
 model Playlist {
@@ -219,6 +225,7 @@ model Playlist {
   items              PlaylistItem[]
   schedules          Schedule[]
   assignedDisplays   Display[]      @relation("DisplayCurrentPlaylist")
+  impressions        ContentImpression[]
 
   @@index([organizationId])
 }
@@ -241,6 +248,33 @@ model PlaylistItem {
 }
 
 // ============================================================================
+// CONTENT IMPRESSIONS (ANALYTICS)
+// ============================================================================
+
+model ContentImpression {
+  id                   String    @id @default(cuid())
+  organizationId       String
+  contentId            String
+  displayId            String
+  playlistId           String?
+  duration             Int?
+  completionPercentage Int?
+  timestamp            DateTime  @default(now())
+  date                 DateTime  @db.Date
+  hour                 Int
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  content      Content      @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  display      Display      @relation(fields: [displayId], references: [id], onDelete: Cascade)
+  playlist     Playlist?    @relation(fields: [playlistId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, date])
+  @@index([contentId, date])
+  @@index([displayId, date])
+  @@map("content_impressions")
+}
+
+// ============================================================================
 // SCHEDULING
 // ============================================================================
 
@@ -250,8 +284,8 @@ model Schedule {
   description String?
   startDate   DateTime
   endDate     DateTime?
-  startTime   String?  // HH:MM format for daily schedules
-  endTime     String?  // HH:MM format for daily schedules
+  startTime   Int?     // Minutes from midnight (0-1439)
+  endTime     Int?     // Minutes from midnight (0-1439)
   daysOfWeek  Int[]    // 0-6 (Sunday-Saturday)
   priority    Int      @default(0)
   isActive    Boolean  @default(true)
@@ -562,6 +596,7 @@ model PromotionRedemption {
   promotionId     String
   promotion       Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
   organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   discountApplied Int       // Actual discount in cents/paise
   redeemedAt      DateTime  @default(now())
 

@@ -1,15 +1,40 @@
 // API Client for Vizora Middleware
 // Uses httpOnly cookies for secure JWT token storage
 
-import type { Display, DisplayOrientation, Content, Playlist, PlaylistItem, Schedule, PaginatedResponse, ContentFolder, AppNotification, ApiKey, CreateApiKeyResponse, SubscriptionStatus, Plan, QuotaUsage, Invoice, CheckoutResponse, BillingPortalResponse, AdminPlan, Promotion, AdminOrganization, AdminUser, PlatformStats, SystemConfig, AdminAuditLog, SystemAnnouncement, IpBlocklistEntry } from './types';
+import type {
+  Display, DisplayOrientation, Content, Playlist, PlaylistItem, Schedule,
+  PaginatedResponse, ContentFolder, AppNotification, ApiKey, CreateApiKeyResponse,
+  SubscriptionStatus, Plan, QuotaUsage, Invoice, CheckoutResponse, BillingPortalResponse,
+  AdminPlan, Promotion, AdminOrganization, AdminUser, PlatformStats, SystemConfig,
+  AdminAuditLog, SystemAnnouncement, IpBlocklistEntry,
+  AnalyticsSummary, DeviceMetric, ContentPerformance, UsageTrend, DeviceDistribution,
+  BandwidthUsage, PlaylistPerformance, AnalyticsExport,
+  User, AuditLog, DisplayGroup,
+  TemplateSearchResult, TemplateCategory, TemplateSummary, TemplateDetail,
+  WidgetType, Widget, LayoutPreset, LayoutZone, Layout, ResolvedLayout, QrOverlayConfig,
+  PlatformHealth,
+} from './types';
 
 // Use relative URL '/api' so requests go through the Next.js rewrite proxy,
 // keeping cookies same-origin. Only fall back to absolute URL for SSR or
 // when explicitly configured (e.g., in production with a separate API domain).
 const API_BASE_URL =
   typeof window !== 'undefined'
-    ? '/api'  // Client-side: proxy through Next.js rewrite (same-origin cookies)
-    : (process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3000/api'));
+    ? '/api/v1'  // Client-side: proxy through Next.js rewrite (same-origin cookies)
+    : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1');
+
+// Warn if NEXT_PUBLIC_API_URL is not set in production (SSR requests need an absolute URL)
+if (
+  typeof window === 'undefined' &&
+  process.env.NODE_ENV === 'production' &&
+  !process.env.NEXT_PUBLIC_API_URL
+) {
+  console.warn(
+    '[Vizora] WARNING: NEXT_PUBLIC_API_URL is not set in production. ' +
+    'SSR requests will fall back to http://localhost:3000/api/v1. ' +
+    'Set NEXT_PUBLIC_API_URL to your middleware API URL for production.',
+  );
+}
 
 // Type definitions for API responses
 interface AuthUser {
@@ -52,8 +77,8 @@ interface ScheduleData {
   displayGroupId?: string;
   startDate: string;
   endDate?: string;
-  startTime?: string;
-  endTime?: string;
+  startTime?: string | number;
+  endTime?: string | number;
   daysOfWeek: number[];  // 0-6 (Sunday-Saturday)
   priority?: number;
   isActive?: boolean;
@@ -82,9 +107,39 @@ function getCsrfToken(): string | null {
 class ApiClient {
   private baseUrl: string;
   private isAuthenticated = false;
+  private csrfInitialized = false;
+  private csrfInitPromise: Promise<void> | null = null;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
+  }
+
+  /**
+   * Ensure a CSRF token cookie is available before making mutating requests.
+   * Makes a lightweight GET to the health endpoint to receive the CSRF cookie.
+   * Only runs once; subsequent calls resolve immediately.
+   */
+  private async ensureCsrfToken(): Promise<void> {
+    if (this.csrfInitialized || typeof window === 'undefined') return;
+    if (getCsrfToken()) {
+      this.csrfInitialized = true;
+      return;
+    }
+    if (!this.csrfInitPromise) {
+      const healthUrl = typeof window !== 'undefined' ? '/api/v1/health' : `${this.baseUrl}/health`;
+      this.csrfInitPromise = fetch(healthUrl, {
+        method: 'GET',
+        credentials: 'include',
+      })
+        .then(() => {
+          this.csrfInitialized = true;
+        })
+        .catch(() => {
+          // Non-fatal: CSRF cookie may already be set by other means
+          this.csrfInitPromise = null;
+        });
+    }
+    await this.csrfInitPromise;
   }
 
   /**
@@ -119,6 +174,13 @@ class ApiClient {
     options: RequestInit = {},
     retries = 3
   ): Promise<T> {
+    // Ensure CSRF token is available before mutating requests
+    const method = (options.method || 'GET').toUpperCase();
+    if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
+      await this.ensureCsrfToken();
+    }
+
+
     // Include CSRF token for state-changing requests
     const csrfToken = getCsrfToken();
     const headers: HeadersInit = {
@@ -174,6 +236,10 @@ class ApiClient {
       if (process.env.NODE_ENV === 'development') {
         console.log('[API] Response received');
       }
+      // Auto-unwrap response envelope { success, data } from middleware
+      if (data && typeof data === 'object' && 'success' in data && 'data' in data) {
+        return data.data as T;
+      }
       return data;
     } catch (error) {
       clearTimeout(timeoutId);
@@ -198,17 +264,14 @@ class ApiClient {
     if (process.env.NODE_ENV === 'development') {
       console.log('[API] Login called');
     }
-    const response = await this.request<{
-      success: boolean;
-      data: LoginResponse;
-    }>('/auth/login', {
+    const response = await this.request<LoginResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
 
     // Mark as authenticated - token is in httpOnly cookie
     this.isAuthenticated = true;
-    return response.data;
+    return response;
   }
 
   async register(
@@ -221,10 +284,7 @@ class ApiClient {
     if (process.env.NODE_ENV === 'development') {
       console.log('[API] Register called');
     }
-    const response = await this.request<{
-      success: boolean;
-      data: RegisterResponse;
-    }>('/auth/register', {
+    const response = await this.request<RegisterResponse>('/auth/register', {
       method: 'POST',
       body: JSON.stringify({
         email,
@@ -237,7 +297,7 @@ class ApiClient {
 
     // Mark as authenticated - token is in httpOnly cookie
     this.isAuthenticated = true;
-    return response.data;
+    return response;
   }
 
   async logout(): Promise<void> {
@@ -245,21 +305,25 @@ class ApiClient {
   }
 
   async refreshToken(): Promise<{ expiresIn: number }> {
-    const response = await this.request<{
-      success: boolean;
-      data: { expiresIn: number };
-    }>('/auth/refresh', {
+    return this.request<{ expiresIn: number }>('/auth/refresh', {
       method: 'POST',
     });
-    return response.data;
   }
 
   async getCurrentUser(): Promise<AuthUser> {
-    const response = await this.request<{
-      success: boolean;
-      data: { user: AuthUser };
-    }>('/auth/me');
-    return response.data.user;
+    const response = await this.request<{ user: AuthUser }>('/auth/me');
+    return response.user;
+  }
+
+  async getOrganization(): Promise<Organization> {
+    return this.request<Organization>('/organizations/current');
+  }
+
+  async changePassword(data: { currentPassword: string; newPassword: string }): Promise<void> {
+    await this.request<void>('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   }
 
   // Displays
@@ -314,9 +378,11 @@ class ApiClient {
   }
 
   async completePairing(data: { code: string; nickname: string; location?: string }): Promise<Display> {
+    // Only send fields the backend DTO accepts (code, nickname)
+    const { code, nickname } = data;
     return this.request<Display>('/devices/pairing/complete', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({ code, nickname }),
     });
   }
 
@@ -591,37 +657,37 @@ class ApiClient {
   }
 
   // Analytics
-  async getAnalyticsSummary(): Promise<any> {
-    return this.request<any>('/analytics/summary');
+  async getAnalyticsSummary(): Promise<AnalyticsSummary> {
+    return this.request<AnalyticsSummary>('/analytics/summary');
   }
 
-  async getDeviceMetrics(range: string = 'month'): Promise<any[]> {
-    return this.request<any[]>(`/analytics/device-metrics?range=${range}`);
+  async getDeviceMetrics(range: string = 'month'): Promise<DeviceMetric[]> {
+    return this.request<DeviceMetric[]>(`/analytics/device-metrics?range=${range}`);
   }
 
-  async getContentPerformance(range: string = 'month'): Promise<any[]> {
-    return this.request<any[]>(`/analytics/content-performance?range=${range}`);
+  async getContentPerformance(range: string = 'month'): Promise<ContentPerformance[]> {
+    return this.request<ContentPerformance[]>(`/analytics/content-performance?range=${range}`);
   }
 
-  async getUsageTrends(range: string = 'month'): Promise<any[]> {
-    return this.request<any[]>(`/analytics/usage-trends?range=${range}`);
+  async getUsageTrends(range: string = 'month'): Promise<UsageTrend[]> {
+    return this.request<UsageTrend[]>(`/analytics/usage-trends?range=${range}`);
   }
 
-  async getDeviceDistribution(): Promise<any[]> {
-    return this.request<any[]>('/analytics/device-distribution');
+  async getDeviceDistribution(): Promise<DeviceDistribution[]> {
+    return this.request<DeviceDistribution[]>('/analytics/device-distribution');
   }
 
-  async getBandwidthUsage(range: string = 'month'): Promise<any[]> {
-    return this.request<any[]>(`/analytics/bandwidth?range=${range}`);
+  async getBandwidthUsage(range: string = 'month'): Promise<BandwidthUsage[]> {
+    return this.request<BandwidthUsage[]>(`/analytics/bandwidth?range=${range}`);
   }
 
-  async getPlaylistPerformance(range: string = 'month'): Promise<any[]> {
-    return this.request<any[]>(`/analytics/playlist-performance?range=${range}`);
+  async getPlaylistPerformance(range: string = 'month'): Promise<PlaylistPerformance[]> {
+    return this.request<PlaylistPerformance[]>(`/analytics/playlist-performance?range=${range}`);
   }
 
   // Analytics Export
-  async exportAnalytics(range: string = 'month'): Promise<any> {
-    return this.request<any>(`/analytics/export?range=${range}`);
+  async exportAnalytics(range: string = 'month'): Promise<AnalyticsExport> {
+    return this.request<AnalyticsExport>(`/analytics/export?range=${range}`);
   }
 
   // Device Uptime Analytics
@@ -678,8 +744,8 @@ class ApiClient {
   }
 
   // Playlist reorder
-  async reorderPlaylistItems(playlistId: string, itemIds: string[]): Promise<any> {
-    return this.request<any>(`/playlists/${playlistId}/reorder`, {
+  async reorderPlaylistItems(playlistId: string, itemIds: string[]): Promise<{ reordered: boolean }> {
+    return this.request<{ reordered: boolean }>(`/playlists/${playlistId}/reorder`, {
       method: 'POST',
       body: JSON.stringify({ itemIds }),
     });
@@ -701,24 +767,24 @@ class ApiClient {
   }
 
   // Display Groups
-  async getDisplayGroups(params?: { page?: number; limit?: number }): Promise<PaginatedResponse<any>> {
+  async getDisplayGroups(params?: { page?: number; limit?: number }): Promise<PaginatedResponse<DisplayGroup>> {
     const query = params ? new URLSearchParams(params as Record<string, string>).toString() : '';
-    return this.request<PaginatedResponse<any>>(`/display-groups${query ? `?${query}` : ''}`);
+    return this.request<PaginatedResponse<DisplayGroup>>(`/display-groups${query ? `?${query}` : ''}`);
   }
 
-  async getDisplayGroup(id: string): Promise<any> {
-    return this.request<any>(`/display-groups/${id}`);
+  async getDisplayGroup(id: string): Promise<DisplayGroup> {
+    return this.request<DisplayGroup>(`/display-groups/${id}`);
   }
 
-  async createDisplayGroup(data: { name: string; description?: string }): Promise<any> {
-    return this.request<any>('/display-groups', {
+  async createDisplayGroup(data: { name: string; description?: string }): Promise<DisplayGroup> {
+    return this.request<DisplayGroup>('/display-groups', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
-  async updateDisplayGroup(id: string, data: { name?: string; description?: string }): Promise<any> {
-    return this.request<any>(`/display-groups/${id}`, {
+  async updateDisplayGroup(id: string, data: { name?: string; description?: string }): Promise<DisplayGroup> {
+    return this.request<DisplayGroup>(`/display-groups/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
@@ -730,42 +796,42 @@ class ApiClient {
     });
   }
 
-  async addDisplaysToGroup(groupId: string, displayIds: string[]): Promise<any> {
-    return this.request<any>(`/display-groups/${groupId}/displays`, {
+  async addDisplaysToGroup(groupId: string, displayIds: string[]): Promise<{ added: number }> {
+    return this.request<{ added: number }>(`/display-groups/${groupId}/displays`, {
       method: 'POST',
       body: JSON.stringify({ displayIds }),
     });
   }
 
-  async removeDisplaysFromGroup(groupId: string, displayIds: string[]): Promise<any> {
-    return this.request<any>(`/display-groups/${groupId}/displays`, {
+  async removeDisplaysFromGroup(groupId: string, displayIds: string[]): Promise<{ removed: number }> {
+    return this.request<{ removed: number }>(`/display-groups/${groupId}/displays`, {
       method: 'DELETE',
       body: JSON.stringify({ displayIds }),
     });
   }
 
   // Users / Team Management
-  async getUsers(params?: { page?: number; limit?: number }): Promise<PaginatedResponse<any>> {
+  async getUsers(params?: { page?: number; limit?: number }): Promise<PaginatedResponse<User>> {
     const query = params ? new URLSearchParams(params as Record<string, string>).toString() : '';
-    return this.request<PaginatedResponse<any>>(`/users${query ? `?${query}` : ''}`);
+    return this.request<PaginatedResponse<User>>(`/users${query ? `?${query}` : ''}`);
   }
 
-  async inviteUser(data: { email: string; firstName: string; lastName: string; role: string }): Promise<any> {
-    return this.request<any>('/users/invite', {
+  async inviteUser(data: { email: string; firstName: string; lastName: string; role: string }): Promise<User & { tempPassword?: string }> {
+    return this.request<User & { tempPassword?: string }>('/users/invite', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
-  async updateUser(id: string, data: { firstName?: string; lastName?: string; role?: string; isActive?: boolean }): Promise<any> {
-    return this.request<any>(`/users/${id}`, {
+  async updateUser(id: string, data: { firstName?: string; lastName?: string; role?: string; isActive?: boolean }): Promise<User> {
+    return this.request<User>(`/users/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
   }
 
-  async deactivateUser(id: string): Promise<any> {
-    return this.request<any>(`/users/${id}`, {
+  async deactivateUser(id: string): Promise<User> {
+    return this.request<User>(`/users/${id}`, {
       method: 'DELETE',
     });
   }
@@ -779,11 +845,11 @@ class ApiClient {
     userId?: string;
     startDate?: string;
     endDate?: string;
-  }): Promise<PaginatedResponse<any>> {
+  }): Promise<PaginatedResponse<AuditLog>> {
     const query = params ? new URLSearchParams(
       Object.fromEntries(Object.entries(params).filter(([_, v]) => v !== undefined)) as Record<string, string>
     ).toString() : '';
-    return this.request<PaginatedResponse<any>>(`/audit-logs${query ? `?${query}` : ''}`);
+    return this.request<PaginatedResponse<AuditLog>>(`/audit-logs${query ? `?${query}` : ''}`);
   }
 
   // Bulk Display Operations
@@ -1076,8 +1142,8 @@ class ApiClient {
     return this.request<PlatformStats>('/admin/stats');
   }
 
-  async getPlatformHealth(): Promise<any> {
-    return this.request<any>('/admin/health');
+  async getPlatformHealth(): Promise<PlatformHealth> {
+    return this.request<PlatformHealth>('/admin/health');
   }
 
   // Admin - Config
@@ -1135,6 +1201,119 @@ class ApiClient {
 
   async deleteAnnouncement(id: string): Promise<void> {
     await this.request<void>(`/admin/announcements/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // ========== Template Library ==========
+
+  async searchTemplates(params?: {
+    search?: string;
+    category?: string;
+    tag?: string;
+    orientation?: string;
+    difficulty?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<TemplateSearchResult> {
+    const query = params ? new URLSearchParams(
+      Object.fromEntries(
+        Object.entries(params)
+          .filter(([_, v]) => v !== undefined && v !== '')
+          .map(([k, v]) => [k, String(v)])
+      )
+    ).toString() : '';
+    return this.request<TemplateSearchResult>(`/template-library${query ? `?${query}` : ''}`);
+  }
+
+  async getTemplateCategories(): Promise<TemplateCategory[]> {
+    return this.request<TemplateCategory[]>('/template-library/categories');
+  }
+
+  async getFeaturedTemplates(): Promise<TemplateSummary[]> {
+    return this.request<TemplateSummary[]>('/template-library/featured');
+  }
+
+  async getSeasonalTemplates(): Promise<TemplateSummary[]> {
+    return this.request<TemplateSummary[]>('/template-library/seasonal');
+  }
+
+  async getTemplateDetail(id: string): Promise<TemplateDetail> {
+    return this.request<TemplateDetail>(`/template-library/${id}`);
+  }
+
+  async getTemplatePreview(id: string): Promise<{ html: string }> {
+    return this.request<{ html: string }>(`/template-library/${id}/preview`);
+  }
+
+  async cloneTemplate(id: string, data?: { name?: string; description?: string }): Promise<Content> {
+    return this.request<Content>(`/template-library/${id}/clone`, {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    });
+  }
+
+  // ========== Widget API Methods ==========
+
+  async getWidgetTypes(): Promise<WidgetType[]> {
+    return this.request<WidgetType[]>('/content/widgets/types');
+  }
+
+  async createWidget(data: { name: string; widgetType: string; widgetConfig?: Record<string, unknown>; description?: string }): Promise<Widget> {
+    return this.request<Widget>('/content/widgets', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateWidget(id: string, data: Partial<Widget>): Promise<Widget> {
+    return this.request<Widget>(`/content/widgets/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async refreshWidget(id: string): Promise<Widget> {
+    return this.request<Widget>(`/content/widgets/${id}/refresh`, {
+      method: 'POST',
+    });
+  }
+
+  // ========== Layout API Methods ==========
+
+  async getLayoutPresets(): Promise<LayoutPreset[]> {
+    return this.request<LayoutPreset[]>('/content/layouts/presets');
+  }
+
+  async createLayout(data: { name: string; layoutType: string; zones?: LayoutZone[]; description?: string }): Promise<Layout> {
+    return this.request<Layout>('/content/layouts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateLayout(id: string, data: Partial<Layout>): Promise<Layout> {
+    return this.request<Layout>(`/content/layouts/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getResolvedLayout(id: string): Promise<ResolvedLayout> {
+    return this.request<ResolvedLayout>(`/content/layouts/${id}/resolved`);
+  }
+
+  // ========== QR Overlay API Methods ==========
+
+  async updateQrOverlay(displayId: string, config: QrOverlayConfig): Promise<QrOverlayConfig> {
+    return this.request<QrOverlayConfig>(`/displays/${displayId}/qr-overlay`, {
+      method: 'PATCH',
+      body: JSON.stringify(config),
+    });
+  }
+
+  async removeQrOverlay(displayId: string): Promise<void> {
+    return this.request<void>(`/displays/${displayId}/qr-overlay`, {
       method: 'DELETE',
     });
   }

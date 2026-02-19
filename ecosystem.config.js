@@ -29,6 +29,9 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: 3000,
       },
+      // Wait for app to signal readiness before accepting traffic
+      wait_ready: true,
+      listen_timeout: 30000,
       // Graceful shutdown — 30s for in-flight requests to complete
       kill_timeout: 30000,
       // Logging
@@ -59,6 +62,9 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: 3002,
       },
+      // Wait for app to signal readiness before accepting traffic
+      wait_ready: true,
+      listen_timeout: 30000,
       // Graceful shutdown
       kill_timeout: 15000, // 15 seconds for WebSocket connections to close
       // Logging
@@ -108,21 +114,21 @@ module.exports = {
   // Deployment configuration (optional)
   deploy: {
     production: {
-      user: 'deploy',
-      host: ['production-server'],
-      ref: 'origin/main',
-      repo: 'git@github.com:your-org/vizora.git',
-      path: '/var/www/vizora',
+      user: process.env.DEPLOY_USER || 'deploy',
+      host: [process.env.PRODUCTION_HOST || 'production-server'],
+      ref: process.env.PRODUCTION_REF || 'origin/main',
+      repo: process.env.GIT_REPO_URL || 'git@github.com:your-org/vizora.git',
+      path: process.env.PRODUCTION_PATH || '/var/www/vizora',
       'pre-deploy-local': '',
       'post-deploy': 'pnpm install && pnpm run build && pm2 reload ecosystem.config.js --env production',
       'pre-setup': '',
     },
     staging: {
-      user: 'deploy',
-      host: ['staging-server'],
-      ref: 'origin/develop',
-      repo: 'git@github.com:your-org/vizora.git', // TODO: Replace with actual repo URL
-      path: '/var/www/vizora-staging',
+      user: process.env.DEPLOY_USER || 'deploy',
+      host: [process.env.STAGING_HOST || 'staging-server'],
+      ref: process.env.STAGING_REF || 'origin/develop',
+      repo: process.env.GIT_REPO_URL || 'git@github.com:your-org/vizora.git',
+      path: process.env.STAGING_PATH || '/var/www/vizora-staging',
       'post-deploy': 'pnpm install && pnpm run build && pm2 reload ecosystem.config.js --env staging',
     },
   },

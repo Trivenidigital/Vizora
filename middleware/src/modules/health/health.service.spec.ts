@@ -26,6 +26,7 @@ describe('HealthService', () => {
 
     service = new HealthService(
       mockDatabaseService as DatabaseService,
+      undefined, // circuitBreaker (optional)
       mockRedisService as RedisService,
       mockStorageService as StorageService,
     );
@@ -157,7 +158,7 @@ describe('HealthService', () => {
       beforeEach(() => {
         mockDatabaseService.$queryRaw.mockResolvedValue([{ '?column?': 1 }]);
         // Create service without redis
-        service = new HealthService(mockDatabaseService as DatabaseService);
+        service = new HealthService(mockDatabaseService as DatabaseService, undefined);
       });
 
       it('should return degraded status for redis', async () => {

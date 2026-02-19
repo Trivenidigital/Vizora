@@ -431,6 +431,9 @@ describe('DisplaysService', () => {
           command: 'screenshot',
           payload: expect.objectContaining({ requestId: expect.any(String) }),
         }),
+        expect.objectContaining({
+          headers: expect.objectContaining({ 'x-internal-api-key': expect.any(String) }),
+        }),
       );
     });
 

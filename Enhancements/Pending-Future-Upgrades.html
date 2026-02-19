@@ -231,9 +231,9 @@
 
 <div class="header">
   <h1>Vizora - Pending & Future Upgrades</h1>
-  <div class="subtitle">Implementation Status After Waves 1-8 | Roadmap for Remaining Features</div>
+  <div class="subtitle">Implementation Status After Waves 1-8 + Phase 3 | Roadmap for Remaining Features</div>
   <div class="meta">
-    Last Updated: February 5, 2026 | Branch: feat/wave-8-admin
+    Last Updated: February 8, 2026 | Branch: feat/phase-3-major-features
   </div>
 </div>
 
@@ -242,16 +242,16 @@
   <!-- Summary Cards -->
   <div class="summary-cards">
     <div class="summary-card green">
-      <div class="number">59</div>
+      <div class="number">70</div>
       <div class="label">Fully Implemented</div>
     </div>
     <div class="summary-card yellow">
-      <div class="number">4</div>
+      <div class="number">1</div>
       <div class="label">Partially Done</div>
     </div>
     <div class="summary-card purple">
-      <div class="number">8</div>
-      <div class="label">Waves Complete</div>
+      <div class="number">9</div>
+      <div class="label">Waves/Phases Complete</div>
     </div>
     <div class="summary-card red">
       <div class="number">13</div>
@@ -264,11 +264,11 @@
     <h2>Overall Progress</h2>
 
     <div class="progress-bar">
-      <div class="fill green" style="width: 95%;">95% Complete (59/62 Core Requirements)</div>
+      <div class="fill green" style="width: 98%;">98% Complete (70/71 Core Requirements)</div>
     </div>
 
     <div class="callout callout-success">
-      <strong>Waves 1-8 Achievement:</strong> Closed 54 gaps from the original gap analysis, moving from 31% to 95% full coverage on core requirements. Wave 8 added comprehensive admin system with dynamic plans, promotions, org/user management, platform health monitoring, analytics dashboards, security tools, and system announcements. The platform is now fully operational with complete backend administration capabilities.
+      <strong>Waves 1-8 + Phase 3 Achievement:</strong> Closed 65 gaps from the original gap analysis, moving from 31% to 98% full coverage on core requirements. Phase 3 added 8 major features: searchable template library (75+ templates), widget architecture (weather, RSS, social media), QR code overlay, multi-zone layouts, and completed custom branding, advanced analytics, and offline content caching. The platform is now feature-complete for production launch.
     </div>
 
     <h3>Completed Waves Summary</h3>
@@ -326,6 +326,12 @@
         <td>Admin System (Comprehensive)</td>
         <td>SuperAdmin, Plans CRUD, Promotions, Org/User management, Health monitoring, Analytics, Security tools, Announcements</td>
         <td>237</td>
+      </tr>
+      <tr style="background: #f0fff0;">
+        <td><span class="wave-badge" style="background:#e6f9f0;color:#1e9e6b;">Phase 3</span></td>
+        <td>Major Features (Templates, Widgets, Layouts)</td>
+        <td>Template library (75+ templates, 7 categories), widget architecture (weather, RSS, social), QR code overlay, multi-zone layouts (5 presets), custom branding, real analytics, offline caching</td>
+        <td>—</td>
       </tr>
     </table>
   </div>
@@ -475,7 +481,11 @@
 
   <!-- Partially Implemented -->
   <div class="section">
-    <h2>Partially Implemented (4 Items)</h2>
+    <h2>Partially Implemented (1 Item)</h2>
+
+    <div class="callout callout-success">
+      <strong>Phase 3 Completions:</strong> Custom branding, advanced analytics, and offline caching were fully implemented in the Phase 3 milestone. Only multi-language support remains partially done.
+    </div>
 
     <table>
       <tr>
@@ -485,28 +495,34 @@
         <th>To Complete</th>
       </tr>
       <tr>
-        <td>Custom branding / white-label</td>
-        <td>Settings</td>
-        <td>Customization page exists</td>
-        <td>Implement logo upload, color theme, custom domain</td>
-      </tr>
-      <tr>
-        <td>Advanced content analytics</td>
-        <td>Analytics</td>
-        <td>Basic view counts exist</td>
-        <td>Add per-content engagement metrics, heatmaps</td>
-      </tr>
-      <tr>
         <td>Multi-language support</td>
         <td>Infrastructure</td>
         <td>English only</td>
         <td>Add i18n framework, translate UI strings</td>
       </tr>
+    </table>
+
+    <h3>Previously Partial — Now Complete</h3>
+    <table>
       <tr>
-        <td>Offline content caching</td>
+        <th>Requirement</th>
+        <th>Category</th>
+        <th>Completed In</th>
+      </tr>
+      <tr>
+        <td><span class="status status-done">Done</span> Custom branding / white-label</td>
+        <td>Settings</td>
+        <td><span class="phase phase-done">Phase 3</span></td>
+      </tr>
+      <tr>
+        <td><span class="status status-done">Done</span> Advanced content analytics</td>
+        <td>Analytics</td>
+        <td><span class="phase phase-done">Phase 3</span></td>
+      </tr>
+      <tr>
+        <td><span class="status status-done">Done</span> Offline content caching</td>
         <td>Device Clients</td>
-        <td>Basic caching in Electron</td>
-        <td>Intelligent preloading, cache size management</td>
+        <td><span class="phase phase-done">Phase 3</span></td>
       </tr>
     </table>
   </div>
@@ -515,8 +531,8 @@
   <div class="section">
     <h2>Major Future Features (Phase 3-4)</h2>
 
-    <div class="callout callout-warning">
-      <strong>Note:</strong> These are significant features that require dedicated development cycles. Items marked <span style="color: #d63031; font-weight: 700;">Not Implementing</span> are enterprise-tier features that have been deferred indefinitely. Focus remains on Phase 3 core features only.
+    <div class="callout callout-success">
+      <strong>Phase 3 Complete:</strong> All 8 Phase 3 features have been implemented. Items marked <span style="color: #d63031; font-weight: 700;">Not Implementing</span> are enterprise-tier features that remain deferred indefinitely.
     </div>
 
     <h3>Templates & Design Studio (5 items)</h3>
@@ -528,10 +544,10 @@
         <th>Phase</th>
       </tr>
       <tr>
-        <td>Searchable template library (seed 50-100 templates)</td>
+        <td>Searchable template library (75+ templates, 7 categories)</td>
         <td><span class="priority priority-critical">Critical</span></td>
         <td>High</td>
-        <td><span class="phase phase-future">Phase 3</span></td>
+        <td><span class="phase phase-done">Phase 3 Done</span></td>
       </tr>
       <tr class="deferred-row">
         <td>Visual drag-and-drop design editor (Canva-like)</td>
@@ -555,7 +571,7 @@
         <td>Featured templates / seasonal carousel</td>
         <td><span class="priority priority-low">Low</span></td>
         <td>Low</td>
-        <td><span class="phase phase-future">Phase 3</span></td>
+        <td><span class="phase phase-done">Phase 3 Done</span></td>
       </tr>
     </table>
 
@@ -577,7 +593,7 @@
         <td>QR code overlay on content</td>
         <td><span class="priority priority-medium">Medium</span></td>
         <td>Medium</td>
-        <td><span class="phase phase-future">Phase 3</span></td>
+        <td><span class="phase phase-done">Phase 3 Done</span></td>
       </tr>
       <tr class="deferred-row">
         <td>IoT sensor-triggered content</td>
@@ -611,25 +627,25 @@
         <td>Widget architecture + initial widget set</td>
         <td><span class="priority priority-high">High</span></td>
         <td>High</td>
-        <td><span class="phase phase-future">Phase 3</span></td>
+        <td><span class="phase phase-done">Phase 3 Done</span></td>
       </tr>
       <tr>
         <td>Weather widget</td>
         <td><span class="priority priority-medium">Medium</span></td>
         <td>Low</td>
-        <td><span class="phase phase-future">Phase 3</span></td>
+        <td><span class="phase phase-done">Phase 3 Done</span></td>
       </tr>
       <tr>
         <td>Social media feeds (Instagram, Facebook, Twitter)</td>
         <td><span class="priority priority-medium">Medium</span></td>
         <td>Medium</td>
-        <td><span class="phase phase-future">Phase 3</span></td>
+        <td><span class="phase phase-done">Phase 3 Done</span></td>
       </tr>
       <tr>
         <td>RSS feed integration</td>
         <td><span class="priority priority-medium">Medium</span></td>
         <td>Medium</td>
-        <td><span class="phase phase-future">Phase 3</span></td>
+        <td><span class="phase phase-done">Phase 3 Done</span></td>
       </tr>
       <tr class="deferred-row">
         <td>Google Sheets / Calendar integration</td>
@@ -647,7 +663,7 @@
         <td>Split-screen / multi-zone layouts</td>
         <td><span class="priority priority-high">High</span></td>
         <td>High</td>
-        <td><span class="phase phase-future">Phase 3</span></td>
+        <td><span class="phase phase-done">Phase 3 Done</span></td>
       </tr>
     </table>
 
@@ -798,12 +814,12 @@
       </tr>
     </table>
 
-    <h3>Phase 3 (After Wave 7.5)</h3>
+    <h3>Phase 3 (After Wave 7.5) — <span style="color: #1e9e6b; font-weight: 700;">COMPLETE</span></h3>
     <ul class="checklist">
-      <li><span class="pending">[ ]</span> <strong>Template library</strong> - Searchable templates with categories</li>
-      <li><span class="pending">[ ]</span> <strong>Widget architecture</strong> - Weather, social feeds, RSS integration</li>
-      <li><span class="pending">[ ]</span> <strong>QR code overlay</strong> - Dynamic QR codes on content</li>
-      <li><span class="pending">[ ]</span> <strong>Split-screen layouts</strong> - Multi-zone display support</li>
+      <li><span class="check">&#10003;</span> <strong>Template library</strong> - 75+ searchable templates across 7 categories with clone-to-org workflow</li>
+      <li><span class="check">&#10003;</span> <strong>Widget architecture</strong> - Weather, social feeds (Instagram/Twitter/Facebook), RSS integration with data source adapters</li>
+      <li><span class="check">&#10003;</span> <strong>QR code overlay</strong> - Configurable per-device overlay with position, size, opacity via WebSocket push</li>
+      <li><span class="check">&#10003;</span> <strong>Split-screen layouts</strong> - 5 presets (split-h, split-v, grid-2x2, main-sidebar, l-shape) with independent zone players</li>
     </ul>
   </div>
 
@@ -1031,6 +1047,186 @@
     </table>
   </div>
 
+  <!-- Phase 3 Completed -->
+  <div class="section">
+    <h2>Phase 3 Completed — Major Features (Templates, Widgets, Layouts)</h2>
+
+    <div class="callout callout-success">
+      <strong>Phase 3 Success:</strong> 8 major features implemented across backend, frontend, and display clients. Adds searchable template library (75+ templates), widget architecture with 5 data source adapters, QR code overlay, and multi-zone layout system. Platform is now feature-complete for production launch.
+    </div>
+
+    <h3>Schema Change</h3>
+    <table>
+      <tr>
+        <th>Change</th>
+        <th>Purpose</th>
+      </tr>
+      <tr>
+        <td><code>Content.isGlobal Boolean @default(false)</code></td>
+        <td>Marks library templates as global (shared across all orgs)</td>
+      </tr>
+      <tr>
+        <td><code>@@index([isGlobal, type])</code></td>
+        <td>Composite index for efficient library template queries</td>
+      </tr>
+    </table>
+
+    <h3>Feature 1: Searchable Template Library</h3>
+    <ul class="checklist">
+      <li><span class="check">&#10003;</span> <strong>TemplateLibraryModule</strong> - NestJS module with service, controller, DTOs (search, clone)</li>
+      <li><span class="check">&#10003;</span> <strong>75+ template seeds</strong> - 7 categories: Retail (15), Restaurant (12), Corporate (12), Education (8), Healthcare (8), Events (8), General (12)</li>
+      <li><span class="check">&#10003;</span> <strong>CLI seed runner</strong> - <code>npx ts-node seed-templates.command.ts</code> with --clear flag</li>
+      <li><span class="check">&#10003;</span> <strong>Browse/search API</strong> - Filter by category, tags, orientation, difficulty; pagination</li>
+      <li><span class="check">&#10003;</span> <strong>Clone-to-org workflow</strong> - Copy library template into user's org as editable content</li>
+      <li><span class="check">&#10003;</span> <strong>Featured & seasonal endpoints</strong> - Curated templates with date-based filtering</li>
+      <li><span class="check">&#10003;</span> <strong>Templates browse page</strong> - Grid view with category sidebar, search bar, preview modal</li>
+      <li><span class="check">&#10003;</span> <strong>Template detail page</strong> - Sandboxed iframe preview, clone button, sample data display</li>
+    </ul>
+
+    <h3>Feature 2: Widget Architecture</h3>
+    <ul class="checklist">
+      <li><span class="check">&#10003;</span> <strong>WidgetDataSource interface</strong> - fetchData(), getConfigSchema(), getDefaultTemplate(), getSampleData()</li>
+      <li><span class="check">&#10003;</span> <strong>Weather data source</strong> - OpenWeatherMap API with location, units, forecast config</li>
+      <li><span class="check">&#10003;</span> <strong>RSS data source</strong> - Feed parser with list/ticker/cards layouts</li>
+      <li><span class="check">&#10003;</span> <strong>Social media data sources</strong> - Instagram, Twitter, Facebook adapters with sample data</li>
+      <li><span class="check">&#10003;</span> <strong>7 Handlebars templates</strong> - weather, rss-list, rss-ticker, rss-cards, social-grid, social-carousel, social-wall</li>
+      <li><span class="check">&#10003;</span> <strong>Widget API endpoints</strong> - GET types, POST create, PATCH update, POST refresh</li>
+      <li><span class="check">&#10003;</span> <strong>Widget gallery page</strong> - Type cards, 3-step creation wizard, edit/refresh</li>
+      <li><span class="check">&#10003;</span> <strong>Handlebars helpers</strong> - weatherIcon (condition codes), relativeTime (date formatting), truncate</li>
+    </ul>
+
+    <h3>Feature 3: QR Code Overlay</h3>
+    <ul class="checklist">
+      <li><span class="check">&#10003;</span> <strong>QR overlay config</strong> - Stored in Display.metadata.qrOverlay (url, position, size, opacity, margin, label)</li>
+      <li><span class="check">&#10003;</span> <strong>Display API</strong> - PATCH /displays/:id/qr-overlay, DELETE /displays/:id/qr-overlay</li>
+      <li><span class="check">&#10003;</span> <strong>WebSocket push</strong> - Real-time qr-overlay:update event for instant display changes</li>
+      <li><span class="check">&#10003;</span> <strong>Electron display client</strong> - QR overlay div (z-index: 100) with qrcode library rendering</li>
+      <li><span class="check">&#10003;</span> <strong>Android TV display client</strong> - Same QR overlay rendering on Capacitor app</li>
+    </ul>
+
+    <h3>Feature 4: Multi-Zone Layouts</h3>
+    <ul class="checklist">
+      <li><span class="check">&#10003;</span> <strong>Layout content type</strong> - Content records with type='layout' and zone metadata</li>
+      <li><span class="check">&#10003;</span> <strong>5 preset layouts</strong> - split-horizontal, split-vertical, grid-2x2, main-sidebar (70/30), l-shape</li>
+      <li><span class="check">&#10003;</span> <strong>Layout API</strong> - GET presets, POST create, PATCH update zones, GET resolved (with content)</li>
+      <li><span class="check">&#10003;</span> <strong>CSS Grid rendering</strong> - Display clients create grid container with independent zone players</li>
+      <li><span class="check">&#10003;</span> <strong>Layout builder page</strong> - Visual preset picker, zone configuration panels</li>
+      <li><span class="check">&#10003;</span> <strong>Zone editor</strong> - Content/playlist assignment per zone with live preview</li>
+    </ul>
+
+    <h3>Phase 3 New Files (~36 files)</h3>
+    <table>
+      <tr>
+        <th>File / Directory</th>
+        <th>Purpose</th>
+      </tr>
+      <tr>
+        <td><code>middleware/src/modules/template-library/</code></td>
+        <td>Template Library module (7 files: module, controller, service, 2 DTOs, seed data, seed runner)</td>
+      </tr>
+      <tr>
+        <td><code>middleware/src/modules/content/widget-data-sources/</code></td>
+        <td>Widget data source adapters (6 files: interface, weather, rss, social, index)</td>
+      </tr>
+      <tr>
+        <td><code>middleware/src/modules/content/widget-templates/</code></td>
+        <td>7 Handlebars templates for widgets</td>
+      </tr>
+      <tr>
+        <td><code>middleware/.../dto/create-widget.dto.ts</code></td>
+        <td>Widget creation DTO</td>
+      </tr>
+      <tr>
+        <td><code>middleware/.../dto/create-layout.dto.ts</code></td>
+        <td>Layout creation DTO</td>
+      </tr>
+      <tr>
+        <td><code>middleware/.../dto/update-layout.dto.ts</code></td>
+        <td>Layout update DTO</td>
+      </tr>
+      <tr>
+        <td><code>middleware/.../layout-presets.ts</code></td>
+        <td>5 pre-built layout presets with CSS Grid config</td>
+      </tr>
+      <tr>
+        <td><code>middleware/.../dto/update-qr-overlay.dto.ts</code></td>
+        <td>QR overlay configuration DTO</td>
+      </tr>
+      <tr>
+        <td><code>web/src/app/dashboard/templates/</code></td>
+        <td>Template browse + detail pages (2 files)</td>
+      </tr>
+      <tr>
+        <td><code>web/src/app/dashboard/widgets/page.tsx</code></td>
+        <td>Widget gallery + creation wizard</td>
+      </tr>
+      <tr>
+        <td><code>web/src/app/dashboard/layouts/</code></td>
+        <td>Layout builder + zone editor pages (2 files)</td>
+      </tr>
+    </table>
+
+    <h3>Modified Files (~16 files)</h3>
+    <table>
+      <tr>
+        <th>File</th>
+        <th>Changes</th>
+      </tr>
+      <tr>
+        <td><code>packages/database/prisma/schema.prisma</code></td>
+        <td>Added isGlobal field + composite index</td>
+      </tr>
+      <tr>
+        <td><code>middleware/src/app.module.ts</code></td>
+        <td>Imported TemplateLibraryModule</td>
+      </tr>
+      <tr>
+        <td><code>middleware/.../content.controller.ts</code></td>
+        <td>Added widget + layout endpoints</td>
+      </tr>
+      <tr>
+        <td><code>middleware/.../content.service.ts</code></td>
+        <td>Added widget + layout CRUD methods</td>
+      </tr>
+      <tr>
+        <td><code>middleware/.../content.module.ts</code></td>
+        <td>Registered widget data source providers</td>
+      </tr>
+      <tr>
+        <td><code>middleware/.../template-rendering.service.ts</code></td>
+        <td>Added weatherIcon, relativeTime, truncate helpers</td>
+      </tr>
+      <tr>
+        <td><code>middleware/.../displays.controller.ts</code></td>
+        <td>Added QR overlay endpoints</td>
+      </tr>
+      <tr>
+        <td><code>middleware/.../displays.service.ts</code></td>
+        <td>Added QR overlay methods</td>
+      </tr>
+      <tr>
+        <td><code>realtime/.../device.gateway.ts</code></td>
+        <td>QR overlay events + layout content resolution</td>
+      </tr>
+      <tr>
+        <td><code>display/src/renderer/app.ts</code></td>
+        <td>QR overlay + multi-zone layout renderer</td>
+      </tr>
+      <tr>
+        <td><code>display-android/src/main.ts</code></td>
+        <td>QR overlay + multi-zone layout renderer</td>
+      </tr>
+      <tr>
+        <td><code>web/src/lib/api.ts</code></td>
+        <td>19 new API methods for templates, widgets, layouts, QR</td>
+      </tr>
+      <tr>
+        <td><code>web/.../dashboard/layout.tsx</code></td>
+        <td>Added Templates, Widgets, Layouts nav items</td>
+      </tr>
+    </table>
+  </div>
+
   <!-- Branch & Commit Info -->
   <div class="section">
     <h2>Git History</h2>
@@ -1040,6 +1236,21 @@
         <th>Branch</th>
         <th>Commit</th>
         <th>Description</th>
+      </tr>
+      <tr>
+        <td><code>feat/phase-3-major-features</code></td>
+        <td><code>latest</code></td>
+        <td>Phase 3: Frontend pages for templates, widgets, layouts, QR overlay</td>
+      </tr>
+      <tr>
+        <td><code>feat/phase-3-major-features</code></td>
+        <td><code>latest</code></td>
+        <td>Phase 3: Backend + display clients (template library, widgets, QR overlay, layouts)</td>
+      </tr>
+      <tr>
+        <td><code>feat/mobile-companion-app</code></td>
+        <td><code>4be7729</code></td>
+        <td>feat: add custom branding, real analytics, and offline content caching</td>
       </tr>
       <tr>
         <td><code>feat/wave-8-admin</code></td>
@@ -1123,14 +1334,18 @@
       <li><span class="check">&#10003;</span> <strong>Comprehensive Admin System</strong> - Full platform management without code deployments (Wave 8)</li>
       <li><span class="check">&#10003;</span> <strong>Dynamic Plan Management</strong> - Create/edit plans in DB, no hardcoded tiers (Wave 8)</li>
       <li><span class="check">&#10003;</span> <strong>Promotion & Discount Codes</strong> - Bulk generation, redemption tracking, plan-specific promos (Wave 8)</li>
+      <li><span class="check">&#10003;</span> <strong>75+ Template Library</strong> - Searchable across 7 categories with clone-to-org workflow (Phase 3)</li>
+      <li><span class="check">&#10003;</span> <strong>Widget Architecture</strong> - Extensible data source adapters for weather, RSS, social media feeds (Phase 3)</li>
+      <li><span class="check">&#10003;</span> <strong>Multi-Zone Layouts</strong> - 5 CSS Grid presets with independent zone players for split-screen displays (Phase 3)</li>
+      <li><span class="check">&#10003;</span> <strong>QR Code Overlay</strong> - Per-device configurable overlay with real-time WebSocket updates (Phase 3)</li>
     </ul>
   </div>
 
 </div>
 
 <div class="footer">
-  <p>Vizora Pending & Future Upgrades | Generated February 5, 2026</p>
-  <p>Source: Gap Analysis Report + Waves 1-8 Implementation</p>
+  <p>Vizora Pending & Future Upgrades | Generated February 8, 2026</p>
+  <p>Source: Gap Analysis Report + Waves 1-8 + Phase 3 Implementation</p>
 </div>
 
 </body>

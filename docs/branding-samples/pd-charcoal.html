@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Precision Dark — Warm Charcoal</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* WARM CHARCOAL — warm gray with subtle brown undertone */
+    --bg-primary: #141210;
+    --bg-secondary: #1C1A17;
+    --bg-tertiary: #252220;
+    --border: #332F2B;
+    --text-primary: #F5F0EA;
+    --text-secondary: #A8A098;
+    --text-tertiary: #736B62;
+    --accent: #7C5CFC;
+    --accent-hover: #6D4AED;
+    --accent-muted: rgba(124, 92, 252, 0.15);
+    --accent-glow: rgba(124, 92, 252, 0.25);
+    --success: #22C55E;
+    --warning: #EAB308;
+    --error: #EF4444;
+    --info: #3B82F6;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', -apple-system, system-ui, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .nav {
+    position: sticky; top: 0; z-index: 100;
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    background: rgba(20, 18, 16, 0.85);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem; height: 56px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .nav-logo { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em; }
+  .nav-logo span { color: var(--accent); }
+  .nav-links { display: flex; gap: 2rem; list-style: none; }
+  .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.875rem; font-weight: 500; transition: color 0.15s; }
+  .nav-links a:hover { color: var(--text-primary); }
+  .nav-actions { display: flex; gap: 0.75rem; align-items: center; }
+  .btn-ghost {
+    background: transparent; border: 1px solid var(--border); color: var(--text-secondary);
+    padding: 6px 14px; border-radius: 6px; font-size: 0.8rem; font-weight: 500;
+    cursor: pointer; transition: all 0.15s; font-family: inherit;
+  }
+  .btn-ghost:hover { color: var(--text-primary); border-color: var(--text-tertiary); }
+  .btn-primary {
+    background: var(--accent); border: none; color: #fff;
+    padding: 6px 16px; border-radius: 6px; font-size: 0.8rem; font-weight: 500;
+    cursor: pointer; transition: all 0.15s; font-family: inherit;
+  }
+  .btn-primary:hover { background: var(--accent-hover); box-shadow: 0 0 20px var(--accent-glow); }
+
+  .hero {
+    min-height: 90vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    padding: 4rem 2rem; position: relative; overflow: hidden;
+  }
+  .hero::before {
+    content: ''; position: absolute; width: 600px; height: 600px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(124,92,252,0.1) 0%, transparent 70%);
+    top: -100px; right: -100px;
+  }
+  .hero::after {
+    content: ''; position: absolute; width: 400px; height: 400px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(234,179,8,0.04) 0%, transparent 70%);
+    bottom: 0; left: -50px;
+  }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    padding: 4px 12px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--bg-secondary);
+    font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 2rem;
+  }
+  .hero-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.4} }
+  .hero h1 { font-size: 3.5rem; font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; max-width: 700px; margin-bottom: 1.25rem; }
+  .hero h1 .gradient-text {
+    background: linear-gradient(135deg, var(--accent), #E9A634);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .hero p { font-size: 1.1rem; color: var(--text-secondary); max-width: 520px; margin-bottom: 2.5rem; }
+  .hero-actions { display: flex; gap: 0.75rem; z-index: 1; }
+  .hero .btn-primary { padding: 10px 24px; font-size: 0.875rem; }
+  .hero .btn-ghost { padding: 10px 24px; font-size: 0.875rem; }
+
+  .dashboard-mockup {
+    max-width: 900px; margin: 3rem auto 0;
+    border: 1px solid var(--border); border-radius: 12px;
+    background: var(--bg-secondary); overflow: hidden;
+    box-shadow: 0 0 80px rgba(124,92,252,0.05); position: relative; z-index: 1;
+  }
+  .mockup-topbar { display: flex; align-items: center; gap: 0.5rem; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+  .mockup-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--bg-tertiary); border: 1px solid var(--border); }
+  .mockup-body { display: flex; min-height: 340px; }
+  .mockup-sidebar { width: 180px; border-right: 1px solid var(--border); padding: 12px 0; flex-shrink: 0; }
+  .sidebar-item { display: flex; align-items: center; gap: 8px; padding: 7px 16px; font-size: 0.8rem; color: var(--text-secondary); cursor: default; transition: all 0.15s; }
+  .sidebar-item:hover { color: var(--text-primary); background: var(--bg-tertiary); }
+  .sidebar-item.active { color: var(--text-primary); background: var(--accent-muted); border-left: 2px solid var(--accent); }
+  .sidebar-icon { width: 16px; height: 16px; border-radius: 3px; background: var(--bg-tertiary); border: 1px solid var(--border); }
+  .sidebar-item.active .sidebar-icon { background: var(--accent-muted); border-color: var(--accent); }
+  .mockup-main { flex: 1; padding: 16px 20px; }
+  .mockup-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .mockup-title { font-size: 0.95rem; font-weight: 600; }
+  .mockup-subtitle { font-size: 0.75rem; color: var(--text-tertiary); margin-top: 2px; }
+  .btn-sm { padding: 5px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 500; cursor: pointer; border: none; font-family: inherit; background: var(--accent); color: #fff; }
+
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+  .stat-card { background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+  .stat-label { font-size: 0.65rem; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+  .stat-value { font-size: 1.25rem; font-weight: 700; }
+  .stat-change { font-size: 0.65rem; color: var(--success); margin-top: 2px; }
+
+  .content-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .content-card { background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; transition: border-color 0.2s; }
+  .content-card:hover { border-color: var(--text-tertiary); }
+  .content-thumb { height: 70px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; }
+  .content-thumb.img { background: linear-gradient(135deg, #251a15, #3d2a1e); }
+  .content-thumb.vid { background: linear-gradient(135deg, #15200f, #253518); }
+  .content-thumb.url { background: linear-gradient(135deg, #1a1520, #2a2035); }
+  .content-info { padding: 8px 10px; }
+  .content-name { font-size: 0.75rem; font-weight: 500; }
+  .content-meta { font-size: 0.65rem; color: var(--text-tertiary); margin-top: 2px; display: flex; justify-content: space-between; }
+
+  .section-label { text-align: center; padding: 3rem 2rem 1rem; border-top: 1px solid var(--border); }
+  .section-label h2 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent); font-weight: 600; }
+  .section-label p { font-size: 0.85rem; color: var(--text-tertiary); margin-top: 0.25rem; }
+  .showcase { max-width: 900px; margin: 0 auto; padding: 2rem; }
+  .showcase-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem; }
+  .showcase-card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; }
+  .showcase-card h3 { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary); margin-bottom: 1rem; }
+
+  .btn-row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+  .btn-s { padding: 5px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 500; cursor: pointer; border: none; font-family: inherit; transition: all 0.15s; }
+  .btn-s.filled { background: var(--accent); color: #fff; }
+  .btn-s.filled:hover { box-shadow: 0 0 16px var(--accent-glow); }
+  .btn-s.outline { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); }
+  .btn-s.ghost { background: transparent; color: var(--accent); border: none; }
+  .btn-s.danger { background: transparent; border: 1px solid rgba(239,68,68,0.3); color: var(--error); }
+
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px; border-radius: 999px; font-size: 0.7rem; font-weight: 500; }
+  .badge .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .badge.online { background: rgba(34,197,94,0.15); color: var(--success); }
+  .badge.online .dot { background: var(--success); animation: pulse 2s ease-in-out infinite; }
+  .badge.offline { background: rgba(239,68,68,0.15); color: var(--error); }
+  .badge.offline .dot { background: var(--error); }
+  .badge.warning { background: rgba(234,179,8,0.15); color: var(--warning); }
+  .badge.warning .dot { background: var(--warning); }
+  .badge.info { background: rgba(59,130,246,0.15); color: var(--info); }
+  .badge.info .dot { background: var(--info); }
+
+  .form-group { margin-bottom: 0.75rem; }
+  .form-label { display: block; font-size: 0.75rem; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px; }
+  .form-input { width: 100%; padding: 8px 12px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.8rem; font-family: inherit; outline: none; transition: all 0.15s; }
+  .form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-muted); }
+  .form-input::placeholder { color: var(--text-tertiary); }
+  .form-input.mono { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; }
+
+  .toast { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; display: flex; align-items: center; gap: 10px; font-size: 0.8rem; margin-top: 0.5rem; border-left: 3px solid transparent; }
+  .toast.success { border-left-color: var(--success); }
+  .toast.error { border-left-color: var(--error); }
+  .toast.warning { border-left-color: var(--warning); }
+  .toast-text { color: var(--text-secondary); }
+  .toast-text strong { color: var(--text-primary); }
+
+  table.data-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+  .data-table th { text-align: left; padding: 8px 12px; font-size: 0.7rem; font-weight: 500; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--border); }
+  .data-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--text-secondary); }
+  .data-table tr:hover td { background: var(--bg-tertiary); color: var(--text-primary); }
+  .data-table .mono { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--text-tertiary); }
+  .data-table .name { color: var(--text-primary); font-weight: 500; }
+
+  .device-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; margin-top: 1rem; }
+  .device-card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 14px; transition: border-color 0.2s; }
+  .device-card:hover { border-color: var(--text-tertiary); }
+  .device-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .device-name { font-size: 0.85rem; font-weight: 600; }
+  .device-location { font-size: 0.7rem; color: var(--text-tertiary); margin-bottom: 8px; }
+  .device-bottom { display: flex; justify-content: space-between; align-items: center; }
+  .device-content { font-size: 0.7rem; color: var(--text-secondary); }
+  .device-time { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--text-tertiary); }
+
+  .footer { border-top: 1px solid var(--border); padding: 2rem; text-align: center; font-size: 0.75rem; color: var(--text-tertiary); margin-top: 4rem; }
+  .variant-banner { background: var(--accent-muted); border-bottom: 1px solid var(--border); padding: 8px 2rem; font-size: 0.72rem; color: var(--accent); text-align: center; font-weight: 600; }
+
+  @media (max-width: 768px) { .hero h1 { font-size: 2.2rem; } .showcase-grid { grid-template-columns: 1fr; } .stats-row { grid-template-columns: repeat(2, 1fr); } .mockup-sidebar { display: none; } .device-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="variant-banner">Precision Dark — Warm Charcoal — Background: #141210 / #1C1A17 / #252220</div>
+<nav class="nav"><div class="nav-logo">vizora<span>.</span></div><ul class="nav-links"><li><a href="#">Features</a></li><li><a href="#">How It Works</a></li><li><a href="#">Pricing</a></li></ul><div class="nav-actions"><button class="btn-ghost">Login</button><button class="btn-primary">Get Started</button></div></nav>
+<section class="hero">
+  <div class="hero-badge"><span class="dot"></span> Now in public beta</div>
+  <h1>Your content.<br><span class="gradient-text">Every screen.</span></h1>
+  <p>The modern digital signage platform. Manage, schedule, and push content to any display — from one precise dashboard.</p>
+  <div class="hero-actions"><button class="btn-primary">Start Free &rarr;</button><button class="btn-ghost">See How It Works</button></div>
+  <div class="dashboard-mockup"><div class="mockup-topbar"><div class="mockup-dot"></div><div class="mockup-dot"></div><div class="mockup-dot"></div></div><div class="mockup-body"><div class="mockup-sidebar"><div class="sidebar-item active"><div class="sidebar-icon"></div> Dashboard</div><div class="sidebar-item"><div class="sidebar-icon"></div> Displays</div><div class="sidebar-item"><div class="sidebar-icon"></div> Content</div><div class="sidebar-item"><div class="sidebar-icon"></div> Playlists</div><div class="sidebar-item"><div class="sidebar-icon"></div> Schedules</div><div class="sidebar-item"><div class="sidebar-icon"></div> Analytics</div></div><div class="mockup-main"><div class="mockup-header"><div><div class="mockup-title">Dashboard</div><div class="mockup-subtitle">Welcome back, Alex</div></div><button class="btn-sm">+ New Content</button></div><div class="stats-row"><div class="stat-card"><div class="stat-label">Displays</div><div class="stat-value">24</div><div class="stat-change">+3 this week</div></div><div class="stat-card"><div class="stat-label">Content</div><div class="stat-value">148</div><div class="stat-change">+12 today</div></div><div class="stat-card"><div class="stat-label">Uptime</div><div class="stat-value">99.8%</div><div class="stat-change">All healthy</div></div><div class="stat-card"><div class="stat-label">Storage</div><div class="stat-value">2.4 GB</div><div class="stat-change">48% used</div></div></div><div class="content-grid"><div class="content-card"><div class="content-thumb img">&#x1F3A8;</div><div class="content-info"><div class="content-name">Holiday Campaign</div><div class="content-meta"><span>Image</span><span>2h ago</span></div></div></div><div class="content-card"><div class="content-thumb vid">&#x1F3AC;</div><div class="content-info"><div class="content-name">Product Demo</div><div class="content-meta"><span>Video</span><span>1d ago</span></div></div></div><div class="content-card"><div class="content-thumb url">&#x1F310;</div><div class="content-info"><div class="content-name">Live Dashboard</div><div class="content-meta"><span>URL</span><span>3d ago</span></div></div></div></div></div></div></div>
+</section>
+<div class="section-label"><h2>Components</h2><p>Buttons, badges, forms, tables, device cards, toasts</p></div>
+<div class="showcase">
+  <div class="showcase-grid">
+    <div class="showcase-card"><h3>Buttons</h3><div class="btn-row"><button class="btn-s filled">Primary</button><button class="btn-s outline">Secondary</button><button class="btn-s ghost">Text Link</button><button class="btn-s danger">Delete</button></div></div>
+    <div class="showcase-card"><h3>Status Badges</h3><div class="btn-row"><span class="badge online"><span class="dot"></span> Online</span><span class="badge offline"><span class="dot"></span> Offline</span><span class="badge warning"><span class="dot"></span> Expiring</span><span class="badge info"><span class="dot"></span> Syncing</span></div></div>
+    <div class="showcase-card"><h3>Form Inputs</h3><div class="form-group"><label class="form-label">Display Name</label><input class="form-input" type="text" placeholder="e.g. Lobby Screen #1" /></div><div class="form-group"><label class="form-label">Device ID</label><input class="form-input mono" type="text" value="dsp_7xk29mf04q" readonly /></div></div>
+    <div class="showcase-card"><h3>Notifications</h3><div class="toast success"><span>&#10003;</span><span class="toast-text"><strong>Content published</strong> to 12 displays</span></div><div class="toast error"><span>&#10007;</span><span class="toast-text"><strong>Display offline</strong> — Lobby East</span></div><div class="toast warning"><span>&#9888;</span><span class="toast-text"><strong>Schedule conflict</strong> on 2 devices</span></div></div>
+  </div>
+  <div class="showcase-card" style="margin-top:1.5rem;"><h3>Device Fleet Table</h3><table class="data-table"><thead><tr><th>Display</th><th>Status</th><th>Content</th><th>Location</th><th>Last Seen</th></tr></thead><tbody><tr><td class="name">Lobby Main</td><td><span class="badge online"><span class="dot"></span> Online</span></td><td>Holiday Campaign</td><td>HQ — Floor 1</td><td class="mono">2m ago</td></tr><tr><td class="name">Cafeteria Menu</td><td><span class="badge online"><span class="dot"></span> Online</span></td><td>Daily Specials</td><td>HQ — Floor 2</td><td class="mono">1m ago</td></tr><tr><td class="name">Store Window</td><td><span class="badge offline"><span class="dot"></span> Offline</span></td><td>Summer Sale</td><td>Retail — Downtown</td><td class="mono">3h ago</td></tr><tr><td class="name">Meeting Room A</td><td><span class="badge online"><span class="dot"></span> Online</span></td><td>Room Schedule</td><td>HQ — Floor 3</td><td class="mono">30s ago</td></tr></tbody></table></div>
+  <div class="showcase-card" style="margin-top:1.5rem;"><h3>Device Cards</h3><div class="device-grid"><div class="device-card"><div class="device-top"><span class="device-name">Lobby Main</span><span class="badge online"><span class="dot"></span> Online</span></div><div class="device-location">HQ Building — Floor 1, Entrance</div><div class="device-bottom"><span class="device-content">&#x25B6; Holiday Campaign</span><span class="device-time">30s ago</span></div></div><div class="device-card"><div class="device-top"><span class="device-name">Store Window</span><span class="badge offline"><span class="dot"></span> Offline</span></div><div class="device-location">Retail — Downtown Branch</div><div class="device-bottom"><span class="device-content">&#x25B6; Summer Sale</span><span class="device-time">3h ago</span></div></div></div></div>
+</div>
+<div class="footer">Precision Dark — Warm Charcoal (#141210) — Vizora Brand Exploration</div>
+</body>
+</html>

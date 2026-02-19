@@ -25,6 +25,10 @@ import { APP_GUARD } from '@nestjs/core';
           secret,
           signOptions: {
             expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+            algorithm: 'HS256' as const,
+          },
+          verifyOptions: {
+            algorithms: ['HS256' as const],
           },
         };
       },

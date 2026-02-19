@@ -40,9 +40,7 @@ export default function RootLayout({
           <ThemeProvider>
             <CustomizationProvider>
               <CommandPaletteWrapper />
-              <main id="main-content">
-                {children}
-              </main>
+              {children}
             </CustomizationProvider>
           </ThemeProvider>
         </ErrorBoundary>

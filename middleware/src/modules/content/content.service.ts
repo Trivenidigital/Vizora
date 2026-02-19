@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Prisma } from '@vizora/database';
 import { DatabaseService } from '../database/database.service';
 import { CreateContentDto } from './dto/create-content.dto';
 import { UpdateContentDto } from './dto/update-content.dto';
@@ -9,6 +10,13 @@ import { BulkUpdateDto, BulkArchiveDto, BulkRestoreDto, BulkDeleteDto, BulkTagDt
 import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { TemplateRenderingService } from './template-rendering.service';
+import { CreateLayoutDto } from './dto/create-layout.dto';
+import { CreateWidgetDto } from './dto/create-widget.dto';
+import { LAYOUT_PRESETS } from './layout-presets';
+import { DataSourceRegistryService } from './data-source-registry.service';
+import type { WidgetDataSource } from './widget-data-sources';
+import * as fs from 'fs';
+import * as path from 'path';
 
 /**
  * Interface for template metadata stored in Content.metadata
@@ -34,6 +42,20 @@ export interface TemplateMetadata {
   renderedAt?: string;
 }
 
+/**
+ * Interface for widget metadata stored in Content.metadata
+ */
+export interface WidgetMetadata {
+  isWidget: true;
+  widgetType: string;
+  widgetConfig: Record<string, any>;
+  templateName: string;
+  templateHtml: string;
+  renderedHtml?: string;
+  renderedAt?: string;
+  lastError?: string;
+}
+
 @Injectable()
 export class ContentService {
   private readonly logger = new Logger(ContentService.name);
@@ -41,6 +63,7 @@ export class ContentService {
   constructor(
     private readonly db: DatabaseService,
     private readonly templateRendering: TemplateRenderingService,
+    private readonly dataSourceRegistry: DataSourceRegistryService,
   ) {}
 
   // Map database content to API response format
@@ -72,7 +95,7 @@ export class ContentService {
     const skip = (page - 1) * limit;
 
     // Validate filter values - only allow whitelisted values
-    const validTypes = ['image', 'video', 'url', 'html', 'pdf', 'template'];
+    const validTypes = ['image', 'video', 'url', 'html', 'pdf', 'template', 'layout', 'widget'];
     const validStatuses = ['active', 'archived', 'draft'];
     const validOrientations = ['landscape', 'portrait', 'both'];
 
@@ -580,7 +603,7 @@ export class ContentService {
         type: 'template',
         url: '', // Templates don't have a URL
         duration: dto.duration || 30,
-        metadata: metadata as any,
+        metadata: metadata as Prisma.InputJsonValue,
         organizationId,
       },
     });
@@ -657,7 +680,7 @@ export class ContentService {
         name: dto.name,
         description: dto.description,
         duration: dto.duration,
-        metadata: metadata as any,
+        metadata: metadata as Prisma.InputJsonValue,
       },
     });
 
@@ -752,7 +775,7 @@ export class ContentService {
       const updated = await this.db.content.update({
         where: { id },
         data: {
-          metadata: updatedMetadata as any,
+          metadata: updatedMetadata as Prisma.InputJsonValue,
         },
       });
 
@@ -772,7 +795,7 @@ export class ContentService {
       await this.db.content.update({
         where: { id },
         data: {
-          metadata: updatedMetadata as any,
+          metadata: updatedMetadata as Prisma.InputJsonValue,
         },
       });
 
@@ -785,5 +808,393 @@ export class ContentService {
    */
   validateTemplateHtml(templateHtml: string) {
     return this.templateRendering.validateTemplate(templateHtml);
+  }
+
+  // ============================================================================
+  // MULTI-ZONE LAYOUTS
+  // ============================================================================
+
+  /**
+   * Get all available layout presets
+   */
+  getLayoutPresets() {
+    return LAYOUT_PRESETS;
+  }
+
+  /**
+   * Create a new multi-zone layout
+   */
+  async createLayout(organizationId: string, dto: CreateLayoutDto) {
+    const metadata = {
+      layoutType: dto.layoutType,
+      zones: dto.zones,
+      gridTemplate: dto.gridTemplate || this.getGridTemplateForType(dto.layoutType),
+      gap: dto.gap ?? 0,
+      backgroundColor: dto.backgroundColor || '#000000',
+    };
+
+    const content = await this.db.content.create({
+      data: {
+        name: dto.name,
+        description: dto.description,
+        type: 'layout',
+        url: '',
+        metadata: metadata as Prisma.InputJsonValue,
+        organizationId,
+      },
+    });
+
+    return this.mapContentResponse(content);
+  }
+
+  /**
+   * Update an existing layout
+   */
+  async updateLayout(organizationId: string, id: string, dto: Partial<CreateLayoutDto>) {
+    const existing = await this.findOne(organizationId, id);
+
+    if (existing.type !== 'layout') {
+      throw new BadRequestException('Content is not a layout');
+    }
+
+    const existingMetadata = (existing.metadata as Record<string, any>) || {};
+
+    const metadata = {
+      layoutType: dto.layoutType || existingMetadata.layoutType,
+      zones: dto.zones || existingMetadata.zones,
+      gridTemplate: dto.gridTemplate || existingMetadata.gridTemplate,
+      gap: dto.gap ?? existingMetadata.gap ?? 0,
+      backgroundColor: dto.backgroundColor || existingMetadata.backgroundColor || '#000000',
+    };
+
+    const content = await this.db.content.update({
+      where: { id },
+      data: {
+        name: dto.name,
+        description: dto.description,
+        metadata: metadata as Prisma.InputJsonValue,
+      },
+    });
+
+    return this.mapContentResponse(content);
+  }
+
+  /**
+   * Get a layout with all zone content fully resolved
+   * Fetches playlist items and content for each zone
+   */
+  async getResolvedLayout(organizationId: string, id: string) {
+    const layout = await this.findOne(organizationId, id);
+
+    if (layout.type !== 'layout') {
+      throw new BadRequestException('Content is not a layout');
+    }
+
+    const metadata = (layout.metadata as Record<string, any>) || {};
+    const zones = metadata.zones || [];
+
+    // Batch-fetch all playlist and content IDs to avoid N+1 queries
+    const playlistIds = zones.filter((z: any) => z.playlistId).map((z: any) => z.playlistId);
+    const contentIds = zones.filter((z: any) => z.contentId).map((z: any) => z.contentId);
+
+    const [playlists, contents] = await Promise.all([
+      playlistIds.length > 0
+        ? this.db.playlist.findMany({
+            where: { id: { in: playlistIds }, organizationId },
+            include: {
+              items: {
+                include: { content: true },
+                orderBy: { order: 'asc' },
+              },
+            },
+          })
+        : Promise.resolve([]),
+      contentIds.length > 0
+        ? this.db.content.findMany({
+            where: { id: { in: contentIds }, organizationId },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const playlistMap = new Map(playlists.map((p: any) => [p.id, p]));
+    const contentMap = new Map(contents.map((c: any) => [c.id, c]));
+
+    // Resolve content for each zone using pre-fetched data
+    const resolvedZones = zones.map((zone: any) => {
+      const resolved: any = { ...zone };
+
+      if (zone.playlistId) {
+        const playlist = playlistMap.get(zone.playlistId);
+        if (playlist) {
+          resolved.playlist = {
+            id: playlist.id,
+            name: playlist.name,
+            items: playlist.items.map((item: any) => ({
+              id: item.id,
+              contentId: item.contentId,
+              duration: item.duration || 10,
+              order: item.order,
+              content: item.content ? this.mapContentResponse(item.content) : null,
+            })),
+          };
+        }
+      }
+
+      if (zone.contentId) {
+        const content = contentMap.get(zone.contentId);
+        if (content) {
+          resolved.content = this.mapContentResponse(content);
+        }
+      }
+
+      return resolved;
+    });
+
+    return {
+      ...this.mapContentResponse(layout),
+      metadata: {
+        ...metadata,
+        zones: resolvedZones,
+      },
+    };
+  }
+
+  /**
+   * Get default grid template for a layout type
+   */
+  private getGridTemplateForType(layoutType: string): { columns: string; rows: string } {
+    const preset = LAYOUT_PRESETS.find(p => p.layoutType === layoutType);
+    if (preset) {
+      return preset.gridTemplate;
+    }
+    // Default for custom layouts
+    return { columns: '1fr', rows: '1fr' };
+  }
+
+  // ============================================================================
+  // WIDGETS
+  // ============================================================================
+
+  /**
+   * Return all available widget types with their config schemas and sample data.
+   */
+  getWidgetTypes() {
+    const types: Array<{
+      type: string;
+      configSchema: Record<string, any>;
+      sampleData: Record<string, any>;
+      defaultTemplate: string;
+    }> = [];
+
+    for (const [, source] of this.dataSourceRegistry.getAll()) {
+      types.push({
+        type: source.type,
+        configSchema: source.getConfigSchema(),
+        sampleData: source.getSampleData(),
+        defaultTemplate: source.getDefaultTemplate(),
+      });
+    }
+
+    return types;
+  }
+
+  /**
+   * Create a widget as a Content record with type='template' and widget metadata.
+   */
+  async createWidget(organizationId: string, dto: CreateWidgetDto) {
+    let source: WidgetDataSource;
+    try {
+      source = this.dataSourceRegistry.get(dto.widgetType);
+    } catch {
+      throw new BadRequestException(`Unknown widget type: ${dto.widgetType}`);
+    }
+
+    // Load the default Handlebars template from disk
+    const templateName = source.getDefaultTemplate();
+    const templateHtml = this.loadWidgetTemplate(templateName);
+
+    // Fetch initial data from the data source (falls back to sample data on failure)
+    let data: Record<string, any>;
+    try {
+      data = await source.fetchData(dto.widgetConfig);
+    } catch (error) {
+      this.logger.warn(`Widget initial data fetch failed, using sample data: ${error}`);
+      data = source.getSampleData();
+    }
+
+    // Render the template with data
+    let renderedHtml = '';
+    try {
+      renderedHtml = this.templateRendering.renderTemplate(templateHtml, data);
+    } catch (error) {
+      this.logger.warn(`Widget initial render failed: ${error}`);
+    }
+
+    const widgetMeta: WidgetMetadata = {
+      isWidget: true,
+      widgetType: dto.widgetType,
+      widgetConfig: dto.widgetConfig,
+      templateName,
+      templateHtml,
+      renderedHtml,
+      renderedAt: new Date().toISOString(),
+    };
+
+    const content = await this.db.content.create({
+      data: {
+        name: dto.name,
+        description: dto.description,
+        type: 'template',
+        url: '',
+        duration: dto.duration || 30,
+        metadata: widgetMeta as Prisma.InputJsonValue,
+        organizationId,
+      },
+    });
+
+    return this.mapContentResponse(content);
+  }
+
+  /**
+   * Update widget configuration and re-render.
+   */
+  async updateWidget(organizationId: string, id: string, dto: Partial<CreateWidgetDto>) {
+    const existing = await this.findOne(organizationId, id);
+
+    const existingMeta = (existing.metadata || {}) as Record<string, any>;
+    if (!existingMeta.isWidget) {
+      throw new BadRequestException('Content is not a widget');
+    }
+
+    const widgetType = dto.widgetType || existingMeta.widgetType;
+    const widgetConfig = dto.widgetConfig || existingMeta.widgetConfig;
+
+    let source: WidgetDataSource;
+    try {
+      source = this.dataSourceRegistry.get(widgetType);
+    } catch {
+      throw new BadRequestException(`Unknown widget type: ${widgetType}`);
+    }
+
+    // If the widget type changed, load the new default template
+    let templateName = existingMeta.templateName;
+    let templateHtml = existingMeta.templateHtml;
+    if (dto.widgetType && dto.widgetType !== existingMeta.widgetType) {
+      templateName = source.getDefaultTemplate();
+      templateHtml = this.loadWidgetTemplate(templateName);
+    }
+
+    // Re-fetch data and re-render
+    let data: Record<string, any>;
+    let renderedHtml = existingMeta.renderedHtml || '';
+    let lastError: string | undefined;
+
+    try {
+      data = await source.fetchData(widgetConfig);
+      renderedHtml = this.templateRendering.renderTemplate(templateHtml, data);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Widget re-render failed: ${message}`);
+      lastError = message;
+    }
+
+    const widgetMeta: WidgetMetadata = {
+      isWidget: true,
+      widgetType,
+      widgetConfig,
+      templateName,
+      templateHtml,
+      renderedHtml,
+      renderedAt: new Date().toISOString(),
+      lastError,
+    };
+
+    const content = await this.db.content.update({
+      where: { id },
+      data: {
+        name: dto.name ?? existing.name,
+        description: dto.description ?? existing.description,
+        duration: dto.duration ?? existing.duration,
+        metadata: widgetMeta as Prisma.InputJsonValue,
+      },
+    });
+
+    return this.mapContentResponse(content);
+  }
+
+  /**
+   * Force refresh a widget: re-fetch data from the data source and re-render.
+   */
+  async refreshWidget(organizationId: string, id: string) {
+    const existing = await this.findOne(organizationId, id);
+
+    const existingMeta = (existing.metadata || {}) as Record<string, any>;
+    if (!existingMeta.isWidget) {
+      throw new BadRequestException('Content is not a widget');
+    }
+
+    let source: WidgetDataSource;
+    try {
+      source = this.dataSourceRegistry.get(existingMeta.widgetType);
+    } catch {
+      throw new BadRequestException(`Unknown widget type: ${existingMeta.widgetType}`);
+    }
+
+    const templateHtml = existingMeta.templateHtml;
+
+    try {
+      const data = await source.fetchData(existingMeta.widgetConfig);
+      const renderedHtml = this.templateRendering.renderTemplate(templateHtml, data);
+
+      const widgetMeta: WidgetMetadata = {
+        ...existingMeta as WidgetMetadata,
+        renderedHtml,
+        renderedAt: new Date().toISOString(),
+        lastError: undefined,
+      };
+
+      const content = await this.db.content.update({
+        where: { id },
+        data: {
+          metadata: widgetMeta as Prisma.InputJsonValue,
+        },
+      });
+
+      return this.mapContentResponse(content);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+
+      const widgetMeta = {
+        ...existingMeta,
+        lastError: message,
+      };
+
+      await this.db.content.update({
+        where: { id },
+        data: {
+          metadata: widgetMeta as Prisma.InputJsonValue,
+        },
+      });
+
+      throw new BadRequestException(`Widget refresh failed: ${message}`);
+    }
+  }
+
+  /**
+   * Load a Handlebars template file from the widget-templates directory.
+   */
+  private loadWidgetTemplate(templateName: string): string {
+    const templatePath = path.join(
+      __dirname,
+      'widget-templates',
+      `${templateName}.hbs`,
+    );
+
+    try {
+      return fs.readFileSync(templatePath, 'utf-8');
+    } catch (error) {
+      this.logger.error(`Failed to load widget template "${templateName}": ${error}`);
+      throw new BadRequestException(`Widget template "${templateName}" not found`);
+    }
   }
 }

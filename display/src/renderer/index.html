@@ -3,7 +3,6 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: http://localhost:3000 http://127.0.0.1:3000; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:3000 http://127.0.0.1:3000 ws://localhost:3002 ws://127.0.0.1:3002; media-src 'self' http://localhost:3000 http://127.0.0.1:3000; frame-src 'self' http: https:;" />
     <title>Vizora Display Client</title>
     <style>
       * {
@@ -165,6 +164,71 @@
         font-size: 24px;
         color: #999;
       }
+      /* QR Code Overlay */
+      #qr-overlay {
+        position: fixed;
+        z-index: 100;
+        padding: 8px;
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        pointer-events: none;
+      }
+
+      #qr-overlay.top-left { top: 16px; left: 16px; }
+      #qr-overlay.top-right { top: 16px; right: 16px; }
+      #qr-overlay.bottom-left { bottom: 16px; left: 16px; }
+      #qr-overlay.bottom-right { bottom: 16px; right: 16px; }
+
+      #qr-overlay canvas,
+      #qr-overlay img {
+        display: block;
+      }
+
+      #qr-overlay .qr-label {
+        font-size: 10px;
+        color: #333;
+        text-align: center;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      /* Multi-Zone Layout */
+      .layout-grid {
+        width: 100%;
+        height: 100%;
+        display: grid;
+        overflow: hidden;
+      }
+
+      .layout-zone {
+        position: relative;
+        overflow: hidden;
+      }
+
+      .layout-zone .content-item {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        opacity: 1;
+      }
+
+      .layout-zone .content-item img,
+      .layout-zone .content-item video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .layout-zone .content-item iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+      }
     </style>
   </head>
   <body>
@@ -192,6 +256,8 @@
       <!-- Content Screen -->
       <div id="content-screen" class="hidden">
         <div id="content-container"></div>
+        <!-- QR Code Overlay -->
+        <div id="qr-overlay" class="hidden"></div>
       </div>
 
       <!-- Error Screen -->

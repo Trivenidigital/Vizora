@@ -9,6 +9,7 @@ const createJestConfig = nextJest({
 const customJestConfig = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   testEnvironment: 'jest-environment-jsdom',
+  maxWorkers: '50%',
   moduleNameMapper: {
     // Handle module aliases
     '^@/(.*)$': '<rootDir>/src/$1',

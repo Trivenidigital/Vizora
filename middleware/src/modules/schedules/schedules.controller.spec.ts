@@ -55,8 +55,8 @@ describe('SchedulesController', () => {
       name: 'Morning Schedule',
       playlistId: 'playlist-123',
       displayId: 'display-123',
-      startTime: '09:00',
-      endTime: '17:00',
+      startTime: 540,   // 09:00
+      endTime: 1020,    // 17:00
       daysOfWeek: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
     };
 
@@ -269,8 +269,8 @@ describe('SchedulesController', () => {
       const checkConflictsDto = {
         displayId: 'display-123',
         daysOfWeek: [1, 2, 3],
-        startTime: '09:00',
-        endTime: '10:00',
+        startTime: 540,   // 09:00
+        endTime: 600,     // 10:00
       };
       const expectedResult = {
         hasConflicts: false,
@@ -291,8 +291,8 @@ describe('SchedulesController', () => {
       const checkConflictsDto = {
         displayId: 'display-123',
         daysOfWeek: [1, 2],
-        startTime: '09:00',
-        endTime: '10:00',
+        startTime: 540,   // 09:00
+        endTime: 600,     // 10:00
       };
       const expectedResult = {
         hasConflicts: true,
@@ -300,8 +300,8 @@ describe('SchedulesController', () => {
           {
             id: 'schedule-1',
             name: 'Existing Schedule',
-            startTime: '09:30',
-            endTime: '10:30',
+            startTime: 570,   // 09:30
+            endTime: 630,     // 10:30
             daysOfWeek: [1, 2],
             playlist: { id: 'p-1', name: 'Playlist 1' },
             display: { id: 'display-123', nickname: 'Display 1' },

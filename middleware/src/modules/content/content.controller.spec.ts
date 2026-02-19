@@ -182,7 +182,6 @@ describe('ContentController', () => {
     it('should upload file successfully', async () => {
       const result = await controller.uploadFile(organizationId, mockFile);
 
-      expect(result).toHaveProperty('success', true);
       expect(result).toHaveProperty('content');
       expect(result).toHaveProperty('fileHash', 'abc123hash');
     });
@@ -283,7 +282,7 @@ describe('ContentController', () => {
       expect(mockContentService.findAll).toHaveBeenCalledWith(
         organizationId,
         pagination,
-        { type: undefined, status: undefined },
+        { type: undefined, status: undefined, templateOrientation: undefined },
       );
     });
 
@@ -295,7 +294,7 @@ describe('ContentController', () => {
       expect(mockContentService.findAll).toHaveBeenCalledWith(
         organizationId,
         pagination,
-        { type: 'image', status: 'active' },
+        { type: 'image', status: 'active', templateOrientation: undefined },
       );
     });
   });
@@ -382,119 +381,6 @@ describe('ContentController', () => {
   });
 
   // ============================================================================
-  // CONTENT TEMPLATES
-  // ============================================================================
-
-  describe('createTemplate', () => {
-    const createTemplateDto = {
-      name: 'Menu Board',
-      templateHtml: '<h1>{{title}}</h1>',
-      dataSource: {
-        type: 'manual',
-        manualData: { title: 'Test' },
-      },
-      refreshConfig: {
-        enabled: true,
-        intervalMinutes: 15,
-      },
-    };
-
-    it('should create template successfully', async () => {
-      const expectedTemplate = { id: 'template-123', ...createTemplateDto, type: 'template' };
-      mockContentService.createTemplate.mockResolvedValue(expectedTemplate as any);
-
-      const result = await controller.createTemplate(organizationId, createTemplateDto as any);
-
-      expect(result).toEqual(expectedTemplate);
-      expect(mockContentService.createTemplate).toHaveBeenCalledWith(organizationId, createTemplateDto);
-    });
-  });
-
-  describe('updateTemplate', () => {
-    const updateTemplateDto = {
-      name: 'Updated Menu Board',
-      templateHtml: '<h2>{{title}}</h2>',
-    };
-
-    it('should update template successfully', async () => {
-      const expectedTemplate = { id: 'template-123', ...updateTemplateDto, type: 'template' };
-      mockContentService.updateTemplate.mockResolvedValue(expectedTemplate as any);
-
-      const result = await controller.updateTemplate(organizationId, 'template-123', updateTemplateDto as any);
-
-      expect(result).toEqual(expectedTemplate);
-      expect(mockContentService.updateTemplate).toHaveBeenCalledWith(
-        organizationId,
-        'template-123',
-        updateTemplateDto,
-      );
-    });
-  });
-
-  describe('previewTemplate', () => {
-    const previewDto = {
-      templateHtml: '<h1>{{title}}</h1>',
-      sampleData: { title: 'Preview' },
-    };
-
-    it('should preview template successfully', async () => {
-      const expectedResult = { html: '<h1>Preview</h1>' };
-      mockContentService.previewTemplate.mockResolvedValue(expectedResult);
-
-      const result = await controller.previewTemplate(previewDto as any);
-
-      expect(result).toEqual(expectedResult);
-      expect(mockContentService.previewTemplate).toHaveBeenCalledWith(previewDto);
-    });
-  });
-
-  describe('validateTemplate', () => {
-    it('should validate template HTML', async () => {
-      const expectedResult = { valid: true, errors: [] };
-      mockContentService.validateTemplateHtml.mockReturnValue(expectedResult);
-
-      const result = await controller.validateTemplate({ templateHtml: '<h1>Test</h1>' });
-
-      expect(result).toEqual(expectedResult);
-      expect(mockContentService.validateTemplateHtml).toHaveBeenCalledWith('<h1>Test</h1>');
-    });
-
-    it('should return validation errors', async () => {
-      const expectedResult = { valid: false, errors: ['Forbidden tag found: <script>'] };
-      mockContentService.validateTemplateHtml.mockReturnValue(expectedResult);
-
-      const result = await controller.validateTemplate({ templateHtml: '<script>alert(1)</script>' });
-
-      expect(result.valid).toBe(false);
-      expect(result.errors).toContain('Forbidden tag found: <script>');
-    });
-  });
-
-  describe('getRenderedTemplate', () => {
-    it('should get rendered HTML for template', async () => {
-      const expectedResult = { html: '<h1>Rendered</h1>', renderedAt: '2024-01-15T00:00:00Z' };
-      mockContentService.getRenderedTemplate.mockResolvedValue(expectedResult);
-
-      const result = await controller.getRenderedTemplate(organizationId, 'template-123');
-
-      expect(result).toEqual(expectedResult);
-      expect(mockContentService.getRenderedTemplate).toHaveBeenCalledWith(organizationId, 'template-123');
-    });
-  });
-
-  describe('refreshTemplate', () => {
-    it('should manually refresh template', async () => {
-      const expectedResult = { id: 'template-123', metadata: { renderedHtml: '<h1>Refreshed</h1>' } };
-      mockContentService.triggerTemplateRefresh.mockResolvedValue(expectedResult as any);
-
-      const result = await controller.refreshTemplate(organizationId, 'template-123');
-
-      expect(result).toEqual(expectedResult);
-      expect(mockContentService.triggerTemplateRefresh).toHaveBeenCalledWith(organizationId, 'template-123');
-    });
-  });
-
-  // ============================================================================
   // FILE REPLACEMENT
   // ============================================================================
 
@@ -542,7 +428,6 @@ describe('ContentController', () => {
         { keepBackup: true },
       );
 
-      expect(result.success).toBe(true);
       expect(result.content).toBeDefined();
       expect(result.fileHash).toBe('newHash123');
     });
@@ -690,123 +575,4 @@ describe('ContentController', () => {
     });
   });
 
-  // ============================================================================
-  // BULK OPERATIONS
-  // ============================================================================
-
-  describe('bulkUpdate', () => {
-    it('should update multiple content items', async () => {
-      const expectedResult = { updated: 3 };
-      mockContentService.bulkUpdate.mockResolvedValue(expectedResult);
-
-      const dto = {
-        ids: ['id-1', 'id-2', 'id-3'],
-        duration: 30,
-        description: 'Updated',
-      };
-      const result = await controller.bulkUpdate(organizationId, dto as any);
-
-      expect(result).toEqual(expectedResult);
-      expect(mockContentService.bulkUpdate).toHaveBeenCalledWith(organizationId, dto);
-    });
-  });
-
-  describe('bulkArchive', () => {
-    it('should archive multiple content items', async () => {
-      const expectedResult = { archived: 3 };
-      mockContentService.bulkArchive.mockResolvedValue(expectedResult);
-
-      const dto = { ids: ['id-1', 'id-2', 'id-3'] };
-      const result = await controller.bulkArchive(organizationId, dto as any);
-
-      expect(result).toEqual(expectedResult);
-      expect(mockContentService.bulkArchive).toHaveBeenCalledWith(organizationId, dto);
-    });
-  });
-
-  describe('bulkRestore', () => {
-    it('should restore multiple content items', async () => {
-      const expectedResult = { restored: 2 };
-      mockContentService.bulkRestore.mockResolvedValue(expectedResult);
-
-      const dto = { ids: ['id-1', 'id-2'] };
-      const result = await controller.bulkRestore(organizationId, dto as any);
-
-      expect(result).toEqual(expectedResult);
-      expect(mockContentService.bulkRestore).toHaveBeenCalledWith(organizationId, dto);
-    });
-  });
-
-  describe('bulkDelete', () => {
-    it('should delete multiple content items', async () => {
-      const expectedResult = { deleted: 3 };
-      mockContentService.bulkDelete.mockResolvedValue(expectedResult);
-
-      const dto = { ids: ['id-1', 'id-2', 'id-3'] };
-      const result = await controller.bulkDelete(organizationId, dto as any);
-
-      expect(result).toEqual(expectedResult);
-      expect(mockContentService.bulkDelete).toHaveBeenCalledWith(organizationId, dto);
-    });
-  });
-
-  describe('bulkAddTags', () => {
-    it('should add tags to multiple content items', async () => {
-      const expectedResult = { added: 4 };
-      mockContentService.bulkAddTags.mockResolvedValue(expectedResult);
-
-      const dto = {
-        contentIds: ['content-1', 'content-2'],
-        tagIds: ['tag-1', 'tag-2'],
-        operation: 'add',
-      };
-      const result = await controller.bulkAddTags(organizationId, dto as any);
-
-      expect(result).toEqual(expectedResult);
-      expect(mockContentService.bulkAddTags).toHaveBeenCalledWith(organizationId, dto);
-    });
-
-    it('should remove tags from multiple content items', async () => {
-      const expectedResult = { removed: 4 };
-      mockContentService.bulkAddTags.mockResolvedValue(expectedResult);
-
-      const dto = {
-        contentIds: ['content-1', 'content-2'],
-        tagIds: ['tag-1', 'tag-2'],
-        operation: 'remove',
-      };
-      const result = await controller.bulkAddTags(organizationId, dto as any);
-
-      expect(result).toEqual(expectedResult);
-      expect(mockContentService.bulkAddTags).toHaveBeenCalledWith(organizationId, dto);
-    });
-
-    it('should replace tags on multiple content items', async () => {
-      const expectedResult = { added: 4 };
-      mockContentService.bulkAddTags.mockResolvedValue(expectedResult);
-
-      const dto = {
-        contentIds: ['content-1', 'content-2'],
-        tagIds: ['tag-1', 'tag-2'],
-        operation: 'replace',
-      };
-      const result = await controller.bulkAddTags(organizationId, dto as any);
-
-      expect(result).toEqual(expectedResult);
-      expect(mockContentService.bulkAddTags).toHaveBeenCalledWith(organizationId, dto);
-    });
-  });
-
-  describe('bulkSetDuration', () => {
-    it('should set duration on multiple content items', async () => {
-      const expectedResult = { updated: 3 };
-      mockContentService.bulkSetDuration.mockResolvedValue(expectedResult);
-
-      const dto = { ids: ['id-1', 'id-2', 'id-3'], duration: 60 };
-      const result = await controller.bulkSetDuration(organizationId, dto as any);
-
-      expect(result).toEqual(expectedResult);
-      expect(mockContentService.bulkSetDuration).toHaveBeenCalledWith(organizationId, dto);
-    });
-  });
 });

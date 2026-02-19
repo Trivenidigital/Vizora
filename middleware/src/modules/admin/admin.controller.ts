@@ -50,6 +50,7 @@ import {
   AuditLogFiltersDto,
   CreateAnnouncementDto,
   UpdateAnnouncementDto,
+  BillingFiltersDto,
 } from './dto';
 
 @Controller('admin')
@@ -233,7 +234,7 @@ export class AdminController {
     @CurrentUser('userId') adminId: string,
     @Req() req: Request,
   ) {
-    const promotion = await this.promotionsService.update(id, dto as any);
+    const promotion = await this.promotionsService.update(id, dto);
 
     await this.adminAuditService.log({
       adminUserId: adminId,
@@ -311,8 +312,8 @@ export class AdminController {
       subscriptionTier: filters.subscriptionTier,
       skip: filters.page ? (filters.page - 1) * (filters.limit || 20) : 0,
       take: filters.limit || 20,
-      sortBy: filters.sortBy as any,
-      sortOrder: filters.sortOrder as any,
+      sortBy: filters.sortBy,
+      sortOrder: filters.sortOrder,
     });
   }
 
@@ -468,8 +469,8 @@ export class AdminController {
       isSuperAdmin: filters.isSuperAdmin,
       skip: filters.page ? (filters.page - 1) * (filters.limit || 20) : 0,
       take: filters.limit || 20,
-      sortBy: filters.sortBy as any,
-      sortOrder: filters.sortOrder as any,
+      sortBy: filters.sortBy,
+      sortOrder: filters.sortOrder,
     });
   }
 
@@ -648,18 +649,18 @@ export class AdminController {
   }
 
   @Get('stats/revenue')
-  async getRevenueStats(@Query('period') period?: string) {
-    return this.platformStatsService.getRevenue(period as any);
+  async getRevenueStats(@Query('period') period?: 'day' | 'week' | 'month' | 'year') {
+    return this.platformStatsService.getRevenue(period);
   }
 
   @Get('stats/signups')
-  async getSignupStats(@Query('period') period?: string) {
-    return this.platformStatsService.getSignups(period as any);
+  async getSignupStats(@Query('period') period?: 'day' | 'week' | 'month' | 'year') {
+    return this.platformStatsService.getSignups(period);
   }
 
   @Get('stats/churn')
-  async getChurnStats(@Query('period') period?: string) {
-    return this.platformStatsService.getChurn(period as any);
+  async getChurnStats(@Query('period') period?: 'day' | 'week' | 'month' | 'year') {
+    return this.platformStatsService.getChurn(period);
   }
 
   @Get('stats/usage')
@@ -682,7 +683,7 @@ export class AdminController {
   // ============================================================================
 
   @Get('billing/transactions')
-  async getBillingTransactions(@Query() filters: { page?: number; limit?: number; status?: string }) {
+  async getBillingTransactions(@Query() filters: BillingFiltersDto) {
     // This would need a dedicated billing service method for admin view
     // For now, return placeholder
     return { data: [], total: 0, message: 'Use billing module for detailed transactions' };
@@ -716,7 +717,7 @@ export class AdminController {
     @Req() req: Request,
   ) {
     const config = await this.systemConfigService.set(key, dto.value, adminId, {
-      dataType: dto.dataType as any,
+      dataType: dto.dataType,
       category: dto.category,
       description: dto.description,
       isSecret: dto.isSecret,
@@ -901,8 +902,8 @@ export class AdminController {
       {
         title: dto.title,
         message: dto.message,
-        type: dto.type as any,
-        targetAudience: dto.targetAudience as any,
+        type: dto.type,
+        targetAudience: dto.targetAudience,
         targetPlans: dto.targetPlans,
         startsAt: new Date(dto.startsAt),
         expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : undefined,
@@ -933,7 +934,7 @@ export class AdminController {
     @CurrentUser('userId') adminId: string,
     @Req() req: Request,
   ) {
-    const announcement = await this.announcementsService.update(id, dto as any);
+    const announcement = await this.announcementsService.update(id, dto);
 
     await this.adminAuditService.log({
       adminUserId: adminId,

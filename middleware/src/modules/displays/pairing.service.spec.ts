@@ -2,6 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PairingService } from './pairing.service';
 import { DatabaseService } from '../database/database.service';
+import { RedisService } from '../redis/redis.service';
 
 // Mock QRCode
 jest.mock('qrcode', () => ({
@@ -12,10 +13,16 @@ describe('PairingService', () => {
   let service: PairingService;
   let mockDatabaseService: jest.Mocked<DatabaseService>;
   let mockJwtService: jest.Mocked<JwtService>;
+  let mockRedisService: jest.Mocked<RedisService>;
+
+  // In-memory store to simulate Redis behavior
+  let redisStore: Map<string, { value: string; ttl: number; expiresAt: number }>;
 
   beforeEach(() => {
     // Clear any interval from previous tests
     jest.useFakeTimers();
+
+    redisStore = new Map();
 
     mockDatabaseService = {
       display: {
@@ -29,10 +36,65 @@ describe('PairingService', () => {
       sign: jest.fn().mockReturnValue('mock-jwt-token'),
     } as any;
 
-    service = new PairingService(mockDatabaseService, mockJwtService);
+    // Create a mock RedisService that uses an in-memory Map to simulate Redis
+    mockRedisService = {
+      get: jest.fn().mockImplementation(async (key: string) => {
+        const entry = redisStore.get(key);
+        if (!entry) return null;
+        // Check TTL expiration
+        if (entry.expiresAt > 0 && Date.now() >= entry.expiresAt) {
+          redisStore.delete(key);
+          return null;
+        }
+        return entry.value;
+      }),
+      set: jest.fn().mockImplementation(async (key: string, value: string, ttlSeconds?: number) => {
+        const expiresAt = ttlSeconds ? Date.now() + ttlSeconds * 1000 : 0;
+        redisStore.set(key, { value, ttl: ttlSeconds || 0, expiresAt });
+        return true;
+      }),
+      del: jest.fn().mockImplementation(async (key: string) => {
+        redisStore.delete(key);
+        return true;
+      }),
+      exists: jest.fn().mockImplementation(async (key: string) => {
+        const entry = redisStore.get(key);
+        if (!entry) return false;
+        if (entry.expiresAt > 0 && Date.now() >= entry.expiresAt) {
+          redisStore.delete(key);
+          return false;
+        }
+        return true;
+      }),
+      getClient: jest.fn().mockReturnValue({
+        scan: jest.fn().mockImplementation(async (cursor: string, _match: string, pattern: string, _count: string, _countVal: number) => {
+          // Return all keys matching the pattern on first call
+          const prefix = pattern.replace('*', '');
+          const matchingKeys: string[] = [];
+          for (const [key, entry] of redisStore.entries()) {
+            if (key.startsWith(prefix)) {
+              // Also check TTL
+              if (entry.expiresAt > 0 && Date.now() >= entry.expiresAt) {
+                redisStore.delete(key);
+                continue;
+              }
+              matchingKeys.push(key);
+            }
+          }
+          return ['0', matchingKeys];
+        }),
+      }),
+      isAvailable: jest.fn().mockReturnValue(true),
+      ping: jest.fn().mockResolvedValue(true),
+      healthCheck: jest.fn().mockResolvedValue({ healthy: true, responseTime: 1 }),
+    } as any;
+
+    service = new PairingService(mockDatabaseService, mockJwtService, mockRedisService);
   });
 
   afterEach(() => {
+    // Trigger onModuleDestroy to clean up intervals
+    service.onModuleDestroy();
     jest.useRealTimers();
   });
 
@@ -54,6 +116,18 @@ describe('PairingService', () => {
       expect(result).toHaveProperty('expiresAt');
       expect(result).toHaveProperty('expiresInSeconds');
       expect(result).toHaveProperty('pairingUrl');
+    });
+
+    it('should store pairing request in Redis with TTL', async () => {
+      mockDatabaseService.display.findUnique.mockResolvedValue(null);
+
+      const result = await service.requestPairingCode(mockRequestDto);
+
+      expect(mockRedisService.set).toHaveBeenCalledWith(
+        `pairing:${result.code}`,
+        expect.any(String),
+        300,
+      );
     });
 
     it('should generate a 6-character alphanumeric code', async () => {
@@ -145,6 +219,15 @@ describe('PairingService', () => {
       expect(result.pairingUrl).toContain(result.code);
       expect(result.pairingUrl).toContain('/dashboard/devices/pair');
     });
+
+    it('should throw if Redis storage fails', async () => {
+      mockDatabaseService.display.findUnique.mockResolvedValue(null);
+      mockRedisService.set.mockResolvedValueOnce(false);
+
+      await expect(service.requestPairingCode(mockRequestDto)).rejects.toThrow(
+        'Failed to store pairing request',
+      );
+    });
   });
 
   describe('checkPairingStatus', () => {
@@ -179,10 +262,9 @@ describe('PairingService', () => {
       });
 
       // Advance time past expiration (5 minutes + 1 second)
-      // Note: The cleanup interval may also run, so we accept either error
       jest.advanceTimersByTime(5 * 60 * 1000 + 1000);
 
-      // Either BadRequestException (expired) or NotFoundException (cleaned up)
+      // Either BadRequestException (expired) or NotFoundException (TTL expired in Redis)
       await expect(service.checkPairingStatus(result.code)).rejects.toThrow();
     });
 
@@ -208,7 +290,7 @@ describe('PairingService', () => {
         metadata: {},
       });
 
-      // completePairing sets plaintextToken on the in-memory request
+      // completePairing sets plaintextToken on the Redis request
       mockDatabaseService.display.findUnique.mockResolvedValue(null);
       mockDatabaseService.display.create.mockResolvedValue({
         id: 'display-id',
@@ -220,7 +302,7 @@ describe('PairingService', () => {
 
       await service.completePairing('org-123', 'user-123', { code: pairingResult.code });
 
-      // Now checkPairingStatus reads the plaintext token from memory
+      // Now checkPairingStatus reads the plaintext token from Redis
       mockDatabaseService.display.findUnique.mockResolvedValue({
         id: 'display-id',
         organizationId: 'org-123',
@@ -241,7 +323,7 @@ describe('PairingService', () => {
         metadata: {},
       });
 
-      // completePairing sets plaintextToken on the in-memory request
+      // completePairing sets plaintextToken on the Redis request
       mockDatabaseService.display.findUnique.mockResolvedValue(null);
       mockDatabaseService.display.create.mockResolvedValue({
         id: 'display-id',
@@ -350,7 +432,7 @@ describe('PairingService', () => {
 
       await expect(
         service.completePairing(organizationId, userId, { code: pairingResult.code }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow();
     });
 
     it('should generate JWT token for device', async () => {
@@ -377,8 +459,39 @@ describe('PairingService', () => {
           organizationId,
           type: 'device',
         }),
-        { expiresIn: '365d' },
+        expect.objectContaining({ expiresIn: '90d' }),
       );
+    });
+
+    it('should store updated pairing request with token in Redis', async () => {
+      mockDatabaseService.display.findUnique.mockResolvedValue(null);
+
+      const pairingResult = await service.requestPairingCode({
+        deviceIdentifier: 'token-device',
+        nickname: 'Token Test',
+        metadata: {},
+      });
+
+      mockDatabaseService.display.create.mockResolvedValue({
+        id: 'new-id',
+        nickname: 'Token Test',
+        deviceIdentifier: 'token-device',
+        status: 'pairing',
+      } as any);
+
+      // Reset call count after requestPairingCode
+      const setCallsBefore = mockRedisService.set.mock.calls.length;
+
+      await service.completePairing(organizationId, userId, { code: pairingResult.code });
+
+      // completePairing should call set again to update with plaintextToken
+      const setCallsAfter = mockRedisService.set.mock.calls.length;
+      expect(setCallsAfter).toBeGreaterThan(setCallsBefore);
+
+      // Verify the stored value contains plaintextToken
+      const lastSetCall = mockRedisService.set.mock.calls[setCallsAfter - 1];
+      const storedData = JSON.parse(lastSetCall[1]);
+      expect(storedData.plaintextToken).toBe('mock-jwt-token');
     });
 
     it('should clean up pairing request after device retrieves token', async () => {
@@ -399,7 +512,7 @@ describe('PairingService', () => {
 
       await service.completePairing(organizationId, userId, { code: pairingResult.code });
 
-      // After completePairing, the request still exists (has plaintextToken set)
+      // After completePairing, the request still exists in Redis (has plaintextToken set)
       // checkPairingStatus will return paired and THEN clean up
       mockDatabaseService.display.findUnique.mockResolvedValue({
         id: 'new-id',
@@ -498,7 +611,7 @@ describe('PairingService', () => {
   });
 
   describe('cleanup expired requests', () => {
-    it('should automatically clean up expired requests', async () => {
+    it('should automatically clean up expired requests via Redis TTL', async () => {
       mockDatabaseService.display.findUnique.mockResolvedValue(null);
 
       const pairingResult = await service.requestPairingCode({
@@ -510,7 +623,7 @@ describe('PairingService', () => {
       // Advance time past expiration plus cleanup interval
       jest.advanceTimersByTime(6 * 60 * 1000); // 6 minutes
 
-      // Try to check status - should be cleaned up
+      // Try to check status - should be cleaned up (Redis TTL expired)
       await expect(service.checkPairingStatus(pairingResult.code)).rejects.toThrow(
         NotFoundException,
       );

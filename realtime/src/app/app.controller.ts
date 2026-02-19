@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Body, HttpStatus, HttpException } from '@nestjs/common';
+import { Controller, Get, Post, Body, HttpStatus, HttpException, UseGuards, Logger } from '@nestjs/common';
 import { DeviceGateway } from '../gateways/device.gateway';
 import { RedisService } from '../services/redis.service';
 import { DatabaseService } from '../database/database.service';
+import { InternalApiGuard } from '../guards/internal-api.guard';
 import { PushPlaylistRequest, PushContentRequest, DeviceCommandType } from '../types';
 
 interface DependencyHealth {
@@ -36,6 +37,8 @@ interface PushResponse {
 
 @Controller()
 export class AppController {
+  private readonly logger = new Logger(AppController.name);
+
   constructor(
     private readonly deviceGateway: DeviceGateway,
     private readonly redisService: RedisService,
@@ -158,6 +161,7 @@ export class AppController {
   }
 
   @Post('push/playlist')
+  @UseGuards(InternalApiGuard)
   async pushPlaylist(@Body() data: PushPlaylistRequest): Promise<PushResponse> {
     await this.deviceGateway.sendPlaylistUpdate(data.deviceId, data.playlist);
     return {
@@ -167,11 +171,22 @@ export class AppController {
   }
 
   @Post('push/content')
+  @UseGuards(InternalApiGuard)
   async pushContent(@Body() data: PushContentRequest): Promise<PushResponse> {
+    // Resolve minio:// URLs to public API endpoints before sending to device
+    const content = { ...data.content };
+    this.logger.log(`Push content received - original URL: ${content.url?.substring(0, 80)}`);
+    if (content.url && content.url.startsWith('minio://')) {
+      const apiBaseUrl = process.env.API_BASE_URL
+        || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3000');
+      content.url = `${apiBaseUrl}/api/v1/device-content/${content.id}/file`;
+      this.logger.log(`Resolved to: ${content.url}`);
+    }
+
     await this.deviceGateway.sendCommand(data.deviceId, {
       type: DeviceCommandType.PUSH_CONTENT,
       payload: {
-        content: data.content,
+        content,
         duration: data.duration || 30,
       },
     });
@@ -182,6 +197,7 @@ export class AppController {
   }
 
   @Post('internal/command')
+  @UseGuards(InternalApiGuard)
   async sendCommand(
     @Body() data: { displayId: string; command: string; payload?: Record<string, unknown> },
   ): Promise<PushResponse> {

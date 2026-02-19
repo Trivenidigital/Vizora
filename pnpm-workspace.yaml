@@ -4,4 +4,6 @@ packages:
   - 'realtime'
   - 'web'
   - 'display'
+  - 'display-android'
+  - 'mobile'
 autoInstallPeers: true

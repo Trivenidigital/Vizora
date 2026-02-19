@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vizora Web Frontend — Manual Testing Report</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --text: #1a1a2e;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --accent: #3b82f6;
+      --accent-light: #eff6ff;
+      --pass: #16a34a;
+      --pass-bg: #f0fdf4;
+      --fail: #dc2626;
+      --fail-bg: #fef2f2;
+      --warn: #d97706;
+      --warn-bg: #fffbeb;
+      --partial: #7c3aed;
+      --partial-bg: #f5f3ff;
+      --card-bg: #f8fafc;
+      --code-bg: #f1f5f9;
+      --high: #dc2626;
+      --medium: #d97706;
+      --low: #3b82f6;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: var(--text);
+      background: var(--bg);
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+      color: var(--text);
+    }
+
+    h2 {
+      font-size: 1.35rem;
+      font-weight: 600;
+      margin-top: 2.5rem;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid var(--accent);
+      color: var(--text);
+    }
+
+    h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-top: 1.5rem;
+      margin-bottom: 0.75rem;
+      color: var(--text);
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 0.25rem 2rem;
+    }
+
+    .meta strong { color: var(--text); }
+
+    hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 2rem 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 1.5rem;
+      font-size: 0.9rem;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 0.6rem 0.75rem;
+      border: 1px solid var(--border);
+    }
+
+    th {
+      background: var(--card-bg);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .status-pass {
+      color: var(--pass);
+      font-weight: 600;
+      background: var(--pass-bg);
+      text-align: center;
+    }
+
+    .status-partial {
+      color: var(--partial);
+      font-weight: 600;
+      background: var(--partial-bg);
+      text-align: center;
+    }
+
+    .status-fail {
+      color: var(--fail);
+      font-weight: 600;
+      background: var(--fail-bg);
+      text-align: center;
+    }
+
+    .bug-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+      border-left: 4px solid var(--border);
+    }
+
+    .bug-card.high { border-left-color: var(--high); }
+    .bug-card.medium { border-left-color: var(--medium); }
+    .bug-card.low { border-left-color: var(--low); }
+
+    .bug-card h4 {
+      font-size: 1rem;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .severity-badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .severity-badge.high { background: var(--fail-bg); color: var(--high); }
+    .severity-badge.medium { background: var(--warn-bg); color: var(--medium); }
+    .severity-badge.low { background: var(--accent-light); color: var(--low); }
+
+    .bug-card dl {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 0.25rem 0.75rem;
+      font-size: 0.875rem;
+    }
+
+    .bug-card dt {
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .bug-card dd { margin: 0; }
+
+    .fix-badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      background: var(--pass-bg);
+      color: var(--pass);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .nofix-badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      background: var(--fail-bg);
+      color: var(--fail);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    code {
+      font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', Consolas, monospace;
+      font-size: 0.85em;
+      background: var(--code-bg);
+      padding: 0.15rem 0.35rem;
+      border-radius: 3px;
+    }
+
+    .fixes-table code {
+      font-size: 0.8em;
+      word-break: break-all;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .summary-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .summary-card .number {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .summary-card .label {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .recommendation {
+      padding: 0.6rem 0.75rem;
+      background: var(--accent-light);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 4px 4px 0;
+      margin-bottom: 0.5rem;
+      font-size: 0.9rem;
+    }
+
+    .recommendation strong { color: var(--text); }
+
+    .assessment {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin-top: 1.5rem;
+    }
+
+    .assessment h3 { margin-top: 0; }
+
+    .remaining-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .remaining-list li {
+      padding: 0.75rem;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+
+    .remaining-list li:last-child { border-bottom: none; }
+
+    .remaining-list li strong { display: block; margin-bottom: 0.25rem; }
+
+    @media (max-width: 640px) {
+      body { padding: 1rem; }
+      .bug-card dl { grid-template-columns: 1fr; }
+      .meta { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Vizora Web Frontend &mdash; Manual Testing Report</h1>
+  <div class="meta">
+    <div><strong>Date:</strong> February 6, 2026</div>
+    <div><strong>Tester:</strong> Automated (Claude Code + Chrome Extension)</div>
+    <div><strong>Environment:</strong> localhost:3001 (Next.js dev), localhost:3000 (NestJS middleware)</div>
+    <div><strong>Browser:</strong> Chrome (latest)</div>
+    <div><strong>Test Account:</strong> testuser@vizora.test / TestPass123!</div>
+  </div>
+
+  <hr>
+
+  <!-- ============================================= -->
+  <h2>1. Pages and Flows Tested</h2>
+
+  <h3>Authentication</h3>
+  <table>
+    <thead><tr><th>Flow</th><th style="width:80px">Status</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Landing page (/)</td><td class="status-pass">PASS</td><td>Gradient background, Vizora title, Login/Get Started buttons, quick links</td></tr>
+      <tr><td>Registration form &mdash; empty submit</td><td class="status-pass">PASS</td><td>HTML5 required validation fires correctly</td></tr>
+      <tr><td>Registration &mdash; valid data</td><td class="status-pass">PASS</td><td>Creates user + org, auto-redirects to /dashboard</td></tr>
+      <tr><td>Login &mdash; wrong password</td><td class="status-pass">PASS</td><td>Shows &ldquo;Invalid email or password&rdquo; error banner</td></tr>
+      <tr><td>Login &mdash; correct credentials</td><td class="status-pass">PASS</td><td>Redirects to /dashboard, cookie set</td></tr>
+      <tr><td>Logout</td><td class="status-pass">PASS</td><td>Redirects to /login, cookie cleared</td></tr>
+      <tr><td>Auth redirect with return URL</td><td class="status-pass">PASS</td><td>Middleware redirects unauthenticated users to /login?redirect=...</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Dashboard Overview (/dashboard)</h3>
+  <table>
+    <thead><tr><th>Element</th><th style="width:80px">Status</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Stats grid (Devices, Content, Playlists, System Status)</td><td class="status-pass">PASS</td><td>Correct counts, &ldquo;Healthy&rdquo; system status</td></tr>
+      <tr><td>Quick Actions (Pair Device, Upload Content, Create Playlist, Schedule)</td><td class="status-pass">PASS</td><td>All links functional</td></tr>
+      <tr><td>Recent Activity</td><td class="status-pass">PASS</td><td>&ldquo;No recent activity yet&rdquo; empty state</td></tr>
+      <tr><td>Storage Usage</td><td class="status-pass">PASS</td><td>Shows 0 MB / 5 GB, 0.0% used</td></tr>
+      <tr><td>Getting Started guide</td><td class="status-pass">PASS</td><td>4-step guide with action button</td></tr>
+      <tr><td>Theme toggle (Light/Dark/System)</td><td class="status-pass">PASS</td><td>Dark mode applies, Light mode reverts</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Devices (/dashboard/devices)</h3>
+  <table>
+    <thead><tr><th>Element</th><th style="width:80px">Status</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Device list with search</td><td class="status-pass">PASS</td><td>Empty state: &ldquo;No devices yet&rdquo;</td></tr>
+      <tr><td>Device Groups (0) filter</td><td class="status-pass">PASS</td><td>Collapsible section</td></tr>
+      <tr><td>&ldquo;+ Pair New Device&rdquo; button</td><td class="status-pass">PASS</td><td>Navigates to /dashboard/devices/pair</td></tr>
+      <tr><td>WebSocket status badge (&ldquo;Offline&rdquo;)</td><td class="status-pass">PASS</td><td>Shows realtime connection status</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Device Pairing (/dashboard/devices/pair)</h3>
+  <table>
+    <thead><tr><th>Element</th><th style="width:80px">Status</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Pairing code input (6-char)</td><td class="status-pass">PASS</td><td>Large, spaced character input</td></tr>
+      <tr><td>How-to instructions</td><td class="status-pass">PASS</td><td>4-step guide</td></tr>
+      <tr><td>Device name + location fields</td><td class="status-pass">PASS</td><td>Present below fold</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Content Library (/dashboard/content)</h3>
+  <table>
+    <thead><tr><th>Element</th><th style="width:80px">Status</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Folder sidebar</td><td class="status-partial">PARTIAL</td><td>&ldquo;All Content&rdquo; shown; &ldquo;No folders yet&rdquo; (folders API returns 500 &mdash; see Bug #2)</td></tr>
+      <tr><td>Grid/List view toggle</td><td class="status-pass">PASS</td><td>Both views available</td></tr>
+      <tr><td>Content type tabs (All, Image, Video, Pdf, Url)</td><td class="status-pass">PASS</td><td>Counts update on creation</td></tr>
+      <tr><td>Search bar</td><td class="status-pass">PASS</td><td>Placeholder text present</td></tr>
+      <tr><td>Filter by Tags</td><td class="status-pass">PASS</td><td>Dropdown visible</td></tr>
+      <tr><td>Advanced filter</td><td class="status-pass">PASS</td><td>Expandable</td></tr>
+      <tr><td>Upload Content modal &mdash; Image type</td><td class="status-pass">PASS</td><td>File drop zone, accepted formats shown</td></tr>
+      <tr><td>Upload Content modal &mdash; URL type</td><td class="status-pass">PASS</td><td>Shows URL input instead of file zone</td></tr>
+      <tr><td>Create URL content</td><td class="status-pass">PASS</td><td>Content card appears with correct title, type, date</td></tr>
+      <tr><td>Content card actions (Push, Playlist, Edit, Delete)</td><td class="status-pass">PASS</td><td>All buttons present</td></tr>
+      <tr><td>Edit Content modal</td><td class="status-partial">PARTIAL</td><td>Modal opens, pre-fills title. <strong>Save fails &mdash; see Bug #1</strong></td></tr>
+      <tr><td>&ldquo;+ New Folder&rdquo; button</td><td class="status-pass">PASS</td><td>Button present (but folder creation would fail due to Bug #2)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Playlists (/dashboard/playlists)</h3>
+  <table>
+    <thead><tr><th>Element</th><th style="width:80px">Status</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Empty state</td><td class="status-pass">PASS</td><td>&ldquo;No playlists yet&rdquo; with Create button</td></tr>
+      <tr><td>&ldquo;+ Create Playlist&rdquo; button + modal</td><td class="status-pass">PASS</td><td>Name + Description fields</td></tr>
+      <tr><td>Create playlist</td><td class="status-pass">PASS</td><td>Card appears with correct title, date, stats</td></tr>
+      <tr><td>Playlist card actions (Preview, Edit, Publish, Duplicate, Delete)</td><td class="status-pass">PASS</td><td>All buttons present</td></tr>
+      <tr><td>Search by name</td><td class="status-pass">PASS</td><td>Search input functional</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Schedules (/dashboard/schedules)</h3>
+  <table>
+    <thead><tr><th>Element</th><th style="width:80px">Status</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Empty state</td><td class="status-pass">PASS</td><td>&ldquo;No schedules yet&rdquo; with Create button</td></tr>
+      <tr><td>List/Calendar view toggle</td><td class="status-pass">PASS</td><td>Both toggle buttons present</td></tr>
+      <tr><td>Create Schedule modal</td><td class="status-pass">PASS</td><td>Comprehensive form</td></tr>
+      <tr><td>Schedule Name field</td><td class="status-pass">PASS</td><td>Required, placeholder text</td></tr>
+      <tr><td>Start Time dropdown</td><td class="status-pass">PASS</td><td>Default 09:00</td></tr>
+      <tr><td>Duration field</td><td class="status-pass">PASS</td><td>Default 60 minutes</td></tr>
+      <tr><td>Timezone selector</td><td class="status-pass">PASS</td><td>Default Eastern</td></tr>
+      <tr><td>Schedule Days (All/Weekdays/Weekends + individual toggles)</td><td class="status-pass">PASS</td><td>Weekdays pre-selected, day chips toggle on/off</td></tr>
+      <tr><td>Next 10 Occurrences preview</td><td class="status-pass">PASS</td><td>Shows calculated dates</td></tr>
+      <tr><td>Playlist selector</td><td class="status-pass">PASS</td><td>Dropdown with &ldquo;Select a playlist...&rdquo;</td></tr>
+      <tr><td>Target Type (Individual Device / Device Group)</td><td class="status-pass">PASS</td><td>Toggle buttons</td></tr>
+      <tr><td>Devices selector</td><td class="status-pass">PASS</td><td>Shows &ldquo;No devices available&rdquo; when empty</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Analytics (/dashboard/analytics)</h3>
+  <table>
+    <thead><tr><th>Element</th><th style="width:80px">Status</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Stats cards (Devices, Content, Size, Uptime)</td><td class="status-pass">PASS</td><td>Correct zero counts for new account</td></tr>
+      <tr><td>Time range selector (Week/Month/Year)</td><td class="status-pass">PASS</td><td>Month selected by default</td></tr>
+      <tr><td>Export CSV button</td><td class="status-pass">PASS</td><td>Present</td></tr>
+      <tr><td>Device Uptime Timeline chart</td><td class="status-partial">PARTIAL</td><td>Chart renders but shows sample data for empty account &mdash; see Bug #3</td></tr>
+      <tr><td>Content Performance chart</td><td class="status-partial">PARTIAL</td><td>Shows sample bar chart data (Testimonials, FAQ) &mdash; see Bug #3</td></tr>
+      <tr><td>Device Distribution pie chart</td><td class="status-partial">PARTIAL</td><td>Shows sample percentages &mdash; see Bug #3</td></tr>
+      <tr><td>Usage Trends chart</td><td class="status-pass">PASS</td><td>Empty chart (correct for 0 content)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Settings (/dashboard/settings)</h3>
+  <table>
+    <thead><tr><th>Element</th><th style="width:80px">Status</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Organization section</td><td class="status-partial">PARTIAL</td><td><strong>Shows hardcoded defaults &mdash; see Bug #4 (FIXED)</strong></td></tr>
+      <tr><td>Theme Preference (radio buttons)</td><td class="status-pass">PASS</td><td>Light/Dark/System, synced with header toggle</td></tr>
+      <tr><td>Semantic Colors Preview</td><td class="status-pass">PASS</td><td>5 color swatches displayed</td></tr>
+      <tr><td>Default Content Duration</td><td class="status-pass">PASS</td><td>Editable number input</td></tr>
+      <tr><td>Timezone selector</td><td class="status-pass">PASS</td><td>5 timezone options</td></tr>
+      <tr><td>Email Notifications toggle</td><td class="status-pass">PASS</td><td>Checkbox functional</td></tr>
+      <tr><td>Billing link</td><td class="status-pass">PASS</td><td>Links to /dashboard/settings/billing</td></tr>
+      <tr><td>API Keys link</td><td class="status-pass">PASS</td><td>Links to /dashboard/settings/api-keys</td></tr>
+      <tr><td>Change Password button</td><td class="status-pass">PASS (UI)</td><td>Button present, no handler attached</td></tr>
+      <tr><td>Export Data button</td><td class="status-pass">PASS (UI)</td><td>Button present, no handler attached</td></tr>
+      <tr><td>Delete Account button</td><td class="status-pass">PASS (UI)</td><td>Button present, no handler attached</td></tr>
+      <tr><td>Save Changes button</td><td class="status-pass">PASS (UI)</td><td>Button present, no handler attached</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Settings &gt; Team (/dashboard/settings/team)</h3>
+  <table>
+    <thead><tr><th>Element</th><th style="width:80px">Status</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Team member table</td><td class="status-pass">PASS</td><td>Shows current user with correct data</td></tr>
+      <tr><td>Columns (Name, Email, Role, Status, Last Login, Actions)</td><td class="status-pass">PASS</td><td>All populated correctly</td></tr>
+      <tr><td>&ldquo;+ Invite User&rdquo; button</td><td class="status-pass">PASS</td><td>Button present</td></tr>
+      <tr><td>Edit/Delete action icons</td><td class="status-pass">PASS</td><td>Present per row</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Settings &gt; API Keys (/dashboard/settings/api-keys)</h3>
+  <table>
+    <thead><tr><th>Element</th><th style="width:80px">Status</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Empty state</td><td class="status-pass">PASS</td><td>&ldquo;No API keys&rdquo; with Create button</td></tr>
+      <tr><td>&ldquo;+ Create API Key&rdquo; button</td><td class="status-pass">PASS</td><td>Present</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Settings &gt; Audit Log (/dashboard/settings/audit-log)</h3>
+  <table>
+    <thead><tr><th>Element</th><th style="width:80px">Status</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Audit entries table</td><td class="status-pass">PASS</td><td>4 entries (Register, Login, Logout, Login) with timestamps</td></tr>
+      <tr><td>Filter dropdowns (Action, Entity Type, User)</td><td class="status-pass">PASS</td><td>All present</td></tr>
+      <tr><td>Date range filters</td><td class="status-pass">PASS</td><td>Start/End date pickers</td></tr>
+      <tr><td>Export CSV button</td><td class="status-pass">PASS</td><td>Present</td></tr>
+      <tr><td>&ldquo;View&rdquo; link on entries with changes</td><td class="status-pass">PASS</td><td>Present on User Registered entry</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Settings &gt; Billing (/dashboard/settings/billing)</h3>
+  <table>
+    <thead><tr><th>Element</th><th style="width:80px">Status</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Current Plan (Free, Trial badge)</td><td class="status-pass">PASS</td><td>Correct for new account</td></tr>
+      <tr><td>Screen Usage (0/5)</td><td class="status-pass">PASS</td><td>Progress bar at 0%</td></tr>
+      <tr><td>Upgrade button</td><td class="status-pass">PASS</td><td>Present</td></tr>
+      <tr><td>Compare Plans link</td><td class="status-pass">PASS</td><td>Present</td></tr>
+      <tr><td>Invoice History link</td><td class="status-pass">PASS</td><td>Present</td></tr>
+      <tr><td>View Invoice History link</td><td class="status-pass">PASS</td><td>Top-right link</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Settings &gt; Customization (/dashboard/settings/customization)</h3>
+  <table>
+    <thead><tr><th>Element</th><th style="width:80px">Status</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Brand Information (Name, Logo URL, Alt Text)</td><td class="status-pass">PASS</td><td>Fields editable</td></tr>
+      <tr><td>Preview panel (Primary, Secondary, Accent colors)</td><td class="status-pass">PASS</td><td>Color swatches shown</td></tr>
+      <tr><td>Brand Name preview</td><td class="status-pass">PASS</td><td>Shows &ldquo;Vizora&rdquo;</td></tr>
+    </tbody>
+  </table>
+
+  <h3>UI/UX General</h3>
+  <table>
+    <thead><tr><th>Element</th><th style="width:80px">Status</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Sidebar navigation (7 items)</td><td class="status-pass">PASS</td><td>All links work, active state highlighted</td></tr>
+      <tr><td>Breadcrumb navigation</td><td class="status-pass">PASS</td><td>Present on all sub-pages</td></tr>
+      <tr><td>Header (logo, notifications, theme, user)</td><td class="status-pass">PASS</td><td>All elements functional</td></tr>
+      <tr><td>User dropdown (Settings, Logout)</td><td class="status-pass">PASS</td><td>Opens/closes correctly</td></tr>
+      <tr><td>Responsive sidebar</td><td class="status-pass">PASS</td><td>Collapses properly</td></tr>
+      <tr><td>Dark mode consistency</td><td class="status-pass">PASS</td><td>All pages support dark mode with correct text contrast</td></tr>
+      <tr><td>Footer version (1.0.0) + Online status</td><td class="status-pass">PASS</td><td>Visible at bottom-left</td></tr>
+    </tbody>
+  </table>
+
+  <hr>
+
+  <!-- ============================================= -->
+  <h2>2. Bugs Found</h2>
+
+  <div class="bug-card high">
+    <h4>
+      Bug #1 &mdash; Content Update Fails (title &rarr; name field mismatch)
+      <span class="severity-badge high">HIGH</span>
+      <span class="fix-badge">FIXED</span>
+    </h4>
+    <dl>
+      <dt>Page</dt>
+      <dd>/dashboard/content &mdash; Edit Content modal</dd>
+      <dt>Behavior</dt>
+      <dd>Clicking &ldquo;Save Changes&rdquo; after editing content title shows error toast: &ldquo;Failed to update content&rdquo; with &ldquo;Max retry attempts (3) exceeded&rdquo;</dd>
+      <dt>Root Cause</dt>
+      <dd>Frontend <code>updateContent()</code> in <code>api.ts</code> sends <code>{ title: "..." }</code> but backend expects <code>{ name: "..." }</code>. The <code>createContent()</code> method correctly maps <code>title &rarr; name</code>, but <code>updateContent()</code> did not.</dd>
+      <dt>Fix</dt>
+      <dd><code>web/src/lib/api.ts</code> &mdash; Added field mapping in <code>updateContent()</code> to convert <code>title &rarr; name</code> before sending to backend.</dd>
+    </dl>
+  </div>
+
+  <div class="bug-card high">
+    <h4>
+      Bug #2 &mdash; Folders API Returns 500 Internal Server Error
+      <span class="severity-badge high">HIGH</span>
+      <span class="nofix-badge">UNFIXED</span>
+    </h4>
+    <dl>
+      <dt>Page</dt>
+      <dd>/dashboard/content (affects folder sidebar)</dd>
+      <dt>Behavior</dt>
+      <dd>Every page load of Content Library triggers multiple 500 errors from <code>GET /api/folders?format=tree</code>. Console shows: &ldquo;[ContentPage] Failed to load folders: Error: Internal server error&rdquo;</dd>
+      <dt>Root Cause</dt>
+      <dd>The folders endpoint returns 500 from the middleware. The <code>content_folders</code> table exists in the database (Prisma says schema is in sync), but the query may fail at runtime due to a service-level error. Requires middleware debug logging to pinpoint exact cause.</dd>
+      <dt>Fix</dt>
+      <dd>None &mdash; requires backend investigation with middleware debug logs.</dd>
+    </dl>
+  </div>
+
+  <div class="bug-card medium">
+    <h4>
+      Bug #3 &mdash; Analytics Shows Sample/Demo Data for Empty Account
+      <span class="severity-badge medium">MEDIUM</span>
+      <span class="nofix-badge">UNFIXED</span>
+    </h4>
+    <dl>
+      <dt>Page</dt>
+      <dd>/dashboard/analytics</dd>
+      <dt>Behavior</dt>
+      <dd>Charts display what appears to be sample data (Testimonials views, FAQ Section views, Device Distribution percentages) for a brand-new account with 0 devices and 0 content. Only the &ldquo;Usage Trends by Content Type&rdquo; chart correctly shows empty data.</dd>
+      <dt>Root Cause</dt>
+      <dd>The analytics hooks (<code>useChartData</code>, <code>useAnalyticsData</code>) likely return mock/demo data when the backend returns empty datasets, or the backend analytics endpoints return seed data.</dd>
+      <dt>Fix</dt>
+      <dd>None &mdash; needs investigation into whether this is intentional demo data or a bug in the analytics data hooks.</dd>
+    </dl>
+  </div>
+
+  <div class="bug-card medium">
+    <h4>
+      Bug #4 &mdash; Settings Page Shows Hardcoded Organization Data
+      <span class="severity-badge medium">MEDIUM</span>
+      <span class="fix-badge">FIXED</span>
+    </h4>
+    <dl>
+      <dt>Page</dt>
+      <dd>/dashboard/settings</dd>
+      <dt>Behavior</dt>
+      <dd>Organization Name shows &ldquo;My Organization&rdquo; and Admin Email shows &ldquo;admin@vizora.com&rdquo; instead of the actual registered values (&ldquo;Test Organization&rdquo; and &ldquo;testuser@vizora.test&rdquo;).</dd>
+      <dt>Root Cause</dt>
+      <dd>Settings page uses <code>useState</code> with hardcoded defaults and never fetches from the API. No <code>useEffect</code> to load real data. &ldquo;Save Changes&rdquo; button has no onClick handler.</dd>
+      <dt>Fix</dt>
+      <dd><code>web/src/app/dashboard/settings/page.tsx</code> &mdash; Added <code>useAuth</code> hook import and <code>useEffect</code> to populate organization name and email from the authenticated user context.</dd>
+    </dl>
+  </div>
+
+  <div class="bug-card low">
+    <h4>
+      Bug #5 &mdash; Error Toast Exposes Internal IDs
+      <span class="severity-badge low">LOW</span>
+      <span class="nofix-badge">UNFIXED</span>
+    </h4>
+    <dl>
+      <dt>Page</dt>
+      <dd>/dashboard/content (when update fails)</dd>
+      <dt>Behavior</dt>
+      <dd>Error toast message includes raw internal content ID: &ldquo;Max retry attempts (3) exceeded for edit_cmlazjnu40301b1l9i7ynkyh2_177038849397&rdquo;</dd>
+      <dt>Root Cause</dt>
+      <dd>The <code>useOptimisticState</code> hook includes the operation key (which contains the entity ID) in its error messages.</dd>
+      <dt>Fix</dt>
+      <dd>None &mdash; cosmetic issue. Error messages should be user-friendly and not expose internal identifiers.</dd>
+    </dl>
+  </div>
+
+  <div class="bug-card low">
+    <h4>
+      Bug #6 &mdash; Breadcrumb Formatting Inconsistency
+      <span class="severity-badge low">LOW</span>
+      <span class="nofix-badge">UNFIXED</span>
+    </h4>
+    <dl>
+      <dt>Page</dt>
+      <dd>/dashboard/settings/api-keys, /dashboard/settings/audit-log</dd>
+      <dt>Behavior</dt>
+      <dd>Breadcrumb shows &ldquo;Api-keys&rdquo; and &ldquo;Audit-log&rdquo; (raw URL slug with lowercase and hyphens) instead of &ldquo;API Keys&rdquo; and &ldquo;Audit Log&rdquo;.</dd>
+      <dt>Root Cause</dt>
+      <dd>Breadcrumb component uses the URL path segment directly without title-casing or mapping to display names.</dd>
+      <dt>Fix</dt>
+      <dd>None &mdash; cosmetic issue.</dd>
+    </dl>
+  </div>
+
+  <div class="bug-card medium">
+    <h4>
+      Bug #7 &mdash; Settings Page Buttons Have No Handlers
+      <span class="severity-badge medium">MEDIUM</span>
+      <span class="nofix-badge">UNFIXED</span>
+    </h4>
+    <dl>
+      <dt>Page</dt>
+      <dd>/dashboard/settings</dd>
+      <dt>Behavior</dt>
+      <dd>&ldquo;Save Changes&rdquo;, &ldquo;Change Password&rdquo;, &ldquo;Export Data&rdquo;, and &ldquo;Delete Account&rdquo; buttons are non-functional (no onClick handlers).</dd>
+      <dt>Root Cause</dt>
+      <dd>Settings page is a partial implementation / stub. Only the UI is built, no backend integration.</dd>
+      <dt>Fix</dt>
+      <dd>None &mdash; requires implementing API integration for each action.</dd>
+    </dl>
+  </div>
+
+  <hr>
+
+  <!-- ============================================= -->
+  <h2>3. Fixes Applied</h2>
+  <table class="fixes-table">
+    <thead><tr><th>File</th><th>Change</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>web/src/lib/api.ts</code> (lines 429&ndash;443)</td>
+        <td>Added <code>title &rarr; name</code> field mapping in <code>updateContent()</code> method</td>
+        <td>Content update was sending <code>{ title }</code> but backend expects <code>{ name }</code>, causing 500 errors</td>
+      </tr>
+      <tr>
+        <td><code>web/src/app/dashboard/settings/page.tsx</code> (lines 1&ndash;19)</td>
+        <td>Added <code>useAuth</code> hook and <code>useEffect</code> to populate org name and email from authenticated user</td>
+        <td>Settings page was showing hardcoded &ldquo;My Organization&rdquo; / &ldquo;admin@vizora.com&rdquo; instead of real data</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <hr>
+
+  <!-- ============================================= -->
+  <h2>4. Remaining Issues Needing Human Attention</h2>
+  <ol class="remaining-list">
+    <li>
+      <strong>Folders API 500 Error (Bug #2)</strong>
+      Requires middleware debug logging to identify why <code>GET /api/folders?format=tree</code> returns 500. The Prisma schema is in sync, so the table exists, but the query fails at runtime. Check NestJS console output for the stack trace.
+    </li>
+    <li>
+      <strong>Analytics Mock Data (Bug #3)</strong>
+      Decide whether charts should show empty states or demo data for new accounts. If demo, add a &ldquo;Sample data&rdquo; label. If not, fix the data hooks to return empty arrays.
+    </li>
+    <li>
+      <strong>Settings Page Backend Integration (Bug #7)</strong>
+      Implement: Save Changes &rarr; <code>PATCH /organizations/:id</code>, Change Password &rarr; <code>POST /auth/change-password</code>, Export Data &rarr; <code>GET /organizations/:id/export</code>, Delete Account &rarr; <code>DELETE /organizations/:id</code> with confirmation modal.
+    </li>
+    <li>
+      <strong>Error Message Sanitization (Bug #5)</strong>
+      Clean up error toasts in <code>useOptimisticState</code> to not expose internal IDs.
+    </li>
+    <li>
+      <strong>Breadcrumb Display Names (Bug #6)</strong>
+      Add a mapping of URL slugs to display names in the breadcrumb component.
+    </li>
+  </ol>
+
+  <hr>
+
+  <!-- ============================================= -->
+  <h2>5. UX Recommendations</h2>
+  <div class="recommendation"><strong>Content Type Change on Edit</strong> &mdash; The edit modal correctly shows &ldquo;Content type cannot be changed after upload&rdquo; &mdash; good UX pattern. Consider also allowing URL editing for URL-type content.</div>
+  <div class="recommendation"><strong>Schedule Form UX</strong> &mdash; The &ldquo;Next 10 Occurrences&rdquo; preview is excellent. Consider adding a conflict detection indicator when devices already have schedules at those times.</div>
+  <div class="recommendation"><strong>Empty States</strong> &mdash; All empty states are well-designed with helpful CTAs and icons. Consistent pattern across all pages.</div>
+  <div class="recommendation"><strong>Dark Mode</strong> &mdash; Comprehensive dark mode support across all pages. All text elements have proper <code>dark:</code> Tailwind classes.</div>
+  <div class="recommendation"><strong>Loading States</strong> &mdash; Consider adding skeleton loaders for the dashboard stats cards and content grid while API calls are in flight.</div>
+  <div class="recommendation"><strong>Notification Bell</strong> &mdash; The notification bell icon in the header could benefit from a badge/count indicator for unread notifications.</div>
+  <div class="recommendation"><strong>Mobile Responsiveness</strong> &mdash; Sidebar collapses correctly, but the schedule creation modal and content library filters may need mobile-specific layouts.</div>
+  <div class="recommendation"><strong>Keyboard Navigation</strong> &mdash; Playlist builder supports Ctrl+Z/Ctrl+Shift+Z for undo/redo &mdash; good. Consider adding keyboard shortcuts for common actions (N for new, E for edit, Delete for delete).</div>
+
+  <hr>
+
+  <!-- ============================================= -->
+  <h2>6. Test Coverage Summary</h2>
+
+  <div class="summary-grid">
+    <div class="summary-card">
+      <div class="number">16</div>
+      <div class="label">Pages Tested</div>
+    </div>
+    <div class="summary-card">
+      <div class="number">8</div>
+      <div class="label">Forms Tested</div>
+    </div>
+    <div class="summary-card">
+      <div class="number">4</div>
+      <div class="label">CRUD Flows</div>
+    </div>
+    <div class="summary-card">
+      <div class="number">4</div>
+      <div class="label">Modals Tested</div>
+    </div>
+  </div>
+
+  <table>
+    <thead><tr><th>Area</th><th>Pages</th><th>Forms</th><th>CRUD</th><th>Modals</th></tr></thead>
+    <tbody>
+      <tr><td>Authentication</td><td>3 (login, register, landing)</td><td>2 (login, register)</td><td>&mdash;</td><td>&mdash;</td></tr>
+      <tr><td>Dashboard</td><td>1 (overview)</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td></tr>
+      <tr><td>Devices</td><td>2 (list, pair)</td><td>1 (pair device)</td><td>Read</td><td>&mdash;</td></tr>
+      <tr><td>Content</td><td>1 (library)</td><td>2 (upload, edit)</td><td>Create, Read, Update</td><td>2 (upload, edit)</td></tr>
+      <tr><td>Playlists</td><td>1 (list)</td><td>1 (create)</td><td>Create, Read</td><td>1 (create)</td></tr>
+      <tr><td>Schedules</td><td>1 (list)</td><td>1 (create)</td><td>Read</td><td>1 (create)</td></tr>
+      <tr><td>Analytics</td><td>1</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td></tr>
+      <tr><td>Settings</td><td>6 (main, team, api-keys, audit, billing, customization)</td><td>1 (main settings)</td><td>Read</td><td>&mdash;</td></tr>
+    </tbody>
+  </table>
+
+  <div class="assessment">
+    <h3>Overall Assessment</h3>
+    <p>The Vizora web frontend is <strong>well-built with a polished UI</strong>. The main issues are:</p>
+    <ul style="margin-top: 0.5rem; padding-left: 1.25rem;">
+      <li>Two high-severity bugs (content update field mapping, folders API error) that affect core CRUD operations</li>
+      <li>Settings page is partially implemented (UI only, no backend integration)</li>
+      <li>Analytics page shows misleading sample data</li>
+    </ul>
+    <p style="margin-top: 0.75rem;">With the two fixes applied in this session and resolution of the remaining items listed above, the frontend would be in good shape for production use.</p>
+  </div>
+
+</body>
+</html>

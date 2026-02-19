@@ -12,8 +12,6 @@ import {
   UploadedFile,
   UseInterceptors,
   UseGuards,
-  MaxFileSizeValidator,
-  ParseFilePipe,
   BadRequestException,
   NotFoundException,
   Logger,
@@ -28,10 +26,7 @@ import { StorageService } from '../storage/storage.service';
 import { CreateContentDto } from './dto/create-content.dto';
 import { UpdateContentDto } from './dto/update-content.dto';
 import { ReplaceFileDto } from './dto/replace-file.dto';
-import { CreateTemplateDto } from './dto/create-template.dto';
-import { UpdateTemplateDto } from './dto/update-template.dto';
-import { PreviewTemplateDto } from './dto/preview-template.dto';
-import { BulkUpdateDto, BulkArchiveDto, BulkRestoreDto, BulkDeleteDto, BulkTagDto, BulkDurationDto } from './dto/bulk-operations.dto';
+import { SetContentExpirationDto } from './dto/set-content-expiration.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import * as fs from 'fs';
@@ -128,7 +123,7 @@ export class ContentController {
       fileSize: file.size,
       mimeType: file.mimetype,
       metadata: { fileHash: validation.hash },
-    } as any);
+    } as CreateContentDto);
 
     // Generate thumbnail using the real content ID (only once, after creation)
     if (contentType === 'image') {
@@ -138,17 +133,16 @@ export class ContentController {
           file.buffer,
           file.mimetype,
         );
-        await this.contentService.update(organizationId, content.id, { thumbnail: thumbnailUrl } as any);
+        await this.contentService.update(organizationId, content.id, { thumbnail: thumbnailUrl });
         content.thumbnail = thumbnailUrl;
         this.logger.debug(`Thumbnail generated: ${thumbnailUrl}`);
       } catch (error) {
         this.logger.warn(`Thumbnail generation failed during upload: ${error}`);
-        // Continue without thumbnail — not a fatal error
+        // Continue without thumbnail -- not a fatal error
       }
     }
 
     return {
-      success: true,
       content,
       fileHash: validation.hash,
     };
@@ -159,12 +153,14 @@ export class ContentController {
    */
   private async saveFileLocally(filename: string, buffer: Buffer): Promise<string> {
     const uploadsDir = path.join(process.cwd(), 'uploads');
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
+    try {
+      await fs.promises.access(uploadsDir);
+    } catch {
+      await fs.promises.mkdir(uploadsDir, { recursive: true });
     }
 
     const filePath = path.join(uploadsDir, filename);
-    fs.writeFileSync(filePath, buffer);
+    await fs.promises.writeFile(filePath, buffer);
 
     const baseUrl = process.env.API_BASE_URL
       || (process.env.NODE_ENV === 'production' ? (() => { throw new Error('API_BASE_URL must be set in production'); })() : 'http://localhost:3000');
@@ -288,7 +284,7 @@ export class ContentController {
     }
 
     // Update content with thumbnail URL
-    await this.contentService.update(organizationId, id, { thumbnail: thumbnailUrl } as any);
+    await this.contentService.update(organizationId, id, { thumbnail: thumbnailUrl });
 
     return { thumbnail: thumbnailUrl };
   }
@@ -396,7 +392,6 @@ export class ContentController {
     );
 
     return {
-      success: true,
       content,
       fileHash: validation.hash,
     };
@@ -429,7 +424,7 @@ export class ContentController {
   async setExpiration(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id') id: string,
-    @Body() body: { expiresAt: string; replacementContentId?: string },
+    @Body() body: SetContentExpirationDto,
   ) {
     const expiresAtDate = new Date(body.expiresAt);
     if (isNaN(expiresAtDate.getTime())) {
@@ -454,125 +449,5 @@ export class ContentController {
     @Param('id') id: string,
   ) {
     return this.contentService.clearExpiration(organizationId, id);
-  }
-
-  // ============================================================================
-  // CONTENT TEMPLATES
-  // ============================================================================
-
-  @Post('templates')
-  @Roles('admin', 'manager')
-  createTemplate(
-    @CurrentUser('organizationId') organizationId: string,
-    @Body() dto: CreateTemplateDto,
-  ) {
-    return this.contentService.createTemplate(organizationId, dto);
-  }
-
-  @Patch('templates/:id')
-  @Roles('admin', 'manager')
-  updateTemplate(
-    @CurrentUser('organizationId') organizationId: string,
-    @Param('id') id: string,
-    @Body() dto: UpdateTemplateDto,
-  ) {
-    return this.contentService.updateTemplate(organizationId, id, dto);
-  }
-
-  @Post('templates/preview')
-  @Roles('admin', 'manager')
-  @HttpCode(HttpStatus.OK)
-  previewTemplate(@Body() dto: PreviewTemplateDto) {
-    return this.contentService.previewTemplate(dto);
-  }
-
-  @Post('templates/validate')
-  @Roles('admin', 'manager')
-  @HttpCode(HttpStatus.OK)
-  validateTemplate(@Body() body: { templateHtml: string }) {
-    return this.contentService.validateTemplateHtml(body.templateHtml);
-  }
-
-  @Get('templates/:id/rendered')
-  @Roles('admin', 'manager')
-  getRenderedTemplate(
-    @CurrentUser('organizationId') organizationId: string,
-    @Param('id') id: string,
-  ) {
-    return this.contentService.getRenderedTemplate(organizationId, id);
-  }
-
-  @Post('templates/:id/refresh')
-  @Roles('admin', 'manager')
-  @HttpCode(HttpStatus.OK)
-  refreshTemplate(
-    @CurrentUser('organizationId') organizationId: string,
-    @Param('id') id: string,
-  ) {
-    return this.contentService.triggerTemplateRefresh(organizationId, id);
-  }
-
-  // ============================================================================
-  // BULK OPERATIONS
-  // ============================================================================
-
-  @Post('bulk/update')
-  @Roles('admin', 'manager')
-  @HttpCode(HttpStatus.OK)
-  bulkUpdate(
-    @CurrentUser('organizationId') organizationId: string,
-    @Body() dto: BulkUpdateDto,
-  ) {
-    return this.contentService.bulkUpdate(organizationId, dto);
-  }
-
-  @Post('bulk/archive')
-  @Roles('admin', 'manager')
-  @HttpCode(HttpStatus.OK)
-  bulkArchive(
-    @CurrentUser('organizationId') organizationId: string,
-    @Body() dto: BulkArchiveDto,
-  ) {
-    return this.contentService.bulkArchive(organizationId, dto);
-  }
-
-  @Post('bulk/restore')
-  @Roles('admin', 'manager')
-  @HttpCode(HttpStatus.OK)
-  bulkRestore(
-    @CurrentUser('organizationId') organizationId: string,
-    @Body() dto: BulkRestoreDto,
-  ) {
-    return this.contentService.bulkRestore(organizationId, dto);
-  }
-
-  @Post('bulk/delete')
-  @Roles('admin')
-  @HttpCode(HttpStatus.OK)
-  bulkDelete(
-    @CurrentUser('organizationId') organizationId: string,
-    @Body() dto: BulkDeleteDto,
-  ) {
-    return this.contentService.bulkDelete(organizationId, dto);
-  }
-
-  @Post('bulk/tags')
-  @Roles('admin', 'manager')
-  @HttpCode(HttpStatus.OK)
-  bulkAddTags(
-    @CurrentUser('organizationId') organizationId: string,
-    @Body() dto: BulkTagDto,
-  ) {
-    return this.contentService.bulkAddTags(organizationId, dto);
-  }
-
-  @Post('bulk/duration')
-  @Roles('admin', 'manager')
-  @HttpCode(HttpStatus.OK)
-  bulkSetDuration(
-    @CurrentUser('organizationId') organizationId: string,
-    @Body() dto: BulkDurationDto,
-  ) {
-    return this.contentService.bulkSetDuration(organizationId, dto);
   }
 }

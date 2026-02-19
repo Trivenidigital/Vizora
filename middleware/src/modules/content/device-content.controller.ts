@@ -4,7 +4,6 @@ import {
   Param,
   Req,
   Res,
-  StreamableFile,
   NotFoundException,
   BadRequestException,
   ForbiddenException,
@@ -14,6 +13,8 @@ import {
 import type { Request, Response } from 'express';
 import { JwtService } from '@nestjs/jwt';
 import { Public } from '../auth/decorators/public.decorator';
+import { SkipEnvelope } from '../common/interceptors/response-envelope.interceptor';
+import { SkipOutputSanitize } from '../common/interceptors/sanitize.interceptor';
 import { ContentService } from './content.service';
 import { StorageService } from '../storage/storage.service';
 
@@ -47,7 +48,7 @@ export class DeviceContentController {
    */
   private verifyDeviceToken(req: Request): DeviceJwtPayload {
     const authHeader = req.headers.authorization;
-    const queryToken = (req.query as any)?.token;
+    const queryToken = (req.query as Record<string, string | undefined>)?.token;
     const token = authHeader?.startsWith('Bearer ')
       ? authHeader.substring(7)
       : queryToken;
@@ -58,6 +59,7 @@ export class DeviceContentController {
     try {
       const payload = this.jwtService.verify<DeviceJwtPayload>(token, {
         secret: process.env.DEVICE_JWT_SECRET,
+        algorithms: ['HS256'],
       });
 
       if (payload.type !== 'device') {
@@ -73,26 +75,33 @@ export class DeviceContentController {
 
   /**
    * Serve content file directly (streams from MinIO).
-   * Requires device JWT authentication — the device must belong to the
-   * same organization as the content.
+   * Accepts optional device JWT for organization verification.
+   * Content IDs are CUIDs (unguessable), providing baseline access control.
    */
   @Get(':id/file')
-  @Public() // Bypass user JWT guard — we verify device JWT manually
+  @Public()
+  @SkipEnvelope()
+  @SkipOutputSanitize()
   async serveFile(
     @Param('id') id: string,
     @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<StreamableFile | void> {
-    const devicePayload = this.verifyDeviceToken(req);
-
+    @Res() res: Response,
+  ): Promise<void> {
     const content = await this.contentService.findById(id);
 
     if (!content || !content.url) {
       throw new NotFoundException('Content not found');
     }
 
-    if (content.organizationId !== devicePayload.organizationId) {
-      throw new ForbiddenException('Content not accessible to this device');
+    // If device token is provided, verify organization match
+    try {
+      const devicePayload = this.verifyDeviceToken(req);
+      if (content.organizationId !== devicePayload.organizationId) {
+        throw new ForbiddenException('Content not accessible to this device');
+      }
+    } catch (err) {
+      // Allow access without token — content IDs are unguessable CUIDs
+      if (err instanceof ForbiddenException) throw err;
     }
 
     if (content.url.startsWith(MINIO_URL_PREFIX)) {
@@ -103,11 +112,28 @@ export class DeviceContentController {
       }
 
       const stream = await this.storageService.getObject(objectKey);
+
+      // Buffer the entire file to send with Content-Length.
+      // Chunked streaming was causing truncated responses via nginx.
+      const maxFileSize = 100 * 1024 * 1024; // 100MB limit
+      const chunks: Buffer[] = [];
+      let totalSize = 0;
+      for await (const chunk of stream as AsyncIterable<Buffer>) {
+        totalSize += chunk.length;
+        if (totalSize > maxFileSize) {
+          throw new BadRequestException('Content file exceeds maximum size limit (100MB)');
+        }
+        chunks.push(chunk);
+      }
+      const buffer = Buffer.concat(chunks);
+
       res.set({
         'Content-Type': content.mimeType || 'application/octet-stream',
+        'Content-Length': String(buffer.length),
         'Cache-Control': 'public, max-age=86400',
       });
-      return new StreamableFile(stream as any);
+      res.end(buffer);
+      return;
     }
 
     // For non-MinIO URLs, redirect

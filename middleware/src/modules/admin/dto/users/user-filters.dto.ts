@@ -40,10 +40,10 @@ export class UserFiltersDto {
   @IsString()
   @IsOptional()
   @IsIn(['createdAt', 'email', 'lastName', 'lastLoginAt'])
-  sortBy?: string;
+  sortBy?: 'createdAt' | 'email' | 'lastName' | 'lastLoginAt';
 
   @IsString()
   @IsOptional()
   @IsIn(['asc', 'desc'])
-  sortOrder?: string;
+  sortOrder?: 'asc' | 'desc';
 }

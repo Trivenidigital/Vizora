@@ -157,6 +157,43 @@ if [[ ! -s "$DAILY_DIR/$BACKUP_FILENAME" ]]; then
     exit 1
 fi
 
+# Verify backup integrity by listing contents via pg_restore
+log_info "Verifying backup integrity..."
+if gunzip -c "$DAILY_DIR/$BACKUP_FILENAME" | pg_restore --list > /dev/null 2>&1; then
+    log_info "Backup integrity verified (pg_restore --list passed)."
+else
+    # Plain-format dumps cannot be verified with pg_restore --list; check gzip integrity instead
+    if gzip -t "$DAILY_DIR/$BACKUP_FILENAME" 2>/dev/null; then
+        log_info "Backup gzip integrity verified."
+    else
+        log_error "Backup integrity check failed."
+        exit 1
+    fi
+fi
+
+# Generate SHA-256 checksum for the backup file
+sha256sum "$DAILY_DIR/$BACKUP_FILENAME" > "$DAILY_DIR/$BACKUP_FILENAME.sha256"
+log_info "Checksum written: $DAILY_DIR/$BACKUP_FILENAME.sha256"
+
+# ---------------------------------------------------------------------------
+# Optional: Off-site S3 Upload
+# ---------------------------------------------------------------------------
+# Set BACKUP_S3_BUCKET (e.g. s3://my-vizora-backups) to enable off-site copies.
+
+if [[ -n "${BACKUP_S3_BUCKET:-}" ]]; then
+    if command -v aws &>/dev/null; then
+        log_info "Uploading backup to S3: ${BACKUP_S3_BUCKET}..."
+        if aws s3 cp "$DAILY_DIR/$BACKUP_FILENAME" "${BACKUP_S3_BUCKET}/daily/$BACKUP_FILENAME" \
+            && aws s3 cp "$DAILY_DIR/$BACKUP_FILENAME.sha256" "${BACKUP_S3_BUCKET}/daily/$BACKUP_FILENAME.sha256"; then
+            log_info "S3 upload complete."
+        else
+            log_error "S3 upload failed. Local backup is still intact."
+        fi
+    else
+        log_info "BACKUP_S3_BUCKET is set but 'aws' CLI is not installed. Skipping S3 upload."
+    fi
+fi
+
 # ---------------------------------------------------------------------------
 # Rotation: Promote to weekly (Sundays) and monthly (1st of month)
 # ---------------------------------------------------------------------------

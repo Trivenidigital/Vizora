@@ -19,6 +19,7 @@ import { CheckQuota } from '../billing/decorators/check-quota.decorator';
 import { DisplaysService } from './displays.service';
 import { CreateDisplayDto } from './dto/create-display.dto';
 import { UpdateDisplayDto } from './dto/update-display.dto';
+import { UpdateQrOverlayDto } from './dto/update-qr-overlay.dto';
 import { BulkDisplayIdsDto, BulkAssignPlaylistDto, BulkAssignGroupDto } from './dto/bulk-operations.dto';
 import { ScreenshotResponseDto, ScreenshotResultDto } from './dto/screenshot.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
@@ -158,7 +159,7 @@ export class DisplaysController {
     return this.displaysService.addTags(organizationId, id, body.tagIds);
   }
 
-  @Delete(':id/tags')
+  @Post(':id/tags/remove')
   @Roles('admin')
   removeTags(
     @CurrentUser('organizationId') organizationId: string,
@@ -214,5 +215,24 @@ export class DisplaysController {
       width: screenshot.width,
       height: screenshot.height,
     };
+  }
+
+  @Patch(':id/qr-overlay')
+  @Roles('admin', 'manager')
+  async updateQrOverlay(
+    @CurrentUser('organizationId') organizationId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateQrOverlayDto,
+  ) {
+    return this.displaysService.updateQrOverlay(organizationId, id, dto);
+  }
+
+  @Delete(':id/qr-overlay')
+  @Roles('admin', 'manager')
+  async removeQrOverlay(
+    @CurrentUser('organizationId') organizationId: string,
+    @Param('id') id: string,
+  ) {
+    return this.displaysService.removeQrOverlay(organizationId, id);
   }
 }

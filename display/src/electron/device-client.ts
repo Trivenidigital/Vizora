@@ -15,6 +15,7 @@ export class DeviceClient {
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private readonly heartbeatIntervalMs = 15000; // 15 seconds
   private cachedDeviceIdentifier: string | null = null;
+  private previousCpuTimes: { idle: number; total: number } | null = null;
 
   constructor(
     private apiUrl: string,
@@ -333,13 +334,40 @@ export class DeviceClient {
   private handleCommand(command: any) {
     switch (command.type) {
       case 'reload':
-        // Reload the renderer
+        console.log('[DeviceClient] Executing reload command');
+        try {
+          const { BrowserWindow } = require('electron');
+          const mainWindow = BrowserWindow.getAllWindows()[0];
+          if (mainWindow) {
+            mainWindow.reload();
+            console.log('[DeviceClient] Reload complete');
+          } else {
+            console.warn('[DeviceClient] No window found for reload');
+          }
+        } catch (err) {
+          console.error('[DeviceClient] Reload failed:', err);
+        }
         break;
       case 'clear_cache':
-        // Clear content cache
+        console.log('[DeviceClient] Executing clear_cache command');
+        try {
+          const { session } = require('electron');
+          session.defaultSession.clearCache().then(() => {
+            console.log('[DeviceClient] Cache cleared successfully');
+          }).catch((err: any) => {
+            console.error('[DeviceClient] Cache clear failed:', err);
+          });
+        } catch (err) {
+          console.error('[DeviceClient] clear_cache failed:', err);
+        }
         break;
       case 'update':
-        // Trigger app update
+        console.log('[DeviceClient] Update command received');
+        // Stub for autoUpdater integration
+        // In production, this would trigger electron-updater:
+        // const { autoUpdater } = require('electron-updater');
+        // autoUpdater.checkForUpdatesAndNotify();
+        console.log('[DeviceClient] Auto-update not yet configured. Update payload:', command.payload);
         break;
       default:
         console.warn('Unknown command type:', command.type);
@@ -394,8 +422,9 @@ export class DeviceClient {
     };
   }
 
+  // Android TV cannot report CPU usage (browser API limitation — os.cpus() is
+  // unavailable in Capacitor/WebView). This method is Electron-only.
   private getCpuUsage(): number {
-    // Simple CPU usage calculation
     const cpus = os.cpus();
     let totalIdle = 0;
     let totalTick = 0;
@@ -407,11 +436,28 @@ export class DeviceClient {
       totalIdle += cpu.times.idle;
     });
 
-    const idle = totalIdle / cpus.length;
-    const total = totalTick / cpus.length;
-    const usage = 100 - (idle / total) * 100;
+    if (this.previousCpuTimes === null) {
+      // First call: store snapshot and return instantaneous usage
+      this.previousCpuTimes = { idle: totalIdle, total: totalTick };
+      const idle = totalIdle / cpus.length;
+      const total = totalTick / cpus.length;
+      const usage = 100 - (idle / total) * 100;
+      return Math.min(100, Math.max(0, Math.round(usage * 100) / 100));
+    }
 
-    return Math.round(usage * 100) / 100;
+    // Delta-based calculation between current and previous snapshot
+    const idleDelta = totalIdle - this.previousCpuTimes.idle;
+    const totalDelta = totalTick - this.previousCpuTimes.total;
+
+    // Update snapshot for next call
+    this.previousCpuTimes = { idle: totalIdle, total: totalTick };
+
+    if (totalDelta === 0) {
+      return 0;
+    }
+
+    const usage = 100 - (idleDelta / totalDelta) * 100;
+    return Math.min(100, Math.max(0, Math.round(usage * 100) / 100));
   }
 
   private getMemoryUsage(): number {

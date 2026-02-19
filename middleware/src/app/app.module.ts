@@ -23,8 +23,10 @@ import { FoldersModule } from '../modules/folders/folders.module';
 import { ApiKeysModule } from '../modules/api-keys/api-keys.module';
 import { BillingModule } from '../modules/billing/billing.module';
 import { AdminModule } from '../modules/admin/admin.module';
+import { TemplateLibraryModule } from '../modules/template-library/template-library.module';
 import { CsrfMiddleware } from '../modules/common/middleware/csrf.middleware';
 import { StorageModule } from '../modules/storage/storage.module';
+import { MetricsModule } from '../modules/metrics/metrics.module';
 
 @Module({
   imports: [
@@ -91,6 +93,8 @@ import { StorageModule } from '../modules/storage/storage.module';
     ApiKeysModule,
     BillingModule,
     AdminModule,
+    TemplateLibraryModule,
+    MetricsModule,
   ],
   controllers: [AppController],
   providers: [

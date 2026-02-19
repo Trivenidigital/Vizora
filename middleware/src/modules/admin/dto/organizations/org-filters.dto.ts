@@ -45,10 +45,10 @@ export class OrgFiltersDto {
   @IsString()
   @IsOptional()
   @IsIn(['createdAt', 'name', 'subscriptionTier', 'screenQuota'])
-  sortBy?: string;
+  sortBy?: 'createdAt' | 'name' | 'subscriptionTier' | 'screenQuota';
 
   @IsString()
   @IsOptional()
   @IsIn(['asc', 'desc'])
-  sortOrder?: string;
+  sortOrder?: 'asc' | 'desc';
 }

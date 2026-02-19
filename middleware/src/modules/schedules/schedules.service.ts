@@ -109,7 +109,7 @@ export class SchedulesService {
   async findActiveSchedules(displayId: string) {
     const now = new Date();
     const dayOfWeek = now.getDay();
-    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const currentTime = now.getHours() * 60 + now.getMinutes();
 
     return this.db.schedule.findMany({
       where: {

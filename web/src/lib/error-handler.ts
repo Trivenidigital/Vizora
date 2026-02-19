@@ -3,6 +3,8 @@
  * Handles logging, user-friendly messages, and error tracking
  */
 
+import { captureException } from './sentry';
+
 export class ApiError extends Error {
   constructor(
     public statusCode: number,
@@ -27,8 +29,8 @@ export function logError(error: unknown, context?: string): void {
   if (process.env.NODE_ENV === 'development') {
     console.error(`[${timestamp}] ${context || 'Error'}:`, error);
   } else {
-    // In production, send to error tracking service
-    // TODO: Integrate with Sentry, LogRocket, or similar
+    // In production, report to Sentry (no-ops if DSN not configured)
+    captureException(error, { context, timestamp });
     console.error(`[${timestamp}] ${context || 'Error'}:`, error instanceof Error ? error.message : error);
   }
 }

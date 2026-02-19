@@ -1,7 +1,7 @@
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app/app.module';
-import { IoAdapter } from '@nestjs/platform-socket.io';
+import { RedisIoAdapter } from './adapters/redis-io.adapter';
 import helmet from 'helmet';
 import { initializeSentry } from './config/sentry.config';
 
@@ -9,6 +9,17 @@ import { initializeSentry } from './config/sentry.config';
 initializeSentry();
 
 async function bootstrap() {
+  // Validate required production environment variables
+  if (process.env.NODE_ENV === 'production') {
+    const required = ['DATABASE_URL', 'REDIS_URL', 'DEVICE_JWT_SECRET', 'INTERNAL_API_SECRET'];
+    const missing = required.filter(key => !process.env[key]);
+    if (missing.length > 0) {
+      Logger.error(`❌ Missing required production env vars: ${missing.join(', ')}`);
+      Logger.error('Set these in your .env or deployment config before starting in production.');
+      process.exit(1);
+    }
+  }
+
   const app = await NestFactory.create(AppModule);
 
   // Security headers
@@ -18,9 +29,14 @@ async function bootstrap() {
   }));
 
   // Enable CORS
+  const corsOrigin = process.env.CORS_ORIGIN?.split(',').map(s => s.trim());
+  if (!corsOrigin && process.env.NODE_ENV === 'production') {
+    Logger.warn('⚠️  CORS_ORIGIN is not set — defaulting to localhost origins. Set CORS_ORIGIN for production.');
+  }
   app.enableCors({
-    origin: process.env.CORS_ORIGIN?.split(',') || [
+    origin: corsOrigin || [
       'http://localhost:3000',
+      'http://localhost:3001',
       'http://localhost:3002',
       'http://localhost:4200',
     ],
@@ -35,8 +51,10 @@ async function bootstrap() {
     }),
   );
 
-  // Use Socket.IO adapter
-  app.useWebSocketAdapter(new IoAdapter(app));
+  // Use Redis-backed Socket.IO adapter for horizontal scaling
+  const redisIoAdapter = new RedisIoAdapter(app);
+  await redisIoAdapter.connectToRedis();
+  app.useWebSocketAdapter(redisIoAdapter);
 
   const globalPrefix = 'api';
   app.setGlobalPrefix(globalPrefix);
@@ -56,6 +74,10 @@ async function bootstrap() {
 
   try {
     await app.listen(port, '0.0.0.0');
+    // Signal PM2 that the app is ready to accept traffic
+    if (typeof process.send === 'function') {
+      process.send('ready');
+    }
     Logger.log(`🚀 Realtime Gateway running on: http://localhost:${port}/${globalPrefix}`);
     Logger.log(`🔌 WebSocket server ready on: ws://localhost:${port}`);
     Logger.log(`📊 Metrics available at: http://localhost:${port}/internal/metrics`);

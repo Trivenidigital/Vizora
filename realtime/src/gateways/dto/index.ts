@@ -1,7 +1,7 @@
 // WebSocket Message DTOs
 // These DTOs provide type-safe validation for WebSocket message payloads
 
-import { IsString, IsNumber, IsOptional, IsObject, ValidateNested, Min, Max, IsEnum, IsBoolean, IsArray } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsObject, ValidateNested, Min, Max, MaxLength, IsEnum, IsBoolean, IsArray, IsNotEmpty } from 'class-validator';
 import { Type } from 'class-transformer';
 
 /**
@@ -160,6 +160,31 @@ export class PlaylistRequestDto {
 }
 
 /**
+ * Screenshot response from device
+ * MaxLength aligned with runtime check: 2MB base64 = ~2,796,203 chars
+ */
+export class ScreenshotResponseDto {
+  @IsString()
+  requestId: string;
+
+  @IsString()
+  @MaxLength(2 * 1024 * 1024)
+  imageData: string;
+
+  @IsNumber()
+  @Min(1)
+  width: number;
+
+  @IsNumber()
+  @Min(1)
+  height: number;
+
+  @IsOptional()
+  @IsString()
+  timestamp?: string;
+}
+
+/**
  * Response wrapper for WebSocket messages
  */
 export interface WebSocketResponse<T = unknown> {
@@ -189,4 +214,31 @@ export function createErrorResponse(error: string): WebSocketResponse {
     error,
     timestamp: new Date().toISOString(),
   };
+}
+
+/**
+ * DTO for join:organization event
+ */
+export class JoinOrganizationDto {
+  @IsString()
+  @IsNotEmpty()
+  organizationId: string;
+}
+
+/**
+ * DTO for join:room event
+ */
+export class JoinRoomDto {
+  @IsString()
+  @IsNotEmpty()
+  room: string;
+}
+
+/**
+ * DTO for leave:room event
+ */
+export class LeaveRoomDto {
+  @IsString()
+  @IsNotEmpty()
+  room: string;
 }

@@ -396,6 +396,8 @@ export class PlaylistsService {
             this.httpService.post(url, {
               deviceId: display.id,
               playlist,
+            }, {
+              headers: { 'x-internal-api-key': process.env.INTERNAL_API_SECRET || '' },
             }),
           );
           this.logger.log(`Notified display ${display.id} of playlist update`);

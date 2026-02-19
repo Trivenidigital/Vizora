@@ -15,9 +15,22 @@ module.exports = {
     '**/*.(t|j)s',
     '!**/*.spec.ts',
     '!**/__tests__/**',
+    '!**/*.module.ts',
+    '!**/index.ts',
+    '!**/main.ts',
+    '!**/seed/**',
   ],
   coverageDirectory: '../coverage',
+  coverageThreshold: {
+    global: {
+      branches: 70,
+      functions: 70,
+      lines: 70,
+      statements: 70,
+    },
+  },
   testEnvironment: 'node',
+  detectOpenHandles: true,
   moduleNameMapper: {
     '^@vizora/database$': '<rootDir>/../test/__mocks__/database.ts',
   },

@@ -24,7 +24,8 @@ import { MetricsAuthMiddleware } from '../metrics/metrics-auth.middleware';
     }),
     JwtModule.register({
       secret: process.env.DEVICE_JWT_SECRET,
-      signOptions: { expiresIn: '365d' },
+      signOptions: { expiresIn: '365d', algorithm: 'HS256' as const },
+      verifyOptions: { algorithms: ['HS256' as const] },
     }),
     ScheduleModule.forRoot(),
     DatabaseModule,

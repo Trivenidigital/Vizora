@@ -152,13 +152,18 @@ describe('AuthController', () => {
   });
 
   describe('refresh', () => {
+    const mockRequest = {
+      cookies: { [AUTH_CONSTANTS.COOKIE_NAME]: 'old-jwt-token' },
+      headers: { authorization: 'Bearer old-jwt-token' },
+    } as any;
+
     it('should refresh token and set new cookie', async () => {
       authService.refresh.mockResolvedValue({
         token: 'new-jwt-token',
         expiresIn: AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS,
       });
 
-      const result = await controller.refresh('user-123', mockResponse as Response);
+      const result = await controller.refresh('user-123', mockRequest, mockResponse as Response);
 
       expect(result.success).toBe(true);
       expect(result.data.expiresIn).toBe(AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS);
@@ -172,10 +177,21 @@ describe('AuthController', () => {
       );
     });
 
+    it('should pass current token to auth service for revocation', async () => {
+      authService.refresh.mockResolvedValue({
+        token: 'new-jwt-token',
+        expiresIn: AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS,
+      });
+
+      await controller.refresh('user-123', mockRequest, mockResponse as Response);
+
+      expect(authService.refresh).toHaveBeenCalledWith('user-123', 'old-jwt-token');
+    });
+
     it('should propagate UnauthorizedException for invalid user', async () => {
       authService.refresh.mockRejectedValue(new UnauthorizedException('User not found'));
 
-      await expect(controller.refresh('invalid-id', mockResponse as Response))
+      await expect(controller.refresh('invalid-id', mockRequest, mockResponse as Response))
         .rejects.toThrow(UnauthorizedException);
     });
   });
@@ -184,7 +200,12 @@ describe('AuthController', () => {
     it('should logout user and clear cookie', async () => {
       authService.logout.mockResolvedValue({ message: 'Logged out successfully' });
 
-      const result = await controller.logout('user-123', mockResponse as Response);
+      const mockRequest = {
+        cookies: { [AUTH_CONSTANTS.COOKIE_NAME]: 'jwt-token' },
+        headers: {},
+      } as any;
+
+      const result = await controller.logout('user-123', mockRequest, mockResponse as Response);
 
       expect(result.success).toBe(true);
       expect(result.message).toBe('Logged out successfully');
@@ -195,6 +216,32 @@ describe('AuthController', () => {
           path: '/',
         }),
       );
+    });
+
+    it('should pass token from cookie to auth service for revocation', async () => {
+      authService.logout.mockResolvedValue({ message: 'Logged out successfully' });
+
+      const mockRequest = {
+        cookies: { [AUTH_CONSTANTS.COOKIE_NAME]: 'jwt-token-from-cookie' },
+        headers: {},
+      } as any;
+
+      await controller.logout('user-123', mockRequest, mockResponse as Response);
+
+      expect(authService.logout).toHaveBeenCalledWith('user-123', 'jwt-token-from-cookie');
+    });
+
+    it('should pass token from Authorization header when no cookie', async () => {
+      authService.logout.mockResolvedValue({ message: 'Logged out successfully' });
+
+      const mockRequest = {
+        cookies: {},
+        headers: { authorization: 'Bearer jwt-token-from-header' },
+      } as any;
+
+      await controller.logout('user-123', mockRequest, mockResponse as Response);
+
+      expect(authService.logout).toHaveBeenCalledWith('user-123', 'jwt-token-from-header');
     });
   });
 

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // Pages that don't require authentication
-const publicPaths = ['/login', '/register', '/'];
+const publicPaths = ['/login', '/register', '/', '/display'];
 
 function base64UrlDecode(str: string): string {
   // Convert Base64url to standard Base64
@@ -27,6 +27,27 @@ function isValidJwtFormat(token: string): boolean {
   }
 }
 
+// Decode JWT payload without signature verification.
+// Returns the parsed payload object, or null if decoding fails.
+// This is defense-in-depth — actual auth verification happens at the API level.
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    return JSON.parse(base64UrlDecode(parts[1]));
+  } catch {
+    return null;
+  }
+}
+
+// Check if the decoded JWT payload indicates a super admin user.
+// Checks for either `isSuperAdmin: true` or `role: 'superadmin'` in the payload.
+function isSuperAdminFromPayload(payload: Record<string, unknown>): boolean {
+  if (payload.isSuperAdmin === true) return true;
+  if (payload.role === 'superadmin') return true;
+  return false;
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -47,7 +68,18 @@ export function middleware(request: NextRequest) {
     loginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(loginUrl);
   }
-  
+
+  // Defense-in-depth: block non-superadmin users from accessing /admin routes.
+  // This decodes the JWT payload (without signature verification) to check for
+  // superadmin privileges. Actual auth verification happens at the API level.
+  if (token && (pathname === '/admin' || pathname.startsWith('/admin/'))) {
+    const payload = decodeJwtPayload(token);
+    if (!payload || !isSuperAdminFromPayload(payload)) {
+      const dashboardUrl = new URL('/dashboard', request.url);
+      return NextResponse.redirect(dashboardUrl);
+    }
+  }
+
   return NextResponse.next();
 }
 
