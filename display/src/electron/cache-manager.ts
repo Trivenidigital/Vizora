@@ -63,15 +63,21 @@ export class CacheManager {
   async downloadContent(id: string, url: string, mimeType: string): Promise<string> {
     // Prevent duplicate downloads
     if (this.downloadingSet.has(id)) {
-      // Wait for existing download
+      // Wait for existing download with timeout
       return new Promise((resolve) => {
+        const timeoutMs = 60000;
         const check = setInterval(() => {
           if (!this.downloadingSet.has(id)) {
             clearInterval(check);
+            clearTimeout(timeout);
             const cached = this.getCachedPath(id);
             resolve(cached || url);
           }
         }, 500);
+        const timeout = setTimeout(() => {
+          clearInterval(check);
+          resolve(url);
+        }, timeoutMs);
       });
     }
 

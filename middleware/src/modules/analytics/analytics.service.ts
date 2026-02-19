@@ -128,6 +128,16 @@ export class AnalyticsService {
     const { startDate } = this.getDateRange(range);
     const days = this.getRangeDays(range);
 
+    const impressionGroups = await this.db.contentImpression.groupBy({
+      by: ['date'],
+      where: {
+        organizationId,
+        timestamp: { gte: startDate },
+      },
+      _count: { id: true },
+    });
+
+    // Also get type breakdown per date using a bounded query
     const impressions = await this.db.contentImpression.findMany({
       where: {
         organizationId,
@@ -137,6 +147,7 @@ export class AnalyticsService {
         date: true,
         content: { select: { type: true } },
       },
+      take: 50000,
     });
 
     // Group by date and type

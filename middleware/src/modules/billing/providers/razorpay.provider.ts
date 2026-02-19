@@ -184,6 +184,10 @@ export class RazorpayProvider implements PaymentProvider {
       .update(payload)
       .digest('hex');
 
+    if (!signature || typeof signature !== 'string') {
+      throw new Error('Missing or invalid webhook signature');
+    }
+
     const sigBuffer = Buffer.from(signature, 'hex');
     const expectedBuffer = Buffer.from(expectedSignature, 'hex');
     if (sigBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {

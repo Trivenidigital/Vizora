@@ -115,8 +115,14 @@ export class DeviceContentController {
 
       // Buffer the entire file to send with Content-Length.
       // Chunked streaming was causing truncated responses via nginx.
+      const maxFileSize = 100 * 1024 * 1024; // 100MB limit
       const chunks: Buffer[] = [];
+      let totalSize = 0;
       for await (const chunk of stream as AsyncIterable<Buffer>) {
+        totalSize += chunk.length;
+        if (totalSize > maxFileSize) {
+          throw new BadRequestException('Content file exceeds maximum size limit (100MB)');
+        }
         chunks.push(chunk);
       }
       const buffer = Buffer.concat(chunks);

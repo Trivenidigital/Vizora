@@ -1,5 +1,6 @@
 import { Injectable, NestMiddleware } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
+import * as crypto from 'crypto';
 
 /**
  * Restricts access to /internal/metrics to localhost or requests with
@@ -24,7 +25,12 @@ export class MetricsAuthMiddleware implements NestMiddleware {
     const metricsToken = process.env.METRICS_TOKEN;
     if (metricsToken) {
       const authHeader = req.headers.authorization;
-      if (authHeader === `Bearer ${metricsToken}`) {
+      const expected = `Bearer ${metricsToken}`;
+      if (
+        authHeader &&
+        authHeader.length === expected.length &&
+        crypto.timingSafeEqual(Buffer.from(authHeader), Buffer.from(expected))
+      ) {
         return next();
       }
     }

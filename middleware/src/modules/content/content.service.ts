@@ -893,52 +893,62 @@ export class ContentService {
     const metadata = (layout.metadata as Record<string, any>) || {};
     const zones = metadata.zones || [];
 
-    // Resolve content for each zone
-    const resolvedZones = await Promise.all(
-      zones.map(async (zone: any) => {
-        const resolved: any = { ...zone };
+    // Batch-fetch all playlist and content IDs to avoid N+1 queries
+    const playlistIds = zones.filter((z: any) => z.playlistId).map((z: any) => z.playlistId);
+    const contentIds = zones.filter((z: any) => z.contentId).map((z: any) => z.contentId);
 
-        // Resolve playlist content for zone
-        if (zone.playlistId) {
-          const playlist = await this.db.playlist.findFirst({
-            where: { id: zone.playlistId, organizationId },
+    const [playlists, contents] = await Promise.all([
+      playlistIds.length > 0
+        ? this.db.playlist.findMany({
+            where: { id: { in: playlistIds }, organizationId },
             include: {
               items: {
                 include: { content: true },
                 orderBy: { order: 'asc' },
               },
             },
-          });
+          })
+        : Promise.resolve([]),
+      contentIds.length > 0
+        ? this.db.content.findMany({
+            where: { id: { in: contentIds }, organizationId },
+          })
+        : Promise.resolve([]),
+    ]);
 
-          if (playlist) {
-            resolved.playlist = {
-              id: playlist.id,
-              name: playlist.name,
-              items: playlist.items.map((item: any) => ({
-                id: item.id,
-                contentId: item.contentId,
-                duration: item.duration || 10,
-                order: item.order,
-                content: item.content ? this.mapContentResponse(item.content) : null,
-              })),
-            };
-          }
+    const playlistMap = new Map(playlists.map((p: any) => [p.id, p]));
+    const contentMap = new Map(contents.map((c: any) => [c.id, c]));
+
+    // Resolve content for each zone using pre-fetched data
+    const resolvedZones = zones.map((zone: any) => {
+      const resolved: any = { ...zone };
+
+      if (zone.playlistId) {
+        const playlist = playlistMap.get(zone.playlistId);
+        if (playlist) {
+          resolved.playlist = {
+            id: playlist.id,
+            name: playlist.name,
+            items: playlist.items.map((item: any) => ({
+              id: item.id,
+              contentId: item.contentId,
+              duration: item.duration || 10,
+              order: item.order,
+              content: item.content ? this.mapContentResponse(item.content) : null,
+            })),
+          };
         }
+      }
 
-        // Resolve single content for zone
-        if (zone.contentId) {
-          const content = await this.db.content.findFirst({
-            where: { id: zone.contentId, organizationId },
-          });
-
-          if (content) {
-            resolved.content = this.mapContentResponse(content);
-          }
+      if (zone.contentId) {
+        const content = contentMap.get(zone.contentId);
+        if (content) {
+          resolved.content = this.mapContentResponse(content);
         }
+      }
 
-        return resolved;
-      }),
-    );
+      return resolved;
+    });
 
     return {
       ...this.mapContentResponse(layout),
