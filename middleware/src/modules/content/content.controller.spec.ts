@@ -250,15 +250,20 @@ describe('ContentController', () => {
       );
     });
 
-    it('should set thumbnail for image content', async () => {
+    it('should fire-and-forget thumbnail generation for image content', async () => {
       await controller.uploadFile(organizationId, mockFile);
 
-      // Thumbnail is now generated after content creation and applied via update
+      // Thumbnail generation is now fire-and-forget (not awaited in upload handler)
+      // Verify it was called but the upload response returns immediately without thumbnail
       expect(mockThumbnailService.generateThumbnail).toHaveBeenCalledWith(
         'content-123',
         mockFile.buffer,
         mockFile.mimetype,
       );
+
+      // Allow the fire-and-forget promise to resolve
+      await new Promise(resolve => setImmediate(resolve));
+
       expect(mockContentService.update).toHaveBeenCalledWith(
         organizationId,
         'content-123',
@@ -470,18 +475,30 @@ describe('ContentController', () => {
       );
     });
 
-    it('should set thumbnail for image files', async () => {
+    it('should fire-and-forget thumbnail generation for image files', async () => {
       await controller.replaceFile(organizationId, 'content-123', mockFile, {});
 
+      // replaceFile no longer passes thumbnail — it's generated in background
+      expect(mockContentService.replaceFile).toHaveBeenCalledWith(
+        organizationId,
+        'content-123',
+        expect.any(String),
+        expect.not.objectContaining({ thumbnail: expect.any(String) }),
+      );
+
+      // Thumbnail is generated fire-and-forget
       expect(mockThumbnailService.generateThumbnail).toHaveBeenCalledWith(
         'content-123',
         mockFile.buffer,
         mockFile.mimetype,
       );
-      expect(mockContentService.replaceFile).toHaveBeenCalledWith(
+
+      // Allow the fire-and-forget promise to resolve
+      await new Promise(resolve => setImmediate(resolve));
+
+      expect(mockContentService.update).toHaveBeenCalledWith(
         organizationId,
         'content-123',
-        expect.any(String),
         expect.objectContaining({ thumbnail: expect.any(String) }),
       );
     });

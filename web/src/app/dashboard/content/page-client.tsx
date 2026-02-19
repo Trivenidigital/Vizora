@@ -53,6 +53,7 @@ export default function ContentClient() {
  const [viewMode, setViewMode] = useState<'grid' | 'list'>(getInitialView);
  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+ const [uploadProgress, setUploadProgress] = useState<number>(0);
  const [uploadQueue, setUploadQueue] = useState<Array<{
  file: File;
  status: 'pending' | 'uploading' | 'success' | 'error';
@@ -319,25 +320,27 @@ export default function ContentClient() {
 
  try {
  setActionLoading(true);
- // Pass file if available, otherwise pass the form as-is (for URL type)
- const contentData = uploadForm.file
- ? { title: uploadForm.title, type: uploadForm.type, file: uploadForm.file }
- : { title: uploadForm.title, type: uploadForm.type, url: uploadForm.url };
+ setUploadProgress(0);
 
- const newContent = await apiClient.createContent(contentData);
- 
- // Generate thumbnail for images
- if (uploadForm.type === 'image' && newContent.id) {
- try {
- await apiClient.post(`/content/${newContent.id}/thumbnail`);
- } catch (thumbnailError) {
- // Don't fail upload if thumbnail generation fails
- console.warn('Thumbnail generation failed:', thumbnailError);
+ let newContent;
+ if (uploadForm.file) {
+ // Use progress-tracking upload for file uploads
+ newContent = await apiClient.uploadContentWithProgress(
+ { title: uploadForm.title, type: uploadForm.type, file: uploadForm.file },
+ (percent) => setUploadProgress(percent),
+ );
+ } else {
+ // URL-based content creation
+ newContent = await apiClient.createContent({
+ title: uploadForm.title,
+ type: uploadForm.type,
+ url: uploadForm.url,
+ });
  }
- }
- 
+
  toast.success('Content uploaded successfully');
  setIsUploadModalOpen(false);
+ setUploadProgress(0);
  if (uploadForm.url.startsWith('blob:')) {
  URL.revokeObjectURL(uploadForm.url);
  }
@@ -348,6 +351,7 @@ export default function ContentClient() {
  toast.error(error.message || 'Failed to upload content');
  } finally {
  setActionLoading(false);
+ setUploadProgress(0);
  }
  };
 
@@ -1334,6 +1338,22 @@ export default function ContentClient() {
  </div>
  )}
  
+ {/* Upload Progress Bar */}
+ {actionLoading && uploadProgress > 0 && (
+ <div className="space-y-2">
+ <div className="flex justify-between text-sm">
+ <span className="text-[var(--foreground-secondary)]">Uploading...</span>
+ <span className="font-medium text-[#00E5A0]">{uploadProgress}%</span>
+ </div>
+ <div className="w-full bg-[var(--border)] rounded-full h-2.5 overflow-hidden">
+ <div
+ className="bg-[#00E5A0] h-2.5 rounded-full transition-all duration-300 ease-out"
+ style={{ width: `${uploadProgress}%` }}
+ />
+ </div>
+ </div>
+ )}
+
  <div className="flex justify-end gap-3 pt-4">
  <button
  onClick={() => {
@@ -1342,9 +1362,11 @@ export default function ContentClient() {
  }
  setUploadForm({ title: '', type: 'image', url: '', file: null });
  setUploadQueue([]);
+ setUploadProgress(0);
  setIsUploadModalOpen(false);
  }}
  className="px-4 py-2 text-sm font-medium text-[var(--foreground-secondary)] bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition"
+ disabled={actionLoading}
  >
  Cancel
  </button>
@@ -1354,7 +1376,7 @@ export default function ContentClient() {
  disabled={actionLoading || (uploadQueue.length === 0 && (!uploadForm.title || !uploadForm.url))}
  >
  {actionLoading && <LoadingSpinner size="sm" />}
- {uploadQueue.length > 0 
+ {uploadQueue.length > 0
  ? `Upload ${uploadQueue.length} File${uploadQueue.length > 1 ? 's' : ''}`
  : 'Upload Content'
  }

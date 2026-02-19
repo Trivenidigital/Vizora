@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { Prisma } from '@vizora/database';
 import { DatabaseService } from '../database/database.service';
+import { RedisService } from '../redis/redis.service';
 import { InviteUserDto } from './dto/invite-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
@@ -8,7 +9,10 @@ import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly redisService: RedisService,
+  ) {}
 
   async findAll(organizationId: string, pagination: PaginationDto) {
     const { page = 1, limit = 10 } = pagination;
@@ -145,6 +149,9 @@ export class UsersService {
       },
     });
 
+    // Invalidate auth cache so JWT validation picks up changes
+    await this.redisService.del(`user_auth:${id}`);
+
     // Log audit event
     await this.db.auditLog.create({
       data: {
@@ -182,6 +189,9 @@ export class UsersService {
         updatedAt: true,
       },
     });
+
+    // Invalidate auth cache so deactivation takes effect immediately
+    await this.redisService.del(`user_auth:${id}`);
 
     // Log audit event
     await this.db.auditLog.create({

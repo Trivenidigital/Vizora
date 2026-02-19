@@ -56,6 +56,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
+  private static readonly USER_CACHE_TTL = 60; // seconds
+  private static readonly USER_CACHE_PREFIX = 'user_auth:';
+
   async validate(payload: JwtPayload) {
     // Reject device tokens in user authentication — devices must use
     // their own auth path with DEVICE_JWT_SECRET, not the user JWT_SECRET
@@ -71,7 +74,29 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       }
     }
 
-    // Validate user exists and is active
+    // Check Redis cache first to avoid DB hit on every request
+    const cacheKey = `${JwtStrategy.USER_CACHE_PREFIX}${payload.sub}`;
+    const cached = await this.redisService.get(cacheKey);
+    if (cached) {
+      try {
+        const userData = JSON.parse(cached);
+        if (!userData.isActive) {
+          throw new UnauthorizedException('User not found or inactive');
+        }
+        return {
+          id: userData.id,
+          email: userData.email,
+          organizationId: userData.organizationId,
+          role: userData.role,
+          organization: userData.organization,
+        };
+      } catch (e) {
+        if (e instanceof UnauthorizedException) throw e;
+        // Cache parse error — fall through to DB
+      }
+    }
+
+    // Cache miss — query database
     const user = await this.databaseService.user.findUnique({
       where: { id: payload.sub },
       include: { organization: true },
@@ -80,6 +105,17 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!user || !user.isActive) {
       throw new UnauthorizedException('User not found or inactive');
     }
+
+    // Cache the user data in Redis
+    const userDataToCache = {
+      id: user.id,
+      email: user.email,
+      organizationId: user.organizationId,
+      role: user.role,
+      isActive: user.isActive,
+      organization: user.organization,
+    };
+    await this.redisService.set(cacheKey, JSON.stringify(userDataToCache), JwtStrategy.USER_CACHE_TTL);
 
     return {
       id: user.id,

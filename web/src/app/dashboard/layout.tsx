@@ -8,6 +8,7 @@ import Breadcrumbs from '@/components/Breadcrumbs';
 import ThemeToggle from '@/components/ThemeToggle';
 import NotificationBell from '@/components/NotificationBell';
 import { DeviceStatusProvider } from '@/lib/context/DeviceStatusContext';
+import QueryProvider from '@/lib/providers/QueryProvider';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { Icon } from '@/theme/icons';
 import type { IconName } from '@/theme/icons';
@@ -219,16 +220,18 @@ export default function DashboardLayout({
             <LoadingSpinner size="lg" />
           </div>
         ) : (
-          <DeviceStatusProvider user={user}>
-            <main id="main-content" className="flex-1 p-6 sm:p-8 lg:p-10 min-h-[calc(100vh-4rem)] overflow-x-hidden">
-              <div className="max-w-7xl mx-auto">
-                <Breadcrumbs />
-                <div className="animate-[fadeIn_0.2s_ease-out]">
-                  {children}
+          <QueryProvider>
+            <DeviceStatusProvider user={user}>
+              <main id="main-content" className="flex-1 p-6 sm:p-8 lg:p-10 min-h-[calc(100vh-4rem)] overflow-x-hidden">
+                <div className="max-w-7xl mx-auto">
+                  <Breadcrumbs />
+                  <div className="animate-[fadeIn_0.2s_ease-out]">
+                    {children}
+                  </div>
                 </div>
-              </div>
-            </main>
-          </DeviceStatusProvider>
+              </main>
+            </DeviceStatusProvider>
+          </QueryProvider>
         )}
       </div>
     </div>

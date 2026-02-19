@@ -23,6 +23,8 @@ describe('JwtStrategy', () => {
 
     mockRedisService = {
       exists: jest.fn().mockResolvedValue(false),
+      get: jest.fn().mockResolvedValue(null),
+      set: jest.fn().mockResolvedValue(true),
     } as any;
   });
 

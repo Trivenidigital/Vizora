@@ -1319,4 +1319,65 @@ class ApiClient {
   }
 }
 
+  /**
+   * Upload content with progress tracking via XMLHttpRequest.
+   * Returns the created content and reports upload progress via callback.
+   */
+  uploadContentWithProgress(
+    data: { title: string; type: string; file: File },
+    onProgress?: (percent: number) => void,
+  ): Promise<Content> {
+    return new Promise((resolve, reject) => {
+      const formData = new FormData();
+      formData.append('file', data.file);
+      formData.append('name', data.title);
+      formData.append('type', data.type);
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${this.baseUrl}/content/upload`);
+      xhr.withCredentials = true;
+
+      const csrfToken = getCsrfToken();
+      if (csrfToken) {
+        xhr.setRequestHeader('X-CSRF-Token', csrfToken);
+      }
+
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable && onProgress) {
+          const percent = Math.round((event.loaded / event.total) * 100);
+          onProgress(percent);
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const result = JSON.parse(xhr.responseText);
+            // Unwrap response envelope
+            const unwrapped = result?.success !== undefined && result?.data !== undefined
+              ? result.data
+              : result;
+            resolve(unwrapped.content || unwrapped);
+          } catch {
+            reject(new Error('Failed to parse upload response'));
+          }
+        } else {
+          try {
+            const error = JSON.parse(xhr.responseText);
+            reject(new Error(error.message || `HTTP ${xhr.status}`));
+          } catch {
+            reject(new Error(`Upload failed with status ${xhr.status}`));
+          }
+        }
+      };
+
+      xhr.onerror = () => reject(new Error('Network error during upload'));
+      xhr.ontimeout = () => reject(new Error('Upload timeout'));
+      xhr.timeout = 120000;
+
+      xhr.send(formData);
+    });
+  }
+}
+
 export const apiClient = new ApiClient(API_BASE_URL);
