@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
   Query,
   Body,
@@ -17,6 +18,8 @@ import { TemplateLibraryService } from './template-library.service';
 import { SkipOutputSanitize } from '../common/interceptors/sanitize.interceptor';
 import { SearchTemplatesDto } from './dto/search-templates.dto';
 import { CloneTemplateDto } from './dto/clone-template.dto';
+import { CreateTemplateDto } from './dto/create-template.dto';
+import { UpdateTemplateDto } from './dto/update-template.dto';
 
 @UseGuards(RolesGuard)
 @Controller('template-library')
@@ -45,6 +48,16 @@ export class TemplateLibraryController {
   @Roles('admin', 'manager', 'viewer')
   getSeasonal() {
     return this.templateLibraryService.getSeasonal();
+  }
+
+  @Post()
+  @Roles('admin')
+  @HttpCode(HttpStatus.CREATED)
+  create(
+    @CurrentUser('organizationId') organizationId: string,
+    @Body() dto: CreateTemplateDto,
+  ) {
+    return this.templateLibraryService.createTemplateForOrg(dto, organizationId);
   }
 
   @Get(':id')
@@ -78,5 +91,21 @@ export class TemplateLibraryController {
     @Body('isFeatured') isFeatured: boolean,
   ) {
     return this.templateLibraryService.setFeatured(id, isFeatured);
+  }
+
+  @Patch(':id')
+  @Roles('admin')
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateTemplateDto,
+  ) {
+    return this.templateLibraryService.updateTemplate(id, dto);
+  }
+
+  @Delete(':id')
+  @Roles('admin')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  remove(@Param('id') id: string) {
+    return this.templateLibraryService.deleteTemplate(id);
   }
 }

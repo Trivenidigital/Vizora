@@ -1253,6 +1253,50 @@ class ApiClient {
     });
   }
 
+  // ========== Template Admin API Methods ==========
+
+  async createTemplate(data: {
+    name: string;
+    description?: string;
+    templateHtml: string;
+    category: string;
+    difficulty?: string;
+    orientation?: string;
+    tags?: string[];
+    sampleData?: Record<string, any>;
+    thumbnailUrl?: string;
+    duration?: number;
+  }): Promise<any> {
+    return this.request<any>('/template-library', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateTemplate(id: string, data: {
+    name?: string;
+    description?: string;
+    templateHtml?: string;
+    category?: string;
+    difficulty?: string;
+    orientation?: string;
+    tags?: string[];
+    sampleData?: Record<string, any>;
+    thumbnailUrl?: string;
+    duration?: number;
+  }): Promise<any> {
+    return this.request<any>(`/template-library/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteTemplate(id: string): Promise<void> {
+    await this.request<void>(`/template-library/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
   // ========== Widget API Methods ==========
 
   async getWidgetTypes(): Promise<WidgetType[]> {
@@ -1315,6 +1359,66 @@ class ApiClient {
   async removeQrOverlay(displayId: string): Promise<void> {
     return this.request<void>(`/displays/${displayId}/qr-overlay`, {
       method: 'DELETE',
+    });
+  }
+
+  /**
+   * Upload content with progress tracking via XMLHttpRequest.
+   * Returns the created content and reports upload progress via callback.
+   */
+  uploadContentWithProgress(
+    data: { title: string; type: string; file: any },
+    onProgress?: (percent: number) => void,
+  ): Promise<Content> {
+    return new Promise((resolve, reject) => {
+      const formData = new FormData();
+      formData.append('file', data.file);
+      formData.append('name', data.title);
+      formData.append('type', data.type);
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${this.baseUrl}/content/upload`);
+      xhr.withCredentials = true;
+
+      const csrfToken = getCsrfToken();
+      if (csrfToken) {
+        xhr.setRequestHeader('X-CSRF-Token', csrfToken);
+      }
+
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable && onProgress) {
+          const percent = Math.round((event.loaded / event.total) * 100);
+          onProgress(percent);
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const result = JSON.parse(xhr.responseText);
+            // Unwrap response envelope
+            const unwrapped = result?.success !== undefined && result?.data !== undefined
+              ? result.data
+              : result;
+            resolve(unwrapped.content || unwrapped);
+          } catch {
+            reject(new Error('Failed to parse upload response'));
+          }
+        } else {
+          try {
+            const error = JSON.parse(xhr.responseText);
+            reject(new Error(error.message || `HTTP ${xhr.status}`));
+          } catch {
+            reject(new Error(`Upload failed with status ${xhr.status}`));
+          }
+        }
+      };
+
+      xhr.onerror = () => reject(new Error('Network error during upload'));
+      xhr.ontimeout = () => reject(new Error('Upload timeout'));
+      xhr.timeout = 120000;
+
+      xhr.send(formData);
     });
   }
 }

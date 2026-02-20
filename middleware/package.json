@@ -113,6 +113,7 @@
     "bullmq": "^5.67.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "compression": "^1.8.1",
     "cookie-parser": "^1.4.7",
     "cron-parser": "^5.5.0",
     "dotenv": "^17.2.3",
@@ -140,6 +141,7 @@
   "devDependencies": {
     "@nestjs/testing": "^11.1.12",
     "@types/bcryptjs": "^3.0.0",
+    "@types/compression": "^1.8.1",
     "@types/cookie-parser": "^1.4.10",
     "@types/dompurify": "^3.2.0",
     "@types/express": "^4.17.21",

@@ -228,6 +228,7 @@ model Playlist {
   impressions        ContentImpression[]
 
   @@index([organizationId])
+  @@index([organizationId, updatedAt])
 }
 
 model PlaylistItem {
@@ -310,6 +311,8 @@ model Schedule {
   @@index([displayGroupId])
   @@index([startDate, endDate])
   @@index([isActive])
+  @@index([displayId, startDate, endDate])
+  @@index([displayGroupId, startDate, endDate])
 }
 
 // ============================================================================

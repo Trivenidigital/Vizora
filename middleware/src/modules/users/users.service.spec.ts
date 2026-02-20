@@ -1,6 +1,7 @@
 import { NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { DatabaseService } from '../database/database.service';
+import { RedisService } from '../redis/redis.service';
 
 jest.mock('bcryptjs', () => ({
   hash: jest.fn().mockResolvedValue('hashed-password'),
@@ -9,6 +10,7 @@ jest.mock('bcryptjs', () => ({
 describe('UsersService', () => {
   let service: UsersService;
   let db: any;
+  let mockRedisService: any;
 
   const organizationId = 'org-123';
   const adminUserId = 'user-admin-1';
@@ -40,7 +42,13 @@ describe('UsersService', () => {
       },
     };
 
-    service = new UsersService(db as unknown as DatabaseService);
+    mockRedisService = {
+      del: jest.fn().mockResolvedValue(true),
+      get: jest.fn().mockResolvedValue(null),
+      set: jest.fn().mockResolvedValue(true),
+    };
+
+    service = new UsersService(db as unknown as DatabaseService, mockRedisService as unknown as RedisService);
   });
 
   afterEach(() => {

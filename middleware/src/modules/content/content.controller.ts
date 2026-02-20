@@ -125,21 +125,18 @@ export class ContentController {
       metadata: { fileHash: validation.hash },
     } as CreateContentDto);
 
-    // Generate thumbnail using the real content ID (only once, after creation)
+    // Generate thumbnail in background (fire-and-forget to avoid blocking upload response)
     if (contentType === 'image') {
-      try {
-        const thumbnailUrl = await this.thumbnailService.generateThumbnail(
-          content.id,
-          file.buffer,
-          file.mimetype,
-        );
+      this.thumbnailService.generateThumbnail(
+        content.id,
+        file.buffer,
+        file.mimetype,
+      ).then(async (thumbnailUrl) => {
         await this.contentService.update(organizationId, content.id, { thumbnail: thumbnailUrl });
-        content.thumbnail = thumbnailUrl;
-        this.logger.debug(`Thumbnail generated: ${thumbnailUrl}`);
-      } catch (error) {
-        this.logger.warn(`Thumbnail generation failed during upload: ${error}`);
-        // Continue without thumbnail -- not a fatal error
-      }
+        this.logger.debug(`Thumbnail generated in background: ${thumbnailUrl}`);
+      }).catch((error) => {
+        this.logger.warn(`Background thumbnail generation failed: ${error}`);
+      });
     }
 
     return {
@@ -364,20 +361,6 @@ export class ContentController {
                        file.mimetype.startsWith('image/') ? 'image' :
                        file.mimetype === 'application/pdf' ? 'pdf' : 'url';
 
-    // Generate thumbnail directly from buffer for images
-    let thumbnailUrl: string | undefined;
-    if (contentType === 'image') {
-      try {
-        thumbnailUrl = await this.thumbnailService.generateThumbnail(
-          id,
-          file.buffer,
-          file.mimetype,
-        );
-      } catch (error) {
-        this.logger.warn(`Thumbnail generation failed during replace: ${error}`);
-      }
-    }
-
     const content = await this.contentService.replaceFile(
       organizationId,
       id,
@@ -385,11 +368,24 @@ export class ContentController {
       {
         name: replaceFileDto.name,
         keepBackup: replaceFileDto.keepBackup,
-        thumbnail: thumbnailUrl,
         fileSize: file.size,
         mimeType: file.mimetype,
       },
     );
+
+    // Generate thumbnail in background (fire-and-forget)
+    if (contentType === 'image') {
+      this.thumbnailService.generateThumbnail(
+        id,
+        file.buffer,
+        file.mimetype,
+      ).then(async (thumbnailUrl) => {
+        await this.contentService.update(organizationId, id, { thumbnail: thumbnailUrl });
+        this.logger.debug(`Replacement thumbnail generated in background: ${thumbnailUrl}`);
+      }).catch((error) => {
+        this.logger.warn(`Background thumbnail generation failed during replace: ${error}`);
+      });
+    }
 
     return {
       content,

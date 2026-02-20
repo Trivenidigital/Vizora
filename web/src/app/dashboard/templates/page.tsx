@@ -6,6 +6,7 @@ import { apiClient } from '@/lib/api';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import EmptyState from '@/components/EmptyState';
 import { Icon } from '@/theme/icons';
+import { useAuth } from '@/lib/hooks/useAuth';
 
 interface TemplateItem {
   id: string;
@@ -31,6 +32,10 @@ interface CategoryItem {
 }
 
 export default function TemplateLibraryPage() {
+  // Auth & admin detection
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
+
   // Data state
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
   const [featuredTemplates, setFeaturedTemplates] = useState<TemplateItem[]>([]);
@@ -41,6 +46,8 @@ export default function TemplateLibraryPage() {
   const [loading, setLoading] = useState(true);
   const [featuredLoading, setFeaturedLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleteModalId, setDeleteModalId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -174,6 +181,15 @@ export default function TemplateLibraryPage() {
             Browse and clone professionally designed templates for your displays
           </p>
         </div>
+        {isAdmin && (
+          <Link
+            href="/dashboard/templates/new"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition font-semibold shadow-md hover:shadow-lg text-sm"
+          >
+            <Icon name="add" size="md" />
+            Create Template
+          </Link>
+        )}
       </div>
 
       {/* Featured Carousel */}
@@ -443,8 +459,29 @@ export default function TemplateLibraryPage() {
                   <Link
                     key={template.id}
                     href={`/dashboard/templates/${template.id}`}
-                    className="bg-[var(--surface)] rounded-lg shadow overflow-hidden hover:shadow-md hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] transition-all duration-300 group border border-transparent"
+                    className="relative bg-[var(--surface)] rounded-lg shadow overflow-hidden hover:shadow-md hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] transition-all duration-300 group border border-transparent"
                   >
+                    {/* Admin action buttons */}
+                    {isAdmin && (
+                      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                        <Link
+                          href={`/dashboard/templates/${template.id}?edit=true`}
+                          className="p-1.5 bg-[var(--surface)] border border-[var(--border)] rounded-md hover:bg-[var(--surface-hover)] transition"
+                          title="Edit template"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Icon name="edit" size="sm" className="text-[#00E5A0]" />
+                        </Link>
+                        <button
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteModalId(template.id); }}
+                          className="p-1.5 bg-[var(--surface)] border border-[var(--border)] rounded-md hover:bg-red-50 transition"
+                          title="Delete template"
+                        >
+                          <Icon name="delete" size="sm" className="text-red-500" />
+                        </button>
+                      </div>
+                    )}
+
                     {/* Thumbnail / Preview */}
                     <div className="h-48 bg-gradient-to-br from-[#00E5A0]/10 to-[#00B4D8]/10 flex items-center justify-center relative overflow-hidden">
                       {template.thumbnailUrl ? (
@@ -571,6 +608,47 @@ export default function TemplateLibraryPage() {
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteModalId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !deleting && setDeleteModalId(null)} />
+          <div className="relative bg-[var(--surface)] rounded-lg shadow-xl border border-[var(--border)] w-full max-w-sm mx-4 p-6 z-10">
+            <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">Delete Template</h3>
+            <p className="text-sm text-[var(--foreground-secondary)] mb-6">
+              Are you sure you want to delete this template? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteModalId(null)}
+                disabled={deleting}
+                className="px-4 py-2 text-sm font-medium text-[var(--foreground-secondary)] bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    setDeleting(true);
+                    await apiClient.deleteTemplate(deleteModalId);
+                    setDeleteModalId(null);
+                    loadTemplates();
+                    loadFeaturedTemplates();
+                  } catch (err: any) {
+                    setError(err.message || 'Failed to delete template');
+                  } finally {
+                    setDeleting(false);
+                  }
+                }}
+                disabled={deleting}
+                className="px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition disabled:opacity-50 flex items-center gap-2"
+              >
+                {deleting ? <><LoadingSpinner size="sm" /> Deleting...</> : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

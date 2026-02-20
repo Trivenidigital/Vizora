@@ -15,6 +15,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { join } from 'path';
 import helmet from 'helmet';
+import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app/app.module';
 import { SanitizeInterceptor } from './modules/common/interceptors/sanitize.interceptor';
@@ -37,16 +38,21 @@ async function bootstrap() {
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // Serve static files (thumbnails) — process.cwd() ensures consistency
-  // with ThumbnailService which writes to the same base directory
+  // Serve static files (thumbnails) with cache headers
   app.useStaticAssets(join(process.cwd(), 'static'), {
     prefix: '/static/',
+    maxAge: '7d',
   });
 
-  // Serve uploaded content files
+  // Serve uploaded content files with long cache (hash-based filenames)
   app.useStaticAssets(join(process.cwd(), 'uploads'), {
     prefix: '/uploads/',
+    maxAge: '30d',
+    immutable: true,
   });
+
+  // Response compression (gzip/brotli) — reduces API payload sizes by 60-80%
+  app.use(compression({ threshold: 1024, level: 6 }));
 
   // Cookie parser (required for httpOnly cookie authentication)
   app.use(cookieParser());

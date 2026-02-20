@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { Content } from '@/lib/types';
 import { Icon } from '@/theme/icons';
 import type { IconName } from '@/theme/icons';
@@ -66,10 +67,13 @@ export function ContentGrid({
             title="Click to preview"
           >
             {item.thumbnailUrl ? (
-              <img
+              <Image
                 src={item.thumbnailUrl}
                 alt={item.title}
-                className="w-full h-full object-cover"
+                fill
+                sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                className="object-cover"
+                loading="lazy"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
                   e.currentTarget.nextElementSibling?.classList.remove('hidden');
