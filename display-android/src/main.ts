@@ -18,6 +18,7 @@ import { SplashScreen } from '@capacitor/splash-screen';
 import { CapacitorHttp, HttpResponse } from '@capacitor/core';
 import { io, Socket } from 'socket.io-client';
 import { AndroidCacheManager } from './cache-manager';
+import { SecureStorage } from './secure-storage';
 
 // Configuration - can be overridden via URL params or stored preferences
 const DEFAULT_CONFIG = {
@@ -119,9 +120,10 @@ class VizoraAndroidTV {
     // Setup Capacitor plugins
     await this.setupCapacitor();
 
-    // Check for existing device token
-    const storedToken = await Preferences.get({ key: 'device_token' });
-    const storedDeviceId = await Preferences.get({ key: 'device_id' });
+    // Check for existing device token (from encrypted storage)
+    await this.migrateCredentialsToSecureStorage();
+    const storedToken = await SecureStorage.get({ key: 'device_token' });
+    const storedDeviceId = await SecureStorage.get({ key: 'device_id' });
 
     this.deviceToken = storedToken.value;
     this.deviceId = storedDeviceId.value;
@@ -263,6 +265,37 @@ class VizoraAndroidTV {
     }
   }
 
+  // ==================== CREDENTIAL MIGRATION ====================
+
+  /**
+   * Migrate device credentials from plain Preferences to SecureStorage.
+   * Runs once: if credentials exist in Preferences but not in SecureStorage,
+   * copies them over and removes the plaintext versions.
+   */
+  private async migrateCredentialsToSecureStorage() {
+    try {
+      const secureToken = await SecureStorage.get({ key: 'device_token' });
+      if (secureToken.value) return; // Already migrated
+
+      const plainToken = await Preferences.get({ key: 'device_token' });
+      const plainDeviceId = await Preferences.get({ key: 'device_id' });
+
+      if (plainToken.value) {
+        console.log('[Vizora] Migrating credentials to secure storage...');
+        await SecureStorage.set({ key: 'device_token', value: plainToken.value });
+        if (plainDeviceId.value) {
+          await SecureStorage.set({ key: 'device_id', value: plainDeviceId.value });
+        }
+        // Remove plaintext credentials
+        await Preferences.remove({ key: 'device_token' });
+        await Preferences.remove({ key: 'device_id' });
+        console.log('[Vizora] Credential migration complete');
+      }
+    } catch (error) {
+      console.error('[Vizora] Credential migration failed:', error);
+    }
+  }
+
   // ==================== PAIRING ====================
 
   private async startPairing() {
@@ -280,11 +313,11 @@ class VizoraAndroidTV {
       const deviceInfo = await this.getDeviceInfo();
       const deviceIdentifier = `android-${deviceInfo.screenWidth}x${deviceInfo.screenHeight}-${Date.now().toString(36)}`;
 
-      console.log('[Vizora] Making pairing request to:', `${this.config.apiUrl}/api/devices/pairing/request`);
+      console.log('[Vizora] Making pairing request to:', `${this.config.apiUrl}/api/v1/devices/pairing/request`);
 
       // Use Capacitor's native HTTP for Android
       const response: HttpResponse = await CapacitorHttp.post({
-        url: `${this.config.apiUrl}/api/devices/pairing/request`,
+        url: `${this.config.apiUrl}/api/v1/devices/pairing/request`,
         headers: { 'Content-Type': 'application/json' },
         data: {
           deviceIdentifier,
@@ -298,7 +331,10 @@ class VizoraAndroidTV {
         throw new Error(`Failed to request pairing code: ${response.status}`);
       }
 
-      const data = response.data;
+      // Unwrap response envelope: { success, data: { code, qrCode, ... } }
+      const responseBody = response.data;
+      const data = responseBody?.data ?? responseBody;
+      console.log('[Vizora] Pairing data:', JSON.stringify(data));
       this.pairingCode = data.code;
       this.deviceId = data.deviceId;
 
@@ -374,7 +410,7 @@ class VizoraAndroidTV {
       try {
         // Use Capacitor's native HTTP for Android
         const response: HttpResponse = await CapacitorHttp.get({
-          url: `${this.config.apiUrl}/api/devices/pairing/status/${this.pairingCode}`,
+          url: `${this.config.apiUrl}/api/v1/devices/pairing/status/${this.pairingCode}`,
         });
 
         if (response.status < 200 || response.status >= 300) {
@@ -386,7 +422,9 @@ class VizoraAndroidTV {
           throw new Error('Failed to check pairing status');
         }
 
-        const data = response.data;
+        // Unwrap response envelope: { success, data: { status, deviceToken, ... } }
+        const responseBody = response.data;
+        const data = responseBody?.data ?? responseBody;
 
         if (data.status === 'paired' && data.deviceToken) {
           console.log('[Vizora] Device paired successfully!');
@@ -394,9 +432,9 @@ class VizoraAndroidTV {
 
           this.deviceToken = data.deviceToken;
 
-          // Store credentials using Capacitor Preferences
-          await Preferences.set({ key: 'device_token', value: data.deviceToken });
-          await Preferences.set({ key: 'device_id', value: this.deviceId || '' });
+          // Store credentials in encrypted storage
+          await SecureStorage.set({ key: 'device_token', value: data.deviceToken });
+          await SecureStorage.set({ key: 'device_id', value: this.deviceId || '' });
 
           this.connectToRealtime();
         }
@@ -527,8 +565,8 @@ class VizoraAndroidTV {
 
       if (error.message.includes('unauthorized') || error.message.includes('invalid token')) {
         console.log('[Vizora] Token invalid, clearing credentials...');
-        await Preferences.remove({ key: 'device_token' });
-        await Preferences.remove({ key: 'device_id' });
+        await SecureStorage.remove({ key: 'device_token' });
+        await SecureStorage.remove({ key: 'device_id' });
         this.deviceToken = null;
         this.deviceId = null;
         setTimeout(() => this.startPairing(), 2000);
@@ -799,13 +837,16 @@ class VizoraAndroidTV {
 
       case 'clear_cache':
         await this.cacheManager.clearCache();
-        await Preferences.clear();
+        // Only clear config preferences, NOT device credentials
+        await Preferences.remove({ key: 'config_api_url' });
+        await Preferences.remove({ key: 'config_realtime_url' });
+        await Preferences.remove({ key: 'config_dashboard_url' });
         window.location.reload();
         break;
 
       case 'unpair':
-        await Preferences.remove({ key: 'device_token' });
-        await Preferences.remove({ key: 'device_id' });
+        await SecureStorage.remove({ key: 'device_token' });
+        await SecureStorage.remove({ key: 'device_id' });
         window.location.reload();
         break;
 

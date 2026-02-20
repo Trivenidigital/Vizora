@@ -1,3 +1,6 @@
+# Local Claude overrides (contains credentials)
+CLAUDE.local.md
+
 # Dependencies
 node_modules/
 .pnp
@@ -80,6 +83,11 @@ docker-compose.override.yml
 
 # NX
 .nx/
+
+# Android signing (NEVER commit keystores or signing credentials)
+*.keystore
+*.jks
+keystore.properties
 
 # Electron builds
 release/

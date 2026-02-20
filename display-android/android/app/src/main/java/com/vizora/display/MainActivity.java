@@ -8,6 +8,9 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // Register SecureStorage plugin before super.onCreate (which initializes the bridge)
+        registerPlugin(SecureStoragePlugin.class);
+
         super.onCreate(savedInstanceState);
 
         // C5: Register crash recovery handler for auto-restart
