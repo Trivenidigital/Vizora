@@ -11,7 +11,8 @@
     "dev": "nx run-many --target=serve --all --parallel",
     "test": "nx run-many --target=test --all",
     "test:e2e": "pnpm --filter @vizora/middleware test:e2e",
-    "lint": "ESLINT_USE_FLAT_CONFIG=false eslint --ext .ts,.tsx middleware/src realtime/src web/src"
+    "lint": "ESLINT_USE_FLAT_CONFIG=false eslint --ext .ts,.tsx middleware/src realtime/src",
+    "lint:web": "pnpm --filter @vizora/web exec next lint"
   },
   "private": true,
   "devDependencies": {

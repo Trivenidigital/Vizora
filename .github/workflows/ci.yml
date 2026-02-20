@@ -74,7 +74,10 @@ jobs:
 
       # Generate Prisma client for tests
       - name: Generate Prisma client
-        run: pnpm --filter @vizora/database exec prisma generate
+        run: |
+          pnpm --filter @vizora/database exec prisma generate
+          mkdir -p packages/database/dist/generated
+          cp -r packages/database/src/generated/* packages/database/dist/generated/
 
       # Push schema to test database
       - name: Setup test database
@@ -132,7 +135,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma client
-        run: pnpm --filter @vizora/database exec prisma generate
+        run: |
+          pnpm --filter @vizora/database exec prisma generate
+          mkdir -p packages/database/dist/generated
+          cp -r packages/database/src/generated/* packages/database/dist/generated/
 
       - name: Setup test database
         run: pnpm --filter @vizora/database exec prisma db push --skip-generate
@@ -157,7 +163,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma client
-        run: pnpm --filter @vizora/database exec prisma generate
+        run: |
+          pnpm --filter @vizora/database exec prisma generate
+          mkdir -p packages/database/dist/generated
+          cp -r packages/database/src/generated/* packages/database/dist/generated/
 
       - name: Build middleware
         run: npx nx build @vizora/middleware
