@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'Vizora Display',
   webDir: 'dist',
   server: {
-    cleartext: true,
+    cleartext: false,
     androidScheme: 'https',
   },
   plugins: {
