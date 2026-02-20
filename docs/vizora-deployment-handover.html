@@ -1,0 +1,1844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vizora Digital Signage — Deployment &amp; Handover Guide</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --primary-light: #818cf8;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --bg-code: #0d1117;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #3b82f6;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+            font-size: 15px;
+        }
+
+        .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+        /* Header */
+        header {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border-bottom: 2px solid var(--primary);
+            padding: 48px 0 40px;
+            text-align: center;
+        }
+        header .logo {
+            font-size: 42px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -1px;
+        }
+        header .subtitle {
+            color: var(--text-muted);
+            font-size: 18px;
+            margin-top: 8px;
+        }
+        header .meta {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 32px;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+        header .meta span { display: flex; align-items: center; gap: 6px; }
+
+        /* Navigation */
+        nav {
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        nav .toc-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 6px 16px;
+        }
+        nav a {
+            color: var(--primary-light);
+            text-decoration: none;
+            font-size: 13px;
+            padding: 4px 0;
+            display: block;
+            transition: color 0.2s;
+        }
+        nav a:hover { color: #fff; }
+        nav .nav-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+
+        /* Main sections */
+        main { padding: 40px 0 80px; }
+
+        section { margin-bottom: 60px; }
+
+        h2 {
+            font-size: 28px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 24px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        h2 .num {
+            background: var(--primary);
+            color: #fff;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        h3 {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--primary-light);
+            margin: 32px 0 16px;
+        }
+
+        h4 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text);
+            margin: 24px 0 12px;
+        }
+
+        p { margin-bottom: 14px; color: var(--text); }
+
+        /* Cards */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+        .card-header {
+            font-size: 16px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Code blocks */
+        pre {
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px 20px;
+            overflow-x: auto;
+            margin-bottom: 16px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        code {
+            font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+            color: #e2e8f0;
+        }
+        p code, li code, td code {
+            background: var(--bg-code);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: var(--primary-light);
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        th {
+            background: var(--bg-code);
+            color: var(--primary-light);
+            font-weight: 600;
+            text-align: left;
+            padding: 12px 16px;
+            border: 1px solid var(--border);
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        td {
+            padding: 10px 16px;
+            border: 1px solid var(--border);
+            vertical-align: top;
+        }
+        tr:nth-child(even) { background: rgba(255,255,255,0.02); }
+
+        /* Lists */
+        ul, ol {
+            padding-left: 24px;
+            margin-bottom: 14px;
+        }
+        li { margin-bottom: 6px; }
+
+        /* Alerts */
+        .alert {
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+        .alert-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+        .alert-warning {
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            color: #fbbf24;
+        }
+        .alert-danger {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+        }
+        .alert-info {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            color: #93c5fd;
+        }
+        .alert-success {
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            color: #86efac;
+        }
+
+        /* Steps */
+        .step {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--primary);
+            border-radius: 0 8px 8px 0;
+            padding: 20px 24px;
+            margin-bottom: 16px;
+        }
+        .step-num {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            background: var(--primary);
+            color: #fff;
+            border-radius: 50%;
+            font-size: 13px;
+            font-weight: 700;
+            margin-right: 10px;
+        }
+        .step-title {
+            font-weight: 600;
+            color: #fff;
+            font-size: 15px;
+        }
+        .step-body { margin-top: 12px; }
+
+        /* Badge */
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .badge-required { background: rgba(239,68,68,0.2); color: #fca5a5; }
+        .badge-optional { background: rgba(59,130,246,0.2); color: #93c5fd; }
+        .badge-port { background: rgba(99,102,241,0.2); color: var(--primary-light); }
+
+        /* Architecture diagram */
+        .arch-diagram {
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 32px;
+            margin: 20px 0;
+            font-family: 'Cascadia Code', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            overflow-x: auto;
+            white-space: pre;
+            text-align: center;
+        }
+
+        /* Checklist */
+        .checklist { list-style: none; padding-left: 0; }
+        .checklist li {
+            padding: 8px 0 8px 32px;
+            position: relative;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .checklist li::before {
+            content: '';
+            position: absolute;
+            left: 4px;
+            top: 12px;
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border);
+            border-radius: 3px;
+        }
+
+        /* Tabs */
+        .tab-group { margin-bottom: 20px; }
+        .tab-buttons {
+            display: flex;
+            gap: 0;
+            border-bottom: 2px solid var(--border);
+            margin-bottom: 0;
+        }
+        .tab-btn {
+            padding: 10px 20px;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+        .tab-btn.active { color: var(--primary-light); border-bottom-color: var(--primary); }
+        .tab-btn:hover { color: var(--text); }
+        .tab-content { display: none; padding: 20px 0; }
+        .tab-content.active { display: block; }
+
+        /* Grid */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        @media (max-width: 768px) {
+            .grid-2 { grid-template-columns: 1fr; }
+            nav .toc-grid { grid-template-columns: 1fr 1fr; }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+        /* Print */
+        @media print {
+            body { background: #fff; color: #000; }
+            .card, pre { border-color: #ccc; }
+            nav { display: none; }
+            header { border-color: #000; }
+        }
+
+        .env-var { color: #22c55e; }
+        .comment { color: #6b7280; }
+    </style>
+</head>
+<body>
+
+<!-- ============================================ -->
+<!-- HEADER                                        -->
+<!-- ============================================ -->
+<header>
+    <div class="container">
+        <div class="logo">VIZORA</div>
+        <div class="subtitle">Digital Signage Platform &mdash; Deployment &amp; Customer Handover Guide</div>
+        <div class="meta">
+            <span>Version 1.0.0</span>
+            <span>February 2026</span>
+            <span>Confidential</span>
+        </div>
+    </div>
+</header>
+
+<!-- ============================================ -->
+<!-- TABLE OF CONTENTS                             -->
+<!-- ============================================ -->
+<nav>
+    <div class="container">
+        <div class="nav-label">Table of Contents</div>
+        <div class="toc-grid">
+            <a href="#overview">1. Platform Overview</a>
+            <a href="#architecture">2. System Architecture</a>
+            <a href="#prerequisites">3. Prerequisites</a>
+            <a href="#infrastructure">4. Infrastructure Setup</a>
+            <a href="#env-config">5. Environment Configuration</a>
+            <a href="#core-deploy">6. Core Engine Deployment</a>
+            <a href="#android-tv">7. Android TV App</a>
+            <a href="#mobile-apps">8. Mobile Apps (iOS &amp; Android)</a>
+            <a href="#desktop-app">9. Desktop Display Client</a>
+            <a href="#nginx-ssl">10. Nginx &amp; SSL Setup</a>
+            <a href="#monitoring">11. Monitoring &amp; Logging</a>
+            <a href="#backups">12. Backups &amp; Recovery</a>
+            <a href="#security">13. Security Hardening</a>
+            <a href="#troubleshooting">14. Troubleshooting</a>
+            <a href="#checklist">15. Go-Live Checklist</a>
+        </div>
+    </div>
+</nav>
+
+<main>
+<div class="container">
+
+<!-- ============================================ -->
+<!-- 1. PLATFORM OVERVIEW                          -->
+<!-- ============================================ -->
+<section id="overview">
+    <h2><span class="num">1</span> Platform Overview</h2>
+
+    <p>Vizora is a complete digital signage management platform that enables businesses to manage and distribute content to display screens across multiple locations in real time. The system consists of three layers:</p>
+
+    <div class="grid-2">
+        <div class="card">
+            <div class="card-header">Vizora Engine (Backend)</div>
+            <ul>
+                <li><strong>Middleware API</strong> &mdash; REST API for all CRUD operations, authentication, file uploads</li>
+                <li><strong>Web Dashboard</strong> &mdash; Admin interface for managing content, displays, playlists, schedules</li>
+                <li><strong>Realtime Gateway</strong> &mdash; WebSocket server for live device communication, status updates, and content push</li>
+            </ul>
+        </div>
+        <div class="card">
+            <div class="card-header">Display Clients</div>
+            <ul>
+                <li><strong>Android TV App</strong> &mdash; Capacitor 6 + Vite app for Android TV devices (Sony, Samsung, Fire TV, etc.)</li>
+                <li><strong>Mobile App</strong> &mdash; Same Capacitor codebase targets Android phones and iOS devices</li>
+                <li><strong>Desktop Client</strong> &mdash; Electron app for Windows, macOS, and Linux display PCs</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">How It Works</div>
+        <ol>
+            <li>Admin logs into the <strong>Web Dashboard</strong>, creates content (images, videos, URLs, HTML templates), organizes them into playlists, and assigns schedules to displays</li>
+            <li>The <strong>Middleware API</strong> stores everything in PostgreSQL and files in MinIO (S3-compatible storage)</li>
+            <li>Display devices running the <strong>TV/Mobile/Desktop app</strong> connect via WebSocket to the <strong>Realtime Gateway</strong></li>
+            <li>When content changes, the Realtime Gateway pushes updates instantly to all affected devices</li>
+            <li>Devices download and render content autonomously, with offline fallback support</li>
+        </ol>
+    </div>
+</section>
+
+<!-- ============================================ -->
+<!-- 2. SYSTEM ARCHITECTURE                        -->
+<!-- ============================================ -->
+<section id="architecture">
+    <h2><span class="num">2</span> System Architecture</h2>
+
+    <h3>Service Port Assignments</h3>
+    <div class="alert alert-danger">
+        <span class="alert-icon">!</span>
+        <div><strong>Ports are hardcoded and validated at startup.</strong> Both Middleware and Realtime services will immediately exit if configured on the wrong port. Do not change these assignments.</div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Service</th>
+                <th>Technology</th>
+                <th>Port</th>
+                <th>Instances (Prod)</th>
+                <th>Notes</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Middleware API</strong></td>
+                <td>NestJS 11</td>
+                <td><span class="badge badge-port">3000</span></td>
+                <td>2 (cluster mode)</td>
+                <td>Stateless, horizontally scalable</td>
+            </tr>
+            <tr>
+                <td><strong>Web Dashboard</strong></td>
+                <td>Next.js 16 (App Router)</td>
+                <td><span class="badge badge-port">3001</span></td>
+                <td>1</td>
+                <td>SSR + client-side rendering</td>
+            </tr>
+            <tr>
+                <td><strong>Realtime Gateway</strong></td>
+                <td>NestJS + Socket.IO</td>
+                <td><span class="badge badge-port">3002</span></td>
+                <td>1 (must stay single)</td>
+                <td>WebSocket state in memory</td>
+            </tr>
+            <tr>
+                <td><strong>PostgreSQL</strong></td>
+                <td>PostgreSQL 16</td>
+                <td><span class="badge badge-port">5432</span></td>
+                <td>1</td>
+                <td>Primary database</td>
+            </tr>
+            <tr>
+                <td><strong>Redis</strong></td>
+                <td>Redis 7</td>
+                <td><span class="badge badge-port">6379</span></td>
+                <td>1</td>
+                <td>Cache, session, device status</td>
+            </tr>
+            <tr>
+                <td><strong>MongoDB</strong></td>
+                <td>MongoDB 7</td>
+                <td><span class="badge badge-port">27017</span></td>
+                <td>1</td>
+                <td>Analytics &amp; events</td>
+            </tr>
+            <tr>
+                <td><strong>MinIO</strong></td>
+                <td>MinIO S3</td>
+                <td><span class="badge badge-port">9000 / 9001</span></td>
+                <td>1</td>
+                <td>API / Console</td>
+            </tr>
+            <tr>
+                <td><strong>ClickHouse</strong></td>
+                <td>ClickHouse 24</td>
+                <td><span class="badge badge-port">8123</span></td>
+                <td>1</td>
+                <td>Analytics warehouse</td>
+            </tr>
+            <tr>
+                <td><strong>Grafana</strong></td>
+                <td>Grafana 11</td>
+                <td><span class="badge badge-port">3003</span></td>
+                <td>1</td>
+                <td>Monitoring dashboards</td>
+            </tr>
+            <tr>
+                <td><strong>Nginx</strong></td>
+                <td>nginx 1.27</td>
+                <td><span class="badge badge-port">80 / 443</span></td>
+                <td>2</td>
+                <td>TLS termination, reverse proxy</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3>Architecture Diagram</h3>
+    <div class="arch-diagram">
+                    Internet (HTTPS / WSS)
+                           |
+                    +------+------+
+                    |    Nginx    |  :80 / :443
+                    | (TLS Term.) |  Reverse Proxy
+                    +--+----+--+-+
+                       |    |  |
+          +------------+    |  +------------+
+          |                 |               |
+   +------+------+  +------+------+  +-----+-------+
+   | Web Dashboard|  | Middleware  |  |  Realtime   |
+   | Next.js :3001|  |  API :3000  |  | Gateway:3002|
+   +------+-------+  +------+------+  +------+------+
+          |                 |                 |
+          +--------+--------+---------+-------+
+                   |                  |
+          +--------+--------+  +-----+------+
+          |   PostgreSQL    |  |   Redis    |
+          |     :5432       |  |   :6379    |
+          +-----------------+  +------------+
+                   |
+     +-------------+-------------+
+     |             |             |
++----+----+  +----+----+  +-----+-----+
+| MongoDB |  |  MinIO  |  |ClickHouse |
+|  :27017 |  |  :9000  |  |  :8123    |
++---------+  +---------+  +-----------+
+
+  [Display Clients connect via WebSocket to Realtime Gateway]
+  Android TV | iOS | Android Phone | Windows | macOS | Linux</div>
+</section>
+
+<!-- ============================================ -->
+<!-- 3. PREREQUISITES                              -->
+<!-- ============================================ -->
+<section id="prerequisites">
+    <h2><span class="num">3</span> Prerequisites</h2>
+
+    <div class="grid-2">
+        <div class="card">
+            <div class="card-header">Server Requirements</div>
+            <table>
+                <tr><th>Spec</th><th>Minimum</th><th>Recommended</th></tr>
+                <tr><td>CPU</td><td>4 cores</td><td>8+ cores</td></tr>
+                <tr><td>RAM</td><td>8 GB</td><td>16+ GB</td></tr>
+                <tr><td>Disk</td><td>50 GB SSD</td><td>200+ GB SSD</td></tr>
+                <tr><td>OS</td><td colspan="2">Ubuntu 22.04+ / Debian 12+ / RHEL 9+</td></tr>
+                <tr><td>Network</td><td colspan="2">Static IP, ports 80 &amp; 443 open</td></tr>
+            </table>
+        </div>
+        <div class="card">
+            <div class="card-header">Software Prerequisites</div>
+            <table>
+                <tr><th>Software</th><th>Version</th><th>Purpose</th></tr>
+                <tr><td>Node.js</td><td>22+</td><td>Application runtime</td></tr>
+                <tr><td>pnpm</td><td>9+</td><td>Package manager</td></tr>
+                <tr><td>Docker</td><td>20.10+</td><td>Infrastructure services</td></tr>
+                <tr><td>Docker Compose</td><td>2.x</td><td>Service orchestration</td></tr>
+                <tr><td>PM2</td><td>5+</td><td>Process manager</td></tr>
+                <tr><td>Git</td><td>2.40+</td><td>Source control</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <h3>For Display Client Development</h3>
+    <div class="grid-2">
+        <div class="card">
+            <div class="card-header">Android TV / Mobile</div>
+            <ul>
+                <li>Android Studio (latest stable)</li>
+                <li>Java JDK 17</li>
+                <li>Android SDK Platform 34 (Android 14)</li>
+                <li>Android TV system image for emulator</li>
+                <li>USB debugging enabled on target TV</li>
+            </ul>
+        </div>
+        <div class="card">
+            <div class="card-header">iOS (Future / Capacitor)</div>
+            <ul>
+                <li>macOS with Xcode 15+ installed</li>
+                <li>Apple Developer Account ($99/year)</li>
+                <li>CocoaPods: <code>sudo gem install cocoapods</code></li>
+                <li>iOS 16+ deployment target</li>
+                <li>Physical device or Simulator for testing</li>
+            </ul>
+        </div>
+    </div>
+
+    <h3>DNS Records Required</h3>
+    <pre><code><span class="comment"># Create these DNS A records pointing to your server IP</span>
+api.yourdomain.com      A    &lt;SERVER_IP&gt;    <span class="comment"># Middleware API</span>
+app.yourdomain.com      A    &lt;SERVER_IP&gt;    <span class="comment"># Web Dashboard</span>
+ws.yourdomain.com       A    &lt;SERVER_IP&gt;    <span class="comment"># WebSocket Gateway</span>
+yourdomain.com          A    &lt;SERVER_IP&gt;    <span class="comment"># Root domain (optional)</span></code></pre>
+</section>
+
+<!-- ============================================ -->
+<!-- 4. INFRASTRUCTURE SETUP                       -->
+<!-- ============================================ -->
+<section id="infrastructure">
+    <h2><span class="num">4</span> Infrastructure Setup (Docker)</h2>
+
+    <p>All backing services (databases, cache, storage, monitoring) run via Docker Compose. The application services (middleware, web, realtime) run on the host via PM2.</p>
+
+    <div class="step">
+        <span class="step-num">1</span>
+        <span class="step-title">Install Docker &amp; Docker Compose</span>
+        <div class="step-body">
+<pre><code><span class="comment"># Ubuntu / Debian</span>
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+<span class="comment"># Log out and back in for group changes</span>
+
+<span class="comment"># Verify</span>
+docker --version
+docker compose version</code></pre>
+        </div>
+    </div>
+
+    <div class="step">
+        <span class="step-num">2</span>
+        <span class="step-title">Clone the Repository</span>
+        <div class="step-body">
+<pre><code>git clone git@github.com:your-org/vizora.git /var/www/vizora
+cd /var/www/vizora
+git checkout main</code></pre>
+        </div>
+    </div>
+
+    <div class="step">
+        <span class="step-num">3</span>
+        <span class="step-title">Start Infrastructure Services</span>
+        <div class="step-body">
+<pre><code><span class="comment"># Copy and configure environment file first (see Section 5)</span>
+cp .env.production.example .env
+nano .env
+
+<span class="comment"># Start all Docker services</span>
+docker compose -f docker/docker-compose.yml up -d
+
+<span class="comment"># On Linux, add the extra hosts override</span>
+docker compose -f docker/docker-compose.yml \
+               -f docker/docker-compose.linux.yml up -d
+
+<span class="comment"># Verify all containers are healthy</span>
+docker compose -f docker/docker-compose.yml ps</code></pre>
+        </div>
+    </div>
+
+    <div class="step">
+        <span class="step-num">4</span>
+        <span class="step-title">Verify Infrastructure Health</span>
+        <div class="step-body">
+<pre><code><span class="comment"># PostgreSQL</span>
+docker exec vizora-postgres pg_isready -U postgres
+
+<span class="comment"># Redis</span>
+docker exec vizora-redis redis-cli -a $REDIS_PASSWORD ping
+
+<span class="comment"># MongoDB</span>
+docker exec vizora-mongodb mongosh --eval "db.adminCommand('ping')"
+
+<span class="comment"># MinIO</span>
+curl http://localhost:9000/minio/health/live
+
+<span class="comment"># ClickHouse</span>
+docker exec vizora-clickhouse clickhouse-client --query "SELECT 1"
+
+<span class="comment"># Grafana</span>
+curl http://localhost:3003/api/health</code></pre>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================ -->
+<!-- 5. ENVIRONMENT CONFIGURATION                  -->
+<!-- ============================================ -->
+<section id="env-config">
+    <h2><span class="num">5</span> Environment Configuration</h2>
+
+    <div class="alert alert-warning">
+        <span class="alert-icon">!</span>
+        <div><strong>Never commit .env files to Git.</strong> Generate fresh secrets for every environment. Never reuse development secrets in production.</div>
+    </div>
+
+    <h3>Step 1: Generate Secure Secrets</h3>
+<pre><code><span class="comment"># Run each command separately and save the output</span>
+openssl rand -hex 32   <span class="comment"># &rarr; JWT_SECRET</span>
+openssl rand -hex 32   <span class="comment"># &rarr; DEVICE_JWT_SECRET</span>
+openssl rand -hex 24   <span class="comment"># &rarr; POSTGRES_PASSWORD</span>
+openssl rand -hex 24   <span class="comment"># &rarr; REDIS_PASSWORD</span>
+openssl rand -hex 24   <span class="comment"># &rarr; MINIO_SECRET_KEY</span>
+openssl rand -hex 24   <span class="comment"># &rarr; MONGO_PASSWORD</span>
+openssl rand -hex 24   <span class="comment"># &rarr; GRAFANA_ADMIN_PASSWORD</span></code></pre>
+
+    <h3>Step 2: Configure Production .env</h3>
+<pre><code><span class="comment"># ===================================================</span>
+<span class="comment"># VIZORA PRODUCTION ENVIRONMENT CONFIGURATION</span>
+<span class="comment"># ===================================================</span>
+
+<span class="comment"># Runtime</span>
+<span class="env-var">NODE_ENV</span>=production
+
+<span class="comment"># Service Ports (DO NOT CHANGE)</span>
+<span class="env-var">PORT</span>=3000
+<span class="env-var">MIDDLEWARE_PORT</span>=3000
+<span class="env-var">WEB_PORT</span>=3001
+<span class="env-var">REALTIME_PORT</span>=3002
+
+<span class="comment"># PostgreSQL</span>
+<span class="env-var">DATABASE_URL</span>=postgresql://postgres:YOUR_PG_PASSWORD@localhost:5432/vizora?connection_limit=10&pool_timeout=20&statement_timeout=30000
+<span class="env-var">POSTGRES_PASSWORD</span>=YOUR_PG_PASSWORD
+
+<span class="comment"># MongoDB</span>
+<span class="env-var">MONGODB_URL</span>=mongodb://mongoadmin:YOUR_MONGO_PASSWORD@localhost:27017/vizora?authSource=admin
+<span class="env-var">MONGO_INITDB_ROOT_USERNAME</span>=mongoadmin
+<span class="env-var">MONGO_INITDB_ROOT_PASSWORD</span>=YOUR_MONGO_PASSWORD
+
+<span class="comment"># Redis</span>
+<span class="env-var">REDIS_URL</span>=redis://:YOUR_REDIS_PASSWORD@localhost:6379
+<span class="env-var">REDIS_PASSWORD</span>=YOUR_REDIS_PASSWORD
+
+<span class="comment"># MinIO (S3-compatible storage)</span>
+<span class="env-var">MINIO_ENDPOINT</span>=localhost
+<span class="env-var">MINIO_PORT</span>=9000
+<span class="env-var">MINIO_ACCESS_KEY</span>=YOUR_MINIO_ACCESS_KEY
+<span class="env-var">MINIO_SECRET_KEY</span>=YOUR_MINIO_SECRET_KEY
+<span class="env-var">MINIO_BUCKET</span>=vizora-assets
+<span class="env-var">MINIO_USE_SSL</span>=true
+<span class="env-var">MINIO_ROOT_USER</span>=YOUR_MINIO_ACCESS_KEY
+<span class="env-var">MINIO_ROOT_PASSWORD</span>=YOUR_MINIO_SECRET_KEY
+
+<span class="comment"># JWT Authentication</span>
+<span class="env-var">JWT_SECRET</span>=YOUR_64_CHAR_HEX_SECRET
+<span class="env-var">JWT_EXPIRES_IN</span>=7d
+<span class="env-var">DEVICE_JWT_SECRET</span>=YOUR_ANOTHER_64_CHAR_HEX_SECRET
+<span class="env-var">BCRYPT_ROUNDS</span>=14
+
+<span class="comment"># Public URLs (change to your domain)</span>
+<span class="env-var">API_BASE_URL</span>=https://api.yourdomain.com
+<span class="env-var">WEB_URL</span>=https://app.yourdomain.com
+<span class="env-var">CORS_ORIGIN</span>=https://app.yourdomain.com
+
+<span class="comment"># Frontend (baked into client bundle at build time)</span>
+<span class="env-var">NEXT_PUBLIC_API_URL</span>=https://api.yourdomain.com/api
+<span class="env-var">NEXT_PUBLIC_SOCKET_URL</span>=https://ws.yourdomain.com
+<span class="env-var">BACKEND_URL</span>=http://localhost:3000
+
+<span class="comment"># Grafana</span>
+<span class="env-var">GRAFANA_ADMIN_USER</span>=admin
+<span class="env-var">GRAFANA_ADMIN_PASSWORD</span>=YOUR_GRAFANA_PASSWORD
+
+<span class="comment"># Logging</span>
+<span class="env-var">LOG_LEVEL</span>=info
+
+<span class="comment"># Backups</span>
+<span class="env-var">BACKUP_DIR</span>=/var/backups/vizora
+<span class="env-var">BACKUP_RETENTION_DAYS</span>=7</code></pre>
+
+    <div class="alert alert-info">
+        <span class="alert-icon">i</span>
+        <div><code>NEXT_PUBLIC_*</code> variables are embedded into the web dashboard at build time and cannot be changed at runtime. If you change these, you must rebuild the web dashboard.</div>
+    </div>
+</section>
+
+<!-- ============================================ -->
+<!-- 6. CORE ENGINE DEPLOYMENT                     -->
+<!-- ============================================ -->
+<section id="core-deploy">
+    <h2><span class="num">6</span> Core Engine Deployment</h2>
+
+    <p>The Vizora engine consists of three Node.js services managed by PM2 in production.</p>
+
+    <div class="step">
+        <span class="step-num">1</span>
+        <span class="step-title">Install Dependencies</span>
+        <div class="step-body">
+<pre><code>cd /var/www/vizora
+pnpm install --frozen-lockfile</code></pre>
+        </div>
+    </div>
+
+    <div class="step">
+        <span class="step-num">2</span>
+        <span class="step-title">Generate Prisma Client &amp; Run Migrations</span>
+        <div class="step-body">
+<pre><code><span class="comment"># Generate the database client</span>
+pnpm --filter @vizora/database db:generate
+
+<span class="comment"># Run all database migrations</span>
+pnpm --filter @vizora/database db:migrate
+
+<span class="comment"># (Optional) Seed initial data</span>
+pnpm --filter @vizora/database db:seed</code></pre>
+        </div>
+    </div>
+
+    <div class="step">
+        <span class="step-num">3</span>
+        <span class="step-title">Build All Services</span>
+        <div class="step-body">
+<pre><code><span class="comment"># Build everything at once</span>
+pnpm build
+
+<span class="comment"># Or build individually</span>
+npx nx build @vizora/middleware
+npx nx build @vizora/web
+npx nx build @vizora/realtime</code></pre>
+            <p>Build artifacts:</p>
+            <ul>
+                <li><code>middleware/dist/main.js</code> &mdash; Middleware API entry point</li>
+                <li><code>web/.next/</code> &mdash; Next.js build output</li>
+                <li><code>realtime/dist/main.js</code> &mdash; Realtime Gateway entry point</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="step">
+        <span class="step-num">4</span>
+        <span class="step-title">Start Services with PM2</span>
+        <div class="step-body">
+<pre><code><span class="comment"># Install PM2 globally</span>
+npm install -g pm2
+
+<span class="comment"># Start all services in production mode</span>
+pm2 start ecosystem.config.js --env production
+
+<span class="comment"># Verify all processes are running</span>
+pm2 list
+
+<span class="comment"># Expected output:</span>
+<span class="comment"># ┌─────────────────────┬────┬─────────┬──────┬───────┐</span>
+<span class="comment"># │ name                │ id │ mode    │ port │ status│</span>
+<span class="comment"># ├─────────────────────┼────┼─────────┼──────┼───────┤</span>
+<span class="comment"># │ vizora-middleware    │ 0  │ cluster │ 3000 │ online│</span>
+<span class="comment"># │ vizora-middleware    │ 1  │ cluster │ 3000 │ online│</span>
+<span class="comment"># │ vizora-realtime     │ 2  │ fork    │ 3002 │ online│</span>
+<span class="comment"># │ vizora-web          │ 3  │ fork    │ 3001 │ online│</span>
+<span class="comment"># └─────────────────────┴────┴─────────┴──────┴───────┘</span></code></pre>
+        </div>
+    </div>
+
+    <div class="step">
+        <span class="step-num">5</span>
+        <span class="step-title">Enable Auto-Start on Reboot</span>
+        <div class="step-body">
+<pre><code><span class="comment"># Generate startup script for your OS</span>
+pm2 startup
+
+<span class="comment"># Save current process list</span>
+pm2 save</code></pre>
+        </div>
+    </div>
+
+    <div class="step">
+        <span class="step-num">6</span>
+        <span class="step-title">Verify Services</span>
+        <div class="step-body">
+<pre><code><span class="comment"># Health check endpoints</span>
+curl http://localhost:3000/api/health   <span class="comment"># Middleware API</span>
+curl http://localhost:3001              <span class="comment"># Web Dashboard</span>
+curl http://localhost:3002/api/health   <span class="comment"># Realtime Gateway</span>
+
+<span class="comment"># View logs</span>
+pm2 logs                                <span class="comment"># All services</span>
+pm2 logs vizora-middleware --lines 50   <span class="comment"># Specific service</span></code></pre>
+        </div>
+    </div>
+
+    <h3>PM2 Operations Reference</h3>
+    <table>
+        <thead>
+            <tr><th>Action</th><th>Command</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>View status</td><td><code>pm2 list</code></td></tr>
+            <tr><td>View logs</td><td><code>pm2 logs [service-name]</code></td></tr>
+            <tr><td>Restart a service</td><td><code>pm2 restart vizora-middleware</code></td></tr>
+            <tr><td>Graceful reload (zero-downtime)</td><td><code>pm2 reload all</code></td></tr>
+            <tr><td>Stop all</td><td><code>pm2 stop all</code></td></tr>
+            <tr><td>Clear logs</td><td><code>pm2 flush</code></td></tr>
+            <tr><td>Monitor resources</td><td><code>pm2 monit</code></td></tr>
+        </tbody>
+    </table>
+
+    <div class="alert alert-warning">
+        <span class="alert-icon">!</span>
+        <div><strong>Realtime Gateway must remain a single instance.</strong> It maintains WebSocket connection state in memory. Running multiple instances will cause devices to lose connection.</div>
+    </div>
+</section>
+
+<!-- ============================================ -->
+<!-- 7. ANDROID TV APP                             -->
+<!-- ============================================ -->
+<section id="android-tv">
+    <h2><span class="num">7</span> Android TV App Deployment</h2>
+
+    <p>The Vizora Display app for Android TV is built with <strong>Capacitor 6 + Vite</strong>. It connects to the Vizora backend via WebSocket to receive content updates in real time.</p>
+
+    <h3>7.1 Development Environment Setup</h3>
+
+    <div class="step">
+        <span class="step-num">1</span>
+        <span class="step-title">Install Android Studio &amp; SDK</span>
+        <div class="step-body">
+            <ol>
+                <li>Download and install <a href="https://developer.android.com/studio" style="color: var(--primary-light)">Android Studio</a> (latest stable)</li>
+                <li>During setup, install:
+                    <ul>
+                        <li>Android SDK Platform 34 (Android 14)</li>
+                        <li>Android SDK Build-Tools (latest)</li>
+                        <li>Android TV system image (for emulator testing)</li>
+                    </ul>
+                </li>
+                <li>Install JDK 17 (bundled with Android Studio or install separately)</li>
+            </ol>
+<pre><code><span class="comment"># Verify Java version</span>
+java -version   <span class="comment"># Must be 17+</span>
+
+<span class="comment"># Set ANDROID_HOME (add to ~/.bashrc or ~/.zshrc)</span>
+export ANDROID_HOME=$HOME/Android/Sdk
+export PATH=$PATH:$ANDROID_HOME/platform-tools
+export PATH=$PATH:$ANDROID_HOME/tools</code></pre>
+        </div>
+    </div>
+
+    <div class="step">
+        <span class="step-num">2</span>
+        <span class="step-title">Initialize the Capacitor Project</span>
+        <div class="step-body">
+<pre><code>cd display-android
+
+<span class="comment"># Install npm dependencies</span>
+npm install
+
+<span class="comment"># Build web assets</span>
+npm run build
+
+<span class="comment"># Sync web assets to Android project</span>
+npx cap sync android</code></pre>
+        </div>
+    </div>
+
+    <h3>7.2 Build the APK</h3>
+
+    <div class="tab-group">
+        <div class="tab-buttons">
+            <button class="tab-btn active" onclick="showTab(this, 'tv-debug')">Debug Build</button>
+            <button class="tab-btn" onclick="showTab(this, 'tv-release')">Release Build (Production)</button>
+        </div>
+        <div id="tv-debug" class="tab-content active">
+<pre><code><span class="comment"># Build and sync web assets, then open Android Studio</span>
+npm run android:dev
+
+<span class="comment"># In Android Studio:</span>
+<span class="comment"># 1. Wait for Gradle sync to complete</span>
+<span class="comment"># 2. Select "debug" build variant</span>
+<span class="comment"># 3. Click Run (green play button)</span>
+<span class="comment"># 4. Select target device (emulator or connected TV)</span></code></pre>
+        </div>
+        <div id="tv-release" class="tab-content">
+
+            <h4>Step A: Create a Signing Keystore (One Time)</h4>
+<pre><code><span class="comment"># Generate a release signing key</span>
+keytool -genkey -v \
+  -keystore vizora-release.keystore \
+  -alias vizora-display \
+  -keyalg RSA -keysize 2048 \
+  -validity 10000 \
+  -storepass YOUR_STORE_PASSWORD \
+  -keypass YOUR_KEY_PASSWORD
+
+<span class="comment"># Store this keystore file securely! If lost, you cannot update the app.</span></code></pre>
+
+            <h4>Step B: Configure Signing</h4>
+            <p>Create <code>display-android/android/keystore.properties</code>:</p>
+<pre><code>storeFile=../vizora-release.keystore
+storePassword=YOUR_STORE_PASSWORD
+keyAlias=vizora-display
+keyPassword=YOUR_KEY_PASSWORD</code></pre>
+            <div class="alert alert-danger">
+                <span class="alert-icon">!</span>
+                <div>Never commit <code>keystore.properties</code> or <code>.keystore</code> files to Git. Add them to <code>.gitignore</code>.</div>
+            </div>
+
+            <h4>Step C: Build Release APK</h4>
+<pre><code><span class="comment"># Build web assets</span>
+npm run build
+
+<span class="comment"># Sync to Android</span>
+npx cap sync android
+
+<span class="comment"># Open Android Studio</span>
+npx cap open android
+
+<span class="comment"># In Android Studio:</span>
+<span class="comment"># Build &gt; Generate Signed Bundle/APK</span>
+<span class="comment"># Choose APK (for sideloading) or AAB (for Play Store)</span>
+<span class="comment"># Select "release" build type</span>
+<span class="comment"># Use the keystore from Step A</span></code></pre>
+            <p>Output APK: <code>android/app/build/outputs/apk/release/vizora-display-1.0.0-release.apk</code></p>
+        </div>
+    </div>
+
+    <h3>7.3 Deploy to Android TV Devices</h3>
+
+    <div class="card">
+        <div class="card-header">Option A: Sideload via ADB (Fastest for Small Deployments)</div>
+        <ol>
+            <li>On the Android TV, go to <strong>Settings &gt; Device Preferences &gt; About &gt; Build</strong> and tap 7 times to enable Developer Options</li>
+            <li>Enable <strong>USB Debugging</strong> (or <strong>Network Debugging</strong> for wireless) in Developer Options</li>
+            <li>Connect via ADB:
+<pre><code><span class="comment"># Connect via USB (plug cable into TV)</span>
+adb devices   <span class="comment"># Should show your TV</span>
+
+<span class="comment"># OR connect wirelessly (TV and computer on same network)</span>
+adb connect &lt;TV_IP_ADDRESS&gt;:5555
+
+<span class="comment"># Install the APK</span>
+adb install vizora-display-1.0.0-release.apk
+
+<span class="comment"># To update (replace existing)</span>
+adb install -r vizora-display-1.0.0-release.apk
+
+<span class="comment"># Launch the app</span>
+adb shell am start -n com.vizora.display/.MainActivity</code></pre>
+            </li>
+            <li>The app will appear in the TV launcher under "Apps"</li>
+        </ol>
+    </div>
+
+    <div class="card">
+        <div class="card-header">Option B: Google Play Store (Android TV)</div>
+        <ol>
+            <li>Create a <a href="https://play.google.com/console" style="color: var(--primary-light)">Google Play Console</a> developer account ($25 one-time fee)</li>
+            <li>Create a new app &gt; select "TV" as form factor</li>
+            <li>Build a signed AAB (Android App Bundle) instead of APK:
+                <ul>
+                    <li>In Android Studio: Build &gt; Generate Signed Bundle/APK &gt; Android App Bundle</li>
+                </ul>
+            </li>
+            <li>Upload the AAB to Play Console &gt; Release &gt; Production</li>
+            <li>Fill in store listing (screenshots, description, privacy policy)</li>
+            <li>Submit for review (typically 1-3 business days)</li>
+            <li>Once approved, TV users can install from Play Store</li>
+        </ol>
+    </div>
+
+    <div class="card">
+        <div class="card-header">Option C: Amazon Fire TV Appstore</div>
+        <ol>
+            <li>Create an <a href="https://developer.amazon.com" style="color: var(--primary-light)">Amazon Developer</a> account (free)</li>
+            <li>Build a signed APK (Amazon requires APK, not AAB)</li>
+            <li>Submit to Amazon Appstore for Fire TV</li>
+            <li>Or sideload directly:
+<pre><code><span class="comment"># Enable Developer Options on Fire TV</span>
+<span class="comment"># Settings > My Fire TV > Developer Options > ADB Debugging ON</span>
+
+adb connect &lt;FIRE_TV_IP&gt;:5555
+adb install vizora-display-1.0.0-release.apk</code></pre>
+            </li>
+        </ol>
+    </div>
+
+    <div class="card">
+        <div class="card-header">Option D: Enterprise MDM (Mass Deployment)</div>
+        <p>For deploying to 50+ TVs, use Mobile Device Management:</p>
+        <ul>
+            <li><strong>Google Android Enterprise</strong> &mdash; managed Google Play for kiosk mode</li>
+            <li><strong>Samsung Knox</strong> &mdash; for Samsung TVs/displays</li>
+            <li><strong>VMware Workspace ONE</strong> / <strong>Microsoft Intune</strong> &mdash; cross-platform EMM</li>
+            <li>Upload APK to your MDM console and push to enrolled devices</li>
+            <li>Configure kiosk/lock task mode to keep the app running full-time</li>
+        </ul>
+    </div>
+
+    <h3>7.4 Android TV App Features</h3>
+    <table>
+        <tr><th>Feature</th><th>Detail</th></tr>
+        <tr><td>Leanback Launcher</td><td>App appears in TV home screen with banner icon</td></tr>
+        <tr><td>D-pad Navigation</td><td>Full remote control support (no touchscreen required)</td></tr>
+        <tr><td>Auto-Start on Boot</td><td>BootReceiver starts app automatically when TV powers on</td></tr>
+        <tr><td>Landscape Lock</td><td>Fixed landscape orientation for display use</td></tr>
+        <tr><td>Keep Screen On</td><td><code>keepScreenOn=true</code> prevents screen dimming</td></tr>
+        <tr><td>QR Code Pairing</td><td>Shows pairing QR code on first launch for easy setup</td></tr>
+        <tr><td>WebSocket Realtime</td><td>Maintains persistent connection for instant content updates</td></tr>
+        <tr><td>Offline Support</td><td>Caches content locally, works without network</td></tr>
+    </table>
+
+    <h3>7.5 TV App Configuration</h3>
+    <p>After installation, the app needs to connect to your Vizora backend:</p>
+    <ol>
+        <li>Launch the app on the TV &mdash; it shows a <strong>pairing screen with a QR code</strong></li>
+        <li>Log into the <strong>Web Dashboard</strong> at <code>https://app.yourdomain.com</code></li>
+        <li>Go to <strong>Displays &gt; Add Display</strong></li>
+        <li>Scan the QR code or enter the <strong>6-digit pairing code</strong> shown on the TV</li>
+        <li>The TV is now paired and will begin displaying assigned content</li>
+    </ol>
+</section>
+
+<!-- ============================================ -->
+<!-- 8. MOBILE APPS                                -->
+<!-- ============================================ -->
+<section id="mobile-apps">
+    <h2><span class="num">8</span> Mobile Apps (iOS &amp; Android Phone)</h2>
+
+    <p>The same Capacitor codebase (<code>display-android/</code>) can be extended to build native apps for <strong>iOS</strong> (iPhones/iPads) and <strong>Android phones</strong>. Capacitor 6 supports both platforms from a single web codebase.</p>
+
+    <h3>8.1 Android Phone App</h3>
+
+    <p>The Android TV APK already works on Android phones. To optimize for phones, you may want to adjust the UI (remove landscape lock, add touch interactions).</p>
+
+    <div class="step">
+        <span class="step-num">1</span>
+        <span class="step-title">Build for Android Phone</span>
+        <div class="step-body">
+<pre><code>cd display-android
+
+<span class="comment"># Build web assets</span>
+npm run build
+
+<span class="comment"># Sync to Android</span>
+npx cap sync android
+
+<span class="comment"># Run on connected phone</span>
+npx cap run android --target &lt;device-id&gt;
+
+<span class="comment"># Or open in Android Studio for full control</span>
+npx cap open android</code></pre>
+        </div>
+    </div>
+
+    <div class="step">
+        <span class="step-num">2</span>
+        <span class="step-title">Distribute to Android Phones</span>
+        <div class="step-body">
+            <ul>
+                <li><strong>Google Play Store:</strong> Submit signed AAB via Play Console (select "Phone" form factor)</li>
+                <li><strong>Direct APK:</strong> Host APK on your server, users download and install (requires enabling "Install from unknown sources")</li>
+                <li><strong>Enterprise:</strong> Use Google Managed Play or MDM for corporate deployments</li>
+            </ul>
+        </div>
+    </div>
+
+    <h3>8.2 iOS App</h3>
+
+    <div class="alert alert-info">
+        <span class="alert-icon">i</span>
+        <div><strong>Requirement:</strong> iOS development requires a Mac with Xcode installed. You cannot build iOS apps on Windows or Linux.</div>
+    </div>
+
+    <div class="step">
+        <span class="step-num">1</span>
+        <span class="step-title">Prerequisites</span>
+        <div class="step-body">
+            <ul>
+                <li>macOS computer with <strong>Xcode 15+</strong> installed from the Mac App Store</li>
+                <li><strong>Apple Developer Account</strong> ($99/year at <a href="https://developer.apple.com" style="color: var(--primary-light)">developer.apple.com</a>)</li>
+                <li>Install CocoaPods: <code>sudo gem install cocoapods</code></li>
+                <li>Xcode Command Line Tools: <code>xcode-select --install</code></li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="step">
+        <span class="step-num">2</span>
+        <span class="step-title">Add iOS Platform to Capacitor</span>
+        <div class="step-body">
+<pre><code>cd display-android   <span class="comment"># Same project directory</span>
+
+<span class="comment"># Add iOS platform</span>
+npx cap add ios
+
+<span class="comment"># Build web assets</span>
+npm run build
+
+<span class="comment"># Sync to iOS project</span>
+npx cap sync ios
+
+<span class="comment"># Open in Xcode</span>
+npx cap open ios</code></pre>
+        </div>
+    </div>
+
+    <div class="step">
+        <span class="step-num">3</span>
+        <span class="step-title">Configure iOS Project in Xcode</span>
+        <div class="step-body">
+            <ol>
+                <li>In Xcode, select the <strong>App</strong> target</li>
+                <li>Under <strong>General</strong>:
+                    <ul>
+                        <li>Bundle Identifier: <code>com.vizora.display</code></li>
+                        <li>Version: <code>1.0.0</code></li>
+                        <li>Deployment Target: iOS 16.0+</li>
+                    </ul>
+                </li>
+                <li>Under <strong>Signing &amp; Capabilities</strong>:
+                    <ul>
+                        <li>Select your Team (Apple Developer Account)</li>
+                        <li>Enable "Automatically manage signing"</li>
+                    </ul>
+                </li>
+                <li>Under <strong>Info</strong>, add required privacy descriptions:
+                    <ul>
+                        <li><code>NSCameraUsageDescription</code> &mdash; "Used for QR code scanning"</li>
+                        <li><code>NSLocalNetworkUsageDescription</code> &mdash; "Used to discover display devices"</li>
+                    </ul>
+                </li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="step">
+        <span class="step-num">4</span>
+        <span class="step-title">Build and Test on iOS</span>
+        <div class="step-body">
+<pre><code><span class="comment"># Build and run on simulator</span>
+npx cap run ios
+
+<span class="comment"># Or in Xcode:</span>
+<span class="comment"># 1. Select a simulator or connected device</span>
+<span class="comment"># 2. Click the Run button (Cmd+R)</span>
+<span class="comment"># 3. Test all features: pairing, content display, WebSocket</span></code></pre>
+        </div>
+    </div>
+
+    <div class="step">
+        <span class="step-num">5</span>
+        <span class="step-title">Submit to Apple App Store</span>
+        <div class="step-body">
+            <ol>
+                <li><strong>Create an App Store Connect listing:</strong>
+                    <ul>
+                        <li>Go to <a href="https://appstoreconnect.apple.com" style="color: var(--primary-light)">App Store Connect</a></li>
+                        <li>Create a new app with bundle ID <code>com.vizora.display</code></li>
+                    </ul>
+                </li>
+                <li><strong>Archive the app in Xcode:</strong>
+                    <ul>
+                        <li>Product &gt; Archive</li>
+                        <li>Select "Distribute App" &gt; "App Store Connect"</li>
+                        <li>Upload to App Store Connect</li>
+                    </ul>
+                </li>
+                <li><strong>Fill in App Store listing:</strong>
+                    <ul>
+                        <li>Screenshots (iPhone 6.7", 6.5", iPad if applicable)</li>
+                        <li>App description, keywords, categories</li>
+                        <li>Privacy policy URL</li>
+                        <li>App review contact information</li>
+                    </ul>
+                </li>
+                <li><strong>Submit for review</strong> (typically 1-3 business days)</li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="step">
+        <span class="step-num">6</span>
+        <span class="step-title">Enterprise Distribution (No App Store)</span>
+        <div class="step-body">
+            <p>For internal/corporate deployment without the App Store:</p>
+            <ul>
+                <li><strong>Apple Enterprise Developer Program</strong> ($299/year) &mdash; distribute IPA directly to employees</li>
+                <li><strong>Apple Business Manager + MDM</strong> &mdash; push apps to managed devices (Jamf, Mosyle, etc.)</li>
+                <li><strong>TestFlight</strong> (free) &mdash; distribute beta builds to up to 10,000 testers</li>
+            </ul>
+        </div>
+    </div>
+
+    <h3>8.3 Mobile App vs TV App Differences</h3>
+    <table>
+        <thead>
+            <tr><th>Feature</th><th>Android TV</th><th>Android Phone</th><th>iOS</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Orientation</td><td>Landscape (locked)</td><td>Portrait or Landscape</td><td>Portrait or Landscape</td></tr>
+            <tr><td>Input</td><td>D-pad / Remote</td><td>Touch</td><td>Touch</td></tr>
+            <tr><td>Launcher</td><td>Leanback Launcher</td><td>Standard Launcher</td><td>Home Screen</td></tr>
+            <tr><td>Boot Auto-Start</td><td>Yes (BootReceiver)</td><td>Optional</td><td>No (iOS restriction)</td></tr>
+            <tr><td>Keep Screen On</td><td>Yes</td><td>Optional</td><td>Via code only</td></tr>
+            <tr><td>Distribution</td><td>Play Store / Sideload / MDM</td><td>Play Store / APK</td><td>App Store / Enterprise / TestFlight</td></tr>
+            <tr><td>Build Tool</td><td>Capacitor + Gradle</td><td>Capacitor + Gradle</td><td>Capacitor + Xcode</td></tr>
+        </tbody>
+    </table>
+</section>
+
+<!-- ============================================ -->
+<!-- 9. DESKTOP DISPLAY CLIENT                     -->
+<!-- ============================================ -->
+<section id="desktop-app">
+    <h2><span class="num">9</span> Desktop Display Client (Electron)</h2>
+
+    <p>The Electron-based desktop app runs on Windows, macOS, and Linux PCs connected to display screens.</p>
+
+    <h3>9.1 Build the Desktop App</h3>
+
+<pre><code>cd display
+
+<span class="comment"># Install dependencies</span>
+npm install
+
+<span class="comment"># Build for all platforms (requires macOS for mac builds)</span>
+npm run package:all
+
+<span class="comment"># Or build for specific platform</span>
+npm run package:win     <span class="comment"># Windows (.exe NSIS installer + portable)</span>
+npm run package:mac     <span class="comment"># macOS (.dmg for Intel + Apple Silicon)</span>
+npm run package:linux   <span class="comment"># Linux (.AppImage + .deb)</span></code></pre>
+
+    <h3>9.2 Output Installers</h3>
+    <table>
+        <thead>
+            <tr><th>Platform</th><th>Format</th><th>Output Path</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Windows</td><td>NSIS Installer (.exe)</td><td><code>display/release/Vizora Display-1.0.0.exe</code></td></tr>
+            <tr><td>Windows</td><td>Portable (.exe)</td><td><code>display/release/Vizora Display-1.0.0-portable.exe</code></td></tr>
+            <tr><td>macOS</td><td>DMG (x64 + arm64)</td><td><code>display/release/Vizora Display-1.0.0.dmg</code></td></tr>
+            <tr><td>Linux</td><td>AppImage</td><td><code>display/release/vizora-display-1.0.0-x64.AppImage</code></td></tr>
+            <tr><td>Linux</td><td>Debian Package</td><td><code>display/release/vizora-display_1.0.0_amd64.deb</code></td></tr>
+        </tbody>
+    </table>
+
+    <h3>9.3 Customer Installation (Windows)</h3>
+    <ol>
+        <li>Download the <code>.exe</code> installer from your distribution server</li>
+        <li>Run the installer &mdash; choose installation directory</li>
+        <li>Desktop and Start Menu shortcuts are created automatically</li>
+        <li>Launch "Vizora Display" from the desktop</li>
+        <li>The app shows a pairing screen &mdash; enter the server URL and pair via QR code or pairing code</li>
+        <li>Configure Windows to auto-start the app (optional):
+<pre><code><span class="comment"># Add to Windows startup (Run dialog: shell:startup)</span>
+<span class="comment"># Create shortcut to Vizora Display in the Startup folder</span></code></pre>
+        </li>
+    </ol>
+
+    <h3>9.4 Customer Installation (macOS)</h3>
+    <ol>
+        <li>Download the <code>.dmg</code> file</li>
+        <li>Open the DMG and drag "Vizora Display" to the Applications folder</li>
+        <li>Launch from Applications or Launchpad</li>
+        <li>On first launch, macOS may ask to allow the app (System Preferences &gt; Security)</li>
+        <li>For auto-start: System Preferences &gt; Users &gt; Login Items &gt; add Vizora Display</li>
+    </ol>
+
+    <h3>9.5 Customer Installation (Linux)</h3>
+<pre><code><span class="comment"># AppImage (universal)</span>
+chmod +x vizora-display-1.0.0-x64.AppImage
+./vizora-display-1.0.0-x64.AppImage
+
+<span class="comment"># Debian/Ubuntu</span>
+sudo dpkg -i vizora-display_1.0.0_amd64.deb
+
+<span class="comment"># Auto-start (systemd)</span>
+mkdir -p ~/.config/autostart
+cat > ~/.config/autostart/vizora-display.desktop &lt;&lt;EOF
+[Desktop Entry]
+Type=Application
+Name=Vizora Display
+Exec=/usr/bin/vizora-display
+X-GNOME-Autostart-enabled=true
+EOF</code></pre>
+</section>
+
+<!-- ============================================ -->
+<!-- 10. NGINX & SSL                               -->
+<!-- ============================================ -->
+<section id="nginx-ssl">
+    <h2><span class="num">10</span> Nginx &amp; SSL Setup</h2>
+
+    <p>Nginx acts as the single entry point, handling TLS termination, routing traffic to the correct backend service, and enabling WebSocket upgrades.</p>
+
+    <h3>10.1 SSL Certificate (Let's Encrypt)</h3>
+<pre><code><span class="comment"># Run the provided SSL setup script</span>
+sudo ./scripts/setup-ssl.sh yourdomain.com --email admin@yourdomain.com
+
+<span class="comment"># Or manually with Certbot</span>
+sudo apt install certbot
+sudo certbot certonly --standalone \
+  -d api.yourdomain.com \
+  -d app.yourdomain.com \
+  -d ws.yourdomain.com \
+  --email admin@yourdomain.com \
+  --agree-tos
+
+<span class="comment"># Auto-renewal cron (runs twice daily)</span>
+sudo systemctl enable certbot.timer
+sudo systemctl start certbot.timer</code></pre>
+
+    <h3>10.2 Start Nginx</h3>
+<pre><code><span class="comment"># Start Nginx via Docker Compose (it's included in docker-compose.yml)</span>
+docker compose -f docker/docker-compose.yml up -d nginx
+
+<span class="comment"># Verify</span>
+curl -I https://app.yourdomain.com     <span class="comment"># Should return 200</span>
+curl -I https://api.yourdomain.com/api/health  <span class="comment"># Should return 200</span></code></pre>
+
+    <h3>10.3 Routing Summary</h3>
+    <table>
+        <thead>
+            <tr><th>URL Pattern</th><th>Routed To</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>https://app.yourdomain.com/</code></td><td>Web Dashboard (:3001)</td><td>Default route</td></tr>
+            <tr><td><code>https://api.yourdomain.com/api/v1/*</code></td><td>Middleware API (:3000)</td><td>60s timeout</td></tr>
+            <tr><td><code>https://api.yourdomain.com/api/*</code></td><td>Middleware API (:3000)</td><td>Rewritten to /api/v1/*</td></tr>
+            <tr><td><code>https://ws.yourdomain.com/socket.io/*</code></td><td>Realtime Gateway (:3002)</td><td>WebSocket upgrade, sticky sessions</td></tr>
+            <tr><td><code>/static/*</code></td><td>Middleware (:3000)</td><td>1h cache</td></tr>
+            <tr><td><code>/uploads/*</code></td><td>Middleware (:3000)</td><td>1h cache</td></tr>
+            <tr><td><code>http://*:80</code></td><td>Redirect to HTTPS</td><td>Except /health and ACME challenges</td></tr>
+        </tbody>
+    </table>
+
+    <div class="alert alert-info">
+        <span class="alert-icon">i</span>
+        <div>Nginx uses <strong>sticky sessions (ip_hash)</strong> for the Realtime Gateway to ensure WebSocket connections stay on the same backend instance.</div>
+    </div>
+</section>
+
+<!-- ============================================ -->
+<!-- 11. MONITORING                                -->
+<!-- ============================================ -->
+<section id="monitoring">
+    <h2><span class="num">11</span> Monitoring &amp; Logging</h2>
+
+    <h3>11.1 Grafana Dashboards</h3>
+    <div class="card">
+        <div class="card-header">Access Grafana</div>
+        <ul>
+            <li><strong>URL:</strong> <code>http://&lt;server&gt;:3003</code></li>
+            <li><strong>Username:</strong> <code>admin</code></li>
+            <li><strong>Password:</strong> <code>GRAFANA_ADMIN_PASSWORD</code> from your .env file</li>
+        </ul>
+        <p>Pre-configured data sources: PostgreSQL, ClickHouse, Prometheus</p>
+    </div>
+
+    <h3>11.2 Prometheus Metrics</h3>
+    <p>Prometheus scrapes metrics from Middleware and Realtime services every 15 seconds.</p>
+    <table>
+        <thead><tr><th>Metric</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr><td><code>vizora_http_requests_total</code></td><td>Total HTTP request count</td></tr>
+            <tr><td><code>vizora_http_request_duration_seconds</code></td><td>Request latency histogram</td></tr>
+            <tr><td><code>vizora_devices_online</code></td><td>Number of connected display devices</td></tr>
+            <tr><td><code>process_resident_memory_bytes</code></td><td>Service memory usage</td></tr>
+            <tr><td><code>process_cpu_seconds_total</code></td><td>CPU usage per service</td></tr>
+        </tbody>
+    </table>
+
+    <h3>11.3 Log Aggregation (Loki)</h3>
+    <p>Promtail ships logs from PM2 log files to Loki. Query via Grafana Explore:</p>
+<pre><code><span class="comment"># All middleware errors</span>
+{job="middleware"} | "ERROR"
+
+<span class="comment"># Realtime WebSocket events</span>
+{job="realtime"} | "WebSocket"
+
+<span class="comment"># Search for a specific device</span>
+{job="vizora"} | "deviceId=ABC123"</code></pre>
+
+    <h3>11.4 PM2 Monitoring</h3>
+<pre><code><span class="comment"># Real-time process monitor</span>
+pm2 monit
+
+<span class="comment"># View all service logs</span>
+pm2 logs
+
+<span class="comment"># View logs for a specific service</span>
+pm2 logs vizora-middleware --lines 100</code></pre>
+</section>
+
+<!-- ============================================ -->
+<!-- 12. BACKUPS                                   -->
+<!-- ============================================ -->
+<section id="backups">
+    <h2><span class="num">12</span> Backups &amp; Disaster Recovery</h2>
+
+    <h3>12.1 PostgreSQL Backup</h3>
+<pre><code><span class="comment"># Manual backup</span>
+./scripts/backup-db.sh
+
+<span class="comment"># What it does:</span>
+<span class="comment"># - pg_dump with gzip compression</span>
+<span class="comment"># - SHA-256 checksum verification</span>
+<span class="comment"># - Three-tier rotation: daily (7 days), weekly (4 weeks), monthly (3 months)</span>
+<span class="comment"># - Optional S3 upload (set BACKUP_S3_BUCKET in .env)</span>
+
+<span class="comment"># Restore from backup</span>
+./scripts/restore-db.sh /var/backups/vizora/daily/postgres-20260210-120000.sql.gz</code></pre>
+
+    <h3>12.2 Automated Backup Schedule</h3>
+<pre><code><span class="comment"># Add to crontab (sudo crontab -e)</span>
+
+<span class="comment"># Daily PostgreSQL backup at 3:00 AM</span>
+0 3 * * * /var/www/vizora/scripts/backup-db.sh >> /var/log/vizora-backup.log 2>&1
+
+<span class="comment"># Daily MongoDB backup at 3:30 AM</span>
+30 3 * * * /var/www/vizora/scripts/backup-mongodb.sh >> /var/log/vizora-backup.log 2>&1
+
+<span class="comment"># SSL certificate renewal check (twice daily)</span>
+0 3,15 * * * certbot renew --quiet --deploy-hook 'docker compose exec nginx nginx -s reload'</code></pre>
+
+    <h3>12.3 Disaster Recovery Steps</h3>
+    <ol>
+        <li>Provision new server with same specs</li>
+        <li>Install prerequisites (Node.js, Docker, PM2, pnpm)</li>
+        <li>Clone repository and checkout the same release tag</li>
+        <li>Copy <code>.env</code> file from backup (stored securely off-site)</li>
+        <li>Start Docker infrastructure: <code>docker compose up -d</code></li>
+        <li>Restore PostgreSQL from backup: <code>./scripts/restore-db.sh &lt;backup-file&gt;</code></li>
+        <li>Build and start services: <code>pnpm install && pnpm build && pm2 start ecosystem.config.js --env production</code></li>
+        <li>Update DNS records to point to new server IP</li>
+        <li>Regenerate SSL certificates: <code>./scripts/setup-ssl.sh yourdomain.com</code></li>
+        <li>Verify all health checks pass</li>
+    </ol>
+</section>
+
+<!-- ============================================ -->
+<!-- 13. SECURITY                                  -->
+<!-- ============================================ -->
+<section id="security">
+    <h2><span class="num">13</span> Security Hardening</h2>
+
+    <h3>13.1 Built-in Security Features</h3>
+    <table>
+        <thead><tr><th>Layer</th><th>Protection</th></tr></thead>
+        <tbody>
+            <tr><td>Authentication</td><td>Dual JWT system (separate secrets for users and devices)</td></tr>
+            <tr><td>Session</td><td>httpOnly cookies, secure flag in production</td></tr>
+            <tr><td>XSS</td><td>Global SanitizeInterceptor on all responses</td></tr>
+            <tr><td>CSRF</td><td>CSRF middleware + guards on state-changing endpoints</td></tr>
+            <tr><td>Headers</td><td>Helmet (HSTS, X-Frame-Options, CSP, X-Content-Type-Options)</td></tr>
+            <tr><td>Rate Limiting</td><td>3-tier (short/medium/long window), strict in production</td></tr>
+            <tr><td>File Uploads</td><td>Magic number verification (prevents MIME spoofing)</td></tr>
+            <tr><td>TLS</td><td>TLS 1.2+ only, modern cipher suite, OCSP stapling</td></tr>
+            <tr><td>Password Hashing</td><td>bcrypt with 14 rounds in production</td></tr>
+        </tbody>
+    </table>
+
+    <h3>13.2 Server Hardening Checklist</h3>
+    <ul class="checklist">
+        <li>SSH key-only authentication (disable password login)</li>
+        <li>Firewall allows only ports 22, 80, 443</li>
+        <li>Database ports (5432, 6379, 27017) bound to localhost only</li>
+        <li>fail2ban configured for SSH brute force protection</li>
+        <li>Automatic security updates enabled</li>
+        <li>All <code>.env</code> and keystore files excluded from Git</li>
+        <li>Secret rotation schedule (quarterly minimum)</li>
+        <li>Regular vulnerability scans (npm audit, Docker image scan)</li>
+    </ul>
+
+    <h3>13.3 Secret Rotation</h3>
+<pre><code><span class="comment"># Use the provided rotation script</span>
+./scripts/rotate-secrets.sh
+
+<span class="comment"># Manual rotation steps:</span>
+<span class="comment"># 1. Generate new secrets</span>
+openssl rand -hex 32   <span class="comment"># New JWT_SECRET</span>
+openssl rand -hex 32   <span class="comment"># New DEVICE_JWT_SECRET</span>
+
+<span class="comment"># 2. Update .env with new values</span>
+<span class="comment"># 3. Restart services</span>
+pm2 restart all
+
+<span class="comment"># 4. Note: Rotating JWT_SECRET invalidates all existing user sessions</span>
+<span class="comment">#    Users will need to log in again</span></code></pre>
+</section>
+
+<!-- ============================================ -->
+<!-- 14. TROUBLESHOOTING                           -->
+<!-- ============================================ -->
+<section id="troubleshooting">
+    <h2><span class="num">14</span> Troubleshooting</h2>
+
+    <div class="card">
+        <div class="card-header">Service Won't Start</div>
+<pre><code><span class="comment"># Check PM2 logs for the failing service</span>
+pm2 logs vizora-middleware --lines 50
+
+<span class="comment"># Common causes:</span>
+<span class="comment"># 1. Port already in use</span>
+lsof -i :3000               <span class="comment"># Linux/Mac</span>
+netstat -ano | findstr :3000 <span class="comment"># Windows</span>
+<span class="comment"># Kill the process and retry</span>
+
+<span class="comment"># 2. Database connection failed</span>
+psql "$DATABASE_URL"         <span class="comment"># Test connection manually</span>
+docker ps | grep postgres    <span class="comment"># Is container running?</span>
+
+<span class="comment"># 3. Missing environment variables</span>
+<span class="comment"># Middleware logs will show: "Missing required env vars in production"</span>
+<span class="comment"># Check: API_BASE_URL, CORS_ORIGIN, DATABASE_URL, JWT_SECRET, DEVICE_JWT_SECRET</span></code></pre>
+    </div>
+
+    <div class="card">
+        <div class="card-header">Display Device Can't Connect</div>
+<pre><code><span class="comment"># 1. Verify Realtime Gateway is running</span>
+pm2 status vizora-realtime
+curl http://localhost:3002/api/health
+
+<span class="comment"># 2. Test WebSocket endpoint</span>
+curl -I "http://localhost:3002/socket.io/?EIO=4&transport=polling"
+
+<span class="comment"># 3. Check Nginx WebSocket config</span>
+<span class="comment"># Ensure /socket.io/ location has:</span>
+<span class="comment">#   proxy_set_header Upgrade $http_upgrade;</span>
+<span class="comment">#   proxy_set_header Connection "upgrade";</span>
+
+<span class="comment"># 4. Check firewall allows WebSocket upgrade on port 443</span>
+
+<span class="comment"># 5. On the device, check network connectivity to ws.yourdomain.com</span></code></pre>
+    </div>
+
+    <div class="card">
+        <div class="card-header">Nginx Returns 502 Bad Gateway</div>
+<pre><code><span class="comment"># 1. Check if backend services are actually running</span>
+pm2 list                         <span class="comment"># All should be "online"</span>
+
+<span class="comment"># 2. Test services directly (bypass Nginx)</span>
+curl http://localhost:3000/api/health
+curl http://localhost:3001
+curl http://localhost:3002/api/health
+
+<span class="comment"># 3. Check Nginx error logs</span>
+docker logs vizora-nginx --tail 50
+
+<span class="comment"># 4. On Linux, verify Nginx can reach host services</span>
+<span class="comment"># Ensure docker-compose.linux.yml is being used</span>
+docker exec vizora-nginx curl http://host.docker.internal:3000/api/health</code></pre>
+    </div>
+
+    <div class="card">
+        <div class="card-header">Content Not Displaying on Device</div>
+        <ol>
+            <li>Check device status in Web Dashboard &mdash; should show "Connected"</li>
+            <li>Verify content is assigned to the device (via playlist + schedule)</li>
+            <li>Check device logs:
+                <ul>
+                    <li>Windows: <code>%APPDATA%\vizora-display\logs\</code></li>
+                    <li>Linux: <code>~/.config/vizora-display/logs/</code></li>
+                    <li>macOS: <code>~/Library/Application Support/vizora-display/logs/</code></li>
+                    <li>Android: <code>adb logcat | grep vizora</code></li>
+                </ul>
+            </li>
+            <li>Test content API: <code>curl https://api.yourdomain.com/api/v1/devices/{id}/content</code></li>
+            <li>Clear device cache and restart the display app</li>
+        </ol>
+    </div>
+
+    <div class="card">
+        <div class="card-header">Android TV App Issues</div>
+<pre><code><span class="comment"># View Android TV app logs</span>
+adb connect &lt;TV_IP&gt;:5555
+adb logcat | grep -i vizora
+
+<span class="comment"># Force-stop and restart</span>
+adb shell am force-stop com.vizora.display
+adb shell am start -n com.vizora.display/.MainActivity
+
+<span class="comment"># Clear app data (resets pairing)</span>
+adb shell pm clear com.vizora.display
+
+<span class="comment"># Reinstall</span>
+adb uninstall com.vizora.display
+adb install vizora-display-1.0.0-release.apk</code></pre>
+    </div>
+
+    <div class="card">
+        <div class="card-header">High Memory Usage</div>
+<pre><code><span class="comment"># Check PM2 memory usage</span>
+pm2 list   <span class="comment"># Look at the "mem" column</span>
+
+<span class="comment"># PM2 auto-restarts at configured limits:</span>
+<span class="comment"># - Middleware: 512MB</span>
+<span class="comment"># - Realtime: 512MB</span>
+<span class="comment"># - Web: 1GB</span>
+
+<span class="comment"># Check database connections</span>
+docker exec vizora-postgres psql -U postgres -c \
+  "SELECT count(*) FROM pg_stat_activity;"
+
+<span class="comment"># If connections are stuck, restart the service</span>
+pm2 restart vizora-middleware</code></pre>
+    </div>
+</section>
+
+<!-- ============================================ -->
+<!-- 15. GO-LIVE CHECKLIST                         -->
+<!-- ============================================ -->
+<section id="checklist">
+    <h2><span class="num">15</span> Go-Live Checklist</h2>
+
+    <h3>Phase 1: Infrastructure</h3>
+    <ul class="checklist">
+        <li>Server provisioned with recommended specs</li>
+        <li>Node.js 22+, Docker, pnpm, PM2 installed</li>
+        <li>Firewall configured (ports 22, 80, 443 only)</li>
+        <li>DNS records created and propagated (api.*, app.*, ws.*)</li>
+        <li>Docker Compose services running and healthy</li>
+        <li>SSL certificates generated via Let's Encrypt</li>
+    </ul>
+
+    <h3>Phase 2: Application</h3>
+    <ul class="checklist">
+        <li>Production .env configured with fresh secrets</li>
+        <li>Database migrations applied successfully</li>
+        <li>All services built: <code>pnpm build</code></li>
+        <li>PM2 running all three services in production mode</li>
+        <li>PM2 startup hook configured for auto-restart on reboot</li>
+        <li>Nginx routing all traffic correctly (HTTP &rarr; HTTPS)</li>
+        <li>Swagger docs disabled in production (<code>NODE_ENV=production</code>)</li>
+    </ul>
+
+    <h3>Phase 3: Verification</h3>
+    <ul class="checklist">
+        <li>Health check endpoints returning 200 OK</li>
+        <li>Admin can log in to Web Dashboard</li>
+        <li>Content upload works (images, videos)</li>
+        <li>Display device pairs successfully via QR code</li>
+        <li>Real-time content push works (change content &rarr; device updates)</li>
+        <li>WebSocket connection stable over 5+ minutes</li>
+        <li>Grafana dashboards showing metrics</li>
+    </ul>
+
+    <h3>Phase 4: Display Clients</h3>
+    <ul class="checklist">
+        <li>Android TV APK built and signed with release keystore</li>
+        <li>TV app installed and paired on at least one test device</li>
+        <li>TV app auto-starts on boot</li>
+        <li>Desktop installer built and tested (if applicable)</li>
+        <li>iOS app built and submitted to App Store (if applicable)</li>
+        <li>Content rendering verified on all target platforms</li>
+    </ul>
+
+    <h3>Phase 5: Operations</h3>
+    <ul class="checklist">
+        <li>Automated backups configured and tested</li>
+        <li>Backup restoration tested successfully</li>
+        <li>Monitoring dashboards accessible and showing data</li>
+        <li>Log aggregation working (Loki + Promtail)</li>
+        <li>Alert rules configured (disk space, service down, high error rate)</li>
+        <li>Disaster recovery procedure documented and tested</li>
+        <li>Secret rotation schedule established</li>
+        <li>Support contact information documented</li>
+    </ul>
+
+    <div class="alert alert-success" style="margin-top: 32px;">
+        <span class="alert-icon">&#10003;</span>
+        <div><strong>Go-Live Approved.</strong> Once all checklist items above are confirmed, the system is ready for production traffic. Monitor closely for the first 48 hours and keep the deployment team on standby.</div>
+    </div>
+</section>
+
+<!-- ============================================ -->
+<!-- FOOTER                                        -->
+<!-- ============================================ -->
+<div style="text-align: center; padding: 40px 0; border-top: 1px solid var(--border); margin-top: 60px;">
+    <p style="color: var(--text-muted); font-size: 13px;">
+        Vizora Digital Signage Platform &mdash; Deployment &amp; Handover Guide v1.0.0<br>
+        Document generated February 2026 &mdash; Confidential
+    </p>
+</div>
+
+</div>
+</main>
+
+<!-- ============================================ -->
+<!-- TAB SWITCHING SCRIPT                          -->
+<!-- ============================================ -->
+<script>
+function showTab(btn, tabId) {
+    const group = btn.closest('.tab-group');
+    group.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    group.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(tabId).classList.add('active');
+}
+</script>
+
+</body>
+</html>

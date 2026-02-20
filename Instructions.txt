@@ -1,0 +1,14 @@
+ Android Studio should be opening now. Here's what to do next:
+
+  1. Wait for Gradle sync to complete (bottom progress bar in Android Studio)
+  2. Select your emulator from the device dropdown (top toolbar) — if none exists, create one via Device Manager (API 34, any phone/tablet image)
+  3. Click the Run button (green play triangle) to install and launch the app
+
+  The app is configured to connect to https://vizora.cloud for both the API and WebSocket. Once it launches:
+
+  1. It will show a pairing screen with a code
+  2. Go to the Vizora dashboard (vizora.cloud) and pair the device using that code
+  3. Then push content from the dashboard
+
+  The Android app uses Capacitor's native HTTP (CapacitorHttp.post/get) instead of browser fetch(), so the streaming/truncation issue from the browser won't
+   apply. It also has transformContentUrl built in to handle URL resolution.

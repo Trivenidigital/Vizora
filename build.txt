@@ -1,0 +1,51 @@
+
+ NX   Running target build for project @vizora/middleware and 1 task it depends on:
+
+
+
+> nx run @vizora/database:build
+
+> tsc --build tsconfig.lib.json
+
+
+> nx run @vizora/middleware:build
+
+> webpack-cli build --node-env=production
+
+[1m[33mWARNING[39m[22m in [1m../node_modules/.pnpm/@opentelemetry+instrumentat_0d8e01436db8276d176627709ff9ab7c/node_modules/@opentelemetry/instrumentation/build/esm/platform/node/instrumentation.js[39m[22m [1m[32m111:39-60[39m[22m
+[1mCritical dependency: the request of a dependency is an expression[39m[22m
+
+[1m[33mWARNING[39m[22m in [1m../node_modules/.pnpm/@opentelemetry+instrumentat_8b1bc6e5176a2414f1b68a677c037b1b/node_modules/@opentelemetry/instrumentation/build/esm/platform/node/instrumentation.js[39m[22m [1m[32m111:39-60[39m[22m
+[1mCritical dependency: the request of a dependency is an expression[39m[22m
+
+[1m[33mWARNING[39m[22m in [1m../node_modules/.pnpm/express@4.22.1/node_modules/express/lib/view.js[39m[22m [1m[32m81:13-25[39m[22m
+[1mCritical dependency: the request of a dependency is an expression[39m[22m
+
+[1m[33mWARNING[39m[22m in [1m../node_modules/.pnpm/handlebars@4.7.8/node_modules/handlebars/lib/index.js[39m[22m [1m[32m23:38-56[39m[22m
+[1mrequire.extensions is [1m[31mnot supported[39m[22m[1m by webpack. [1m[33mUse a loader instead[39m[22m[1m.[39m[22m
+
+[1m[33mWARNING[39m[22m in [1m../node_modules/.pnpm/handlebars@4.7.8/node_modules/handlebars/lib/index.js[39m[22m [1m[32m24:2-20[39m[22m
+[1mrequire.extensions is [1m[31mnot supported[39m[22m[1m by webpack. [1m[33mUse a loader instead[39m[22m[1m.[39m[22m
+
+[1m[33mWARNING[39m[22m in [1m../node_modules/.pnpm/handlebars@4.7.8/node_modules/handlebars/lib/index.js[39m[22m [1m[32m25:2-20[39m[22m
+[1mrequire.extensions is [1m[31mnot supported[39m[22m[1m by webpack. [1m[33mUse a loader instead[39m[22m[1m.[39m[22m
+
+[1m[33mWARNING[39m[22m in [1m../node_modules/.pnpm/jsdom@27.4.0/node_modules/jsdom/lib/jsdom/utils.js[39m[22m [1m[32m102:2-36[39m[22m
+[1mModule [1m[31mnot found[39m[22m[1m: [1m[31mError[39m[22m[1m: Can't resolve 'canvas' in 'C:\Projects\vizora\node_modules\.pnpm\jsdom@27.4.0\node_modules\jsdom\lib\jsdom'[39m[22m
+
+[1m[33mWARNING[39m[22m in [1m../node_modules/.pnpm/require-in-the-middle@8.0.1/node_modules/require-in-the-middle/index.js[39m[22m [1m[32m276:16-23[39m[22m
+[1mCritical dependency: require function is used in a way in which dependencies cannot be statically extracted[39m[22m
+
+[1m[33mWARNING[39m[22m in [1m../node_modules/.pnpm/ws@8.19.0/node_modules/ws/lib/buffer-util.js[39m[22m [1m[32m117:23-44[39m[22m
+[1mModule [1m[31mnot found[39m[22m[1m: [1m[31mError[39m[22m[1m: Can't resolve 'bufferutil' in 'C:\Projects\vizora\node_modules\.pnpm\ws@8.19.0\node_modules\ws\lib'[39m[22m
+
+[1m[33mWARNING[39m[22m in [1m../node_modules/.pnpm/ws@8.19.0/node_modules/ws/lib/validation.js[39m[22m [1m[32m144:24-49[39m[22m
+[1mModule [1m[31mnot found[39m[22m[1m: [1m[31mError[39m[22m[1m: Can't resolve 'utf-8-validate' in 'C:\Projects\vizora\node_modules\.pnpm\ws@8.19.0\node_modules\ws\lib'[39m[22m
+
+webpack compiled with [1m[33m10 warnings[39m[22m (25d1d70cfd6ec598)
+
+
+
+ NX   Successfully ran target build for project @vizora/middleware and 1 task it depends on
+
+

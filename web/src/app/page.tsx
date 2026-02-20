@@ -600,37 +600,9 @@ export default function Index() {
         </div>
       </section>
 
-      {/* ─── 3. Social Proof + Stats (Merged) ─── */}
+      {/* ─── 3. Stats ─── */}
       <section className="py-14 px-6">
         <div className="max-w-5xl mx-auto">
-          <p className="text-[0.65rem] uppercase tracking-[0.14em] font-bold mb-8 text-center" style={{ color: '#6B655D' }}>
-            Trusted by forward-thinking teams worldwide
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-5 mb-12">
-            {[
-              { name: 'Meridian', weight: '800', spacing: '0.04em' },
-              { name: 'ATLAS RETAIL', weight: '400', spacing: '0.18em' },
-              { name: 'apex', weight: '700', spacing: '0.02em' },
-              { name: 'BrightPath', weight: '600', spacing: '-0.01em' },
-              { name: 'NOVATECH', weight: '300', spacing: '0.14em' },
-              { name: 'Urban Eats', weight: '500', spacing: '0.03em' },
-            ].map((brand) => (
-              <span
-                key={brand.name}
-                className="text-sm transition-opacity hover:opacity-80"
-                style={{
-                  color: '#6B655D',
-                  fontWeight: brand.weight,
-                  letterSpacing: brand.spacing,
-                  fontFamily: 'var(--font-sora), sans-serif',
-                  opacity: 0.6,
-                }}
-              >
-                {brand.name}
-              </span>
-            ))}
-          </div>
-
           <Reveal>
             <div
               className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 py-10 px-6 sm:px-8 rounded-2xl"

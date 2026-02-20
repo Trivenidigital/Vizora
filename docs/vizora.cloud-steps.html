@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Launch Vizora on vizora.cloud — Step-by-Step Guide</title>
+    <style>
+        :root {
+            --pri: #6366f1;
+            --pri-d: #4f46e5;
+            --pri-l: #a5b4fc;
+            --bg: #0b1120;
+            --bg2: #151d30;
+            --bg3: #1c2640;
+            --bg-code: #0a0f1c;
+            --tx: #e2e8f0;
+            --tx2: #94a3b8;
+            --bdr: #2a3550;
+            --ok: #22c55e;
+            --warn: #f59e0b;
+            --err: #ef4444;
+            --info: #3b82f6;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--tx);
+            line-height: 1.75;
+            font-size: 15px;
+        }
+        .wrap { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+
+        /* ── Header ── */
+        header {
+            background: linear-gradient(160deg, #1a1040 0%, #0b1120 50%, #0a1628 100%);
+            border-bottom: 3px solid var(--pri);
+            padding: 52px 0 44px;
+            text-align: center;
+        }
+        header h1 {
+            font-size: 36px; font-weight: 800;
+            background: linear-gradient(135deg, #c7d2fe, var(--pri));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text; letter-spacing: -0.5px;
+        }
+        .domain-badge {
+            display: inline-block; margin-top: 12px;
+            background: var(--bg3); border: 1px solid var(--pri);
+            padding: 6px 24px; border-radius: 24px;
+            font-family: 'Cascadia Code', 'Fira Code', monospace;
+            font-size: 18px; color: var(--pri-l); letter-spacing: 0.5px;
+        }
+        header .meta { margin-top: 16px; color: var(--tx2); font-size: 13px; }
+
+        /* ── Nav ── */
+        nav {
+            background: var(--bg2); border-bottom: 1px solid var(--bdr);
+            padding: 14px 0; position: sticky; top: 0; z-index: 100;
+        }
+        .nav-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--tx2); font-weight: 600; margin-bottom: 8px; }
+        .nav-grid { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+        nav a { color: var(--pri-l); text-decoration: none; font-size: 13px; white-space: nowrap; }
+        nav a:hover { color: #fff; }
+        nav a .sn { color: var(--tx2); font-size: 11px; margin-right: 3px; }
+
+        /* ── Main ── */
+        main { padding: 48px 0 80px; }
+        section { margin-bottom: 56px; scroll-margin-top: 56px; }
+
+        h2 {
+            font-size: 24px; font-weight: 700; color: #fff;
+            margin-bottom: 20px; padding-bottom: 10px;
+            border-bottom: 2px solid var(--pri);
+            display: flex; align-items: center; gap: 10px;
+        }
+        h2 .n {
+            background: var(--pri); color: #fff;
+            min-width: 32px; height: 32px; border-radius: 8px;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 14px; font-weight: 700;
+        }
+        h3 { font-size: 18px; font-weight: 600; color: var(--pri-l); margin: 28px 0 14px; }
+        h4 { font-size: 15px; font-weight: 600; color: var(--tx); margin: 20px 0 10px; }
+        p { margin-bottom: 12px; }
+
+        /* ── Code ── */
+        pre {
+            background: var(--bg-code); border: 1px solid var(--bdr);
+            border-radius: 8px; padding: 16px 20px;
+            overflow-x: auto; margin-bottom: 16px;
+            font-size: 13px; line-height: 1.65;
+        }
+        code { font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', Consolas, monospace; color: #e2e8f0; }
+        p code, li code, td code {
+            background: var(--bg-code); padding: 2px 6px;
+            border-radius: 4px; font-size: 13px; color: var(--pri-l);
+        }
+        .cm { color: #6b7280; }
+        .ev { color: #34d399; }
+        .sv { color: #fbbf24; }
+        .hi { color: #f472b6; }
+
+        /* ── Cards / Steps ── */
+        .card {
+            background: var(--bg2); border: 1px solid var(--bdr);
+            border-radius: 10px; padding: 22px 24px; margin-bottom: 18px;
+        }
+        .card-h { font-weight: 600; color: #fff; margin-bottom: 10px; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+
+        .step {
+            background: var(--bg2); border: 1px solid var(--bdr);
+            border-left: 4px solid var(--pri);
+            border-radius: 0 10px 10px 0;
+            padding: 18px 22px; margin-bottom: 14px;
+        }
+        .step .sh {
+            display: flex; align-items: center; gap: 10px;
+            font-weight: 600; color: #fff; font-size: 15px; margin-bottom: 10px;
+        }
+        .step .sn {
+            background: var(--pri); color: #fff;
+            width: 26px; height: 26px; border-radius: 50%;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 12px; font-weight: 700; flex-shrink: 0;
+        }
+
+        /* ── Alerts ── */
+        .al {
+            border-radius: 8px; padding: 14px 18px;
+            margin-bottom: 16px; font-size: 14px;
+            display: flex; gap: 10px; align-items: flex-start;
+        }
+        .al b { display: block; margin-bottom: 2px; }
+        .al-i { flex-shrink: 0; font-size: 16px; margin-top: 1px; }
+        .al-w { background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.3); color: #fbbf24; }
+        .al-d { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3); color: #fca5a5; }
+        .al-i2 { background: rgba(59,130,246,.1); border: 1px solid rgba(59,130,246,.3); color: #93c5fd; }
+        .al-s { background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.3); color: #86efac; }
+
+        /* ── Tables ── */
+        table { width: 100%; border-collapse: collapse; margin-bottom: 18px; font-size: 14px; }
+        th {
+            background: var(--bg-code); color: var(--pri-l); font-weight: 600;
+            text-align: left; padding: 10px 14px; border: 1px solid var(--bdr);
+            font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        td { padding: 9px 14px; border: 1px solid var(--bdr); vertical-align: top; }
+        tr:nth-child(even) { background: rgba(255,255,255,.02); }
+
+        /* ── Lists ── */
+        ul, ol { padding-left: 22px; margin-bottom: 12px; }
+        li { margin-bottom: 5px; }
+
+        /* ── Checklist ── */
+        .ck { list-style: none; padding-left: 0; }
+        .ck li { padding: 7px 0 7px 30px; position: relative; border-bottom: 1px solid rgba(255,255,255,.04); }
+        .ck li::before {
+            content: ''; position: absolute; left: 2px; top: 10px;
+            width: 16px; height: 16px; border: 2px solid var(--bdr); border-radius: 3px;
+        }
+
+        /* ── Grid ── */
+        .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        @media (max-width: 700px) { .g2 { grid-template-columns: 1fr; } }
+
+        /* ── Env file preview ── */
+        .env-block {
+            background: var(--bg-code); border: 1px solid var(--bdr);
+            border-radius: 10px; padding: 20px 24px; margin-bottom: 18px;
+            font-family: 'Cascadia Code', monospace; font-size: 13px;
+            line-height: 1.7; overflow-x: auto; white-space: pre;
+        }
+
+        /* ── Time estimate ── */
+        .time {
+            display: inline-block; background: var(--bg3);
+            border: 1px solid var(--bdr); border-radius: 6px;
+            padding: 3px 12px; font-size: 12px; color: var(--tx2);
+            margin-left: 8px; font-weight: 400;
+        }
+
+        /* ── Scrollbar ── */
+        ::-webkit-scrollbar { width: 7px; height: 7px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: var(--bdr); border-radius: 4px; }
+
+        /* ── Footer ── */
+        footer {
+            text-align: center; padding: 32px 0; border-top: 1px solid var(--bdr);
+            margin-top: 48px; color: var(--tx2); font-size: 13px;
+        }
+
+        /* ── Print ── */
+        @media print {
+            body { background: #fff; color: #000; font-size: 12px; }
+            nav { display: none; }
+            header { border-color: #000; }
+            pre, .card, .step, .env-block { border-color: #ccc; }
+            .al { border-color: #999; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="wrap">
+        <h1>Launch Vizora on Production</h1>
+        <div class="domain-badge">vizora.cloud</div>
+        <div class="meta">Complete step-by-step deployment guide &mdash; February 2026</div>
+    </div>
+</header>
+
+<nav>
+    <div class="wrap">
+        <div class="nav-title">Steps</div>
+        <div class="nav-grid">
+            <a href="#s1"><span class="sn">1</span> DNS Setup</a>
+            <a href="#s2"><span class="sn">2</span> Server Prep</a>
+            <a href="#s3"><span class="sn">3</span> Clone Repo</a>
+            <a href="#s4"><span class="sn">4</span> Generate Secrets</a>
+            <a href="#s5"><span class="sn">5</span> Production .env</a>
+            <a href="#s6"><span class="sn">6</span> Docker Infra</a>
+            <a href="#s7"><span class="sn">7</span> Database</a>
+            <a href="#s8"><span class="sn">8</span> Build Services</a>
+            <a href="#s9"><span class="sn">9</span> SSL Certificate</a>
+            <a href="#s10"><span class="sn">10</span> Start PM2</a>
+            <a href="#s11"><span class="sn">11</span> Start Nginx</a>
+            <a href="#s12"><span class="sn">12</span> Verify Launch</a>
+            <a href="#s13"><span class="sn">13</span> Auto-Start</a>
+            <a href="#s14"><span class="sn">14</span> Backups</a>
+            <a href="#s15"><span class="sn">15</span> Firewall</a>
+            <a href="#s16"><span class="sn">16</span> Monitoring</a>
+            <a href="#s17"><span class="sn">17</span> Final Checks</a>
+        </div>
+    </div>
+</nav>
+
+<main>
+<div class="wrap">
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- OVERVIEW                                                               -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="card" style="margin-bottom: 36px;">
+    <div class="card-h">What This Guide Does</div>
+    <p>Takes you from a blank VPS + the registered domain <code>vizora.cloud</code> to a fully running production Vizora platform with HTTPS, all services live, and monitoring enabled.</p>
+    <p><strong>Architecture:</strong> Everything runs on a single domain. Nginx routes by URL path &mdash; no subdomains required.</p>
+    <table>
+        <tr><th>URL</th><th>Service</th></tr>
+        <tr><td><code>https://vizora.cloud/</code></td><td>Web Dashboard (Next.js :3001)</td></tr>
+        <tr><td><code>https://vizora.cloud/api/v1/*</code></td><td>Middleware API (NestJS :3000)</td></tr>
+        <tr><td><code>https://vizora.cloud/socket.io/*</code></td><td>Realtime WebSocket (Socket.IO :3002)</td></tr>
+    </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- STEP 1: DNS                                                            -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="s1">
+    <h2><span class="n">1</span> Point DNS to Your Server</h2>
+
+    <p>Log into your domain registrar (wherever you bought <code>vizora.cloud</code>) and create these DNS records:</p>
+
+    <table>
+        <thead><tr><th>Type</th><th>Host / Name</th><th>Value</th><th>TTL</th></tr></thead>
+        <tbody>
+            <tr><td><code>A</code></td><td><code>@</code></td><td><code>YOUR_VPS_IP_ADDRESS</code></td><td>300</td></tr>
+            <tr><td><code>A</code></td><td><code>www</code></td><td><code>YOUR_VPS_IP_ADDRESS</code></td><td>300</td></tr>
+        </tbody>
+    </table>
+
+    <div class="al al-i2">
+        <span class="al-i">i</span>
+        <div><b>Find your VPS IP</b>Log into your VPS provider dashboard (DigitalOcean, AWS, Hetzner, etc.) and copy the public IPv4 address. Example: <code>167.172.5.42</code></div>
+    </div>
+
+    <h3>Verify DNS Propagation</h3>
+    <p>Wait 2-5 minutes after setting records, then verify from your local machine:</p>
+<pre><code><span class="cm"># From your local terminal (not the server)</span>
+nslookup vizora.cloud
+
+<span class="cm"># Or on Linux/macOS</span>
+dig vizora.cloud +short
+<span class="cm"># Should output: YOUR_VPS_IP_ADDRESS</span>
+
+<span class="cm"># You can also check online:</span>
+<span class="cm"># https://dnschecker.org/#A/vizora.cloud</span></code></pre>
+
+    <div class="al al-w">
+        <span class="al-i">!</span>
+        <div><b>DNS must propagate before Step 9 (SSL)</b>Let's Encrypt needs to reach your server via the domain name. If DNS hasn't propagated, the SSL certificate request will fail. Proceed with Steps 2-8 while waiting.</div>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- STEP 2: SERVER PREP                                                    -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="s2">
+    <h2><span class="n">2</span> Prepare the Server</h2>
+
+    <div class="step">
+        <div class="sh"><span class="sn">a</span> SSH into your VPS</div>
+<pre><code>ssh root@YOUR_VPS_IP_ADDRESS</code></pre>
+    </div>
+
+    <div class="step">
+        <div class="sh"><span class="sn">b</span> Update the system</div>
+<pre><code>apt update && apt upgrade -y</code></pre>
+    </div>
+
+    <div class="step">
+        <div class="sh"><span class="sn">c</span> Install Node.js 22</div>
+<pre><code><span class="cm"># Add NodeSource repository and install</span>
+curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+apt install -y nodejs
+
+<span class="cm"># Verify</span>
+node --version   <span class="cm"># Should show v22.x.x</span>
+npm --version    <span class="cm"># Should show 10.x.x</span></code></pre>
+    </div>
+
+    <div class="step">
+        <div class="sh"><span class="sn">d</span> Install pnpm and PM2</div>
+<pre><code><span class="cm"># pnpm — the package manager used by Vizora</span>
+npm install -g pnpm@9
+
+<span class="cm"># PM2 — process manager for running services in production</span>
+npm install -g pm2
+
+<span class="cm"># Verify</span>
+pnpm --version   <span class="cm"># Should show 9.x.x</span>
+pm2 --version    <span class="cm"># Should show 5.x.x</span></code></pre>
+    </div>
+
+    <div class="step">
+        <div class="sh"><span class="sn">e</span> Install Docker &amp; Docker Compose</div>
+<pre><code><span class="cm"># Install Docker using the official convenience script</span>
+curl -fsSL https://get.docker.com | sh
+
+<span class="cm"># Verify</span>
+docker --version          <span class="cm"># Should show 24+ or 27+</span>
+docker compose version    <span class="cm"># Should show v2.x.x</span></code></pre>
+    </div>
+
+    <div class="step">
+        <div class="sh"><span class="sn">f</span> Install certbot (for SSL)</div>
+<pre><code>apt install -y certbot</code></pre>
+    </div>
+
+    <div class="step">
+        <div class="sh"><span class="sn">g</span> Install build tools (needed by some npm packages)</div>
+<pre><code>apt install -y build-essential python3 git</code></pre>
+    </div>
+
+    <h3>Quick verification checklist</h3>
+<pre><code>node --version      <span class="cm"># v22.x.x</span>
+pnpm --version      <span class="cm"># 9.x.x</span>
+pm2 --version       <span class="cm"># 5.x.x</span>
+docker --version    <span class="cm"># 24+ or 27+</span>
+certbot --version   <span class="cm"># 2.x.x</span>
+git --version       <span class="cm"># 2.x.x</span></code></pre>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- STEP 3: CLONE                                                          -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="s3">
+    <h2><span class="n">3</span> Clone the Repository</h2>
+
+<pre><code><span class="cm"># Create the deployment directory</span>
+mkdir -p /var/www
+cd /var/www
+
+<span class="cm"># Clone the Vizora repository</span>
+git clone <span class="sv">YOUR_GIT_REPO_URL</span> vizora
+cd /var/www/vizora
+
+<span class="cm"># Checkout the main (stable) branch</span>
+git checkout main
+
+<span class="cm"># Verify the project structure</span>
+ls -la
+<span class="cm"># Should show: middleware/  web/  realtime/  docker/  packages/  ecosystem.config.js  etc.</span></code></pre>
+
+    <div class="al al-i2">
+        <span class="al-i">i</span>
+        <div>Replace <code>YOUR_GIT_REPO_URL</code> with your actual repository URL (e.g., <code>git@github.com:your-org/vizora.git</code>). If using SSH, ensure your server's SSH key is added to your Git provider.</div>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- STEP 4: GENERATE SECRETS                                               -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="s4">
+    <h2><span class="n">4</span> Generate Production Secrets</h2>
+
+    <p>Run each command below <strong>on the server</strong>. Copy and save each output &mdash; you'll paste them into the <code>.env</code> file in the next step.</p>
+
+<pre><code><span class="cm"># Run these one at a time. Each outputs a random string.</span>
+<span class="cm"># Save each output — you'll need them in Step 5.</span>
+
+echo "JWT_SECRET:"
+openssl rand -hex 32
+
+echo "DEVICE_JWT_SECRET:"
+openssl rand -hex 32
+
+echo "INTERNAL_API_SECRET:"
+openssl rand -hex 32
+
+echo "POSTGRES_PASSWORD:"
+openssl rand -hex 24
+
+echo "REDIS_PASSWORD:"
+openssl rand -hex 24
+
+echo "MONGO_PASSWORD:"
+openssl rand -hex 24
+
+echo "MINIO_ACCESS_KEY:"
+openssl rand -hex 16
+
+echo "MINIO_SECRET_KEY:"
+openssl rand -hex 24
+
+echo "GRAFANA_ADMIN_PASSWORD:"
+openssl rand -hex 24
+
+echo "METRICS_TOKEN:"
+openssl rand -hex 32</code></pre>
+
+    <div class="al al-d">
+        <span class="al-i">!</span>
+        <div><b>Save these secrets somewhere secure</b>(password manager, encrypted notes). If you lose them, you'll need to regenerate and reconfigure. Never share them or commit them to Git.</div>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- STEP 5: PRODUCTION .env                                                -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="s5">
+    <h2><span class="n">5</span> Create Production .env File</h2>
+
+    <div class="step">
+        <div class="sh"><span class="sn">a</span> Copy the template</div>
+<pre><code>cd /var/www/vizora
+cp .env.production.example .env</code></pre>
+    </div>
+
+    <div class="step">
+        <div class="sh"><span class="sn">b</span> Edit the .env file</div>
+<pre><code>nano .env</code></pre>
+    </div>
+
+    <p>Replace the placeholder values with your secrets from Step 4 and the <code>vizora.cloud</code> domain. Here is the <strong>complete production .env</strong> with every value you need to set:</p>
+
+    <div class="env-block"><span class="cm"># =============================================================================</span>
+<span class="cm">#  Vizora — Production .env for vizora.cloud</span>
+<span class="cm"># =============================================================================</span>
+
+<span class="cm"># Runtime</span>
+<span class="ev">NODE_ENV</span>=production
+
+<span class="cm"># Service Ports — DO NOT CHANGE</span>
+<span class="ev">PORT</span>=3000
+<span class="ev">MIDDLEWARE_PORT</span>=3000
+<span class="ev">WEB_PORT</span>=3001
+<span class="ev">REALTIME_PORT</span>=3002
+
+<span class="cm"># ─── PostgreSQL ───────────────────────────────────────────────────────</span>
+<span class="cm"># Replace PASTE_POSTGRES_PASSWORD with the value from Step 4</span>
+<span class="ev">DATABASE_URL</span>=postgresql://postgres:<span class="sv">PASTE_POSTGRES_PASSWORD</span>@localhost:5432/vizora?connection_limit=10&pool_timeout=20&statement_timeout=30000
+<span class="ev">POSTGRES_URL</span>=postgresql://postgres:<span class="sv">PASTE_POSTGRES_PASSWORD</span>@localhost:5432/vizora
+<span class="ev">POSTGRES_PASSWORD</span>=<span class="sv">PASTE_POSTGRES_PASSWORD</span>
+
+<span class="cm"># ─── MongoDB ──────────────────────────────────────────────────────────</span>
+<span class="ev">MONGODB_URL</span>=mongodb://mongoadmin:<span class="sv">PASTE_MONGO_PASSWORD</span>@localhost:27017/vizora?authSource=admin
+<span class="ev">MONGO_INITDB_ROOT_USERNAME</span>=mongoadmin
+<span class="ev">MONGO_INITDB_ROOT_PASSWORD</span>=<span class="sv">PASTE_MONGO_PASSWORD</span>
+
+<span class="cm"># ─── Redis ────────────────────────────────────────────────────────────</span>
+<span class="ev">REDIS_URL</span>=redis://:<span class="sv">PASTE_REDIS_PASSWORD</span>@localhost:6379
+<span class="ev">REDIS_PASSWORD</span>=<span class="sv">PASTE_REDIS_PASSWORD</span>
+
+<span class="cm"># ─── JWT Authentication ───────────────────────────────────────────────</span>
+<span class="ev">JWT_SECRET</span>=<span class="sv">PASTE_JWT_SECRET</span>
+<span class="ev">JWT_EXPIRES_IN</span>=7d
+<span class="ev">DEVICE_JWT_SECRET</span>=<span class="sv">PASTE_DEVICE_JWT_SECRET</span>
+<span class="ev">BCRYPT_ROUNDS</span>=14
+
+<span class="cm"># ─── Internal API Secret ─────────────────────────────────────────────</span>
+<span class="ev">INTERNAL_API_SECRET</span>=<span class="sv">PASTE_INTERNAL_API_SECRET</span>
+
+<span class="cm"># ─── URLs for vizora.cloud ────────────────────────────────────────────</span>
+<span class="cm"># IMPORTANT: These MUST be set exactly as shown for vizora.cloud</span>
+<span class="hi">API_BASE_URL</span>=<span class="sv">https://vizora.cloud</span>
+<span class="hi">WEB_URL</span>=<span class="sv">https://vizora.cloud</span>
+<span class="ev">REALTIME_URL</span>=http://localhost:3002
+<span class="hi">CORS_ORIGIN</span>=<span class="sv">https://vizora.cloud</span>
+
+<span class="cm"># ─── Frontend Build-Time URLs ─────────────────────────────────────────</span>
+<span class="cm"># These get baked into the Next.js client bundle. If you change them,</span>
+<span class="cm"># you MUST rebuild the web service (Step 8).</span>
+<span class="hi">NEXT_PUBLIC_API_URL</span>=<span class="sv">https://vizora.cloud/api</span>
+<span class="hi">NEXT_PUBLIC_SOCKET_URL</span>=<span class="sv">https://vizora.cloud</span>
+<span class="ev">BACKEND_URL</span>=http://localhost:3000
+
+<span class="cm"># ─── MinIO / S3 Storage ───────────────────────────────────────────────</span>
+<span class="ev">MINIO_ENDPOINT</span>=localhost
+<span class="ev">MINIO_PORT</span>=9000
+<span class="ev">MINIO_ACCESS_KEY</span>=<span class="sv">PASTE_MINIO_ACCESS_KEY</span>
+<span class="ev">MINIO_SECRET_KEY</span>=<span class="sv">PASTE_MINIO_SECRET_KEY</span>
+<span class="ev">MINIO_BUCKET</span>=vizora-assets
+<span class="ev">MINIO_USE_SSL</span>=false
+<span class="ev">MINIO_ROOT_USER</span>=<span class="sv">PASTE_MINIO_ACCESS_KEY</span>
+<span class="ev">MINIO_ROOT_PASSWORD</span>=<span class="sv">PASTE_MINIO_SECRET_KEY</span>
+
+<span class="cm"># ─── Monitoring ───────────────────────────────────────────────────────</span>
+<span class="ev">GRAFANA_ADMIN_USER</span>=admin
+<span class="ev">GF_SECURITY_ADMIN_PASSWORD</span>=<span class="sv">PASTE_GRAFANA_ADMIN_PASSWORD</span>
+<span class="ev">METRICS_TOKEN</span>=<span class="sv">PASTE_METRICS_TOKEN</span>
+<span class="ev">LOG_LEVEL</span>=info
+
+<span class="cm"># ─── Backups ──────────────────────────────────────────────────────────</span>
+<span class="ev">BACKUP_DIR</span>=/var/backups/vizora
+<span class="ev">BACKUP_RETENTION_DAYS</span>=7</div>
+
+    <div class="al al-w">
+        <span class="al-i">!</span>
+        <div><b>Consistency rule:</b> The password in <code>DATABASE_URL</code> must exactly match <code>POSTGRES_PASSWORD</code>. Same for Redis and MongoDB. If they don't match, services can't connect to Docker containers.</div>
+    </div>
+
+    <div class="al al-i2">
+        <span class="al-i">i</span>
+        <div><b>MINIO_USE_SSL=false</b> because MinIO runs locally behind Nginx. The browser hits <code>https://vizora.cloud</code> (HTTPS), but internally the middleware talks to MinIO on <code>localhost:9000</code> (no TLS needed).</div>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- STEP 6: DOCKER INFRASTRUCTURE                                          -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="s6">
+    <h2><span class="n">6</span> Start Docker Infrastructure</h2>
+
+    <p>This starts PostgreSQL, Redis, MongoDB, MinIO, ClickHouse, Grafana, Prometheus, Loki, and Promtail.</p>
+
+<pre><code>cd /var/www/vizora
+
+<span class="cm"># Create the logs directory (PM2 will write here)</span>
+mkdir -p logs
+
+<span class="cm"># Start all infrastructure services</span>
+<span class="cm"># On Linux VPS, always include the linux override for host.docker.internal</span>
+docker compose -f docker/docker-compose.yml \
+               -f docker/docker-compose.linux.yml \
+               up -d --build
+
+<span class="cm"># Wait 15-20 seconds for health checks to pass, then verify:</span>
+docker compose -f docker/docker-compose.yml ps</code></pre>
+
+    <p>You should see all containers with status <code>Up (healthy)</code>:</p>
+<pre><code><span class="cm"># Expected output:</span>
+<span class="cm"># vizora-postgres     running (healthy)</span>
+<span class="cm"># vizora-mongodb      running (healthy)</span>
+<span class="cm"># vizora-redis        running (healthy)</span>
+<span class="cm"># vizora-minio        running (healthy)</span>
+<span class="cm"># vizora-clickhouse   running (healthy)</span>
+<span class="cm"># vizora-grafana      running (healthy)</span>
+<span class="cm"># vizora-prometheus   running</span>
+<span class="cm"># vizora-loki         running</span>
+<span class="cm"># vizora-promtail     running</span></code></pre>
+
+    <h3>Troubleshoot if containers fail</h3>
+<pre><code><span class="cm"># View logs for a specific container</span>
+docker logs vizora-postgres --tail 30
+docker logs vizora-redis --tail 30
+
+<span class="cm"># Restart a specific container</span>
+docker compose -f docker/docker-compose.yml restart postgres</code></pre>
+
+    <div class="al al-w">
+        <span class="al-i">!</span>
+        <div><b>Don't start Nginx yet.</b> We need the SSL certificate first (Step 9) and Nginx needs the application services running. Skip the <code>nginx</code> container for now &mdash; it's fine that it shows as unhealthy.</div>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- STEP 7: DATABASE                                                       -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="s7">
+    <h2><span class="n">7</span> Initialize the Database</h2>
+
+<pre><code>cd /var/www/vizora
+
+<span class="cm"># Install all project dependencies</span>
+pnpm install --frozen-lockfile
+
+<span class="cm"># Generate the Prisma ORM client</span>
+pnpm --filter @vizora/database db:generate
+
+<span class="cm"># Run all database migrations (creates tables, indexes, etc.)</span>
+pnpm --filter @vizora/database db:migrate</code></pre>
+
+    <h3>Verify the database</h3>
+<pre><code><span class="cm"># Connect to PostgreSQL and check tables exist</span>
+docker exec vizora-postgres psql -U postgres -d vizora -c "\dt"
+
+<span class="cm"># Should show tables: Organization, User, Display, Content, Playlist,</span>
+<span class="cm"># Schedule, DisplayGroup, Tag, ContentImpression, Notification, etc.</span></code></pre>
+
+    <div class="al al-i2">
+        <span class="al-i">i</span>
+        <div><b>Optional:</b> If you have a seed script to create an initial admin user, run it now:<br><code>pnpm --filter @vizora/database db:seed</code></div>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- STEP 8: BUILD SERVICES                                                 -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="s8">
+    <h2><span class="n">8</span> Build All Services</h2>
+
+    <div class="al al-d">
+        <span class="al-i">!</span>
+        <div><b>The .env must be correct BEFORE building.</b> <code>NEXT_PUBLIC_API_URL</code> and <code>NEXT_PUBLIC_SOCKET_URL</code> are embedded into the web dashboard at build time. If you change them later, you must rebuild.</div>
+    </div>
+
+<pre><code>cd /var/www/vizora
+
+<span class="cm"># Build all three services (middleware, web, realtime)</span>
+pnpm build</code></pre>
+
+    <p>This compiles:</p>
+    <table>
+        <tr><th>Service</th><th>Build Output</th><th>What It Does</th></tr>
+        <tr><td>Middleware</td><td><code>middleware/dist/main.js</code></td><td>REST API server</td></tr>
+        <tr><td>Web Dashboard</td><td><code>web/.next/</code></td><td>Next.js SSR + client app</td></tr>
+        <tr><td>Realtime</td><td><code>realtime/dist/main.js</code></td><td>WebSocket gateway</td></tr>
+    </table>
+
+    <h3>Verify build succeeded</h3>
+<pre><code><span class="cm"># Check build outputs exist</span>
+ls -la middleware/dist/main.js
+ls -la realtime/dist/main.js
+ls -d web/.next
+
+<span class="cm"># All three should exist without errors</span></code></pre>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- STEP 9: SSL CERTIFICATE                                                -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="s9">
+    <h2><span class="n">9</span> Get SSL Certificate for vizora.cloud</h2>
+
+    <div class="al al-w">
+        <span class="al-i">!</span>
+        <div><b>Prerequisite:</b> DNS from Step 1 must be propagated. Verify with <code>dig vizora.cloud +short</code> &mdash; it should return your server IP. If it doesn't, wait and retry.</div>
+    </div>
+
+    <div class="step">
+        <div class="sh"><span class="sn">a</span> Stop anything on port 80</div>
+<pre><code><span class="cm"># Certbot needs port 80 free for the ACME challenge</span>
+docker compose -f docker/docker-compose.yml stop nginx 2>/dev/null || true
+
+<span class="cm"># Verify port 80 is free</span>
+ss -tlnp | grep :80
+<span class="cm"># Should show nothing. If something is using it, stop that process.</span></code></pre>
+    </div>
+
+    <div class="step">
+        <div class="sh"><span class="sn">b</span> Run the SSL setup script</div>
+<pre><code>cd /var/www/vizora
+
+sudo ./scripts/setup-ssl.sh vizora.cloud --email admin@vizora.cloud</code></pre>
+        <p>This obtains a Let's Encrypt certificate and stores it at:<br>
+        <code>/etc/letsencrypt/live/vizora/fullchain.pem</code><br>
+        <code>/etc/letsencrypt/live/vizora/privkey.pem</code></p>
+        <p>The Nginx config is already configured to read from this exact path.</p>
+    </div>
+
+    <div class="step">
+        <div class="sh"><span class="sn">c</span> Verify the certificate</div>
+<pre><code><span class="cm"># Check certificate files exist</span>
+ls -la /etc/letsencrypt/live/vizora/
+
+<span class="cm"># View certificate details</span>
+openssl x509 -in /etc/letsencrypt/live/vizora/fullchain.pem -noout -subject -dates
+
+<span class="cm"># Should show:</span>
+<span class="cm"># subject=CN = vizora.cloud</span>
+<span class="cm"># notBefore=Feb 10 ... 2026</span>
+<span class="cm"># notAfter=May 11 ... 2026</span></code></pre>
+    </div>
+
+    <h3>If the script fails</h3>
+<pre><code><span class="cm"># Manual fallback — run certbot directly</span>
+sudo certbot certonly --standalone \
+  --preferred-challenges http \
+  -d vizora.cloud \
+  --cert-name vizora \
+  --non-interactive \
+  --agree-tos \
+  --email admin@vizora.cloud</code></pre>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- STEP 10: START PM2                                                     -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="s10">
+    <h2><span class="n">10</span> Start Application Services (PM2)</h2>
+
+<pre><code>cd /var/www/vizora
+
+<span class="cm"># Start all three services in production mode</span>
+pm2 start ecosystem.config.js --env production
+
+<span class="cm"># Check status</span>
+pm2 list</code></pre>
+
+    <p>Expected output:</p>
+<pre><code><span class="cm">┌─────────────────────┬────┬─────────┬──────┬────────┬─────────┐</span>
+<span class="cm">│ name                │ id │ mode    │ pid  │ status │ mem     │</span>
+<span class="cm">├─────────────────────┼────┼─────────┼──────┼────────┼─────────┤</span>
+<span class="cm">│ vizora-middleware    │ 0  │ cluster │ 1234 │ online │ 120 MB  │</span>
+<span class="cm">│ vizora-middleware    │ 1  │ cluster │ 1235 │ online │ 118 MB  │</span>
+<span class="cm">│ vizora-realtime     │ 2  │ fork    │ 1236 │ online │ 95 MB   │</span>
+<span class="cm">│ vizora-web          │ 3  │ fork    │ 1237 │ online │ 180 MB  │</span>
+<span class="cm">└─────────────────────┴────┴─────────┴──────┴────────┴─────────┘</span></code></pre>
+
+    <h3>Verify services respond</h3>
+<pre><code><span class="cm"># Test each service directly (bypassing Nginx)</span>
+curl -s http://localhost:3000/api/health | head -20
+<span class="cm"># Should return JSON with health status</span>
+
+curl -s -o /dev/null -w "%{http_code}" http://localhost:3001
+<span class="cm"># Should return: 200</span>
+
+curl -s http://localhost:3002/api/health | head -20
+<span class="cm"># Should return JSON with health status</span></code></pre>
+
+    <h3>If a service fails to start</h3>
+<pre><code><span class="cm"># View error logs</span>
+pm2 logs vizora-middleware --lines 30
+pm2 logs vizora-realtime --lines 30
+pm2 logs vizora-web --lines 30
+
+<span class="cm"># Common issues:</span>
+<span class="cm"># - "Missing required env vars" → check your .env file</span>
+<span class="cm"># - "EADDRINUSE" → port already taken, find and kill the process</span>
+<span class="cm"># - "ECONNREFUSED" on database → Docker containers not running</span></code></pre>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- STEP 11: START NGINX                                                   -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="s11">
+    <h2><span class="n">11</span> Start Nginx (HTTPS Reverse Proxy)</h2>
+
+<pre><code>cd /var/www/vizora
+
+<span class="cm"># Start (or restart) the Nginx container</span>
+docker compose -f docker/docker-compose.yml \
+               -f docker/docker-compose.linux.yml \
+               up -d nginx
+
+<span class="cm"># Verify Nginx is running</span>
+docker compose -f docker/docker-compose.yml ps nginx</code></pre>
+
+    <h3>Test from the server</h3>
+<pre><code><span class="cm"># HTTP should redirect to HTTPS</span>
+curl -I http://vizora.cloud
+<span class="cm"># Should return: 301 Moved Permanently → https://vizora.cloud</span>
+
+<span class="cm"># HTTPS should serve the web dashboard</span>
+curl -I https://vizora.cloud
+<span class="cm"># Should return: 200 OK</span>
+
+<span class="cm"># API should respond</span>
+curl -s https://vizora.cloud/api/health
+<span class="cm"># Should return JSON health data</span></code></pre>
+
+    <div class="al al-s">
+        <span class="al-i">&#10003;</span>
+        <div><b>If all three return success, your platform is live at https://vizora.cloud</b></div>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- STEP 12: VERIFY                                                        -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="s12">
+    <h2><span class="n">12</span> Verify the Launch</h2>
+
+    <p>Open a browser on your local machine and test each of these:</p>
+
+    <table>
+        <thead><tr><th>Test</th><th>URL</th><th>Expected Result</th></tr></thead>
+        <tbody>
+            <tr><td>Web Dashboard</td><td><code>https://vizora.cloud</code></td><td>Login page loads with Vizora branding</td></tr>
+            <tr><td>API Health</td><td><code>https://vizora.cloud/api/health</code></td><td>JSON response with <code>{"success": true}</code></td></tr>
+            <tr><td>API Version</td><td><code>https://vizora.cloud/api/v1/health</code></td><td>Same health JSON (versioned route)</td></tr>
+            <tr><td>HTTPS Lock</td><td>Browser address bar</td><td>Padlock icon shows (valid certificate)</td></tr>
+            <tr><td>HTTP Redirect</td><td><code>http://vizora.cloud</code></td><td>Auto-redirects to https://</td></tr>
+        </tbody>
+    </table>
+
+    <h3>Test WebSocket connectivity</h3>
+    <p>Open browser DevTools (F12) &gt; Console and run:</p>
+<pre><code><span class="cm">// Paste this into the browser console on https://vizora.cloud</span>
+const ws = new WebSocket('wss://vizora.cloud/socket.io/?EIO=4&transport=websocket');
+ws.onopen = () => console.log('WebSocket connected!');
+ws.onerror = (e) => console.error('WebSocket error:', e);
+ws.onclose = (e) => console.log('WebSocket closed:', e.code);
+<span class="cm">// Should print: "WebSocket connected!"</span></code></pre>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- STEP 13: AUTO-START                                                    -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="s13">
+    <h2><span class="n">13</span> Configure Auto-Start on Reboot</h2>
+
+    <p>Ensure everything restarts automatically if the server reboots.</p>
+
+    <h3>PM2 (Application Services)</h3>
+<pre><code><span class="cm"># Generate the startup script for your OS</span>
+pm2 startup
+<span class="cm"># PM2 will print a command — copy and run it. Example:</span>
+<span class="cm"># sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u root --hp /root</span>
+
+<span class="cm"># Save current process list so PM2 knows what to start</span>
+pm2 save</code></pre>
+
+    <h3>Docker (Infrastructure)</h3>
+    <p>All Docker containers are already set to <code>restart: unless-stopped</code>, so they auto-start when Docker starts. Just ensure Docker starts on boot:</p>
+<pre><code>sudo systemctl enable docker</code></pre>
+
+    <h3>Verify auto-start works</h3>
+<pre><code><span class="cm"># Simulate a reboot (optional — only do this if you can)</span>
+sudo reboot
+
+<span class="cm"># After reboot, SSH back in and check:</span>
+docker compose -f /var/www/vizora/docker/docker-compose.yml ps   <span class="cm"># All healthy</span>
+pm2 list                                                          <span class="cm"># All online</span>
+curl -I https://vizora.cloud                                      <span class="cm"># 200 OK</span></code></pre>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- STEP 14: BACKUPS                                                       -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="s14">
+    <h2><span class="n">14</span> Set Up Automated Backups</h2>
+
+    <div class="step">
+        <div class="sh"><span class="sn">a</span> Create backup directory</div>
+<pre><code>sudo mkdir -p /var/backups/vizora/{daily,weekly,monthly}
+sudo chown -R root:root /var/backups/vizora</code></pre>
+    </div>
+
+    <div class="step">
+        <div class="sh"><span class="sn">b</span> Make backup scripts executable</div>
+<pre><code>chmod +x /var/www/vizora/scripts/backup-db.sh
+chmod +x /var/www/vizora/scripts/backup-mongodb.sh 2>/dev/null || true</code></pre>
+    </div>
+
+    <div class="step">
+        <div class="sh"><span class="sn">c</span> Test backup manually</div>
+<pre><code>cd /var/www/vizora
+./scripts/backup-db.sh
+
+<span class="cm"># Verify backup was created</span>
+ls -la /var/backups/vizora/daily/</code></pre>
+    </div>
+
+    <div class="step">
+        <div class="sh"><span class="sn">d</span> Schedule automated backups</div>
+<pre><code><span class="cm"># Open crontab editor</span>
+sudo crontab -e
+
+<span class="cm"># Add these lines at the bottom:</span>
+
+# Daily PostgreSQL backup at 3:00 AM
+0 3 * * * cd /var/www/vizora && ./scripts/backup-db.sh >> /var/log/vizora-backup.log 2>&1
+
+# SSL certificate renewal check (twice daily)
+0 3,15 * * * certbot renew --quiet --deploy-hook 'docker compose -f /var/www/vizora/docker/docker-compose.yml exec nginx nginx -s reload'</code></pre>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- STEP 15: FIREWALL                                                      -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="s15">
+    <h2><span class="n">15</span> Configure Firewall</h2>
+
+<pre><code><span class="cm"># Enable UFW firewall</span>
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+
+<span class="cm"># Allow SSH (so you don't lock yourself out!)</span>
+sudo ufw allow 22/tcp
+
+<span class="cm"># Allow HTTP and HTTPS</span>
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+
+<span class="cm"># Enable the firewall</span>
+sudo ufw enable
+
+<span class="cm"># Verify</span>
+sudo ufw status
+<span class="cm"># Should show:</span>
+<span class="cm"># 22/tcp    ALLOW   Anywhere</span>
+<span class="cm"># 80/tcp    ALLOW   Anywhere</span>
+<span class="cm"># 443/tcp   ALLOW   Anywhere</span></code></pre>
+
+    <div class="al al-i2">
+        <span class="al-i">i</span>
+        <div><b>All database ports (5432, 6379, 27017, 9000, 8123) are already bound to <code>127.0.0.1</code></b> in docker-compose.yml, so they're not reachable from the internet even without a firewall. The UFW rules add defense in depth.</div>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- STEP 16: MONITORING                                                    -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="s16">
+    <h2><span class="n">16</span> Access Monitoring</h2>
+
+    <div class="al al-w">
+        <span class="al-i">!</span>
+        <div><b>Grafana is on port 3003, which is blocked by the firewall (intentionally).</b> Access it via SSH tunnel from your local machine &mdash; not by opening port 3003 to the internet.</div>
+    </div>
+
+    <h3>Access Grafana via SSH tunnel</h3>
+<pre><code><span class="cm"># Run this on YOUR LOCAL MACHINE (not the server)</span>
+ssh -L 3003:localhost:3003 root@YOUR_VPS_IP
+
+<span class="cm"># Now open in your browser:</span>
+<span class="cm"># http://localhost:3003</span>
+<span class="cm"># Username: admin</span>
+<span class="cm"># Password: (the GRAFANA_ADMIN_PASSWORD from your .env)</span></code></pre>
+
+    <h3>PM2 monitoring on the server</h3>
+<pre><code><span class="cm"># Real-time process dashboard</span>
+pm2 monit
+
+<span class="cm"># Quick status check</span>
+pm2 list
+
+<span class="cm"># View recent logs</span>
+pm2 logs --lines 50</code></pre>
+
+    <h3>Quick health check script</h3>
+    <p>Run this anytime to verify everything is working:</p>
+<pre><code>echo "=== Docker Infrastructure ==="
+docker compose -f /var/www/vizora/docker/docker-compose.yml ps --format "table {{.Name}}\t{{.Status}}"
+
+echo ""
+echo "=== PM2 Services ==="
+pm2 jlist | python3 -c "import sys,json; [print(f'{p[\"name\"]}: {p[\"pm2_env\"][\"status\"]}') for p in json.load(sys.stdin)]"
+
+echo ""
+echo "=== HTTPS Check ==="
+curl -s -o /dev/null -w "vizora.cloud: HTTP %{http_code}\n" https://vizora.cloud
+curl -s -o /dev/null -w "API health:   HTTP %{http_code}\n" https://vizora.cloud/api/health</code></pre>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- STEP 17: FINAL CHECKLIST                                               -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="s17">
+    <h2><span class="n">17</span> Final Go-Live Checklist</h2>
+
+    <h3>Infrastructure</h3>
+    <ul class="ck">
+        <li>DNS A record for <code>vizora.cloud</code> points to VPS IP</li>
+        <li>Node.js 22+, pnpm 9, PM2, Docker installed</li>
+        <li>All Docker containers running and healthy</li>
+        <li>SSL certificate valid for <code>vizora.cloud</code></li>
+        <li>Firewall allows only ports 22, 80, 443</li>
+    </ul>
+
+    <h3>Application</h3>
+    <ul class="ck">
+        <li>Production .env configured with strong unique secrets</li>
+        <li>Database migrations applied successfully</li>
+        <li>All services built (<code>pnpm build</code>)</li>
+        <li>PM2 running 4 processes (2 middleware + 1 realtime + 1 web)</li>
+        <li>Nginx running and routing HTTPS to services</li>
+    </ul>
+
+    <h3>Verification</h3>
+    <ul class="ck">
+        <li><code>https://vizora.cloud</code> loads the login page</li>
+        <li><code>https://vizora.cloud/api/health</code> returns success</li>
+        <li>HTTP redirects to HTTPS automatically</li>
+        <li>Browser shows valid SSL padlock</li>
+        <li>WebSocket connection works (tested in DevTools)</li>
+    </ul>
+
+    <h3>Operations</h3>
+    <ul class="ck">
+        <li>PM2 startup hook configured (<code>pm2 startup && pm2 save</code>)</li>
+        <li>Docker auto-starts on boot (<code>systemctl enable docker</code>)</li>
+        <li>Automated database backups scheduled (crontab)</li>
+        <li>SSL auto-renewal scheduled (crontab)</li>
+        <li>Grafana accessible via SSH tunnel</li>
+    </ul>
+
+    <div class="al al-s" style="margin-top: 28px;">
+        <span class="al-i">&#10003;</span>
+        <div><b>vizora.cloud is live.</b> Monitor logs closely for the first 48 hours. Keep this guide handy for reference during operations.</div>
+    </div>
+
+    <h3 style="margin-top: 36px;">Day-to-Day Operations Quick Reference</h3>
+    <table>
+        <thead><tr><th>Task</th><th>Command</th></tr></thead>
+        <tbody>
+            <tr><td>Check service status</td><td><code>pm2 list</code></td></tr>
+            <tr><td>View live logs</td><td><code>pm2 logs</code></td></tr>
+            <tr><td>Restart a service</td><td><code>pm2 restart vizora-middleware</code></td></tr>
+            <tr><td>Zero-downtime reload</td><td><code>pm2 reload all</code></td></tr>
+            <tr><td>Check Docker health</td><td><code>docker compose -f docker/docker-compose.yml ps</code></td></tr>
+            <tr><td>View Nginx logs</td><td><code>docker logs vizora-nginx --tail 50</code></td></tr>
+            <tr><td>Manual database backup</td><td><code>./scripts/backup-db.sh</code></td></tr>
+            <tr><td>Check SSL expiry</td><td><code>certbot certificates</code></td></tr>
+            <tr><td>Deploy code update</td><td><code>git pull && pnpm install && pnpm build && pm2 reload all</code></td></tr>
+            <tr><td>Check disk space</td><td><code>df -h</code></td></tr>
+        </tbody>
+    </table>
+</section>
+
+</div>
+</main>
+
+<footer>
+    <div class="wrap">
+        Vizora Digital Signage Platform &mdash; vizora.cloud Deployment Guide<br>
+        Generated February 2026 &mdash; Confidential
+    </div>
+</footer>
+
+</body>
+</html>

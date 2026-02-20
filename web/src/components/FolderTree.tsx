@@ -127,8 +127,17 @@ export default function FolderTree({
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="p-3 border-b border-[var(--border)]">
+      <div className="p-3 border-b border-[var(--border)] flex items-center justify-between">
         <h3 className="text-sm font-semibold text-[var(--foreground)]">Folders</h3>
+        {onCreateFolder && (
+          <button
+            onClick={onCreateFolder}
+            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-[#00E5A0] bg-[#00E5A0]/10 rounded-md hover:bg-[#00E5A0]/20 transition"
+          >
+            <Icon name="add" size="sm" />
+            New Folder
+          </button>
+        )}
       </div>
 
       {/* Folder List */}
@@ -168,18 +177,6 @@ export default function FolderTree({
         )}
       </div>
 
-      {/* New Folder Button */}
-      {onCreateFolder && (
-        <div className="p-3 border-t border-[var(--border)]">
-          <button
-            onClick={onCreateFolder}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-[#00E5A0] bg-[#00E5A0]/10 rounded-md hover:bg-[#00E5A0]/20 transition"
-          >
-            <Icon name="add" size="sm" />
-            New Folder
-          </button>
-        </div>
-      )}
     </div>
   );
 }
