@@ -74,11 +74,11 @@ jobs:
 
       # Generate Prisma client for tests
       - name: Generate Prisma client
-        run: npx prisma generate --schema=packages/database/prisma/schema.prisma
+        run: pnpm --filter @vizora/database exec prisma generate
 
       # Push schema to test database
       - name: Setup test database
-        run: npx prisma db push --schema=packages/database/prisma/schema.prisma --skip-generate
+        run: pnpm --filter @vizora/database exec prisma db push --skip-generate
 
       - name: Run middleware unit tests
         working-directory: middleware
@@ -132,10 +132,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma client
-        run: npx prisma generate --schema=packages/database/prisma/schema.prisma
+        run: pnpm --filter @vizora/database exec prisma generate
 
       - name: Setup test database
-        run: npx prisma db push --schema=packages/database/prisma/schema.prisma --skip-generate
+        run: pnpm --filter @vizora/database exec prisma db push --skip-generate
 
       - name: Run API E2E tests
         continue-on-error: true
@@ -157,7 +157,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma client
-        run: npx prisma generate --schema=packages/database/prisma/schema.prisma
+        run: pnpm --filter @vizora/database exec prisma generate
 
       - name: Build middleware
         run: npx nx build @vizora/middleware
