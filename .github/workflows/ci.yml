@@ -25,9 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v3
-        with:
-          version: 9
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -67,22 +65,20 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v3
-        with:
-          version: 9
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      
+
       # Generate Prisma client for tests
       - name: Generate Prisma client
-        run: npx nx run database:generate
+        run: npx prisma generate --schema=packages/database/prisma/schema.prisma
 
       # Push schema to test database
       - name: Setup test database
-        run: npx prisma db push --schema=database/prisma/schema.prisma --skip-generate
+        run: npx prisma db push --schema=packages/database/prisma/schema.prisma --skip-generate
 
       - name: Run middleware unit tests
         working-directory: middleware
@@ -128,9 +124,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v3
-        with:
-          version: 9
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -138,10 +132,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma client
-        run: npx nx run database:generate
+        run: npx prisma generate --schema=packages/database/prisma/schema.prisma
 
       - name: Setup test database
-        run: npx prisma db push --schema=database/prisma/schema.prisma --skip-generate
+        run: npx prisma db push --schema=packages/database/prisma/schema.prisma --skip-generate
 
       - name: Run API E2E tests
         continue-on-error: true
@@ -155,18 +149,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v3
-        with:
-          version: 9
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      
+
+      - name: Generate Prisma client
+        run: npx prisma generate --schema=packages/database/prisma/schema.prisma
+
       - name: Build middleware
         run: npx nx build @vizora/middleware
-        
+
       - name: Build web
         run: npx nx build @vizora/web
 
@@ -177,9 +172,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v3
-        with:
-          version: 9
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
