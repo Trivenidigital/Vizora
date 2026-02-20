@@ -131,12 +131,14 @@ export class DeviceContentController {
         'Content-Type': content.mimeType || 'application/octet-stream',
         'Content-Length': String(buffer.length),
         'Cache-Control': 'public, max-age=86400',
+        'Cross-Origin-Resource-Policy': 'cross-origin',
       });
       res.end(buffer);
       return;
     }
 
-    // For non-MinIO URLs, redirect
+    // For non-MinIO URLs, redirect (CORP header on redirect itself)
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
     res.redirect(content.url);
     return;
   }

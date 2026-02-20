@@ -30,14 +30,22 @@ const DEFAULT_CONFIG = {
 // Transform URLs from localhost to emulator-accessible addresses (needed for Android emulator)
 // When apiUrl points to localhost/127.0.0.1, rewrite to 10.0.2.2 for emulator access.
 // When apiUrl is a real hostname, rewrite localhost references to use that hostname instead.
-function transformContentUrl(url: string, apiUrl: string): string {
+function transformContentUrl(url: string, apiUrl: string, deviceToken?: string | null): string {
   if (!url) return url;
+  let result: string;
   if (apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1')) {
-    return url.replace(/http:\/\/localhost/g, 'http://10.0.2.2')
-              .replace(/http:\/\/127\.0\.0\.1/g, 'http://10.0.2.2');
+    result = url.replace(/http:\/\/localhost/g, 'http://10.0.2.2')
+                .replace(/http:\/\/127\.0\.0\.1/g, 'http://10.0.2.2');
+  } else {
+    result = url.replace(/http:\/\/localhost:\d+/g, apiUrl)
+                .replace(/http:\/\/127\.0\.0\.1:\d+/g, apiUrl);
   }
-  return url.replace(/http:\/\/localhost:\d+/g, apiUrl)
-            .replace(/http:\/\/127\.0\.0\.1:\d+/g, apiUrl);
+  // Append device JWT token for authentication — img/video tags can't send headers
+  if (deviceToken && (result.startsWith('http://') || result.startsWith('https://'))) {
+    const separator = result.includes('?') ? '&' : '?';
+    result += `${separator}token=${encodeURIComponent(deviceToken)}`;
+  }
+  return result;
 }
 
 interface Config {
@@ -749,7 +757,7 @@ class VizoraAndroidTV {
     const contentType = currentItem.content.type;
     let contentUrl = (contentType === 'html' || contentType === 'template')
       ? currentItem.content.url
-      : transformContentUrl(currentItem.content.url, this.config.apiUrl);
+      : transformContentUrl(currentItem.content.url, this.config.apiUrl, this.deviceToken);
 
     // Check cache for media content
     let resolvedUrl = contentUrl;
@@ -897,7 +905,7 @@ class VizoraAndroidTV {
       const type = item.content.type;
       if (type !== 'image' && type !== 'video') continue;
 
-      const contentUrl = transformContentUrl(item.content.url, this.config.apiUrl);
+      const contentUrl = transformContentUrl(item.content.url, this.config.apiUrl, this.deviceToken);
       try {
         const cached = await this.cacheManager.getCachedUri(item.content.id);
         if (!cached) {
@@ -1017,7 +1025,7 @@ class VizoraAndroidTV {
     const contentType = content.type;
     const contentUrl = (contentType === 'html' || contentType === 'template')
       ? content.url
-      : transformContentUrl(content.url, this.config.apiUrl);
+      : transformContentUrl(content.url, this.config.apiUrl, this.deviceToken);
 
     console.log(`[Vizora] Rendering temporary content: ${contentType} - ${contentUrl}`);
 
@@ -1246,7 +1254,7 @@ class VizoraAndroidTV {
     const contentType = content.type;
     const contentUrl = (contentType === 'html' || contentType === 'template')
       ? content.url
-      : transformContentUrl(content.url, this.config.apiUrl);
+      : transformContentUrl(content.url, this.config.apiUrl, this.deviceToken);
 
     switch (contentType) {
       case 'image':
