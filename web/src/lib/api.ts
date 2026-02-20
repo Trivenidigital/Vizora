@@ -1368,7 +1368,7 @@ class ApiClient {
    * Returns the created content and reports upload progress via callback.
    */
   uploadContentWithProgress(
-    data: { title: string; type: string; file: File },
+    data: { title: string; type: string; file: any },
     onProgress?: (percent: number) => void,
   ): Promise<Content> {
     return new Promise((resolve, reject) => {
