@@ -1361,7 +1361,6 @@ class ApiClient {
       method: 'DELETE',
     });
   }
-}
 
   /**
    * Upload content with progress tracking via XMLHttpRequest.
