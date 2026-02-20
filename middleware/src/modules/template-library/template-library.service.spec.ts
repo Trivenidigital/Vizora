@@ -596,4 +596,175 @@ describe('TemplateLibraryService', () => {
       });
     });
   });
+
+  describe('createTemplateForOrg', () => {
+    const createDto = {
+      name: 'New Template',
+      description: 'A new template',
+      templateHtml: '<h1>{{title}}</h1>',
+      category: 'retail',
+      difficulty: 'beginner',
+      orientation: 'landscape',
+      tags: ['promo', 'sale'],
+      sampleData: { title: 'Sample' },
+      thumbnailUrl: 'https://example.com/thumb.png',
+      duration: 30,
+    };
+
+    it('should create a global template with correct metadata', async () => {
+      const created = makeTemplate({ organizationId: 'org-1' });
+      mockDb.content.create.mockResolvedValue(created);
+
+      const result = await service.createTemplateForOrg(createDto, 'org-1');
+
+      expect(mockDb.content.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          isGlobal: true,
+          type: 'template',
+          status: 'active',
+          organizationId: 'org-1',
+          url: '',
+          name: 'New Template',
+          metadata: expect.objectContaining({
+            isLibraryTemplate: true,
+            isFeatured: false,
+            category: 'retail',
+            templateHtml: '<h1>{{title}}</h1>',
+            libraryTags: ['promo', 'sale'],
+          }),
+        }),
+      });
+      expect(result.id).toBe('tmpl-1');
+    });
+
+    it('should render HTML with sample data on create', async () => {
+      const created = makeTemplate({ organizationId: 'org-1' });
+      mockDb.content.create.mockResolvedValue(created);
+
+      await service.createTemplateForOrg(createDto, 'org-1');
+
+      expect(mockTemplateRendering.processTemplate).toHaveBeenCalledWith(
+        '<h1>{{title}}</h1>',
+        { title: 'Sample' },
+      );
+      expect(mockDb.content.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          metadata: expect.objectContaining({
+            renderedHtml: '<h1>Rendered</h1>',
+            renderedAt: expect.any(String),
+          }),
+        }),
+      });
+    });
+
+    it('should handle render failure gracefully', async () => {
+      mockTemplateRendering.processTemplate.mockImplementation(() => {
+        throw new Error('Template syntax error');
+      });
+      const created = makeTemplate({ organizationId: 'org-1' });
+      mockDb.content.create.mockResolvedValue(created);
+
+      // Should not throw
+      const result = await service.createTemplateForOrg(createDto, 'org-1');
+
+      expect(result.id).toBe('tmpl-1');
+      // Metadata should NOT have renderedHtml since rendering failed
+      expect(mockDb.content.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          metadata: expect.not.objectContaining({
+            renderedHtml: expect.anything(),
+          }),
+        }),
+      });
+    });
+  });
+
+  describe('updateTemplate', () => {
+    it('should update template name and metadata fields', async () => {
+      const template = makeTemplate();
+      mockDb.content.findFirst.mockResolvedValue(template);
+      const updated = makeTemplate({ name: 'Updated Name' });
+      mockDb.content.update.mockResolvedValue(updated);
+
+      const result = await service.updateTemplate('tmpl-1', {
+        name: 'Updated Name',
+        category: 'corporate',
+        tags: ['info'],
+      });
+
+      expect(mockDb.content.findFirst).toHaveBeenCalledWith({
+        where: { id: 'tmpl-1', isGlobal: true, type: 'template' },
+      });
+      expect(mockDb.content.update).toHaveBeenCalledWith({
+        where: { id: 'tmpl-1' },
+        data: expect.objectContaining({
+          name: 'Updated Name',
+          metadata: expect.objectContaining({
+            category: 'corporate',
+            libraryTags: ['info'],
+          }),
+        }),
+      });
+      expect(result.id).toBe('tmpl-1');
+    });
+
+    it('should re-render when HTML changes', async () => {
+      const template = makeTemplate();
+      mockDb.content.findFirst.mockResolvedValue(template);
+      const updated = makeTemplate();
+      mockDb.content.update.mockResolvedValue(updated);
+
+      await service.updateTemplate('tmpl-1', {
+        templateHtml: '<h2>{{subtitle}}</h2>',
+      });
+
+      expect(mockTemplateRendering.processTemplate).toHaveBeenCalledWith(
+        '<h2>{{subtitle}}</h2>',
+        { title: 'Sample' },
+      );
+      expect(mockDb.content.update).toHaveBeenCalledWith({
+        where: { id: 'tmpl-1' },
+        data: expect.objectContaining({
+          metadata: expect.objectContaining({
+            renderedHtml: '<h1>Rendered</h1>',
+            renderedAt: expect.any(String),
+          }),
+        }),
+      });
+    });
+
+    it('should throw NotFoundException for missing template', async () => {
+      mockDb.content.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.updateTemplate('nonexistent', { name: 'Foo' }),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('deleteTemplate', () => {
+    it('should soft-delete by setting status to archived', async () => {
+      const template = makeTemplate();
+      mockDb.content.findFirst.mockResolvedValue(template);
+      mockDb.content.update.mockResolvedValue({ ...template, status: 'archived' });
+
+      await service.deleteTemplate('tmpl-1');
+
+      expect(mockDb.content.findFirst).toHaveBeenCalledWith({
+        where: { id: 'tmpl-1', isGlobal: true, type: 'template' },
+      });
+      expect(mockDb.content.update).toHaveBeenCalledWith({
+        where: { id: 'tmpl-1' },
+        data: { status: 'archived' },
+      });
+    });
+
+    it('should throw NotFoundException for missing template', async () => {
+      mockDb.content.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.deleteTemplate('nonexistent'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
 });

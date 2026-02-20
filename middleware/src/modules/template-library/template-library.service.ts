@@ -4,6 +4,8 @@ import { DatabaseService } from '../database/database.service';
 import { TemplateRenderingService } from '../content/template-rendering.service';
 import { SearchTemplatesDto } from './dto/search-templates.dto';
 import { CloneTemplateDto } from './dto/clone-template.dto';
+import { CreateTemplateDto } from './dto/create-template.dto';
+import { UpdateTemplateDto } from './dto/update-template.dto';
 import { PaginatedResponse } from '../common/dto/pagination.dto';
 
 /**
@@ -270,6 +272,148 @@ export class TemplateLibraryService {
     });
 
     return this.mapTemplateResponse(updated);
+  }
+
+  /**
+   * Create a new global library template for an organization
+   */
+  async createTemplateForOrg(dto: CreateTemplateDto, organizationId: string) {
+    const metadata: LibraryTemplateMetadata = {
+      templateHtml: dto.templateHtml,
+      isLibraryTemplate: true,
+      isFeatured: false,
+      category: dto.category,
+      libraryTags: dto.tags || [],
+      previewImageUrl: dto.thumbnailUrl,
+      difficulty: (dto.difficulty as LibraryTemplateMetadata['difficulty']) || 'beginner',
+      dataSource: {
+        type: 'manual',
+        manualData: dto.sampleData,
+      },
+      refreshConfig: {
+        enabled: false,
+        intervalMinutes: 0,
+      },
+      sampleData: dto.sampleData,
+    };
+
+    // Try to render with sample data
+    try {
+      const data = dto.sampleData || {};
+      const renderedHtml = this.templateRendering.processTemplate(dto.templateHtml, data);
+      metadata.renderedHtml = renderedHtml;
+      metadata.renderedAt = new Date().toISOString();
+    } catch (error) {
+      this.logger.warn(`Template render failed during create: ${error}`);
+    }
+
+    const content = await this.db.content.create({
+      data: {
+        name: dto.name,
+        description: dto.description || null,
+        type: 'template',
+        url: '',
+        duration: dto.duration || 30,
+        templateOrientation: dto.orientation || null,
+        metadata: metadata as unknown as Prisma.InputJsonValue,
+        organizationId,
+        isGlobal: true,
+        status: 'active',
+      },
+    });
+
+    return this.mapTemplateResponse(content);
+  }
+
+  /**
+   * Update an existing library template
+   */
+  async updateTemplate(id: string, dto: UpdateTemplateDto) {
+    const template = await this.db.content.findFirst({
+      where: { id, isGlobal: true, type: 'template' },
+    });
+
+    if (!template) {
+      throw new NotFoundException('Template not found in library');
+    }
+
+    const existingMetadata = (template.metadata as Record<string, unknown>) || {};
+
+    // Merge DTO fields into existing metadata
+    const updatedMetadata = { ...existingMetadata };
+    if (dto.templateHtml !== undefined) {
+      updatedMetadata.templateHtml = dto.templateHtml;
+    }
+    if (dto.category !== undefined) {
+      updatedMetadata.category = dto.category;
+    }
+    if (dto.tags !== undefined) {
+      updatedMetadata.libraryTags = dto.tags;
+    }
+    if (dto.difficulty !== undefined) {
+      updatedMetadata.difficulty = dto.difficulty;
+    }
+    if (dto.sampleData !== undefined) {
+      updatedMetadata.sampleData = dto.sampleData;
+    }
+    if (dto.thumbnailUrl !== undefined) {
+      updatedMetadata.previewImageUrl = dto.thumbnailUrl;
+    }
+
+    // Re-render if templateHtml or sampleData changed
+    if (dto.templateHtml !== undefined || dto.sampleData !== undefined) {
+      try {
+        const html = (updatedMetadata.templateHtml as string) || '';
+        const sampleData = (updatedMetadata.sampleData as Record<string, any>) || {};
+        const renderedHtml = this.templateRendering.processTemplate(html, sampleData);
+        updatedMetadata.renderedHtml = renderedHtml;
+        updatedMetadata.renderedAt = new Date().toISOString();
+      } catch (error) {
+        this.logger.warn(`Template render failed during update: ${error}`);
+      }
+    }
+
+    // Build update data
+    const updateData: any = {
+      metadata: updatedMetadata as Prisma.InputJsonValue,
+    };
+    if (dto.name !== undefined) {
+      updateData.name = dto.name;
+    }
+    if (dto.description !== undefined) {
+      updateData.description = dto.description;
+    }
+    if (dto.duration !== undefined) {
+      updateData.duration = dto.duration;
+    }
+    if (dto.orientation !== undefined) {
+      updateData.templateOrientation = dto.orientation;
+    }
+
+    const updated = await this.db.content.update({
+      where: { id },
+      data: updateData,
+    });
+
+    return this.mapTemplateResponse(updated);
+  }
+
+  /**
+   * Soft-delete a library template by setting status to 'archived'
+   */
+  async deleteTemplate(id: string) {
+    const template = await this.db.content.findFirst({
+      where: { id, isGlobal: true, type: 'template' },
+    });
+
+    if (!template) {
+      throw new NotFoundException('Template not found in library');
+    }
+
+    await this.db.content.update({
+      where: { id },
+      data: { status: 'archived' },
+    });
   }
 
   /**
