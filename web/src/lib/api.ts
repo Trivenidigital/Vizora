@@ -1253,6 +1253,50 @@ class ApiClient {
     });
   }
 
+  // ========== Template Admin API Methods ==========
+
+  async createTemplate(data: {
+    name: string;
+    description?: string;
+    templateHtml: string;
+    category: string;
+    difficulty?: string;
+    orientation?: string;
+    tags?: string[];
+    sampleData?: Record<string, any>;
+    thumbnailUrl?: string;
+    duration?: number;
+  }): Promise<any> {
+    return this.request<any>('/template-library', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateTemplate(id: string, data: {
+    name?: string;
+    description?: string;
+    templateHtml?: string;
+    category?: string;
+    difficulty?: string;
+    orientation?: string;
+    tags?: string[];
+    sampleData?: Record<string, any>;
+    thumbnailUrl?: string;
+    duration?: number;
+  }): Promise<any> {
+    return this.request<any>(`/template-library/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteTemplate(id: string): Promise<void> {
+    await this.request<void>(`/template-library/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
   // ========== Widget API Methods ==========
 
   async getWidgetTypes(): Promise<WidgetType[]> {
