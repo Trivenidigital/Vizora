@@ -1,5 +1,14 @@
 import { config } from '../constants/config';
 import { useAuthStore } from '../stores/auth';
+import type {
+  Display,
+  Content,
+  Playlist,
+  PlaylistItem,
+  UpdateDisplayData,
+  ContentFilterParams,
+  PaginationParams,
+} from '../types';
 
 type RequestOptions = {
   method?: string;
@@ -29,10 +38,18 @@ class ApiClient {
       throw new ApiError(res.status, error.message ?? 'Request failed');
     }
 
-    return res.json();
+    const json = await res.json();
+
+    // Unwrap response envelope: { success, data, meta } → data
+    if (json && typeof json === 'object' && 'success' in json && 'data' in json) {
+      return json.data as T;
+    }
+
+    return json as T;
   }
 
-  // Auth
+  // ---------- Auth ----------
+
   async login(email: string, password: string) {
     return this.request<LoginResponse>('/api/auth/login', {
       method: 'POST',
@@ -51,10 +68,147 @@ class ApiClient {
     return this.request<MeResponse>('/api/auth/me');
   }
 
-  // Devices
+  // ---------- Displays ----------
+
   async getDisplays() {
-    return this.request<DisplayListResponse>('/api/displays');
+    return this.request<Display[]>('/api/v1/displays');
   }
+
+  async getDisplay(id: string) {
+    return this.request<Display>(`/api/v1/displays/${id}`);
+  }
+
+  async updateDisplay(id: string, data: UpdateDisplayData) {
+    return this.request<Display>(`/api/v1/displays/${id}`, {
+      method: 'PATCH',
+      body: data,
+    });
+  }
+
+  async deleteDisplay(id: string) {
+    return this.request<void>(`/api/v1/displays/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async pushContent(displayId: string, contentId: string, duration?: number) {
+    return this.request<void>(`/api/v1/displays/${displayId}/push-content`, {
+      method: 'POST',
+      body: { contentId, ...(duration ? { duration } : {}) },
+    });
+  }
+
+  async requestScreenshot(displayId: string) {
+    return this.request<{ message: string }>(`/api/v1/displays/${displayId}/screenshot`, {
+      method: 'POST',
+    });
+  }
+
+  async getScreenshot(displayId: string) {
+    return this.request<{ url: string; timestamp: string }>(`/api/v1/displays/${displayId}/screenshot`);
+  }
+
+  // ---------- Content ----------
+
+  async getContent(params?: ContentFilterParams) {
+    const query = params ? '?' + buildQuery(params) : '';
+    return this.request<Content[]>(`/api/v1/content${query}`);
+  }
+
+  async getContentItem(id: string) {
+    return this.request<Content>(`/api/v1/content/${id}`);
+  }
+
+  async deleteContent(id: string) {
+    return this.request<void>(`/api/v1/content/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  /**
+   * Upload a file using XMLHttpRequest for progress tracking.
+   * `uri` is the local file URI from expo-image-picker.
+   */
+  async uploadFile(
+    uri: string,
+    name: string,
+    mimeType: string,
+    onProgress?: (percent: number) => void,
+  ): Promise<Content> {
+    const token = useAuthStore.getState().token;
+    const formData = new FormData();
+
+    formData.append('file', {
+      uri,
+      name,
+      type: mimeType,
+    } as unknown as Blob);
+
+    formData.append('name', name);
+
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${this.baseUrl}/api/v1/content/upload`);
+
+      if (token) {
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      }
+
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable && onProgress) {
+          onProgress(Math.round((event.loaded / event.total) * 100));
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          const json = JSON.parse(xhr.responseText);
+          // Unwrap envelope
+          const data = json?.data ?? json;
+          resolve(data as Content);
+        } else {
+          const error = JSON.parse(xhr.responseText).message ?? 'Upload failed';
+          reject(new ApiError(xhr.status, error));
+        }
+      };
+
+      xhr.onerror = () => reject(new ApiError(0, 'Network error during upload'));
+      xhr.send(formData);
+    });
+  }
+
+  // ---------- Playlists ----------
+
+  async getPlaylists(params?: PaginationParams) {
+    const query = params ? '?' + buildQuery(params) : '';
+    return this.request<Playlist[]>(`/api/v1/playlists${query}`);
+  }
+
+  async getPlaylist(id: string) {
+    return this.request<Playlist>(`/api/v1/playlists/${id}`);
+  }
+
+  async addPlaylistItem(playlistId: string, contentId: string, duration?: number) {
+    return this.request<PlaylistItem>(`/api/v1/playlists/${playlistId}/items`, {
+      method: 'POST',
+      body: { contentId, ...(duration ? { duration } : {}) },
+    });
+  }
+
+  async removePlaylistItem(playlistId: string, itemId: string) {
+    return this.request<void>(`/api/v1/playlists/${playlistId}/items/${itemId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async reorderPlaylist(playlistId: string, itemIds: string[]) {
+    return this.request<void>(`/api/v1/playlists/${playlistId}/reorder`, {
+      method: 'POST',
+      body: { itemIds },
+    });
+  }
+
+  // ---------- Pairing ----------
 
   async completePairing(code: string, nickname?: string) {
     return this.request<PairingCompleteResponse>('/api/devices/pairing/complete', {
@@ -62,6 +216,11 @@ class ApiClient {
       body: { code, ...(nickname ? { nickname } : {}) },
     });
   }
+}
+
+function buildQuery(params: Record<string, unknown>): string {
+  const entries = Object.entries(params).filter(([, v]) => v != null);
+  return new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
 }
 
 export const api = new ApiClient();
@@ -76,7 +235,7 @@ export class ApiError extends Error {
   }
 }
 
-// Response types
+// Response types (auth — not wrapped in envelope)
 export type LoginResponse = {
   access_token?: string;
   token?: string;
@@ -102,23 +261,6 @@ export type MeResponse = {
   name: string;
   role: string;
   organizationId: string;
-};
-
-export type Display = {
-  id: string;
-  nickname: string;
-  deviceIdentifier: string;
-  status: 'online' | 'offline' | 'pairing';
-  location?: string;
-  orientation?: string;
-  lastSeen?: string;
-  createdAt: string;
-};
-
-export type DisplayListResponse = {
-  data?: Display[];
-  displays?: Display[];
-  items?: Display[];
 };
 
 export type PairingCompleteResponse = {

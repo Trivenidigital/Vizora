@@ -11,7 +11,7 @@ initializeSentry();
 async function bootstrap() {
   // Validate required production environment variables
   if (process.env.NODE_ENV === 'production') {
-    const required = ['DATABASE_URL', 'REDIS_URL', 'DEVICE_JWT_SECRET', 'INTERNAL_API_SECRET'];
+    const required = ['DATABASE_URL', 'REDIS_URL', 'DEVICE_JWT_SECRET', 'JWT_SECRET', 'INTERNAL_API_SECRET'];
     const missing = required.filter(key => !process.env[key]);
     if (missing.length > 0) {
       Logger.error(`❌ Missing required production env vars: ${missing.join(', ')}`);
