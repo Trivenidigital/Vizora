@@ -314,3 +314,84 @@ body {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* ─── AI Section: Neural Grid Background ─── */
+
+@keyframes eh-node-drift {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(8px, -6px); }
+  50% { transform: translate(-4px, 8px); }
+  75% { transform: translate(6px, 4px); }
+}
+
+@keyframes eh-line-pulse {
+  0%, 100% { opacity: 0.04; }
+  50% { opacity: 0.12; }
+}
+
+.eh-neural-grid {
+  position: relative;
+  overflow: hidden;
+}
+
+.eh-neural-grid::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(0,229,160,0.06) 1px, transparent 1px),
+    radial-gradient(circle at 60% 20%, rgba(0,180,216,0.05) 1px, transparent 1px),
+    radial-gradient(circle at 80% 60%, rgba(0,229,160,0.04) 1px, transparent 1px),
+    radial-gradient(circle at 35% 75%, rgba(0,180,216,0.05) 1px, transparent 1px),
+    radial-gradient(circle at 90% 85%, rgba(0,229,160,0.03) 1px, transparent 1px),
+    radial-gradient(circle at 10% 90%, rgba(139,92,246,0.04) 1px, transparent 1px);
+  background-size: 100% 100%;
+  animation: eh-node-drift 20s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.eh-neural-grid::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(135deg, transparent 40%, rgba(0,229,160,0.03) 50%, transparent 60%),
+    linear-gradient(45deg, transparent 40%, rgba(0,180,216,0.02) 50%, transparent 60%);
+  animation: eh-line-pulse 8s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* AI feature card glassmorphism */
+.eh-ai-card {
+  background: rgba(12, 34, 41, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid #1B3D47;
+  border-radius: 12px;
+  padding: 24px;
+  transition: all 0.3s ease;
+  position: relative;
+  z-index: 1;
+}
+
+.eh-ai-card:hover {
+  border-color: rgba(0, 229, 160, 0.3);
+  box-shadow: 0 0 20px rgba(0, 229, 160, 0.08), 0 8px 32px rgba(0, 0, 0, 0.2);
+  transform: translateY(-3px);
+}
+
+.eh-ai-card:hover .eh-ai-icon {
+  box-shadow: 0 0 12px rgba(0, 229, 160, 0.2);
+}
+
+/* Powered by AI badge pulse */
+@keyframes eh-ai-badge-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 229, 160, 0.15); }
+  50% { box-shadow: 0 0 0 6px rgba(0, 229, 160, 0); }
+}
+
+.eh-ai-badge {
+  animation: eh-ai-badge-pulse 3s ease-in-out infinite;
+}

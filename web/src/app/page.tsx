@@ -33,6 +33,10 @@ import {
   Layers,
   ListMusic,
   Monitor,
+  Sparkles,
+  MessageSquare,
+  Bot,
+  Brain,
 } from 'lucide-react';
 
 /* ─── Scroll-triggered fade-in ─── */
@@ -288,6 +292,16 @@ export default function Index() {
             <span className="text-lg font-bold tracking-[-0.03em] eh-gradient" style={{ fontFamily: 'var(--font-sora), sans-serif' }}>
               VIZORA
             </span>
+            <span
+              className="hidden sm:inline-flex text-[0.55rem] font-bold uppercase tracking-[0.08em] px-2 py-0.5 rounded-full"
+              style={{
+                color: '#00E5A0',
+                background: 'rgba(0,229,160,0.08)',
+                border: '1px solid rgba(0,229,160,0.15)',
+              }}
+            >
+              AI-Powered
+            </span>
           </Link>
 
           <div className="hidden md:flex items-center gap-8">
@@ -410,16 +424,16 @@ export default function Index() {
             <h1
               className="eh-heading text-4xl sm:text-5xl lg:text-[4rem] font-bold mb-6"
             >
-              Every screen. Every location.
+              Every screen runs itself.
               <br />
-              <span className="eh-gradient">One command center.</span>
+              <span className="eh-gradient">You just set the goal.</span>
             </h1>
             <p
-              className="text-base sm:text-lg max-w-[540px] mx-auto leading-relaxed mb-10"
+              className="text-base sm:text-lg max-w-[580px] mx-auto leading-relaxed mb-10"
               style={{ color: '#9A958E' }}
             >
-              Deploy digital signage in minutes. Push content to thousands of
-              screens instantly. Know the moment any display goes offline.
+              Vizora&apos;s AI engine optimizes content, predicts device issues, and adapts
+              to your audience &mdash; so you manage outcomes, not screens.
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-8">
@@ -441,16 +455,16 @@ export default function Index() {
             {/* Trust line */}
             <div className="flex items-center justify-center gap-6 text-xs" style={{ color: '#6B655D' }}>
               <span className="flex items-center gap-1.5">
-                <Check size={14} style={{ color: '#00E5A0' }} />
-                30-day free trial
+                <Sparkles size={14} style={{ color: '#00E5A0' }} />
+                AI-Powered
               </span>
               <span className="flex items-center gap-1.5">
                 <Check size={14} style={{ color: '#00E5A0' }} />
-                No credit card required
+                30-day free trial
               </span>
               <span className="hidden sm:flex items-center gap-1.5">
                 <Check size={14} style={{ color: '#00E5A0' }} />
-                Cancel anytime
+                No credit card required
               </span>
             </div>
           </div>
@@ -615,7 +629,7 @@ export default function Index() {
                 { value: 50000, suffix: '+', label: 'Screens Managed', icon: Tv },
                 { value: 99.9, suffix: '%', label: 'Platform Uptime', icon: Activity },
                 { value: 2500, suffix: '+', label: 'Organizations', icon: Users },
-                { value: 45, suffix: '+', label: 'Countries', icon: Globe },
+                { value: 6, suffix: '', label: 'AI Systems', icon: Sparkles },
               ].map((stat) => (
                 <div key={stat.label} className="text-center">
                   <stat.icon size={18} className="mx-auto mb-3" style={{ color: '#00E5A0', opacity: 0.7 }} />
@@ -631,6 +645,146 @@ export default function Index() {
                   </div>
                 </div>
               ))}
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ─── 3b. AI Features ─── */}
+      <section className="py-20 sm:py-28 px-6 eh-neural-grid" style={{ background: '#051518' }}>
+        <div className="max-w-5xl mx-auto relative z-10">
+          <Reveal>
+            <div className="text-center mb-16">
+              <span
+                className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.15em] mb-4 px-3 py-1.5 rounded-full"
+                style={{ color: '#00E5A0', background: 'rgba(0,229,160,0.08)', border: '1px solid rgba(0,229,160,0.15)' }}
+              >
+                <Sparkles size={12} />
+                Intelligence Engine
+              </span>
+              <h2 className="eh-heading text-3xl sm:text-4xl lg:text-[2.75rem] font-bold mb-5">
+                AI that works <span className="eh-gradient">while you sleep</span>
+              </h2>
+              <p style={{ color: '#9A958E' }} className="max-w-xl mx-auto text-base sm:text-lg">
+                Six intelligent systems running behind every screen in your network.
+              </p>
+            </div>
+          </Reveal>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {[
+              {
+                icon: Sparkles,
+                title: 'AI Content Generation',
+                headline: 'Describe it. Deploy it.',
+                bullets: [
+                  'Generate professional signage from text prompts',
+                  'Auto-resize and optimize for any screen resolution',
+                  'Brand-consistent designs every time',
+                ],
+                color: '#00E5A0',
+              },
+              {
+                icon: CalendarClock,
+                title: 'Smart Scheduling',
+                headline: 'Right content, right moment.',
+                bullets: [
+                  'Optimal time slot suggestions based on audience patterns',
+                  'Auto-schedule by content type and location',
+                  'Timezone-intelligent deployment across regions',
+                ],
+                color: '#00B4D8',
+              },
+              {
+                icon: Activity,
+                title: 'Predictive Monitoring',
+                headline: 'Fix it before it breaks.',
+                bullets: [
+                  'Detects device anomalies before failures occur',
+                  'Auto-recovery and self-healing network capabilities',
+                  'Proactive alerts, not reactive firefighting',
+                ],
+                color: '#8B5CF6',
+              },
+              {
+                icon: Eye,
+                title: 'Audience Intelligence',
+                headline: 'Screens that read the room.',
+                bullets: [
+                  'Real-time audience-aware content adjustment',
+                  'Demographic insights and engagement analytics',
+                  'Privacy-first, edge-processed data',
+                ],
+                color: '#00E5A0',
+              },
+              {
+                icon: MessageSquare,
+                title: 'AI Analytics',
+                headline: 'Ask questions. Get answers.',
+                bullets: [
+                  'Natural language queries on signage performance',
+                  'AI-generated weekly reports and recommendations',
+                  'Anomaly detection on engagement metrics',
+                ],
+                color: '#00B4D8',
+              },
+              {
+                icon: Bot,
+                title: 'Autonomous Operations',
+                headline: 'Set goals. Walk away.',
+                bullets: [
+                  'Self-optimizing playlists that improve over time',
+                  'Auto-curates content based on performance data',
+                  'Hands-off management at any scale',
+                ],
+                color: '#8B5CF6',
+              },
+            ].map((feature, i) => (
+              <Reveal key={feature.title} delay={i * 80}>
+                <div className="eh-ai-card h-full">
+                  <div
+                    className="eh-ai-icon inline-flex items-center justify-center w-10 h-10 rounded-lg mb-4 transition-shadow duration-300"
+                    style={{
+                      background: `${feature.color}12`,
+                      border: `1px solid ${feature.color}25`,
+                    }}
+                  >
+                    <feature.icon size={20} style={{ color: feature.color }} />
+                  </div>
+                  <div className="text-[0.7rem] font-bold uppercase tracking-[0.08em] mb-1.5" style={{ color: feature.color }}>
+                    {feature.title}
+                  </div>
+                  <h3 className="eh-heading text-lg font-semibold mb-3" style={{ color: '#F0ECE8' }}>
+                    {feature.headline}
+                  </h3>
+                  <ul className="space-y-2">
+                    {feature.bullets.map((bullet) => (
+                      <li key={bullet} className="flex items-start gap-2 text-[0.82rem] leading-relaxed" style={{ color: '#B5AEA6' }}>
+                        <Check size={14} className="mt-0.5 shrink-0" style={{ color: feature.color, opacity: 0.7 }} />
+                        {bullet}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+
+          {/* Powered by AI badge */}
+          <Reveal delay={500}>
+            <div className="flex justify-center mt-12">
+              <div
+                className="eh-ai-badge inline-flex items-center gap-2 px-5 py-2 rounded-full"
+                style={{
+                  background: 'rgba(0,229,160,0.06)',
+                  border: '1px solid rgba(0,229,160,0.2)',
+                }}
+              >
+                <Sparkles size={14} style={{ color: '#00E5A0' }} />
+                <span className="text-sm font-semibold" style={{ color: '#00E5A0' }}>
+                  Powered by AI
+                </span>
+              </div>
             </div>
           </Reveal>
         </div>
@@ -778,6 +932,8 @@ export default function Index() {
                     'Remote device control and diagnostics',
                     'Automatic offline alerts and recovery',
                     'Live content preview across all screens',
+                    'Predictive fleet monitoring — AI detects issues early',
+                    'AI-powered auto-recovery for self-healing networks',
                   ].map((item) => (
                     <li key={item} className="flex items-start gap-2.5 text-sm" style={{ color: '#9A958E' }}>
                       <Check size={16} className="mt-0.5 shrink-0" style={{ color: '#00E5A0' }} />
@@ -941,6 +1097,8 @@ export default function Index() {
                     'Magic number validation blocks spoofed files',
                     'Handlebars template engine for dynamic content',
                     'Automatic expiration with replacement content',
+                    'AI content generation from text prompts',
+                    'Intelligent format optimization for any screen',
                   ].map((item) => (
                     <li key={item} className="flex items-start gap-2.5 text-sm" style={{ color: '#9A958E' }}>
                       <Check size={16} className="mt-0.5 shrink-0" style={{ color: '#00B4D8' }} />
@@ -984,6 +1142,8 @@ export default function Index() {
                     'Drag-and-drop playlist builder with undo/redo',
                     'Device groups and location-based targeting',
                     'Analytics dashboard with CSV export',
+                    'AI-optimized time slot suggestions',
+                    'Performance-driven auto-scheduling',
                   ].map((item) => (
                     <li key={item} className="flex items-start gap-2.5 text-sm" style={{ color: '#9A958E' }}>
                       <Check size={16} className="mt-0.5 shrink-0" style={{ color: '#8B5CF6' }} />
@@ -1095,28 +1255,28 @@ export default function Index() {
               {
                 icon: ShoppingBag,
                 title: 'Retail & Stores',
-                desc: 'Dynamic promotions, product showcases, and seasonal campaigns that update across all locations simultaneously.',
+                desc: 'AI-driven promotions based on foot traffic patterns. Dynamic product showcases and seasonal campaigns that update across all locations simultaneously.',
                 color: '#00E5A0',
                 bg: 'rgba(0,229,160,0.03)',
               },
               {
                 icon: Building2,
                 title: 'Corporate Offices',
-                desc: 'Welcome screens, meeting room displays, KPI dashboards, and employee communications at scale.',
+                desc: 'Intelligent content rotation powered by audience data. Welcome screens, meeting room displays, KPI dashboards, and employee communications at scale.',
                 color: '#00B4D8',
                 bg: 'rgba(0,180,216,0.03)',
               },
               {
                 icon: Stethoscope,
                 title: 'Healthcare',
-                desc: 'Patient wayfinding, wait time boards, health education displays, and emergency notifications.',
+                desc: 'AI-adaptive wayfinding that responds to real-time conditions. Wait time boards, health education displays, and emergency notifications.',
                 color: '#8B5CF6',
                 bg: 'rgba(139,92,246,0.03)',
               },
               {
                 icon: UtensilsCrossed,
                 title: 'Restaurants & QSR',
-                desc: 'Digital menu boards, specials rotation, kitchen display systems, and drive-thru content.',
+                desc: 'Smart menu optimization by time of day and season. Digital menu boards, specials rotation, kitchen display systems, and drive-thru content.',
                 color: '#F59E0B',
                 bg: 'rgba(245,158,11,0.03)',
               },
@@ -1313,6 +1473,12 @@ export default function Index() {
                     desc: 'Every action logged with user, timestamp, and IP. Complete compliance trail.',
                     color: '#00E5A0',
                   },
+                  {
+                    icon: Brain,
+                    title: 'Privacy-First AI',
+                    desc: 'All AI processing respects data boundaries. Edge computing keeps sensitive data on-device. No data leaves your network without permission.',
+                    color: '#00B4D8',
+                  },
                 ].map((feature) => (
                   <div key={feature.title} className="flex gap-4">
                     <div
@@ -1492,7 +1658,7 @@ export default function Index() {
                   <span className="text-sm" style={{ color: '#6B655D' }}>/screen/mo</span>
                 </div>
                 <ul className="space-y-3 mb-8">
-                  {['Up to 100 screens', 'API access', 'Priority support', 'Advanced scheduling', '100 GB storage'].map((f) => (
+                  {['Up to 100 screens', 'AI-powered features included', 'API access', 'Priority support', 'Advanced scheduling', '100 GB storage'].map((f) => (
                     <li key={f} className="flex items-start gap-2.5 text-sm" style={{ color: '#F0ECE8' }}>
                       <Check size={16} className="mt-0.5 shrink-0" style={{ color: '#00B4D8' }} />
                       {f}
@@ -1517,7 +1683,7 @@ export default function Index() {
                   <span className="text-4xl sm:text-5xl font-bold" style={{ fontFamily: 'var(--font-sora), sans-serif' }}>Custom</span>
                 </div>
                 <ul className="space-y-3 mb-8">
-                  {['Unlimited screens', 'SLA & dedicated support', 'SSO integration', 'Custom integrations', 'On-prem option'].map((f) => (
+                  {['Unlimited screens', 'Advanced AI + custom models', 'SLA & dedicated support', 'SSO integration', 'Custom integrations', 'On-prem option'].map((f) => (
                     <li key={f} className="flex items-start gap-2.5 text-sm" style={{ color: '#9A958E' }}>
                       <Check size={16} className="mt-0.5 shrink-0" style={{ color: '#00E5A0' }} />
                       {f}
@@ -1578,6 +1744,10 @@ export default function Index() {
               <FAQItem
                 q="What does the free trial include?"
                 a="The free trial gives you 5 screens for 30 days with no credit card required. You get full access to content uploads, basic scheduling, and the real-time monitoring dashboard. When you're ready to scale, choose Basic, Pro, or contact us for Enterprise."
+              />
+              <FAQItem
+                q="How does Vizora use AI?"
+                a="Vizora integrates AI across the platform — from content generation and smart scheduling to predictive device monitoring and audience-aware content adaptation. Our AI engine continuously optimizes your signage network, suggesting the best times to display content, detecting device anomalies before they cause downtime, and generating performance reports automatically. All AI features are included in Pro plans and above."
               />
             </div>
           </Reveal>
@@ -1716,8 +1886,8 @@ export default function Index() {
                 </span>
               </Link>
               <p className="text-sm leading-relaxed mb-4" style={{ color: '#6B655D' }}>
-                The modern digital signage platform.
-                Real-time control for every screen.
+                AI-powered digital signage platform.
+                Intelligent control for every screen.
               </p>
               <div className="flex items-center gap-4">
                 {[
