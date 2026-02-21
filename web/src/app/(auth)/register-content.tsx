@@ -136,7 +136,7 @@ export default function RegisterContent() {
       </div>
 
       {/* Right — Registration Form */}
-      <div className="flex-1 flex flex-col justify-center px-6 py-8 sm:px-10 lg:pl-6 lg:pr-10 xl:pl-8 xl:pr-14">
+      <div className="flex-1 flex flex-col justify-center lg:justify-start px-6 py-8 sm:px-10 lg:pl-6 lg:pr-10 lg:pt-28 xl:pl-8 xl:pr-14">
         {/* Mobile-only compact trust banner */}
         <div className="md:hidden mb-8">
           <div className="flex items-center gap-2.5 mb-4">
