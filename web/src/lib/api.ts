@@ -10,7 +10,7 @@ import type {
   AnalyticsSummary, DeviceMetric, ContentPerformance, UsageTrend, DeviceDistribution,
   BandwidthUsage, PlaylistPerformance, AnalyticsExport,
   User, AuditLog, DisplayGroup,
-  TemplateSearchResult, TemplateCategory, TemplateSummary, TemplateDetail,
+  TemplateSearchResult, TemplateCategory, TemplateSummary, TemplateDetail, AIGenerateResponse,
   WidgetType, Widget, LayoutPreset, LayoutZone, Layout, ResolvedLayout, QrOverlayConfig,
   PlatformHealth,
 } from './types';
@@ -1254,6 +1254,37 @@ class ApiClient {
 
   async getSeasonalTemplates(): Promise<TemplateSummary[]> {
     return this.request<TemplateSummary[]>('/template-library/seasonal');
+  }
+
+  async getPopularTemplates(): Promise<TemplateSummary[]> {
+    return this.request<TemplateSummary[]>('/template-library/popular');
+  }
+
+  async getUserTemplates(params?: {
+    search?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<TemplateSearchResult> {
+    const query = params ? new URLSearchParams(
+      Object.fromEntries(
+        Object.entries(params)
+          .filter(([_, v]) => v !== undefined && v !== '')
+          .map(([k, v]) => [k, String(v)])
+      )
+    ).toString() : '';
+    return this.request<TemplateSearchResult>(`/template-library/user-templates${query ? `?${query}` : ''}`);
+  }
+
+  async aiGenerateTemplate(data: {
+    prompt: string;
+    category?: string;
+    orientation?: string;
+    style?: string;
+  }): Promise<AIGenerateResponse> {
+    return this.request<AIGenerateResponse>('/template-library/ai-generate', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   }
 
   async getTemplateDetail(id: string): Promise<TemplateDetail> {
