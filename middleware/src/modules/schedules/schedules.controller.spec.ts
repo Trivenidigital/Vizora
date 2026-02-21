@@ -3,6 +3,8 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { SchedulesController } from './schedules.controller';
 import { SchedulesService } from './schedules.service';
+import { SubscriptionActiveGuard } from '../billing/guards/subscription-active.guard';
+import { DatabaseService } from '../database/database.service';
 
 describe('SchedulesController', () => {
   let controller: SchedulesController;
@@ -40,6 +42,8 @@ describe('SchedulesController', () => {
         { provide: SchedulesService, useValue: mockSchedulesService },
         { provide: JwtService, useValue: mockJwtService },
         { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('test-secret') } },
+        { provide: DatabaseService, useValue: {} },
+        SubscriptionActiveGuard,
       ],
     }).compile();
 

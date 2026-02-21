@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from '../database/database.module';
 import { BillingService } from './billing.service';
+import { BillingLifecycleService } from './billing-lifecycle.service';
 import { BillingController } from './billing.controller';
 import { WebhooksController } from './webhooks.controller';
 import { StripeProvider } from './providers/stripe.provider';
@@ -14,6 +15,7 @@ import { QuotaGuard } from './guards/quota.guard';
   controllers: [BillingController, WebhooksController],
   providers: [
     BillingService,
+    BillingLifecycleService,
     StripeProvider,
     RazorpayProvider,
     SubscriptionActiveGuard,

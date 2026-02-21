@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { useDeviceStatus } from '@/lib/context/DeviceStatusContext';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import UpgradeBanner from '@/components/UpgradeBanner';
 import { HelpIcon } from '@/components/Tooltip';
 import { Icon, type IconName, iconMap } from '@/theme/icons';
 
@@ -170,6 +171,9 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  Welcome to your Vizora dashboard. Here's what's happening.
  </p>
  </div>
+
+ {/* Upgrade Banner (shows when approaching limits) */}
+ <UpgradeBanner />
 
  {/* Error Banner */}
  {error && (

@@ -16,6 +16,7 @@ describe('SubscriptionActiveGuard', () => {
     } as any;
 
     mockRequest = {
+      method: 'POST',
       user: {
         id: 'user-123',
         organizationId: 'org-123',
@@ -36,6 +37,56 @@ describe('SubscriptionActiveGuard', () => {
   });
 
   describe('canActivate', () => {
+    describe('read-only access passthrough', () => {
+      it('should allow GET requests regardless of subscription status', async () => {
+        mockRequest.method = 'GET';
+
+        const result = await guard.canActivate(mockExecutionContext);
+
+        expect(result).toBe(true);
+        expect(mockDatabaseService.organization.findUnique).not.toHaveBeenCalled();
+      });
+
+      it('should allow HEAD requests regardless of subscription status', async () => {
+        mockRequest.method = 'HEAD';
+
+        const result = await guard.canActivate(mockExecutionContext);
+
+        expect(result).toBe(true);
+        expect(mockDatabaseService.organization.findUnique).not.toHaveBeenCalled();
+      });
+
+      it('should block POST requests with expired subscription', async () => {
+        mockRequest.method = 'POST';
+        mockDatabaseService.organization.findUnique.mockResolvedValue({
+          subscriptionStatus: 'canceled',
+          trialEndsAt: null,
+        } as any);
+
+        await expect(guard.canActivate(mockExecutionContext)).rejects.toThrow(ForbiddenException);
+      });
+
+      it('should block PATCH requests with expired subscription', async () => {
+        mockRequest.method = 'PATCH';
+        mockDatabaseService.organization.findUnique.mockResolvedValue({
+          subscriptionStatus: 'canceled',
+          trialEndsAt: null,
+        } as any);
+
+        await expect(guard.canActivate(mockExecutionContext)).rejects.toThrow(ForbiddenException);
+      });
+
+      it('should block DELETE requests with expired subscription', async () => {
+        mockRequest.method = 'DELETE';
+        mockDatabaseService.organization.findUnique.mockResolvedValue({
+          subscriptionStatus: 'canceled',
+          trialEndsAt: null,
+        } as any);
+
+        await expect(guard.canActivate(mockExecutionContext)).rejects.toThrow(ForbiddenException);
+      });
+    });
+
     describe('when subscription is active', () => {
       it('should allow access', async () => {
         mockDatabaseService.organization.findUnique.mockResolvedValue({

@@ -15,6 +15,7 @@ import type { Request } from 'express';
 import { JwtService } from '@nestjs/jwt';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { RequiresSubscription } from '../billing/decorators/requires-subscription.decorator';
 import { SchedulesService } from './schedules.service';
 import { CreateScheduleDto } from './dto/create-schedule.dto';
 import { UpdateScheduleDto } from './dto/update-schedule.dto';
@@ -24,6 +25,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 
 @UseGuards(RolesGuard)
+@RequiresSubscription()
 @Controller('schedules')
 export class SchedulesController {
   constructor(

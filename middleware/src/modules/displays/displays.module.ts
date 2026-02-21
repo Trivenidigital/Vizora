@@ -6,9 +6,11 @@ import { DisplaysController } from './displays.controller';
 import { PairingService } from './pairing.service';
 import { PairingController } from './pairing.controller';
 import { StorageModule } from '../storage/storage.module';
+import { BillingModule } from '../billing/billing.module';
 
 @Module({
   imports: [
+    BillingModule,
     JwtModule.registerAsync({
       useFactory: () => ({
         secret: process.env.DEVICE_JWT_SECRET,

@@ -5,6 +5,7 @@ import { BillingService } from './billing.service';
 import { DatabaseService } from '../database/database.service';
 import { StripeProvider } from './providers/stripe.provider';
 import { RazorpayProvider } from './providers/razorpay.provider';
+import { MailService } from '../mail/mail.service';
 import { PLAN_TIERS } from './constants/plans';
 
 // Set up environment variables before tests run
@@ -123,6 +124,16 @@ describe('BillingService', () => {
       verifyWebhookSignature: jest.fn(),
     };
 
+    const mockMailService = {
+      sendWelcomeEmail: jest.fn().mockResolvedValue(undefined),
+      sendTrialReminderEmail: jest.fn().mockResolvedValue(undefined),
+      sendTrialExpiredEmail: jest.fn().mockResolvedValue(undefined),
+      sendPaymentReceiptEmail: jest.fn().mockResolvedValue(undefined),
+      sendPaymentFailedEmail: jest.fn().mockResolvedValue(undefined),
+      sendPlanChangedEmail: jest.fn().mockResolvedValue(undefined),
+      sendSubscriptionCanceledEmail: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BillingService,
@@ -130,6 +141,7 @@ describe('BillingService', () => {
         { provide: ConfigService, useValue: mockConfigService },
         { provide: StripeProvider, useValue: mockStripeProvider },
         { provide: RazorpayProvider, useValue: mockRazorpayProvider },
+        { provide: MailService, useValue: mockMailService },
       ],
     }).compile();
 
@@ -297,8 +309,8 @@ describe('BillingService', () => {
       expect(mockStripeProvider.createCheckoutSession).toHaveBeenCalledWith(
         expect.objectContaining({
           customerId: 'cus_stripe123',
-          successUrl: expect.stringContaining('success=true'),
-          cancelUrl: expect.stringContaining('canceled=true'),
+          successUrl: expect.stringContaining('/billing/success'),
+          cancelUrl: expect.stringContaining('/billing/cancel'),
         }),
       );
     });
