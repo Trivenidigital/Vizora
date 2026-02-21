@@ -13,16 +13,6 @@ jest.mock('@/lib/validation', () => ({
   },
 }));
 
-jest.mock('@/components/Button', () => {
-  return function MockButton({ children, loading, ...props }: any) {
-    return (
-      <button {...props} disabled={loading}>
-        {loading ? 'Loading...' : children}
-      </button>
-    );
-  };
-});
-
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn() }),
   usePathname: () => '/login',
@@ -42,24 +32,24 @@ describe('LoginPage', () => {
 
   it('renders login form', () => {
     render(<LoginContent />);
-    expect(screen.getByText('Login to Vizora')).toBeInTheDocument();
-    expect(screen.getByLabelText('Email address')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Log in to Vizora' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Email')).toBeInTheDocument();
     expect(screen.getByLabelText('Password')).toBeInTheDocument();
   });
 
   it('renders sign up link', () => {
     render(<LoginContent />);
-    expect(screen.getByText('Sign up')).toBeInTheDocument();
+    expect(screen.getByText('Sign up free')).toBeInTheDocument();
   });
 
   it('renders submit button', () => {
     render(<LoginContent />);
-    expect(screen.getByLabelText('Log in to your account')).toBeInTheDocument();
+    expect(screen.getByText('Log in', { selector: 'button' })).toBeInTheDocument();
   });
 
   it('updates email field on input', () => {
     render(<LoginContent />);
-    const emailInput = screen.getByLabelText('Email address');
+    const emailInput = screen.getByLabelText('Email');
     fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
     expect(emailInput).toHaveValue('test@example.com');
   });
@@ -78,12 +68,17 @@ describe('LoginPage', () => {
     apiClient.login.mockRejectedValue(new Error('Invalid credentials'));
 
     render(<LoginContent />);
-    fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'test@test.com' } });
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'test@test.com' } });
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'wrong' } });
-    fireEvent.submit(screen.getByLabelText('Log in to your account'));
+    fireEvent.submit(screen.getByText('Log in', { selector: 'button' }));
 
     await waitFor(() => {
-      expect(screen.getByText('Invalid credentials')).toBeInTheDocument();
+      expect(screen.getByText('Invalid email or password. Please try again.')).toBeInTheDocument();
     });
+  });
+
+  it('renders forgot password link', () => {
+    render(<LoginContent />);
+    expect(screen.getByText('Forgot password?')).toBeInTheDocument();
   });
 });
