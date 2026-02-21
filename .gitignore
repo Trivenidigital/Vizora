@@ -104,5 +104,8 @@ vizora/
 
 # Local Claude settings
 .claude/settings.local.json
-nul
-nul
+
+# Debug artifacts
+.logcat_out.txt
+.ssh_out.txt
+emulator-*.png
