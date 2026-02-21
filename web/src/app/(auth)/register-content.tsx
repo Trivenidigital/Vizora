@@ -151,7 +151,7 @@ export default function RegisterContent() {
           </p>
         </div>
 
-        <div className="w-full max-w-md lg:max-w-2xl mx-auto md:mx-0 lg:mx-auto">
+        <div className="w-full max-w-md lg:max-w-2xl mx-auto md:mx-0">
           <h1 className="text-2xl sm:text-3xl font-bold text-[var(--foreground)] eh-heading mb-2">
             Create your account
           </h1>
