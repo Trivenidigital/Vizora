@@ -15,6 +15,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { OrganizationsService } from './organizations.service';
+import { StorageQuotaService } from '../storage/storage-quota.service';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { BrandingConfigDto } from './dto/branding-config.dto';
@@ -24,7 +25,10 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 
 @Controller('organizations')
 export class OrganizationsController {
-  constructor(private readonly organizationsService: OrganizationsService) {}
+  constructor(
+    private readonly organizationsService: OrganizationsService,
+    private readonly storageQuotaService: StorageQuotaService,
+  ) {}
 
   // Create organization is handled during registration
   // This endpoint should be admin-only for creating additional orgs
@@ -39,6 +43,12 @@ export class OrganizationsController {
   @Get('current')
   findCurrent(@CurrentUser('organizationId') organizationId: string) {
     return this.organizationsService.findOne(organizationId);
+  }
+
+  // Get storage usage and quota for the current user's organization
+  @Get('storage')
+  async getStorageInfo(@CurrentUser('organizationId') organizationId: string) {
+    return this.storageQuotaService.getStorageInfo(organizationId);
   }
 
   // Get by ID - only allow access to own organization

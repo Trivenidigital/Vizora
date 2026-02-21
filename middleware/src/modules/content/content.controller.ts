@@ -23,6 +23,7 @@ import { ContentService } from './content.service';
 import { ThumbnailService } from './thumbnail.service';
 import { FileValidationService } from './file-validation.service';
 import { StorageService } from '../storage/storage.service';
+import { StorageQuotaService } from '../storage/storage-quota.service';
 import { CreateContentDto } from './dto/create-content.dto';
 import { UpdateContentDto } from './dto/update-content.dto';
 import { ReplaceFileDto } from './dto/replace-file.dto';
@@ -45,6 +46,7 @@ export class ContentController {
     private readonly thumbnailService: ThumbnailService,
     private readonly fileValidationService: FileValidationService,
     private readonly storageService: StorageService,
+    private readonly storageQuotaService: StorageQuotaService,
   ) {}
 
   @Post()
@@ -72,6 +74,9 @@ export class ContentController {
     if (!file) {
       throw new BadRequestException('No file provided');
     }
+
+    // Check storage quota before processing
+    await this.storageQuotaService.checkQuota(organizationId, file.size);
 
     // Validate file using magic numbers, size, etc.
     const validation = await this.fileValidationService.validateFile(
@@ -103,11 +108,11 @@ export class ContentController {
       } catch (error) {
         this.logger.warn(`MinIO upload failed, falling back to local storage: ${error}`);
         // Fall back to local storage
-        fileUrl = await this.saveFileLocally(filename, file.buffer);
+        fileUrl = await this.saveFileLocally(organizationId, filename, file.buffer);
       }
     } else {
       // MinIO not available, use local storage
-      fileUrl = await this.saveFileLocally(filename, file.buffer);
+      fileUrl = await this.saveFileLocally(organizationId, filename, file.buffer);
     }
 
     // Determine the content type from the file mimetype
@@ -124,6 +129,9 @@ export class ContentController {
       mimeType: file.mimetype,
       metadata: { fileHash: validation.hash },
     } as CreateContentDto);
+
+    // Track storage usage after successful upload
+    await this.storageQuotaService.incrementUsage(organizationId, file.size);
 
     // Generate thumbnail in background (fire-and-forget to avoid blocking upload response)
     if (contentType === 'image') {
@@ -146,10 +154,10 @@ export class ContentController {
   }
 
   /**
-   * Helper to save file to local uploads directory
+   * Helper to save file to local uploads directory, scoped by organizationId.
    */
-  private async saveFileLocally(filename: string, buffer: Buffer): Promise<string> {
-    const uploadsDir = path.join(process.cwd(), 'uploads');
+  private async saveFileLocally(organizationId: string, filename: string, buffer: Buffer): Promise<string> {
+    const uploadsDir = path.join(process.cwd(), 'uploads', organizationId);
     try {
       await fs.promises.access(uploadsDir);
     } catch {
@@ -161,7 +169,7 @@ export class ContentController {
 
     const baseUrl = process.env.API_BASE_URL
       || (process.env.NODE_ENV === 'production' ? (() => { throw new Error('API_BASE_URL must be set in production'); })() : 'http://localhost:3000');
-    return `${baseUrl}/uploads/${filename}`;
+    return `${baseUrl}/uploads/${organizationId}/${filename}`;
   }
 
   @Get()
@@ -322,6 +330,16 @@ export class ContentController {
       throw new BadRequestException('No file provided');
     }
 
+    // Get existing content to determine net storage change
+    const existingContent = await this.contentService.findOne(organizationId, id);
+    const oldFileSize = existingContent.fileSize || 0;
+    const netIncrease = file.size - oldFileSize;
+
+    // Check storage quota only if net storage increases
+    if (netIncrease > 0) {
+      await this.storageQuotaService.checkQuota(organizationId, netIncrease);
+    }
+
     // Validate file
     const validation = await this.fileValidationService.validateFile(
       file.buffer,
@@ -350,10 +368,10 @@ export class ContentController {
         this.logger.debug(`Replacement file uploaded to MinIO: ${objectKey}`);
       } catch (error) {
         this.logger.warn(`MinIO upload failed for replacement, falling back to local: ${error}`);
-        fileUrl = await this.saveFileLocally(filename, file.buffer);
+        fileUrl = await this.saveFileLocally(organizationId, filename, file.buffer);
       }
     } else {
-      fileUrl = await this.saveFileLocally(filename, file.buffer);
+      fileUrl = await this.saveFileLocally(organizationId, filename, file.buffer);
     }
 
     // Determine thumbnail for images
@@ -372,6 +390,13 @@ export class ContentController {
         mimeType: file.mimetype,
       },
     );
+
+    // Update storage usage: adjust for the net difference
+    if (netIncrease > 0) {
+      await this.storageQuotaService.incrementUsage(organizationId, netIncrease);
+    } else if (netIncrease < 0) {
+      await this.storageQuotaService.decrementUsage(organizationId, Math.abs(netIncrease));
+    }
 
     // Generate thumbnail in background (fire-and-forget)
     if (contentType === 'image') {

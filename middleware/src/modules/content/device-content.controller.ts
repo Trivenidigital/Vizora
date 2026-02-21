@@ -75,8 +75,7 @@ export class DeviceContentController {
 
   /**
    * Serve content file directly (streams from MinIO).
-   * Accepts optional device JWT for organization verification.
-   * Content IDs are CUIDs (unguessable), providing baseline access control.
+   * Requires device JWT authentication to prevent unauthorized access.
    */
   @Get(':id/file')
   @Public()
@@ -93,15 +92,10 @@ export class DeviceContentController {
       throw new NotFoundException('Content not found');
     }
 
-    // If device token is provided, verify organization match
-    try {
-      const devicePayload = this.verifyDeviceToken(req);
-      if (content.organizationId !== devicePayload.organizationId) {
-        throw new ForbiddenException('Content not accessible to this device');
-      }
-    } catch (err) {
-      // Allow access without token — content IDs are unguessable CUIDs
-      if (err instanceof ForbiddenException) throw err;
+    // Device JWT is mandatory — throws UnauthorizedException if missing/invalid
+    const devicePayload = this.verifyDeviceToken(req);
+    if (content.organizationId !== devicePayload.organizationId) {
+      throw new ForbiddenException('Content not accessible to this device');
     }
 
     if (content.url.startsWith(MINIO_URL_PREFIX)) {

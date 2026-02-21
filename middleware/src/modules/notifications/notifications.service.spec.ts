@@ -33,6 +33,9 @@ describe('NotificationsService', () => {
         updateMany: jest.fn(),
         deleteMany: jest.fn(),
       },
+      user: {
+        findFirst: jest.fn(),
+      },
     };
 
     service = new NotificationsService(db as unknown as DatabaseService);
@@ -119,6 +122,7 @@ describe('NotificationsService', () => {
         userId: 'user-123',
         organizationId,
       };
+      db.user.findFirst.mockResolvedValue({ id: 'user-123', organizationId });
       db.notification.create.mockResolvedValue({ id: 'notif-4', ...createDto });
 
       await service.create(createDto);

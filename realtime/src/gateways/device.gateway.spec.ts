@@ -174,7 +174,7 @@ describe('DeviceGateway', () => {
         organizationId: 'org-1',
         deviceIdentifier: 'test-id',
       });
-      mockDatabaseService.display.findUnique.mockResolvedValue({ id: 'device-1' });
+      mockDatabaseService.display.findUnique.mockResolvedValue({ id: 'device-1', organizationId: 'org-1' });
 
       const client = createMockSocket();
 
@@ -219,7 +219,7 @@ describe('DeviceGateway', () => {
         organizationId: 'org-1',
         deviceIdentifier: 'test-id',
       });
-      mockDatabaseService.display.findUnique.mockResolvedValue({ id: 'device-1' });
+      mockDatabaseService.display.findUnique.mockResolvedValue({ id: 'device-1', organizationId: 'org-1' });
 
       // Exhaust the rate limit (11 connections from same IP)
       for (let i = 0; i < 11; i++) {
@@ -948,7 +948,7 @@ describe('DeviceGateway', () => {
         organizationId: 'org-1',
         deviceIdentifier: 'test-id',
       });
-      mockDatabaseService.display.findUnique.mockResolvedValue({ id: 'device-1' });
+      mockDatabaseService.display.findUnique.mockResolvedValue({ id: 'device-1', organizationId: 'org-1' });
 
       // 10 connections should be fine
       for (let i = 0; i < 10; i++) {
@@ -979,7 +979,7 @@ describe('DeviceGateway', () => {
         organizationId: 'org-1',
         deviceIdentifier: 'test-id',
       });
-      mockDatabaseService.display.findUnique.mockResolvedValue({ id: 'device-1' });
+      mockDatabaseService.display.findUnique.mockResolvedValue({ id: 'device-1', organizationId: 'org-1' });
 
       // Use a unique IP
       const testIp = '10.0.0.99';

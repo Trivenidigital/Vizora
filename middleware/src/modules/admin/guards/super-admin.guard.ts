@@ -7,7 +7,7 @@ export class SuperAdminGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
-    const userId = request.user?.userId;
+    const userId = request.user?.id;
 
     if (!userId) {
       throw new ForbiddenException('Authentication required');

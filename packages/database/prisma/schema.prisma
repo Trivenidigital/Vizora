@@ -30,6 +30,8 @@ model Organization {
   billingEmail           String?
   trialEndsAt            DateTime?
   subscriptionStatus     String   @default("trial") // trial, active, past_due, canceled
+  storageUsedBytes       BigInt   @default(0)           // Current storage usage in bytes
+  storageQuotaBytes      BigInt   @default(5368709120)  // 5GB default quota in bytes
   settings               Json?    @db.JsonB
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt

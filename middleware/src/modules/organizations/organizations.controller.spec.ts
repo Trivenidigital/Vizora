@@ -2,11 +2,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException } from '@nestjs/common';
 import { OrganizationsController } from './organizations.controller';
 import { OrganizationsService } from './organizations.service';
+import { StorageQuotaService } from '../storage/storage-quota.service';
 import { Reflector } from '@nestjs/core';
 
 describe('OrganizationsController', () => {
   let controller: OrganizationsController;
   let mockOrganizationsService: jest.Mocked<OrganizationsService>;
+  let mockStorageQuotaService: jest.Mocked<StorageQuotaService>;
 
   beforeEach(async () => {
     mockOrganizationsService = {
@@ -16,10 +18,19 @@ describe('OrganizationsController', () => {
       remove: jest.fn(),
     } as any;
 
+    mockStorageQuotaService = {
+      getStorageInfo: jest.fn(),
+      checkQuota: jest.fn(),
+      incrementUsage: jest.fn(),
+      decrementUsage: jest.fn(),
+      recalculateUsage: jest.fn(),
+    } as any;
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [OrganizationsController],
       providers: [
         { provide: OrganizationsService, useValue: mockOrganizationsService },
+        { provide: StorageQuotaService, useValue: mockStorageQuotaService },
         { provide: Reflector, useValue: { getAllAndOverride: jest.fn() } },
       ],
     }).compile();

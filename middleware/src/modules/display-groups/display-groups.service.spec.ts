@@ -37,6 +37,9 @@ describe('DisplayGroupsService', () => {
         createMany: jest.fn(),
         deleteMany: jest.fn(),
       },
+      display: {
+        count: jest.fn(),
+      },
     };
 
     service = new DisplayGroupsService(mockDatabaseService as DatabaseService);
@@ -290,6 +293,7 @@ describe('DisplayGroupsService', () => {
       mockDatabaseService.displayGroup.findFirst
         .mockResolvedValueOnce(mockDisplayGroup) // First call in addDisplays -> findOne
         .mockResolvedValueOnce(groupWithDisplays); // Second call in addDisplays -> return findOne
+      mockDatabaseService.display.count.mockResolvedValue(2);
       mockDatabaseService.displayGroupMember.createMany.mockResolvedValue({ count: 2 });
 
       const result = await service.addDisplays('org-123', 'group-123', manageDto);
@@ -314,6 +318,7 @@ describe('DisplayGroupsService', () => {
 
     it('should skip duplicate display assignments', async () => {
       mockDatabaseService.displayGroup.findFirst.mockResolvedValue(mockDisplayGroup);
+      mockDatabaseService.display.count.mockResolvedValue(1);
       mockDatabaseService.displayGroupMember.createMany.mockResolvedValue({ count: 1 });
 
       await service.addDisplays('org-123', 'group-123', { displayIds: ['display-1'] });
@@ -323,6 +328,21 @@ describe('DisplayGroupsService', () => {
           skipDuplicates: true,
         }),
       );
+    });
+
+    it('should reject displays from a different organization', async () => {
+      mockDatabaseService.displayGroup.findFirst.mockResolvedValue(mockDisplayGroup);
+      // Only 1 of 2 displays belongs to org-123
+      mockDatabaseService.display.count.mockResolvedValue(1);
+
+      await expect(
+        service.addDisplays('org-123', 'group-123', manageDto),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(mockDatabaseService.display.count).toHaveBeenCalledWith({
+        where: { id: { in: manageDto.displayIds }, organizationId: 'org-123' },
+      });
+      expect(mockDatabaseService.displayGroupMember.createMany).not.toHaveBeenCalled();
     });
 
     it('should handle adding a single display', async () => {
@@ -353,6 +373,7 @@ describe('DisplayGroupsService', () => {
           displays: [],
         })
         .mockResolvedValueOnce(groupWithDisplay);
+      mockDatabaseService.display.count.mockResolvedValue(1);
       mockDatabaseService.displayGroupMember.createMany.mockResolvedValue({ count: 1 });
 
       const result = await service.addDisplays('org-123', 'group-123', singleDto);

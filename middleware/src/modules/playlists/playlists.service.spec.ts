@@ -46,6 +46,8 @@ describe('PlaylistsService', () => {
       $transaction: jest.fn((fn) => fn(mockDatabaseService)),
       content: {
         findMany: jest.fn(),
+        findFirst: jest.fn(),
+        count: jest.fn(),
       },
     };
 
@@ -166,6 +168,7 @@ describe('PlaylistsService', () => {
 
     it('should replace items when updating with new items', async () => {
       mockDatabaseService.playlist.findFirst.mockResolvedValue(mockPlaylist);
+      mockDatabaseService.content.count.mockResolvedValue(1);
       mockDatabaseService.playlistItem.deleteMany.mockResolvedValue({ count: 1 });
       mockDatabaseService.playlist.update.mockResolvedValue({
         ...mockPlaylist,
@@ -185,6 +188,7 @@ describe('PlaylistsService', () => {
   describe('addItem', () => {
     it('should add item to playlist', async () => {
       mockDatabaseService.playlist.findFirst.mockResolvedValue(mockPlaylist);
+      mockDatabaseService.content.findFirst.mockResolvedValue({ id: 'content-123' });
       mockDatabaseService.playlistItem.findFirst.mockResolvedValue({ order: 0 });
       mockDatabaseService.playlistItem.create.mockResolvedValue(mockPlaylistItem);
 
@@ -195,6 +199,7 @@ describe('PlaylistsService', () => {
 
     it('should set correct order for new item', async () => {
       mockDatabaseService.playlist.findFirst.mockResolvedValue(mockPlaylist);
+      mockDatabaseService.content.findFirst.mockResolvedValue({ id: 'content-123' });
       mockDatabaseService.playlistItem.findFirst.mockResolvedValue({ order: 5 });
       mockDatabaseService.playlistItem.create.mockResolvedValue(mockPlaylistItem);
 
@@ -213,11 +218,14 @@ describe('PlaylistsService', () => {
   describe('removeItem', () => {
     it('should remove item from playlist', async () => {
       mockDatabaseService.playlist.findFirst.mockResolvedValue(mockPlaylist);
-      mockDatabaseService.playlistItem.delete.mockResolvedValue(mockPlaylistItem);
+      mockDatabaseService.playlistItem.deleteMany.mockResolvedValue({ count: 1 });
 
       const result = await service.removeItem('org-123', 'playlist-123', 'item-123');
 
-      expect(result).toEqual(mockPlaylistItem);
+      expect(result).toEqual({ id: 'item-123', playlistId: 'playlist-123' });
+      expect(mockDatabaseService.playlistItem.deleteMany).toHaveBeenCalledWith({
+        where: { id: 'item-123', playlistId: 'playlist-123' },
+      });
     });
   });
 
