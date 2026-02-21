@@ -70,6 +70,8 @@ describe('RegisterPage', () => {
     fireEvent.change(screen.getByLabelText('Work Email'), { target: { value: 'john@test.com' } });
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Pass1234' } });
     fireEvent.change(screen.getByLabelText('Confirm Password'), { target: { value: 'Pass1234' } });
+    // Check the terms checkbox so form proceeds to API call
+    fireEvent.click(screen.getByRole('checkbox'));
     fireEvent.submit(screen.getByText('Create Account', { selector: 'button' }));
 
     await waitFor(() => {
