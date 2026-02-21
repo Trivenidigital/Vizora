@@ -367,7 +367,7 @@ export default function RegisterContent() {
             </div>
 
             {/* Terms of Service */}
-            <div className="flex items-start gap-2 auth-field-enter auth-field-enter-4">
+            <div className="flex items-start gap-2 lg:justify-center auth-field-enter auth-field-enter-4">
               <input
                 type="checkbox"
                 id="agreeTerms"
@@ -399,7 +399,7 @@ export default function RegisterContent() {
             <button
               type="submit"
               disabled={loading || success || !allFieldsFilled}
-              className="w-full eh-btn-neon py-3 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none disabled:hover:shadow-none auth-field-enter auth-field-enter-5"
+              className="w-full lg:max-w-sm lg:mx-auto eh-btn-neon py-3 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none disabled:hover:shadow-none auth-field-enter auth-field-enter-5"
             >
               {success ? (
                 <span className="flex items-center justify-center gap-2">
