@@ -23,6 +23,7 @@ export default function LoginContent() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
 
   const update = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -66,6 +67,8 @@ export default function LoginContent() {
         setError('Account temporarily locked. Please try again in 15 minutes.');
       } else if (message.toLowerCase().includes('credentials') || message.toLowerCase().includes('invalid')) {
         setError('Invalid email or password. Please try again.');
+      } else if (message.toLowerCase().includes('timeout') || message.toLowerCase().includes('network')) {
+        setError('Unable to connect. Check your internet connection and try again.');
       } else {
         setError(message);
       }
@@ -102,35 +105,52 @@ export default function LoginContent() {
           </p>
 
           {error && (
-            <div className="flex items-start gap-3 bg-[var(--error)]/10 border border-[var(--error)]/30 text-[var(--error)] px-4 py-3 rounded-lg mb-6">
+            <div className={`flex items-start gap-3 px-4 py-3 rounded-lg mb-6 ${
+              error.toLowerCase().includes('locked')
+                ? 'bg-amber-500/10 border border-amber-500/30 text-amber-400'
+                : 'bg-[var(--error)]/10 border border-[var(--error)]/30 text-[var(--error)]'
+            }`}>
               <svg className="w-5 h-5 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
+                {error.toLowerCase().includes('locked') ? (
+                  <path fillRule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clipRule="evenodd" />
+                ) : (
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
+                )}
               </svg>
-              <span className="text-sm">{error}</span>
+              <div className="text-sm">
+                <p>{error}</p>
+                {error.toLowerCase().includes('locked') && (
+                  <Link href="/forgot-password" className="underline font-medium hover:opacity-80 mt-1 inline-block">
+                    Reset your password instead
+                  </Link>
+                )}
+              </div>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-            <FormField
-              id="email"
-              label="Email"
-              type="email"
-              value={formData.email}
-              onChange={(v) => update('email', v)}
-              error={errors.email}
-              onClearError={() => clearFieldError('email')}
-              validate={(v) => {
-                if (!v.trim()) return 'Email is required';
-                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return 'Please enter a valid email';
-                return null;
-              }}
-              placeholder="you@example.com"
-              autoComplete="email"
-              inputMode="email"
-              enterKeyHint="next"
-            />
+            <div className="auth-field-enter auth-field-enter-1">
+              <FormField
+                id="email"
+                label="Email"
+                type="email"
+                value={formData.email}
+                onChange={(v) => update('email', v)}
+                error={errors.email}
+                onClearError={() => clearFieldError('email')}
+                validate={(v) => {
+                  if (!v.trim()) return 'Email is required';
+                  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return 'Please enter a valid email';
+                  return null;
+                }}
+                placeholder="you@example.com"
+                autoComplete="email"
+                inputMode="email"
+                enterKeyHint="next"
+              />
+            </div>
 
-            <div>
+            <div className="auth-field-enter auth-field-enter-2">
               <div className="flex items-center justify-between mb-1.5">
                 <label
                   htmlFor="password"
@@ -139,7 +159,7 @@ export default function LoginContent() {
                   Password
                 </label>
                 <Link
-                  href="/login"
+                  href="/forgot-password"
                   className="text-xs text-[var(--foreground-tertiary)] hover:text-[var(--primary)] transition-colors"
                   tabIndex={-1}
                 >
@@ -167,10 +187,24 @@ export default function LoginContent() {
               )}
             </div>
 
+            {/* Remember me */}
+            <div className="flex items-center gap-2 auth-field-enter auth-field-enter-3">
+              <input
+                type="checkbox"
+                id="rememberMe"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 rounded border-[var(--border)] bg-[var(--background)] text-[var(--primary)] focus:ring-[var(--primary)] focus:ring-2 accent-[#00E5A0] cursor-pointer"
+              />
+              <label htmlFor="rememberMe" className="text-sm text-[var(--foreground-tertiary)] cursor-pointer select-none">
+                Remember me for 30 days
+              </label>
+            </div>
+
             <button
               type="submit"
               disabled={loading}
-              className="w-full eh-btn-neon py-3 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none disabled:hover:shadow-none"
+              className="w-full eh-btn-neon py-3 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none disabled:hover:shadow-none auth-field-enter auth-field-enter-4"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">

@@ -11,6 +11,25 @@ import PasswordInput from '@/components/auth/PasswordInput';
 import PasswordChecklist from '@/components/auth/PasswordChecklist';
 
 export default function RegisterContent() {
+  const commonDomains = ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'icloud.com', 'protonmail.com', 'mail.com', 'aol.com'];
+  const typoMap: Record<string, string> = {
+    'gmial.com': 'gmail.com', 'gmal.com': 'gmail.com', 'gmaill.com': 'gmail.com', 'gamil.com': 'gmail.com',
+    'gmali.com': 'gmail.com', 'gnail.com': 'gmail.com', 'gmail.co': 'gmail.com',
+    'yaho.com': 'yahoo.com', 'yahooo.com': 'yahoo.com', 'yahoo.co': 'yahoo.com',
+    'outllok.com': 'outlook.com', 'outlok.com': 'outlook.com', 'outlook.co': 'outlook.com',
+    'hotmal.com': 'hotmail.com', 'hotmial.com': 'hotmail.com', 'hotmail.co': 'hotmail.com',
+  };
+
+  const getEmailSuggestion = (email: string): string | null => {
+    if (!email.includes('@')) return null;
+    const domain = email.split('@')[1]?.toLowerCase();
+    if (!domain) return null;
+    if (typoMap[domain]) {
+      return email.split('@')[0] + '@' + typoMap[domain];
+    }
+    return null;
+  };
+
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -25,6 +44,8 @@ export default function RegisterContent() {
   const [success, setSuccess] = useState(false);
   // Honeypot field for bot protection
   const [website, setWebsite] = useState('');
+  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [emailSuggestion, setEmailSuggestion] = useState<string | null>(null);
 
   const update = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -41,8 +62,9 @@ export default function RegisterContent() {
       formData.email.trim() !== '' &&
       formData.password !== '' &&
       formData.confirmPassword !== '' &&
-      formData.organizationName.trim() !== '',
-    [formData]
+      formData.organizationName.trim() !== '' &&
+      agreeTerms,
+    [formData, agreeTerms]
   );
 
   // Password match indicator
@@ -72,6 +94,12 @@ export default function RegisterContent() {
         });
         setErrors(fieldErrors);
       }
+      setLoading(false);
+      return;
+    }
+
+    if (!agreeTerms) {
+      setErrors((prev) => ({ ...prev, agreeTerms: 'You must agree to the Terms of Service' }));
       setLoading(false);
       return;
     }
@@ -171,7 +199,7 @@ export default function RegisterContent() {
             </div>
 
             {/* Name fields */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 auth-field-enter auth-field-enter-1">
               <FormField
                 id="firstName"
                 label="First Name"
@@ -198,41 +226,64 @@ export default function RegisterContent() {
               />
             </div>
 
-            <FormField
-              id="organization"
-              label="Organization Name"
-              value={formData.organizationName}
-              onChange={(v) => update('organizationName', v)}
-              error={errors.organizationName}
-              onClearError={() => clearFieldError('organizationName')}
-              validate={(v) => (v.trim().length === 0 ? 'Organization name is required' : null)}
-              placeholder="Acme Corp"
-              autoComplete="organization"
-              enterKeyHint="next"
-              tooltip="This creates your workspace. Team members will join this organization."
-            />
+            <div className="auth-field-enter auth-field-enter-2">
+              <FormField
+                id="organization"
+                label="Organization Name"
+                value={formData.organizationName}
+                onChange={(v) => update('organizationName', v)}
+                error={errors.organizationName}
+                onClearError={() => clearFieldError('organizationName')}
+                validate={(v) => (v.trim().length === 0 ? 'Organization name is required' : null)}
+                placeholder="Acme Corp"
+                autoComplete="organization"
+                enterKeyHint="next"
+                tooltip="This creates your workspace. Team members will join this organization."
+              />
+            </div>
 
-            <FormField
-              id="email"
-              label="Work Email"
-              type="email"
-              value={formData.email}
-              onChange={(v) => update('email', v)}
-              error={errors.email}
-              onClearError={() => clearFieldError('email')}
-              validate={(v) => {
-                if (!v.trim()) return 'Email is required';
-                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return 'Please enter a valid email';
-                return null;
-              }}
-              placeholder="john@acmecorp.com"
-              autoComplete="email"
-              inputMode="email"
-              enterKeyHint="next"
-            />
+            <div className="auth-field-enter auth-field-enter-3">
+              <FormField
+                id="email"
+                label="Work Email"
+                type="email"
+                value={formData.email}
+                onChange={(v) => {
+                  update('email', v);
+                  setEmailSuggestion(getEmailSuggestion(v));
+                }}
+                error={errors.email}
+                onClearError={() => clearFieldError('email')}
+                validate={(v) => {
+                  if (!v.trim()) return 'Email is required';
+                  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return 'Please enter a valid email';
+                  return null;
+                }}
+                placeholder="john@acmecorp.com"
+                autoComplete="email"
+                inputMode="email"
+                enterKeyHint="next"
+              />
+              {emailSuggestion && (
+                <p className="text-xs text-amber-400 mt-1">
+                  Did you mean{' '}
+                  <button
+                    type="button"
+                    className="underline font-medium hover:text-amber-300"
+                    onClick={() => {
+                      update('email', emailSuggestion);
+                      setEmailSuggestion(null);
+                    }}
+                  >
+                    {emailSuggestion}
+                  </button>
+                  ?
+                </p>
+              )}
+            </div>
 
             {/* Password with checklist */}
-            <div>
+            <div className="auth-field-enter auth-field-enter-4">
               <label
                 htmlFor="password"
                 className="block text-[13px] font-semibold text-[var(--foreground-secondary)] mb-1.5"
@@ -262,7 +313,7 @@ export default function RegisterContent() {
             </div>
 
             {/* Confirm Password */}
-            <div>
+            <div className="auth-field-enter auth-field-enter-5">
               <label
                 htmlFor="confirmPassword"
                 className="block text-[13px] font-semibold text-[var(--foreground-secondary)] mb-1.5"
@@ -313,11 +364,40 @@ export default function RegisterContent() {
               )}
             </div>
 
+            {/* Terms of Service */}
+            <div className="flex items-start gap-2 auth-field-enter auth-field-enter-7">
+              <input
+                type="checkbox"
+                id="agreeTerms"
+                checked={agreeTerms}
+                onChange={(e) => {
+                  setAgreeTerms(e.target.checked);
+                  if (errors.agreeTerms) setErrors((prev) => ({ ...prev, agreeTerms: '' }));
+                }}
+                className="w-4 h-4 mt-0.5 rounded border-[var(--border)] bg-[var(--background)] text-[var(--primary)] focus:ring-[var(--primary)] focus:ring-2 accent-[#00E5A0] cursor-pointer"
+              />
+              <label htmlFor="agreeTerms" className="text-xs text-[var(--foreground-tertiary)] cursor-pointer select-none leading-relaxed">
+                I agree to the{' '}
+                <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-[var(--primary)] hover:underline">
+                  Terms of Service
+                </a>{' '}
+                and{' '}
+                <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-[var(--primary)] hover:underline">
+                  Privacy Policy
+                </a>
+              </label>
+            </div>
+            {errors.agreeTerms && (
+              <p className="text-xs text-[var(--error)] -mt-3" role="alert">
+                {errors.agreeTerms}
+              </p>
+            )}
+
             {/* Submit */}
             <button
               type="submit"
               disabled={loading || success || !allFieldsFilled}
-              className="w-full eh-btn-neon py-3 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none disabled:hover:shadow-none"
+              className="w-full eh-btn-neon py-3 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none disabled:hover:shadow-none auth-field-enter auth-field-enter-8"
             >
               {success ? (
                 <span className="flex items-center justify-center gap-2">

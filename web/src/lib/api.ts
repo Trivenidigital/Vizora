@@ -326,6 +326,24 @@ class ApiClient {
     });
   }
 
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  async validateResetToken(token: string): Promise<{ valid: boolean; email?: string }> {
+    return this.request<{ valid: boolean; email?: string }>(`/auth/validate-reset-token?token=${encodeURIComponent(token)}`);
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, newPassword }),
+    });
+  }
+
   // Displays
   async getDisplays(params?: { page?: number; limit?: number }): Promise<PaginatedResponse<Display>> {
     const query = params ? new URLSearchParams(params as Record<string, string>).toString() : '';

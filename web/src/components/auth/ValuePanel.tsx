@@ -3,7 +3,7 @@
 import MiniDashboard from './MiniDashboard';
 
 interface ValuePanelProps {
-  variant: 'register' | 'login';
+  variant: 'register' | 'login' | 'forgot-password' | 'reset-password';
 }
 
 const content = {
@@ -14,6 +14,14 @@ const content = {
   login: {
     headline: 'Welcome back.',
     subtext: 'Your screens are waiting.',
+  },
+  'forgot-password': {
+    headline: "Don't worry.",
+    subtext: "It happens to the best of us. We'll help you get back into your account.",
+  },
+  'reset-password': {
+    headline: 'Almost there.',
+    subtext: 'Choose a strong, unique password to keep your account secure.',
   },
 };
 
@@ -128,6 +136,89 @@ export default function ValuePanel({ variant }: ValuePanelProps) {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {variant === 'forgot-password' && (
+          <div className="rounded-xl border border-[#1B3D47] bg-[#0C2229]/60 p-6">
+            <div className="flex items-center justify-center">
+              <div className="relative">
+                {/* Glow effect behind key */}
+                <div
+                  className="absolute inset-0 rounded-full opacity-40"
+                  style={{
+                    background: 'radial-gradient(circle, rgba(0,229,160,0.25) 0%, transparent 70%)',
+                    animation: 'eh-glow-breathe 4s ease-in-out infinite',
+                    transform: 'scale(2)',
+                  }}
+                />
+                <svg
+                  width="64"
+                  height="64"
+                  viewBox="0 0 64 64"
+                  fill="none"
+                  className="relative z-10"
+                >
+                  {/* Key body */}
+                  <circle cx="22" cy="24" r="10" stroke="#00E5A0" strokeWidth="2" fill="none" opacity="0.9" />
+                  <circle cx="22" cy="24" r="4" fill="#00E5A0" opacity="0.2" />
+                  <line x1="32" y1="24" x2="52" y2="24" stroke="#00E5A0" strokeWidth="2" strokeLinecap="round" opacity="0.9" />
+                  <line x1="48" y1="24" x2="48" y2="32" stroke="#00E5A0" strokeWidth="2" strokeLinecap="round" opacity="0.7" />
+                  <line x1="42" y1="24" x2="42" y2="30" stroke="#00E5A0" strokeWidth="2" strokeLinecap="round" opacity="0.7" />
+                  {/* Decorative dots */}
+                  <circle cx="22" cy="24" r="1.5" fill="#00E5A0" opacity="0.6" />
+                </svg>
+              </div>
+            </div>
+            <p className="text-center text-xs text-[var(--foreground-tertiary)] mt-4">
+              A secure reset link will be sent to your email
+            </p>
+          </div>
+        )}
+
+        {variant === 'reset-password' && (
+          <div className="rounded-xl border border-[#1B3D47] bg-[#0C2229]/60 p-6">
+            <div className="flex items-center justify-center">
+              <div className="relative">
+                {/* Glow effect behind shield */}
+                <div
+                  className="absolute inset-0 rounded-full opacity-40"
+                  style={{
+                    background: 'radial-gradient(circle, rgba(0,229,160,0.25) 0%, transparent 70%)',
+                    animation: 'eh-glow-breathe 4s ease-in-out infinite',
+                    transform: 'scale(2)',
+                  }}
+                />
+                <svg
+                  width="64"
+                  height="64"
+                  viewBox="0 0 64 64"
+                  fill="none"
+                  className="relative z-10"
+                >
+                  {/* Shield */}
+                  <path
+                    d="M32 8L12 18v14c0 12.4 8.5 24 20 28 11.5-4 20-15.6 20-28V18L32 8z"
+                    stroke="#00E5A0"
+                    strokeWidth="2"
+                    fill="rgba(0,229,160,0.06)"
+                    strokeLinejoin="round"
+                  />
+                  {/* Checkmark inside shield */}
+                  <polyline
+                    points="22,32 29,39 42,26"
+                    stroke="#00E5A0"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill="none"
+                  />
+                </svg>
+              </div>
+            </div>
+            <p className="text-center text-xs text-[var(--foreground-tertiary)] mt-4">
+              Your account will be protected with your new password
+            </p>
           </div>
         )}
 

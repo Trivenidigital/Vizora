@@ -395,3 +395,28 @@ body {
 .eh-ai-badge {
   animation: eh-ai-badge-pulse 3s ease-in-out infinite;
 }
+
+/* Staggered form field entrance */
+@keyframes auth-field-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.auth-field-enter {
+  animation: auth-field-enter 0.4s ease-out both;
+}
+
+.auth-field-enter-1 { animation-delay: 0.05s; }
+.auth-field-enter-2 { animation-delay: 0.1s; }
+.auth-field-enter-3 { animation-delay: 0.15s; }
+.auth-field-enter-4 { animation-delay: 0.2s; }
+.auth-field-enter-5 { animation-delay: 0.25s; }
+.auth-field-enter-6 { animation-delay: 0.3s; }
+.auth-field-enter-7 { animation-delay: 0.35s; }
+.auth-field-enter-8 { animation-delay: 0.4s; }
