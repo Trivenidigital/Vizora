@@ -399,7 +399,7 @@ export default function RegisterContent() {
             <button
               type="submit"
               disabled={loading || success || !allFieldsFilled}
-              className="w-full eh-btn-neon py-3 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none disabled:hover:shadow-none auth-field-enter auth-field-enter-5"
+              className="w-full sm:w-auto sm:min-w-[220px] sm:mx-auto sm:block eh-btn-neon py-3 sm:px-12 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none disabled:hover:shadow-none auth-field-enter auth-field-enter-5"
             >
               {success ? (
                 <span className="flex items-center justify-center gap-2">
