@@ -15,6 +15,14 @@ export default defineConfig(({ mode }) => {
           manualChunks: undefined,
         },
       },
+      // Strip console.log/warn in production builds (keep console.error)
+      minify: 'terser',
+      terserOptions: {
+        compress: {
+          drop_console: mode === 'production',
+          pure_funcs: mode === 'production' ? ['console.log', 'console.warn'] : [],
+        },
+      },
     },
     server: {
       port: 3003,

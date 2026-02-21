@@ -30,14 +30,22 @@ const DEFAULT_CONFIG = {
 // Transform URLs from localhost to emulator-accessible addresses (needed for Android emulator)
 // When apiUrl points to localhost/127.0.0.1, rewrite to 10.0.2.2 for emulator access.
 // When apiUrl is a real hostname, rewrite localhost references to use that hostname instead.
-function transformContentUrl(url: string, apiUrl: string): string {
+function transformContentUrl(url: string, apiUrl: string, deviceToken?: string | null): string {
   if (!url) return url;
+  let result: string;
   if (apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1')) {
-    return url.replace(/http:\/\/localhost/g, 'http://10.0.2.2')
-              .replace(/http:\/\/127\.0\.0\.1/g, 'http://10.0.2.2');
+    result = url.replace(/http:\/\/localhost/g, 'http://10.0.2.2')
+                .replace(/http:\/\/127\.0\.0\.1/g, 'http://10.0.2.2');
+  } else {
+    result = url.replace(/http:\/\/localhost:\d+/g, apiUrl)
+                .replace(/http:\/\/127\.0\.0\.1:\d+/g, apiUrl);
   }
-  return url.replace(/http:\/\/localhost:\d+/g, apiUrl)
-            .replace(/http:\/\/127\.0\.0\.1:\d+/g, apiUrl);
+  // Append device JWT token for authentication — img/video tags can't send headers
+  if (deviceToken && (result.startsWith('http://') || result.startsWith('https://'))) {
+    const separator = result.includes('?') ? '&' : '?';
+    result += `${separator}token=${encodeURIComponent(deviceToken)}`;
+  }
+  return result;
 }
 
 interface Config {
@@ -79,6 +87,40 @@ interface PushContent {
   duration?: number;
 }
 
+interface QrOverlayConfig {
+  enabled: boolean;
+  url: string;
+  position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  size?: number;
+  margin?: number;
+  backgroundColor?: string;
+  opacity?: number;
+  label?: string;
+}
+
+interface LayoutMetadata {
+  gridTemplate?: { columns?: string; rows?: string };
+  gap?: number;
+  backgroundColor?: string;
+  zones: LayoutZone[];
+}
+
+interface LayoutZone {
+  id: string;
+  gridArea: string;
+  resolvedPlaylist?: Playlist;
+  resolvedContent?: PlaylistItem['content'];
+}
+
+interface HeartbeatResponse {
+  commands?: Array<{ type: string; payload?: Record<string, unknown>; [key: string]: unknown }>;
+}
+
+interface PerformanceMemory {
+  usedJSHeapSize: number;
+  jsHeapSizeLimit: number;
+}
+
 class VizoraAndroidTV {
   private socket: Socket | null = null;
   private deviceId: string | null = null;
@@ -102,8 +144,11 @@ class VizoraAndroidTV {
   private temporaryContentTimer: ReturnType<typeof setTimeout> | null = null;
   private savedPlaylistState: { playlist: Playlist; index: number } | null = null;
 
+  // Pairing retry state
+  private pairingRetryCount = 0;
+
   // QR overlay and multi-zone layout state
-  private qrOverlayConfig: any = null;
+  private qrOverlayConfig: QrOverlayConfig | null = null;
   private zoneTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   private zoneIndices: Map<string, number> = new Map();
 
@@ -130,6 +175,18 @@ class VizoraAndroidTV {
 
     if (this.deviceToken && this.deviceId) {
       console.log('[Vizora] Found existing device credentials, connecting...');
+
+      // Restore last playlist for offline resilience
+      try {
+        const lastPlaylist = await Preferences.get({ key: 'last_playlist' });
+        if (lastPlaylist.value) {
+          this.currentPlaylist = JSON.parse(lastPlaylist.value);
+          console.log('[Vizora] Restored last playlist from storage');
+        }
+      } catch (err) {
+        console.warn('[Vizora] Failed to restore last playlist:', err);
+      }
+
       this.connectToRealtime();
     } else {
       console.log('[Vizora] No credentials found, starting pairing flow...');
@@ -298,15 +355,25 @@ class VizoraAndroidTV {
 
   // ==================== PAIRING ====================
 
+  private getPairingRetryDelay(): number {
+    return Math.min(5000 * Math.pow(2, this.pairingRetryCount), 300000);
+  }
+
   private async startPairing() {
     this.showScreen('pairing');
     this.updateStatus('connecting', 'Requesting pairing code...');
 
     if (!this.isOnline) {
       this.showError('No network connection. Please check your network settings.');
-      setTimeout(() => this.startPairing(), 5000);
+      const delay = this.getPairingRetryDelay();
+      this.pairingRetryCount++;
+      console.log(`[Vizora] Pairing retry in ${delay}ms (attempt ${this.pairingRetryCount})`);
+      setTimeout(() => this.startPairing(), delay);
       return;
     }
+
+    // Reset retry count on fresh online attempt
+    this.pairingRetryCount = 0;
 
     try {
       // Generate a unique device identifier
@@ -355,7 +422,10 @@ class VizoraAndroidTV {
     } catch (error) {
       console.error('[Vizora] Pairing request failed:', error);
       this.showError('Failed to request pairing code. Retrying...');
-      setTimeout(() => this.startPairing(), 5000);
+      const delay = this.getPairingRetryDelay();
+      this.pairingRetryCount++;
+      console.log(`[Vizora] Pairing retry in ${delay}ms (attempt ${this.pairingRetryCount})`);
+      setTimeout(() => this.startPairing(), delay);
     }
   }
 
@@ -429,6 +499,7 @@ class VizoraAndroidTV {
         if (data.status === 'paired' && data.deviceToken) {
           console.log('[Vizora] Device paired successfully!');
           this.stopPairingCheck();
+          this.pairingRetryCount = 0;
 
           this.deviceToken = data.deviceToken;
 
@@ -486,7 +557,7 @@ class VizoraAndroidTV {
 
       // Use browser performance API for memory if available, otherwise defaults
       let memoryUsage = 50; // reasonable default
-      const perfMemory = (performance as any).memory;
+      const perfMemory = (performance as unknown as { memory?: PerformanceMemory }).memory;
       if (perfMemory && perfMemory.jsHeapSizeLimit) {
         memoryUsage = Math.round((perfMemory.usedJSHeapSize / perfMemory.jsHeapSizeLimit) * 100 * 100) / 100;
       }
@@ -502,9 +573,9 @@ class VizoraAndroidTV {
         status: 'online',
       };
 
-      this.socket.emit('heartbeat', heartbeatData, (response: any) => {
+      this.socket.emit('heartbeat', heartbeatData, (response: HeartbeatResponse) => {
         if (response && response.commands) {
-          response.commands.forEach((cmd: any) => this.handleCommand(cmd));
+          response.commands.forEach((cmd) => this.handleCommand(cmd));
         }
       });
     } catch (error) {
@@ -524,6 +595,12 @@ class VizoraAndroidTV {
     if (!this.isOnline) {
       console.log('[Vizora] Offline, will retry when network is available');
       this.updateStatus('offline', 'No network connection');
+      // Start playback from restored playlist if available
+      if (this.currentPlaylist && this.currentPlaylist.items?.length > 0 && !this.playbackTimer) {
+        console.log('[Vizora] Starting offline playback from restored playlist');
+        this.showScreen('content');
+        this.playContent();
+      }
       return;
     }
 
@@ -543,7 +620,8 @@ class VizoraAndroidTV {
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
+      reconnectionDelayMax: 60000,
+      randomizationFactor: 0.5,
     });
 
     this.socket.on('connect', () => {
@@ -551,12 +629,19 @@ class VizoraAndroidTV {
       this.updateStatus('online', 'Connected');
       this.showScreen('content');
       this.startHeartbeat();
+
+      // If we have a restored playlist from offline, start playback while waiting for server update
+      if (this.currentPlaylist && this.currentPlaylist.items?.length > 0 && !this.playbackTimer) {
+        console.log('[Vizora] Starting playback from restored playlist');
+        this.playContent();
+      }
     });
 
     this.socket.on('disconnect', (reason) => {
       console.log('[Vizora] Disconnected:', reason);
       this.updateStatus('offline', 'Disconnected');
       this.stopHeartbeat();
+      // Continue playing current playlist if available (content stays in DOM)
     });
 
     this.socket.on('connect_error', async (error) => {
@@ -598,9 +683,16 @@ class VizoraAndroidTV {
 
   // ==================== PLAYBACK ====================
 
-  private updatePlaylist(playlist: Playlist) {
+  private async updatePlaylist(playlist: Playlist) {
     this.currentPlaylist = playlist;
     this.currentIndex = 0;
+
+    // Persist playlist for offline resilience
+    try {
+      await Preferences.set({ key: 'last_playlist', value: JSON.stringify(playlist) });
+    } catch (err) {
+      console.warn('[Vizora] Failed to persist playlist:', err);
+    }
 
     if (this.playbackTimer) {
       clearTimeout(this.playbackTimer);
@@ -609,6 +701,7 @@ class VizoraAndroidTV {
 
     const container = document.getElementById('content-container');
     if (container) {
+      this.cleanupMediaElements(container);
       container.innerHTML = '';
     }
 
@@ -653,6 +746,7 @@ class VizoraAndroidTV {
       });
     }
 
+    this.cleanupMediaElements(container);
     container.innerHTML = '';
 
     const contentDiv = document.createElement('div');
@@ -663,7 +757,7 @@ class VizoraAndroidTV {
     const contentType = currentItem.content.type;
     let contentUrl = (contentType === 'html' || contentType === 'template')
       ? currentItem.content.url
-      : transformContentUrl(currentItem.content.url, this.config.apiUrl);
+      : transformContentUrl(currentItem.content.url, this.config.apiUrl, this.deviceToken);
 
     // Check cache for media content
     let resolvedUrl = contentUrl;
@@ -732,7 +826,7 @@ class VizoraAndroidTV {
         // Use sandboxed iframe to safely render HTML content
         const htmlIframe = document.createElement('iframe');
         htmlIframe.sandbox.add('allow-scripts');
-        htmlIframe.srcdoc = contentUrl;
+        htmlIframe.srcdoc = this.sanitizeHtmlContent(contentUrl);
         htmlIframe.style.width = '100%';
         htmlIframe.style.height = '100%';
         htmlIframe.style.border = 'none';
@@ -811,7 +905,7 @@ class VizoraAndroidTV {
       const type = item.content.type;
       if (type !== 'image' && type !== 'video') continue;
 
-      const contentUrl = transformContentUrl(item.content.url, this.config.apiUrl);
+      const contentUrl = transformContentUrl(item.content.url, this.config.apiUrl, this.deviceToken);
       try {
         const cached = await this.cacheManager.getCachedUri(item.content.id);
         if (!cached) {
@@ -872,7 +966,7 @@ class VizoraAndroidTV {
         break;
 
       case 'qr-overlay-update':
-        this.renderQrOverlay(command.payload?.config);
+        this.renderQrOverlay(command.payload?.config as QrOverlayConfig | undefined);
         break;
 
       default:
@@ -920,6 +1014,7 @@ class VizoraAndroidTV {
     if (!container) return;
 
     // Clear current content
+    this.cleanupMediaElements(container);
     container.innerHTML = '';
 
     const contentDiv = document.createElement('div');
@@ -930,7 +1025,7 @@ class VizoraAndroidTV {
     const contentType = content.type;
     const contentUrl = (contentType === 'html' || contentType === 'template')
       ? content.url
-      : transformContentUrl(content.url, this.config.apiUrl);
+      : transformContentUrl(content.url, this.config.apiUrl, this.deviceToken);
 
     console.log(`[Vizora] Rendering temporary content: ${contentType} - ${contentUrl}`);
 
@@ -989,7 +1084,7 @@ class VizoraAndroidTV {
         // Use sandboxed iframe to safely render HTML content
         const tempHtmlIframe = document.createElement('iframe');
         tempHtmlIframe.sandbox.add('allow-scripts');
-        tempHtmlIframe.srcdoc = contentUrl;
+        tempHtmlIframe.srcdoc = this.sanitizeHtmlContent(contentUrl);
         tempHtmlIframe.style.width = '100%';
         tempHtmlIframe.style.height = '100%';
         tempHtmlIframe.style.border = 'none';
@@ -1025,6 +1120,7 @@ class VizoraAndroidTV {
       // No playlist was playing, just clear the screen
       const container = document.getElementById('content-container');
       if (container) {
+        this.cleanupMediaElements(container);
         container.innerHTML = '';
       }
     }
@@ -1032,7 +1128,7 @@ class VizoraAndroidTV {
 
   // ==================== QR OVERLAY ====================
 
-  private async renderQrOverlay(config: any) {
+  private async renderQrOverlay(config: QrOverlayConfig | undefined) {
     const overlay = document.getElementById('qr-overlay');
     if (!overlay) return;
 
@@ -1089,11 +1185,13 @@ class VizoraAndroidTV {
 
   // ==================== MULTI-ZONE LAYOUT ====================
 
-  private renderLayout(content: any) {
+  private renderLayout(content: PlaylistItem) {
     const container = document.getElementById('content-container');
     if (!container) return;
 
-    const metadata = content.metadata || content.content?.metadata;
+    const raw = content as unknown as Record<string, unknown>;
+    const contentRecord = content.content as unknown as Record<string, unknown> | null;
+    const metadata = (raw.metadata || contentRecord?.metadata) as LayoutMetadata | undefined;
     if (!metadata || !metadata.zones) return;
 
     this.cleanupLayout();
@@ -1120,11 +1218,12 @@ class VizoraAndroidTV {
       grid.appendChild(zoneDiv);
     }
 
+    this.cleanupMediaElements(container);
     container.innerHTML = '';
     container.appendChild(grid);
   }
 
-  private createZonePlayer(zoneId: string, playlist: any, container: HTMLElement) {
+  private createZonePlayer(zoneId: string, playlist: Playlist, container: HTMLElement) {
     this.zoneIndices.set(zoneId, 0);
 
     const playZoneItem = () => {
@@ -1146,7 +1245,8 @@ class VizoraAndroidTV {
     playZoneItem();
   }
 
-  private renderZoneContent(content: any, container: HTMLElement) {
+  private renderZoneContent(content: NonNullable<PlaylistItem['content']>, container: HTMLElement) {
+    this.cleanupMediaElements(container);
     container.innerHTML = '';
     const contentDiv = document.createElement('div');
     contentDiv.className = 'content-item';
@@ -1154,7 +1254,7 @@ class VizoraAndroidTV {
     const contentType = content.type;
     const contentUrl = (contentType === 'html' || contentType === 'template')
       ? content.url
-      : transformContentUrl(content.url, this.config.apiUrl);
+      : transformContentUrl(content.url, this.config.apiUrl, this.deviceToken);
 
     switch (contentType) {
       case 'image':
@@ -1175,7 +1275,7 @@ class VizoraAndroidTV {
       case 'template':
         const iframe = document.createElement('iframe');
         iframe.sandbox.add('allow-scripts');
-        iframe.srcdoc = content.url;
+        iframe.srcdoc = this.sanitizeHtmlContent(content.url);
         iframe.style.cssText = 'width:100%;height:100%;border:none;';
         contentDiv.appendChild(iframe);
         break;
@@ -1195,6 +1295,30 @@ class VizoraAndroidTV {
     for (const [, timer] of this.zoneTimers) clearTimeout(timer);
     this.zoneTimers.clear();
     this.zoneIndices.clear();
+  }
+
+  // ==================== HTML CONTENT SANITIZATION ====================
+
+  private sanitizeHtmlContent(html: string): string {
+    const cspTag = '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; script-src \'unsafe-inline\'; img-src data: blob:; font-src data:;">';
+    // Inject CSP into <head> if present, otherwise prepend
+    if (html.includes('<head>')) {
+      return html.replace('<head>', '<head>' + cspTag);
+    } else if (html.includes('<html>')) {
+      return html.replace('<html>', '<html><head>' + cspTag + '</head>');
+    }
+    return cspTag + html;
+  }
+
+  // ==================== MEDIA CLEANUP ====================
+
+  private cleanupMediaElements(container: HTMLElement) {
+    const videos = container.querySelectorAll('video');
+    videos.forEach(video => {
+      video.pause();
+      video.removeAttribute('src');
+      video.load(); // forces release of media resources
+    });
   }
 
   // ==================== UI HELPERS ====================

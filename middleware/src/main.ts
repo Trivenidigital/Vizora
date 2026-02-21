@@ -44,12 +44,9 @@ async function bootstrap() {
     maxAge: '7d',
   });
 
-  // Serve uploaded content files with long cache (hash-based filenames)
-  app.useStaticAssets(join(process.cwd(), 'uploads'), {
-    prefix: '/uploads/',
-    maxAge: '30d',
-    immutable: true,
-  });
+  // NOTE: /uploads/ static route removed for security (H2).
+  // Local files must be served through authenticated device-content endpoint.
+  // MinIO-stored content (primary) is already served via DeviceContentController.
 
   // Response compression (gzip/brotli) — reduces API payload sizes by 60-80%
   app.use(compression({ threshold: 1024, level: 6 }));

@@ -18,6 +18,34 @@ export class SchedulesService {
       throw new BadRequestException('Cannot specify both displayId and displayGroupId');
     }
 
+    // Validate foreign keys belong to the same organization
+    if (createScheduleDto.displayId) {
+      const display = await this.db.display.findFirst({
+        where: { id: createScheduleDto.displayId, organizationId },
+      });
+      if (!display) {
+        throw new NotFoundException('Display not found');
+      }
+    }
+
+    if (createScheduleDto.displayGroupId) {
+      const displayGroup = await this.db.displayGroup.findFirst({
+        where: { id: createScheduleDto.displayGroupId, organizationId },
+      });
+      if (!displayGroup) {
+        throw new NotFoundException('Display group not found');
+      }
+    }
+
+    if (createScheduleDto.playlistId) {
+      const playlist = await this.db.playlist.findFirst({
+        where: { id: createScheduleDto.playlistId, organizationId },
+      });
+      if (!playlist) {
+        throw new NotFoundException('Playlist not found');
+      }
+    }
+
     return this.db.schedule.create({
       data: {
         ...createScheduleDto,
@@ -106,13 +134,14 @@ export class SchedulesService {
     return schedule;
   }
 
-  async findActiveSchedules(displayId: string) {
+  async findActiveSchedules(displayId: string, organizationId: string) {
     const now = new Date();
     const dayOfWeek = now.getDay();
     const currentTime = now.getHours() * 60 + now.getMinutes();
 
     return this.db.schedule.findMany({
       where: {
+        organizationId,
         isActive: true,
         startDate: { lte: now },
         daysOfWeek: { has: dayOfWeek },
@@ -159,6 +188,34 @@ export class SchedulesService {
 
     if (updateScheduleDto.displayId && updateScheduleDto.displayGroupId) {
       throw new BadRequestException('Cannot specify both displayId and displayGroupId');
+    }
+
+    // Validate foreign keys belong to the same organization
+    if (updateScheduleDto.displayId) {
+      const display = await this.db.display.findFirst({
+        where: { id: updateScheduleDto.displayId, organizationId },
+      });
+      if (!display) {
+        throw new NotFoundException('Display not found');
+      }
+    }
+
+    if (updateScheduleDto.displayGroupId) {
+      const displayGroup = await this.db.displayGroup.findFirst({
+        where: { id: updateScheduleDto.displayGroupId, organizationId },
+      });
+      if (!displayGroup) {
+        throw new NotFoundException('Display group not found');
+      }
+    }
+
+    if (updateScheduleDto.playlistId) {
+      const playlist = await this.db.playlist.findFirst({
+        where: { id: updateScheduleDto.playlistId, organizationId },
+      });
+      if (!playlist) {
+        throw new NotFoundException('Playlist not found');
+      }
     }
 
     return this.db.schedule.update({

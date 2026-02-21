@@ -11,7 +11,7 @@ describe('SuperAdminGuard', () => {
     return {
       switchToHttp: () => ({
         getRequest: () => ({
-          user: userId ? { userId } : undefined,
+          user: userId ? { id: userId } : undefined,
         }),
       }),
     } as ExecutionContext;

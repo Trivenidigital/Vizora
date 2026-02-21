@@ -10,7 +10,7 @@ env:
   # Required environment variables for tests
   NODE_ENV: test
   JWT_SECRET: test-jwt-secret-at-least-32-characters-long
-  DEVICE_JWT_SECRET: test-device-jwt-secret-32-chars
+  DEVICE_JWT_SECRET: test-device-jwt-secret-that-is-32-chars
   DATABASE_URL: postgresql://test_user:test_pass@localhost:5432/test_db
   MONGODB_URL: mongodb://localhost:27017/test_db
   REDIS_URL: redis://localhost:6379
@@ -25,9 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v3
-        with:
-          version: 9
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -67,22 +65,23 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v3
-        with:
-          version: 9
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      
+
       # Generate Prisma client for tests
       - name: Generate Prisma client
-        run: npx nx run database:generate
+        run: |
+          pnpm --filter @vizora/database exec prisma generate
+          mkdir -p packages/database/dist/generated
+          cp -r packages/database/src/generated/* packages/database/dist/generated/
 
       # Push schema to test database
       - name: Setup test database
-        run: npx prisma db push --schema=database/prisma/schema.prisma --skip-generate
+        run: pnpm --filter @vizora/database exec prisma db push --skip-generate
 
       - name: Run middleware unit tests
         working-directory: middleware
@@ -128,9 +127,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v3
-        with:
-          version: 9
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -138,10 +135,13 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma client
-        run: npx nx run database:generate
+        run: |
+          pnpm --filter @vizora/database exec prisma generate
+          mkdir -p packages/database/dist/generated
+          cp -r packages/database/src/generated/* packages/database/dist/generated/
 
       - name: Setup test database
-        run: npx prisma db push --schema=database/prisma/schema.prisma --skip-generate
+        run: pnpm --filter @vizora/database exec prisma db push --skip-generate
 
       - name: Run API E2E tests
         continue-on-error: true
@@ -155,18 +155,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v3
-        with:
-          version: 9
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      
+
+      - name: Generate Prisma client
+        run: |
+          pnpm --filter @vizora/database exec prisma generate
+          mkdir -p packages/database/dist/generated
+          cp -r packages/database/src/generated/* packages/database/dist/generated/
+
       - name: Build middleware
         run: npx nx build @vizora/middleware
-        
+
       - name: Build web
         run: npx nx build @vizora/web
 
@@ -177,9 +181,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v3
-        with:
-          version: 9
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

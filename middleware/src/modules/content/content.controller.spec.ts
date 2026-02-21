@@ -13,6 +13,7 @@ import { ContentService } from './content.service';
 import { ThumbnailService } from './thumbnail.service';
 import { FileValidationService } from './file-validation.service';
 import { StorageService } from '../storage/storage.service';
+import { StorageQuotaService } from '../storage/storage-quota.service';
 
 describe('ContentController', () => {
   let controller: ContentController;
@@ -20,6 +21,7 @@ describe('ContentController', () => {
   let mockThumbnailService: jest.Mocked<ThumbnailService>;
   let mockFileValidationService: jest.Mocked<FileValidationService>;
   let mockStorageService: jest.Mocked<StorageService>;
+  let mockStorageQuotaService: jest.Mocked<StorageQuotaService>;
 
   const organizationId = 'org-123';
 
@@ -79,6 +81,14 @@ describe('ContentController', () => {
       getBucket: jest.fn().mockReturnValue('vizora-content'),
     } as any;
 
+    mockStorageQuotaService = {
+      getStorageInfo: jest.fn(),
+      checkQuota: jest.fn(),
+      incrementUsage: jest.fn(),
+      decrementUsage: jest.fn(),
+      recalculateUsage: jest.fn(),
+    } as any;
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ContentController],
       providers: [
@@ -86,6 +96,7 @@ describe('ContentController', () => {
         { provide: ThumbnailService, useValue: mockThumbnailService },
         { provide: FileValidationService, useValue: mockFileValidationService },
         { provide: StorageService, useValue: mockStorageService },
+        { provide: StorageQuotaService, useValue: mockStorageQuotaService },
       ],
     }).compile();
 
@@ -403,6 +414,11 @@ describe('ContentController', () => {
         mimeType: 'image/jpeg',
       });
       mockFileValidationService.sanitizeFilename.mockReturnValue('new-image.jpg');
+      mockContentService.findOne.mockResolvedValue({
+        id: 'content-123',
+        name: 'old-image.jpg',
+        fileSize: 1024,
+      } as any);
       mockContentService.replaceFile.mockResolvedValue({
         id: 'content-123',
         name: 'new-image.jpg',

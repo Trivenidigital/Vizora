@@ -72,6 +72,7 @@ export class SchedulesController {
     if (!token) {
       throw new UnauthorizedException('Device authentication required');
     }
+    let organizationId: string;
     try {
       const payload = this.jwtService.verify(token, {
         secret: process.env.DEVICE_JWT_SECRET,
@@ -79,11 +80,12 @@ export class SchedulesController {
       if (payload.type !== 'device') {
         throw new UnauthorizedException('Invalid token type');
       }
+      organizationId = payload.organizationId;
     } catch (error) {
       if (error instanceof UnauthorizedException) throw error;
       throw new UnauthorizedException('Invalid or expired device token');
     }
-    return this.schedulesService.findActiveSchedules(displayId);
+    return this.schedulesService.findActiveSchedules(displayId, organizationId);
   }
 
   @Get(':id')

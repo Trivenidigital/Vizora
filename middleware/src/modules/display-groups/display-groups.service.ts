@@ -95,6 +95,14 @@ export class DisplayGroupsService {
   async addDisplays(organizationId: string, groupId: string, dto: ManageDisplaysDto) {
     await this.findOne(organizationId, groupId);
 
+    // Verify all displayIds belong to the caller's organization
+    const validDisplayCount = await this.db.display.count({
+      where: { id: { in: dto.displayIds }, organizationId },
+    });
+    if (validDisplayCount !== dto.displayIds.length) {
+      throw new NotFoundException('One or more displays not found');
+    }
+
     await this.db.displayGroupMember.createMany({
       data: dto.displayIds.map((displayId) => ({
         displayGroupId: groupId,

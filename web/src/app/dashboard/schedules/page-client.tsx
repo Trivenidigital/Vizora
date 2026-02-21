@@ -489,21 +489,8 @@ export default function SchedulesClient() {
  </div>
  </div>
 
- {/* Empty State */}
- {schedules.length === 0 ? (
- <EmptyState
- icon="schedules"
- title="No schedules yet"
- description="Create your first schedule to automate content playback on your devices"
- action={{
- label: 'Create Schedule',
- onClick: () => {
- resetForm();
- setIsCreateModalOpen(true);
- },
- }}
- />
- ) : viewMode === 'calendar' ? (
+ {/* Content Area */}
+ {viewMode === 'calendar' ? (
  <ScheduleCalendar
  schedules={schedules}
  onSelectEvent={(schedule) => openEditModal(schedule)}
@@ -518,6 +505,19 @@ export default function SchedulesClient() {
  days: slotInfo.daysOfWeek.map(d => DAY_NAMES[d]),
  }));
  setIsCreateModalOpen(true);
+ }}
+ />
+ ) : schedules.length === 0 ? (
+ <EmptyState
+ icon="schedules"
+ title="No schedules yet"
+ description="Create your first schedule to automate content playback on your devices"
+ action={{
+ label: 'Create Schedule',
+ onClick: () => {
+ resetForm();
+ setIsCreateModalOpen(true);
+ },
  }}
  />
  ) : (

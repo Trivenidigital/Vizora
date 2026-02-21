@@ -177,6 +177,17 @@ export class PlaylistsService {
 
     const { items, ...playlistData } = updatePlaylistDto;
 
+    // Validate all content IDs belong to the organization
+    if (items && items.length > 0) {
+      const contentIds = items.map(item => item.contentId);
+      const validCount = await this.db.content.count({
+        where: { id: { in: contentIds }, organizationId },
+      });
+      if (validCount !== contentIds.length) {
+        throw new NotFoundException('One or more content items not found');
+      }
+    }
+
     const updatedPlaylist = items
       ? await this.db.$transaction(async (tx) => {
           await tx.playlistItem.deleteMany({
@@ -233,6 +244,14 @@ export class PlaylistsService {
   async addItem(organizationId: string, playlistId: string, contentId: string, duration?: number) {
     await this.findOne(organizationId, playlistId);
 
+    // Verify the content belongs to the same organization
+    const content = await this.db.content.findFirst({
+      where: { id: contentId, organizationId },
+    });
+    if (!content) {
+      throw new NotFoundException('Content not found');
+    }
+
     const maxOrder = await this.db.playlistItem.findFirst({
       where: { playlistId },
       orderBy: { order: 'desc' },
@@ -260,9 +279,16 @@ export class PlaylistsService {
   async removeItem(organizationId: string, playlistId: string, itemId: string) {
     await this.findOne(organizationId, playlistId);
 
-    const deletedItem = await this.db.playlistItem.delete({
-      where: { id: itemId },
+    // Scope deletion to the specific playlist to prevent cross-playlist item removal
+    const result = await this.db.playlistItem.deleteMany({
+      where: { id: itemId, playlistId },
     });
+
+    if (result.count === 0) {
+      throw new NotFoundException('Playlist item not found');
+    }
+
+    const deletedItem = { id: itemId, playlistId };
 
     // Notify displays about the playlist change
     this.notifyPlaylistChangeAfterItemUpdate(playlistId);

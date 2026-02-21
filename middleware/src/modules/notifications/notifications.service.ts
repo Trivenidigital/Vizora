@@ -19,6 +19,16 @@ export class NotificationsService {
    * Create a new notification
    */
   async create(data: CreateNotificationDto & { organizationId: string }) {
+    // Validate userId belongs to the same organization
+    if (data.userId) {
+      const user = await this.db.user.findFirst({
+        where: { id: data.userId, organizationId: data.organizationId },
+      });
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+    }
+
     const notification = await this.db.notification.create({
       data: {
         title: data.title,

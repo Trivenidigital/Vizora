@@ -187,13 +187,13 @@ export class DeviceGateway
       const deviceId = payload.sub;
       const orgId = payload.organizationId;
 
-      // Step 3: Verify device exists in database (B.1)
-      const deviceExists = await this.databaseService.display.findUnique({
+      // Step 3: Verify device exists in database and belongs to the JWT's org (B.1 + M2)
+      const device = await this.databaseService.display.findUnique({
         where: { id: deviceId },
-        select: { id: true },
+        select: { id: true, organizationId: true },
       });
-      if (!deviceExists) {
-        this.logger.warn(`Connection rejected: Device not found in database (id: ${deviceId})`);
+      if (!device || device.organizationId !== orgId) {
+        this.logger.warn(`Connection rejected: Device not found or org mismatch (id: ${deviceId}, jwtOrg: ${orgId}, deviceOrg: ${device?.organizationId})`);
         client.emit('error', { message: 'device_not_found' });
         client.disconnect();
         return;

@@ -30,8 +30,8 @@ describe('SchedulesController', () => {
     } as any;
 
     mockJwtService = {
-      verify: jest.fn().mockReturnValue({ type: 'device', sub: 'device-123' }),
-      verifyAsync: jest.fn().mockResolvedValue({ type: 'device', sub: 'device-123' }),
+      verify: jest.fn().mockReturnValue({ type: 'device', sub: 'device-123', organizationId }),
+      verifyAsync: jest.fn().mockResolvedValue({ type: 'device', sub: 'device-123', organizationId }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -194,7 +194,7 @@ describe('SchedulesController', () => {
       const result = await controller.findActiveSchedules('display-123', mockReq as any);
 
       expect(result).toEqual(expectedResult);
-      expect(mockSchedulesService.findActiveSchedules).toHaveBeenCalledWith('display-123');
+      expect(mockSchedulesService.findActiveSchedules).toHaveBeenCalledWith('display-123', organizationId);
       expect(mockJwtService.verify).toHaveBeenCalledWith('valid-device-token', {
         secret: process.env.DEVICE_JWT_SECRET,
       });

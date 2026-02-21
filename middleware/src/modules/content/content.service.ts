@@ -14,6 +14,7 @@ import { CreateLayoutDto } from './dto/create-layout.dto';
 import { CreateWidgetDto } from './dto/create-widget.dto';
 import { LAYOUT_PRESETS } from './layout-presets';
 import { DataSourceRegistryService } from './data-source-registry.service';
+import { StorageQuotaService } from '../storage/storage-quota.service';
 import type { WidgetDataSource } from './widget-data-sources';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -64,6 +65,7 @@ export class ContentService {
     private readonly db: DatabaseService,
     private readonly templateRendering: TemplateRenderingService,
     private readonly dataSourceRegistry: DataSourceRegistryService,
+    private readonly storageQuotaService: StorageQuotaService,
   ) {}
 
   // Map database content to API response format
@@ -177,10 +179,17 @@ export class ContentService {
   }
 
   async remove(organizationId: string, id: string) {
-    await this.findOne(organizationId, id);
-    return this.db.content.delete({
+    const content = await this.findOne(organizationId, id);
+    const deleted = await this.db.content.delete({
       where: { id },
     });
+
+    // Decrement storage usage if the content had a file size
+    if (content.fileSize && content.fileSize > 0) {
+      await this.storageQuotaService.decrementUsage(organizationId, content.fileSize);
+    }
+
+    return deleted;
   }
 
   async archive(organizationId: string, id: string) {

@@ -11,6 +11,7 @@ import { ContentService, TemplateMetadata } from './content.service';
 import { DatabaseService } from '../database/database.service';
 import { TemplateRenderingService } from './template-rendering.service';
 import { DataSourceRegistryService } from './data-source-registry.service';
+import { StorageQuotaService } from '../storage/storage-quota.service';
 import { CreateTemplateDto } from './dto/create-template.dto';
 
 describe('ContentService', () => {
@@ -18,6 +19,7 @@ describe('ContentService', () => {
   let mockDatabaseService: any;
   let mockTemplateRendering: jest.Mocked<TemplateRenderingService>;
   let mockDataSourceRegistry: jest.Mocked<DataSourceRegistryService>;
+  let mockStorageQuotaService: jest.Mocked<StorageQuotaService>;
 
   const mockContent = {
     id: 'content-123',
@@ -113,10 +115,19 @@ describe('ContentService', () => {
       ]),
     } as any;
 
+    mockStorageQuotaService = {
+      getStorageInfo: jest.fn(),
+      checkQuota: jest.fn(),
+      incrementUsage: jest.fn(),
+      decrementUsage: jest.fn(),
+      recalculateUsage: jest.fn(),
+    } as any;
+
     service = new ContentService(
       mockDatabaseService as DatabaseService,
       mockTemplateRendering,
       mockDataSourceRegistry,
+      mockStorageQuotaService,
     );
   });
 

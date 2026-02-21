@@ -43,6 +43,15 @@ describe('SchedulesService', () => {
         update: jest.fn(),
         delete: jest.fn(),
       },
+      display: {
+        findFirst: jest.fn(),
+      },
+      displayGroup: {
+        findFirst: jest.fn(),
+      },
+      playlist: {
+        findFirst: jest.fn(),
+      },
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -85,6 +94,8 @@ describe('SchedulesService', () => {
         displayGroup: null,
       };
 
+      (databaseService as any).display.findFirst.mockResolvedValue({ id: mockDisplayId });
+      (databaseService as any).playlist.findFirst.mockResolvedValue({ id: mockPlaylistId });
       databaseService.schedule.create.mockResolvedValue(mockCreatedSchedule);
 
       const result = await service.create(mockOrganizationId, createDto);
@@ -121,6 +132,8 @@ describe('SchedulesService', () => {
         displayGroup: { id: 'group-123' },
       };
 
+      (databaseService as any).displayGroup.findFirst.mockResolvedValue({ id: 'group-123' });
+      (databaseService as any).playlist.findFirst.mockResolvedValue({ id: mockPlaylistId });
       databaseService.schedule.create.mockResolvedValue(mockCreatedSchedule);
 
       const result = await service.create(mockOrganizationId, createDtoWithGroup);
@@ -169,6 +182,8 @@ describe('SchedulesService', () => {
         displayGroup: null,
       };
 
+      (databaseService as any).display.findFirst.mockResolvedValue({ id: mockDisplayId });
+      (databaseService as any).playlist.findFirst.mockResolvedValue({ id: mockPlaylistId });
       databaseService.schedule.create.mockResolvedValue(mockCreatedSchedule);
 
       const result = await service.create(mockOrganizationId, createDtoNoEndDate);
@@ -324,18 +339,19 @@ describe('SchedulesService', () => {
 
       databaseService.schedule.findMany.mockResolvedValue(mockActiveSchedules);
 
-      const result = await service.findActiveSchedules(mockDisplayId);
+      const result = await service.findActiveSchedules(mockDisplayId, mockOrganizationId);
 
       expect(databaseService.schedule.findMany).toHaveBeenCalled();
       expect(result).toEqual(mockActiveSchedules);
     });
 
-    it('should filter by current date, time, and day of week', async () => {
+    it('should filter by current date, time, day of week, and organizationId', async () => {
       databaseService.schedule.findMany.mockResolvedValue([]);
 
-      await service.findActiveSchedules(mockDisplayId);
+      await service.findActiveSchedules(mockDisplayId, mockOrganizationId);
 
       const callArgs = databaseService.schedule.findMany.mock.calls[0][0];
+      expect(callArgs.where.organizationId).toBe(mockOrganizationId);
       expect(callArgs.where.isActive).toBe(true);
       expect(callArgs.where.startDate).toHaveProperty('lte');
       expect(callArgs.where.daysOfWeek).toHaveProperty('has');

@@ -14,6 +14,7 @@ import {
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { SuperAdminGuard } from '../admin/guards/super-admin.guard';
 import { TemplateLibraryService } from './template-library.service';
 import { SkipOutputSanitize } from '../common/interceptors/sanitize.interceptor';
 import { SearchTemplatesDto } from './dto/search-templates.dto';
@@ -52,6 +53,7 @@ export class TemplateLibraryController {
 
   @Post()
   @Roles('admin')
+  @UseGuards(SuperAdminGuard)
   @HttpCode(HttpStatus.CREATED)
   create(
     @CurrentUser('organizationId') organizationId: string,
@@ -86,6 +88,7 @@ export class TemplateLibraryController {
 
   @Patch(':id/featured')
   @Roles('admin')
+  @UseGuards(SuperAdminGuard)
   setFeatured(
     @Param('id') id: string,
     @Body('isFeatured') isFeatured: boolean,
@@ -95,6 +98,7 @@ export class TemplateLibraryController {
 
   @Patch(':id')
   @Roles('admin')
+  @UseGuards(SuperAdminGuard)
   update(
     @Param('id') id: string,
     @Body() dto: UpdateTemplateDto,
@@ -104,6 +108,7 @@ export class TemplateLibraryController {
 
   @Delete(':id')
   @Roles('admin')
+  @UseGuards(SuperAdminGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(@Param('id') id: string) {
     return this.templateLibraryService.deleteTemplate(id);
