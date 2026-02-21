@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,43 +10,29 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { api, Display } from '../../src/api/client';
 import { useAuthStore } from '../../src/stores/auth';
+import { useDevicesStore } from '../../src/stores/devices';
+import { useRealtimeEvents } from '../../src/hooks/useRealtimeEvents';
+import { ConnectionStatus } from '../../src/components/ConnectionStatus';
 import { colors, spacing, fontSize, borderRadius } from '../../src/constants/theme';
+import type { Display } from '../../src/types';
 
 export default function DevicesScreen() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
 
-  const [displays, setDisplays] = useState<Display[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const displays = useDevicesStore((s) => s.displays);
+  const isLoading = useDevicesStore((s) => s.isLoading);
+  const fetchDisplays = useDevicesStore((s) => s.fetchDisplays);
 
-  const fetchDisplays = useCallback(async () => {
-    try {
-      const res = await api.getDisplays();
-      // API may return data in different shapes
-      const list = res.data ?? res.displays ?? res.items ?? [];
-      setDisplays(Array.isArray(list) ? list : []);
-    } catch {
-      // Silently fail — user sees empty state
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+  const { isConnected } = useRealtimeEvents();
 
   useFocusEffect(
     useCallback(() => {
       fetchDisplays();
     }, [fetchDisplays]),
   );
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchDisplays();
-  };
 
   const handleLogout = async () => {
     await logout();
@@ -67,12 +53,17 @@ export default function DevicesScreen() {
   };
 
   const renderDevice = ({ item }: { item: Display }) => (
-    <View style={styles.card}>
+    <TouchableOpacity
+      style={styles.card}
+      onPress={() => router.push(`/device-detail?id=${item.id}`)}
+      activeOpacity={0.7}
+    >
       <View style={styles.cardHeader}>
         <View style={[styles.statusDot, { backgroundColor: statusColor(item.status) }]} />
         <Text style={styles.deviceName} numberOfLines={1}>
           {item.nickname || item.deviceIdentifier}
         </Text>
+        <Text style={styles.chevron}>›</Text>
       </View>
       <View style={styles.cardMeta}>
         <Text style={styles.metaText}>
@@ -82,11 +73,11 @@ export default function DevicesScreen() {
           <Text style={styles.metaText}>{item.location}</Text>
         ) : null}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   const renderEmpty = () => {
-    if (loading) return null;
+    if (isLoading) return null;
     return (
       <View style={styles.empty}>
         <Text style={styles.emptyTitle}>No Displays Yet</Text>
@@ -101,9 +92,12 @@ export default function DevicesScreen() {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>Displays</Text>
-          <Text style={styles.headerSubtitle}>{user?.name ?? 'My Organization'}</Text>
+        <View style={styles.headerLeft}>
+          <ConnectionStatus isConnected={isConnected} />
+          <View>
+            <Text style={styles.headerTitle}>Displays</Text>
+            <Text style={styles.headerSubtitle}>{user?.name ?? 'My Organization'}</Text>
+          </View>
         </View>
         <TouchableOpacity onPress={handleLogout} activeOpacity={0.7}>
           <Text style={styles.logoutText}>Sign Out</Text>
@@ -111,7 +105,7 @@ export default function DevicesScreen() {
       </View>
 
       {/* Device List */}
-      {loading ? (
+      {isLoading && displays.length === 0 ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.teal} />
         </View>
@@ -124,8 +118,8 @@ export default function DevicesScreen() {
           ListEmptyComponent={renderEmpty}
           refreshControl={
             <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
+              refreshing={isLoading && displays.length > 0}
+              onRefresh={fetchDisplays}
               tintColor={colors.teal}
               colors={[colors.teal]}
             />
@@ -159,6 +153,10 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: fontSize.xl,
@@ -208,6 +206,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textPrimary,
     flex: 1,
+  },
+  chevron: {
+    fontSize: fontSize.xl,
+    color: colors.textMuted,
+    marginLeft: spacing.sm,
   },
   cardMeta: {
     flexDirection: 'row',
