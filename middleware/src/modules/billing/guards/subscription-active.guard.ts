@@ -6,12 +6,23 @@ import {
 } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 
+/**
+ * Guards write operations (POST, PUT, PATCH, DELETE) behind active subscription.
+ * GET/HEAD requests pass through to allow read-only dashboard access for expired users.
+ */
 @Injectable()
 export class SubscriptionActiveGuard implements CanActivate {
   constructor(private readonly db: DatabaseService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
+
+    // Allow read-only access (GET/HEAD) regardless of subscription status
+    const method = request.method?.toUpperCase();
+    if (method === 'GET' || method === 'HEAD') {
+      return true;
+    }
+
     const organizationId = request.user?.organizationId;
 
     if (!organizationId) {
@@ -35,7 +46,7 @@ export class SubscriptionActiveGuard implements CanActivate {
       return true;
     }
 
-    // Allow if in trial period
+    // Allow if in trial period and trial hasn't expired
     if (org.subscriptionStatus === 'trial' && org.trialEndsAt) {
       if (new Date(org.trialEndsAt) > new Date()) {
         return true;

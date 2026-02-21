@@ -19,6 +19,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { RequiresSubscription } from '../billing/decorators/requires-subscription.decorator';
 import { ContentService } from './content.service';
 import { ThumbnailService } from './thumbnail.service';
 import { FileValidationService } from './file-validation.service';
@@ -37,6 +38,7 @@ import * as path from 'path';
 const MINIO_URL_PREFIX = 'minio://';
 
 @UseGuards(RolesGuard)
+@RequiresSubscription()
 @Controller('content')
 export class ContentController {
   private readonly logger = new Logger(ContentController.name);

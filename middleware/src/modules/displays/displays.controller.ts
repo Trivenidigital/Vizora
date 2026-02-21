@@ -16,6 +16,7 @@ import { JwtService } from '@nestjs/jwt';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CheckQuota } from '../billing/decorators/check-quota.decorator';
+import { RequiresSubscription } from '../billing/decorators/requires-subscription.decorator';
 import { DisplaysService } from './displays.service';
 import { CreateDisplayDto } from './dto/create-display.dto';
 import { UpdateDisplayDto } from './dto/update-display.dto';
@@ -27,6 +28,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 
 @UseGuards(RolesGuard)
+@RequiresSubscription()
 @Controller('displays')
 export class DisplaysController {
   constructor(

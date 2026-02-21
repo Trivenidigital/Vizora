@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PlaylistsController } from './playlists.controller';
 import { PlaylistsService } from './playlists.service';
+import { SubscriptionActiveGuard } from '../billing/guards/subscription-active.guard';
+import { DatabaseService } from '../database/database.service';
 
 describe('PlaylistsController', () => {
   let controller: PlaylistsController;
@@ -23,7 +25,11 @@ describe('PlaylistsController', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PlaylistsController],
-      providers: [{ provide: PlaylistsService, useValue: mockPlaylistsService }],
+      providers: [
+        { provide: PlaylistsService, useValue: mockPlaylistsService },
+        { provide: DatabaseService, useValue: {} },
+        SubscriptionActiveGuard,
+      ],
     }).compile();
 
     controller = module.get<PlaylistsController>(PlaylistsController);

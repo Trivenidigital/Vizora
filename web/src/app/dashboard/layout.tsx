@@ -12,6 +12,7 @@ import QueryProvider from '@/lib/providers/QueryProvider';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { Icon } from '@/theme/icons';
 import type { IconName } from '@/theme/icons';
+import TrialBanner from '@/components/TrialBanner';
 
 const navigation: Array<{ name: string; href: string; icon: IconName; exactMatch?: boolean }> = [
   { name: 'Overview', href: '/dashboard', icon: 'overview', exactMatch: true },
@@ -159,6 +160,11 @@ export default function DashboardLayout({
           </div>
         </div>
       </header>
+
+      {/* Trial/Subscription Banner */}
+      <div className="fixed top-16 left-0 right-0 z-20">
+        <TrialBanner />
+      </div>
 
       <div className="flex pt-16">
         {/* Sidebar */}

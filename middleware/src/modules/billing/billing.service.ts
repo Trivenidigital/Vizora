@@ -29,6 +29,7 @@ import {
   getStripePriceId,
   getRazorpayPlanId,
 } from './constants/plans';
+import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class BillingService {
@@ -39,6 +40,7 @@ export class BillingService {
     private readonly configService: ConfigService,
     private readonly stripeProvider: StripeProvider,
     private readonly razorpayProvider: RazorpayProvider,
+    private readonly mailService: MailService,
   ) {}
 
   /**
@@ -232,8 +234,8 @@ export class BillingService {
     }
 
     const baseUrl = this.configService.get<string>('APP_URL') || 'http://localhost:3001';
-    const successUrl = dto.successUrl || `${baseUrl}/dashboard/billing?success=true`;
-    const cancelUrl = dto.cancelUrl || `${baseUrl}/dashboard/billing?canceled=true`;
+    const successUrl = dto.successUrl || `${baseUrl}/dashboard/settings/billing/success`;
+    const cancelUrl = dto.cancelUrl || `${baseUrl}/dashboard/settings/billing/cancel`;
 
     const result = await provider.createCheckoutSession({
       customerId,
@@ -328,6 +330,13 @@ export class BillingService {
   ): Promise<SubscriptionStatusResponse> {
     const org = await this.db.organization.findUnique({
       where: { id: organizationId },
+      include: {
+        users: {
+          where: { role: 'admin' },
+          take: 1,
+          select: { email: true, firstName: true },
+        },
+      },
     });
 
     if (!org) {
@@ -363,6 +372,25 @@ export class BillingService {
           subscriptionStatus: 'canceled',
         },
       });
+    }
+
+    // Send cancellation confirmation email
+    const admin = org.users[0];
+    if (admin?.email) {
+      try {
+        // Get the period end for access-until date
+        const status = await this.getSubscriptionStatus(organizationId);
+        const accessUntil = status.currentPeriodEnd
+          ? new Date(status.currentPeriodEnd).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+          : 'the end of your billing period';
+        await this.mailService.sendSubscriptionCanceledEmail(
+          admin.email,
+          admin.firstName || admin.email.split('@')[0],
+          accessUntil,
+        );
+      } catch (emailError) {
+        this.logger.warn(`Failed to send cancellation email for org ${organizationId}: ${emailError}`);
+      }
     }
 
     return this.getSubscriptionStatus(organizationId);
@@ -647,6 +675,13 @@ export class BillingService {
         provider === 'stripe'
           ? { stripeCustomerId: customerId }
           : { razorpayCustomerId: customerId },
+      include: {
+        users: {
+          where: { role: 'admin' },
+          take: 1,
+          select: { email: true, firstName: true },
+        },
+      },
     });
 
     if (!org) return;
@@ -671,6 +706,25 @@ export class BillingService {
       });
     }
 
+    // Send payment receipt email
+    const admin = org.users[0];
+    if (admin?.email) {
+      const formattedAmount = currency === 'inr'
+        ? `₹${((amount || 0) / 100).toFixed(2)}`
+        : `$${((amount || 0) / 100).toFixed(2)}`;
+      try {
+        await this.mailService.sendPaymentReceiptEmail(
+          admin.email,
+          admin.firstName || admin.email.split('@')[0],
+          PLAN_TIERS[org.subscriptionTier]?.name || org.subscriptionTier,
+          formattedAmount,
+          (currency || 'usd').toUpperCase(),
+        );
+      } catch (emailError) {
+        this.logger.warn(`Failed to send receipt email for org ${org.id}: ${emailError}`);
+      }
+    }
+
     this.logger.log(`Payment succeeded for org ${org.id}`);
   }
 
@@ -692,6 +746,13 @@ export class BillingService {
         provider === 'stripe'
           ? { stripeCustomerId: customerId }
           : { razorpayCustomerId: customerId },
+      include: {
+        users: {
+          where: { role: 'admin' },
+          take: 1,
+          select: { email: true, firstName: true },
+        },
+      },
     });
 
     if (!org) return;
@@ -700,6 +761,19 @@ export class BillingService {
       where: { id: org.id },
       data: { subscriptionStatus: 'past_due' },
     });
+
+    // Send payment failed email
+    const admin = org.users[0];
+    if (admin?.email) {
+      try {
+        await this.mailService.sendPaymentFailedEmail(
+          admin.email,
+          admin.firstName || admin.email.split('@')[0],
+        );
+      } catch (emailError) {
+        this.logger.warn(`Failed to send payment failed email for org ${org.id}: ${emailError}`);
+      }
+    }
 
     this.logger.log(`Payment failed for org ${org.id}, marked as past_due`);
   }

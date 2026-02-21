@@ -13,6 +13,7 @@ import { TemplateRenderingService } from './template-rendering.service';
 import { TemplateRefreshService } from './template-refresh.service';
 import { DataSourceRegistryService } from './data-source-registry.service';
 import { StorageModule } from '../storage/storage.module';
+import { BillingModule } from '../billing/billing.module';
 import {
   WeatherDataSource,
   RssDataSource,
@@ -24,6 +25,7 @@ import {
 @Module({
   imports: [
     StorageModule,
+    BillingModule,
     JwtModule.registerAsync({
       useFactory: () => ({
         secret: process.env.DEVICE_JWT_SECRET,

@@ -57,9 +57,9 @@ export class AuthService {
     const bcryptRounds = parseInt(process.env.BCRYPT_ROUNDS || '14', 10);
     const passwordHash = await bcrypt.hash(dto.password, bcryptRounds);
 
-    // Calculate trial end date (7 days from now)
+    // Calculate trial end date (30 days from now)
     const trialEndsAt = new Date();
-    trialEndsAt.setDate(trialEndsAt.getDate() + 7);
+    trialEndsAt.setDate(trialEndsAt.getDate() + 30);
 
     // Wrap all operations in transaction to ensure data consistency
     const result = await this.databaseService.$transaction(async (tx) => {
@@ -110,6 +110,15 @@ export class AuthService {
 
     // Generate JWT token
     const token = this.generateToken(user, organization);
+
+    // Send welcome email (non-blocking)
+    this.mailService.sendWelcomeEmail(
+      user.email,
+      user.firstName || user.email.split('@')[0],
+      30,
+    ).catch((err) => {
+      this.logger.warn(`Failed to send welcome email to ${user.email}: ${err}`);
+    });
 
     return {
       user: this.sanitizeUser(user),

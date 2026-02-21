@@ -45,7 +45,7 @@ describe('AuthService', () => {
     slug: 'test-org',
     subscriptionTier: 'free',
     screenQuota: 5,
-    trialEndsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     subscriptionStatus: 'trial',
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -88,6 +88,7 @@ describe('AuthService', () => {
 
     mockMailService = {
       sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
+      sendWelcomeEmail: jest.fn().mockResolvedValue(undefined),
     };
 
     // Directly instantiate the service with mocked dependencies
@@ -205,7 +206,7 @@ describe('AuthService', () => {
       });
     });
 
-    it('should set trial period to 7 days', async () => {
+    it('should set trial period to 30 days', async () => {
       mockDatabaseService.user.findUnique.mockResolvedValue(null);
       mockDatabaseService.organization.findUnique.mockResolvedValue(null);
       mockDatabaseService.organization.create.mockResolvedValue(mockOrganization);

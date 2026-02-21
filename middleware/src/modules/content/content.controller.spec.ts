@@ -14,6 +14,8 @@ import { ThumbnailService } from './thumbnail.service';
 import { FileValidationService } from './file-validation.service';
 import { StorageService } from '../storage/storage.service';
 import { StorageQuotaService } from '../storage/storage-quota.service';
+import { SubscriptionActiveGuard } from '../billing/guards/subscription-active.guard';
+import { DatabaseService } from '../database/database.service';
 
 describe('ContentController', () => {
   let controller: ContentController;
@@ -97,6 +99,8 @@ describe('ContentController', () => {
         { provide: FileValidationService, useValue: mockFileValidationService },
         { provide: StorageService, useValue: mockStorageService },
         { provide: StorageQuotaService, useValue: mockStorageQuotaService },
+        { provide: DatabaseService, useValue: {} },
+        SubscriptionActiveGuard,
       ],
     }).compile();
 
