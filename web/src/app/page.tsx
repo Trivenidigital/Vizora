@@ -1948,11 +1948,14 @@ export default function Index() {
             <div>
               <h4 className="text-xs font-bold uppercase tracking-[0.1em] mb-4" style={{ color: '#9A958E' }}>Legal</h4>
               <ul className="space-y-2.5">
-                {['Privacy Policy', 'Terms of Service', 'Security'].map((label) => (
-                  <li key={label}>
-                    <span className="text-sm transition-colors hover:text-[#F0ECE8] cursor-pointer" style={{ color: '#6B655D' }}>
-                      {label}
-                    </span>
+                {[
+                  { href: '/privacy', label: 'Privacy Policy' },
+                  { href: '/terms', label: 'Terms of Service' },
+                ].map((l) => (
+                  <li key={l.href}>
+                    <Link href={l.href} className="text-sm transition-colors hover:text-[#F0ECE8]" style={{ color: '#6B655D' }}>
+                      {l.label}
+                    </Link>
                   </li>
                 ))}
               </ul>
