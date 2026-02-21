@@ -45,6 +45,18 @@ interface DevicePayload {
   jti?: string;
 }
 
+interface UserPayload {
+  sub: string; // user ID
+  email: string;
+  organizationId: string;
+  type?: string;
+  jti?: string;
+}
+
+type AuthPayload =
+  | { kind: 'device'; payload: DevicePayload }
+  | { kind: 'user'; payload: UserPayload };
+
 @WebSocketGateway({
   cors: {
     origin: process.env.CORS_ORIGIN?.split(',').map(s => s.trim()) || ['http://localhost:3001'],
@@ -179,13 +191,22 @@ export class DeviceGateway
       }
 
       // Step 2: Authentication (JWT verify + revocation + dedup)
-      const payload = await this.authenticateConnection(client);
-      if (!payload) {
+      const authResult = await this.authenticateConnection(client);
+      if (!authResult) {
         return;
       }
 
-      const deviceId = payload.sub;
-      const orgId = payload.organizationId;
+      // User/dashboard connections: just join org room, skip device setup
+      if (authResult.kind === 'user') {
+        const orgId = authResult.payload.organizationId;
+        await client.join(`org:${orgId}`);
+        this.logger.log(`Dashboard client joined org:${orgId} (user: ${authResult.payload.sub}, socket: ${client.id})`);
+        return;
+      }
+
+      // Device connection flow (unchanged)
+      const deviceId = authResult.payload.sub;
+      const orgId = authResult.payload.organizationId;
 
       // Step 3: Verify device exists in database and belongs to the JWT's org (B.1 + M2)
       const device = await this.databaseService.display.findUnique({
@@ -244,10 +265,10 @@ export class DeviceGateway
   }
 
   /**
-   * Authenticate the connection: verify JWT, check revocation, deduplicate sockets.
-   * Returns the device payload on success, or null if connection was rejected.
+   * Authenticate the connection: verify JWT (device or user), check revocation, deduplicate sockets.
+   * Returns a discriminated union on success, or null if connection was rejected.
    */
-  private async authenticateConnection(client: Socket): Promise<DevicePayload | null> {
+  private async authenticateConnection(client: Socket): Promise<AuthPayload | null> {
     const token = client.handshake.auth.token;
 
     if (!token) {
@@ -256,47 +277,81 @@ export class DeviceGateway
       return null;
     }
 
-    // Verify device JWT
-    const payload = this.jwtService.verify<DevicePayload>(token, {
-      secret: process.env.DEVICE_JWT_SECRET,
-      algorithms: ['HS256'],
-    });
+    // Try device JWT first
+    try {
+      const payload = this.jwtService.verify<DevicePayload>(token, {
+        secret: process.env.DEVICE_JWT_SECRET,
+        algorithms: ['HS256'],
+      });
 
-    if (payload.type !== 'device') {
-      this.logger.warn('Connection rejected: Invalid token type');
-      client.disconnect();
-      return null;
-    }
+      if (payload.type === 'device') {
+        // Check if the token has been revoked
+        if (payload.jti) {
+          const isRevoked = await this.redisService.exists(`revoked_token:${payload.jti}`);
+          if (isRevoked) {
+            this.logger.warn(`Connection rejected: Token revoked (jti: ${payload.jti})`);
+            client.disconnect();
+            return null;
+          }
+        }
 
-    // Check if the token has been revoked
-    if (payload.jti) {
-      const isRevoked = await this.redisService.exists(`revoked_token:${payload.jti}`);
-      if (isRevoked) {
-        this.logger.warn(`Connection rejected: Token revoked (jti: ${payload.jti})`);
-        client.disconnect();
-        return null;
+        const deviceId = payload.sub;
+
+        // 2.5: Device socket deduplication - disconnect old socket if device already connected
+        const existingSocketId = this.deviceSockets.get(deviceId);
+        if (existingSocketId) {
+          const existingSocket = this.server?.sockets?.sockets?.get(existingSocketId);
+          if (existingSocket) {
+            this.logger.log(`Disconnecting stale socket ${existingSocketId} for device ${deviceId}`);
+            existingSocket.disconnect(true);
+          }
+        }
+        this.deviceSockets.set(deviceId, client.id);
+
+        // Store device info in socket data
+        client.data.deviceId = deviceId;
+        client.data.organizationId = payload.organizationId;
+        client.data.deviceIdentifier = payload.deviceIdentifier;
+
+        return { kind: 'device', payload };
       }
+    } catch {
+      // Device JWT verification failed — try user JWT below
     }
 
-    const deviceId = payload.sub;
+    // Try user JWT
+    try {
+      const userPayload = this.jwtService.verify<UserPayload>(token, {
+        secret: process.env.JWT_SECRET,
+        algorithms: ['HS256'],
+      });
 
-    // 2.5: Device socket deduplication - disconnect old socket if device already connected
-    const existingSocketId = this.deviceSockets.get(deviceId);
-    if (existingSocketId) {
-      const existingSocket = this.server?.sockets?.sockets?.get(existingSocketId);
-      if (existingSocket) {
-        this.logger.log(`Disconnecting stale socket ${existingSocketId} for device ${deviceId}`);
-        existingSocket.disconnect(true);
+      if (userPayload.sub && userPayload.organizationId) {
+        // Check if the token has been revoked
+        if (userPayload.jti) {
+          const isRevoked = await this.redisService.exists(`revoked_token:${userPayload.jti}`);
+          if (isRevoked) {
+            this.logger.warn(`Connection rejected: User token revoked (jti: ${userPayload.jti})`);
+            client.disconnect();
+            return null;
+          }
+        }
+
+        // Store user info in socket data
+        client.data.userId = userPayload.sub;
+        client.data.organizationId = userPayload.organizationId;
+        client.data.isDashboard = true;
+
+        this.logger.log(`Dashboard user connected: ${userPayload.sub} (${client.id})`);
+        return { kind: 'user', payload: userPayload };
       }
+    } catch {
+      // User JWT also failed
     }
-    this.deviceSockets.set(deviceId, client.id);
 
-    // Store device info in socket data
-    client.data.deviceId = deviceId;
-    client.data.organizationId = payload.organizationId;
-    client.data.deviceIdentifier = payload.deviceIdentifier;
-
-    return payload;
+    this.logger.warn('Connection rejected: Invalid or unrecognized token');
+    client.disconnect();
+    return null;
   }
 
   /**
