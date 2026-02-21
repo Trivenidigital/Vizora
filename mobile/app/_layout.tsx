@@ -26,15 +26,11 @@ export default function RootLayout() {
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)/login" options={{ title: 'Sign In', headerShown: false }} />
         <Stack.Screen name="(auth)/register" options={{ title: 'Create Account' }} />
-        <Stack.Screen name="(main)/devices" options={{ title: 'Displays', headerShown: false }} />
-        <Stack.Screen
-          name="(main)/scan"
-          options={{ title: 'Scan QR Code', presentation: 'fullScreenModal' }}
-        />
-        <Stack.Screen
-          name="(main)/pair-confirm"
-          options={{ title: 'Confirm Pairing', presentation: 'modal' }}
-        />
+        <Stack.Screen name="(main)" options={{ headerShown: false }} />
+        <Stack.Screen name="device-detail" options={{ title: 'Display Details' }} />
+        <Stack.Screen name="content-detail" options={{ title: 'Content Details' }} />
+        <Stack.Screen name="playlist-detail" options={{ title: 'Playlist Details' }} />
+        <Stack.Screen name="upload" options={{ title: 'Upload Content', presentation: 'modal' }} />
       </Stack>
     </>
   );
