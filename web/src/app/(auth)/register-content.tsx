@@ -131,12 +131,12 @@ export default function RegisterContent() {
   return (
     <div className="min-h-screen flex bg-[var(--background)]">
       {/* Left — Value Proposition */}
-      <div className="hidden md:flex md:w-[45%] lg:w-1/2">
+      <div className="hidden md:flex md:w-[35%] lg:w-[38%]">
         <ValuePanel variant="register" />
       </div>
 
       {/* Right — Registration Form */}
-      <div className="flex-1 flex flex-col justify-center px-6 py-8 sm:px-10 lg:pl-8 lg:pr-12 xl:pl-10 xl:pr-16">
+      <div className="flex-1 flex flex-col justify-center px-6 py-8 sm:px-10 lg:pl-6 lg:pr-10 xl:pl-8 xl:pr-14">
         {/* Mobile-only compact trust banner */}
         <div className="md:hidden mb-8">
           <div className="flex items-center gap-2.5 mb-4">
