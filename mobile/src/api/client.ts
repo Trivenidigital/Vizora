@@ -51,21 +51,21 @@ class ApiClient {
   // ---------- Auth ----------
 
   async login(email: string, password: string) {
-    return this.request<LoginResponse>('/api/auth/login', {
+    return this.request<LoginResponse>('/api/v1/auth/login', {
       method: 'POST',
       body: { email, password },
     });
   }
 
   async register(data: RegisterData) {
-    return this.request<LoginResponse>('/api/auth/register', {
+    return this.request<LoginResponse>('/api/v1/auth/register', {
       method: 'POST',
       body: data,
     });
   }
 
   async getMe() {
-    return this.request<MeResponse>('/api/auth/me');
+    return this.request<MeResponse>('/api/v1/auth/me');
   }
 
   // ---------- Displays ----------
@@ -161,14 +161,18 @@ class ApiClient {
       };
 
       xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          const json = JSON.parse(xhr.responseText);
-          // Unwrap envelope
-          const data = json?.data ?? json;
-          resolve(data as Content);
-        } else {
-          const error = JSON.parse(xhr.responseText).message ?? 'Upload failed';
-          reject(new ApiError(xhr.status, error));
+        try {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            const json = JSON.parse(xhr.responseText);
+            // Unwrap envelope
+            const data = json?.data ?? json;
+            resolve(data as Content);
+          } else {
+            const json = JSON.parse(xhr.responseText);
+            reject(new ApiError(xhr.status, json.message ?? 'Upload failed'));
+          }
+        } catch {
+          reject(new ApiError(xhr.status || 0, 'Invalid server response'));
         }
       };
 
@@ -211,7 +215,7 @@ class ApiClient {
   // ---------- Pairing ----------
 
   async completePairing(code: string, nickname?: string) {
-    return this.request<PairingCompleteResponse>('/api/devices/pairing/complete', {
+    return this.request<PairingCompleteResponse>('/api/v1/devices/pairing/complete', {
       method: 'POST',
       body: { code, ...(nickname ? { nickname } : {}) },
     });

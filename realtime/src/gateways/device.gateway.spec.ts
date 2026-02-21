@@ -153,17 +153,56 @@ describe('DeviceGateway', () => {
       expect(client.disconnect).toHaveBeenCalled();
     });
 
-    it('should reject connections with an invalid token type', async () => {
-      mockJwtService.verify.mockReturnValue({
-        sub: 'device-1',
-        type: 'user', // not 'device'
-        organizationId: 'org-1',
-        deviceIdentifier: 'test-id',
+    it('should reject connections when both JWT verifications fail', async () => {
+      mockJwtService.verify.mockImplementation(() => {
+        throw new Error('invalid token');
       });
 
       const client = createMockSocket();
 
       await gateway.handleConnection(client as any);
+      expect(client.disconnect).toHaveBeenCalled();
+    });
+
+    it('should accept user JWT and join org room without device setup', async () => {
+      // Device JWT fails, user JWT succeeds
+      mockJwtService.verify
+        .mockImplementationOnce(() => { throw new Error('invalid device token'); })
+        .mockReturnValueOnce({
+          sub: 'user-1',
+          email: 'test@example.com',
+          organizationId: 'org-1',
+          type: 'user',
+        });
+
+      const client = createMockSocket();
+
+      await gateway.handleConnection(client as any);
+      // User connections should NOT be disconnected
+      expect(client.disconnect).not.toHaveBeenCalled();
+      // User connections should join org room
+      expect(client.join).toHaveBeenCalledWith('org:org-1');
+      // User connections should NOT trigger device DB lookup
+      expect(mockDatabaseService.display.findUnique).not.toHaveBeenCalled();
+      // User connections should NOT update Redis device status
+      expect(mockRedisService.setDeviceStatus).not.toHaveBeenCalled();
+    });
+
+    it('should prevent device tokens from being accepted as user tokens', async () => {
+      // Both verifications return a device-type payload
+      mockJwtService.verify.mockReturnValue({
+        sub: 'device-1',
+        type: 'device',
+        organizationId: 'org-1',
+        deviceIdentifier: 'test-id',
+      });
+      // But device is not in DB
+      mockDatabaseService.display.findUnique.mockResolvedValue(null);
+
+      const client = createMockSocket();
+
+      await gateway.handleConnection(client as any);
+      // Device path runs (type === 'device') but device not found → disconnect
       expect(client.disconnect).toHaveBeenCalled();
     });
 

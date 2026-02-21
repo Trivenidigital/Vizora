@@ -326,7 +326,7 @@ export class DeviceGateway
         algorithms: ['HS256'],
       });
 
-      if (userPayload.sub && userPayload.organizationId) {
+      if (userPayload.sub && userPayload.organizationId && userPayload.type !== 'device') {
         // Check if the token has been revoked
         if (userPayload.jti) {
           const isRevoked = await this.redisService.exists(`revoked_token:${userPayload.jti}`);

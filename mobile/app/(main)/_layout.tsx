@@ -1,5 +1,10 @@
+import { Text } from 'react-native';
 import { Tabs } from 'expo-router';
 import { colors, fontSize } from '../../src/constants/theme';
+
+function TabIcon({ label }: { label: string; color: string }) {
+  return <Text style={{ fontSize: 20 }}>{label}</Text>;
+}
 
 export default function MainTabLayout() {
   return (
@@ -51,10 +56,4 @@ export default function MainTabLayout() {
       <Tabs.Screen name="pair-confirm" options={{ href: null }} />
     </Tabs>
   );
-}
-
-import { Text } from 'react-native';
-
-function TabIcon({ label }: { label: string; color: string }) {
-  return <Text style={{ fontSize: 20 }}>{label}</Text>;
 }
