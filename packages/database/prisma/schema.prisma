@@ -78,12 +78,27 @@ model User {
   auditLogs      AuditLog[]
   notifications  Notification[]
   apiKeys        ApiKey[]
+  passwordResetTokens PasswordResetToken[]
 
   @@index([organizationId])
   @@index([email])
   @@index([clerkUserId])
   @@index([isSuperAdmin])
   @@map("users")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  token     String    @unique // SHA-256 hash of the actual token
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([token])
+  @@index([userId])
+  @@map("password_reset_tokens")
 }
 
 // ============================================================================

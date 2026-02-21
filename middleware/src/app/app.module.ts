@@ -27,6 +27,7 @@ import { TemplateLibraryModule } from '../modules/template-library/template-libr
 import { CsrfMiddleware } from '../modules/common/middleware/csrf.middleware';
 import { StorageModule } from '../modules/storage/storage.module';
 import { MetricsModule } from '../modules/metrics/metrics.module';
+import { MailModule } from '../modules/mail/mail.module';
 
 @Module({
   imports: [
@@ -76,6 +77,7 @@ import { MetricsModule } from '../modules/metrics/metrics.module';
     ),
     CommonModule,
     StorageModule,
+    MailModule,
     DatabaseModule,
     RedisModule,
     AuthModule,

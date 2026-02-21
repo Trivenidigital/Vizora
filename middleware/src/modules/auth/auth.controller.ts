@@ -10,7 +10,7 @@ import {
   ApiCookieAuth,
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto } from './dto';
+import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto } from './dto';
 import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -225,6 +225,69 @@ export class AuthController {
     return {
       success: true,
       data: { user: safeUser },
+    };
+  }
+
+  @ApiOperation({ summary: 'Request a password reset email' })
+  @ApiBody({ type: ForgotPasswordDto })
+  @ApiResponse({ status: 200, description: 'If the email exists, a reset link has been sent.' })
+  @Public()
+  @Post('forgot-password')
+  @Throttle({
+    default: {
+      limit: process.env.NODE_ENV === 'production' ? 5 : 1000,
+      ttl: 60000,
+    },
+  })
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    await this.authService.forgotPassword(dto.email);
+    // Always return success to prevent email enumeration
+    return {
+      success: true,
+      data: {
+        message: 'If an account exists with this email, a reset link has been sent.',
+      },
+    };
+  }
+
+  @ApiOperation({ summary: 'Validate a password reset token' })
+  @ApiResponse({ status: 200, description: 'Token validation result.' })
+  @Public()
+  @Get('validate-reset-token')
+  async validateResetToken(@Req() req: Request) {
+    const token = req.query.token as string;
+    if (!token) {
+      return {
+        success: true,
+        data: { valid: false },
+      };
+    }
+    const result = await this.authService.validateResetToken(token);
+    return {
+      success: true,
+      data: result,
+    };
+  }
+
+  @ApiOperation({ summary: 'Reset password with token' })
+  @ApiBody({ type: ResetPasswordDto })
+  @ApiResponse({ status: 200, description: 'Password reset successful.' })
+  @ApiResponse({ status: 401, description: 'Invalid or expired token.' })
+  @Public()
+  @Post('reset-password')
+  @Throttle({
+    default: {
+      limit: process.env.NODE_ENV === 'production' ? 5 : 1000,
+      ttl: 60000,
+    },
+  })
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    await this.authService.resetPassword(dto.token, dto.newPassword);
+    return {
+      success: true,
+      data: {
+        message: 'Password has been reset successfully.',
+      },
     };
   }
 }

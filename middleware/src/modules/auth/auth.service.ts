@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   UnauthorizedException,
   ConflictException,
   ForbiddenException,
@@ -9,6 +10,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { DatabaseService } from '../database/database.service';
 import { RedisService } from '../redis/redis.service';
+import { MailService } from '../mail/mail.service';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { RegisterDto, LoginDto } from './dto';
@@ -20,10 +22,13 @@ const LOCKOUT_TTL_SECONDS = 15 * 60; // 15 minutes
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private databaseService: DatabaseService,
     private jwtService: JwtService,
     private redisService: RedisService,
+    private mailService: MailService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -243,6 +248,137 @@ export class AuthService {
     }
 
     return { message: 'Logged out successfully' };
+  }
+
+  async forgotPassword(email: string): Promise<void> {
+    // Rate limit: 3 per hour per email
+    const rateLimitKey = `password_reset:${email}`;
+    const attempts = await this.redisService.get(rateLimitKey);
+    if (attempts && parseInt(attempts, 10) >= 3) {
+      // Don't throw — always return success to prevent enumeration
+      return;
+    }
+
+    // Increment rate limit counter
+    const count = await this.redisService.incr(rateLimitKey);
+    if (count === 1) {
+      await this.redisService.expire(rateLimitKey, 3600); // 1 hour TTL
+    }
+
+    // Find user
+    const user = await this.databaseService.user.findUnique({
+      where: { email },
+    });
+
+    if (!user || !user.isActive) {
+      // Don't reveal if email exists — always return silently
+      return;
+    }
+
+    // Generate cryptographically random token (32 bytes = 64 hex chars)
+    const rawToken = crypto.randomBytes(32).toString('hex');
+
+    // Hash token before storing (SHA-256)
+    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+    // Store hashed token in database
+    await this.databaseService.passwordResetToken.create({
+      data: {
+        token: hashedToken,
+        userId: user.id,
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+      },
+    });
+
+    // Build reset URL
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+    const resetUrl = `${frontendUrl}/reset-password?token=${rawToken}`;
+
+    // Send email (uses raw token, not hashed)
+    await this.mailService.sendPasswordResetEmail(user.email, user.firstName, resetUrl);
+  }
+
+  async validateResetToken(rawToken: string): Promise<{ valid: boolean; email?: string }> {
+    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+    const tokenRecord = await this.databaseService.passwordResetToken.findUnique({
+      where: { token: hashedToken },
+      include: { user: true },
+    });
+
+    if (!tokenRecord) {
+      return { valid: false };
+    }
+
+    if (tokenRecord.usedAt) {
+      return { valid: false };
+    }
+
+    if (new Date() > tokenRecord.expiresAt) {
+      return { valid: false };
+    }
+
+    // Mask email for privacy
+    const email = tokenRecord.user.email;
+    const [local, domain] = email.split('@');
+    const maskedLocal = local.charAt(0) + '***' + (local.length > 1 ? local.charAt(local.length - 1) : '');
+    const maskedEmail = `${maskedLocal}@${domain}`;
+
+    return { valid: true, email: maskedEmail };
+  }
+
+  async resetPassword(rawToken: string, newPassword: string): Promise<void> {
+    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+    const tokenRecord = await this.databaseService.passwordResetToken.findUnique({
+      where: { token: hashedToken },
+      include: { user: true },
+    });
+
+    if (!tokenRecord) {
+      throw new UnauthorizedException('Invalid or expired reset token');
+    }
+
+    if (tokenRecord.usedAt) {
+      throw new UnauthorizedException('This reset link has already been used');
+    }
+
+    if (new Date() > tokenRecord.expiresAt) {
+      throw new UnauthorizedException('This reset link has expired');
+    }
+
+    // Hash new password
+    const bcryptRounds = parseInt(process.env.BCRYPT_ROUNDS || '14', 10);
+    const passwordHash = await bcrypt.hash(newPassword, bcryptRounds);
+
+    // Update password and mark token as used in a transaction
+    await this.databaseService.$transaction(async (tx) => {
+      // Update user's password
+      await tx.user.update({
+        where: { id: tokenRecord.userId },
+        data: { passwordHash },
+      });
+
+      // Mark token as used
+      await tx.passwordResetToken.update({
+        where: { id: tokenRecord.id },
+        data: { usedAt: new Date() },
+      });
+
+      // Log audit event
+      await tx.auditLog.create({
+        data: {
+          organizationId: tokenRecord.user.organizationId,
+          userId: tokenRecord.userId,
+          action: 'password_reset',
+          entityType: 'user',
+          entityId: tokenRecord.userId,
+        },
+      });
+    });
+
+    // Clear login attempt counter for this user
+    await this.redisService.del(`login_attempts:${tokenRecord.user.email}`);
   }
 
   private generateToken(user: any, organization: any): string {

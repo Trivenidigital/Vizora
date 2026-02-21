@@ -55,8 +55,10 @@ export class CsrfMiddleware implements NestMiddleware {
     const isDevicePairing = fullPath.includes('/devices/pairing');
     const isAuthLogin = fullPath.includes('/auth/login');
     const isAuthRegister = fullPath.includes('/auth/register');
+    const isAuthForgotPassword = fullPath.includes('/auth/forgot-password');
+    const isAuthResetPassword = fullPath.includes('/auth/reset-password');
 
-    if (isDevicePairing || isAuthLogin || isAuthRegister) {
+    if (isDevicePairing || isAuthLogin || isAuthRegister || isAuthForgotPassword || isAuthResetPassword) {
       return next();
     }
 

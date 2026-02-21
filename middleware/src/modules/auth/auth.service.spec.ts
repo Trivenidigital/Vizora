@@ -3,6 +3,7 @@ import { ConflictException, UnauthorizedException, ForbiddenException, HttpExcep
 import { AuthService } from './auth.service';
 import { DatabaseService } from '../database/database.service';
 import { RedisService } from '../redis/redis.service';
+import { MailService } from '../mail/mail.service';
 import * as bcrypt from 'bcryptjs';
 
 // Mock bcryptjs
@@ -22,6 +23,7 @@ describe('AuthService', () => {
   let mockDatabaseService: any;
   let mockJwtService: any;
   let mockRedisService: any;
+  let mockMailService: any;
 
   const mockUser = {
     id: 'user-123',
@@ -84,11 +86,16 @@ describe('AuthService', () => {
       expire: jest.fn().mockResolvedValue(true),
     };
 
+    mockMailService = {
+      sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
+    };
+
     // Directly instantiate the service with mocked dependencies
     service = new AuthService(
       mockDatabaseService as DatabaseService,
       mockJwtService as JwtService,
       mockRedisService as RedisService,
+      mockMailService as MailService,
     );
     
     // Reset bcrypt mocks
