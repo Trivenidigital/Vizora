@@ -136,7 +136,7 @@ export default function RegisterContent() {
       </div>
 
       {/* Right — Registration Form */}
-      <div className="flex-1 flex flex-col justify-center px-6 py-10 sm:px-12 lg:px-16 xl:px-20">
+      <div className="flex-1 flex flex-col justify-center px-6 py-8 sm:px-10 lg:px-12 xl:px-16">
         {/* Mobile-only compact trust banner */}
         <div className="md:hidden mb-8">
           <div className="flex items-center gap-2.5 mb-4">
@@ -151,11 +151,11 @@ export default function RegisterContent() {
           </p>
         </div>
 
-        <div className="w-full max-w-md mx-auto md:mx-0">
+        <div className="w-full max-w-md lg:max-w-none mx-auto md:mx-0">
           <h1 className="text-2xl sm:text-3xl font-bold text-[var(--foreground)] eh-heading mb-2">
             Create your account
           </h1>
-          <p className="text-sm text-[var(--foreground-tertiary)] mb-8">
+          <p className="text-sm text-[var(--foreground-tertiary)] mb-6 lg:mb-4">
             Get started in under 5 minutes. No credit card required.
           </p>
 
@@ -184,7 +184,7 @@ export default function RegisterContent() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+          <form onSubmit={handleSubmit} className="space-y-4 lg:space-y-3" noValidate>
             {/* Honeypot — hidden from users, bots fill it */}
             <div className="absolute -left-[9999px]" aria-hidden="true">
               <label htmlFor="website">Website</label>
@@ -198,8 +198,8 @@ export default function RegisterContent() {
               />
             </div>
 
-            {/* Name fields */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 auth-field-enter auth-field-enter-1">
+            {/* Row 1: Name + Organization — 3 cols on xl, 2 on sm */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-3 auth-field-enter auth-field-enter-1">
               <FormField
                 id="firstName"
                 label="First Name"
@@ -224,148 +224,150 @@ export default function RegisterContent() {
                 autoComplete="family-name"
                 enterKeyHint="next"
               />
+              <div className="sm:col-span-2 xl:col-span-1">
+                <FormField
+                  id="organization"
+                  label="Organization Name"
+                  value={formData.organizationName}
+                  onChange={(v) => update('organizationName', v)}
+                  error={errors.organizationName}
+                  onClearError={() => clearFieldError('organizationName')}
+                  validate={(v) => (v.trim().length === 0 ? 'Organization name is required' : null)}
+                  placeholder="Acme Corp"
+                  autoComplete="organization"
+                  enterKeyHint="next"
+                  tooltip="This creates your workspace. Team members will join this organization."
+                />
+              </div>
             </div>
 
-            <div className="auth-field-enter auth-field-enter-2">
-              <FormField
-                id="organization"
-                label="Organization Name"
-                value={formData.organizationName}
-                onChange={(v) => update('organizationName', v)}
-                error={errors.organizationName}
-                onClearError={() => clearFieldError('organizationName')}
-                validate={(v) => (v.trim().length === 0 ? 'Organization name is required' : null)}
-                placeholder="Acme Corp"
-                autoComplete="organization"
-                enterKeyHint="next"
-                tooltip="This creates your workspace. Team members will join this organization."
-              />
-            </div>
-
-            <div className="auth-field-enter auth-field-enter-3">
-              <FormField
-                id="email"
-                label="Work Email"
-                type="email"
-                value={formData.email}
-                onChange={(v) => {
-                  update('email', v);
-                  setEmailSuggestion(getEmailSuggestion(v));
-                }}
-                error={errors.email}
-                onClearError={() => clearFieldError('email')}
-                validate={(v) => {
-                  if (!v.trim()) return 'Email is required';
-                  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return 'Please enter a valid email';
-                  return null;
-                }}
-                placeholder="john@acmecorp.com"
-                autoComplete="email"
-                inputMode="email"
-                enterKeyHint="next"
-              />
-              {emailSuggestion && (
-                <p className="text-xs text-amber-400 mt-1">
-                  Did you mean{' '}
-                  <button
-                    type="button"
-                    className="underline font-medium hover:text-amber-300"
-                    onClick={() => {
-                      update('email', emailSuggestion);
-                      setEmailSuggestion(null);
-                    }}
-                  >
-                    {emailSuggestion}
-                  </button>
-                  ?
-                </p>
-              )}
-            </div>
-
-            {/* Password with checklist */}
-            <div className="auth-field-enter auth-field-enter-4">
-              <label
-                htmlFor="password"
-                className="block text-[13px] font-semibold text-[var(--foreground-secondary)] mb-1.5"
-              >
-                Password
-              </label>
-              <PasswordInput
-                id="password"
-                value={formData.password}
-                onChange={(e) => {
-                  update('password', e.target.value);
-                  clearFieldError('password');
-                }}
-                placeholder="Create a strong password"
-                autoComplete="new-password"
-                enterKeyHint="next"
-                error={!!errors.password}
-                aria-label="Password"
-                aria-invalid={!!errors.password}
-              />
-              {errors.password && (
-                <p className="mt-1 text-xs text-[var(--error)]" role="alert">
-                  {errors.password}
-                </p>
-              )}
-              <PasswordChecklist password={formData.password} />
-            </div>
-
-            {/* Confirm Password */}
-            <div className="auth-field-enter auth-field-enter-5">
-              <label
-                htmlFor="confirmPassword"
-                className="block text-[13px] font-semibold text-[var(--foreground-secondary)] mb-1.5"
-              >
-                Confirm Password
-              </label>
-              <PasswordInput
-                id="confirmPassword"
-                value={formData.confirmPassword}
-                onChange={(e) => {
-                  update('confirmPassword', e.target.value);
-                  clearFieldError('confirmPassword');
-                }}
-                placeholder="Confirm your password"
-                autoComplete="new-password"
-                enterKeyHint="done"
-                error={!!errors.confirmPassword}
-                aria-label="Confirm Password"
-                aria-invalid={!!errors.confirmPassword}
-              />
-              {errors.confirmPassword && (
-                <p className="mt-1 text-xs text-[var(--error)]" role="alert">
-                  {errors.confirmPassword}
-                </p>
-              )}
-              {passwordMatch !== null && !errors.confirmPassword && (
-                <p
-                  className={`mt-1 text-xs flex items-center gap-1 ${
-                    passwordMatch ? 'text-[var(--success)]' : 'text-[var(--error)]'
-                  }`}
+            {/* Row 2: Email + Password — 2 cols on lg */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-3 auth-field-enter auth-field-enter-2">
+              <div>
+                <FormField
+                  id="email"
+                  label="Work Email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(v) => {
+                    update('email', v);
+                    setEmailSuggestion(getEmailSuggestion(v));
+                  }}
+                  error={errors.email}
+                  onClearError={() => clearFieldError('email')}
+                  validate={(v) => {
+                    if (!v.trim()) return 'Email is required';
+                    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return 'Please enter a valid email';
+                    return null;
+                  }}
+                  placeholder="john@acmecorp.com"
+                  autoComplete="email"
+                  inputMode="email"
+                  enterKeyHint="next"
+                />
+                {emailSuggestion && (
+                  <p className="text-xs text-amber-400 mt-1">
+                    Did you mean{' '}
+                    <button
+                      type="button"
+                      className="underline font-medium hover:text-amber-300"
+                      onClick={() => {
+                        update('email', emailSuggestion);
+                        setEmailSuggestion(null);
+                      }}
+                    >
+                      {emailSuggestion}
+                    </button>
+                    ?
+                  </p>
+                )}
+              </div>
+              <div>
+                <label
+                  htmlFor="password"
+                  className="block text-[13px] font-semibold text-[var(--foreground-secondary)] mb-1.5"
                 >
-                  {passwordMatch ? (
-                    <>
-                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                        <path d="M2 6L5 9L10 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                      Passwords match
-                    </>
-                  ) : (
-                    <>
-                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                        <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                      </svg>
-                      Passwords don&apos;t match
-                    </>
-                  )}
-                </p>
-              )}
+                  Password
+                </label>
+                <PasswordInput
+                  id="password"
+                  value={formData.password}
+                  onChange={(e) => {
+                    update('password', e.target.value);
+                    clearFieldError('password');
+                  }}
+                  placeholder="Create a strong password"
+                  autoComplete="new-password"
+                  enterKeyHint="next"
+                  error={!!errors.password}
+                  aria-label="Password"
+                  aria-invalid={!!errors.password}
+                />
+                {errors.password && (
+                  <p className="mt-1 text-xs text-[var(--error)]" role="alert">
+                    {errors.password}
+                  </p>
+                )}
+                <PasswordChecklist password={formData.password} />
+              </div>
+            </div>
+
+            {/* Row 3: Confirm Password — half-width on lg to align with password column */}
+            <div className="lg:grid lg:grid-cols-2 lg:gap-3 auth-field-enter auth-field-enter-3">
+              <div className="lg:col-start-2">
+                <label
+                  htmlFor="confirmPassword"
+                  className="block text-[13px] font-semibold text-[var(--foreground-secondary)] mb-1.5"
+                >
+                  Confirm Password
+                </label>
+                <PasswordInput
+                  id="confirmPassword"
+                  value={formData.confirmPassword}
+                  onChange={(e) => {
+                    update('confirmPassword', e.target.value);
+                    clearFieldError('confirmPassword');
+                  }}
+                  placeholder="Confirm your password"
+                  autoComplete="new-password"
+                  enterKeyHint="done"
+                  error={!!errors.confirmPassword}
+                  aria-label="Confirm Password"
+                  aria-invalid={!!errors.confirmPassword}
+                />
+                {errors.confirmPassword && (
+                  <p className="mt-1 text-xs text-[var(--error)]" role="alert">
+                    {errors.confirmPassword}
+                  </p>
+                )}
+                {passwordMatch !== null && !errors.confirmPassword && (
+                  <p
+                    className={`mt-1 text-xs flex items-center gap-1 ${
+                      passwordMatch ? 'text-[var(--success)]' : 'text-[var(--error)]'
+                    }`}
+                  >
+                    {passwordMatch ? (
+                      <>
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                          <path d="M2 6L5 9L10 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        Passwords match
+                      </>
+                    ) : (
+                      <>
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                          <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                        </svg>
+                        Passwords don&apos;t match
+                      </>
+                    )}
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* Terms of Service */}
-            <div className="flex items-start gap-2 auth-field-enter auth-field-enter-7">
+            <div className="flex items-start gap-2 auth-field-enter auth-field-enter-4">
               <input
                 type="checkbox"
                 id="agreeTerms"
@@ -397,7 +399,7 @@ export default function RegisterContent() {
             <button
               type="submit"
               disabled={loading || success || !allFieldsFilled}
-              className="w-full eh-btn-neon py-3 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none disabled:hover:shadow-none auth-field-enter auth-field-enter-8"
+              className="w-full eh-btn-neon py-3 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none disabled:hover:shadow-none auth-field-enter auth-field-enter-5"
             >
               {success ? (
                 <span className="flex items-center justify-center gap-2">
@@ -421,7 +423,7 @@ export default function RegisterContent() {
           </form>
 
           {/* Trust signals */}
-          <div className="flex items-center justify-center gap-4 mt-5 text-[10px] text-[var(--foreground-tertiary)]">
+          <div className="flex items-center justify-center gap-4 mt-4 lg:mt-3 text-[10px] text-[var(--foreground-tertiary)]">
             <span className="flex items-center gap-1">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
@@ -436,7 +438,7 @@ export default function RegisterContent() {
           </div>
 
           {/* Divider + Login link */}
-          <div className="relative mt-8">
+          <div className="relative mt-6 lg:mt-4">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-[var(--border)]" />
             </div>
@@ -445,7 +447,7 @@ export default function RegisterContent() {
             </div>
           </div>
 
-          <p className="text-center mt-6 text-sm text-[var(--foreground-secondary)]">
+          <p className="text-center mt-4 lg:mt-3 text-sm text-[var(--foreground-secondary)]">
             Already have an account?{' '}
             <Link href="/login" className="text-[var(--primary)] font-medium hover:underline">
               Log in

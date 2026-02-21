@@ -59,7 +59,7 @@ export default function ValuePanel({ variant }: ValuePanelProps) {
   const { headline, subtext } = content[variant];
 
   return (
-    <div className="relative hidden md:flex flex-col justify-between p-10 lg:p-12 bg-[#061A21] overflow-hidden">
+    <div className="relative hidden md:flex flex-col p-10 lg:p-12 bg-[#061A21] overflow-hidden">
       {/* Atmospheric background */}
       <div className="absolute inset-0 eh-grain" />
       <div
@@ -111,9 +111,9 @@ export default function ValuePanel({ variant }: ValuePanelProps) {
       </div>
 
       {/* Dashboard preview - only on register */}
-      <div className="relative z-10 mt-8">
+      <div className="relative z-10 mt-6">
         {variant === 'register' && (
-          <div className="transform scale-[0.92] origin-bottom-left">
+          <div className="transform scale-[0.96] origin-bottom-left">
             <MiniDashboard />
           </div>
         )}

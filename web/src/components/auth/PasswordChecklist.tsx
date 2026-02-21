@@ -17,7 +17,7 @@ export default function PasswordChecklist({ password }: PasswordChecklistProps) 
   const allMet = requirements.every((r) => r.test(password));
 
   return (
-    <div className="mt-2 space-y-1">
+    <div className="mt-2 flex flex-col gap-1 md:flex-row md:flex-wrap md:gap-x-4 md:gap-y-1">
       {requirements.map((req) => {
         const met = req.test(password);
         return (
@@ -45,7 +45,7 @@ export default function PasswordChecklist({ password }: PasswordChecklistProps) 
         );
       })}
       {allMet && (
-        <p className="text-xs text-[var(--success)] font-medium mt-1">Strong password</p>
+        <p className="text-xs text-[var(--success)] font-medium mt-1 md:mt-0 md:ml-1">Strong password</p>
       )}
     </div>
   );
