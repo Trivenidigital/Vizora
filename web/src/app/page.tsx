@@ -424,9 +424,9 @@ export default function Index() {
             <h1
               className="eh-heading text-4xl sm:text-5xl lg:text-[4rem] font-bold mb-6"
             >
-              Every screen runs itself.
+              Every screen. Every location.
               <br />
-              <span className="eh-gradient">You just set the goal.</span>
+              <span className="eh-gradient">One command center.</span>
             </h1>
             <p
               className="text-base sm:text-lg max-w-[580px] mx-auto leading-relaxed mb-10"
