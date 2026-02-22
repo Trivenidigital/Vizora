@@ -187,6 +187,14 @@ export default function Index() {
   const [activeFeatureTab, setActiveFeatureTab] = useState('realtime');
   const [showStickyBar, setShowStickyBar] = useState(false);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
+  const [pricing, setPricing] = useState<{
+    region: string;
+    currency: string;
+    symbol: string;
+    basic: { monthly: number; annual: number };
+    pro: { monthly: number; annual: number };
+    locale: string;
+  } | null>(null);
   const heroRef = useRef<HTMLElement>(null);
   const finalCtaRef = useRef<HTMLElement>(null);
   const footerRef = useRef<HTMLElement>(null);
@@ -249,6 +257,21 @@ export default function Index() {
       heroObserver.disconnect();
       bottomObserver.disconnect();
     };
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/geo-pricing')
+      .then(r => r.json())
+      .then(setPricing)
+      .catch(() => {
+        // Default to USD on error
+        setPricing({
+          region: 'US', currency: 'USD', symbol: '$',
+          basic: { monthly: 6, annual: 5 },
+          pro: { monthly: 8, annual: 7 },
+          locale: 'en-US',
+        });
+      });
   }, []);
 
   const nav = useCallback((id: string) => {
@@ -1582,6 +1605,25 @@ export default function Index() {
                   </span>
                 </button>
               </div>
+              {pricing && (
+                <div className="mt-3 flex items-center justify-center gap-2">
+                  <button
+                    onClick={() => setPricing(prev => prev ? { ...prev, region: 'US', currency: 'USD', symbol: '$', basic: { monthly: 6, annual: 5 }, pro: { monthly: 8, annual: 7 } } : prev)}
+                    className="text-xs font-medium px-2 py-0.5 rounded-full transition-all"
+                    style={pricing.region === 'US' ? { color: '#00E5A0', background: 'rgba(0,229,160,0.12)' } : { color: '#6B655D' }}
+                  >
+                    USD
+                  </button>
+                  <span style={{ color: '#3A3530' }}>|</span>
+                  <button
+                    onClick={() => setPricing(prev => prev ? { ...prev, region: 'IN', currency: 'INR', symbol: '\u20B9', basic: { monthly: 399, annual: 317 }, pro: { monthly: 599, annual: 483 } } : prev)}
+                    className="text-xs font-medium px-2 py-0.5 rounded-full transition-all"
+                    style={pricing.region === 'IN' ? { color: '#00E5A0', background: 'rgba(0,229,160,0.12)' } : { color: '#6B655D' }}
+                  >
+                    INR
+                  </button>
+                </div>
+              )}
             </div>
           </Reveal>
 
@@ -1616,7 +1658,7 @@ export default function Index() {
                 <p className="text-xs mb-5" style={{ color: '#6B655D' }}>Up to 50 screens</p>
                 <div className="flex items-baseline gap-1 mb-6">
                   <span className="text-4xl sm:text-5xl font-bold" style={{ fontFamily: 'var(--font-mono), monospace' }}>
-                    ${billingCycle === 'monthly' ? '6' : '5'}
+                    {pricing ? `${pricing.symbol}${billingCycle === 'monthly' ? pricing.basic.monthly : pricing.basic.annual}` : `$${billingCycle === 'monthly' ? '6' : '5'}`}
                   </span>
                   <span className="text-sm" style={{ color: '#6B655D' }}>/screen/mo</span>
                 </div>
@@ -1653,7 +1695,7 @@ export default function Index() {
                 <p className="text-xs mb-5" style={{ color: '#6B655D' }}>Up to 100 screens</p>
                 <div className="flex items-baseline gap-1 mb-6">
                   <span className="text-4xl sm:text-5xl font-bold" style={{ fontFamily: 'var(--font-mono), monospace', color: '#00E5A0' }}>
-                    ${billingCycle === 'monthly' ? '8' : '7'}
+                    {pricing ? `${pricing.symbol}${billingCycle === 'monthly' ? pricing.pro.monthly : pricing.pro.annual}` : `$${billingCycle === 'monthly' ? '8' : '7'}`}
                   </span>
                   <span className="text-sm" style={{ color: '#6B655D' }}>/screen/mo</span>
                 </div>
