@@ -39,7 +39,7 @@ export default function ContentClient() {
  const [pushDuration, setPushDuration] = useState(30);
  const [uploadForm, setUploadForm] = useState({
  title: '',
- type: 'image' as 'image' | 'video' | 'pdf' | 'url',
+ type: 'image' as 'image' | 'video' | 'pdf' | 'url' | 'html' | 'template',
  url: '',
  file: null as File | null,
  });
@@ -573,6 +573,9 @@ export default function ContentClient() {
  return 'document';
  case 'url':
  return 'link';
+ case 'html':
+ case 'template':
+ return 'document';
  default:
  return 'folder';
  }
@@ -581,11 +584,14 @@ export default function ContentClient() {
  const getStatusColor = (status: string) => {
  switch (status) {
  case 'ready':
+ case 'active':
  return 'bg-[rgba(0,229,160,0.1)] text-[#00E5A0]';
  case 'processing':
  return 'bg-[rgba(245,158,11,0.1)] text-[var(--accent-warm)]';
  case 'error':
  return 'bg-[rgba(220,38,38,0.1)] text-[var(--error)]';
+ case 'archived':
+ return 'bg-[var(--surface-secondary)] text-[var(--foreground-tertiary)]';
  default:
  return 'bg-[var(--surface-secondary)] text-[var(--foreground)]';
  }
@@ -726,7 +732,7 @@ export default function ContentClient() {
  onClick={() => setIsUploadModalOpen(true)}
  className="bg-[#00E5A0] text-[#061A21] px-6 py-3 rounded-lg hover:bg-[#00CC8E] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
  >
- <Icon name="add" size="lg" className="text-white" />
+ <Icon name="add" size="lg" className="text-[#061A21]" />
  <span>Upload Content</span>
  </button>
  </div>
@@ -1015,28 +1021,28 @@ export default function ContentClient() {
  <div className="flex justify-end gap-2">
  <button
  onClick={() => handlePushToDevice(item)}
- className="text-green-600 hover:text-green-800 hover:bg-green-50 px-2 py-1 rounded transition"
+ className="text-success-600 dark:text-success-400 hover:bg-success-500/10 px-2 py-1 rounded-lg transition"
  title="Push to device"
  >
  <Icon name="push" size="md" />
  </button>
  <button
  onClick={() => handleAddToPlaylist(item)}
- className="text-purple-600 hover:text-purple-800 hover:bg-purple-50 px-2 py-1 rounded transition"
+ className="text-purple-500 dark:text-purple-400 hover:bg-purple-500/10 px-2 py-1 rounded-lg transition"
  title="Add to playlist"
  >
  <Icon name="add" size="md" />
  </button>
  <button
  onClick={() => handleEdit(item)}
- className="text-[#00E5A0] hover:text-[#00E5A0] hover:bg-[#00E5A0]/5 px-2 py-1 rounded transition"
+ className="text-[#00E5A0] hover:bg-[#00E5A0]/10 px-2 py-1 rounded-lg transition"
  title="Edit"
  >
  <Icon name="edit" size="md" />
  </button>
  <button
  onClick={() => handleDelete(item)}
- className="text-red-600 hover:text-red-800 hover:bg-red-50 px-2 py-1 rounded transition"
+ className="text-error-500 dark:text-error-400 hover:bg-error-500/10 px-2 py-1 rounded-lg transition"
  title="Delete"
  >
  <Icon name="delete" size="md" />
@@ -1106,28 +1112,28 @@ export default function ContentClient() {
  <div className="grid grid-cols-2 gap-3">
  <button
  onClick={() => handlePushToDevice(item)}
- className="text-sm bg-green-50 text-green-600 py-2 rounded hover:bg-green-100 transition font-medium flex items-center justify-center gap-1"
+ className="text-sm bg-success-500/10 text-success-600 dark:text-success-400 py-2 rounded-lg hover:bg-success-500/20 transition font-medium flex items-center justify-center gap-1"
  >
  <Icon name="push" size="sm" />
  Push
  </button>
  <button
  onClick={() => handleAddToPlaylist(item)}
- className="text-sm bg-purple-50 text-purple-600 py-2 rounded hover:bg-purple-100 transition font-medium flex items-center justify-center gap-1"
+ className="text-sm bg-purple-500/10 text-purple-600 dark:text-purple-400 py-2 rounded-lg hover:bg-purple-500/20 transition font-medium flex items-center justify-center gap-1"
  >
  <Icon name="add" size="sm" />
  Playlist
  </button>
  <button
  onClick={() => handleEdit(item)}
- className="text-sm bg-[#00E5A0]/5 text-[#00E5A0] py-2 rounded hover:bg-[#00E5A0]/10 transition font-medium flex items-center justify-center gap-1"
+ className="text-sm bg-[#00E5A0]/5 text-[#00E5A0] py-2 rounded-lg hover:bg-[#00E5A0]/10 transition font-medium flex items-center justify-center gap-1"
  >
  <Icon name="edit" size="sm" />
  Edit
  </button>
  <button
  onClick={() => handleDelete(item)}
- className="text-sm bg-red-50 text-red-600 py-2 rounded hover:bg-red-100 transition font-medium flex items-center justify-center gap-1"
+ className="text-sm bg-error-500/10 text-error-600 dark:text-error-400 py-2 rounded-lg hover:bg-error-500/20 transition font-medium flex items-center justify-center gap-1"
  >
  <Icon name="delete" size="sm" />
  Delete
@@ -1372,7 +1378,7 @@ export default function ContentClient() {
  </button>
  <button
  onClick={handleUpload}
- className="px-4 py-2 text-sm font-medium text-white bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
  disabled={actionLoading || (uploadQueue.length === 0 && (!uploadForm.title || !uploadForm.url))}
  >
  {actionLoading && <LoadingSpinner size="sm" />}
@@ -1446,7 +1452,7 @@ export default function ContentClient() {
  </button>
  <button
  onClick={handleSaveEdit}
- className="px-4 py-2 text-sm font-medium text-white bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
  disabled={actionLoading || !uploadForm.title}
  >
  {actionLoading && <LoadingSpinner size="sm" />}
@@ -1479,7 +1485,7 @@ export default function ContentClient() {
  max={3600}
  value={pushDuration}
  onChange={(e) => setPushDuration(Math.max(5, Math.min(3600, parseInt(e.target.value) || 30)))}
- className="w-24 px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-[var(--foreground)]"
+ className="w-24 px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
  />
  <div className="flex gap-1">
  {[15, 30, 60, 120].map((sec) => (
@@ -1488,7 +1494,7 @@ export default function ContentClient() {
  onClick={() => setPushDuration(sec)}
  className={`px-2 py-1 text-xs rounded ${
  pushDuration === sec
- ? 'bg-green-600 text-white'
+ ? 'bg-[#00E5A0] text-[#061A21]'
  : 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
  }`}
  >
@@ -1530,7 +1536,7 @@ export default function ContentClient() {
  setSelectedDevices(selectedDevices.filter((id) => id !== device.id));
  }
  }}
- className="mr-3 h-4 w-4 rounded border-[var(--border)] text-green-600 focus:ring-green-500"
+ className="mr-3 h-4 w-4 rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]"
  />
  <div className="flex-1">
  <div className="font-medium text-[var(--foreground)]">{device.nickname}</div>
@@ -1539,7 +1545,7 @@ export default function ContentClient() {
  <span
  className={`px-2 py-1 text-xs rounded-full ${
  device.status === 'online'
- ? 'bg-green-100 text-green-800'
+ ? 'bg-success-500/10 text-success-700 dark:text-success-400'
  : 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)]'
  }`}
  >
@@ -1560,11 +1566,11 @@ export default function ContentClient() {
  </button>
  <button
  onClick={confirmPush}
- className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
  disabled={actionLoading || selectedDevices.length === 0}
  >
  {actionLoading && <LoadingSpinner size="sm" />}
- <Icon name="push" size="md" className="text-white" />
+ <Icon name="push" size="md" className="text-[#061A21]" />
  Push to {selectedDevices.length} Device{selectedDevices.length !== 1 ? 's' : ''}
  </button>
  </div>
@@ -1684,7 +1690,7 @@ export default function ContentClient() {
  <button
  onClick={handleCreateFolder}
  disabled={actionLoading || !newFolderName.trim()}
- className="px-4 py-2 text-sm font-medium text-white bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
  >
  {actionLoading && <LoadingSpinner size="sm" />}
  Create Folder

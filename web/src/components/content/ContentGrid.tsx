@@ -36,6 +36,9 @@ export function ContentGrid({
         return 'document';
       case 'url':
         return 'link';
+      case 'html':
+      case 'template':
+        return 'document';
       default:
         return 'folder';
     }
@@ -44,11 +47,12 @@ export function ContentGrid({
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'ready':
-        return 'bg-green-100 text-green-800';
+      case 'active':
+        return 'bg-success-500/10 text-success-700 dark:text-success-400';
       case 'processing':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-warning-500/10 text-warning-700 dark:text-warning-400';
       case 'error':
-        return 'bg-red-100 text-red-800';
+        return 'bg-error-500/10 text-error-700 dark:text-error-400';
       default:
         return 'bg-[var(--background-secondary)] text-[var(--foreground)]';
     }
@@ -121,14 +125,14 @@ export function ContentGrid({
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => onPushToDevice(item)}
-                className="text-sm bg-green-50 text-green-600 py-2 rounded hover:bg-green-100 transition font-medium flex items-center justify-center gap-1"
+                className="text-sm bg-success-500/10 text-success-600 dark:text-success-400 py-2 rounded hover:bg-success-500/20 transition font-medium flex items-center justify-center gap-1"
               >
                 <Icon name="push" size="sm" />
                 Push
               </button>
               <button
                 onClick={() => onAddToPlaylist(item)}
-                className="text-sm bg-purple-50 text-purple-600 py-2 rounded hover:bg-purple-100 transition font-medium flex items-center justify-center gap-1"
+                className="text-sm bg-purple-500/10 text-purple-600 dark:text-purple-400 py-2 rounded hover:bg-purple-500/20 transition font-medium flex items-center justify-center gap-1"
               >
                 <Icon name="add" size="sm" />
                 Playlist
@@ -142,7 +146,7 @@ export function ContentGrid({
               </button>
               <button
                 onClick={() => onDelete(item)}
-                className="text-sm bg-red-50 text-red-600 py-2 rounded hover:bg-red-100 transition font-medium flex items-center justify-center gap-1"
+                className="text-sm bg-error-500/10 text-error-600 dark:text-error-400 py-2 rounded hover:bg-error-500/20 transition font-medium flex items-center justify-center gap-1"
               >
                 <Icon name="delete" size="sm" />
                 Delete

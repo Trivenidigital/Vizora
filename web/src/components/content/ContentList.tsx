@@ -37,6 +37,9 @@ export function ContentList({
         return 'document';
       case 'url':
         return 'link';
+      case 'html':
+      case 'template':
+        return 'document';
       default:
         return 'folder';
     }
@@ -45,11 +48,12 @@ export function ContentList({
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'ready':
-        return 'bg-green-100 text-green-800';
+      case 'active':
+        return 'bg-success-500/10 text-success-700 dark:text-success-400';
       case 'processing':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-warning-500/10 text-warning-700 dark:text-warning-400';
       case 'error':
-        return 'bg-red-100 text-red-800';
+        return 'bg-error-500/10 text-error-700 dark:text-error-400';
       default:
         return 'bg-[var(--background-secondary)] text-[var(--foreground)]';
     }
@@ -153,14 +157,14 @@ export function ContentList({
                 <div className="flex justify-end gap-2">
                   <button
                     onClick={() => onPushToDevice(item)}
-                    className="text-green-600 hover:text-green-800 hover:bg-green-50 px-2 py-1 rounded transition"
+                    className="text-success-600 dark:text-success-400 hover:text-success-700 dark:hover:text-success-300 hover:bg-success-500/10 px-2 py-1 rounded transition"
                     title="Push to device"
                   >
                     <Icon name="push" size="md" />
                   </button>
                   <button
                     onClick={() => onAddToPlaylist(item)}
-                    className="text-purple-600 hover:text-purple-800 hover:bg-purple-50 px-2 py-1 rounded transition"
+                    className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:bg-purple-500/10 px-2 py-1 rounded transition"
                     title="Add to playlist"
                   >
                     <Icon name="add" size="md" />
@@ -174,7 +178,7 @@ export function ContentList({
                   </button>
                   <button
                     onClick={() => onDelete(item)}
-                    className="text-red-600 hover:text-red-800 hover:bg-red-50 px-2 py-1 rounded transition"
+                    className="text-error-600 dark:text-error-400 hover:text-error-700 dark:hover:text-error-300 hover:bg-error-500/10 px-2 py-1 rounded transition"
                     title="Delete"
                   >
                     <Icon name="delete" size="md" />

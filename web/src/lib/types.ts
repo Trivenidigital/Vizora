@@ -18,10 +18,10 @@ export interface Display {
 export interface Content {
   id: string;
   title: string;
-  type: 'image' | 'video' | 'pdf' | 'url';
+  type: 'image' | 'video' | 'pdf' | 'url' | 'html' | 'template';
   url?: string;
   thumbnailUrl?: string;
-  status: 'ready' | 'processing' | 'error';
+  status: 'ready' | 'processing' | 'error' | 'active' | 'archived';
   duration?: number;
   metadata?: Record<string, any>;
   folderId?: string;

@@ -261,6 +261,38 @@ describe('SanitizeInterceptor', () => {
     });
   });
 
+  describe('Date Object Preservation', () => {
+    it('should preserve Date objects without modification', () => {
+      const now = new Date('2026-02-22T12:00:00.000Z');
+      mockRequest.body = {
+        name: 'Test',
+        createdAt: now,
+        updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      };
+
+      interceptor.intercept(mockExecutionContext, mockCallHandler);
+
+      expect(mockRequest.body.createdAt).toBe(now);
+      expect(mockRequest.body.createdAt instanceof Date).toBe(true);
+      expect(mockRequest.body.updatedAt instanceof Date).toBe(true);
+    });
+
+    it('should preserve Date objects in response output', (done) => {
+      const createdAt = new Date('2026-02-22T12:00:00.000Z');
+      mockCallHandler.handle = jest.fn().mockReturnValue(
+        of({ name: 'Test', createdAt }),
+      );
+
+      const result$ = interceptor.intercept(mockExecutionContext, mockCallHandler);
+
+      result$.subscribe((response) => {
+        expect(response.createdAt).toBe(createdAt);
+        expect(response.createdAt instanceof Date).toBe(true);
+        done();
+      });
+    });
+  });
+
   describe('Query Params Sanitization', () => {
     it('should sanitize XSS in query parameters', () => {
       mockRequest.query = {

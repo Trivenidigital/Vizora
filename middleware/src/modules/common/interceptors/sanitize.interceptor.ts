@@ -122,6 +122,10 @@ export class SanitizeInterceptor implements NestInterceptor {
       return obj.map(item => this.sanitizeObject(item));
     }
 
+    if (obj instanceof Date) {
+      return obj;
+    }
+
     if (typeof obj === 'object') {
       const sanitized: Record<string, any> = {};
       for (const [key, value] of Object.entries(obj)) {
