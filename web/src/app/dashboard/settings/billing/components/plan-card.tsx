@@ -13,8 +13,9 @@ interface PlanCardProps {
 }
 
 export function PlanCard({ plan, onSelect, onContactSales, isCurrentPlan, isLoading }: PlanCardProps) {
-  const formatPrice = (price: number, currency: string) => {
-    if (currency === 'INR') {
+  const formatPrice = (priceInSmallestUnit: number, currency: string) => {
+    const price = priceInSmallestUnit / 100; // cents/paise → dollars/rupees
+    if (currency === 'INR' || currency === 'inr') {
       return new Intl.NumberFormat('en-IN', {
         style: 'currency',
         currency: 'INR',
@@ -24,8 +25,8 @@ export function PlanCard({ plan, onSelect, onContactSales, isCurrentPlan, isLoad
     }
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: currency,
-      minimumFractionDigits: 2,
+      currency: currency.toUpperCase(),
+      minimumFractionDigits: price % 1 === 0 ? 0 : 2,
       maximumFractionDigits: 2,
     }).format(price);
   };
