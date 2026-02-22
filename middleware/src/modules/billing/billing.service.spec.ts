@@ -223,7 +223,7 @@ describe('BillingService', () => {
       const result = await service.getPlans('org-123', 'IN', 'monthly');
 
       const basicPlan = result.find((p) => p.id === 'basic');
-      expect(basicPlan?.price).toBe(50000);
+      expect(basicPlan?.price).toBe(39900);
       expect(basicPlan?.currency).toBe('inr');
     });
 

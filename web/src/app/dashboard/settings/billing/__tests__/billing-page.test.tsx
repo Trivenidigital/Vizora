@@ -16,6 +16,8 @@ jest.mock('@/lib/api', () => ({
   apiClient: {
     getSubscriptionStatus: jest.fn(),
     getQuotaUsage: jest.fn(),
+    getOrganization: jest.fn(),
+    updateOrganization: jest.fn(),
     cancelSubscription: jest.fn(),
     reactivateSubscription: jest.fn(),
     getBillingPortalUrl: jest.fn(),
@@ -55,6 +57,7 @@ describe('BillingPage', () => {
     jest.clearAllMocks();
     (apiClient.getSubscriptionStatus as jest.Mock).mockResolvedValue(mockSubscription);
     (apiClient.getQuotaUsage as jest.Mock).mockResolvedValue(mockQuota);
+    (apiClient.getOrganization as jest.Mock).mockResolvedValue({ id: 'org-1', country: 'US', gstin: null });
   });
 
   it('renders subscription status', async () => {
