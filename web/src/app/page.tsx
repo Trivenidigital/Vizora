@@ -261,7 +261,10 @@ export default function Index() {
 
   useEffect(() => {
     fetch('/api/geo-pricing')
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error('geo-pricing failed');
+        return r.json();
+      })
       .then(setPricing)
       .catch(() => {
         // Default to USD on error
