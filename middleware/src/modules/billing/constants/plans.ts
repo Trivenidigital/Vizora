@@ -48,8 +48,8 @@ export const PLAN_TIERS: Record<string, PlanTier> = {
         yearly: 6000, // $60/screen/year (save ~17%)
       },
       inr: {
-        monthly: 50000, // ₹500/screen
-        yearly: 500000,
+        monthly: 39900, // ₹399/screen
+        yearly: 379900, // ₹3,799/screen/year (saves ₹989)
       },
     },
     features: [
@@ -70,8 +70,8 @@ export const PLAN_TIERS: Record<string, PlanTier> = {
         yearly: 8000, // $80/screen/year (save ~17%)
       },
       inr: {
-        monthly: 65000, // ₹650/screen
-        yearly: 650000,
+        monthly: 59900, // ₹599/screen
+        yearly: 579900, // ₹5,799/screen/year (saves ₹1,389)
       },
     },
     features: [
