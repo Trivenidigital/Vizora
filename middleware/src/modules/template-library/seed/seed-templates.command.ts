@@ -27,7 +27,7 @@ async function main() {
     });
     if (!systemOrg) {
       systemOrg = await prisma.organization.create({
-        data: { name: 'Vizora System' },
+        data: { name: 'Vizora System', slug: 'vizora-system' },
       });
       console.log(`Created system organization: ${systemOrg.id}`);
     } else {
