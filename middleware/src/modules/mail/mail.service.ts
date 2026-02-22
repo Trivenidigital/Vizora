@@ -151,6 +151,7 @@ export class MailService {
     to: string,
     firstName: string,
     daysRemaining: number,
+    pricing?: { amount: string; currency: string },
   ): Promise<void> {
     const urgency = daysRemaining <= 2 ? 'expires very soon' : 'is ending soon';
     const subject = `Your Vizora trial ${urgency} — ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} left`;
@@ -164,6 +165,9 @@ export class MailService {
           <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
             Upgrade now to keep everything running without interruption.
           </p>
+          ${pricing ? `<p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
+            Plans start at <strong style="color:#00E5A0;">${pricing.amount}/screen/month</strong>.
+          </p>` : ''}
           ${this.ctaButton('View Plans & Upgrade', this.upgradeUrl)}
           <p style="color:#5A6B73;font-size:12px;line-height:1.5;margin:16px 0 0 0;">
             If you've already upgraded, you can safely ignore this email.
@@ -175,6 +179,7 @@ export class MailService {
   async sendTrialExpiredEmail(
     to: string,
     firstName: string,
+    pricing?: { amount: string; currency: string },
   ): Promise<void> {
     const subject = 'Your Vizora trial has ended';
     const html = this.wrapInTemplate(`
@@ -187,6 +192,9 @@ export class MailService {
           <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
             Upgrade today to restore full access and keep your signage running smoothly.
           </p>
+          ${pricing ? `<p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
+            Plans start at <strong style="color:#00E5A0;">${pricing.amount}/screen/month</strong>.
+          </p>` : ''}
           ${this.ctaButton('Upgrade Now', this.upgradeUrl)}
           <p style="color:#5A6B73;font-size:12px;line-height:1.5;margin:16px 0 0 0;">
             Your content and settings are preserved. Upgrading will instantly re-enable everything.

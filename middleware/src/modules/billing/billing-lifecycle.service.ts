@@ -41,7 +41,10 @@ export class BillingLifecycleService {
         subscriptionStatus: 'trial',
         trialEndsAt: { lte: now },
       },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        country: true,
         users: {
           where: { role: 'admin' },
           take: 1,
@@ -64,9 +67,13 @@ export class BillingLifecycleService {
         // Send trial expired email
         const admin = org.users[0];
         if (admin?.email) {
+          const pricing = org.country === 'IN'
+            ? { amount: '\u20B9399', currency: 'INR' }
+            : { amount: '$6', currency: 'USD' };
           await this.mailService.sendTrialExpiredEmail(
             admin.email,
             admin.firstName || admin.email.split('@')[0],
+            pricing,
           );
         }
 
@@ -98,7 +105,10 @@ export class BillingLifecycleService {
           lte: endOfDay,
         },
       },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        country: true,
         users: {
           where: { role: 'admin' },
           take: 1,
@@ -115,10 +125,14 @@ export class BillingLifecycleService {
       try {
         const admin = org.users[0];
         if (admin?.email) {
+          const pricing = org.country === 'IN'
+            ? { amount: '\u20B9399', currency: 'INR' }
+            : { amount: '$6', currency: 'USD' };
           await this.mailService.sendTrialReminderEmail(
             admin.email,
             admin.firstName || admin.email.split('@')[0],
             daysBeforeExpiry,
+            pricing,
           );
         }
       } catch (error) {
