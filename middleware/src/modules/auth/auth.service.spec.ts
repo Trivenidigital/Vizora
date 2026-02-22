@@ -4,6 +4,7 @@ import { AuthService } from './auth.service';
 import { DatabaseService } from '../database/database.service';
 import { RedisService } from '../redis/redis.service';
 import { MailService } from '../mail/mail.service';
+import { GeoService } from '../common/services/geo.service';
 import * as bcrypt from 'bcryptjs';
 
 // Mock bcryptjs
@@ -24,6 +25,7 @@ describe('AuthService', () => {
   let mockJwtService: any;
   let mockRedisService: any;
   let mockMailService: any;
+  let mockGeoService: any;
 
   const mockUser = {
     id: 'user-123',
@@ -91,12 +93,17 @@ describe('AuthService', () => {
       sendWelcomeEmail: jest.fn().mockResolvedValue(undefined),
     };
 
+    mockGeoService = {
+      detect: jest.fn().mockReturnValue({ country: 'US', currency: 'USD', provider: 'stripe' }),
+    };
+
     // Directly instantiate the service with mocked dependencies
     service = new AuthService(
       mockDatabaseService as DatabaseService,
       mockJwtService as JwtService,
       mockRedisService as RedisService,
       mockMailService as MailService,
+      mockGeoService as GeoService,
     );
     
     // Reset bcrypt mocks

@@ -15,6 +15,7 @@ import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { RegisterDto, LoginDto } from './dto';
 import { AUTH_CONSTANTS } from './constants/auth.constants';
+import { GeoService } from '../common/services/geo.service';
 
 // Account lockout constants
 const MAX_LOGIN_ATTEMPTS = 10;
@@ -29,9 +30,10 @@ export class AuthService {
     private jwtService: JwtService,
     private redisService: RedisService,
     private mailService: MailService,
+    private geoService: GeoService,
   ) {}
 
-  async register(dto: RegisterDto) {
+  async register(dto: RegisterDto, clientIp?: string) {
     // Check if email already exists
     const existingUser = await this.databaseService.user.findUnique({
       where: { email: dto.email },
@@ -61,6 +63,11 @@ export class AuthService {
     const trialEndsAt = new Date();
     trialEndsAt.setDate(trialEndsAt.getDate() + 30);
 
+    // Detect country from client IP for regional pricing
+    const geo = clientIp
+      ? this.geoService.detect(clientIp)
+      : { country: 'US', currency: 'USD', provider: 'stripe' };
+
     // Wrap all operations in transaction to ensure data consistency
     const result = await this.databaseService.$transaction(async (tx) => {
       // Create organization
@@ -72,6 +79,7 @@ export class AuthService {
           screenQuota: 5,
           trialEndsAt,
           subscriptionStatus: 'trial',
+          country: geo.country,
         },
       });
 

@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { AUTH_CONSTANTS } from './constants/auth.constants';
 import { ConflictException, UnauthorizedException } from '@nestjs/common';
 
@@ -63,6 +63,11 @@ describe('AuthController', () => {
       organizationName: 'Test Organization',
     };
 
+    const mockRegisterRequest = {
+      ip: '127.0.0.1',
+      socket: { remoteAddress: '127.0.0.1' },
+    } as unknown as Request;
+
     it('should register a new user and set auth cookie', async () => {
       authService.register.mockResolvedValue({
         user: mockUser,
@@ -71,7 +76,7 @@ describe('AuthController', () => {
         expiresIn: AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS,
       });
 
-      const result = await controller.register(registerDto, mockResponse as Response);
+      const result = await controller.register(registerDto, mockRegisterRequest, mockResponse as Response);
 
       expect(result.success).toBe(true);
       expect(result.data.user).toEqual(mockUser);
@@ -94,15 +99,28 @@ describe('AuthController', () => {
         expiresIn: AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS,
       });
 
-      const result = await controller.register(registerDto, mockResponse as Response);
+      const result = await controller.register(registerDto, mockRegisterRequest, mockResponse as Response);
 
       expect(result.data).not.toHaveProperty('token');
+    });
+
+    it('should pass client IP to auth service', async () => {
+      authService.register.mockResolvedValue({
+        user: mockUser,
+        organization: mockOrganization,
+        token: 'jwt-token',
+        expiresIn: AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS,
+      });
+
+      await controller.register(registerDto, mockRegisterRequest, mockResponse as Response);
+
+      expect(authService.register).toHaveBeenCalledWith(registerDto, '127.0.0.1');
     });
 
     it('should propagate ConflictException when email exists', async () => {
       authService.register.mockRejectedValue(new ConflictException('Email already exists'));
 
-      await expect(controller.register(registerDto, mockResponse as Response))
+      await expect(controller.register(registerDto, mockRegisterRequest, mockResponse as Response))
         .rejects.toThrow(ConflictException);
     });
   });
@@ -266,6 +284,11 @@ describe('AuthController', () => {
       organizationName: 'Test Organization',
     };
 
+    const mockRegisterRequest = {
+      ip: '127.0.0.1',
+      socket: { remoteAddress: '127.0.0.1' },
+    } as unknown as Request;
+
     beforeEach(() => {
       authService.register.mockResolvedValue({
         user: mockUser,
@@ -279,7 +302,7 @@ describe('AuthController', () => {
       const originalEnv = process.env.NODE_ENV;
       process.env.NODE_ENV = 'development';
 
-      await controller.register(registerDto, mockResponse as Response);
+      await controller.register(registerDto, mockRegisterRequest, mockResponse as Response);
 
       expect(mockResponse.cookie).toHaveBeenCalledWith(
         expect.any(String),
@@ -294,7 +317,7 @@ describe('AuthController', () => {
     });
 
     it('should include maxAge based on token expiry constant', async () => {
-      await controller.register(registerDto, mockResponse as Response);
+      await controller.register(registerDto, mockRegisterRequest, mockResponse as Response);
 
       expect(mockResponse.cookie).toHaveBeenCalledWith(
         expect.any(String),

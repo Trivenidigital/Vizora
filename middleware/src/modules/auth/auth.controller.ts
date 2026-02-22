@@ -91,9 +91,11 @@ export class AuthController {
   })
   async register(
     @Body() dto: RegisterDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.authService.register(dto);
+    const clientIp = req.ip || req.socket?.remoteAddress || '';
+    const result = await this.authService.register(dto, clientIp);
 
     // Set httpOnly cookie with JWT token
     this.setAuthCookie(res, result.token);
