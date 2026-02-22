@@ -34,6 +34,19 @@ async function main() {
     console.log(`Templates to seed: ${categorySummary.total}`);
     console.log(`Categories: ${Object.entries(categorySummary).filter(([k]) => k !== 'total').map(([k, v]) => `${k}(${v})`).join(', ')}`);
 
+    // Find or create a system organization for global templates
+    let systemOrg = await prisma.organization.findFirst({
+      where: { name: 'Vizora System' },
+    });
+    if (!systemOrg) {
+      systemOrg = await prisma.organization.create({
+        data: { name: 'Vizora System' },
+      });
+      console.log(`Created system organization: ${systemOrg.id}`);
+    } else {
+      console.log(`Using existing system organization: ${systemOrg.id}`);
+    }
+
     if (clearFirst) {
       console.log('\nClearing existing library templates...');
       const deleted = await prisma.content.deleteMany({
@@ -75,6 +88,7 @@ async function main() {
           templateOrientation: seed.templateOrientation === 'both' ? 'landscape' : seed.templateOrientation,
           isGlobal: true,
           status: 'active',
+          organizationId: systemOrg.id,
           metadata: {
             templateHtml: seed.templateHtml,
             isLibraryTemplate: true,
