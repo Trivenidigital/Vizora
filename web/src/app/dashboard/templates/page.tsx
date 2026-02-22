@@ -26,7 +26,7 @@ interface TemplateItem {
   previewImageUrl?: string | null;
   isFeatured?: boolean;
   useCount?: number;
-  metadata?: { templateHtml?: string; [key: string]: unknown } | null;
+  metadata?: { templateHtml?: string; renderedHtml?: string; [key: string]: unknown } | null;
 }
 
 interface CategoryItem {
@@ -263,6 +263,7 @@ export default function TemplateLibraryPage() {
     thumbnailUrl: t.thumbnailUrl || t.previewImageUrl,
     previewImageUrl: t.previewImageUrl,
     templateHtml: t.metadata?.templateHtml as string | undefined,
+    renderedHtml: t.metadata?.renderedHtml as string | undefined,
     isFeatured: t.isFeatured,
     useCount: t.useCount,
     tags: t.libraryTags || t.tags,

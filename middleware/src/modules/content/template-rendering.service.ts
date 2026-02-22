@@ -29,7 +29,6 @@ export class TemplateRenderingService {
     'form',
     'meta',
     'link',
-    'style',
     'base',
   ];
 
@@ -441,6 +440,7 @@ export class TemplateRenderingService {
         'dl', 'dt', 'dd',
         'figure', 'figcaption',
         'article', 'section', 'header', 'footer', 'nav', 'aside', 'main',
+        'style',
       ],
       ALLOWED_ATTR: [
         'href', 'src', 'alt', 'title', 'width', 'height',

@@ -22,7 +22,7 @@ export const SkipOutputSanitize = () => SetMetadata(SKIP_OUTPUT_SANITIZE_KEY, tr
 export class SanitizeInterceptor implements NestInterceptor {
   constructor(private readonly reflector?: Reflector) {}
 
-  private readonly templateHtmlFields = ['templateHtml', 'htmlContent', 'customCss'];
+  private readonly templateHtmlFields = ['templateHtml', 'htmlContent', 'customCss', 'renderedHtml'];
 
   private readonly sanitizeOptions: sanitizeHtml.IOptions = {
     allowedTags: [], // Strip all HTML tags

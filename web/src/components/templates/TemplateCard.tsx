@@ -12,6 +12,7 @@ interface TemplateCardProps {
   thumbnailUrl?: string | null;
   previewImageUrl?: string | null;
   templateHtml?: string | null;
+  renderedHtml?: string | null;
   isFeatured?: boolean;
   useCount?: number;
   tags?: string[];
@@ -49,6 +50,7 @@ export default function TemplateCard({
   thumbnailUrl,
   previewImageUrl,
   templateHtml,
+  renderedHtml,
   isFeatured,
   useCount,
   tags,
@@ -93,10 +95,10 @@ export default function TemplateCard({
             className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             onError={() => setImgError(true)}
           />
-        ) : templateHtml ? (
+        ) : (renderedHtml || templateHtml) ? (
           <div className="absolute inset-0 overflow-hidden">
             <iframe
-              srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;overflow:hidden;background:#fff;}</style></head><body>${templateHtml}</body></html>`}
+              srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;overflow:hidden;background:#fff;}</style></head><body>${renderedHtml || templateHtml}</body></html>`}
               sandbox=""
               tabIndex={-1}
               className="w-[1920px] h-[1080px] origin-top-left pointer-events-none border-0"
