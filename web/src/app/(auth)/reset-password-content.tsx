@@ -110,13 +110,13 @@ export default function ResetPasswordContent() {
   return (
     <div className="min-h-screen flex bg-[var(--background)]">
       {/* Left — Value Proposition */}
-      <div className="hidden md:flex md:w-[45%] lg:w-1/2">
+      <div className="hidden md:flex md:w-[35%] lg:w-[38%]">
         <ValuePanel variant="reset-password" />
       </div>
 
       {/* Right — Content */}
-      <div className="flex-1 flex flex-col justify-center px-6 py-10 sm:px-12 lg:px-16 xl:px-20">
-        {/* Mobile-only logo */}
+      <div className="flex-1 flex flex-col justify-center lg:justify-start px-6 py-8 sm:px-10 lg:pl-6 lg:pr-10 lg:pt-28 xl:pl-8 xl:pr-14">
+        {/* Mobile-only compact trust banner */}
         <div className="md:hidden mb-8">
           <div className="flex items-center gap-2.5 mb-4">
             <div className="w-7 h-7 rounded-lg bg-[#00E5A0]/10 border border-[#00E5A0]/20 flex items-center justify-center">
@@ -124,9 +124,13 @@ export default function ResetPasswordContent() {
             </div>
             <span className="text-[var(--foreground)] font-semibold text-sm">Vizora</span>
           </div>
+          <p className="text-[var(--foreground-tertiary)] text-sm">
+            Create a new secure password.{' '}
+            <span className="text-[#00E5A0] font-medium">Your account security matters.</span>
+          </p>
         </div>
 
-        <div className="w-full max-w-md mx-auto md:mx-0">
+        <div className="w-full max-w-md lg:max-w-2xl mx-auto md:mx-0">
           {/* Loading state */}
           {pageState === 'loading' && (
             <div className="flex flex-col items-center justify-center py-16">
@@ -174,7 +178,7 @@ export default function ResetPasswordContent() {
               <h1 className="text-2xl sm:text-3xl font-bold text-[var(--foreground)] eh-heading mb-2 auth-field-enter">
                 Create new password
               </h1>
-              <p className="text-sm text-[var(--foreground-tertiary)] mb-8 auth-field-enter auth-field-enter-1">
+              <p className="text-sm text-[var(--foreground-tertiary)] mb-6 lg:mb-4 auth-field-enter auth-field-enter-1">
                 {maskedEmail ? (
                   <>Choose a strong password for <span className="text-[var(--foreground-secondary)] font-medium">{maskedEmail}</span>.</>
                 ) : (
@@ -198,7 +202,7 @@ export default function ResetPasswordContent() {
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+              <form onSubmit={handleSubmit} className="space-y-4 lg:space-y-3" noValidate>
                 <div className="auth-field-enter auth-field-enter-2">
                   <label htmlFor="newPassword" className="block text-[13px] font-semibold text-[var(--foreground-secondary)] mb-1.5">
                     New Password
@@ -263,7 +267,7 @@ export default function ResetPasswordContent() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full eh-btn-neon py-3 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none disabled:hover:shadow-none"
+                    className="w-full sm:w-auto sm:min-w-[220px] sm:mx-auto sm:block eh-btn-neon py-3 sm:px-12 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none disabled:hover:shadow-none"
                   >
                     {loading ? (
                       <span className="flex items-center justify-center gap-2">
@@ -280,7 +284,32 @@ export default function ResetPasswordContent() {
                 </div>
               </form>
 
-              <div className="mt-8 text-center auth-field-enter auth-field-enter-5">
+              {/* Trust signals */}
+              <div className="flex items-center justify-center gap-4 mt-4 lg:mt-3 text-[10px] text-[var(--foreground-tertiary)]">
+                <span className="flex items-center gap-1">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0110 0v4" />
+                  </svg>
+                  256-bit encrypted
+                </span>
+                <span className="text-[var(--border)]">|</span>
+                <span>Free 30-day trial</span>
+                <span className="text-[var(--border)]">|</span>
+                <span>5 screens included</span>
+              </div>
+
+              {/* Divider + back link */}
+              <div className="relative mt-6 lg:mt-4">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-[var(--border)]" />
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="bg-[var(--background)] px-3 text-[var(--foreground-tertiary)]">or</span>
+                </div>
+              </div>
+
+              <div className="mt-4 lg:mt-3 text-center auth-field-enter auth-field-enter-5">
                 <Link href="/login" className="text-sm text-[var(--foreground-secondary)] hover:text-[var(--primary)] transition-colors">
                   &larr; Back to Login
                 </Link>
