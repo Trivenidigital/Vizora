@@ -400,7 +400,14 @@ export class TemplateRenderingService {
 
     // Check for forbidden protocols in href/src attributes
     for (const protocol of this.FORBIDDEN_PROTOCOLS) {
-      if (lowerHtml.includes(protocol)) {
+      if (protocol === 'data:') {
+        // Allow data:image/* URIs (safe for embedded images/SVGs)
+        // Block data:text/html, data:application/*, etc.
+        const dataUriPattern = /data:(?!image\/)/i;
+        if (dataUriPattern.test(templateHtml)) {
+          errors.push(`Forbidden protocol found: ${protocol}`);
+        }
+      } else if (lowerHtml.includes(protocol)) {
         errors.push(`Forbidden protocol found: ${protocol}`);
       }
     }

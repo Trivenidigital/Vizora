@@ -299,13 +299,21 @@ describe('TemplateRenderingService', () => {
       expect(result.errors).toContain('Forbidden protocol found: javascript:');
     });
 
-    it('should detect data: protocol', () => {
+    it('should detect dangerous data: protocol (text/html)', () => {
       const template = '<a href="data:text/html,<script>alert(1)</script>">Click</a>';
 
       const result = service.validateTemplate(template);
 
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('Forbidden protocol found: data:');
+    });
+
+    it('should allow data:image/ URIs for embedded images', () => {
+      const template = '<img src="data:image/svg+xml;base64,PHN2Zy8+" />';
+
+      const result = service.validateTemplate(template);
+
+      expect(result.valid).toBe(true);
     });
 
     it('should detect vbscript: protocol', () => {
