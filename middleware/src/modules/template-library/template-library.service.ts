@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { Prisma } from '@vizora/database';
 import { DatabaseService } from '../database/database.service';
 import { TemplateRenderingService } from '../content/template-rendering.service';
@@ -6,6 +6,7 @@ import { SearchTemplatesDto } from './dto/search-templates.dto';
 import { CloneTemplateDto } from './dto/clone-template.dto';
 import { CreateTemplateDto } from './dto/create-template.dto';
 import { UpdateTemplateDto } from './dto/update-template.dto';
+import { PublishTemplateDto } from './dto/publish-template.dto';
 import { PaginatedResponse } from '../common/dto/pagination.dto';
 
 /**
@@ -212,6 +213,127 @@ export class TemplateLibraryService {
     });
 
     return this.mapTemplateResponse(cloned);
+  }
+
+  /**
+   * Publish rendered template HTML to one or more displays.
+   *
+   * Creates a Content record with the rendered HTML, then for each display:
+   * finds or creates a "Quick Publish" playlist, adds the content as an item,
+   * and assigns the playlist to the display.
+   */
+  async publishTemplate(
+    templateId: string,
+    dto: PublishTemplateDto,
+    organizationId: string,
+    userId: string,
+  ) {
+    // 1. Verify the source template exists
+    const template = await this.db.content.findFirst({
+      where: { id: templateId, type: 'template' },
+    });
+
+    if (!template) {
+      throw new NotFoundException('Template not found');
+    }
+
+    if (!dto.displayIds.length) {
+      throw new BadRequestException('At least one display ID is required');
+    }
+
+    // 2. Create the published content record
+    const content = await this.db.content.create({
+      data: {
+        name: dto.name,
+        type: 'html',
+        url: '', // Inline HTML content — no external URL
+        duration: dto.duration || 30,
+        metadata: {
+          htmlContent: dto.renderedHtml,
+          sourceTemplateId: templateId,
+          publishedBy: userId,
+          publishedAt: new Date().toISOString(),
+        } as Prisma.InputJsonValue,
+        status: 'active',
+        organizationId,
+        isGlobal: false,
+      },
+    });
+
+    // 3. Assign content to each display via playlists
+    let displayCount = 0;
+
+    for (const displayId of dto.displayIds) {
+      // Verify display belongs to this organization
+      const display = await this.db.display.findFirst({
+        where: { id: displayId, organizationId },
+      });
+
+      if (!display) {
+        this.logger.warn(
+          `Skipping display ${displayId}: not found or not in org ${organizationId}`,
+        );
+        continue;
+      }
+
+      // Find or create a "Quick Publish" playlist for this display
+      let playlist = await this.db.playlist.findFirst({
+        where: {
+          organizationId,
+          name: `Quick Publish - ${display.nickname || display.deviceIdentifier}`,
+        },
+      });
+
+      if (!playlist) {
+        playlist = await this.db.playlist.create({
+          data: {
+            name: `Quick Publish - ${display.nickname || display.deviceIdentifier}`,
+            description: 'Auto-created playlist for quick-published template content',
+            organizationId,
+          },
+        });
+      }
+
+      // Determine next order value for the playlist item
+      const lastItem = await this.db.playlistItem.findFirst({
+        where: { playlistId: playlist.id },
+        orderBy: { order: 'desc' },
+      });
+      const nextOrder = lastItem ? lastItem.order + 1 : 0;
+
+      // Add the content as a playlist item
+      await this.db.playlistItem.create({
+        data: {
+          playlistId: playlist.id,
+          contentId: content.id,
+          order: nextOrder,
+          duration: dto.duration || null,
+        },
+      });
+
+      // Assign this playlist to the display
+      await this.db.display.update({
+        where: { id: displayId },
+        data: { currentPlaylistId: playlist.id },
+      });
+
+      displayCount++;
+    }
+
+    // 4. Increment useCount on the source template
+    const templateMetadata = (template.metadata as Record<string, unknown>) || {};
+    const currentUseCount = ((templateMetadata.useCount as number) || 0) + 1;
+    await this.db.content.update({
+      where: { id: templateId },
+      data: {
+        metadata: {
+          ...templateMetadata,
+          useCount: currentUseCount,
+        } as Prisma.InputJsonValue,
+      },
+    });
+
+    return { contentId: content.id, displayCount };
   }
 
   /**

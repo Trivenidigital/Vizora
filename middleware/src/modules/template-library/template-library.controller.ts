@@ -21,6 +21,7 @@ import { SearchTemplatesDto } from './dto/search-templates.dto';
 import { CloneTemplateDto } from './dto/clone-template.dto';
 import { CreateTemplateDto } from './dto/create-template.dto';
 import { UpdateTemplateDto } from './dto/update-template.dto';
+import { PublishTemplateDto } from './dto/publish-template.dto';
 
 @UseGuards(RolesGuard)
 @Controller('template-library')
@@ -108,6 +109,18 @@ export class TemplateLibraryController {
     @Body() dto: CloneTemplateDto,
   ) {
     return this.templateLibraryService.clone(id, organizationId, dto);
+  }
+
+  @Post(':id/publish')
+  @Roles('admin', 'manager')
+  @HttpCode(HttpStatus.CREATED)
+  publish(
+    @Param('id') id: string,
+    @CurrentUser('organizationId') organizationId: string,
+    @CurrentUser('id') userId: string,
+    @Body() dto: PublishTemplateDto,
+  ) {
+    return this.templateLibraryService.publishTemplate(id, dto, organizationId, userId);
   }
 
   @Patch(':id/featured')
