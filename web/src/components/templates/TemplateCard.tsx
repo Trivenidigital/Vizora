@@ -11,6 +11,7 @@ interface TemplateCardProps {
   orientation?: string;
   thumbnailUrl?: string | null;
   previewImageUrl?: string | null;
+  templateHtml?: string | null;
   isFeatured?: boolean;
   useCount?: number;
   tags?: string[];
@@ -47,6 +48,7 @@ export default function TemplateCard({
   orientation,
   thumbnailUrl,
   previewImageUrl,
+  templateHtml,
   isFeatured,
   useCount,
   tags,
@@ -83,7 +85,7 @@ export default function TemplateCard({
           }}
         />
 
-        {/* Thumbnail image */}
+        {/* Thumbnail image or HTML preview */}
         {thumb && !imgError ? (
           <img
             src={thumb}
@@ -91,6 +93,17 @@ export default function TemplateCard({
             className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             onError={() => setImgError(true)}
           />
+        ) : templateHtml ? (
+          <div className="absolute inset-0 overflow-hidden">
+            <iframe
+              srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;overflow:hidden;background:#fff;}</style></head><body>${templateHtml}</body></html>`}
+              sandbox=""
+              tabIndex={-1}
+              className="w-[1920px] h-[1080px] origin-top-left pointer-events-none border-0"
+              style={{ transform: 'scale(0.16)', transformOrigin: 'top left' }}
+              title={`${name} preview`}
+            />
+          </div>
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="text-[var(--foreground-tertiary)] opacity-30">
