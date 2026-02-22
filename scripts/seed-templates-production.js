@@ -1,22 +1,35 @@
+#!/usr/bin/env node
 /**
- * CLI seed runner for template library
+ * Production template seeder
  *
- * Usage:
- *   npx ts-node middleware/src/modules/template-library/seed/seed-templates.command.ts
+ * Usage: node scripts/seed-templates-production.js [--clear]
  *
- * Options:
- *   --clear   Remove all existing library templates before seeding
+ * Uses the generated Prisma client directly (no @vizora/database resolution needed).
+ * Transpiles template-seeds.ts on-the-fly via ts-node/register.
  */
 
-import { PrismaClient } from '@vizora/database';
-import { allTemplateSeeds, categorySummary } from './template-seeds';
+// Register ts-node for importing .ts files
+require('ts-node').register({
+  transpileOnly: true,
+  compilerOptions: {
+    module: 'commonjs',
+    target: 'es2020',
+    esModuleInterop: true,
+    strict: false,
+    skipLibCheck: true,
+  },
+});
+
+const path = require('path');
+const { PrismaClient } = require(path.join(__dirname, '..', 'packages', 'database', 'src', 'generated', 'prisma'));
+const { allTemplateSeeds, categorySummary } = require(path.join(__dirname, '..', 'middleware', 'src', 'modules', 'template-library', 'seed', 'template-seeds'));
 
 async function main() {
   const prisma = new PrismaClient();
   const clearFirst = process.argv.includes('--clear');
 
   try {
-    console.log('Template Library Seeder');
+    console.log('Template Library Seeder (Production)');
     console.log('='.repeat(40));
     console.log(`Templates to seed: ${categorySummary.total}`);
     console.log(`Categories: ${Object.entries(categorySummary).filter(([k]) => k !== 'total').map(([k, v]) => `${k}(${v})`).join(', ')}`);
@@ -29,16 +42,6 @@ async function main() {
       console.log(`Deleted ${deleted.count} existing library templates.`);
     }
 
-    // Check for existing templates
-    const existing = await prisma.content.count({
-      where: { isGlobal: true, type: 'template' },
-    });
-
-    if (existing > 0 && !clearFirst) {
-      console.log(`\nFound ${existing} existing library templates. Use --clear to replace them.`);
-      console.log('Skipping seeds that already exist (by name)...');
-    }
-
     // Get existing template names to avoid duplicates
     const existingNames = new Set(
       (await prisma.content.findMany({
@@ -46,6 +49,12 @@ async function main() {
         select: { name: true },
       })).map((t) => t.name),
     );
+
+    const existing = existingNames.size;
+    if (existing > 0 && !clearFirst) {
+      console.log(`\nFound ${existing} existing library templates. Use --clear to replace them.`);
+      console.log('Skipping seeds that already exist (by name)...');
+    }
 
     let created = 0;
     let skipped = 0;
@@ -82,6 +91,9 @@ async function main() {
         },
       });
       created++;
+      if (created % 10 === 0) {
+        console.log(`  Created ${created} templates...`);
+      }
     }
 
     console.log(`\nDone! Created: ${created}, Skipped: ${skipped}`);
