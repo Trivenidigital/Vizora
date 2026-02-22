@@ -21,6 +21,7 @@ export interface LibraryTemplateMetadata {
   seasonalStart?: string;
   seasonalEnd?: string;
   difficulty?: 'beginner' | 'intermediate' | 'advanced';
+  useCount?: number;
   dataSource: {
     type: 'manual';
     manualData?: Record<string, any>;
@@ -181,6 +182,15 @@ export class TemplateLibraryService {
 
     const metadata = template.metadata as Record<string, unknown> | null;
 
+    // Increment useCount on the source template
+    const currentUseCount = ((metadata?.useCount as number) || 0) + 1;
+    await this.db.content.update({
+      where: { id },
+      data: {
+        metadata: { ...metadata, useCount: currentUseCount } as Prisma.InputJsonValue,
+      },
+    });
+
     // Create a copy in the user's org (not global)
     const cloned = await this.db.content.create({
       data: {
@@ -191,8 +201,9 @@ export class TemplateLibraryService {
         duration: template.duration,
         metadata: {
           ...metadata,
-          isLibraryTemplate: false, // Mark as user's own template
+          isLibraryTemplate: false,
           clonedFrom: id,
+          useCount: 0,
         },
         templateOrientation: template.templateOrientation,
         organizationId,
@@ -201,6 +212,75 @@ export class TemplateLibraryService {
     });
 
     return this.mapTemplateResponse(cloned);
+  }
+
+  /**
+   * Get popular templates sorted by useCount
+   */
+  async getPopular(limit = 20) {
+    const templates = await this.db.content.findMany({
+      where: {
+        isGlobal: true,
+        type: 'template',
+        status: 'active',
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 500,
+    });
+
+    // Sort by useCount (stored in metadata)
+    const sorted = templates.sort((a, b) => {
+      const metaA = a.metadata as Record<string, unknown> | null;
+      const metaB = b.metadata as Record<string, unknown> | null;
+      return ((metaB?.useCount as number) || 0) - ((metaA?.useCount as number) || 0);
+    });
+
+    return sorted.slice(0, limit).map((item) => this.mapTemplateResponse(item));
+  }
+
+  /**
+   * Get user's own templates (cloned + created, non-global, org-scoped)
+   */
+  async getUserTemplates(organizationId: string, dto: SearchTemplatesDto) {
+    const { page = 1, limit = 20, search } = dto;
+    const skip = (page - 1) * limit;
+
+    const where: any = {
+      organizationId,
+      type: 'template',
+      isGlobal: false,
+      status: 'active',
+    };
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [data, total] = await Promise.all([
+      this.db.content.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.db.content.count({ where }),
+    ]);
+
+    const mapped = data.map((item) => this.mapTemplateResponse(item));
+    return new PaginatedResponse(mapped, total, page, limit);
+  }
+
+  /**
+   * AI template generation (placeholder)
+   */
+  async aiGenerate(_prompt: string, _options?: { category?: string; orientation?: string; style?: string }) {
+    return {
+      available: false,
+      message: 'AI Designer is launching soon. We\'re training our AI to create stunning display templates.',
+    };
   }
 
   /**
@@ -432,6 +512,7 @@ export class TemplateLibraryService {
       libraryTags: metadata?.libraryTags || [],
       difficulty: metadata?.difficulty || 'beginner',
       isFeatured: metadata?.isFeatured || false,
+      useCount: (metadata?.useCount as number) || 0,
       previewImageUrl: metadata?.previewImageUrl,
       seasonalStart: metadata?.seasonalStart,
       seasonalEnd: metadata?.seasonalEnd,

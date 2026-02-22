@@ -419,6 +419,10 @@ export interface TemplateSummary {
   difficulty: string;
   tags: string[];
   isFeatured: boolean;
+  useCount?: number;
+  previewImageUrl?: string | null;
+  templateOrientation?: string | null;
+  libraryTags?: string[];
 }
 
 export interface TemplateDetail extends TemplateSummary {
@@ -428,6 +432,13 @@ export interface TemplateDetail extends TemplateSummary {
   previewUrl: string | null;
   createdAt: string;
   updatedAt: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface AIGenerateResponse {
+  available: boolean;
+  message?: string;
+  template?: TemplateSummary;
 }
 
 // Widget types

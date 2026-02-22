@@ -51,6 +51,30 @@ export class TemplateLibraryController {
     return this.templateLibraryService.getSeasonal();
   }
 
+  @Get('popular')
+  @Roles('admin', 'manager', 'viewer')
+  getPopular() {
+    return this.templateLibraryService.getPopular();
+  }
+
+  @Get('user-templates')
+  @Roles('admin', 'manager', 'viewer')
+  getUserTemplates(
+    @CurrentUser('organizationId') organizationId: string,
+    @Query() dto: SearchTemplatesDto,
+  ) {
+    return this.templateLibraryService.getUserTemplates(organizationId, dto);
+  }
+
+  @Post('ai-generate')
+  @Roles('admin', 'manager')
+  @HttpCode(HttpStatus.OK)
+  aiGenerate(
+    @Body() body: { prompt: string; category?: string; orientation?: string; style?: string },
+  ) {
+    return this.templateLibraryService.aiGenerate(body.prompt, body);
+  }
+
   @Post()
   @Roles('admin')
   @UseGuards(SuperAdminGuard)
