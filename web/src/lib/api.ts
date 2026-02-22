@@ -47,6 +47,7 @@ interface AuthUser {
   organization?: {
     name: string;
     subscriptionTier: string;
+    country?: string;
   };
 }
 
@@ -57,6 +58,7 @@ interface Organization {
   subscriptionTier: string;
   screenQuota: number;
   trialEndsAt: string;
+  country?: string;
 }
 
 interface LoginResponse {
@@ -317,6 +319,13 @@ class ApiClient {
 
   async getOrganization(): Promise<Organization> {
     return this.request<Organization>('/organizations/current');
+  }
+
+  async updateOrganization(id: string, data: Partial<{ name: string; country: string }>): Promise<Organization> {
+    return this.request<Organization>(`/organizations/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
   }
 
   async changePassword(data: { currentPassword: string; newPassword: string }): Promise<void> {

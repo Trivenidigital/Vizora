@@ -20,12 +20,16 @@ export default function SettingsPage() {
  timezone: 'America/New_York',
  defaultDuration: 30,
  notifications: true,
+ country: 'US',
+ organizationId: '',
  });
 
  // Change password modal state
  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
  const [passwordLoading, setPasswordLoading] = useState(false);
+
+ const [saving, setSaving] = useState(false);
 
  // Fetch real settings on mount
  useEffect(() => {
@@ -36,6 +40,8 @@ export default function SettingsPage() {
          ...prev,
          email: user.email || prev.email,
          organizationName: user.organization?.name || prev.organizationName,
+         organizationId: user.organizationId || prev.organizationId,
+         country: user.organization?.country || prev.country,
        }));
      } catch (err) {
        console.error('Failed to load settings:', err);
@@ -105,6 +111,22 @@ export default function SettingsPage() {
  onChange={(e) => setSettings({ ...settings, email: e.target.value })}
  className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
  />
+ </div>
+ <div>
+   <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
+     Region
+   </label>
+   <select
+     value={settings.country || 'US'}
+     onChange={(e) => setSettings({ ...settings, country: e.target.value })}
+     className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+   >
+     <option value="US">United States (USD)</option>
+     <option value="IN">India (INR)</option>
+   </select>
+   <p className="mt-2 text-xs text-[var(--foreground-tertiary)]">
+     Determines your billing currency and payment methods
+   </p>
  </div>
  </div>
  </div>
@@ -296,8 +318,29 @@ export default function SettingsPage() {
 
  {/* Save Button */}
  <div className="flex justify-end">
- <button className="px-6 py-3 text-sm font-medium text-white bg-[#00E5A0] text-[#061A21] hover:bg-[#00CC8E] dark:bg-[#00E5A0] text-[#061A21] dark:hover:bg-[#00E5A0] text-[#061A21] rounded-lg transition shadow-md">
- Save Changes
+ <button
+   onClick={async () => {
+     if (!settings.organizationId) {
+       toast.error('Organization not loaded yet');
+       return;
+     }
+     setSaving(true);
+     try {
+       await apiClient.updateOrganization(settings.organizationId, {
+         name: settings.organizationName,
+         country: settings.country,
+       });
+       toast.success('Settings saved successfully');
+     } catch (error: any) {
+       toast.error(error.message || 'Failed to save settings');
+     } finally {
+       setSaving(false);
+     }
+   }}
+   disabled={saving}
+   className="px-6 py-3 text-sm font-medium bg-[#00E5A0] text-[#061A21] hover:bg-[#00CC8E] dark:bg-[#00E5A0] dark:hover:bg-[#00CC8E] rounded-lg transition shadow-md disabled:opacity-50"
+ >
+   {saving ? 'Saving...' : 'Save Changes'}
  </button>
  </div>
 

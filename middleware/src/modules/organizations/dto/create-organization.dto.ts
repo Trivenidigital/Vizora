@@ -18,4 +18,8 @@ export class CreateOrganizationDto {
   @IsOptional()
   @IsObject()
   settings?: Record<string, any>;
+
+  @IsOptional()
+  @IsString()
+  country?: string;
 }
