@@ -20,6 +20,9 @@ export default function BillingPage() {
  const [loading, setLoading] = useState(true);
  const [actionLoading, setActionLoading] = useState(false);
  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
+ const [gstin, setGstin] = useState('');
+ const [gstinSaving, setGstinSaving] = useState(false);
+ const [orgId, setOrgId] = useState<string | null>(null);
 
  useEffect(() => {
  loadBillingData();
@@ -28,12 +31,17 @@ export default function BillingPage() {
  const loadBillingData = async () => {
  try {
  setLoading(true);
- const [subData, quotaData] = await Promise.all([
+ const [subData, quotaData, orgData] = await Promise.all([
  apiClient.getSubscriptionStatus(),
  apiClient.getQuotaUsage(),
+ apiClient.getOrganization(),
  ]);
  setSubscription(subData);
  setQuota(quotaData);
+ setOrgId(orgData.id);
+ if (orgData.gstin) {
+  setGstin(orgData.gstin);
+ }
  } catch (error: any) {
  toast.error(error.message || 'Failed to load billing information');
  } finally {
@@ -82,6 +90,19 @@ export default function BillingPage() {
  toast.error(error.message || 'Failed to reactivate subscription');
  } finally {
  setActionLoading(false);
+ }
+ };
+
+ const handleSaveGstin = async () => {
+ if (!orgId) return;
+ try {
+  setGstinSaving(true);
+  await apiClient.updateOrganization(orgId, { gstin });
+  toast.success('GSTIN saved successfully');
+ } catch (error: any) {
+  toast.error(error.message || 'Failed to save GSTIN');
+ } finally {
+  setGstinSaving(false);
  }
  };
 
@@ -239,6 +260,37 @@ export default function BillingPage() {
  </p>
  </div>
  </div>
+ </div>
+ )}
+
+ {/* GSTIN field for Indian organizations */}
+ {subscription?.paymentProvider === 'razorpay' && (
+ <div className="bg-[var(--surface)] rounded-lg shadow-md p-6">
+  <h3 className="text-lg font-semibold text-[var(--foreground)] mb-4">Tax Information</h3>
+  <div>
+   <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
+    GSTIN (GST Identification Number)
+   </label>
+   <input
+    type="text"
+    value={gstin}
+    onChange={(e) => setGstin(e.target.value.toUpperCase())}
+    placeholder="e.g., 22AAAAA0000A1Z5"
+    maxLength={15}
+    className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent font-mono"
+   />
+   <p className="mt-2 text-xs text-[var(--foreground-tertiary)]">
+    Required for GST-compliant invoices in India
+   </p>
+   <button
+    onClick={handleSaveGstin}
+    disabled={gstinSaving}
+    className="mt-3 px-4 py-2 text-sm font-medium bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition flex items-center gap-2"
+   >
+    {gstinSaving && <LoadingSpinner size="sm" />}
+    Save GSTIN
+   </button>
+  </div>
  </div>
  )}
 

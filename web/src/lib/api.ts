@@ -59,6 +59,7 @@ interface Organization {
   screenQuota: number;
   trialEndsAt: string;
   country?: string;
+  gstin?: string;
 }
 
 interface LoginResponse {
@@ -321,7 +322,7 @@ class ApiClient {
     return this.request<Organization>('/organizations/current');
   }
 
-  async updateOrganization(id: string, data: Partial<{ name: string; country: string }>): Promise<Organization> {
+  async updateOrganization(id: string, data: Partial<{ name: string; country: string; gstin: string }>): Promise<Organization> {
     return this.request<Organization>(`/organizations/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),

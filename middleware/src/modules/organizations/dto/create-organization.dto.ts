@@ -22,4 +22,8 @@ export class CreateOrganizationDto {
   @IsOptional()
   @IsString()
   country?: string;
+
+  @IsOptional()
+  @IsString()
+  gstin?: string;
 }

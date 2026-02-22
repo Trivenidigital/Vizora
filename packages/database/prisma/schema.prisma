@@ -27,6 +27,7 @@ model Organization {
   razorpaySubscriptionId String?
   paymentProvider        String?  // 'stripe' | 'razorpay'
   country                String?  // ISO 3166-1 alpha-2 (e.g., 'US', 'IN')
+  gstin                  String?  // GST Identification Number (India only)
   billingEmail           String?
   trialEndsAt            DateTime?
   subscriptionStatus     String   @default("trial") // trial, active, past_due, canceled
