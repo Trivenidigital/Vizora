@@ -1,5 +1,7 @@
 'use client';
 
+import { type ReactNode } from 'react';
+
 interface CategoryItem {
   name: string;
   count?: number;
@@ -26,7 +28,7 @@ interface TemplateSidebarProps {
   totalCount: number;
 }
 
-const ORIENTATIONS: { value: Orientation; label: string; icon: JSX.Element }[] = [
+const ORIENTATIONS: { value: Orientation; label: string; icon: ReactNode }[] = [
   {
     value: '',
     label: 'All',
