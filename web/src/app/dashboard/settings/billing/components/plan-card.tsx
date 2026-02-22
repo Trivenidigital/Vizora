@@ -7,11 +7,12 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 interface PlanCardProps {
   plan: Plan;
   onSelect: () => void;
+  onContactSales?: () => void;
   isCurrentPlan: boolean;
   isLoading?: boolean;
 }
 
-export function PlanCard({ plan, onSelect, isCurrentPlan, isLoading }: PlanCardProps) {
+export function PlanCard({ plan, onSelect, onContactSales, isCurrentPlan, isLoading }: PlanCardProps) {
   const formatPrice = (price: number, currency: string) => {
     if (currency === 'INR') {
       return new Intl.NumberFormat('en-IN', {
@@ -91,12 +92,12 @@ export function PlanCard({ plan, onSelect, isCurrentPlan, isLoading }: PlanCardP
 
       <div className="p-6 pt-0">
         {isEnterprise ? (
-          <a
-            href="mailto:sales@vizora.io?subject=Enterprise%20Plan%20Inquiry"
-            className="block w-full text-center py-3 px-4 bg-[var(--surface-hover)] text-[var(--foreground)] font-semibold rounded-lg hover:bg-[var(--border)] transition"
+          <button
+            onClick={onContactSales}
+            className="w-full py-3 px-4 bg-[var(--surface-hover)] text-[var(--foreground)] font-semibold rounded-lg hover:bg-[var(--border)] transition"
           >
             Contact Sales
-          </a>
+          </button>
         ) : isCurrentPlan ? (
           <button
             disabled

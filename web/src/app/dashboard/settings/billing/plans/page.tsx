@@ -49,6 +49,18 @@ export default function PlansPage() {
  }
  };
 
+ const [showContactModal, setShowContactModal] = useState(false);
+
+ const handleContactSales = async () => {
+   try {
+     await navigator.clipboard.writeText('sales@vizora.io');
+     toast.success('Email copied! Reach us at sales@vizora.io');
+   } catch {
+     // Clipboard failed, show modal as fallback
+   }
+   setShowContactModal(true);
+ };
+
  // Calculate yearly savings
  const getYearlySavings = (plan: Plan) => {
  if (plan.interval !== 'monthly' || plan.price === 0) return 0;
@@ -146,6 +158,7 @@ export default function PlansPage() {
  key={plan.id}
  plan={displayPlan}
  onSelect={() => handleSelectPlan(plan)}
+ onContactSales={handleContactSales}
  isCurrentPlan={plan.isCurrent}
  isLoading={checkoutLoading === plan.id}
  />
@@ -218,14 +231,62 @@ export default function PlansPage() {
  Contact our sales team for custom enterprise pricing and dedicated support.
  </p>
  </div>
- <a
- href="mailto:sales@vizora.io?subject=Enterprise%20Plan%20Inquiry"
+ <button
+ onClick={handleContactSales}
  className="px-6 py-3 bg-[var(--surface)] text-[#00E5A0] font-semibold rounded-lg hover:bg-[#00E5A0]/5 transition whitespace-nowrap"
  >
  Contact Sales
+ </button>
+ </div>
+ </div>
+
+ {/* Contact Sales Modal */}
+ {showContactModal && (
+ <div className="fixed inset-0 z-50 flex items-center justify-center">
+ <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowContactModal(false)} />
+ <div className="relative bg-[var(--surface)] rounded-xl border border-[var(--border)] w-full max-w-md mx-4 p-6 shadow-2xl animate-[fadeIn_0.15s_ease-out]">
+ <h3 className="font-[var(--font-sora)] text-lg font-semibold text-[var(--foreground)] mb-2">Contact Sales</h3>
+ <p className="text-sm text-[var(--foreground-secondary)] mb-4">
+ Get in touch with our sales team for custom enterprise pricing, dedicated support, and volume discounts.
+ </p>
+ <div className="bg-[var(--background)] rounded-lg p-4 mb-4">
+ <div className="flex items-center justify-between">
+ <div>
+ <div className="text-xs text-[var(--foreground-tertiary)] mb-1">Email</div>
+ <div className="text-[var(--foreground)] font-medium">sales@vizora.io</div>
+ </div>
+ <button
+ onClick={async () => {
+ try {
+ await navigator.clipboard.writeText('sales@vizora.io');
+ toast.success('Email copied to clipboard!');
+ } catch {
+ toast.error('Failed to copy — please copy manually');
+ }
+ }}
+ className="px-3 py-1.5 text-xs font-medium bg-[var(--surface-hover)] text-[var(--foreground)] rounded-lg hover:bg-[var(--border)] transition"
+ >
+ Copy
+ </button>
+ </div>
+ </div>
+ <div className="flex justify-end gap-2">
+ <button
+ onClick={() => setShowContactModal(false)}
+ className="px-4 py-2 text-sm font-medium text-[var(--foreground-secondary)] rounded-lg hover:bg-[var(--surface-hover)] transition"
+ >
+ Close
+ </button>
+ <a
+ href="mailto:sales@vizora.io?subject=Enterprise%20Plan%20Inquiry"
+ className="px-5 py-2 text-sm font-semibold bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition"
+ >
+ Open Email Client
  </a>
  </div>
  </div>
+ </div>
+ )}
  </div>
  );
 }
