@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&family=Nunito+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      font-family: 'Nunito Sans', 'Segoe UI', Arial, sans-serif;
+      color: #3e2723;
+    }
+
+    /* Kraft paper background with texture simulation */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background:
+        /* Paper grain effect */
+        repeating-linear-gradient(
+          0deg,
+          transparent,
+          transparent 2px,
+          rgba(62, 39, 35, 0.015) 2px,
+          rgba(62, 39, 35, 0.015) 4px
+        ),
+        repeating-linear-gradient(
+          90deg,
+          transparent,
+          transparent 3px,
+          rgba(62, 39, 35, 0.01) 3px,
+          rgba(62, 39, 35, 0.01) 6px
+        ),
+        /* Warm gradient base */
+        radial-gradient(ellipse at 20% 20%, #faf3e0 0%, transparent 70%),
+        radial-gradient(ellipse at 80% 80%, #f5e6c8 0%, transparent 60%),
+        radial-gradient(ellipse at 50% 50%, #faf3e0 0%, #f0dfc0 100%);
+      z-index: 0;
+    }
+
+    /* Decorative wheat/grain stalks - left side */
+    .wheat-left {
+      position: absolute;
+      top: 120px;
+      left: 40px;
+      z-index: 1;
+      opacity: 0.15;
+    }
+
+    .wheat-left::before {
+      content: '';
+      display: block;
+      width: 4px;
+      height: 500px;
+      background: linear-gradient(to top, #8d6e63, #d4a574);
+      border-radius: 2px;
+      transform: rotate(-5deg);
+    }
+
+    .wheat-left::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -12px;
+      width: 28px;
+      height: 80px;
+      background: radial-gradient(ellipse, #c8a06e, transparent);
+      border-radius: 50%;
+      transform: rotate(-15deg);
+    }
+
+    /* Decorative wheat - right side */
+    .wheat-right {
+      position: absolute;
+      top: 180px;
+      right: 50px;
+      z-index: 1;
+      opacity: 0.12;
+    }
+
+    .wheat-right::before {
+      content: '';
+      display: block;
+      width: 4px;
+      height: 420px;
+      background: linear-gradient(to top, #8d6e63, #d4a574);
+      border-radius: 2px;
+      transform: rotate(4deg);
+    }
+
+    /* Subtle border frame */
+    .frame {
+      position: absolute;
+      top: 20px; left: 20px; right: 20px; bottom: 20px;
+      border: 2px solid rgba(62, 39, 35, 0.12);
+      border-radius: 12px;
+      z-index: 0;
+    }
+
+    .frame::before {
+      content: '';
+      position: absolute;
+      top: 6px; left: 6px; right: 6px; bottom: 6px;
+      border: 1px solid rgba(62, 39, 35, 0.06);
+      border-radius: 8px;
+    }
+
+    /* Header */
+    .header {
+      position: relative;
+      z-index: 2;
+      text-align: center;
+      padding: 40px 0 10px;
+    }
+
+    .bakery-name {
+      font-family: 'Caveat', cursive, sans-serif;
+      font-size: 96px;
+      font-weight: 700;
+      color: #3e2723;
+      line-height: 1;
+      letter-spacing: 2px;
+    }
+
+    .bakery-name::before {
+      content: '';
+      display: inline-block;
+      width: 120px;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, #d4a574, transparent);
+      vertical-align: middle;
+      margin-right: 24px;
+    }
+
+    .bakery-name::after {
+      content: '';
+      display: inline-block;
+      width: 120px;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, #d4a574, transparent);
+      vertical-align: middle;
+      margin-left: 24px;
+    }
+
+    .tagline {
+      font-family: 'Caveat', cursive, sans-serif;
+      font-size: 44px;
+      color: #8d6e63;
+      margin-top: 0;
+      font-weight: 500;
+    }
+
+    /* Main content grid */
+    .menu-grid {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      gap: 32px;
+      padding: 24px 64px 40px;
+      height: 830px;
+    }
+
+    .menu-section {
+      background: rgba(255, 255, 255, 0.45);
+      border-radius: 16px;
+      padding: 24px 28px;
+      border: 1px solid rgba(212, 165, 116, 0.3);
+      position: relative;
+      backdrop-filter: blur(2px);
+    }
+
+    .menu-section::before {
+      content: '';
+      position: absolute;
+      top: -1px; left: 20%; right: 20%;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, #d4a574, transparent);
+      border-radius: 0 0 2px 2px;
+    }
+
+    .section-emoji {
+      font-size: 40px;
+      text-align: center;
+      margin-bottom: 4px;
+      line-height: 1;
+    }
+
+    .section-title {
+      font-family: 'Caveat', cursive, sans-serif;
+      font-size: 46px;
+      font-weight: 700;
+      color: #3e2723;
+      text-align: center;
+      margin-bottom: 14px;
+      line-height: 1.1;
+    }
+
+    .section-divider {
+      width: 50px;
+      height: 2px;
+      background: #d4a574;
+      margin: 0 auto 14px;
+      border-radius: 1px;
+    }
+
+    .menu-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 7px 0;
+      border-bottom: 1px dotted rgba(62, 39, 35, 0.15);
+    }
+
+    .menu-item:last-child {
+      border-bottom: none;
+    }
+
+    .item-name {
+      font-size: 28px;
+      font-weight: 600;
+      color: #3e2723;
+      flex: 1;
+    }
+
+    .item-price {
+      font-size: 28px;
+      font-weight: 700;
+      color: #8d6e63;
+      white-space: nowrap;
+      margin-left: 12px;
+      font-family: 'Nunito Sans', sans-serif;
+    }
+
+    .item-desc {
+      font-size: 22px;
+      color: #795548;
+      font-weight: 400;
+      margin-top: 2px;
+      line-height: 1.3;
+    }
+
+    /* Sandwich section has descriptions */
+    .menu-item-detailed {
+      padding: 9px 0;
+      border-bottom: 1px dotted rgba(62, 39, 35, 0.15);
+    }
+
+    .menu-item-detailed:last-child {
+      border-bottom: none;
+    }
+
+    .menu-item-detailed .item-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+
+    /* Decorative corner flourishes */
+    .corner-tl, .corner-br {
+      position: absolute;
+      width: 60px;
+      height: 60px;
+      z-index: 1;
+      opacity: 0.2;
+    }
+
+    .corner-tl {
+      top: 32px;
+      left: 32px;
+      border-top: 3px solid #8d6e63;
+      border-left: 3px solid #8d6e63;
+      border-radius: 8px 0 0 0;
+    }
+
+    .corner-br {
+      bottom: 32px;
+      right: 32px;
+      border-bottom: 3px solid #8d6e63;
+      border-right: 3px solid #8d6e63;
+      border-radius: 0 0 8px 0;
+    }
+
+    /* Subtle floating animation for decorative elements */
+    @keyframes floatGentle {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-6px); }
+    }
+
+    .float-emoji {
+      position: absolute;
+      z-index: 1;
+      font-size: 48px;
+      opacity: 0.12;
+      animation: floatGentle 6s ease-in-out infinite;
+    }
+
+    .float-emoji.fe1 { top: 160px; left: 80px; animation-delay: 0s; }
+    .float-emoji.fe2 { top: 500px; right: 75px; animation-delay: 2s; }
+    .float-emoji.fe3 { bottom: 80px; left: 120px; animation-delay: 4s; }
+    .float-emoji.fe4 { bottom: 120px; right: 160px; animation-delay: 1s; }
+  </style>
+</head>
+<body>
+  <div class="frame"></div>
+  <div class="wheat-left"></div>
+  <div class="wheat-right"></div>
+  <div class="corner-tl"></div>
+  <div class="corner-br"></div>
+
+  <div class="float-emoji fe1">🌾</div>
+  <div class="float-emoji fe2">🥐</div>
+  <div class="float-emoji fe3">🍞</div>
+  <div class="float-emoji fe4">🧁</div>
+
+  <header class="header">
+    <div class="bakery-name" data-editable="true" data-field="bakery_name">Flour &amp; Fold</div>
+    <div class="tagline" data-editable="true" data-field="tagline">Freshly Baked Daily</div>
+  </header>
+
+  <div class="menu-grid">
+    <!-- MORNING PASTRIES -->
+    <div class="menu-section">
+      <div class="section-emoji">🥐</div>
+      <div class="section-title" data-editable="true" data-field="section1_title">Morning Pastries</div>
+      <div class="section-divider"></div>
+
+      <div class="menu-item">
+        <span class="item-name" data-editable="true" data-field="pastry1_name">Butter Croissant</span>
+        <span class="item-price" data-editable="true" data-field="pastry1_price">$3.75</span>
+      </div>
+      <div class="menu-item">
+        <span class="item-name" data-editable="true" data-field="pastry2_name">Pain au Chocolat</span>
+        <span class="item-price" data-editable="true" data-field="pastry2_price">$4.25</span>
+      </div>
+      <div class="menu-item">
+        <span class="item-name" data-editable="true" data-field="pastry3_name">Almond Croissant</span>
+        <span class="item-price" data-editable="true" data-field="pastry3_price">$4.75</span>
+      </div>
+      <div class="menu-item">
+        <span class="item-name" data-editable="true" data-field="pastry4_name">Danish (Seasonal)</span>
+        <span class="item-price" data-editable="true" data-field="pastry4_price">$4.50</span>
+      </div>
+      <div class="menu-item">
+        <span class="item-name" data-editable="true" data-field="pastry5_name">Scone (Blueberry or Cranberry)</span>
+        <span class="item-price" data-editable="true" data-field="pastry5_price">$3.50</span>
+      </div>
+    </div>
+
+    <!-- ARTISAN BREADS -->
+    <div class="menu-section">
+      <div class="section-emoji">🍞</div>
+      <div class="section-title" data-editable="true" data-field="section2_title">Artisan Breads</div>
+      <div class="section-divider"></div>
+
+      <div class="menu-item">
+        <span class="item-name" data-editable="true" data-field="bread1_name">Sourdough Boule</span>
+        <span class="item-price" data-editable="true" data-field="bread1_price">$7.50</span>
+      </div>
+      <div class="menu-item">
+        <span class="item-name" data-editable="true" data-field="bread2_name">Multigrain Loaf</span>
+        <span class="item-price" data-editable="true" data-field="bread2_price">$6.50</span>
+      </div>
+      <div class="menu-item">
+        <span class="item-name" data-editable="true" data-field="bread3_name">Olive Focaccia</span>
+        <span class="item-price" data-editable="true" data-field="bread3_price">$8.00</span>
+      </div>
+      <div class="menu-item">
+        <span class="item-name" data-editable="true" data-field="bread4_name">Baguette</span>
+        <span class="item-price" data-editable="true" data-field="bread4_price">$4.00</span>
+      </div>
+      <div class="menu-item">
+        <span class="item-name" data-editable="true" data-field="bread5_name">Ciabatta</span>
+        <span class="item-price" data-editable="true" data-field="bread5_price">$5.00</span>
+      </div>
+    </div>
+
+    <!-- SANDWICHES -->
+    <div class="menu-section">
+      <div class="section-emoji">🥪</div>
+      <div class="section-title" data-editable="true" data-field="section3_title">Sandwiches</div>
+      <div class="section-divider"></div>
+
+      <div class="menu-item-detailed">
+        <div class="item-row">
+          <span class="item-name" data-editable="true" data-field="sand1_name">Turkey &amp; Brie</span>
+          <span class="item-price" data-editable="true" data-field="sand1_price">$12.50</span>
+        </div>
+        <div class="item-desc" data-editable="true" data-field="sand1_desc">Smoked turkey, brie, fig jam, arugula on ciabatta</div>
+      </div>
+      <div class="menu-item-detailed">
+        <div class="item-row">
+          <span class="item-name" data-editable="true" data-field="sand2_name">Caprese</span>
+          <span class="item-price" data-editable="true" data-field="sand2_price">$11.00</span>
+        </div>
+        <div class="item-desc" data-editable="true" data-field="sand2_desc">Fresh mozzarella, tomato, basil, pesto on focaccia</div>
+      </div>
+      <div class="menu-item-detailed">
+        <div class="item-row">
+          <span class="item-name" data-editable="true" data-field="sand3_name">Ham &amp; Gruyere</span>
+          <span class="item-price" data-editable="true" data-field="sand3_price">$11.50</span>
+        </div>
+        <div class="item-desc" data-editable="true" data-field="sand3_desc">Black forest ham, gruyere, dijon on baguette</div>
+      </div>
+    </div>
+
+    <!-- SWEET TREATS -->
+    <div class="menu-section">
+      <div class="section-emoji">🧁</div>
+      <div class="section-title" data-editable="true" data-field="section4_title">Sweet Treats</div>
+      <div class="section-divider"></div>
+
+      <div class="menu-item">
+        <span class="item-name" data-editable="true" data-field="sweet1_name">Macarons (3pc)</span>
+        <span class="item-price" data-editable="true" data-field="sweet1_price">$6.00</span>
+      </div>
+      <div class="menu-item">
+        <span class="item-name" data-editable="true" data-field="sweet2_name">Chocolate Eclair</span>
+        <span class="item-price" data-editable="true" data-field="sweet2_price">$5.50</span>
+      </div>
+      <div class="menu-item">
+        <span class="item-name" data-editable="true" data-field="sweet3_name">Fruit Tart</span>
+        <span class="item-price" data-editable="true" data-field="sweet3_price">$6.50</span>
+      </div>
+      <div class="menu-item">
+        <span class="item-name" data-editable="true" data-field="sweet4_name">Carrot Cake Slice</span>
+        <span class="item-price" data-editable="true" data-field="sweet4_price">$5.00</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

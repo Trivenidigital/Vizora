@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      font-family: 'Poppins', 'Segoe UI', sans-serif;
+      background: #fff8e7;
+      color: #3d2c1e;
+    }
+
+    /* Sunrise gradient header */
+    .sunrise-bar {
+      width: 100%;
+      height: 180px;
+      background: linear-gradient(180deg,
+        #f7941d 0%,
+        #f9b44a 30%,
+        #fcd785 60%,
+        #fff3d6 85%,
+        #fff8e7 100%
+      );
+      position: relative;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 28px;
+    }
+    .sunrise-bar::before {
+      content: '';
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 260px;
+      height: 130px;
+      background: radial-gradient(ellipse at center bottom, rgba(247,148,29,0.25) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+
+    .header-content {
+      text-align: center;
+      position: relative;
+      z-index: 1;
+    }
+    .sun-emoji {
+      font-size: 48px;
+      display: block;
+      margin-bottom: 4px;
+      filter: drop-shadow(0 2px 8px rgba(247,148,29,0.5));
+    }
+    .restaurant-name {
+      font-family: 'Quicksand', 'Verdana', sans-serif;
+      font-size: 62px;
+      font-weight: 700;
+      color: #3d2c1e;
+      line-height: 1;
+      letter-spacing: -1px;
+    }
+    .serving-time {
+      font-family: 'Poppins', sans-serif;
+      font-size: 30px;
+      font-weight: 600;
+      color: #a0622a;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    /* Main content area */
+    .menu-content {
+      display: flex;
+      gap: 0;
+      padding: 20px 56px 28px;
+      height: calc(1080px - 180px);
+    }
+
+    /* Each menu section */
+    .menu-section {
+      flex: 1;
+      padding: 0 28px;
+      display: flex;
+      flex-direction: column;
+    }
+    .menu-section:not(:last-child) {
+      border-right: 2px solid rgba(243,156,18,0.15);
+    }
+
+    /* Section beverage is narrower */
+    .menu-section.beverages {
+      flex: 0.75;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 18px;
+      padding-bottom: 12px;
+      border-bottom: 3px solid;
+    }
+    .section-emoji {
+      font-size: 40px;
+    }
+    .section-title {
+      font-family: 'Quicksand', sans-serif;
+      font-size: 34px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    /* Color coding per section */
+    .section-eggs .section-header {
+      border-color: #e74c3c;
+    }
+    .section-eggs .section-title { color: #c0392b; }
+    .section-eggs .item-price { color: #c0392b; }
+
+    .section-pancakes .section-header {
+      border-color: #f39c12;
+    }
+    .section-pancakes .section-title { color: #d68910; }
+    .section-pancakes .item-price { color: #d68910; }
+
+    .section-beverages .section-header {
+      border-color: #27ae60;
+    }
+    .section-beverages .section-title { color: #1e8449; }
+    .section-beverages .item-price { color: #1e8449; }
+
+    /* Menu items */
+    .menu-item {
+      padding: 12px 0;
+      border-bottom: 1px dashed rgba(61,44,30,0.1);
+    }
+    .menu-item:last-child {
+      border-bottom: none;
+    }
+    .item-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+    .item-name {
+      font-family: 'Quicksand', sans-serif;
+      font-size: 30px;
+      font-weight: 700;
+      color: #3d2c1e;
+      line-height: 1.2;
+    }
+    .item-dots {
+      flex: 1;
+      margin: 0 10px;
+      border-bottom: 2px dotted rgba(61,44,30,0.15);
+      min-width: 24px;
+      position: relative;
+      top: -6px;
+    }
+    .item-price {
+      font-family: 'Quicksand', sans-serif;
+      font-size: 32px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .item-desc {
+      font-size: 28px;
+      color: #8b7355;
+      font-weight: 500;
+      margin-top: 2px;
+      line-height: 1.2;
+    }
+
+    /* Beverage items are simpler */
+    .bev-item {
+      display: flex;
+      align-items: baseline;
+      padding: 16px 0;
+      border-bottom: 1px dashed rgba(61,44,30,0.1);
+    }
+    .bev-item:last-child {
+      border-bottom: none;
+    }
+    .bev-name {
+      font-family: 'Quicksand', sans-serif;
+      font-size: 30px;
+      font-weight: 700;
+      color: #3d2c1e;
+    }
+    .bev-dots {
+      flex: 1;
+      margin: 0 10px;
+      border-bottom: 2px dotted rgba(61,44,30,0.15);
+      min-width: 16px;
+      position: relative;
+      top: -6px;
+    }
+    .bev-price {
+      font-family: 'Quicksand', sans-serif;
+      font-size: 32px;
+      font-weight: 700;
+      color: #1e8449;
+      flex-shrink: 0;
+    }
+    .bev-note {
+      font-size: 28px;
+      color: #8b7355;
+      font-weight: 500;
+      display: block;
+      margin-top: -2px;
+    }
+
+    /* Decorative corner ornaments */
+    .corner-ornament {
+      position: fixed;
+      font-size: 80px;
+      opacity: 0.06;
+      pointer-events: none;
+    }
+    .corner-ornament.tl { top: 190px; left: 20px; }
+    .corner-ornament.tr { top: 190px; right: 20px; }
+    .corner-ornament.bl { bottom: 16px; left: 20px; }
+    .corner-ornament.br { bottom: 16px; right: 20px; }
+
+    /* Subtle wave decoration at bottom */
+    .wave-decor {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 6px;
+      background: linear-gradient(90deg, #e74c3c, #f39c12, #27ae60, #f39c12, #e74c3c);
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+  <!-- Sunrise gradient header -->
+  <div class="sunrise-bar">
+    <div class="header-content">
+      <span class="sun-emoji">&#9728;&#65039;</span>
+      <h1 class="restaurant-name" data-editable="true" data-field="restaurant_name">Morning Glory Kitchen</h1>
+      <div class="serving-time" data-editable="true" data-field="serving_time">Served 7 AM &#8211; 11 AM</div>
+    </div>
+  </div>
+
+  <!-- Menu Content -->
+  <div class="menu-content">
+    <!-- Eggs & Omelettes -->
+    <div class="menu-section section-eggs">
+      <div class="section-header">
+        <span class="section-emoji">&#127859;</span>
+        <span class="section-title" data-editable="true" data-field="section1_title">Eggs &amp; Omelettes</span>
+      </div>
+
+      <div class="menu-item">
+        <div class="item-top">
+          <span class="item-name" data-editable="true" data-field="egg1_name">Classic Eggs Benedict</span>
+          <span class="item-dots"></span>
+          <span class="item-price" data-editable="true" data-field="egg1_price">$14.95</span>
+        </div>
+        <div class="item-desc" data-editable="true" data-field="egg1_desc">Poached eggs, Canadian bacon, hollandaise, English muffin</div>
+      </div>
+
+      <div class="menu-item">
+        <div class="item-top">
+          <span class="item-name" data-editable="true" data-field="egg2_name">Western Omelette</span>
+          <span class="item-dots"></span>
+          <span class="item-price" data-editable="true" data-field="egg2_price">$12.95</span>
+        </div>
+        <div class="item-desc" data-editable="true" data-field="egg2_desc">Ham, peppers, onions, cheddar cheese</div>
+      </div>
+
+      <div class="menu-item">
+        <div class="item-top">
+          <span class="item-name" data-editable="true" data-field="egg3_name">Avocado Toast</span>
+          <span class="item-dots"></span>
+          <span class="item-price" data-editable="true" data-field="egg3_price">$13.50</span>
+        </div>
+        <div class="item-desc" data-editable="true" data-field="egg3_desc">Sourdough, smashed avocado, poached eggs, everything seasoning</div>
+      </div>
+
+      <div class="menu-item">
+        <div class="item-top">
+          <span class="item-name" data-editable="true" data-field="egg4_name">Huevos Rancheros</span>
+          <span class="item-dots"></span>
+          <span class="item-price" data-editable="true" data-field="egg4_price">$13.95</span>
+        </div>
+        <div class="item-desc" data-editable="true" data-field="egg4_desc">Fried eggs, black beans, salsa verde, tortilla, cotija</div>
+      </div>
+    </div>
+
+    <!-- Pancakes & Waffles -->
+    <div class="menu-section section-pancakes">
+      <div class="section-header">
+        <span class="section-emoji">&#129374;</span>
+        <span class="section-title" data-editable="true" data-field="section2_title">Pancakes &amp; Waffles</span>
+      </div>
+
+      <div class="menu-item">
+        <div class="item-top">
+          <span class="item-name" data-editable="true" data-field="pan1_name">Buttermilk Stack (3)</span>
+          <span class="item-dots"></span>
+          <span class="item-price" data-editable="true" data-field="pan1_price">$11.95</span>
+        </div>
+        <div class="item-desc" data-editable="true" data-field="pan1_desc">Classic buttermilk pancakes, maple syrup, whipped butter</div>
+      </div>
+
+      <div class="menu-item">
+        <div class="item-top">
+          <span class="item-name" data-editable="true" data-field="pan2_name">Belgian Waffle</span>
+          <span class="item-dots"></span>
+          <span class="item-price" data-editable="true" data-field="pan2_price">$12.95</span>
+        </div>
+        <div class="item-desc" data-editable="true" data-field="pan2_desc">Crispy waffle, fresh berries, whipped cream</div>
+      </div>
+
+      <div class="menu-item">
+        <div class="item-top">
+          <span class="item-name" data-editable="true" data-field="pan3_name">Banana Foster French Toast</span>
+          <span class="item-dots"></span>
+          <span class="item-price" data-editable="true" data-field="pan3_price">$14.50</span>
+        </div>
+        <div class="item-desc" data-editable="true" data-field="pan3_desc">Brioche, caramelized bananas, pecans, cinnamon</div>
+      </div>
+
+      <div class="menu-item">
+        <div class="item-top">
+          <span class="item-name" data-editable="true" data-field="pan4_name">Lemon Ricotta Pancakes</span>
+          <span class="item-dots"></span>
+          <span class="item-price" data-editable="true" data-field="pan4_price">$13.50</span>
+        </div>
+        <div class="item-desc" data-editable="true" data-field="pan4_desc">Light, fluffy, lemon zest, blueberry compote</div>
+      </div>
+    </div>
+
+    <!-- Beverages -->
+    <div class="menu-section beverages section-beverages">
+      <div class="section-header">
+        <span class="section-emoji">&#9749;</span>
+        <span class="section-title" data-editable="true" data-field="section3_title">Beverages</span>
+      </div>
+
+      <div class="bev-item">
+        <span class="bev-name" data-editable="true" data-field="bev1_name">Fresh Squeezed OJ</span>
+        <span class="bev-dots"></span>
+        <span class="bev-price" data-editable="true" data-field="bev1_price">$5.00</span>
+      </div>
+
+      <div class="bev-item">
+        <div>
+          <span class="bev-name" data-editable="true" data-field="bev2_name">Coffee</span>
+          <span class="bev-note" data-editable="true" data-field="bev2_note">Unlimited Refills</span>
+        </div>
+        <span class="bev-dots"></span>
+        <span class="bev-price" data-editable="true" data-field="bev2_price">$3.50</span>
+      </div>
+
+      <div class="bev-item">
+        <span class="bev-name" data-editable="true" data-field="bev3_name">Mimosa</span>
+        <span class="bev-dots"></span>
+        <span class="bev-price" data-editable="true" data-field="bev3_price">$8.00</span>
+      </div>
+
+      <div class="bev-item">
+        <span class="bev-name" data-editable="true" data-field="bev4_name">Smoothie of the Day</span>
+        <span class="bev-dots"></span>
+        <span class="bev-price" data-editable="true" data-field="bev4_price">$7.50</span>
+      </div>
+
+      <!-- Extra info box -->
+      <div style="margin-top: auto; background: linear-gradient(135deg, rgba(39,174,96,0.08), rgba(243,156,18,0.08)); border-radius: 16px; padding: 20px 24px; text-align: center;">
+        <div style="font-family: 'Quicksand', sans-serif; font-size: 28px; font-weight: 700; color: #d68910;" data-editable="true" data-field="promo_line1">Weekend Brunch Special</div>
+        <div style="font-size: 28px; color: #8b7355; font-weight: 500; margin-top: 4px;" data-editable="true" data-field="promo_line2">Bottomless Mimosas $18</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Decorative corners -->
+  <div class="corner-ornament tl">&#127774;</div>
+  <div class="corner-ornament tr">&#129374;</div>
+  <div class="corner-ornament bl">&#127859;</div>
+  <div class="corner-ornament br">&#9749;</div>
+
+  <!-- Bottom color bar -->
+  <div class="wave-decor"></div>
+</body>
+</html>

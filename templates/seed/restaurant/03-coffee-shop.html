@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;400;600;700&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      font-family: 'Source Sans 3', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      color: #3c2415;
+      background:
+        /* Subtle noise texture */
+        radial-gradient(ellipse at 30% 20%, rgba(111,78,55,0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 70% 80%, rgba(111,78,55,0.06) 0%, transparent 50%),
+        /* Main warm gradient */
+        linear-gradient(
+          135deg,
+          #faf7f2 0%,
+          #f5f0e1 25%,
+          #efe5d0 50%,
+          #f2ead8 75%,
+          #faf7f2 100%
+        );
+    }
+
+    /* Decorative coffee bean circles */
+    .bean {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .bean-1 {
+      width: 180px;
+      height: 180px;
+      top: -40px;
+      right: 120px;
+      background: radial-gradient(circle, rgba(60,36,21,0.06), rgba(60,36,21,0.02) 60%, transparent 70%);
+    }
+
+    .bean-2 {
+      width: 120px;
+      height: 120px;
+      bottom: 40px;
+      left: 60px;
+      background: radial-gradient(circle, rgba(111,78,55,0.06), rgba(111,78,55,0.02) 60%, transparent 70%);
+    }
+
+    .bean-3 {
+      width: 90px;
+      height: 90px;
+      top: 200px;
+      left: 40px;
+      background: radial-gradient(circle, rgba(60,36,21,0.05), transparent 70%);
+    }
+
+    .bean-4 {
+      width: 150px;
+      height: 150px;
+      bottom: -30px;
+      right: 200px;
+      background: radial-gradient(circle, rgba(111,78,55,0.05), transparent 70%);
+    }
+
+    .bean-5 {
+      width: 70px;
+      height: 70px;
+      top: 100px;
+      right: 50px;
+      background: radial-gradient(circle, rgba(60,36,21,0.04), transparent 70%);
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      padding: 48px 80px 40px;
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    .shop-name {
+      font-family: 'Josefin Sans', 'Segoe UI', sans-serif;
+      font-size: 82px;
+      font-weight: 700;
+      color: #3c2415;
+      letter-spacing: 6px;
+      line-height: 1;
+    }
+
+    .shop-name .ampersand {
+      font-weight: 300;
+      color: #6f4e37;
+      font-style: normal;
+    }
+
+    .tagline {
+      font-family: 'Source Sans 3', 'Segoe UI', sans-serif;
+      font-size: 28px;
+      font-style: italic;
+      color: #6f4e37;
+      letter-spacing: 6px;
+      margin-top: 6px;
+      text-transform: uppercase;
+    }
+
+    .header-divider {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      margin-top: 22px;
+    }
+
+    .header-divider .line {
+      flex: 1;
+      max-width: 500px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #6f4e37 30%, #6f4e37 70%, transparent);
+      opacity: 0.3;
+    }
+
+    .header-divider .icon {
+      font-size: 36px;
+      line-height: 1;
+    }
+
+    /* Menu sections */
+    .menu-body {
+      flex: 1;
+      display: flex;
+      gap: 0;
+      padding-top: 20px;
+    }
+
+    .menu-section {
+      flex: 1;
+      padding: 0 50px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .menu-section:not(:last-child) {
+      border-right: 2px solid rgba(60,36,21,0.08);
+    }
+
+    .section-header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .section-icon {
+      font-size: 36px;
+      margin-bottom: 6px;
+      display: block;
+    }
+
+    .section-title {
+      font-family: 'Josefin Sans', 'Segoe UI', sans-serif;
+      font-size: 40px;
+      font-weight: 700;
+      color: #3c2415;
+      letter-spacing: 8px;
+      text-transform: uppercase;
+    }
+
+    .section-underline {
+      width: 60px;
+      height: 3px;
+      background: #6f4e37;
+      margin: 10px auto 0;
+      border-radius: 2px;
+      opacity: 0.5;
+    }
+
+    .items-list {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      gap: 14px;
+    }
+
+    .menu-item {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .item-name {
+      font-family: 'Source Sans 3', 'Segoe UI', sans-serif;
+      font-size: 30px;
+      font-weight: 600;
+      color: #3c2415;
+      white-space: nowrap;
+    }
+
+    .item-dots {
+      flex: 1;
+      border-bottom: 2px dotted rgba(111,78,55,0.3);
+      margin-bottom: 7px;
+      min-width: 20px;
+    }
+
+    .item-price {
+      font-family: 'Source Sans 3', 'Segoe UI', sans-serif;
+      font-size: 30px;
+      font-weight: 600;
+      color: #6f4e37;
+      white-space: nowrap;
+    }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      padding-top: 20px;
+    }
+
+    .footer-divider {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 15px;
+      margin-bottom: 14px;
+    }
+
+    .footer-divider .line {
+      flex: 1;
+      max-width: 600px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(60,36,21,0.15), transparent);
+    }
+
+    .footer-divider .bean-icon {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #6f4e37;
+      opacity: 0.3;
+    }
+
+    .footer-info {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 50px;
+    }
+
+    .footer-item {
+      font-family: 'Source Sans 3', 'Segoe UI', sans-serif;
+      font-size: 24px;
+      color: #8b7355;
+      letter-spacing: 2px;
+    }
+
+    .footer-separator {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #6f4e37;
+      opacity: 0.3;
+    }
+
+    /* Floating steam animation */
+    @keyframes steamRise {
+      0% {
+        transform: translateY(0) scale(1);
+        opacity: 0.15;
+      }
+      50% {
+        opacity: 0.08;
+      }
+      100% {
+        transform: translateY(-60px) scale(1.5);
+        opacity: 0;
+      }
+    }
+
+    .steam {
+      position: absolute;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: rgba(111,78,55,0.1);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .steam-1 {
+      top: 85px;
+      left: 50%;
+      margin-left: -15px;
+      animation: steamRise 4s ease-out infinite;
+    }
+
+    .steam-2 {
+      top: 90px;
+      left: 50%;
+      margin-left: 10px;
+      animation: steamRise 4s ease-out infinite 1.3s;
+    }
+
+    .steam-3 {
+      top: 88px;
+      left: 50%;
+      margin-left: -40px;
+      animation: steamRise 4s ease-out infinite 2.6s;
+    }
+
+    /* Warm border accent at top */
+    .top-accent {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 6px;
+      background: linear-gradient(90deg, #3c2415, #6f4e37, #8b6b4a, #6f4e37, #3c2415);
+      z-index: 10;
+    }
+
+    /* Bottom accent */
+    .bottom-accent {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 6px;
+      background: linear-gradient(90deg, #3c2415, #6f4e37, #8b6b4a, #6f4e37, #3c2415);
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+  <!-- Top/bottom accent bars -->
+  <div class="top-accent"></div>
+  <div class="bottom-accent"></div>
+
+  <!-- Decorative coffee bean circles -->
+  <div class="bean bean-1"></div>
+  <div class="bean bean-2"></div>
+  <div class="bean bean-3"></div>
+  <div class="bean bean-4"></div>
+  <div class="bean bean-5"></div>
+
+  <!-- Steam animation -->
+  <div class="steam steam-1"></div>
+  <div class="steam steam-2"></div>
+  <div class="steam steam-3"></div>
+
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1 class="shop-name" data-editable="true" data-field="shop_name">Ember <span class="ampersand">&amp;</span> Brew</h1>
+      <p class="tagline" data-editable="true" data-field="tagline">Freshly Roasted Daily</p>
+      <div class="header-divider">
+        <div class="line"></div>
+        <div class="icon">&#9749;</div>
+        <div class="line"></div>
+      </div>
+    </div>
+
+    <!-- Menu Body -->
+    <div class="menu-body">
+      <!-- Hot Drinks -->
+      <div class="menu-section">
+        <div class="section-header">
+          <span class="section-icon">&#9749;</span>
+          <h2 class="section-title" data-editable="true" data-field="section1_title">Hot Drinks</h2>
+          <div class="section-underline"></div>
+        </div>
+        <div class="items-list">
+          <div class="menu-item">
+            <span class="item-name" data-editable="true" data-field="hot1_name">Espresso</span>
+            <span class="item-dots"></span>
+            <span class="item-price" data-editable="true" data-field="hot1_price">$3.50</span>
+          </div>
+          <div class="menu-item">
+            <span class="item-name" data-editable="true" data-field="hot2_name">Americano</span>
+            <span class="item-dots"></span>
+            <span class="item-price" data-editable="true" data-field="hot2_price">$4.00</span>
+          </div>
+          <div class="menu-item">
+            <span class="item-name" data-editable="true" data-field="hot3_name">Cappuccino</span>
+            <span class="item-dots"></span>
+            <span class="item-price" data-editable="true" data-field="hot3_price">$5.00</span>
+          </div>
+          <div class="menu-item">
+            <span class="item-name" data-editable="true" data-field="hot4_name">Caf&eacute; Latte</span>
+            <span class="item-dots"></span>
+            <span class="item-price" data-editable="true" data-field="hot4_price">$5.50</span>
+          </div>
+          <div class="menu-item">
+            <span class="item-name" data-editable="true" data-field="hot5_name">Mocha</span>
+            <span class="item-dots"></span>
+            <span class="item-price" data-editable="true" data-field="hot5_price">$5.75</span>
+          </div>
+          <div class="menu-item">
+            <span class="item-name" data-editable="true" data-field="hot6_name">Hot Chocolate</span>
+            <span class="item-dots"></span>
+            <span class="item-price" data-editable="true" data-field="hot6_price">$4.50</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cold Drinks -->
+      <div class="menu-section">
+        <div class="section-header">
+          <span class="section-icon">&#129380;</span>
+          <h2 class="section-title" data-editable="true" data-field="section2_title">Cold Drinks</h2>
+          <div class="section-underline"></div>
+        </div>
+        <div class="items-list">
+          <div class="menu-item">
+            <span class="item-name" data-editable="true" data-field="cold1_name">Iced Latte</span>
+            <span class="item-dots"></span>
+            <span class="item-price" data-editable="true" data-field="cold1_price">$5.50</span>
+          </div>
+          <div class="menu-item">
+            <span class="item-name" data-editable="true" data-field="cold2_name">Cold Brew</span>
+            <span class="item-dots"></span>
+            <span class="item-price" data-editable="true" data-field="cold2_price">$5.00</span>
+          </div>
+          <div class="menu-item">
+            <span class="item-name" data-editable="true" data-field="cold3_name">Frapp&eacute;</span>
+            <span class="item-dots"></span>
+            <span class="item-price" data-editable="true" data-field="cold3_price">$6.00</span>
+          </div>
+          <div class="menu-item">
+            <span class="item-name" data-editable="true" data-field="cold4_name">Iced Matcha</span>
+            <span class="item-dots"></span>
+            <span class="item-price" data-editable="true" data-field="cold4_price">$5.75</span>
+          </div>
+          <div class="menu-item">
+            <span class="item-name" data-editable="true" data-field="cold5_name">Fresh Lemonade</span>
+            <span class="item-dots"></span>
+            <span class="item-price" data-editable="true" data-field="cold5_price">$4.00</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pastries -->
+      <div class="menu-section">
+        <div class="section-header">
+          <span class="section-icon">&#127848;</span>
+          <h2 class="section-title" data-editable="true" data-field="section3_title">Pastries</h2>
+          <div class="section-underline"></div>
+        </div>
+        <div class="items-list">
+          <div class="menu-item">
+            <span class="item-name" data-editable="true" data-field="pastry1_name">Butter Croissant</span>
+            <span class="item-dots"></span>
+            <span class="item-price" data-editable="true" data-field="pastry1_price">$3.75</span>
+          </div>
+          <div class="menu-item">
+            <span class="item-name" data-editable="true" data-field="pastry2_name">Blueberry Muffin</span>
+            <span class="item-dots"></span>
+            <span class="item-price" data-editable="true" data-field="pastry2_price">$4.25</span>
+          </div>
+          <div class="menu-item">
+            <span class="item-name" data-editable="true" data-field="pastry3_name">Cinnamon Roll</span>
+            <span class="item-dots"></span>
+            <span class="item-price" data-editable="true" data-field="pastry3_price">$4.50</span>
+          </div>
+          <div class="menu-item">
+            <span class="item-name" data-editable="true" data-field="pastry4_name">Banana Bread</span>
+            <span class="item-dots"></span>
+            <span class="item-price" data-editable="true" data-field="pastry4_price">$3.50</span>
+          </div>
+          <div class="menu-item">
+            <span class="item-name" data-editable="true" data-field="pastry5_name">Chocolate Chip Cookie</span>
+            <span class="item-dots"></span>
+            <span class="item-price" data-editable="true" data-field="pastry5_price">$2.75</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <div class="footer-divider">
+        <div class="line"></div>
+        <div class="bean-icon"></div>
+        <div class="bean-icon"></div>
+        <div class="bean-icon"></div>
+        <div class="line"></div>
+      </div>
+      <div class="footer-info">
+        <span class="footer-item" data-editable="true" data-field="footer_hours">Open Daily 6:30 AM &ndash; 8:00 PM</span>
+        <div class="footer-separator"></div>
+        <span class="footer-item" data-editable="true" data-field="footer_wifi">Free Wi-Fi Available</span>
+        <div class="footer-separator"></div>
+        <span class="footer-item" data-editable="true" data-field="footer_extra">Ask About Our Loyalty Card</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

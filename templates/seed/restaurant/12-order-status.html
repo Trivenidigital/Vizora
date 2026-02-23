@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+      background: #111111;
+      color: #ffffff;
+    }
+
+    /* Top bar */
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 48px;
+      height: 100px;
+      background: #1a1a1a;
+      border-bottom: 2px solid #2a2a2a;
+    }
+
+    .top-bar-left {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .status-icon {
+      width: 14px;
+      height: 14px;
+      background: #2ecc71;
+      border-radius: 50%;
+      box-shadow: 0 0 8px rgba(46, 204, 113, 0.5);
+      animation: livePulse 2s ease-in-out infinite;
+    }
+
+    @keyframes livePulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(46, 204, 113, 0.5); }
+      50% { opacity: 0.6; box-shadow: 0 0 16px rgba(46, 204, 113, 0.8); }
+    }
+
+    .board-title {
+      font-size: 44px;
+      font-weight: 800;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: #ffffff;
+    }
+
+    .board-title span {
+      color: #555555;
+      font-weight: 500;
+    }
+
+    .live-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(46, 204, 113, 0.1);
+      border: 1px solid rgba(46, 204, 113, 0.3);
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 20px;
+      font-weight: 600;
+      color: #2ecc71;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .live-dot {
+      width: 10px;
+      height: 10px;
+      background: #2ecc71;
+      border-radius: 50%;
+      animation: livePulse 1.5s ease-in-out infinite;
+    }
+
+    .top-bar-right {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+
+    .time-display {
+      font-family: 'JetBrains Mono', 'Courier New', monospace;
+      font-size: 40px;
+      font-weight: 600;
+      color: #888888;
+      letter-spacing: 2px;
+    }
+
+    /* Main columns container */
+    .columns-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 0;
+      height: 980px;
+    }
+
+    .status-column {
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #222222;
+    }
+
+    .status-column:last-child {
+      border-right: none;
+    }
+
+    /* Column headers */
+    .column-header {
+      padding: 24px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+    }
+
+    .column-header::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0; right: 0;
+      height: 3px;
+    }
+
+    .column-preparing .column-header {
+      background: linear-gradient(180deg, rgba(231, 76, 60, 0.15) 0%, transparent 100%);
+    }
+
+    .column-preparing .column-header::after {
+      background: #e74c3c;
+    }
+
+    .column-ready .column-header {
+      background: linear-gradient(180deg, rgba(46, 204, 113, 0.15) 0%, transparent 100%);
+    }
+
+    .column-ready .column-header::after {
+      background: #2ecc71;
+    }
+
+    .column-done .column-header {
+      background: linear-gradient(180deg, rgba(127, 140, 141, 0.12) 0%, transparent 100%);
+    }
+
+    .column-done .column-header::after {
+      background: #7f8c8d;
+    }
+
+    .column-label {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .column-status-dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+    }
+
+    .column-preparing .column-status-dot {
+      background: #e74c3c;
+      box-shadow: 0 0 12px rgba(231, 76, 60, 0.5);
+      animation: dotPulseRed 2s ease-in-out infinite;
+    }
+
+    @keyframes dotPulseRed {
+      0%, 100% { box-shadow: 0 0 12px rgba(231, 76, 60, 0.5); }
+      50% { box-shadow: 0 0 24px rgba(231, 76, 60, 0.9); }
+    }
+
+    .column-ready .column-status-dot {
+      background: #2ecc71;
+      box-shadow: 0 0 12px rgba(46, 204, 113, 0.5);
+    }
+
+    .column-done .column-status-dot {
+      background: #7f8c8d;
+    }
+
+    .column-title {
+      font-size: 32px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+    }
+
+    .column-preparing .column-title { color: #e74c3c; }
+    .column-ready .column-title { color: #2ecc71; }
+    .column-done .column-title { color: #7f8c8d; }
+
+    .column-count {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 28px;
+      font-weight: 700;
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 12px;
+    }
+
+    .column-preparing .column-count {
+      background: rgba(231, 76, 60, 0.15);
+      color: #e74c3c;
+    }
+
+    .column-ready .column-count {
+      background: rgba(46, 204, 113, 0.15);
+      color: #2ecc71;
+    }
+
+    .column-done .column-count {
+      background: rgba(127, 140, 141, 0.1);
+      color: #7f8c8d;
+    }
+
+    /* Order cards area */
+    .orders-list {
+      flex: 1;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .order-card {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      padding: 20px 28px;
+      border-radius: 12px;
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+    }
+
+    .column-preparing .order-card {
+      border-left: 4px solid #e74c3c;
+    }
+
+    .column-ready .order-card {
+      border-left: 4px solid #2ecc71;
+      animation: readyPulse 3s ease-in-out infinite;
+    }
+
+    @keyframes readyPulse {
+      0%, 100% {
+        background: #1a1a1a;
+        box-shadow: none;
+      }
+      50% {
+        background: rgba(46, 204, 113, 0.06);
+        box-shadow: 0 0 20px rgba(46, 204, 113, 0.1);
+      }
+    }
+
+    .column-done .order-card {
+      border-left: 4px solid #444444;
+      opacity: 0.5;
+    }
+
+    .order-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .column-preparing .order-dot {
+      background: #e74c3c;
+      animation: orderDotBlink 1.5s ease-in-out infinite;
+    }
+
+    @keyframes orderDotBlink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .column-ready .order-dot {
+      background: #2ecc71;
+      box-shadow: 0 0 8px rgba(46, 204, 113, 0.6);
+    }
+
+    .column-done .order-dot {
+      background: #555555;
+    }
+
+    .order-number {
+      font-family: 'JetBrains Mono', 'Courier New', monospace;
+      font-size: 72px;
+      font-weight: 800;
+      letter-spacing: 4px;
+      flex: 1;
+      line-height: 1;
+    }
+
+    .column-preparing .order-number { color: #ffffff; }
+    .column-ready .order-number { color: #2ecc71; }
+    .column-done .order-number { color: #666666; text-decoration: line-through; text-decoration-color: #444; }
+
+    .order-hash {
+      color: #555555;
+      font-weight: 500;
+    }
+
+    .column-ready .order-hash { color: rgba(46, 204, 113, 0.5); }
+    .column-done .order-hash { color: #444444; }
+
+    .order-time {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 24px;
+      color: #555555;
+      white-space: nowrap;
+    }
+
+    .column-ready .order-time { color: rgba(46, 204, 113, 0.6); }
+
+    /* Animated progress bar for preparing orders */
+    .order-progress {
+      position: relative;
+      width: 80px;
+      height: 6px;
+      background: #2a2a2a;
+      border-radius: 3px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .order-progress::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      height: 100%;
+      width: 60%;
+      background: #e74c3c;
+      border-radius: 3px;
+      animation: progressSlide 3s ease-in-out infinite;
+    }
+
+    @keyframes progressSlide {
+      0% { width: 20%; }
+      50% { width: 80%; }
+      100% { width: 20%; }
+    }
+
+    .order-card:nth-child(2) .order-progress::after { animation-delay: 0.5s; }
+    .order-card:nth-child(3) .order-progress::after { animation-delay: 1s; }
+    .order-card:nth-child(4) .order-progress::after { animation-delay: 1.5s; }
+
+    /* Ready checkmark */
+    .order-check {
+      font-size: 32px;
+      flex-shrink: 0;
+    }
+
+    /* Bottom status bar */
+    .bottom-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0; right: 0;
+      height: 48px;
+      background: #1a1a1a;
+      border-top: 1px solid #2a2a2a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 64px;
+      padding: 0 48px;
+    }
+
+    .bottom-stat {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 22px;
+      color: #666666;
+    }
+
+    .bottom-stat-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .bottom-stat-dot.red { background: #e74c3c; }
+    .bottom-stat-dot.green { background: #2ecc71; }
+    .bottom-stat-dot.gray { background: #7f8c8d; }
+
+    .bottom-stat-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      color: #999999;
+    }
+
+    /* Scan line effect for that kitchen monitor feel */
+    body::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 3px,
+        rgba(0, 0, 0, 0.03) 3px,
+        rgba(0, 0, 0, 0.03) 4px
+      );
+      pointer-events: none;
+      z-index: 100;
+    }
+  </style>
+</head>
+<body>
+  <!-- Top bar with title and time -->
+  <div class="top-bar">
+    <div class="top-bar-left">
+      <div class="status-icon"></div>
+      <div class="board-title" data-editable="true" data-field="board_title">ORDER STATUS <span>BOARD</span></div>
+      <div class="live-badge">
+        <div class="live-dot"></div>
+        LIVE
+      </div>
+    </div>
+    <div class="top-bar-right">
+      <div class="time-display" data-editable="true" data-field="current_time">11:45 AM</div>
+    </div>
+  </div>
+
+  <!-- Three status columns -->
+  <div class="columns-container">
+    <!-- PREPARING -->
+    <div class="status-column column-preparing">
+      <div class="column-header">
+        <div class="column-label">
+          <div class="column-status-dot"></div>
+          <div class="column-title" data-editable="true" data-field="col1_title">Preparing</div>
+        </div>
+        <div class="column-count" data-editable="true" data-field="col1_count">4</div>
+      </div>
+      <div class="orders-list">
+        <div class="order-card">
+          <div class="order-dot"></div>
+          <div class="order-number"><span class="order-hash">#</span><span data-editable="true" data-field="prep_order1">247</span></div>
+          <div class="order-progress"></div>
+          <div class="order-time" data-editable="true" data-field="prep_time1">2 min</div>
+        </div>
+        <div class="order-card">
+          <div class="order-dot"></div>
+          <div class="order-number"><span class="order-hash">#</span><span data-editable="true" data-field="prep_order2">251</span></div>
+          <div class="order-progress"></div>
+          <div class="order-time" data-editable="true" data-field="prep_time2">4 min</div>
+        </div>
+        <div class="order-card">
+          <div class="order-dot"></div>
+          <div class="order-number"><span class="order-hash">#</span><span data-editable="true" data-field="prep_order3">253</span></div>
+          <div class="order-progress"></div>
+          <div class="order-time" data-editable="true" data-field="prep_time3">5 min</div>
+        </div>
+        <div class="order-card">
+          <div class="order-dot"></div>
+          <div class="order-number"><span class="order-hash">#</span><span data-editable="true" data-field="prep_order4">256</span></div>
+          <div class="order-progress"></div>
+          <div class="order-time" data-editable="true" data-field="prep_time4">7 min</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- READY FOR PICKUP -->
+    <div class="status-column column-ready">
+      <div class="column-header">
+        <div class="column-label">
+          <div class="column-status-dot"></div>
+          <div class="column-title" data-editable="true" data-field="col2_title">Ready for Pickup</div>
+        </div>
+        <div class="column-count" data-editable="true" data-field="col2_count">4</div>
+      </div>
+      <div class="orders-list">
+        <div class="order-card">
+          <div class="order-dot"></div>
+          <div class="order-number"><span class="order-hash">#</span><span data-editable="true" data-field="ready_order1">244</span></div>
+          <div class="order-check">✅</div>
+          <div class="order-time" data-editable="true" data-field="ready_time1">Ready</div>
+        </div>
+        <div class="order-card">
+          <div class="order-dot"></div>
+          <div class="order-number"><span class="order-hash">#</span><span data-editable="true" data-field="ready_order2">248</span></div>
+          <div class="order-check">✅</div>
+          <div class="order-time" data-editable="true" data-field="ready_time2">Ready</div>
+        </div>
+        <div class="order-card">
+          <div class="order-dot"></div>
+          <div class="order-number"><span class="order-hash">#</span><span data-editable="true" data-field="ready_order3">250</span></div>
+          <div class="order-check">✅</div>
+          <div class="order-time" data-editable="true" data-field="ready_time3">Ready</div>
+        </div>
+        <div class="order-card">
+          <div class="order-dot"></div>
+          <div class="order-number"><span class="order-hash">#</span><span data-editable="true" data-field="ready_order4">252</span></div>
+          <div class="order-check">✅</div>
+          <div class="order-time" data-editable="true" data-field="ready_time4">Ready</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PICKED UP -->
+    <div class="status-column column-done">
+      <div class="column-header">
+        <div class="column-label">
+          <div class="column-status-dot"></div>
+          <div class="column-title" data-editable="true" data-field="col3_title">Picked Up</div>
+        </div>
+        <div class="column-count" data-editable="true" data-field="col3_count">4</div>
+      </div>
+      <div class="orders-list">
+        <div class="order-card">
+          <div class="order-dot"></div>
+          <div class="order-number"><span class="order-hash">#</span><span data-editable="true" data-field="done_order1">238</span></div>
+          <div class="order-time" data-editable="true" data-field="done_time1">11:22</div>
+        </div>
+        <div class="order-card">
+          <div class="order-dot"></div>
+          <div class="order-number"><span class="order-hash">#</span><span data-editable="true" data-field="done_order2">241</span></div>
+          <div class="order-time" data-editable="true" data-field="done_time2">11:28</div>
+        </div>
+        <div class="order-card">
+          <div class="order-dot"></div>
+          <div class="order-number"><span class="order-hash">#</span><span data-editable="true" data-field="done_order3">243</span></div>
+          <div class="order-time" data-editable="true" data-field="done_time3">11:35</div>
+        </div>
+        <div class="order-card">
+          <div class="order-dot"></div>
+          <div class="order-number"><span class="order-hash">#</span><span data-editable="true" data-field="done_order4">245</span></div>
+          <div class="order-time" data-editable="true" data-field="done_time4">11:39</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom status bar -->
+  <div class="bottom-bar">
+    <div class="bottom-stat">
+      <div class="bottom-stat-dot red"></div>
+      Preparing: <span class="bottom-stat-value">4</span>
+    </div>
+    <div class="bottom-stat">
+      <div class="bottom-stat-dot green"></div>
+      Ready: <span class="bottom-stat-value">4</span>
+    </div>
+    <div class="bottom-stat">
+      <div class="bottom-stat-dot gray"></div>
+      Completed: <span class="bottom-stat-value">4</span>
+    </div>
+    <div class="bottom-stat" data-editable="true" data-field="avg_wait">Avg Wait: 6 min</div>
+  </div>
+</body>
+</html>

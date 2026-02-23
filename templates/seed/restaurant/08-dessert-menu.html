@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Dancing+Script:wght@400;600;700&family=Raleway:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      font-family: 'Raleway', 'Helvetica Neue', Arial, sans-serif;
+      color: #4a3040;
+      background:
+        /* Soft shimmer overlay */
+        radial-gradient(ellipse at 20% 50%, rgba(183,110,121,0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 30%, rgba(232,223,245,0.3) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 90%, rgba(183,110,121,0.06) 0%, transparent 40%),
+        linear-gradient(160deg, #fdf6f0 0%, #f8e8ee 35%, #e8dff5 65%, #fdf6f0 100%);
+    }
+
+    /* Decorative top rose-gold line */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 5px;
+      background: linear-gradient(90deg, transparent 5%, #b76e79 20%, #d4a0a8 50%, #b76e79 80%, transparent 95%);
+    }
+
+    /* Bottom matching line */
+    body::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 5px;
+      background: linear-gradient(90deg, transparent 5%, #b76e79 20%, #d4a0a8 50%, #b76e79 80%, transparent 95%);
+    }
+
+    .layout {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      padding: 48px 80px 40px;
+    }
+
+    /* ---- HEADER ---- */
+    .header {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    .emoji-row-top {
+      font-size: 36px;
+      letter-spacing: 20px;
+      margin-bottom: 8px;
+    }
+
+    .restaurant-name {
+      font-family: 'Cormorant Garamond', 'Georgia', serif;
+      font-size: 88px;
+      font-weight: 700;
+      color: #b76e79;
+      letter-spacing: 12px;
+      line-height: 1;
+    }
+
+    .subtitle {
+      font-family: 'Dancing Script', 'Brush Script MT', cursive;
+      font-size: 48px;
+      color: #9a6878;
+      margin-top: 4px;
+      font-weight: 600;
+    }
+
+    /* Rose gold ornamental divider */
+    .ornament-divider {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      margin: 20px 0 24px;
+    }
+
+    .ornament-line {
+      width: 280px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #b76e79, transparent);
+    }
+
+    .ornament-diamond {
+      width: 12px;
+      height: 12px;
+      background: #b76e79;
+      transform: rotate(45deg);
+      flex-shrink: 0;
+    }
+
+    /* ---- DESSERT GRID ---- */
+    .dessert-grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px 64px;
+      padding: 0 20px;
+    }
+
+    .dessert-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 20px;
+      padding: 18px 24px;
+      background: linear-gradient(135deg, rgba(255,255,255,0.6) 0%, rgba(248,232,238,0.3) 100%);
+      border-radius: 16px;
+      border: 1px solid rgba(183,110,121,0.15);
+      transition: none;
+    }
+
+    .dessert-emoji {
+      font-size: 48px;
+      flex-shrink: 0;
+      margin-top: 4px;
+    }
+
+    .dessert-info {
+      flex: 1;
+    }
+
+    .dessert-name-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 6px;
+    }
+
+    .dessert-name {
+      font-family: 'Cormorant Garamond', 'Georgia', serif;
+      font-size: 36px;
+      font-weight: 700;
+      color: #5a3545;
+      line-height: 1.15;
+    }
+
+    .dessert-price {
+      font-family: 'Cormorant Garamond', 'Georgia', serif;
+      font-size: 36px;
+      font-weight: 600;
+      color: #b76e79;
+      flex-shrink: 0;
+      margin-left: 16px;
+    }
+
+    .dessert-desc {
+      font-size: 24px;
+      color: #7a5a68;
+      line-height: 1.4;
+      font-weight: 400;
+    }
+
+    /* ---- FOOTER ---- */
+    .footer-divider {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      margin: 24px 0 14px;
+    }
+
+    .footer {
+      text-align: center;
+      padding-bottom: 8px;
+    }
+
+    .footer-text {
+      font-family: 'Dancing Script', 'Brush Script MT', cursive;
+      font-size: 34px;
+      color: #9a6878;
+      font-weight: 600;
+    }
+
+    .footer-emoji {
+      font-size: 28px;
+      letter-spacing: 12px;
+      margin-top: 6px;
+    }
+
+    /* Decorative corner flourishes */
+    .corner-tl, .corner-tr, .corner-bl, .corner-br {
+      position: absolute;
+      width: 80px;
+      height: 80px;
+    }
+    .corner-tl { top: 16px; left: 16px; border-top: 2px solid #b76e79; border-left: 2px solid #b76e79; border-radius: 8px 0 0 0; }
+    .corner-tr { top: 16px; right: 16px; border-top: 2px solid #b76e79; border-right: 2px solid #b76e79; border-radius: 0 8px 0 0; }
+    .corner-bl { bottom: 16px; left: 16px; border-bottom: 2px solid #b76e79; border-left: 2px solid #b76e79; border-radius: 0 0 0 8px; }
+    .corner-br { bottom: 16px; right: 16px; border-bottom: 2px solid #b76e79; border-right: 2px solid #b76e79; border-radius: 0 0 8px 0; }
+  </style>
+</head>
+<body>
+
+  <!-- Corner flourishes -->
+  <div class="corner-tl" aria-hidden="true"></div>
+  <div class="corner-tr" aria-hidden="true"></div>
+  <div class="corner-bl" aria-hidden="true"></div>
+  <div class="corner-br" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <!-- HEADER -->
+    <div class="header">
+      <div class="emoji-row-top" aria-hidden="true">&#127856; &#127846; &#127848;</div>
+      <div class="restaurant-name" data-editable="true" data-field="restaurant_name">P&eacute;tale</div>
+      <div class="subtitle" data-editable="true" data-field="subtitle">Handcrafted Desserts</div>
+    </div>
+
+    <div class="ornament-divider" aria-hidden="true">
+      <div class="ornament-line"></div>
+      <div class="ornament-diamond"></div>
+      <div class="ornament-line"></div>
+    </div>
+
+    <!-- DESSERT GRID -->
+    <div class="dessert-grid">
+
+      <div class="dessert-card">
+        <div class="dessert-emoji" aria-hidden="true">&#127854;</div>
+        <div class="dessert-info">
+          <div class="dessert-name-row">
+            <span class="dessert-name" data-editable="true" data-field="dessert1_name">Vanilla Bean Cr&egrave;me Br&ucirc;l&eacute;e</span>
+            <span class="dessert-price" data-editable="true" data-field="dessert1_price">$12.00</span>
+          </div>
+          <div class="dessert-desc" data-editable="true" data-field="dessert1_desc">Tahitian vanilla custard, caramelized sugar crust</div>
+        </div>
+      </div>
+
+      <div class="dessert-card">
+        <div class="dessert-emoji" aria-hidden="true">&#127851;</div>
+        <div class="dessert-info">
+          <div class="dessert-name-row">
+            <span class="dessert-name" data-editable="true" data-field="dessert2_name">Dark Chocolate Torte</span>
+            <span class="dessert-price" data-editable="true" data-field="dessert2_price">$14.00</span>
+          </div>
+          <div class="dessert-desc" data-editable="true" data-field="dessert2_desc">Flourless chocolate cake, raspberry coulis, gold leaf</div>
+        </div>
+      </div>
+
+      <div class="dessert-card">
+        <div class="dessert-emoji" aria-hidden="true">&#127853;</div>
+        <div class="dessert-info">
+          <div class="dessert-name-row">
+            <span class="dessert-name" data-editable="true" data-field="dessert3_name">Strawberry Shortcake</span>
+            <span class="dessert-price" data-editable="true" data-field="dessert3_price">$11.00</span>
+          </div>
+          <div class="dessert-desc" data-editable="true" data-field="dessert3_desc">Fresh strawberries, vanilla sponge, Chantilly cream</div>
+        </div>
+      </div>
+
+      <div class="dessert-card">
+        <div class="dessert-emoji" aria-hidden="true">&#127861;</div>
+        <div class="dessert-info">
+          <div class="dessert-name-row">
+            <span class="dessert-name" data-editable="true" data-field="dessert4_name">Matcha Tiramisu</span>
+            <span class="dessert-price" data-editable="true" data-field="dessert4_price">$13.00</span>
+          </div>
+          <div class="dessert-desc" data-editable="true" data-field="dessert4_desc">Green tea mascarpone, ladyfingers, white chocolate dust</div>
+        </div>
+      </div>
+
+      <div class="dessert-card">
+        <div class="dessert-emoji" aria-hidden="true">&#127856;</div>
+        <div class="dessert-info">
+          <div class="dessert-name-row">
+            <span class="dessert-name" data-editable="true" data-field="dessert5_name">Salted Caramel Cheesecake</span>
+            <span class="dessert-price" data-editable="true" data-field="dessert5_price">$12.50</span>
+          </div>
+          <div class="dessert-desc" data-editable="true" data-field="dessert5_desc">New York style, salted caramel drizzle, pecan crumble</div>
+        </div>
+      </div>
+
+      <div class="dessert-card">
+        <div class="dessert-emoji" aria-hidden="true">&#127848;</div>
+        <div class="dessert-info">
+          <div class="dessert-name-row">
+            <span class="dessert-name" data-editable="true" data-field="dessert6_name">Mango Panna Cotta</span>
+            <span class="dessert-price" data-editable="true" data-field="dessert6_price">$11.50</span>
+          </div>
+          <div class="dessert-desc" data-editable="true" data-field="dessert6_desc">Coconut panna cotta, mango compote, passion fruit</div>
+        </div>
+      </div>
+
+      <div class="dessert-card">
+        <div class="dessert-emoji" aria-hidden="true">&#127846;</div>
+        <div class="dessert-info">
+          <div class="dessert-name-row">
+            <span class="dessert-name" data-editable="true" data-field="dessert7_name">Pistachio Gelato Trio</span>
+            <span class="dessert-price" data-editable="true" data-field="dessert7_price">$10.00</span>
+          </div>
+          <div class="dessert-desc" data-editable="true" data-field="dessert7_desc">Three scoops: pistachio, dark chocolate, vanilla bean</div>
+        </div>
+      </div>
+
+      <div class="dessert-card">
+        <div class="dessert-emoji" aria-hidden="true">&#127859;</div>
+        <div class="dessert-info">
+          <div class="dessert-name-row">
+            <span class="dessert-name" data-editable="true" data-field="dessert8_name">Lemon Tart</span>
+            <span class="dessert-price" data-editable="true" data-field="dessert8_price">$11.00</span>
+          </div>
+          <div class="dessert-desc" data-editable="true" data-field="dessert8_desc">Buttery shortcrust, lemon curd, torched meringue</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer-divider" aria-hidden="true">
+      <div class="ornament-line"></div>
+      <div class="ornament-diamond"></div>
+      <div class="ornament-line"></div>
+    </div>
+
+    <div class="footer">
+      <div class="footer-text" data-editable="true" data-field="footer_message">Please inform your server of any allergies or dietary requirements</div>
+      <div class="footer-emoji" aria-hidden="true">&#127800; &#127801; &#127800;</div>
+    </div>
+
+  </div>
+</body>
+</html>

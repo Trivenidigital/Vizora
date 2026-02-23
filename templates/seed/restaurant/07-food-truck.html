@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1080, height=1920">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Roboto+Condensed:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1080px;
+      height: 1920px;
+      overflow: hidden;
+      font-family: 'Roboto Condensed', 'Arial Narrow', Arial, sans-serif;
+      color: #ffffff;
+      background:
+        /* Grunge noise texture */
+        repeating-linear-gradient(
+          45deg,
+          transparent,
+          transparent 2px,
+          rgba(0,0,0,0.04) 2px,
+          rgba(0,0,0,0.04) 4px
+        ),
+        repeating-linear-gradient(
+          -30deg,
+          transparent,
+          transparent 3px,
+          rgba(255,215,0,0.02) 3px,
+          rgba(255,215,0,0.02) 5px
+        ),
+        repeating-linear-gradient(
+          90deg,
+          transparent,
+          transparent 6px,
+          rgba(0,0,0,0.03) 6px,
+          rgba(0,0,0,0.03) 8px
+        ),
+        linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%);
+    }
+
+    /* Top flame accent bar */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 12px;
+      background: linear-gradient(90deg, #ff3b30, #ffd700, #ff3b30, #ffd700, #ff3b30);
+      z-index: 10;
+    }
+
+    /* Bottom flame accent bar */
+    body::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 12px;
+      background: linear-gradient(90deg, #ffd700, #ff3b30, #ffd700, #ff3b30, #ffd700);
+      z-index: 10;
+    }
+
+    .container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      padding: 24px 48px;
+    }
+
+    /* ---- HEADER ---- */
+    .header {
+      text-align: center;
+      padding: 28px 0 20px;
+    }
+
+    .fire-emoji-top {
+      font-size: 52px;
+      letter-spacing: 12px;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .truck-name {
+      font-family: 'Bebas Neue', 'Impact', sans-serif;
+      font-size: 120px;
+      line-height: 1;
+      color: #ffd700;
+      letter-spacing: 10px;
+      text-shadow:
+        3px 3px 0 #ff3b30,
+        6px 6px 0 rgba(255,59,48,0.4);
+    }
+
+    .tagline {
+      font-family: 'Bebas Neue', 'Impact', sans-serif;
+      font-size: 44px;
+      color: #ff3b30;
+      letter-spacing: 16px;
+      margin-top: 2px;
+    }
+
+    .header-divider {
+      width: 100%;
+      height: 6px;
+      margin: 20px 0;
+      background: repeating-linear-gradient(
+        90deg,
+        #ffd700,
+        #ffd700 20px,
+        transparent 20px,
+        transparent 28px
+      );
+    }
+
+    /* ---- COMBOS SECTION ---- */
+    .combos {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 10px 0;
+    }
+
+    .combo-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 20px;
+      padding: 16px 20px;
+      background: linear-gradient(135deg, rgba(255,215,0,0.06) 0%, rgba(255,59,48,0.04) 100%);
+      border-left: 5px solid #ff3b30;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .combo-badge {
+      flex-shrink: 0;
+      width: 64px;
+      height: 64px;
+      background: #ff3b30;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Bebas Neue', 'Impact', sans-serif;
+      font-size: 36px;
+      color: #ffffff;
+      border: 3px solid #ffd700;
+      margin-top: 2px;
+    }
+
+    .combo-details {
+      flex: 1;
+    }
+
+    .combo-name-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 4px;
+    }
+
+    .combo-name {
+      font-family: 'Bebas Neue', 'Impact', sans-serif;
+      font-size: 44px;
+      color: #ffd700;
+      letter-spacing: 2px;
+      line-height: 1.1;
+    }
+
+    .combo-price {
+      font-family: 'Bebas Neue', 'Impact', sans-serif;
+      font-size: 44px;
+      color: #ffffff;
+      letter-spacing: 1px;
+      flex-shrink: 0;
+      margin-left: 16px;
+    }
+
+    .combo-desc {
+      font-size: 28px;
+      color: #cccccc;
+      line-height: 1.3;
+      font-weight: 400;
+    }
+
+    /* ---- SIDES & DRINKS ---- */
+    .extras-row {
+      display: flex;
+      gap: 32px;
+      padding: 16px 0 8px;
+    }
+
+    .extras-col {
+      flex: 1;
+    }
+
+    .extras-title {
+      font-family: 'Bebas Neue', 'Impact', sans-serif;
+      font-size: 48px;
+      color: #ff3b30;
+      letter-spacing: 6px;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 3px solid rgba(255,215,0,0.3);
+    }
+
+    .extras-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 6px 0;
+      font-size: 30px;
+    }
+
+    .extras-item-name {
+      color: #ffffff;
+      font-weight: 700;
+    }
+
+    .extras-item-price {
+      color: #ffd700;
+      font-family: 'Bebas Neue', 'Impact', sans-serif;
+      font-size: 32px;
+      letter-spacing: 1px;
+    }
+
+    .extras-divider {
+      flex: 1;
+      border-bottom: 1px dashed rgba(255,255,255,0.15);
+      margin: 0 12px;
+      min-width: 20px;
+      align-self: center;
+      transform: translateY(-4px);
+    }
+
+    /* ---- BOTTOM CTA ---- */
+    .bottom-divider {
+      width: 100%;
+      height: 6px;
+      margin: 16px 0 12px;
+      background: repeating-linear-gradient(
+        90deg,
+        #ff3b30,
+        #ff3b30 20px,
+        transparent 20px,
+        transparent 28px
+      );
+    }
+
+    .order-cta {
+      text-align: center;
+      padding: 16px 0 24px;
+    }
+
+    .order-text {
+      font-family: 'Bebas Neue', 'Impact', sans-serif;
+      font-size: 72px;
+      color: #ffd700;
+      letter-spacing: 8px;
+      text-shadow: 2px 2px 0 #ff3b30;
+      animation: pulse-cta 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-cta {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    .cta-subtext {
+      font-size: 28px;
+      color: #999999;
+      letter-spacing: 4px;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- HEADER -->
+    <div class="header">
+      <span class="fire-emoji-top" aria-hidden="true">🔥🔥🔥</span>
+      <div class="truck-name" data-editable="true" data-field="truck_name">BLAZE BITES</div>
+      <div class="tagline" data-editable="true" data-field="tagline">STREET EATS</div>
+    </div>
+
+    <div class="header-divider" aria-hidden="true"></div>
+
+    <!-- COMBO ITEMS -->
+    <div class="combos">
+
+      <div class="combo-item">
+        <div class="combo-badge">#1</div>
+        <div class="combo-details">
+          <div class="combo-name-row">
+            <span class="combo-name" data-editable="true" data-field="combo1_name">THE CLASSIC</span>
+            <span class="combo-price" data-editable="true" data-field="combo1_price">$9.50</span>
+          </div>
+          <div class="combo-desc" data-editable="true" data-field="combo1_desc">Double smash burger, American cheese, secret sauce, pickles</div>
+        </div>
+      </div>
+
+      <div class="combo-item">
+        <div class="combo-badge">#2</div>
+        <div class="combo-details">
+          <div class="combo-name-row">
+            <span class="combo-name" data-editable="true" data-field="combo2_name">LOADED FRIES</span>
+            <span class="combo-price" data-editable="true" data-field="combo2_price">$7.00</span>
+          </div>
+          <div class="combo-desc" data-editable="true" data-field="combo2_desc">Cheese sauce, bacon bits, jalape&ntilde;os, sour cream</div>
+        </div>
+      </div>
+
+      <div class="combo-item">
+        <div class="combo-badge">#3</div>
+        <div class="combo-details">
+          <div class="combo-name-row">
+            <span class="combo-name" data-editable="true" data-field="combo3_name">CRISPY CHICKEN</span>
+            <span class="combo-price" data-editable="true" data-field="combo3_price">$10.50</span>
+          </div>
+          <div class="combo-desc" data-editable="true" data-field="combo3_desc">Fried chicken sandwich, slaw, spicy mayo, brioche bun</div>
+        </div>
+      </div>
+
+      <div class="combo-item">
+        <div class="combo-badge">#4</div>
+        <div class="combo-details">
+          <div class="combo-name-row">
+            <span class="combo-name" data-editable="true" data-field="combo4_name">STREET TACOS (3)</span>
+            <span class="combo-price" data-editable="true" data-field="combo4_price">$11.00</span>
+          </div>
+          <div class="combo-desc" data-editable="true" data-field="combo4_desc">Carne asada, cilantro, onion, lime, corn tortillas</div>
+        </div>
+      </div>
+
+      <div class="combo-item">
+        <div class="combo-badge">#5</div>
+        <div class="combo-details">
+          <div class="combo-name-row">
+            <span class="combo-name" data-editable="true" data-field="combo5_name">VEGGIE WRAP</span>
+            <span class="combo-price" data-editable="true" data-field="combo5_price">$8.50</span>
+          </div>
+          <div class="combo-desc" data-editable="true" data-field="combo5_desc">Grilled veggies, hummus, feta, spinach tortilla</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- SIDES & DRINKS -->
+    <div class="extras-row">
+      <div class="extras-col">
+        <div class="extras-title" data-editable="true" data-field="sides_title">SIDES</div>
+        <div class="extras-item">
+          <span class="extras-item-name" data-editable="true" data-field="side1_name">Regular Fries</span>
+          <span class="extras-divider"></span>
+          <span class="extras-item-price" data-editable="true" data-field="side1_price">$4.00</span>
+        </div>
+        <div class="extras-item">
+          <span class="extras-item-name" data-editable="true" data-field="side2_name">Onion Rings</span>
+          <span class="extras-divider"></span>
+          <span class="extras-item-price" data-editable="true" data-field="side2_price">$5.00</span>
+        </div>
+        <div class="extras-item">
+          <span class="extras-item-name" data-editable="true" data-field="side3_name">Mac &amp; Cheese</span>
+          <span class="extras-divider"></span>
+          <span class="extras-item-price" data-editable="true" data-field="side3_price">$5.50</span>
+        </div>
+      </div>
+      <div class="extras-col">
+        <div class="extras-title" data-editable="true" data-field="drinks_title">DRINKS</div>
+        <div class="extras-item">
+          <span class="extras-item-name" data-editable="true" data-field="drink1_name">Fountain Soda</span>
+          <span class="extras-divider"></span>
+          <span class="extras-item-price" data-editable="true" data-field="drink1_price">$2.50</span>
+        </div>
+        <div class="extras-item">
+          <span class="extras-item-name" data-editable="true" data-field="drink2_name">Fresh Lemonade</span>
+          <span class="extras-divider"></span>
+          <span class="extras-item-price" data-editable="true" data-field="drink2_price">$4.00</span>
+        </div>
+        <div class="extras-item">
+          <span class="extras-item-name" data-editable="true" data-field="drink3_name">Bottled Water</span>
+          <span class="extras-divider"></span>
+          <span class="extras-item-price" data-editable="true" data-field="drink3_price">$2.00</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom-divider" aria-hidden="true"></div>
+
+    <!-- ORDER CTA -->
+    <div class="order-cta">
+      <div class="order-text" data-editable="true" data-field="cta_text">ORDER HERE &rarr;</div>
+      <div class="cta-subtext" data-editable="true" data-field="cta_subtext">CASH &amp; CARD ACCEPTED</div>
+    </div>
+
+  </div>
+</body>
+</html>

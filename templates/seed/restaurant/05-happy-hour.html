@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+      background: #0d0d0d;
+      color: #ffffff;
+    }
+
+    /* Geometric background pattern */
+    .bg-pattern {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 0;
+      background:
+        linear-gradient(135deg, rgba(255,45,123,0.03) 25%, transparent 25%),
+        linear-gradient(225deg, rgba(0,240,255,0.03) 25%, transparent 25%),
+        linear-gradient(315deg, rgba(179,71,234,0.03) 25%, transparent 25%),
+        linear-gradient(45deg, rgba(255,45,123,0.02) 25%, transparent 25%);
+      background-size: 120px 120px;
+    }
+    .bg-pattern::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background:
+        repeating-linear-gradient(
+          0deg,
+          transparent,
+          transparent 59px,
+          rgba(255,255,255,0.015) 59px,
+          rgba(255,255,255,0.015) 60px
+        ),
+        repeating-linear-gradient(
+          90deg,
+          transparent,
+          transparent 59px,
+          rgba(255,255,255,0.015) 59px,
+          rgba(255,255,255,0.015) 60px
+        );
+    }
+
+    /* Ambient glow blobs */
+    .glow-blob {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(120px);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .glow-blob.pink {
+      width: 500px; height: 500px;
+      background: rgba(255,45,123,0.12);
+      top: -100px; left: -100px;
+    }
+    .glow-blob.cyan {
+      width: 400px; height: 400px;
+      background: rgba(0,240,255,0.10);
+      bottom: -80px; right: 100px;
+    }
+    .glow-blob.purple {
+      width: 350px; height: 350px;
+      background: rgba(179,71,234,0.10);
+      top: 200px; right: -50px;
+    }
+
+    .content {
+      position: relative;
+      z-index: 1;
+      width: 100%; height: 100%;
+      display: flex;
+      flex-direction: column;
+      padding: 48px 72px 36px;
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .header-main {
+      font-family: 'Outfit', 'Arial Black', sans-serif;
+      font-weight: 900;
+      font-size: 96px;
+      letter-spacing: 12px;
+      text-transform: uppercase;
+      background: linear-gradient(90deg, #ff2d7b, #b347ea, #00f0ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 0 40px rgba(255,45,123,0.4));
+      line-height: 1;
+    }
+    .header-time {
+      font-family: 'Outfit', sans-serif;
+      font-size: 56px;
+      font-weight: 800;
+      color: #00f0ff;
+      text-shadow:
+        0 0 20px rgba(0,240,255,0.6),
+        0 0 40px rgba(0,240,255,0.3),
+        0 0 80px rgba(0,240,255,0.15);
+      margin-top: 4px;
+      letter-spacing: 4px;
+    }
+    .header-sub {
+      font-size: 28px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.5);
+      letter-spacing: 8px;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    /* Three columns */
+    .menu-columns {
+      display: flex;
+      gap: 48px;
+      flex: 1;
+      margin-top: 8px;
+    }
+    .menu-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .col-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 36px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 4px;
+      padding-bottom: 14px;
+      margin-bottom: 20px;
+      position: relative;
+    }
+    .col-title::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 3px;
+      border-radius: 2px;
+    }
+
+    .col-cocktails .col-title {
+      color: #ff2d7b;
+      text-shadow: 0 0 20px rgba(255,45,123,0.4);
+    }
+    .col-cocktails .col-title::after {
+      width: 100%;
+      background: linear-gradient(90deg, #ff2d7b, transparent);
+    }
+    .col-cocktails .deal-price { color: #ff2d7b; text-shadow: 0 0 15px rgba(255,45,123,0.5); }
+
+    .col-beer .col-title {
+      color: #00f0ff;
+      text-shadow: 0 0 20px rgba(0,240,255,0.4);
+    }
+    .col-beer .col-title::after {
+      width: 100%;
+      background: linear-gradient(90deg, #00f0ff, transparent);
+    }
+    .col-beer .deal-price { color: #00f0ff; text-shadow: 0 0 15px rgba(0,240,255,0.5); }
+
+    .col-bites .col-title {
+      color: #b347ea;
+      text-shadow: 0 0 20px rgba(179,71,234,0.4);
+    }
+    .col-bites .col-title::after {
+      width: 100%;
+      background: linear-gradient(90deg, #b347ea, transparent);
+    }
+    .col-bites .deal-price { color: #b347ea; text-shadow: 0 0 15px rgba(179,71,234,0.5); }
+
+    .col-emoji {
+      margin-right: 8px;
+      font-size: 32px;
+    }
+
+    /* Menu items */
+    .menu-item {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      padding: 14px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .menu-item:last-child {
+      border-bottom: none;
+    }
+    .item-name {
+      font-size: 32px;
+      font-weight: 700;
+      color: #ffffff;
+      line-height: 1.2;
+    }
+    .item-prices {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      flex-shrink: 0;
+      margin-left: 16px;
+    }
+    .old-price {
+      font-size: 28px;
+      color: rgba(255,255,255,0.3);
+      text-decoration: line-through;
+      font-weight: 500;
+    }
+    .deal-price {
+      font-family: 'Outfit', sans-serif;
+      font-size: 42px;
+      font-weight: 900;
+    }
+
+    /* Footer / bar name */
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      margin-top: auto;
+      padding-top: 20px;
+    }
+    .footer-line {
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+    }
+    .bar-name {
+      font-family: 'Outfit', sans-serif;
+      font-size: 34px;
+      font-weight: 800;
+      letter-spacing: 10px;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.35);
+    }
+
+    /* Neon pulse animation */
+    @keyframes neonPulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.85; }
+    }
+    .header-main {
+      animation: neonPulse 3s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-pattern"></div>
+  <div class="glow-blob pink"></div>
+  <div class="glow-blob cyan"></div>
+  <div class="glow-blob purple"></div>
+
+  <div class="content">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-main" data-editable="true" data-field="heading">Happy Hour</div>
+      <div class="header-time" data-editable="true" data-field="time_range">4 PM &#8211; 7 PM</div>
+      <div class="header-sub" data-editable="true" data-field="frequency">Every Weekday</div>
+    </div>
+
+    <!-- Three columns -->
+    <div class="menu-columns">
+      <!-- Cocktails -->
+      <div class="menu-col col-cocktails">
+        <div class="col-title"><span class="col-emoji">&#127864;</span> <span data-editable="true" data-field="col1_title">Cocktails</span></div>
+
+        <div class="menu-item">
+          <span class="item-name" data-editable="true" data-field="cocktail1_name">Margarita</span>
+          <span class="item-prices">
+            <span class="old-price" data-editable="true" data-field="cocktail1_old">$14</span>
+            <span class="deal-price" data-editable="true" data-field="cocktail1_new">$8</span>
+          </span>
+        </div>
+
+        <div class="menu-item">
+          <span class="item-name" data-editable="true" data-field="cocktail2_name">Mojito</span>
+          <span class="item-prices">
+            <span class="old-price" data-editable="true" data-field="cocktail2_old">$13</span>
+            <span class="deal-price" data-editable="true" data-field="cocktail2_new">$7</span>
+          </span>
+        </div>
+
+        <div class="menu-item">
+          <span class="item-name" data-editable="true" data-field="cocktail3_name">Old Fashioned</span>
+          <span class="item-prices">
+            <span class="old-price" data-editable="true" data-field="cocktail3_old">$15</span>
+            <span class="deal-price" data-editable="true" data-field="cocktail3_new">$9</span>
+          </span>
+        </div>
+
+        <div class="menu-item">
+          <span class="item-name" data-editable="true" data-field="cocktail4_name">Espresso Martini</span>
+          <span class="item-prices">
+            <span class="old-price" data-editable="true" data-field="cocktail4_old">$16</span>
+            <span class="deal-price" data-editable="true" data-field="cocktail4_new">$9</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Beer & Wine -->
+      <div class="menu-col col-beer">
+        <div class="col-title"><span class="col-emoji">&#127866;</span> <span data-editable="true" data-field="col2_title">Beer &amp; Wine</span></div>
+
+        <div class="menu-item">
+          <span class="item-name" data-editable="true" data-field="beer1_name">Draft Beer</span>
+          <span class="item-prices">
+            <span class="old-price" data-editable="true" data-field="beer1_old">$8</span>
+            <span class="deal-price" data-editable="true" data-field="beer1_new">$4</span>
+          </span>
+        </div>
+
+        <div class="menu-item">
+          <span class="item-name" data-editable="true" data-field="beer2_name">House Wine</span>
+          <span class="item-prices">
+            <span class="old-price" data-editable="true" data-field="beer2_old">$12</span>
+            <span class="deal-price" data-editable="true" data-field="beer2_new">$6</span>
+          </span>
+        </div>
+
+        <div class="menu-item">
+          <span class="item-name" data-editable="true" data-field="beer3_name">Craft IPA</span>
+          <span class="item-prices">
+            <span class="old-price" data-editable="true" data-field="beer3_old">$9</span>
+            <span class="deal-price" data-editable="true" data-field="beer3_new">$5</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Bites -->
+      <div class="menu-col col-bites">
+        <div class="col-title"><span class="col-emoji">&#127869;</span> <span data-editable="true" data-field="col3_title">Bites</span></div>
+
+        <div class="menu-item">
+          <span class="item-name" data-editable="true" data-field="bite1_name">Wings (10pc)</span>
+          <span class="item-prices">
+            <span class="old-price" data-editable="true" data-field="bite1_old">$16</span>
+            <span class="deal-price" data-editable="true" data-field="bite1_new">$10</span>
+          </span>
+        </div>
+
+        <div class="menu-item">
+          <span class="item-name" data-editable="true" data-field="bite2_name">Nachos</span>
+          <span class="item-prices">
+            <span class="old-price" data-editable="true" data-field="bite2_old">$14</span>
+            <span class="deal-price" data-editable="true" data-field="bite2_new">$8</span>
+          </span>
+        </div>
+
+        <div class="menu-item">
+          <span class="item-name" data-editable="true" data-field="bite3_name">Sliders (3)</span>
+          <span class="item-prices">
+            <span class="old-price" data-editable="true" data-field="bite3_old">$15</span>
+            <span class="deal-price" data-editable="true" data-field="bite3_new">$9</span>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <div class="footer-line"></div>
+      <div class="bar-name" data-editable="true" data-field="bar_name">Pulse Lounge</div>
+      <div class="footer-line"></div>
+    </div>
+  </div>
+</body>
+</html>
