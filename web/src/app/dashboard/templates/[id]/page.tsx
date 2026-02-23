@@ -207,11 +207,11 @@ export default function TemplateDetailPage() {
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty?.toLowerCase()) {
       case 'beginner':
-        return 'bg-green-100 text-green-800';
+        return 'bg-success-500/10 text-success-700 dark:text-success-400';
       case 'intermediate':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-warning-500/10 text-warning-700 dark:text-warning-400';
       case 'advanced':
-        return 'bg-red-100 text-red-800';
+        return 'bg-error-500/10 text-error-700 dark:text-error-400';
       default:
         return 'bg-[var(--surface-hover)] text-[var(--foreground-secondary)]';
     }
@@ -328,7 +328,7 @@ export default function TemplateDetailPage() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setShowDeleteModal(true)}
-                className="px-4 py-2 text-sm font-medium text-red-600 bg-[var(--surface)] border border-red-200 rounded-lg hover:bg-red-50 transition"
+                className="px-4 py-2 text-sm font-medium text-error-600 dark:text-error-400 bg-[var(--surface)] border border-error-500/20 rounded-lg hover:bg-error-500/10 transition"
               >
                 Delete
               </button>
@@ -347,13 +347,22 @@ export default function TemplateDetailPage() {
               </button>
             </div>
           ) : (
-            <button
-              onClick={() => setShowCloneModal(true)}
-              className="px-6 py-3 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
-            >
-              <Icon name="copy" size="md" />
-              Clone to My Content
-            </button>
+            <>
+              <Link
+                href={`/dashboard/templates/${templateId}/edit`}
+                className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 text-sm font-medium inline-flex items-center gap-2"
+              >
+                <Icon name="edit" size="sm" />
+                Edit Visually
+              </Link>
+              <button
+                onClick={() => setShowCloneModal(true)}
+                className="px-6 py-3 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
+              >
+                <Icon name="copy" size="md" />
+                Clone to My Content
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -365,7 +374,7 @@ export default function TemplateDetailPage() {
           {editMode ? (
             <div className="space-y-4">
               {saveError && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{saveError}</div>
+                <div className="p-3 bg-error-500/10 border border-error-500/20 rounded-lg text-sm text-error-700 dark:text-error-300">{saveError}</div>
               )}
               <div>
                 <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">Name</label>
@@ -665,8 +674,8 @@ export default function TemplateDetailPage() {
                 </div>
 
                 {cloneError && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-sm text-red-700">{cloneError}</p>
+                  <div className="p-3 bg-error-500/10 border border-error-500/20 rounded-lg">
+                    <p className="text-sm text-error-700 dark:text-error-300">{cloneError}</p>
                   </div>
                 )}
 

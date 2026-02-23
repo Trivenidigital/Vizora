@@ -1356,6 +1356,18 @@ class ApiClient {
     });
   }
 
+  async publishTemplate(templateId: string, data: {
+    renderedHtml: string;
+    displayIds: string[];
+    name: string;
+    duration?: number;
+  }): Promise<{ contentId: string; displayCount: number }> {
+    return this.request<{ contentId: string; displayCount: number }>(`/template-library/${templateId}/publish`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   // ========== Widget API Methods ==========
 
   async getWidgetTypes(): Promise<WidgetType[]> {
