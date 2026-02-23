@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 
 interface ImagePropertiesProps {
   elementId: string;
@@ -25,6 +25,7 @@ export default function ImageProperties({
   onImageUpload,
 }: ImagePropertiesProps) {
   const [localSrc, setLocalSrc] = useState(src);
+  useEffect(() => { setLocalSrc(src); }, [src]);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface TextPropertiesProps {
   elementId: string;
@@ -55,6 +55,7 @@ export default function TextProperties({
   onPropertyChange,
 }: TextPropertiesProps) {
   const [localText, setLocalText] = useState(textContent);
+  useEffect(() => { setLocalText(textContent); }, [textContent]);
 
   const fontSize = parseInt(styles.fontSize || '16', 10);
   const colorHex = rgbToHex(styles.color || '#ffffff');

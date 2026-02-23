@@ -114,9 +114,7 @@ export default function EditPageClient({ templateId }: EditPageClientProps) {
     try {
       const renderedHtml = await canvasRef.current.serialize();
 
-      // publishTemplate will be added in Task 7 — call it now so the
-      // wiring is ready once the method exists.
-      await (apiClient as any).publishTemplate(templateId, {
+      await apiClient.publishTemplate(templateId, {
         renderedHtml,
         name: `${templateName} - Edited`,
         displayIds: [],
@@ -145,8 +143,7 @@ export default function EditPageClient({ templateId }: EditPageClientProps) {
           minute: '2-digit',
         });
 
-        // publishTemplate will be added in Task 7
-        await (apiClient as any).publishTemplate(templateId, {
+        await apiClient.publishTemplate(templateId, {
           renderedHtml,
           name: `${templateName} - ${dateLabel}`,
           displayIds,

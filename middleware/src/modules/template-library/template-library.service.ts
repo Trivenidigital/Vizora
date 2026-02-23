@@ -237,103 +237,102 @@ export class TemplateLibraryService {
       throw new NotFoundException('Template not found');
     }
 
-    if (!dto.displayIds.length) {
-      throw new BadRequestException('At least one display ID is required');
-    }
-
-    // 2. Create the published content record
-    const content = await this.db.content.create({
-      data: {
-        name: dto.name,
-        type: 'html',
-        url: '', // Inline HTML content — no external URL
-        duration: dto.duration || 30,
-        metadata: {
-          htmlContent: dto.renderedHtml,
-          sourceTemplateId: templateId,
-          publishedBy: userId,
-          publishedAt: new Date().toISOString(),
-        } as Prisma.InputJsonValue,
-        status: 'active',
-        organizationId,
-        isGlobal: false,
-      },
-    });
-
-    // 3. Assign content to each display via playlists
-    let displayCount = 0;
-
-    for (const displayId of dto.displayIds) {
-      // Verify display belongs to this organization
-      const display = await this.db.display.findFirst({
-        where: { id: displayId, organizationId },
-      });
-
-      if (!display) {
-        this.logger.warn(
-          `Skipping display ${displayId}: not found or not in org ${organizationId}`,
-        );
-        continue;
-      }
-
-      // Find or create a "Quick Publish" playlist for this display
-      let playlist = await this.db.playlist.findFirst({
-        where: {
+    // 2. Execute all writes in a transaction for atomicity
+    return this.db.$transaction(async (tx) => {
+      // Create the published content record (draft if displayIds is empty)
+      const content = await tx.content.create({
+        data: {
+          name: dto.name,
+          type: 'html',
+          url: '', // Inline HTML content — no external URL
+          duration: dto.duration || 30,
+          metadata: {
+            htmlContent: dto.renderedHtml,
+            sourceTemplateId: templateId,
+            publishedBy: userId,
+            publishedAt: new Date().toISOString(),
+          } as Prisma.InputJsonValue,
+          status: 'active',
           organizationId,
-          name: `Quick Publish - ${display.nickname || display.deviceIdentifier}`,
+          isGlobal: false,
         },
       });
 
-      if (!playlist) {
-        playlist = await this.db.playlist.create({
-          data: {
-            name: `Quick Publish - ${display.nickname || display.deviceIdentifier}`,
-            description: 'Auto-created playlist for quick-published template content',
+      // 3. Assign content to each display via playlists
+      let displayCount = 0;
+
+      for (const displayId of dto.displayIds) {
+        // Verify display belongs to this organization
+        const display = await tx.display.findFirst({
+          where: { id: displayId, organizationId },
+        });
+
+        if (!display) {
+          this.logger.warn(
+            `Skipping display ${displayId}: not found or not in org ${organizationId}`,
+          );
+          continue;
+        }
+
+        // Find or create a "Quick Publish" playlist for this display
+        let playlist = await tx.playlist.findFirst({
+          where: {
             organizationId,
+            name: `Quick Publish - ${display.nickname || display.deviceIdentifier}`,
           },
         });
+
+        if (!playlist) {
+          playlist = await tx.playlist.create({
+            data: {
+              name: `Quick Publish - ${display.nickname || display.deviceIdentifier}`,
+              description: 'Auto-created playlist for quick-published template content',
+              organizationId,
+            },
+          });
+        }
+
+        // Determine next order value for the playlist item
+        const lastItem = await tx.playlistItem.findFirst({
+          where: { playlistId: playlist.id },
+          orderBy: { order: 'desc' },
+        });
+        const nextOrder = lastItem ? lastItem.order + 1 : 0;
+
+        // Add the content as a playlist item
+        await tx.playlistItem.create({
+          data: {
+            playlistId: playlist.id,
+            contentId: content.id,
+            order: nextOrder,
+            duration: dto.duration || null,
+          },
+        });
+
+        // Assign this playlist to the display
+        await tx.display.update({
+          where: { id: displayId },
+          data: { currentPlaylistId: playlist.id },
+        });
+
+        displayCount++;
       }
 
-      // Determine next order value for the playlist item
-      const lastItem = await this.db.playlistItem.findFirst({
-        where: { playlistId: playlist.id },
-        orderBy: { order: 'desc' },
-      });
-      const nextOrder = lastItem ? lastItem.order + 1 : 0;
-
-      // Add the content as a playlist item
-      await this.db.playlistItem.create({
+      // 4. Increment useCount on the source template
+      const templateMetadata = (template.metadata as Record<string, unknown>) || {};
+      const currentUseCount = ((templateMetadata.useCount as number) || 0) + 1;
+      await tx.content.update({
+        where: { id: templateId },
         data: {
-          playlistId: playlist.id,
-          contentId: content.id,
-          order: nextOrder,
-          duration: dto.duration || null,
+          metadata: {
+            ...templateMetadata,
+            useCount: currentUseCount,
+          } as Prisma.InputJsonValue,
         },
       });
 
-      // Assign this playlist to the display
-      await this.db.display.update({
-        where: { id: displayId },
-        data: { currentPlaylistId: playlist.id },
-      });
-
-      displayCount++;
-    }
-
-    // 4. Increment useCount on the source template
-    const templateMetadata = (template.metadata as Record<string, unknown>) || {};
-    const currentUseCount = ((templateMetadata.useCount as number) || 0) + 1;
-    await this.db.content.update({
-      where: { id: templateId },
-      data: {
-        metadata: {
-          ...templateMetadata,
-          useCount: currentUseCount,
-        } as Prisma.InputJsonValue,
-      },
+      return { contentId: content.id, displayCount };
     });
-
-    return { contentId: content.id, displayCount };
   }
 
   /**
