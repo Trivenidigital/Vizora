@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
 
 interface AIDesignerModalProps {
@@ -37,6 +37,21 @@ export default function AIDesignerModal({ onClose, onTemplateGenerated }: AIDesi
   const [selectedStyle, setSelectedStyle] = useState('');
   const [generationStep, setGenerationStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
+
+  // Close on Escape key and lock body scroll
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = 'unset';
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [onClose]);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
