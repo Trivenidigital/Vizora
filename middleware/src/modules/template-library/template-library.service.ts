@@ -395,6 +395,53 @@ export class TemplateLibraryService {
   }
 
   /**
+   * Create a blank org-scoped design for the user to customize
+   */
+  async createBlank(organizationId: string, orientation: 'landscape' | 'portrait' = 'landscape') {
+    const templateHtml = `<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body { margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #ffffff; font-family: system-ui, sans-serif; }
+  .placeholder { text-align: center; color: #999; }
+  .placeholder h2 { font-size: 24px; font-weight: 300; margin: 0 0 8px; }
+  .placeholder p { font-size: 14px; margin: 0; }
+</style>
+</head>
+<body>
+  <div class="placeholder">
+    <h2>Your Design</h2>
+    <p>Click elements to edit in the visual editor</p>
+  </div>
+</body>
+</html>`;
+
+    const content = await this.db.content.create({
+      data: {
+        name: 'Untitled Design',
+        description: null,
+        type: 'template',
+        url: '',
+        duration: 30,
+        templateOrientation: orientation,
+        metadata: {
+          templateHtml,
+          isLibraryTemplate: false,
+          category: 'general',
+          libraryTags: [],
+          dataSource: { type: 'manual' },
+          refreshConfig: { enabled: false, intervalMinutes: 0 },
+        },
+        organizationId,
+        isGlobal: false,
+        status: 'active',
+      },
+    });
+
+    return this.mapTemplateResponse(content);
+  }
+
+  /**
    * AI template generation (placeholder)
    */
   async aiGenerate(_prompt: string, _options?: { category?: string; orientation?: string; style?: string }) {

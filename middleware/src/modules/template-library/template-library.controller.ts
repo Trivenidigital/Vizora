@@ -67,6 +67,16 @@ export class TemplateLibraryController {
     return this.templateLibraryService.getUserTemplates(organizationId, dto);
   }
 
+  @Post('create-blank')
+  @Roles('admin', 'manager', 'viewer')
+  @HttpCode(HttpStatus.CREATED)
+  createBlank(
+    @CurrentUser('organizationId') organizationId: string,
+    @Body() body: { orientation?: 'landscape' | 'portrait' },
+  ) {
+    return this.templateLibraryService.createBlank(organizationId, body?.orientation);
+  }
+
   @Post('ai-generate')
   @Roles('admin', 'manager')
   @HttpCode(HttpStatus.OK)
