@@ -204,12 +204,17 @@ export default function TemplateLibraryPage() {
     if (!cloneModalId) return;
     try {
       setCloning(true);
-      await apiClient.cloneTemplate(cloneModalId);
+      const cloned = await apiClient.cloneTemplate(cloneModalId);
       setCloneModalId(null);
       setDetailModalId(null);
-      // Switch to user templates to show the clone
-      setViewMode('your-templates');
-      loadUserTemplates();
+      // Navigate to WYSIWYG editor with the cloned template
+      const clonedId = (cloned as any).id;
+      if (clonedId) {
+        router.push(`/dashboard/templates/${clonedId}/edit-visual`);
+      } else {
+        setViewMode('your-templates');
+        loadUserTemplates();
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to clone template');
     } finally {
