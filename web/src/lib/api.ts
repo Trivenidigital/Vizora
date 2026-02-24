@@ -1316,6 +1316,13 @@ class ApiClient {
     });
   }
 
+  async createBlankDesign(orientation?: 'landscape' | 'portrait'): Promise<Content> {
+    return this.request<Content>('/template-library/create-blank', {
+      method: 'POST',
+      body: JSON.stringify({ orientation: orientation || 'landscape' }),
+    });
+  }
+
   // ========== Template Admin API Methods ==========
 
   async createTemplate(data: {
