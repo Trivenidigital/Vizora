@@ -19,6 +19,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const unreadCountAbortRef = useRef<AbortController | null>(null);
 
   // Socket connection for real-time updates
   const { on, isConnected } = useSocket({
@@ -43,13 +44,45 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     }
   }, []);
 
-  // Fetch unread count
+  // Fetch unread count with request deduplication
   const fetchUnreadCount = useCallback(async () => {
+    // Abort any in-flight unread-count request to prevent piling
+    if (unreadCountAbortRef.current) {
+      unreadCountAbortRef.current.abort();
+    }
+
+    const controller = new AbortController();
+    unreadCountAbortRef.current = controller;
+
+    // Use a 5s timeout instead of the default 30s
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
     try {
-      const response = await apiClient.getUnreadNotificationCount();
-      setUnreadCount(response.count);
-    } catch (err) {
-      console.error('[Notifications] Failed to fetch unread count:', err);
+      const response = await fetch(
+        `${apiClient.getBaseUrl()}/notifications/unread-count`,
+        {
+          credentials: 'include',
+          signal: controller.signal,
+        }
+      );
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        return; // Silently fail — don't trigger "offline mode"
+      }
+
+      const data = await response.json();
+      // Auto-unwrap response envelope
+      const count = data?.data?.count ?? data?.count ?? 0;
+      setUnreadCount(count);
+    } catch {
+      clearTimeout(timeoutId);
+      // Silently ignore — AbortError or network failure
+      // Don't log errors for aborted requests or timeouts
+    } finally {
+      if (unreadCountAbortRef.current === controller) {
+        unreadCountAbortRef.current = null;
+      }
     }
   }, []);
 
@@ -121,6 +154,11 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     return () => {
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
+      }
+      // Abort any in-flight request on cleanup
+      if (unreadCountAbortRef.current) {
+        unreadCountAbortRef.current.abort();
+        unreadCountAbortRef.current = null;
       }
     };
   }, [autoFetch, user, pollInterval, fetchUnreadCount]);

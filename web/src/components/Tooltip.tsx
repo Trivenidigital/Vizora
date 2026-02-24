@@ -33,11 +33,11 @@ export default function Tooltip({
       </div>
       {show && (
         <div
-          className={`absolute z-50 px-3 py-2 text-sm text-white bg-[#061A21] rounded-lg shadow-lg whitespace-nowrap ${positionClasses[position]}`}
+          className={`absolute z-50 px-3 py-2 text-sm text-[var(--foreground)] bg-[var(--surface-secondary)] rounded-lg shadow-lg whitespace-nowrap border border-[var(--border)] ${positionClasses[position]}`}
           role="tooltip"
         >
           {content}
-          <div className="absolute w-2 h-2 bg-[#061A21] transform rotate-45" />
+          <div className="absolute w-2 h-2 bg-[var(--surface-secondary)] transform rotate-45" />
         </div>
       )}
     </div>

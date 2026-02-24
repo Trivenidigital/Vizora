@@ -32,6 +32,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     applyTheme(shouldBeDark);
   }, []);
 
+  // Sync dark class whenever isDark changes (ensures React reconciliation doesn't undo it)
+  useEffect(() => {
+    if (!isMounted) return;
+    applyTheme(isDark);
+  }, [isDark, isMounted]);
+
   // Listen for system theme changes
   useEffect(() => {
     if (!isMounted) return;
@@ -59,11 +65,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const applyTheme = (dark: boolean) => {
     const html = document.documentElement;
-    if (dark) {
-      html.classList.add('dark');
-    } else {
-      html.classList.remove('dark');
-    }
+    html.classList.toggle('dark', dark);
+    // Also update color-scheme for browser form elements
+    html.style.colorScheme = dark ? 'dark' : 'light';
   };
 
   const setMode = (newMode: ThemeMode) => {

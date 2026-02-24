@@ -16,6 +16,7 @@ jest.mock('@/lib/api', () => {
       getCurrentUser: jest.fn().mockResolvedValue({ id: 'u1', email: 'test@test.com', firstName: 'Test', lastName: 'User', organizationId: 'org1', role: 'admin' }),
       setAuthenticated: jest.fn(),
       logout: jest.fn(),
+      getBaseUrl: jest.fn().mockReturnValue('/api/v1'),
     },
   };
 });
@@ -46,9 +47,24 @@ jest.mock('../useAuth', () => ({
   }),
 }));
 
+// Mock fetch for unread-count endpoint
+const mockFetch = jest.fn().mockResolvedValue({
+  ok: true,
+  json: () => Promise.resolve({ data: { count: 1 } }),
+});
+global.fetch = mockFetch;
+
 const hookOptions = { autoFetch: true, pollInterval: 999999999 };
 
 describe('useNotifications', () => {
+  beforeEach(() => {
+    mockFetch.mockClear();
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: { count: 1 } }),
+    });
+  });
+
   it('fetches notifications on mount', async () => {
     const { result } = renderHook(() => useNotifications(hookOptions));
 
@@ -60,11 +76,19 @@ describe('useNotifications', () => {
     expect(result.current.unreadCount).toBe(1);
   });
 
-  it('calls API methods', () => {
+  it('calls API methods', async () => {
     renderHook(() => useNotifications(hookOptions));
     const { apiClient } = require('@/lib/api');
-    expect(apiClient.getNotifications).toHaveBeenCalled();
-    expect(apiClient.getUnreadNotificationCount).toHaveBeenCalled();
+
+    await waitFor(() => {
+      expect(apiClient.getNotifications).toHaveBeenCalled();
+    });
+
+    // unread-count now uses fetch directly instead of apiClient
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/v1/notifications/unread-count',
+      expect.objectContaining({ credentials: 'include' })
+    );
   });
 
   it('returns expected API functions', () => {
@@ -78,5 +102,22 @@ describe('useNotifications', () => {
   it('starts in loading state', () => {
     const { result } = renderHook(() => useNotifications(hookOptions));
     expect(result.current.loading).toBe(true);
+  });
+
+  it('handles unread-count timeout gracefully', async () => {
+    // Simulate a timeout (abort)
+    mockFetch.mockImplementation(() => {
+      return new Promise((_, reject) => {
+        reject(new DOMException('Aborted', 'AbortError'));
+      });
+    });
+
+    const { result } = renderHook(() => useNotifications(hookOptions));
+
+    // Should not throw, unreadCount stays at 0
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+    expect(result.current.unreadCount).toBe(0);
   });
 });

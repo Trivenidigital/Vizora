@@ -41,7 +41,7 @@ export default function TrialBanner() {
         <div className="px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse shrink-0" />
-            <p className="text-sm text-red-100 truncate">
+            <p className="text-sm text-red-100">
               <span className="font-semibold">Your free trial has ended.</span>
               {' '}Your data is safe. Upgrade to pick up where you left off.
             </p>
@@ -63,7 +63,7 @@ export default function TrialBanner() {
         <div className="px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse shrink-0" />
-            <p className="text-sm text-amber-100 truncate">
+            <p className="text-sm text-amber-100">
               <span className="font-semibold">Free Trial</span>
               {' '}&mdash; {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'} remaining. Upgrade to keep your screens running.
             </p>
@@ -92,11 +92,11 @@ export default function TrialBanner() {
 
   // Normal trial state (> 5 days left)
   return (
-    <div className="bg-gradient-to-r from-[#061A21] to-[#0a2a35] border-b border-[#00E5A0]/20">
+    <div className="bg-[var(--surface)] border-b border-[var(--primary)]/20">
       <div className="px-4 sm:px-6 lg:px-8 py-2 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-2 h-2 bg-[#00E5A0] rounded-full shrink-0" />
-          <p className="text-sm text-[#00E5A0]/90 truncate">
+          <div className="w-2 h-2 bg-[var(--primary)] rounded-full shrink-0" />
+          <p className="text-sm text-[var(--primary)]">
             <span className="font-semibold">Free Trial</span>
             {' '}&mdash; {daysRemaining} days remaining
           </p>
@@ -104,13 +104,13 @@ export default function TrialBanner() {
         <div className="flex items-center gap-2 shrink-0">
           <Link
             href="/dashboard/settings/billing/plans"
-            className="px-3 py-1 text-sm text-[#00E5A0] border border-[#00E5A0]/30 rounded-md hover:bg-[#00E5A0]/10 transition-colors font-medium"
+            className="px-3 py-1 text-sm text-[var(--primary)] border border-[var(--primary)]/30 rounded-md hover:bg-[var(--primary)]/10 transition-colors font-medium"
           >
             View Plans
           </Link>
           <button
             onClick={() => setDismissed(true)}
-            className="p-1.5 text-[#00E5A0]/30 hover:text-[#00E5A0]/60 transition-colors"
+            className="p-1.5 text-[var(--primary)]/30 hover:text-[var(--primary)]/60 transition-colors"
             aria-label="Dismiss"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

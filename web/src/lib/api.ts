@@ -117,6 +117,10 @@ class ApiClient {
     this.baseUrl = baseUrl;
   }
 
+  getBaseUrl(): string {
+    return this.baseUrl;
+  }
+
   /**
    * Ensure a CSRF token cookie is available before making mutating requests.
    * Makes a lightweight GET to the health endpoint to receive the CSRF cookie.
