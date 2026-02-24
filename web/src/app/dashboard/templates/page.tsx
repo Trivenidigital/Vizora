@@ -210,7 +210,7 @@ export default function TemplateLibraryPage() {
       // Navigate to WYSIWYG editor with the cloned template
       const clonedId = (cloned as any).id;
       if (clonedId) {
-        router.push(`/dashboard/templates/${clonedId}/edit-visual`);
+        router.push(`/dashboard/templates/${clonedId}/edit`);
       } else {
         setViewMode('your-templates');
         loadUserTemplates();

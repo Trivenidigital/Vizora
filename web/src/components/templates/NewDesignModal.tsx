@@ -33,7 +33,7 @@ export default function NewDesignModal({ onClose, onStartFromTemplate, onAIDesig
       const result = await apiClient.createBlankDesign('landscape');
       const id = (result as any).id;
       if (id) {
-        router.push(`/dashboard/templates/${id}/edit-visual`);
+        router.push(`/dashboard/templates/${id}/edit`);
       }
     } catch (err) {
       console.error('Failed to create blank design:', err);
