@@ -10,6 +10,7 @@ import TemplateSidebar from '@/components/templates/TemplateSidebar';
 import TemplateCard from '@/components/templates/TemplateCard';
 import TemplateDetailModal from '@/components/templates/TemplateDetailModal';
 import AIDesignerModal from '@/components/templates/AIDesignerModal';
+import NewDesignModal from '@/components/templates/NewDesignModal';
 import { TemplateGridSkeleton } from '@/components/templates/TemplateCardSkeleton';
 
 interface TemplateItem {
@@ -73,6 +74,7 @@ export default function TemplateLibraryPage() {
   const [deleting, setDeleting] = useState(false);
   const [cloneModalId, setCloneModalId] = useState<string | null>(null);
   const [cloning, setCloning] = useState(false);
+  const [showNewDesign, setShowNewDesign] = useState(false);
 
   // Featured scroll
   const featuredRef = useRef<HTMLDivElement>(null);
@@ -293,7 +295,7 @@ export default function TemplateLibraryPage() {
           onDifficultyChange={(d) => { setSelectedDifficulty(d); setPage(1); }}
           viewMode={viewMode}
           onViewModeChange={(m) => { setViewMode(m); setPage(1); setSearchQuery(''); }}
-          onNewDesignClick={() => router.push('/dashboard/templates/new')}
+          onNewDesignClick={() => setShowNewDesign(true)}
           onAIDesignerClick={() => setShowAIDesigner(true)}
           isAdmin={isAdmin}
           totalCount={totalCount}
@@ -325,6 +327,13 @@ export default function TemplateLibraryPage() {
                 className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium text-[#00E5A0] border border-[#00E5A0]/20 hover:bg-[#00E5A0]/5 transition-all"
               >
                 AI Designer
+              </button>
+              <button
+                onClick={() => setShowNewDesign(true)}
+                className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--foreground-secondary)] border border-[var(--border)] hover:bg-[var(--surface-hover)] transition-all flex items-center gap-1"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                New Design
               </button>
               {viewMode === 'home' && (
                 <>
@@ -641,6 +650,18 @@ export default function TemplateLibraryPage() {
             setViewMode('your-templates');
             loadUserTemplates();
           }}
+        />
+      )}
+
+      {/* New Design Modal */}
+      {showNewDesign && (
+        <NewDesignModal
+          onClose={() => setShowNewDesign(false)}
+          onStartFromTemplate={() => {
+            setViewMode('home');
+            setPage(1);
+          }}
+          onAIDesigner={() => setShowAIDesigner(true)}
         />
       )}
 
