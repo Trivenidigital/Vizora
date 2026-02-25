@@ -15,6 +15,20 @@
     "lint:web": "pnpm --filter @vizora/web exec next lint"
   },
   "private": true,
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "sharp",
+      "esbuild",
+      "@swc/core",
+      "nx",
+      "@parcel/watcher",
+      "msgpackr-extract",
+      "unrs-resolver"
+    ]
+  },
   "devDependencies": {
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.0.0",
