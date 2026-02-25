@@ -147,7 +147,25 @@ export default function ContentClient() {
  } else {
  response = await apiClient.getContent();
  }
- setContent(response.data || response || []);
+ const items = response.data || response || [];
+ setContent(items);
+
+ // Auto-generate missing thumbnails for image content in the background
+ const imageMissingThumbnails = items.filter(
+   (item: Content) => item.type === 'image' && !item.thumbnailUrl && item.id
+ );
+ if (imageMissingThumbnails.length > 0) {
+   Promise.allSettled(
+     imageMissingThumbnails.map((item: Content) =>
+       apiClient.generateThumbnail(item.id).catch(() => {})
+     )
+   ).then(() => {
+     // Reload to pick up newly generated thumbnails
+     apiClient.getContent().then(refreshed => {
+       setContent(refreshed.data || refreshed || []);
+     }).catch(() => {});
+   });
+ }
  } catch (error: any) {
  toast.error(error.message || 'Failed to load content');
  } finally {
@@ -264,7 +282,7 @@ export default function ContentClient() {
  // Generate thumbnail for images
  if (uploadForm.type === 'image' && newContent.id) {
  try {
- await apiClient.post(`/content/${newContent.id}/thumbnail`);
+ await apiClient.generateThumbnail(newContent.id);
  } catch (thumbnailError) {
  console.warn('Thumbnail generation failed:', thumbnailError);
  }

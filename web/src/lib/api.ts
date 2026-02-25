@@ -499,7 +499,9 @@ class ApiClient {
         if (process.env.NODE_ENV === 'development') {
           console.log('[API] File upload successful');
         }
-        return result.content || result;
+        // Unwrap response envelope { success, data: { content, fileHash } }
+        const unwrapped = (result && typeof result === 'object' && 'success' in result && 'data' in result) ? result.data : result;
+        return unwrapped.content || unwrapped;
       } catch (error) {
         clearTimeout(timeoutId);
         if (error instanceof Error && error.name === 'AbortError') {
@@ -1430,6 +1432,15 @@ class ApiClient {
   async removeQrOverlay(displayId: string): Promise<void> {
     return this.request<void>(`/displays/${displayId}/qr-overlay`, {
       method: 'DELETE',
+    });
+  }
+
+  /**
+   * Trigger thumbnail generation for a content item.
+   */
+  async generateThumbnail(contentId: string): Promise<{ thumbnail: string }> {
+    return this.request<{ thumbnail: string }>(`/content/${contentId}/thumbnail`, {
+      method: 'POST',
     });
   }
 
