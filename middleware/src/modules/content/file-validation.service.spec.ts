@@ -227,6 +227,33 @@ describe('FileValidationService', () => {
         ).rejects.toThrow('suspicious content');
       });
 
+      it('should allow JPEGs with base64 in EXIF/XMP metadata', async () => {
+        // Real-world JPEGs often contain XMP metadata with base64-encoded thumbnails
+        const jpegWithXmpBase64 = Buffer.concat([
+          Buffer.from([0xff, 0xd8, 0xff]),
+          Buffer.from('xmlns:xmp="http://ns.adobe.com/xap/1.0/" base64,iVBOR'),
+        ]);
+
+        const result = await service.validateFile(
+          jpegWithXmpBase64,
+          'photo.jpg',
+          'image/jpeg',
+        );
+
+        expect(result.valid).toBe(true);
+      });
+
+      it('should reject files with data: URI base64 payloads', async () => {
+        const maliciousFile = Buffer.concat([
+          Buffer.from([0xff, 0xd8, 0xff]),
+          Buffer.from('data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg=='),
+        ]);
+
+        await expect(
+          service.validateFile(maliciousFile, 'evil.jpg', 'image/jpeg'),
+        ).rejects.toThrow('suspicious content');
+      });
+
       it('should reject PDFs with JavaScript', async () => {
         const maliciousPdf = Buffer.concat([
           Buffer.from([0x25, 0x50, 0x44, 0x46]),

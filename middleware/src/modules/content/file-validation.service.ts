@@ -160,7 +160,7 @@ export class FileValidationService {
       /onerror=/i,
       /onload=/i,
       /eval\(/i,
-      /base64,/i, // Base64-encoded executables
+      /data:\s*[^;]{1,50};\s*base64,/i, // data: URI with Base64-encoded payload
       /%PDF.*\/JS/i, // PDF with JavaScript
       /\/EmbeddedFile/i, // PDF with embedded files
     ];
