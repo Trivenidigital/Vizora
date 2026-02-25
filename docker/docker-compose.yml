@@ -208,6 +208,7 @@ services:
   #
   # On Linux hosts, uncomment extra_hosts below so host.docker.internal resolves.
   nginx:
+    profiles: ["production"]
     build:
       context: ./nginx
       dockerfile: Dockerfile

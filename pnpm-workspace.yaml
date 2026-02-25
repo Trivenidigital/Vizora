@@ -1,9 +1,10 @@
 packages:
-  - 'packages/*'
-  - 'middleware'
-  - 'realtime'
-  - 'web'
-  - 'display'
-  - 'display-android'
-  - 'mobile'
+  - packages/*
+  - middleware
+  - realtime
+  - web
+  - display
+  - display-android
+  - mobile
+
 autoInstallPeers: true
