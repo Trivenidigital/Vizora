@@ -39,61 +39,9 @@ export default function HealthMonitoringClient() {
  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline' | 'error'>('offline');
  const [activeAlerts, setActiveAlerts] = useState<Record<string, any>>({});
 
- // Real-time event handling for health alerts
+ // Real-time event handling for health monitoring
  useRealtimeEvents({
  enabled: true,
- onHealthAlert: (alert) => {
- // Add to active alerts
- setActiveAlerts((prev) => ({
- ...prev,
- [alert.deviceId]: alert,
- }));
-
- // Update device health if we have that device
- setDeviceHealthData((prev) => {
- const device = devices.find((d) => d.id === alert.deviceId);
- if (!device) return prev;
-
- const currentHealth = prev[alert.deviceId] || generateMockDeviceHealth(alert.deviceId, device.nickname);
-
- // Adjust health score based on alert severity
- let newScore = currentHealth.score;
- if (alert.severity === 'critical') {
- newScore = Math.max(0, newScore - 20);
- } else if (alert.severity === 'warning') {
- newScore = Math.max(0, newScore - 10);
- }
-
- return {
- ...prev,
- [alert.deviceId]: {
- ...currentHealth,
- score: newScore,
- },
- };
- });
-
- // Show toast notification
- switch (alert.severity) {
- case 'critical':
- toast.error(`Critical: ${alert.message} (Device)`);
- break;
- case 'warning':
- toast.warning(`Warning: ${alert.message} (Device)`);
- break;
- default:
- toast.info(`${alert.message} (Device)`);
- }
-
- // Clear alert after 30 seconds
- setTimeout(() => {
- setActiveAlerts((prev) => {
- const updated = { ...prev };
- delete updated[alert.deviceId];
- return updated;
- });
- }, 30000);
- },
  onConnectionChange: (isConnected) => {
  setRealtimeStatus(isConnected ? 'connected' : 'offline');
  if (isConnected) {
