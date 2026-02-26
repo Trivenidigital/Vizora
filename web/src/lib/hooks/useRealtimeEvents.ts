@@ -19,23 +19,6 @@ export type PlaylistUpdate = {
   payload: Partial<Playlist>;
 };
 
-export type HealthAlert = {
-  deviceId: string;
-  alertType: 'high_cpu' | 'high_memory' | 'disk_full' | 'offline' | 'error';
-  severity: 'critical' | 'warning' | 'info';
-  message: string;
-  timestamp: string;
-};
-
-export type ScheduleExecution = {
-  scheduleId: string;
-  displayId: string;
-  playlistId: string;
-  action: 'started' | 'completed' | 'failed';
-  timestamp: string;
-  error?: string;
-};
-
 // Sync Queue for offline support
 interface SyncQueueItem {
   id: string;
@@ -60,9 +43,7 @@ export interface UseRealtimeEventsOptions {
   };
   onDeviceStatusChange?: (update: DeviceStatusUpdate) => void;
   onPlaylistChange?: (update: PlaylistUpdate) => void;
-  onHealthAlert?: (alert: HealthAlert) => void;
-  onScheduleExecution?: (execution: ScheduleExecution) => void;
-  onConnectionChange?: (isConnected: boolean) => void;
+  onConnectionChange?: (isConnected: boolean | null) => void;
   onSyncStateChange?: (state: SyncState) => void;
   offlineQueueSize?: number;
   retryAttempts?: number;
@@ -74,8 +55,6 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
     auth,
     onDeviceStatusChange,
     onPlaylistChange,
-    onHealthAlert,
-    onScheduleExecution,
     onConnectionChange,
     onSyncStateChange,
     offlineQueueSize = 50,
@@ -255,28 +234,6 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
     [onPlaylistChange, resolveConflict]
   );
 
-  // Health alert handler
-  const handleHealthAlert = useCallback(
-    (alert: HealthAlert) => {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[RealtimeEvents] Health alert:', alert);
-      }
-      onHealthAlert?.(alert);
-    },
-    [onHealthAlert]
-  );
-
-  // Schedule execution handler
-  const handleScheduleExecution = useCallback(
-    (execution: ScheduleExecution) => {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[RealtimeEvents] Schedule execution:', execution);
-      }
-      onScheduleExecution?.(execution);
-    },
-    [onScheduleExecution]
-  );
-
   // Setup Socket.io event listeners
   useEffect(() => {
     if (!enabled || !socket) return;
@@ -286,12 +243,6 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
 
     // Playlist changes
     const unsubPlaylist = on('playlist:updated', handlePlaylistUpdate);
-
-    // Health alerts
-    const unsubHealth = on('health:alert', handleHealthAlert);
-
-    // Schedule execution
-    const unsubSchedule = on('schedule:executed', handleScheduleExecution);
 
     // Connection state change
     const unsubConnect = on('connect', () => {
@@ -305,9 +256,10 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
 
     const unsubDisconnect = on('disconnect', () => {
       setIsOffline(true);
-      onConnectionChange?.(false);
+      // null = reconnecting (WS dropped but browser online), false = truly offline
+      onConnectionChange?.(navigator.onLine ? null : false);
       if (process.env.NODE_ENV === 'development') {
-        console.log('[RealtimeEvents] Disconnected, offline mode enabled');
+        console.log('[RealtimeEvents] Disconnected, browser online:', navigator.onLine);
       }
     });
 
@@ -319,8 +271,6 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
     return () => {
       unsubDeviceStatus?.();
       unsubPlaylist?.();
-      unsubHealth?.();
-      unsubSchedule?.();
       unsubConnect?.();
       unsubDisconnect?.();
     };
@@ -330,8 +280,6 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
     on,
     handleDeviceStatusUpdate,
     handlePlaylistUpdate,
-    handleHealthAlert,
-    handleScheduleExecution,
     onConnectionChange,
     onSyncStateChange,
     syncOfflineQueue,
@@ -344,6 +292,7 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
         console.log('[RealtimeEvents] Browser online, attempting to sync...');
       }
       setIsOffline(false);
+      onConnectionChange?.(null); // Signal reconnecting (not offline, not yet connected)
       if (isConnected) {
         syncOfflineQueue();
       }
@@ -363,7 +312,7 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [isConnected, syncOfflineQueue]);
+  }, [isConnected, syncOfflineQueue, onConnectionChange]);
 
   // Public API
   return {
@@ -379,9 +328,6 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
     },
     emitPlaylistUpdate: (data: PlaylistUpdate) => {
       emitEvent('playlist:update', data, { optimistic: true });
-    },
-    emitScheduleUpdate: (data: ScheduleExecution) => {
-      emitEvent('schedule:update', data, { optimistic: true });
     },
     emitCustomEvent: (event: string, data: any, options?: { optimistic?: boolean }) => {
       emitEvent(event, data, options);

@@ -39,7 +39,7 @@ export class SanitizeInterceptor implements NestInterceptor {
    */
   private readonly templateSanitizeOptions: sanitizeHtml.IOptions = {
     allowedTags: sanitizeHtml.defaults.allowedTags.concat([
-      'style', 'img', 'video', 'source', 'iframe', 'div', 'span', 'section',
+      'style', 'img', 'video', 'source', 'div', 'span', 'section',
       'header', 'footer', 'nav', 'main', 'article', 'aside', 'figure',
       'figcaption', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'svg', 'path',
       'circle', 'rect', 'line', 'polyline', 'polygon', 'text', 'g', 'defs',
@@ -53,8 +53,6 @@ export class SanitizeInterceptor implements NestInterceptor {
       'video': ['src', 'poster', 'width', 'height', 'controls', 'autoplay',
                 'loop', 'muted', 'preload', 'playsinline'],
       'source': ['src', 'type', 'media', 'srcset', 'sizes'],
-      'iframe': ['src', 'width', 'height', 'frameborder', 'allow',
-                 'allowfullscreen', 'sandbox', 'loading'],
       'a': ['href', 'target', 'rel'],
       'svg': ['viewBox', 'xmlns', 'width', 'height', 'fill', 'stroke'],
       'path': ['d', 'fill', 'stroke', 'stroke-width', 'transform'],

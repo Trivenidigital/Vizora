@@ -213,7 +213,7 @@ export class ContentController {
     // Check if content is stored in MinIO
     if (content.url.startsWith(MINIO_URL_PREFIX)) {
       const objectKey = content.url.substring(MINIO_URL_PREFIX.length);
-      const expiry = expirySeconds ? parseInt(expirySeconds, 10) : 3600;
+      const expiry = Math.min(parseInt(expirySeconds, 10) || 3600, 86400);
 
       if (!this.storageService.isMinioAvailable()) {
         throw new BadRequestException('Storage service is currently unavailable');

@@ -71,11 +71,14 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  }, []);
 
  // Memoized callback for connection changes
- const handleConnectionChange = useCallback((isConnected: boolean) => {
- setRealtimeStatus(isConnected ? 'connected' : 'offline');
- if (isConnected) {
+ const handleConnectionChange = useCallback((isConnected: boolean | null) => {
+ if (isConnected === true) {
+ setRealtimeStatus('connected');
  toast.info('Real-time connection established');
+ } else if (isConnected === false) {
+ setRealtimeStatus('offline');
  }
+ // null = reconnecting, keep current status
  }, [toast]);
 
  // Real-time event handling

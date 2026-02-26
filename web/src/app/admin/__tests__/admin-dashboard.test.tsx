@@ -1,3 +1,9 @@
+/**
+ * NOTE: These tests fail because the page component is async (server-component style)
+ * but renders as a Client Component in jsdom, producing an empty <div />.
+ * This is a known issue tied to the RSC migration deferral.
+ * Tests will be fixed when the page is refactored to proper RSC architecture.
+ */
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';

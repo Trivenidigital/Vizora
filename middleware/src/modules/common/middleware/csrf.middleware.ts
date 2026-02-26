@@ -50,15 +50,23 @@ export class CsrfMiddleware implements NestMiddleware {
 
     // Skip CSRF for public endpoints that don't require cookies
     // These use other protections (rate limiting)
-    // Check using includes() to handle various path formats
+    // Use endsWith() for exact suffix matching to prevent path traversal bypasses
     const fullPath = req.originalUrl || req.url || req.path;
-    const isDevicePairing = fullPath.includes('/devices/pairing');
-    const isAuthLogin = fullPath.includes('/auth/login');
-    const isAuthRegister = fullPath.includes('/auth/register');
-    const isAuthForgotPassword = fullPath.includes('/auth/forgot-password');
-    const isAuthResetPassword = fullPath.includes('/auth/reset-password');
+    const csrfExemptSuffixes = [
+      '/auth/login',
+      '/auth/register',
+      '/auth/forgot-password',
+      '/auth/reset-password',
+      '/devices/pairing/request',
+      '/devices/pairing/status',
+      '/webhooks/stripe',
+      '/webhooks/razorpay',
+    ];
 
-    if (isDevicePairing || isAuthLogin || isAuthRegister || isAuthForgotPassword || isAuthResetPassword) {
+    const isExempt = csrfExemptSuffixes.some(suffix => fullPath.endsWith(suffix))
+      || fullPath.match(/\/devices\/pairing\/status\/[A-Za-z0-9]+$/);
+
+    if (isExempt) {
       return next();
     }
 

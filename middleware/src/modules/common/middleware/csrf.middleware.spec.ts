@@ -157,14 +157,16 @@ describe('CsrfMiddleware', () => {
       });
     });
 
-    it('should skip CSRF for paths that start with public paths', () => {
+    it('should NOT skip CSRF for paths that merely contain public suffixes', () => {
       mockRequest.method = 'POST';
       mockRequest.path = '/api/auth/login/something';
       mockRequest.cookies = { [AUTH_CONSTANTS.CSRF_COOKIE_NAME]: 'some-token' };
+      mockRequest.headers = { 'x-csrf-token': 'wrong-token' };
 
       middleware.use(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockNext).toHaveBeenCalled();
+      // Should not pass through — path traversal bypass should be blocked
+      expect(mockNext).not.toHaveBeenCalled();
     });
   });
 

@@ -1,143 +1,152 @@
 # Deployment Readiness Summary
 
-**Date:** 2026-02-17
-**Branch:** feat/phase-3-major-features
-**Assessment By:** Automated Testing Suite + Code Review
+**Date**: 2026-02-25
+**Branch**: `fix/content-upload-and-thumbnails`
+**Assessed By**: Comprehensive automated testing + security code inspection
 
 ---
 
 ## Test Results Overview
 
-| Service | Test Suites | Tests | Pass Rate | Build |
-|---------|-------------|-------|-----------|-------|
-| Middleware | 79 | 1,653 | 100% | PASS |
-| Realtime | 8 | 191 | 100% | PASS |
-| Web Dashboard | ~65 | ~500+ | ~97% (2 known failures) | PASS (direct) / FAIL (Nx) |
-| Display (Electron) | 0 | 0 | N/A | Not verified |
-| Display (Android TV) | 0 | 0 | N/A | Not verified |
-| **Total** | **~152** | **~2,344+** | **~99.9%** | **3/3 services build** |
+| Service | Suites | Tests | Passed | Failed | Pass Rate | Build |
+|---------|--------|-------|--------|--------|-----------|-------|
+| Middleware | 84 | 1,731 | 1,728 | 3 | 99.8% | **PASS** |
+| Realtime | 9 | 205 | 203 | 2 | 99.0% | **PASS** |
+| Web Dashboard | 73 | 823 | 774 | 49 | 94.0% | **FAIL** |
+| **TOTAL** | **166** | **2,759** | **2,705** | **54** | **98.0%** | **2/3 PASS** |
+
+### Failure Breakdown
+
+**Middleware (3 failures)**: JWT strategy returns NaN for storage fields — NEW regression on this branch
+**Realtime (2 failures)**: Test expects old API prefix `/api/` vs actual `/api/v1/` — test bug only
+**Web (49 failures)**:
+- 25 pre-existing (3 admin suites: async RSC in jsdom — known, not production bugs)
+- 24 new regressions (missing API methods, type mismatches, build error)
 
 ---
 
 ## Total Bugs by Severity
 
-| Severity | Count | Details |
-|----------|-------|---------|
-| **CRITICAL** | 3 | Secrets in git history, Docker default credentials, Grafana "admin123" password |
-| **HIGH** | 6 | Nx web build flaky, display client tests unverified/missing, template XSS gap, login rate limit permissive |
-| **MEDIUM** | 9 | Untested content controllers, CSRF race condition, API client SSR URL, Socket adapter untested, `any` types in API client, zero web utility test coverage, WS per-message rate limiting, web Dockerfile non-root, realtime missing bootstrap validation |
-| **LOW** | 8 | Jest force exit warnings (x2), missing source maps, stale dependency, slow tests, untested DB package, untested settings pages, 401 redirect scope |
-| **Total** | **26** | |
+| Severity | Module Tests | Code Inspection | Integration | Total |
+|----------|-------------|-----------------|-------------|-------|
+| **CRITICAL** | 0 | 1 | 1 | **2** |
+| **HIGH** | 1 | 2 | 4 | **7** |
+| **MEDIUM** | 1 | 7 | 4 | **12** |
+| **LOW** | 2 | 11 | 2 | **15** |
+| **TOTAL** | **4** | **21** | **11** | **36** |
 
 ---
 
 ## Deployment Blockers
 
-### 3 CRITICAL blockers that MUST be resolved:
+### CRITICAL — Must Fix Before Deploy
 
-1. **SECRETS IN GIT HISTORY (CRITICAL):** The `.env` file contains real JWT secrets, API secrets, and `GRAFANA_ADMIN_PASSWORD=admin123` committed to version control. Past commits expose: `JWT_SECRET`, `DEVICE_JWT_SECRET`, `INTERNAL_API_SECRET`.
+| # | Bug ID | Description | Service |
+|---|--------|-------------|---------|
+| 1 | BUG-BILLING-001 | **Webhook signature verification missing** — Stripe/Razorpay events silently dropped, subscription lifecycle broken | Middleware |
+| 2 | BUG-WEB-003 / BUG-INT-WEB-BUILD | **Web build fails** — TypeScript error in settings/page.tsx (`organization.settings` doesn't exist on type) | Web |
 
-   **FIX REQUIRED:**
-   - Rotate ALL secrets using `openssl rand -hex 32`
-   - Remove `.env` from git history (BFG Repo-Cleaner or `git filter-branch`)
+### HIGH — Should Fix Before Deploy
 
-2. **DOCKER DEFAULT CREDENTIALS (CRITICAL):** `docker-compose.yml` has insecure fallback defaults for MongoDB, Redis, and MinIO that would be used if env vars aren't set.
+| # | Bug ID | Description | Service |
+|---|--------|-------------|---------|
+| 3 | BUG-AUTH-001 | JWT strategy returns `NaN` for org storage fields | Middleware |
+| 4 | BUG-INT-001 | BigInt serialization crash on organization API endpoints | Middleware |
+| 5 | BUG-INT-002 | Frontend can't pass JWT to WebSocket (httpOnly cookie inaccessible) | Web↔Realtime |
+| 6 | BUG-WEB-001 | `apiClient.getQuotaUsage` missing — crashes dashboard page | Web |
+| 7 | BUG-WEB-002 | `apiClient.setAuthenticated` missing — crashes templates page | Web |
+| 8 | BUG-CONTENT-001 | Widget template name path traversal | Middleware |
+| 9 | BUG-CONTENT-002 | RSS data source SSRF (no URL validation) | Middleware |
 
-   **FIX REQUIRED:** Remove default fallbacks; require env vars explicitly.
+### MEDIUM — Fix Soon After Deploy
 
-3. **GRAFANA PASSWORD "admin123" (CRITICAL):** Monitoring infrastructure accessible with trivial password.
-
-   **FIX REQUIRED:** Set strong, unique password in production.
-
-### Additional HIGH concerns:
-
-4. **ROOT BUILD SCRIPT FLAKY (HIGH):** `pnpm run build` intermittently fails for web due to Nx plugin worker timeout. Post-deploy script may fail.
-
-5. **DISPLAY CLIENTS UNVERIFIED (HIGH):** Manual QA on target hardware essential before production.
-
-6. **PLAYWRIGHT E2E NOT RUN:** 24 spec files not executed (requires full service stack).
+| # | Bug ID | Description |
+|---|--------|-------------|
+| 10 | BUG-INT-003 | Content deletion orphans MinIO files |
+| 11 | BUG-INT-004 | Bulk delete doesn't decrement storage quota |
+| 12 | BUG-INT-005 | Plan upgrade doesn't update storage quota |
+| 13 | BUG-INT-006 | JWT strategy omits firstName/lastName |
+| 14 | BUG-AUTH-002 | ChangePassword DTO missing complexity validation |
+| 15 | BUG-BILLING-002 | Checkout successUrl/cancelUrl not validated |
+| 16 | BUG-BILLING-003 | Missing webhook idempotency |
+| 17 | BUG-COMMON-001 | CSRF middleware uses `includes()` for path exemption |
+| 18 | BUG-COMMON-002 | Sanitize interceptor allows `<iframe>` in templates |
+| 19 | BUG-CONTENT-003 | Template data source passes arbitrary headers |
+| 20 | BUG-CONTENT-004 | Template triple-brace validation bypass |
+| 21 | BUG-DISPLAYS-001 | Pairing code brute force not rate limited |
 
 ---
 
 ## Go/No-Go Recommendation
 
-### **NO-GO** - 3 critical security issues must be resolved first
-
-#### CRITICAL - Must Fix Immediately:
-- [ ] Rotate ALL secrets (JWT_SECRET, DEVICE_JWT_SECRET, INTERNAL_API_SECRET, Grafana password)
-- [ ] Remove `.env` from git history (`git filter-repo --path .env --invert-paths`)
-- [ ] Remove default credential fallbacks from `docker-compose.yml`
-- [ ] Generate production `.env` from `.env.production.example` with strong, unique values
-
-#### Must Do Before Deploy:
-- [ ] Fix root build script (bypass Nx for web: use `cd web && next build`)
-- [ ] Verify production `.env` has all CHANGEME values replaced
-- [ ] Manual QA of display clients (Electron/Android TV) on target hardware:
-  - Device pairing
-  - Content display / playlist cycling
-  - WebSocket reconnection after network loss
-  - Offline content playback
-
-#### Should Do Before Deploy:
-- [ ] Run Playwright E2E suite (`npx playwright test`) in staging environment
-- [ ] Reduce login rate limit from 5/min to 3/min
-- [ ] Add `USER node` to web/Dockerfile
-- [ ] Add bootstrap validation to realtime service
-- [ ] Test CSRF token availability on fresh page loads
-
-#### Can Do After Deploy:
-- [ ] Add display client test suites (Electron + Android TV)
-- [ ] Add per-message WebSocket rate limiting
-- [ ] Add template content validation for XSS prevention
-- [ ] Replace `any` types in web API client with proper interfaces
-- [ ] Fix Jest force-exit issues in middleware and realtime
-- [ ] Add database migration smoke tests
+### **NO-GO** — 2 Critical + 7 High-severity issues must be resolved
 
 ---
 
 ## Prioritized Fix List
 
-| Priority | Bug ID | Description | Effort |
-|----------|--------|-------------|--------|
-| **1** | **SEC-001** | **Rotate secrets + scrub git history** | **1-2 hours** |
-| **2** | **SEC-002** | **Remove Docker default credentials** | **30 min** |
-| **3** | **SEC-003** | **Set strong Grafana password** | **5 min** |
-| 4 | INT-BUG-005 | Fix root build script / Nx web build | 1-2 hours |
-| 5 | BUG-DISP-001/002 | Manual QA display clients | 4-8 hours |
-| 6 | SEC-005 | Reduce login rate limit to 3/min | 15 min |
-| 7 | SEC-007 | Add `USER node` to web Dockerfile | 5 min |
-| 8 | SEC-008 | Add realtime bootstrap validation | 30 min |
-| 9 | BUG-WEB-003 | API client SSR URL validation | 30 min |
-| 10 | BUG-MW-001 | Add content sub-controller tests | 4-6 hours |
-| 11 | SEC-006 | WebSocket per-message rate limiting | 2-3 hours |
-| 12 | SEC-004 | Template content XSS validation | 3-4 hours |
-| 13 | INT-BUG-003 | CSRF token initialization | 1-2 hours |
-| 14 | INT-BUG-002 | Replace `any` types in API client | 2-3 hours |
-| 15 | BUG-MW-004/RT-001 | Fix Jest force-exit warnings | 1-2 hours |
+| Priority | Bug ID | Description | Estimated Effort |
+|----------|--------|-------------|------------------|
+| **1** | BUG-BILLING-001 | Fix webhook signature verification | 2-3 hours |
+| **2** | BUG-WEB-003 | Fix web build TypeScript error | 30 min |
+| **3** | BUG-AUTH-001 | Fix NaN in JWT org storage fields | 15 min |
+| **4** | BUG-INT-001 | Add BigInt conversion in organizations service | 30 min |
+| **5** | BUG-WEB-001 | Add `getQuotaUsage()` to API client or guard call | 30 min |
+| **6** | BUG-WEB-002 | Add `setAuthenticated()` to API client or remove call | 15 min |
+| **7** | BUG-INT-002 | Fix WebSocket auth (cookie transport or token endpoint) | 2-3 hours |
+| **8** | BUG-CONTENT-001 | Sanitize widget template names | 15 min |
+| **9** | BUG-CONTENT-002 | Add SSRF validation to RSS data source | 30 min |
+| 10 | BUG-INT-003 | Add MinIO file deletion on content remove | 30 min |
+| 11 | BUG-INT-004 | Add quota decrement in bulkDelete | 30 min |
+| 12 | BUG-INT-005 | Update quota on plan change | 1-2 hours |
+| 13 | BUG-INT-006 | Add firstName/lastName to JWT strategy return | 15 min |
+| 14 | BUG-AUTH-002 | Add password complexity to ChangePasswordDto | 15 min |
+| 15 | BUG-COMMON-001 | Fix CSRF path matching to exact match | 30 min |
+
+**Total estimated effort for blockers (items 1-9): ~7-8 hours**
 
 ---
 
 ## Service Health Summary
 
 ```
-Middleware API:  ████████████████████ A-  (1653/1653 tests pass, excellent coverage)
-Realtime GW:    ████████████████████ A   (191/191 tests pass, all core modules covered)
-Web Dashboard:  ███████████████░░░░░ B+  (97% pass, Nx build issue, SSR URL concern)
-Display Electron: ░░░░░░░░░░░░░░░░░░░░ F   (no tests)
-Display Android:  ░░░░░░░░░░░░░░░░░░░░ F   (no tests)
-Database Package: ██████████████░░░░░░ B   (indirectly tested, no migration tests)
-Infrastructure:   ████████████████████ A   (well-configured Docker + PM2)
-Security:         ████████████████████ A   (XSS, CSRF, JWT, rate limiting, lockout)
+Middleware API:   ████████████████████ A-  (1728/1731 pass, 1 new regression)
+Realtime GW:     ████████████████████ A   (203/205 pass, test bugs only)
+Web Dashboard:   ██████████████░░░░░░ C+  (build fails, 24 new test failures)
+Billing System:  ████████░░░░░░░░░░░░ D   (tests pass but webhooks are broken)
+Infrastructure:  ████████████████████ A   (Docker + PM2 well-configured)
+Security:        ████████████████░░░░ B+  (solid layers, some gaps to harden)
 ```
+
+---
+
+## Detailed Bug Reports
+
+See individual reports in `bug-reports/`:
+- `module-middleware-auth.md` — Auth module (3 bugs)
+- `module-middleware-billing.md` — Billing module (4 bugs, 1 CRITICAL)
+- `module-middleware-content.md` — Content module (5 bugs)
+- `module-middleware-common.md` — Common module (3 bugs)
+- `module-middleware-displays.md` — Displays module (2 bugs)
+- `module-middleware-other.md` — All other middleware modules (3 bugs)
+- `module-web-dashboard.md` — Web dashboard (6 bugs, 1 CRITICAL)
+- `module-realtime-gateway.md` — Realtime gateway (1 bug)
+- `integration-report.md` — Cross-module integration (8 bugs)
 
 ---
 
 ## Conclusion
 
-The Vizora platform's **backend services are architecturally sound** with excellent test coverage (1,844 passing tests across middleware + realtime) and passing builds. The **web dashboard is functionally ready** with 97% test pass rate. However, **3 critical security issues block production deployment:**
+The Vizora platform has a **solid foundation** with 2,705 passing tests (98% pass rate) across all services. The middleware and realtime backends are well-architected with proper security patterns (dual JWT, CSRF, XSS sanitization, rate limiting, account lockout).
 
-1. **Real secrets are committed to git history** and must be rotated
-2. **Docker infrastructure has insecure default credentials** that could be used if env vars aren't set
-3. **Grafana monitoring is secured with "admin123"**
+However, **the current branch is NOT ready for production deployment** due to:
 
-**These are ~2-hour fixes.** Once resolved, the platform moves to CONDITIONAL GO status, pending manual QA of display clients and Playwright E2E validation in staging. The codebase is well-architected with proper security layers (CSRF, XSS sanitization, JWT separation, rate limiting, account lockout) - the blockers are configuration/ops issues, not code quality issues.
+1. **The billing webhook system is fundamentally broken** — subscription lifecycle events from Stripe/Razorpay are silently dropped because `verifyWebhookSignature()` is never called
+2. **The web application cannot build** — TypeScript error blocks `next build`
+3. **Multiple runtime crashes** — BigInt serialization, missing API client methods
+4. **Dashboard real-time features don't work** — WebSocket auth mismatch
+
+All issues are fixable with an estimated **7-8 hours of focused work** on the top 9 priority items. After those fixes, the platform would move to **CONDITIONAL GO** pending:
+- Re-run of all test suites to verify fixes
+- Playwright E2E suite run in staging environment
+- Manual QA of display clients on target hardware

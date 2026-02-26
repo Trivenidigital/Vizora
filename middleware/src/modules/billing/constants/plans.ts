@@ -7,6 +7,7 @@ export interface PlanTier {
   id: string;
   name: string;
   screenQuota: number; // -1 for unlimited
+  storageQuotaMb: number; // Storage quota in megabytes
   prices: {
     usd: { monthly: number; yearly: number; stripePriceId?: string };
     inr: { monthly: number; yearly: number; razorpayPlanId?: string };
@@ -26,6 +27,7 @@ export const PLAN_TIERS: Record<string, PlanTier> = {
     id: 'free',
     name: 'Free',
     screenQuota: 5,
+    storageQuotaMb: 1024, // 1 GB
     prices: {
       usd: { monthly: 0, yearly: 0 },
       inr: { monthly: 0, yearly: 0 },
@@ -42,6 +44,7 @@ export const PLAN_TIERS: Record<string, PlanTier> = {
     id: 'basic',
     name: 'Basic',
     screenQuota: 50,
+    storageQuotaMb: 25600, // 25 GB
     prices: {
       usd: {
         monthly: 600, // $6/screen, stored as cents
@@ -64,6 +67,7 @@ export const PLAN_TIERS: Record<string, PlanTier> = {
     id: 'pro',
     name: 'Pro',
     screenQuota: 100,
+    storageQuotaMb: 102400, // 100 GB
     prices: {
       usd: {
         monthly: 800, // $8/screen, stored as cents
@@ -86,6 +90,7 @@ export const PLAN_TIERS: Record<string, PlanTier> = {
     id: 'enterprise',
     name: 'Enterprise',
     screenQuota: -1, // unlimited
+    storageQuotaMb: 512000, // 500 GB
     prices: {
       usd: { monthly: -1, yearly: -1 }, // custom pricing
       inr: { monthly: -1, yearly: -1 },

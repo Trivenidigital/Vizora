@@ -48,6 +48,9 @@ interface AuthUser {
     name: string;
     subscriptionTier: string;
     country?: string;
+    settings?: Record<string, any>;
+    storageUsedBytes?: number;
+    storageQuotaBytes?: number;
   };
 }
 
@@ -60,6 +63,7 @@ interface Organization {
   trialEndsAt: string;
   country?: string;
   gstin?: string;
+  settings?: Record<string, any>;
 }
 
 interface LoginResponse {
@@ -322,7 +326,7 @@ class ApiClient {
     return this.request<Organization>('/organizations/current');
   }
 
-  async updateOrganization(id: string, data: Partial<{ name: string; country: string; gstin: string }>): Promise<Organization> {
+  async updateOrganization(id: string, data: Partial<{ name: string; country: string; gstin: string; settings: Record<string, any> }>): Promise<Organization> {
     return this.request<Organization>(`/organizations/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
@@ -406,11 +410,10 @@ class ApiClient {
   }
 
   async completePairing(data: { code: string; nickname: string; location?: string }): Promise<Display> {
-    // Only send fields the backend DTO accepts (code, nickname)
-    const { code, nickname } = data;
+    const { code, nickname, location } = data;
     return this.request<Display>('/devices/pairing/complete', {
       method: 'POST',
-      body: JSON.stringify({ code, nickname }),
+      body: JSON.stringify({ code, nickname, ...(location && { location }) }),
     });
   }
 

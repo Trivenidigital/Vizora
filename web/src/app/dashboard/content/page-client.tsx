@@ -68,7 +68,7 @@ export default function ContentClient() {
  ]);
  const [selectedTags, setSelectedTags] = useState<string[]>([]);
  const [showTagFilter, setShowTagFilter] = useState(false);
- const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline'>('offline');
+ const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'reconnecting' | 'offline'>('reconnecting');
 
  // Folder state
  const [folders, setFolders] = useState<ContentFolder[]>([]);
@@ -80,10 +80,15 @@ export default function ContentClient() {
  const [targetFolderId, setTargetFolderId] = useState<string | null>(null);
 
  // Real-time event handling
- const handleConnectionChange = useCallback((connected: boolean) => {
- setRealtimeStatus(connected ? 'connected' : 'offline');
- if (connected) {
+ const handleConnectionChange = useCallback((connected: boolean | null) => {
+ if (connected === true) {
+ setRealtimeStatus('connected');
  toast.info('Real-time sync enabled');
+ } else if (connected === false) {
+ setRealtimeStatus('offline');
+ } else {
+ // null = reconnecting (WebSocket dropped but browser is online)
+ setRealtimeStatus('reconnecting');
  }
  }, [toast]);
 
@@ -730,10 +735,16 @@ export default function ContentClient() {
  Real-time enabled
  </span>
  )}
- {realtimeStatus === 'offline' && (
+ {realtimeStatus === 'reconnecting' && (
  <span className="ml-2 inline-flex items-center gap-1 text-xs text-yellow-600">
- <span className="w-2 h-2 bg-yellow-600 rounded-full"></span>
- Offline mode
+ <span className="w-2 h-2 bg-yellow-600 rounded-full animate-pulse"></span>
+ Reconnecting...
+ </span>
+ )}
+ {realtimeStatus === 'offline' && (
+ <span className="ml-2 inline-flex items-center gap-1 text-xs text-red-500">
+ <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+ Offline
  </span>
  )}
  {getPendingCount() > 0 && (

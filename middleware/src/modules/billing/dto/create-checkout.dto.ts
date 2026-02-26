@@ -1,4 +1,4 @@
-import { IsString, IsIn, IsOptional } from 'class-validator';
+import { IsString, IsIn, IsOptional, IsUrl } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateCheckoutDto {
@@ -24,15 +24,15 @@ export class CreateCheckoutDto {
     description: 'URL to redirect to on successful checkout',
     example: 'https://app.vizora.io/billing/success',
   })
-  @IsString()
   @IsOptional()
+  @IsUrl({ protocols: ['http', 'https'], require_protocol: true })
   successUrl?: string;
 
   @ApiPropertyOptional({
     description: 'URL to redirect to if checkout is cancelled',
     example: 'https://app.vizora.io/billing/cancel',
   })
-  @IsString()
   @IsOptional()
+  @IsUrl({ protocols: ['http', 'https'], require_protocol: true })
   cancelUrl?: string;
 }

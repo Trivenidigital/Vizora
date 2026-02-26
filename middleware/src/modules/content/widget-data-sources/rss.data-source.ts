@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { CircuitBreakerService } from '../../common/services/circuit-breaker.service';
 import { WidgetDataSource } from './widget-data-source.interface';
 
@@ -30,6 +30,20 @@ export class RssDataSource implements WidgetDataSource {
     if (!feedUrl) {
       this.logger.warn('No feedUrl provided, returning sample data');
       return this.getSampleData();
+    }
+
+    // SSRF validation: block private/internal addresses
+    const url = new URL(feedUrl);
+    const hostname = url.hostname.toLowerCase();
+    const blockedPatterns = [
+      /^localhost$/i, /^127\./, /^10\./, /^172\.(1[6-9]|2\d|3[01])\./,
+      /^192\.168\./, /^0\./, /^169\.254\./, /^::1$/, /^fc00:/i, /^fe80:/i,
+    ];
+    if (blockedPatterns.some(p => p.test(hostname))) {
+      throw new BadRequestException('Feed URL points to a blocked address');
+    }
+    if (!['http:', 'https:'].includes(url.protocol)) {
+      throw new BadRequestException('Feed URL must use HTTP or HTTPS');
     }
 
     const maxItems = config.maxItems ?? 10;

@@ -28,19 +28,30 @@ export class StorageQuotaService {
 
   /**
    * Check if an upload would exceed the org's quota. Throws if it would.
+   * Uses a serializable transaction to prevent race conditions where
+   * concurrent uploads could both pass the quota check.
    */
   async checkQuota(organizationId: string, fileSizeBytes: number): Promise<void> {
-    const info = await this.getStorageInfo(organizationId);
-    if (!info) return;
-    if (info.usedBytes + fileSizeBytes > info.quotaBytes) {
-      throw new PayloadTooLargeException({
-        message: 'Storage quota exceeded',
-        usedBytes: info.usedBytes,
-        quotaBytes: info.quotaBytes,
-        availableBytes: info.availableBytes,
-        requestedBytes: fileSizeBytes,
+    await this.db.$transaction(async (tx) => {
+      const org = await tx.organization.findUnique({
+        where: { id: organizationId },
+        select: { storageUsedBytes: true, storageQuotaBytes: true },
       });
-    }
+      if (!org) return;
+
+      const usedBytes = Number(org.storageUsedBytes);
+      const quotaBytes = Number(org.storageQuotaBytes);
+
+      if (usedBytes + fileSizeBytes > quotaBytes) {
+        throw new PayloadTooLargeException({
+          message: 'Storage quota exceeded',
+          usedBytes,
+          quotaBytes,
+          availableBytes: quotaBytes - usedBytes,
+          requestedBytes: fileSizeBytes,
+        });
+      }
+    });
   }
 
   /**

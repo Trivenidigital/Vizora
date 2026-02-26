@@ -186,14 +186,27 @@ export class ThumbnailService {
     }
 
     try {
-      // Fetch image from URL
+      // Fetch image from URL with streaming size check
       const response = await fetch(imageUrl);
       const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
       if (contentLength > this.MAX_FILE_SIZE) {
         throw new Error('Image too large for thumbnail generation');
       }
-      const arrayBuffer = await response.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
+
+      // Stream the response body with size enforcement to prevent
+      // Content-Length spoofing (header says small, body is huge)
+      const chunks: Buffer[] = [];
+      let totalLength = 0;
+      if (response.body) {
+        for await (const chunk of response.body as AsyncIterable<Uint8Array>) {
+          totalLength += chunk.length;
+          if (totalLength > this.MAX_FILE_SIZE) {
+            throw new Error('Image exceeds maximum size during download');
+          }
+          chunks.push(Buffer.from(chunk));
+        }
+      }
+      const buffer = Buffer.concat(chunks);
 
       const contentType = response.headers.get('content-type') || 'image/jpeg';
 

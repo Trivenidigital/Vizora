@@ -3,7 +3,12 @@
  * Centralizes magic numbers and configuration values
  */
 export const AUTH_CONSTANTS = {
-  // Token expiry in seconds (7 days)
+  /**
+   * 7-day token expiry balances UX (fewer re-logins) against security.
+   * Mitigations: token revocation on logout, 60s Redis cache for user lookups
+   * means deactivated users are blocked within 60s. For higher-security deployments,
+   * reduce to 1-2h with more active refresh.
+   */
   TOKEN_EXPIRY_SECONDS: 7 * 24 * 60 * 60, // 604800
 
   // Token expiry in milliseconds (7 days)

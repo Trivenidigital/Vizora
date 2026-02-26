@@ -1,9 +1,10 @@
-import { IsArray, IsOptional, IsString, IsInt, IsDateString, ArrayMinSize, ValidateNested, Min, IsIn } from 'class-validator';
+import { IsArray, IsOptional, IsString, IsInt, IsDateString, ArrayMinSize, ArrayMaxSize, ValidateNested, Min, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class BulkUpdateDto {
   @IsArray()
   @ArrayMinSize(1)
+  @ArrayMaxSize(100)
   @IsString({ each: true })
   ids!: string[];
 
@@ -28,6 +29,7 @@ export class BulkUpdateDto {
 export class BulkArchiveDto {
   @IsArray()
   @ArrayMinSize(1)
+  @ArrayMaxSize(100)
   @IsString({ each: true })
   ids!: string[];
 }
@@ -35,6 +37,7 @@ export class BulkArchiveDto {
 export class BulkRestoreDto {
   @IsArray()
   @ArrayMinSize(1)
+  @ArrayMaxSize(100)
   @IsString({ each: true })
   ids!: string[];
 }
@@ -42,6 +45,7 @@ export class BulkRestoreDto {
 export class BulkDeleteDto {
   @IsArray()
   @ArrayMinSize(1)
+  @ArrayMaxSize(100)
   @IsString({ each: true })
   ids!: string[];
 }
@@ -49,11 +53,13 @@ export class BulkDeleteDto {
 export class BulkTagDto {
   @IsArray()
   @ArrayMinSize(1)
+  @ArrayMaxSize(100)
   @IsString({ each: true })
   contentIds!: string[];
 
   @IsArray()
   @ArrayMinSize(1)
+  @ArrayMaxSize(100)
   @IsString({ each: true })
   tagIds!: string[];
 
@@ -66,6 +72,7 @@ export class BulkTagDto {
 export class BulkDurationDto {
   @IsArray()
   @ArrayMinSize(1)
+  @ArrayMaxSize(100)
   @IsString({ each: true })
   ids!: string[];
 

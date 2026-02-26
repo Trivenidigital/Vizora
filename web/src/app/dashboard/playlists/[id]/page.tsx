@@ -14,7 +14,7 @@ import PlaylistPreviewPanel from '@/components/playlist/PlaylistPreviewPanel';
 import {
  DndContext,
  DragOverlay,
- closestCenter,
+ pointerWithin,
  PointerSensor,
  KeyboardSensor,
  useSensor,
@@ -138,7 +138,12 @@ export default function PlaylistBuilderPage() {
  if (!over || !playlist) return;
 
  // Check if dragging from content library to playlist
- if (active.id.toString().startsWith('content-') && over.id === 'playlist-drop-zone') {
+ // Accept drop on the zone OR on any existing playlist item (append to end)
+ const isContentDrag = active.id.toString().startsWith('content-');
+ const isPlaylistTarget = over.id === 'playlist-drop-zone' ||
+  (!over.id.toString().startsWith('content-') && isContentDrag);
+
+ if (isContentDrag && isPlaylistTarget) {
  const content = active.data.current?.content as Content;
  if (content) {
  try {
@@ -334,7 +339,7 @@ export default function PlaylistBuilderPage() {
  <div className="flex-1 flex overflow-hidden">
  <DndContext
  sensors={sensors}
- collisionDetection={closestCenter}
+ collisionDetection={pointerWithin}
  onDragStart={handleDragStart}
  onDragEnd={handleDragEnd}
  >

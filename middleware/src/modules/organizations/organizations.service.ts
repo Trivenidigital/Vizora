@@ -13,6 +13,20 @@ export class OrganizationsService {
     private readonly storageService: StorageService,
   ) {}
 
+  /**
+   * Convert BigInt fields to Number for JSON serialization.
+   * PostgreSQL returns BigInt for storageUsedBytes/storageQuotaBytes,
+   * but JSON.stringify cannot handle BigInt values.
+   */
+  private sanitizeOrg(org: any) {
+    if (!org) return org;
+    return {
+      ...org,
+      storageUsedBytes: Number(org.storageUsedBytes ?? 0),
+      storageQuotaBytes: Number(org.storageQuotaBytes ?? 0),
+    };
+  }
+
   async create(createOrganizationDto: CreateOrganizationDto) {
     const existing = await this.db.organization.findUnique({
       where: { slug: createOrganizationDto.slug },
@@ -22,9 +36,10 @@ export class OrganizationsService {
       throw new ConflictException('Organization with this slug already exists');
     }
 
-    return this.db.organization.create({
+    const org = await this.db.organization.create({
       data: createOrganizationDto,
     });
+    return this.sanitizeOrg(org);
   }
 
   async findAll(pagination: PaginationDto) {
@@ -40,7 +55,7 @@ export class OrganizationsService {
       this.db.organization.count(),
     ]);
 
-    return new PaginatedResponse(data, total, page, limit);
+    return new PaginatedResponse(data.map(org => this.sanitizeOrg(org)), total, page, limit);
   }
 
   async findOne(id: string) {
@@ -62,7 +77,7 @@ export class OrganizationsService {
       throw new NotFoundException('Organization not found');
     }
 
-    return organization;
+    return this.sanitizeOrg(organization);
   }
 
   async findBySlug(slug: string) {
@@ -74,11 +89,11 @@ export class OrganizationsService {
       throw new NotFoundException('Organization not found');
     }
 
-    return organization;
+    return this.sanitizeOrg(organization);
   }
 
   async update(id: string, updateOrganizationDto: UpdateOrganizationDto) {
-    await this.findOne(id);
+    const org = await this.findOne(id);
 
     if (updateOrganizationDto.slug) {
       const existing = await this.db.organization.findFirst({
@@ -93,17 +108,27 @@ export class OrganizationsService {
       }
     }
 
-    return this.db.organization.update({
+    // Merge settings with existing to avoid overwriting branding etc.
+    const { settings: incomingSettings, ...rest } = updateOrganizationDto;
+    const data: Record<string, any> = { ...rest };
+    if (incomingSettings) {
+      const currentSettings = (org.settings as Record<string, unknown>) || {};
+      data.settings = { ...currentSettings, ...incomingSettings };
+    }
+
+    const updated = await this.db.organization.update({
       where: { id },
-      data: updateOrganizationDto,
+      data,
     });
+    return this.sanitizeOrg(updated);
   }
 
   async remove(id: string) {
     await this.findOne(id);
-    return this.db.organization.delete({
+    const deleted = await this.db.organization.delete({
       where: { id },
     });
+    return this.sanitizeOrg(deleted);
   }
 
   async getBranding(orgId: string) {
@@ -129,12 +154,13 @@ export class OrganizationsService {
       brandingDto.customCSS = this.sanitizeCSS(brandingDto.customCSS);
     }
     const currentSettings = (org.settings as Record<string, unknown>) || {};
-    return this.db.organization.update({
+    const updated = await this.db.organization.update({
       where: { id: orgId },
       data: {
         settings: { ...currentSettings, branding: brandingDto },
       },
     });
+    return this.sanitizeOrg(updated);
   }
 
   async uploadLogo(orgId: string, file: Express.Multer.File) {

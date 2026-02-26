@@ -582,7 +582,7 @@ describe('DeviceGateway', () => {
             items: expect.arrayContaining([
               expect.objectContaining({
                 content: expect.objectContaining({
-                  url: expect.stringContaining('/api/device-content/c-1/file'),
+                  url: expect.stringContaining('/api/v1/device-content/c-1/file'),
                 }),
               }),
             ]),
@@ -896,7 +896,7 @@ describe('DeviceGateway', () => {
 
       const result = (gateway as any).resolveContentUrl(item);
 
-      expect(result).toContain('/api/device-content/c-1/file');
+      expect(result).toContain('/api/v1/device-content/c-1/file');
     });
 
     it('should return original URL for non-minio URLs', () => {

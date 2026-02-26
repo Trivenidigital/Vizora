@@ -7,6 +7,7 @@ import {
   BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Public } from '../auth/decorators/public.decorator';
 import { SkipCsrf } from '../common/guards/csrf.guard';
 import { PairingService } from './pairing.service';
@@ -24,6 +25,7 @@ export class PairingController {
    */
   @Public()
   @SkipCsrf()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('request')
   async requestPairingCode(@Body() requestDto: RequestPairingDto) {
     return this.pairingService.requestPairingCode(requestDto);
@@ -33,6 +35,7 @@ export class PairingController {
    * Display checks pairing status (Public endpoint)
    */
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Get('status/:code')
   async checkPairingStatus(@Param('code') code: string) {
     return this.pairingService.checkPairingStatus(code);

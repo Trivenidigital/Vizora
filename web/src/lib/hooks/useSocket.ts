@@ -74,13 +74,15 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketReturn {
     hasLoggedErrorRef.current = false;
 
     // Create socket connection with auth
+    // withCredentials ensures httpOnly cookies are sent with the WebSocket upgrade request
     const socket = io(url, {
+      withCredentials: true,
       reconnection,
       reconnectionDelay,
       reconnectionDelayMax,
       reconnectionAttempts,
       transports: ['websocket', 'polling'],
-      auth: auth || {},
+      auth: auth ? { organizationId: auth.organizationId } : {},
     });
 
     socketRef.current = socket;
@@ -153,7 +155,7 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketReturn {
       socketRef.current = null;
     };
   // Dependencies are intentionally primitives to avoid reconnect loops from object identity changes
-  }, [url, autoConnect, reconnection, reconnectionDelay, reconnectionDelayMax, reconnectionAttempts, auth?.token, auth?.organizationId]);
+  }, [url, autoConnect, reconnection, reconnectionDelay, reconnectionDelayMax, reconnectionAttempts, auth?.organizationId]);
 
   // Emit event
   const emit = useCallback((event: string, data?: any) => {

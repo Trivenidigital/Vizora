@@ -6,6 +6,7 @@ import { DatabaseService } from '../database/database.service';
 import { StripeProvider } from './providers/stripe.provider';
 import { RazorpayProvider } from './providers/razorpay.provider';
 import { MailService } from '../mail/mail.service';
+import { RedisService } from '../redis/redis.service';
 import { PLAN_TIERS } from './constants/plans';
 
 // Set up environment variables before tests run
@@ -24,6 +25,7 @@ describe('BillingService', () => {
   let mockConfigService: any;
   let mockStripeProvider: any;
   let mockRazorpayProvider: any;
+  let mockRedisService: any;
 
   const mockOrganization = {
     id: 'org-123',
@@ -134,6 +136,11 @@ describe('BillingService', () => {
       sendSubscriptionCanceledEmail: jest.fn().mockResolvedValue(undefined),
     };
 
+    mockRedisService = {
+      get: jest.fn().mockResolvedValue(null),
+      set: jest.fn().mockResolvedValue(true),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BillingService,
@@ -142,6 +149,7 @@ describe('BillingService', () => {
         { provide: StripeProvider, useValue: mockStripeProvider },
         { provide: RazorpayProvider, useValue: mockRazorpayProvider },
         { provide: MailService, useValue: mockMailService },
+        { provide: RedisService, useValue: mockRedisService },
       ],
     }).compile();
 
@@ -462,21 +470,25 @@ describe('BillingService', () => {
   });
 
   describe('handleWebhookEvent', () => {
-    it('should process subscription.updated event', async () => {
+    const rawBody = Buffer.from('test-body');
+    const signature = 'test-signature';
+
+    it('should verify signature and process subscription.updated event', async () => {
       mockDatabaseService.organization.findFirst.mockResolvedValue(mockOrganization);
       mockDatabaseService.organization.update.mockResolvedValue({});
-
-      const event = {
+      mockStripeProvider.verifyWebhookSignature.mockReturnValue({
         type: 'customer.subscription.updated',
         data: {
+          id: 'evt_123',
           customer: 'cus_stripe123',
           status: 'active',
         },
-      };
+      });
 
-      const result = await service.handleWebhookEvent('stripe', event);
+      const result = await service.handleWebhookEvent('stripe', { rawBody, signature });
 
       expect(result).toEqual({ received: true });
+      expect(mockStripeProvider.verifyWebhookSignature).toHaveBeenCalledWith(rawBody, signature);
       expect(mockDatabaseService.organization.update).toHaveBeenCalledWith({
         where: { id: 'org-123' },
         data: { subscriptionStatus: 'active' },
@@ -486,15 +498,15 @@ describe('BillingService', () => {
     it('should handle subscription.deleted and downgrade to free', async () => {
       mockDatabaseService.organization.findFirst.mockResolvedValue(mockOrganization);
       mockDatabaseService.organization.update.mockResolvedValue({});
-
-      const event = {
+      mockStripeProvider.verifyWebhookSignature.mockReturnValue({
         type: 'customer.subscription.deleted',
         data: {
+          id: 'evt_456',
           customer: 'cus_stripe123',
         },
-      };
+      });
 
-      await service.handleWebhookEvent('stripe', event);
+      await service.handleWebhookEvent('stripe', { rawBody, signature });
 
       expect(mockDatabaseService.organization.update).toHaveBeenCalledWith({
         where: { id: 'org-123' },
@@ -508,19 +520,19 @@ describe('BillingService', () => {
 
     it('should handle checkout.session.completed', async () => {
       mockDatabaseService.organization.update.mockResolvedValue({});
-
-      const event = {
+      mockStripeProvider.verifyWebhookSignature.mockReturnValue({
         type: 'checkout.session.completed',
         data: {
+          id: 'cs_789',
           subscription: 'sub_new123',
           metadata: {
             organizationId: 'org-123',
             planId: 'pro',
           },
         },
-      };
+      });
 
-      await service.handleWebhookEvent('stripe', event);
+      await service.handleWebhookEvent('stripe', { rawBody, signature });
 
       expect(mockDatabaseService.organization.update).toHaveBeenCalledWith({
         where: { id: 'org-123' },
@@ -537,8 +549,7 @@ describe('BillingService', () => {
       mockDatabaseService.organization.findFirst.mockResolvedValue(mockOrganization);
       mockDatabaseService.organization.update.mockResolvedValue({});
       mockDatabaseService.billingTransaction.create.mockResolvedValue({});
-
-      const event = {
+      mockStripeProvider.verifyWebhookSignature.mockReturnValue({
         type: 'invoice.payment_succeeded',
         data: {
           id: 'inv_123',
@@ -546,9 +557,9 @@ describe('BillingService', () => {
           amount_paid: 2900,
           currency: 'usd',
         },
-      };
+      });
 
-      await service.handleWebhookEvent('stripe', event);
+      await service.handleWebhookEvent('stripe', { rawBody, signature });
 
       expect(mockDatabaseService.billingTransaction.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -560,6 +571,32 @@ describe('BillingService', () => {
           currency: 'usd',
         }),
       });
+    });
+
+    it('should skip duplicate webhook events via idempotency', async () => {
+      mockRedisService.get.mockResolvedValue('1');
+      mockStripeProvider.verifyWebhookSignature.mockReturnValue({
+        type: 'customer.subscription.updated',
+        data: { id: 'evt_duplicate' },
+      });
+
+      const result = await service.handleWebhookEvent('stripe', { rawBody, signature });
+
+      expect(result).toEqual({ received: true });
+      expect(mockDatabaseService.organization.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('should use razorpay provider for razorpay webhooks', async () => {
+      mockDatabaseService.organization.findFirst.mockResolvedValue(mockOrganization);
+      mockDatabaseService.organization.update.mockResolvedValue({});
+      mockRazorpayProvider.verifyWebhookSignature.mockReturnValue({
+        type: 'subscription.updated',
+        data: { id: 'evt_rz', subscription: { customer_id: 'cust_razorpay123', status: 'active' } },
+      });
+
+      await service.handleWebhookEvent('razorpay', { rawBody, signature });
+
+      expect(mockRazorpayProvider.verifyWebhookSignature).toHaveBeenCalledWith(rawBody, signature);
     });
   });
 

@@ -22,8 +22,6 @@ export { useRealtimeEvents } from './useRealtimeEvents';
 export type {
   DeviceStatusUpdate,
   PlaylistUpdate,
-  HealthAlert,
-  ScheduleExecution,
   UseRealtimeEventsOptions,
 } from './useRealtimeEvents';
 

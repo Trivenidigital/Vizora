@@ -123,11 +123,17 @@ describe('ContentService', () => {
       recalculateUsage: jest.fn(),
     } as any;
 
+    const mockStorageService = {
+      deleteFile: jest.fn().mockResolvedValue(undefined),
+      isMinioAvailable: jest.fn().mockReturnValue(false),
+    } as any;
+
     service = new ContentService(
       mockDatabaseService as DatabaseService,
       mockTemplateRendering,
       mockDataSourceRegistry,
       mockStorageQuotaService,
+      mockStorageService,
     );
   });
 
@@ -1268,7 +1274,11 @@ describe('ContentService', () => {
 
   describe('bulkDelete', () => {
     it('should delete multiple content items', async () => {
-      mockDatabaseService.content.count.mockResolvedValue(3);
+      mockDatabaseService.content.findMany.mockResolvedValue([
+        { id: 'id-1', fileSize: 1000, fileKey: null, url: null },
+        { id: 'id-2', fileSize: 2000, fileKey: null, url: null },
+        { id: 'id-3', fileSize: 0, fileKey: null, url: null },
+      ]);
       mockDatabaseService.content.deleteMany.mockResolvedValue({ count: 3 });
 
       const result = await service.bulkDelete('org-123', {
@@ -1282,7 +1292,10 @@ describe('ContentService', () => {
     });
 
     it('should throw error if some content not found', async () => {
-      mockDatabaseService.content.count.mockResolvedValue(2);
+      mockDatabaseService.content.findMany.mockResolvedValue([
+        { id: 'id-1', fileSize: 0, fileKey: null, url: null },
+        { id: 'id-2', fileSize: 0, fileKey: null, url: null },
+      ]);
 
       await expect(
         service.bulkDelete('org-123', { ids: ['id-1', 'id-2', 'id-3'] }),

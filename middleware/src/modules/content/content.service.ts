@@ -15,6 +15,7 @@ import { CreateWidgetDto } from './dto/create-widget.dto';
 import { LAYOUT_PRESETS } from './layout-presets';
 import { DataSourceRegistryService } from './data-source-registry.service';
 import { StorageQuotaService } from '../storage/storage-quota.service';
+import { StorageService } from '../storage/storage.service';
 import type { WidgetDataSource } from './widget-data-sources';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -66,6 +67,7 @@ export class ContentService {
     private readonly templateRendering: TemplateRenderingService,
     private readonly dataSourceRegistry: DataSourceRegistryService,
     private readonly storageQuotaService: StorageQuotaService,
+    private readonly storageService: StorageService,
   ) {}
 
   // Map database content to API response format
@@ -180,6 +182,24 @@ export class ContentService {
 
   async remove(organizationId: string, id: string) {
     const content = await this.findOne(organizationId, id);
+
+    // Delete file from MinIO storage if it exists
+    if (content.fileKey) {
+      try {
+        await this.storageService.deleteFile(content.fileKey);
+      } catch (error) {
+        this.logger.error(`Failed to delete file ${content.fileKey} from storage: ${error}`);
+      }
+    } else if (content.url?.startsWith('minio://')) {
+      // Fall back to extracting object key from minio:// URL
+      const objectKey = content.url.substring('minio://'.length);
+      try {
+        await this.storageService.deleteFile(objectKey);
+      } catch (error) {
+        this.logger.error(`Failed to delete file ${objectKey} from storage: ${error}`);
+      }
+    }
+
     const deleted = await this.db.content.delete({
       where: { id },
     });
@@ -455,18 +475,35 @@ export class ContentService {
   async bulkDelete(organizationId: string, dto: BulkDeleteDto) {
     const { ids } = dto;
 
-    // Verify all content belongs to organization
-    const contentCount = await this.db.content.count({
+    // Fetch items with file info for storage cleanup
+    const items = await this.db.content.findMany({
       where: { id: { in: ids }, organizationId },
+      select: { id: true, fileSize: true, fileKey: true, url: true },
     });
 
-    if (contentCount !== ids.length) {
+    if (items.length !== ids.length) {
       throw new BadRequestException('Some content items not found or not accessible');
+    }
+
+    // Delete files from storage (fire-and-forget with logging)
+    for (const item of items) {
+      const objectKey = (item as any).fileKey || (item.url?.startsWith('minio://') ? item.url.substring('minio://'.length) : null);
+      if (objectKey) {
+        this.storageService.deleteFile(objectKey).catch(error => {
+          this.logger.error(`Failed to delete file ${objectKey} during bulk delete: ${error}`);
+        });
+      }
     }
 
     const result = await this.db.content.deleteMany({
       where: { id: { in: ids }, organizationId },
     });
+
+    // Decrement storage quota for total file sizes
+    const totalBytes = items.reduce((sum, item) => sum + (item.fileSize || 0), 0);
+    if (totalBytes > 0) {
+      await this.storageQuotaService.decrementUsage(organizationId, totalBytes);
+    }
 
     return { deleted: result.count };
   }
@@ -1193,10 +1230,16 @@ export class ContentService {
    * Load a Handlebars template file from the widget-templates directory.
    */
   private loadWidgetTemplate(templateName: string): string {
+    // Sanitize template name to prevent path traversal
+    const safeName = templateName.replace(/[^a-zA-Z0-9_-]/g, '');
+    if (!safeName) {
+      throw new BadRequestException('Invalid widget template name');
+    }
+
     const templatePath = path.join(
       __dirname,
       'widget-templates',
-      `${templateName}.hbs`,
+      `${safeName}.hbs`,
     );
 
     try {
