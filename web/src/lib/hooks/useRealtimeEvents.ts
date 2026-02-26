@@ -43,7 +43,7 @@ export interface UseRealtimeEventsOptions {
   };
   onDeviceStatusChange?: (update: DeviceStatusUpdate) => void;
   onPlaylistChange?: (update: PlaylistUpdate) => void;
-  onConnectionChange?: (isConnected: boolean) => void;
+  onConnectionChange?: (isConnected: boolean | null) => void;
   onSyncStateChange?: (state: SyncState) => void;
   offlineQueueSize?: number;
   retryAttempts?: number;
@@ -256,9 +256,10 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
 
     const unsubDisconnect = on('disconnect', () => {
       setIsOffline(true);
-      onConnectionChange?.(false);
+      // null = reconnecting (WS dropped but browser online), false = truly offline
+      onConnectionChange?.(navigator.onLine ? null : false);
       if (process.env.NODE_ENV === 'development') {
-        console.log('[RealtimeEvents] Disconnected, offline mode enabled');
+        console.log('[RealtimeEvents] Disconnected, browser online:', navigator.onLine);
       }
     });
 
@@ -291,6 +292,7 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
         console.log('[RealtimeEvents] Browser online, attempting to sync...');
       }
       setIsOffline(false);
+      onConnectionChange?.(null); // Signal reconnecting (not offline, not yet connected)
       if (isConnected) {
         syncOfflineQueue();
       }
@@ -310,7 +312,7 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [isConnected, syncOfflineQueue]);
+  }, [isConnected, syncOfflineQueue, onConnectionChange]);
 
   // Public API
   return {
