@@ -1,9 +1,10 @@
-import { IsArray, IsString, ArrayMinSize } from 'class-validator';
+import { IsArray, IsString, ArrayMinSize, ArrayMaxSize } from 'class-validator';
 
 export class BulkDisplayIdsDto {
   @IsArray()
   @IsString({ each: true })
   @ArrayMinSize(1)
+  @ArrayMaxSize(100)
   displayIds: string[];
 }
 

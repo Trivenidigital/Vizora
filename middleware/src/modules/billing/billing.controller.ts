@@ -96,7 +96,8 @@ export class BillingController {
     @CurrentUser('organizationId') organizationId: string,
     @Query('limit') limit?: string,
   ) {
-    return this.billingService.getInvoices(organizationId, limit ? parseInt(limit, 10) : undefined);
+    const parsedLimit = Math.min(parseInt(limit, 10) || 10, 100);
+    return this.billingService.getInvoices(organizationId, parsedLimit);
   }
 
   @Get('quota')
