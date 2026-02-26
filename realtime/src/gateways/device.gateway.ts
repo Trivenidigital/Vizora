@@ -547,10 +547,12 @@ export class DeviceGateway
     this.metricsService.updateDeviceStatus(deviceId, orgId, 'online');
 
     // Notify dashboard about device online status
+    const now = new Date().toISOString();
     this.server.to(`org:${orgId}`).emit('device:status', {
       deviceId,
       status: 'online',
-      timestamp: new Date().toISOString(),
+      lastSeen: now,
+      timestamp: now,
     });
   }
 
@@ -615,12 +617,14 @@ export class DeviceGateway
         this.metricsService.updateDeviceStatus(deviceId, client.data.organizationId, 'offline');
 
         // Notify dashboard
+        const now = new Date().toISOString();
         this.server
           .to(`org:${client.data.organizationId}`)
           .emit('device:status', {
             deviceId,
             status: 'offline',
-            timestamp: new Date().toISOString(),
+            lastSeen: now,
+            timestamp: now,
           });
       }
     } catch (error: unknown) {
