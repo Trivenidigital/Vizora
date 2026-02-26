@@ -1,4 +1,4 @@
-import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -24,7 +24,6 @@ import { ApiKeysModule } from '../modules/api-keys/api-keys.module';
 import { BillingModule } from '../modules/billing/billing.module';
 import { AdminModule } from '../modules/admin/admin.module';
 import { TemplateLibraryModule } from '../modules/template-library/template-library.module';
-import { CsrfMiddleware } from '../modules/common/middleware/csrf.middleware';
 import { StorageModule } from '../modules/storage/storage.module';
 import { MetricsModule } from '../modules/metrics/metrics.module';
 import { MailModule } from '../modules/mail/mail.module';
@@ -107,10 +106,4 @@ import { MailModule } from '../modules/mail/mail.module';
     },
   ],
 })
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer): void {
-    // Apply CSRF protection to all routes
-    // Using '{*path}' syntax for path-to-regexp v8+ compatibility
-    consumer.apply(CsrfMiddleware).forRoutes('{*path}');
-  }
-}
+export class AppModule {}
