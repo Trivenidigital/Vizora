@@ -1,216 +1,241 @@
-# Web Dashboard - Full End-to-End Test Report
+# Vizora Web Dashboard — Full Test Report
 
-**Date**: 2026-02-18
-**Tester**: Claude (automated)
-**Branch**: `feat/phase-3-major-features`
-**Environment**: Windows 11, localhost (middleware:3000, web:3001, realtime:3002)
-**Test Account**: test2@vizora.test (admin, org: "Test Org 2", free tier)
-
----
-
-## Executive Summary
-
-Tested all 11 dashboard modules via browser automation and API verification. Found **4 bugs** (2 critical, 1 high, 1 medium). All 3 critical/high bugs were fixed and verified.
-
-| Metric | Value |
-|--------|-------|
-| Modules tested | 11/11 |
-| Bugs found | 4 |
-| Critical bugs | 2 (both fixed) |
-| High bugs | 1 (fixed) |
-| Medium bugs | 1 (not fixed - cosmetic) |
-| Pages that load without error | 10/11 pre-fix, 11/11 post-fix |
+**Date:** 2026-02-26
+**Tester:** Claude Code (automated)
+**Branch:** `fix/content-upload-and-thumbnails`
+**Environment:** localhost (middleware :3000, web :3001, Docker infra running)
+**Test User:** tester@vizora.test (admin, "Test Org", free tier trial)
 
 ---
 
-## Module-by-Module Results
+## Module 1: Overview (Dashboard Home)
 
-### Module 1: Dashboard Overview (`/dashboard`)
-**Status**: PASS (with network errors fixed)
+**Status: PASS**
 
-- Dashboard cards render: total displays, active content, playlists, schedules
-- Quick Actions section visible with action buttons
-- Recent Activity feed loads
-- Storage Usage indicator present
+| Check | Result |
+|-------|--------|
+| Page loads without errors | PASS |
+| Dashboard widgets render | PASS — Total Devices (0), Content Items (0), Playlists (0), System Status (Healthy) |
+| Quick Actions section | PASS — Pair Device, Upload Content, Create Playlist, Schedule buttons present |
+| Recent Activity | PASS — Empty state "No recent activity yet" |
+| Storage Usage | PASS — Shows "0 MB / 5 GB", "0.0% used" |
+| Getting Started guide | PASS — 4-step onboarding guide renders |
+| Trial banner | PASS — "Free Trial — 30 days remaining" with "View Plans" link |
+| User avatar/profile | PASS — Shows "TE" initials, email, name |
 
-**Pre-fix issues**:
-- `GET /api/v1/notifications?limit=20` returned 400 Bad Request on every page load (fixed)
-- `GET /api/v1/organizations/undefined/branding` returned 403 on every page load (fixed)
-
-**Post-fix**: Both API calls succeed with 200 OK.
-
----
-
-### Module 2: Devices (`/dashboard/devices`)
-**Status**: PASS
-
-- Page loads with empty state ("No displays found")
-- Search input functional
-- "Pair Display" button present and clickable
-- Filter/sort controls visible
-
-**Network errors**: None (post-fix)
+**Console Errors:** WebSocket connection failure (expected — realtime service not running)
 
 ---
 
-### Module 3: Content Library (`/dashboard/content`)
-**Status**: PASS
+## Module 2: Devices
 
-- Content library page loads with folder sidebar
-- Search bar, filter dropdown, and upload button present
-- Grid/list view toggle works
-- "Offline mode" indicator shown (expected - no content uploaded)
-- Folder navigation functional
+**Status: PASS**
 
-**Network errors**: None (post-fix)
-
----
-
-### Module 4: Templates (`/dashboard/templates`)
-**Status**: FAIL (pre-fix) -> PASS (post-fix)
-
-**Pre-fix**: Page displayed "Bad Request" error. API call `GET /api/v1/template-library?page=1&limit=12` returned 400.
-
-**Root cause**: Global `ValidationPipe` had `enableImplicitConversion: false`, preventing `@Type(() => Number)` decorators from converting query string params (always strings) to numbers. The `@IsInt()` and `@Min(1)` validators then rejected the string values.
-
-**Fix**: Changed `enableImplicitConversion` to `true` in `middleware/src/main.ts:90`.
-
-**Post-fix**: Templates page loads correctly. API returns `200 OK` with paginated response. Template categories, featured templates, and search all functional.
+| Check | Result |
+|-------|--------|
+| Page loads | PASS |
+| Empty state | PASS — "No devices yet" with "Pair Device" button |
+| Search box | PASS — Present and functional |
+| "Pair New Device" button | PASS |
+| Device Groups dropdown | PASS — Shows "Device Groups (0)" |
+| Breadcrumb navigation | PASS |
+| API calls | PASS — GET /displays, /playlists, /display-groups all return 200 |
 
 ---
 
-### Module 5: Widgets (`/dashboard/widgets`)
-**Status**: PASS
+## Module 3: Content
 
-- Widget Gallery loads with widget type cards
-- Widget types displayed: Clock, Weather, RSS Feed, Social Media, etc.
-- "Create Widget" button present
-- Category filtering visible
+**Status: PASS**
 
-**Network errors**: None (post-fix)
-
----
-
-### Module 6: Layouts (`/dashboard/layouts`)
-**Status**: FAIL (pre-fix) -> PASS (post-fix)
-
-**Pre-fix**: React crash - "Objects are not valid as a React child (found: object with keys {id, name, gridArea})". The page showed the error boundary fallback.
-
-**Root cause**: The layout presets API (`/api/v1/content/layouts/presets`) returns `zones` as an array of objects `[{id, name, gridArea}]`. The page component at 3 locations rendered `{preset.zones}` directly as a React child (intended to show zone count), which React cannot render because it's an object array.
-
-**Fix**: Changed 3 locations in `web/src/app/dashboard/layouts/page.tsx` (lines 362, 418, 433) to use `{Array.isArray(preset.zones) ? preset.zones.length : preset.zones}`.
-
-**Post-fix**: Layouts page loads correctly. Layout presets render with zone counts. Create Layout form accessible.
+| Check | Result |
+|-------|--------|
+| Page loads | PASS |
+| Content Library heading | PASS — "Manage your media assets (0 items)" |
+| Folders panel | PASS — "All Content" + "No folders yet" |
+| Grid/List view toggle | PASS |
+| Upload Content button | PASS |
+| Search box | PASS |
+| Type filters | PASS — All, Image (0), Video (0), Pdf (0), Url (0) |
+| Status filter | PASS — All Statuses, Ready, Processing, Error |
+| Date filter | PASS — All Time, Last 7/30/90 days |
+| Tag filter | PASS |
+| Empty state | PASS — "No content yet" with upload button |
+| API calls | PASS — GET /content, /folders, /displays, /playlists all return 200 |
 
 ---
 
-### Module 7: Playlists (`/dashboard/playlists`)
-**Status**: PASS
+## Module 4: Templates
 
-- Page loads with empty state
-- "Create Playlist" button present
-- Search and filter controls visible
+**Status: PASS**
 
-**Network errors**: None (post-fix)
+| Check | Result |
+|-------|--------|
+| Page loads | PASS |
+| Hero section | PASS — "Design Your Perfect Display" |
+| Categories sidebar | PASS |
+| Orientation filter | PASS |
+| Difficulty filter | PASS |
+| Template grid | PASS — "All Templates (0)" with empty state |
+| Search functionality | PASS |
+| API calls | PASS — GET /template-library, /categories, /featured, /popular all return 200 |
 
----
-
-### Module 8: Schedules (`/dashboard/schedules`)
-**Status**: PASS
-
-- Page loads with list view
-- Calendar/list toggle functional
-- "Create Schedule" button present
-- Empty state displayed correctly
-
-**Network errors**: None (post-fix)
+**Note:** The previously reported "Bad Request" error was caused by the BigInt serialization crash on `/auth/me`, which cascaded to make the entire dashboard unreliable. With the BigInt fix, templates work correctly. The frontend properly uses empty string for "All" filters and filters them out before sending to the backend.
 
 ---
 
-### Module 9: Analytics (`/dashboard/analytics`)
-**Status**: PASS
+## Module 5: Widgets
 
-- Summary cards render (Total Views, Avg Uptime, Active Devices, Content Items)
-- Charts section visible
-- Time range filter (7d, 30d, 90d) present
-- Export button functional
+**Status: PASS**
 
-**Network errors**: None (post-fix)
-
----
-
-### Module 10: Settings (`/dashboard/settings`)
-**Status**: PASS
-
-- Settings page loads with tabbed navigation
-- Sections verified: Organization, Appearance, Display Settings, Notifications, Billing, Developer, Account
-- Form fields render correctly in each section
-- Save buttons present
-
-**Network errors**: None (post-fix)
+| Check | Result |
+|-------|--------|
+| Page loads | PASS |
+| Widget Gallery heading | PASS |
+| Widget types listed | PASS |
 
 ---
 
-### Module 11: Global UI Elements
-**Status**: PASS (minor issue)
+## Module 6: Layouts
 
-- Sidebar navigation: all 10 menu items present and clickable
-- Top navbar: search, notifications bell, user avatar
-- Theme toggle: Light/dark mode button present
-- Breadcrumbs: render on sub-pages
-- Responsive layout: sidebar collapses on narrow viewports
+**Status: PASS**
 
-**Minor issue**: Theme toggle button click did not visually switch themes during testing (may be a timing/state issue - not confirmed as bug).
-
----
-
-## Bugs Found
-
-### BUG-001: Global ValidationPipe rejects query string numbers [CRITICAL] [FIXED]
-- **Affected pages**: Templates, Notifications (all pages), any paginated endpoint
-- **Root cause**: `enableImplicitConversion: false` in global ValidationPipe config
-- **File**: `middleware/src/main.ts:90`
-- **Fix**: Set `enableImplicitConversion: true`
-- **Verification**: Templates API returns 200 OK, Notifications API returns 200 OK
-
-### BUG-002: Layouts page crash - zones rendered as React child [CRITICAL] [FIXED]
-- **Affected pages**: Layouts (`/dashboard/layouts`)
-- **Root cause**: `preset.zones` is `[{id, name, gridArea}]` but rendered directly in JSX
-- **File**: `web/src/app/dashboard/layouts/page.tsx:362,418,433`
-- **Fix**: Guard with `Array.isArray(preset.zones) ? preset.zones.length : preset.zones`
-- **Verification**: Layouts page loads without crash, zone counts display correctly
-
-### BUG-003: CustomizationProvider fails to unwrap response envelope [HIGH] [FIXED]
-- **Affected pages**: All pages (fires on every page load)
-- **Root cause**: `CustomizationProvider.tsx` uses raw `fetch()` and reads `org.id` directly from response JSON, but the API wraps responses in `{success, data}` envelope. So `org.id` is `undefined`, causing a request to `/api/v1/organizations/undefined/branding` which returns 403.
-- **File**: `web/src/components/providers/CustomizationProvider.tsx:43-65`
-- **Fix**: Unwrap envelope: `const org = orgJson?.data ?? orgJson` for both org and branding responses
-- **Verification**: No more 403 errors on `/organizations/undefined/branding`
-
-### BUG-004: Theme toggle may not visually switch [MEDIUM] [NOT FIXED]
-- **Affected pages**: Global (all pages)
-- **Symptoms**: Clicking the light/dark mode toggle did not visibly change the theme
-- **Status**: Could not reproduce reliably; may be a timing issue with browser automation. Needs manual verification.
+| Check | Result |
+|-------|--------|
+| Page loads | PASS |
+| Layout Presets section | PASS |
+| Preset options | PASS — Split Horizontal (2 zones), Split Vertical (2 zones), 2x2 Grid (4 zones), Main+Sidebar (2 zones), L-Shape (3 zones) |
 
 ---
 
-## API Verification Summary
+## Module 7: Playlists
 
-| Endpoint | Pre-fix | Post-fix |
-|----------|---------|----------|
-| `GET /api/v1/template-library?page=1&limit=12` | 400 Bad Request | 200 OK |
-| `GET /api/v1/template-library/categories` | 200 OK | 200 OK |
-| `GET /api/v1/template-library/featured` | 200 OK | 200 OK |
-| `GET /api/v1/notifications?limit=20` | 400 Bad Request | 200 OK |
-| `GET /api/v1/notifications/unread-count` | 400 Bad Request | 200 OK |
-| `GET /api/v1/organizations/:id/branding` | 403 (undefined id) | 200 OK |
-| `GET /api/v1/content/layouts/presets` | 200 OK | 200 OK |
-| `GET /api/v1/health` | 200 OK | 200 OK |
+**Status: PASS**
+
+| Check | Result |
+|-------|--------|
+| Page loads | PASS |
+| Empty state | PASS — "No playlists yet" |
+| Create button | PASS |
+| Search box | PASS |
+| API calls | PASS — GET /playlists returns 200 |
 
 ---
 
-## Files Modified
+## Module 8: Schedules
 
-1. **`middleware/src/main.ts`** (line 90): `enableImplicitConversion: false` -> `true`
-2. **`web/src/components/providers/CustomizationProvider.tsx`** (lines 43-65): Unwrap response envelope for org and branding API calls
-3. **`web/src/app/dashboard/layouts/page.tsx`** (lines 362, 418, 433): Guard `preset.zones` rendering with `Array.isArray()` check
+**Status: PASS**
+
+| Check | Result |
+|-------|--------|
+| Page loads | PASS |
+| Empty state | PASS — "No schedules yet" |
+| Create button | PASS |
+| API calls | PASS — GET /schedules returns 200 |
+
+---
+
+## Module 9: Analytics
+
+**Status: PASS**
+
+| Check | Result |
+|-------|--------|
+| Page loads | PASS |
+| Summary cards | PASS — Total Devices (0), Content Items (0), Total Size (0 B), System Uptime (0%) |
+| Charts render | PASS — Device Uptime Timeline, Content Performance, Device Distribution, Usage Trends, Bandwidth Usage, Top Playlists |
+
+---
+
+## Module 10: Settings
+
+**Status: PASS (with fixes applied)**
+
+| Check | Result |
+|-------|--------|
+| Settings main page loads | PASS |
+| Organization section | PASS — Name, country inputs |
+| Appearance/theme section | PASS — Color picker for primary/success/warning/error/info |
+| Display Settings section | PASS — Default duration input |
+| Notifications section | PASS |
+| Billing link | PASS — Links to /dashboard/settings/billing |
+| API Keys link | PASS — Links to /dashboard/settings/api-keys |
+| Account section | PASS — Password change form |
+| Billing sub-page | PASS — Current Plan, Upgrade, Compare Plans, Invoice History |
+| API Keys sub-page | PASS — Empty state with usage instructions |
+| Password change | PASS (after fix) — POST /auth/change-password works |
+
+---
+
+## Module 11: Global UI Elements
+
+**Status: PASS**
+
+| Check | Result |
+|-------|--------|
+| Top nav - Notification bell | PASS |
+| Top nav - Theme toggle | PASS — Light/Dark buttons present |
+| Top nav - User profile | PASS — Shows name, email, avatar initials |
+| Sidebar navigation | PASS — All 10 items (Overview through Settings) |
+| Sidebar active highlighting | PASS |
+| Sidebar version/platform | PASS — "Version 1.0.0", "Platform Vizora" |
+| Breadcrumb navigation | PASS — Present on all sub-pages |
+| Trial banner | PASS — Shows on all pages with dismiss button |
+| Login flow | PASS — Email/password login, cookie-based auth |
+| Logout | Not tested via UI (API works) |
+
+**Console Errors (global):**
+- WebSocket connection failures (expected — realtime service not running in test)
+- No other errors after fixes
+
+---
+
+## Bugs Found & Fixed
+
+### BUG 1: BigInt Serialization Crash (CRITICAL) — FIXED
+
+- **Severity:** CRITICAL
+- **Pages Affected:** ALL authenticated pages
+- **Error:** `"Do not know how to serialize a BigInt"` (HTTP 500)
+- **Steps to Reproduce:** Login → Navigate to any dashboard page
+- **Expected:** Page loads with user data
+- **Actual:** Multiple 500 errors on `/auth/me`, `/billing/quota`, `/billing/subscription`
+- **Root Cause:** Prisma `Organization` model has `storageUsedBytes` (BigInt) and `storageQuotaBytes` (BigInt). The JWT strategy (`jwt.strategy.ts:118`) calls `JSON.stringify()` on user data including the full organization object, which crashes on BigInt values. This breaks ALL authenticated routes because auth validation fails before reaching the handler.
+- **Endpoints Affected:** `/auth/me`, `/billing/quota`, `/billing/subscription`, `/organizations/current`, and transitively all protected endpoints
+- **Files Modified:**
+  1. `middleware/src/main.ts` — Added global `BigInt.prototype.toJSON = function() { return Number(this); }` (line 4-7)
+  2. `middleware/src/modules/auth/strategies/jwt.strategy.ts` — Explicitly convert BigInt fields to Number before caching (lines 110-115)
+
+### BUG 2: Missing Change Password Endpoint (CRITICAL) — FIXED
+
+- **Severity:** CRITICAL
+- **Page:** Settings → Account → Change Password form
+- **Error:** `POST /api/v1/auth/change-password` returned 404
+- **Steps to Reproduce:** Go to Settings → scroll to Account → enter current and new passwords → submit
+- **Expected:** Password changes successfully
+- **Actual:** 404 Not Found
+- **Root Cause:** Frontend `web/src/lib/api.ts:332-337` calls `POST /auth/change-password`, but the backend auth controller had no such endpoint
+- **Files Created/Modified:**
+  1. `middleware/src/modules/auth/dto/change-password.dto.ts` — NEW: DTO with `currentPassword` and `newPassword` validation
+  2. `middleware/src/modules/auth/dto/index.ts` — Added export for ChangePasswordDto
+  3. `middleware/src/modules/auth/auth.service.ts` — Added `changePassword()` method (validates current password, hashes new, updates DB, invalidates cache)
+  4. `middleware/src/modules/auth/auth.controller.ts` — Added `POST change-password` endpoint with JwtAuthGuard
+
+### BUG 3: Unsaved Settings Fields (MEDIUM) — FIXED
+
+- **Severity:** MEDIUM
+- **Page:** Settings
+- **Steps to Reproduce:** Go to Settings → change Default Duration, Timezone, or Notification preferences → Save → Reload page
+- **Expected:** Settings persist
+- **Actual (before fix):** Changes are silently lost
+- **Root Cause:** The save handler in `web/src/app/dashboard/settings/page.tsx` only saved `organizationName` and `country`. The fields `defaultDuration`, `timezone`, and `notifications` were NOT included in the save payload.
+- **Files Modified:**
+  1. `web/src/app/dashboard/settings/page.tsx` — Save handler now includes `settings: { defaultDuration, timezone, notifications }` in update payload; load handler reads them from `organization.settings`
+  2. `web/src/lib/api.ts` — Added `settings` to Organization interface and AuthUser.organization type; expanded `updateOrganization` parameter type
+  3. `middleware/src/modules/organizations/organizations.service.ts` — `update()` now merges incoming settings with existing settings (preserves branding config)
+
+---
+
+## Infrastructure Notes
+
+- **Prisma dist copy issue:** The `postbuild` script in `packages/database/package.json` uses `cp -r src/generated dist/` which fails silently on Windows Git Bash. Required manual copy of Prisma generated files to `dist/generated/prisma/`.
+- **Realtime service not tested:** WebSocket connections fail because the realtime gateway (:3002) was not started. This is expected in isolated testing and does not affect dashboard functionality (graceful degradation).

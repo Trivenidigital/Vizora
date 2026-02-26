@@ -72,3 +72,31 @@
 - Realtime: builds via `npx nx build @vizora/realtime`
 - Web: builds via `npx nx build @vizora/web` (35 routes, Turbopack)
 - **Root cause of prior nx build failure**: `display-android` directory was not in `pnpm-workspace.yaml` but Nx auto-discovered it, breaking the project graph. Fix: add `display-android` to workspace packages
+
+## Session: 2026-02-25 - Content Upload Fix & Deployment
+
+### Production Deployment
+- **Server**: root@89.167.55.176, project at `/opt/vizora/app`
+- **PM2 manages**: vizora-middleware (x2 cluster), vizora-realtime (x1), vizora-web (x1)
+- **Deploy flow**: git pull → rebuild affected services → pm2 restart
+
+### Prisma Client + Webpack Bundling Pitfall (CRITICAL)
+- `prisma generate` updates `packages/database/src/generated/prisma/` but NOT `dist/generated/prisma/`
+- Middleware webpack resolves `@vizora/database` from `dist/` — so stale DMMF gets bundled
+- **After running `prisma generate` on server, MUST also copy to dist**:
+  ```bash
+  cp packages/database/src/generated/prisma/index.js packages/database/dist/generated/prisma/index.js
+  cp packages/database/src/generated/prisma/index.d.ts packages/database/dist/generated/prisma/index.d.ts
+  ```
+- Then rebuild middleware: `npx nx build @vizora/middleware --skip-nx-cache`
+- Verify with: `grep -c "fieldName" middleware/dist/main.js` (count should include DMMF occurrences)
+
+### File Validation False Positives
+- `/base64,/i` regex in file-validation.service.ts matched JPEG EXIF/XMP metadata containing "base64,"
+- Fix: Changed to `/data:\s*[^;]{1,50};\s*base64,/i` — only matches actual `data:` URI payloads
+- Always check real-world file content patterns before adding suspicious content regex
+
+### Response Envelope Unwrapping
+- Backend wraps all responses in `{ success, data, meta }` via ResponseEnvelopeInterceptor
+- Frontend multipart upload paths may not unwrap the envelope — check `createContent` and similar methods
+- Pattern: `const unwrapped = ('success' in result && 'data' in result) ? result.data : result;`
