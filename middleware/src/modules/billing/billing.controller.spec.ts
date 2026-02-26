@@ -253,7 +253,7 @@ describe('BillingController', () => {
       const result = await controller.getInvoices(organizationId);
 
       expect(result).toEqual(mockInvoices);
-      expect(mockBillingService.getInvoices).toHaveBeenCalledWith(organizationId, undefined);
+      expect(mockBillingService.getInvoices).toHaveBeenCalledWith(organizationId, 10);
     });
 
     it('should pass limit parameter as integer', async () => {
@@ -264,12 +264,20 @@ describe('BillingController', () => {
       expect(mockBillingService.getInvoices).toHaveBeenCalledWith(organizationId, 5);
     });
 
-    it('should handle NaN limit gracefully', async () => {
+    it('should clamp limit to max 100', async () => {
+      mockBillingService.getInvoices.mockResolvedValue(mockInvoices);
+
+      await controller.getInvoices(organizationId, '500');
+
+      expect(mockBillingService.getInvoices).toHaveBeenCalledWith(organizationId, 100);
+    });
+
+    it('should default NaN limit to 10', async () => {
       mockBillingService.getInvoices.mockResolvedValue(mockInvoices);
 
       await controller.getInvoices(organizationId, 'invalid');
 
-      expect(mockBillingService.getInvoices).toHaveBeenCalledWith(organizationId, NaN);
+      expect(mockBillingService.getInvoices).toHaveBeenCalledWith(organizationId, 10);
     });
   });
 
