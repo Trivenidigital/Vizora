@@ -196,6 +196,13 @@ export class TemplateRenderingService {
    * @returns Rendered HTML string
    */
   renderTemplate(templateHtml: string, data: Record<string, any>): string {
+    // Block triple-brace (unescaped) expressions for XSS prevention
+    if (/\{\{\{[^}]+\}\}\}/.test(templateHtml)) {
+      throw new BadRequestException(
+        'Template contains unescaped expressions ({{{ }}}), which are not allowed',
+      );
+    }
+
     try {
       // Compile the template
       const template = Handlebars.compile(templateHtml, {
@@ -251,12 +258,22 @@ export class TemplateRenderingService {
           const timeoutId = setTimeout(() => controller.abort(), this.REQUEST_TIMEOUT);
 
           try {
+            // Filter out sensitive headers that could leak credentials
+            const BLOCKED_HEADERS = ['authorization', 'cookie', 'host', 'x-internal-api-key', 'x-forwarded-for'];
+            const safeHeaders = dataSource.headers
+              ? Object.fromEntries(
+                  Object.entries(dataSource.headers).filter(
+                    ([key]) => !BLOCKED_HEADERS.includes(key.toLowerCase()),
+                  ),
+                )
+              : {};
+
             const response = await fetch(dataSource.url!, {
               method: dataSource.method || 'GET',
               headers: {
                 'Accept': 'application/json',
                 'User-Agent': 'Vizora-Template-Service/1.0',
-                ...dataSource.headers,
+                ...safeHeaders,
               },
               signal: controller.signal,
             });
