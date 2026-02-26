@@ -19,12 +19,15 @@ jest.mock('@/lib/api', () => ({
   apiClient: {
     getContent: jest.fn().mockResolvedValue({ data: [] }),
     getPlaylists: jest.fn().mockResolvedValue({ data: [] }),
+    getQuotaUsage: jest.fn().mockResolvedValue({ storageUsedBytes: 0, storageQuotaBytes: 1073741824, screenCount: 0, screenQuota: 5 }),
+    setAuthenticated: jest.fn(),
   },
 }));
 
+const stableDeviceStatuses = {};
 jest.mock('@/lib/context/DeviceStatusContext', () => ({
   useDeviceStatus: () => ({
-    deviceStatuses: {},
+    deviceStatuses: stableDeviceStatuses,
     isInitialized: true,
   }),
 }));

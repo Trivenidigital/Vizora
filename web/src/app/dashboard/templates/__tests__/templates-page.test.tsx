@@ -10,6 +10,9 @@ jest.mock('@/lib/api', () => ({
     getTemplateCategories: (...args: any[]) => mockGetTemplateCategories(...args),
     getFeaturedTemplates: (...args: any[]) => mockGetFeaturedTemplates(...args),
     searchTemplates: (...args: any[]) => mockSearchTemplates(...args),
+    getCurrentUser: jest.fn().mockResolvedValue({ id: '1', email: 'test@test.com', firstName: 'Test', lastName: 'User', organizationId: 'org-1', role: 'admin' }),
+    setAuthenticated: jest.fn(),
+    getQuotaUsage: jest.fn().mockResolvedValue({ storageUsedBytes: 0, storageQuotaBytes: 1073741824, screenCount: 0, screenQuota: 5 }),
   },
 }));
 
@@ -20,6 +23,10 @@ jest.mock('@/theme/icons', () => ({
 jest.mock('@/components/LoadingSpinner', () => {
   return function MockSpinner() { return <div data-testid="spinner">Loading...</div>; };
 });
+
+jest.mock('@/components/templates/TemplateCardSkeleton', () => ({
+  TemplateGridSkeleton: ({ count }: { count?: number }) => <div data-testid="spinner">Loading {count} templates...</div>,
+}));
 
 jest.mock('@/components/EmptyState', () => {
   return function MockEmpty({ title }: any) { return <div data-testid="empty-state">{title || 'No items'}</div>; };
