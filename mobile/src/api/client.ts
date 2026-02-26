@@ -246,7 +246,8 @@ export type LoginResponse = {
   user: {
     id: string;
     email: string;
-    name: string;
+    firstName: string;
+    lastName: string;
     role: string;
     organizationId: string;
   };
@@ -255,14 +256,16 @@ export type LoginResponse = {
 export type RegisterData = {
   email: string;
   password: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   organizationName: string;
 };
 
 export type MeResponse = {
   id: string;
   email: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   role: string;
   organizationId: string;
 };

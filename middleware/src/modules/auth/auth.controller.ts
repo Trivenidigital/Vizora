@@ -100,10 +100,11 @@ export class AuthController {
     // Set httpOnly cookie with JWT token
     this.setAuthCookie(res, result.token);
 
-    // Return response without token in body (token is in cookie)
+    // Return response with token in body (for mobile clients) and cookie (for web)
     return {
       success: true,
       data: {
+        access_token: result.token,
         user: result.user,
         organization: result.organization,
         expiresIn: result.expiresIn,
@@ -137,10 +138,11 @@ export class AuthController {
     // Set httpOnly cookie with JWT token
     this.setAuthCookie(res, result.token);
 
-    // Return response without token in body (token is in cookie)
+    // Return response with token in body (for mobile clients) and cookie (for web)
     return {
       success: true,
       data: {
+        access_token: result.token,
         user: result.user,
         expiresIn: result.expiresIn,
       },

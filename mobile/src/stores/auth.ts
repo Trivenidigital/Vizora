@@ -7,7 +7,8 @@ const USER_KEY = 'vizora_user';
 type User = {
   id: string;
   email: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   role: string;
   organizationId: string;
 };

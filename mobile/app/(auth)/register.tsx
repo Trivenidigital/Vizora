@@ -15,28 +15,37 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api, ApiError } from '../../src/api/client';
 import { useAuthStore } from '../../src/stores/auth';
+import { validateEmail, validatePassword, validateName, validateOrgName } from '../../src/utils/validation';
 import { colors, spacing, fontSize, borderRadius } from '../../src/constants/theme';
 
 export default function RegisterScreen() {
   const router = useRouter();
   const setAuth = useAuthStore((s) => s.setAuth);
 
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [orgName, setOrgName] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
-    if (!name.trim() || !email.trim() || !password.trim() || !orgName.trim()) {
-      Alert.alert('Error', 'All fields are required.');
-      return;
-    }
+    const firstNameError = validateName(firstName, 'First name');
+    if (firstNameError) { Alert.alert('Error', firstNameError); return; }
+    const lastNameError = validateName(lastName, 'Last name');
+    if (lastNameError) { Alert.alert('Error', lastNameError); return; }
+    const emailError = validateEmail(email);
+    if (emailError) { Alert.alert('Error', emailError); return; }
+    const passwordError = validatePassword(password);
+    if (passwordError) { Alert.alert('Error', passwordError); return; }
+    const orgError = validateOrgName(orgName);
+    if (orgError) { Alert.alert('Error', orgError); return; }
 
     setLoading(true);
     try {
       const res = await api.register({
-        name: name.trim(),
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         email: email.trim(),
         password,
         organizationName: orgName.trim(),
@@ -68,12 +77,22 @@ export default function RegisterScreen() {
             Set up your organization to start managing displays.
           </Text>
 
-          <Text style={styles.label}>Your Name</Text>
+          <Text style={styles.label}>First Name</Text>
           <TextInput
             style={styles.input}
-            value={name}
-            onChangeText={setName}
-            placeholder="John Doe"
+            value={firstName}
+            onChangeText={setFirstName}
+            placeholder="John"
+            placeholderTextColor={colors.textMuted}
+            autoCapitalize="words"
+          />
+
+          <Text style={styles.label}>Last Name</Text>
+          <TextInput
+            style={styles.input}
+            value={lastName}
+            onChangeText={setLastName}
+            placeholder="Doe"
             placeholderTextColor={colors.textMuted}
             autoCapitalize="words"
           />
