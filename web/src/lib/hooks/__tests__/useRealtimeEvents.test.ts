@@ -336,7 +336,9 @@ describe('useRealtimeEvents', () => {
       });
 
       await waitFor(() => {
-        expect(onConnectionChange).toHaveBeenCalledWith(false);
+        // When browser is online (navigator.onLine=true in jsdom), disconnect sends null (reconnecting)
+        // When browser is truly offline, disconnect sends false
+        expect(onConnectionChange).toHaveBeenCalledWith(null);
       });
     });
   });
