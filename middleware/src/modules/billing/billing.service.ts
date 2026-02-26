@@ -30,6 +30,7 @@ import {
   getRazorpayPlanId,
 } from './constants/plans';
 import { MailService } from '../mail/mail.service';
+import { RedisService } from '../redis/redis.service';
 
 @Injectable()
 export class BillingService {
@@ -41,6 +42,7 @@ export class BillingService {
     private readonly stripeProvider: StripeProvider,
     private readonly razorpayProvider: RazorpayProvider,
     private readonly mailService: MailService,
+    private readonly redisService: RedisService,
   ) {}
 
   /**
@@ -501,13 +503,35 @@ export class BillingService {
   }
 
   /**
-   * Handle webhook events from payment providers
+   * Handle webhook events from payment providers.
+   * Verifies the webhook signature before processing events.
    */
   async handleWebhookEvent(
     provider: 'stripe' | 'razorpay',
-    event: WebhookEvent,
+    rawEvent: { rawBody: Buffer; signature: string },
   ): Promise<{ received: boolean }> {
+    const paymentProvider =
+      provider === 'stripe' ? this.stripeProvider : this.razorpayProvider;
+
+    // Verify signature and parse the event
+    const event = paymentProvider.verifyWebhookSignature(
+      rawEvent.rawBody,
+      rawEvent.signature,
+    );
+
     this.logger.log(`Processing ${provider} webhook: ${event.type}`);
+
+    // Idempotency: skip duplicate events
+    const eventId = event.data?.id || event.data?.object?.id;
+    if (eventId) {
+      const idempotencyKey = `webhook:processed:${provider}:${eventId}`;
+      const alreadyProcessed = await this.redisService.get(idempotencyKey);
+      if (alreadyProcessed) {
+        this.logger.debug(`Skipping duplicate webhook: ${eventId}`);
+        return { received: true };
+      }
+      await this.redisService.set(idempotencyKey, '1', 172800); // 48h TTL
+    }
 
     try {
       switch (event.type) {
