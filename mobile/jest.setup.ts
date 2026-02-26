@@ -1,4 +1,23 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+// Eagerly resolve all lazy globals installed by expo/src/winter/runtime.native.ts
+// to prevent Jest 30's "import outside test scope" error when lazily triggered.
+const _g = globalThis as Record<string, unknown>;
+for (const key of [
+  'TextDecoder',
+  'TextDecoderStream',
+  'TextEncoderStream',
+  'URL',
+  'URLSearchParams',
+  '__ExpoImportMetaRegistry',
+  'structuredClone',
+]) {
+  try {
+    void _g[key];
+  } catch {
+    // ignore — some may not be defined
+  }
+}
+
 // Mock expo-secure-store
 jest.mock('expo-secure-store', () => {
   const store: Record<string, string> = {};

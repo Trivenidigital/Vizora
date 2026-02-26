@@ -1,0 +1,31 @@
+appId: com.vizora.companion
+name: Content Tab
+---
+# Prerequisite: user must be logged in
+- launchApp
+
+# Wait for main screen
+- assertVisible:
+    text: "Displays"
+    timeout: 10000
+
+# Navigate to Content tab
+- tapOn: "Content"
+
+# Verify content screen loads
+- assertVisible:
+    text: "Content"
+    timeout: 5000
+
+# Test type filter if visible
+- tapOn:
+    text: "Images"
+    optional: true
+
+- tapOn:
+    text: "Videos"
+    optional: true
+
+- tapOn:
+    text: "All"
+    optional: true

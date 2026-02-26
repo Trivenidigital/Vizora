@@ -1,0 +1,19 @@
+appId: com.vizora.companion
+name: Logout Flow
+---
+# Prerequisite: user must be logged in
+- launchApp
+
+# Wait for main screen
+- assertVisible:
+    text: "Displays"
+    timeout: 10000
+
+# Tap Sign Out
+- tapOn: "Sign Out"
+
+# Verify return to login screen
+- assertVisible:
+    text: "Sign In"
+    timeout: 5000
+- assertVisible: "VIZORA"

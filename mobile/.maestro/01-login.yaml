@@ -1,0 +1,25 @@
+appId: com.vizora.companion
+name: Login Flow
+---
+# Launch app — should show login screen
+- launchApp
+
+# Verify login screen elements
+- assertVisible: "VIZORA"
+- assertVisible: "Sign In"
+
+# Enter credentials
+- tapOn:
+    id: "email-input"
+- inputText: "test@vizora.cloud"
+- tapOn:
+    id: "password-input"
+- inputText: "TestPass123!"
+
+# Submit login
+- tapOn: "Sign In"
+
+# Verify navigation to Displays screen
+- assertVisible:
+    text: "Displays"
+    timeout: 10000
