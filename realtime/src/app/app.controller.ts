@@ -187,7 +187,7 @@ export class AppController {
       type: DeviceCommandType.PUSH_CONTENT,
       payload: {
         content,
-        duration: data.duration || 30,
+        duration: data.duration || 5,
       },
     });
     return {

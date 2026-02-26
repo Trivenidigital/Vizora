@@ -326,7 +326,7 @@ export class DisplaysService {
     organizationId: string,
     displayId: string,
     contentId: string,
-    duration: number = 30,
+    duration: number = 5,
   ) {
     // Verify display exists and belongs to organization
     await this.findOne(organizationId, displayId);
@@ -370,7 +370,7 @@ export class DisplaysService {
             headers: { 'x-internal-api-key': process.env.INTERNAL_API_SECRET || '' },
           }),
         );
-        this.logger.log(`Pushed content ${contentId} to display ${displayId} for ${duration}s`);
+        this.logger.log(`Pushed content ${contentId} to display ${displayId} for ${duration} min`);
       },
       (error) => {
         if (error) {

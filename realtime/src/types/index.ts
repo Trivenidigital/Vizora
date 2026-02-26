@@ -165,6 +165,7 @@ export interface PushContentData {
 export interface PushContentRequest {
   deviceId: string;
   content: PushContentData;
+  /** Display duration in minutes */
   duration?: number;
 }
 

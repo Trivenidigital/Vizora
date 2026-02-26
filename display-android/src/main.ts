@@ -960,7 +960,7 @@ class VizoraAndroidTV {
       case 'push_content':
         if (command.payload) {
           const content = command.payload.content as PushContent;
-          const duration = (command.payload.duration as number) || 30;
+          const duration = (command.payload.duration as number) || 5;
           this.handleContentPush(content, duration);
         }
         break;
@@ -976,8 +976,8 @@ class VizoraAndroidTV {
 
   // ==================== TEMPORARY CONTENT PUSH ====================
 
-  private handleContentPush(content: PushContent, duration: number = 30) {
-    console.log(`[Vizora] Pushing content: ${content.name} for ${duration}s`);
+  private handleContentPush(content: PushContent, duration: number = 5) {
+    console.log(`[Vizora] Pushing content: ${content.name} for ${duration} min`);
 
     // Save current playlist state if playing
     if (this.currentPlaylist && !this.temporaryContent) {
@@ -1003,10 +1003,10 @@ class VizoraAndroidTV {
     this.temporaryContent = content;
     this.renderTemporaryContent(content);
 
-    // Set timer to resume playlist after duration
+    // Set timer to resume playlist after duration (convert minutes to ms)
     this.temporaryContentTimer = setTimeout(() => {
       this.resumePlaylist();
-    }, duration * 1000);
+    }, duration * 60 * 1000);
   }
 
   private renderTemporaryContent(content: PushContent) {

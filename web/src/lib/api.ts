@@ -765,7 +765,7 @@ class ApiClient {
   async pushContentToDisplay(
     displayId: string,
     contentId: string,
-    duration: number = 30,
+    duration: number = 5,
   ): Promise<{ success: boolean; message: string }> {
     return this.request<{ success: boolean; message: string }>(
       `/displays/${displayId}/push-content`,

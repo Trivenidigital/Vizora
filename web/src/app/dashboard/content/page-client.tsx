@@ -36,7 +36,7 @@ export default function ContentClient() {
  const [playlists, setPlaylists] = useState<Playlist[]>([]);
  const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
  const [selectedPlaylist, setSelectedPlaylist] = useState('');
- const [pushDuration, setPushDuration] = useState(30);
+ const [pushDuration, setPushDuration] = useState(5);
  const [uploadForm, setUploadForm] = useState({
  title: '',
  type: 'image' as 'image' | 'video' | 'pdf' | 'url' | 'html' | 'template',
@@ -503,7 +503,7 @@ export default function ContentClient() {
  const handlePushToDevice = (item: Content) => {
  setSelectedContent(item);
  setSelectedDevices([]);
- setPushDuration(30);
+ setPushDuration(5);
  setIsPushModalOpen(true);
  };
 
@@ -519,7 +519,7 @@ export default function ContentClient() {
  )
  );
 
- toast.success(`Content pushed to ${selectedDevices.length} device(s) for ${pushDuration}s`);
+ toast.success(`Content pushed to ${selectedDevices.length} device(s) for ${pushDuration} min`);
  setIsPushModalOpen(false);
  } catch (error: any) {
  toast.error(error.message || 'Failed to push content');
@@ -1505,35 +1505,35 @@ export default function ContentClient() {
  {/* Duration Input */}
  <div>
  <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
- Display Duration (seconds)
+ Display Duration (minutes)
  </label>
  <div className="flex items-center gap-2">
  <input
  type="number"
- min={5}
- max={3600}
+ min={1}
+ max={60}
  value={pushDuration}
- onChange={(e) => setPushDuration(Math.max(5, Math.min(3600, parseInt(e.target.value) || 30)))}
+ onChange={(e) => setPushDuration(Math.max(1, Math.min(60, parseInt(e.target.value) || 5)))}
  className="w-24 px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
  />
  <div className="flex gap-1">
- {[15, 30, 60, 120].map((sec) => (
+ {[1, 5, 15, 30].map((min) => (
  <button
- key={sec}
- onClick={() => setPushDuration(sec)}
+ key={min}
+ onClick={() => setPushDuration(min)}
  className={`px-2 py-1 text-xs rounded ${
- pushDuration === sec
+ pushDuration === min
  ? 'bg-[#00E5A0] text-[#061A21]'
  : 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
  }`}
  >
- {sec}s
+ {min}m
  </button>
  ))}
  </div>
  </div>
  <p className="mt-1 text-xs text-[var(--foreground-tertiary)]">
- Min: 5s, Max: 3600s (1 hour)
+ Min: 1 min, Max: 60 min (1 hour)
  </p>
  </div>
 
