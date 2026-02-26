@@ -298,12 +298,16 @@ export class BillingService {
 
       await provider.updateSubscription(subscriptionId, priceId);
 
-      // Update organization with new tier and quota
+      // Update organization with new tier, screen quota, and storage quota
+      const tierConfig = PLAN_TIERS[dto.planId];
       await this.db.organization.update({
         where: { id: organizationId },
         data: {
           subscriptionTier: dto.planId,
           screenQuota: getScreenQuotaForTier(dto.planId),
+          ...(tierConfig?.storageQuotaMb
+            ? { storageQuotaBytes: BigInt(tierConfig.storageQuotaMb * 1024 * 1024) }
+            : {}),
         },
       });
     }
@@ -825,7 +829,8 @@ export class BillingService {
       return;
     }
 
-    // Update organization with subscription details
+    // Update organization with subscription details and storage quota
+    const tierConfig = PLAN_TIERS[planId];
     await this.db.organization.update({
       where: { id: organizationId },
       data: {
@@ -835,6 +840,9 @@ export class BillingService {
         screenQuota: getScreenQuotaForTier(planId),
         paymentProvider: 'stripe',
         trialEndsAt: null, // End any trial
+        ...(tierConfig?.storageQuotaMb
+          ? { storageQuotaBytes: BigInt(tierConfig.storageQuotaMb * 1024 * 1024) }
+          : {}),
       },
     });
 
