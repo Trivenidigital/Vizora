@@ -114,55 +114,9 @@ export default function SchedulesClient() {
 
  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
- // Real-time event handling for schedule execution
+ // Real-time event handling for schedule status
  const { isConnected } = useRealtimeEvents({
  enabled: true,
- onScheduleExecution: (execution) => {
- // Track execution in history
- setExecutionHistory((prev) => ({
- ...prev,
- [execution.scheduleId]: {
- action: execution.action,
- timestamp: execution.timestamp,
- error: execution.error,
- displayId: execution.displayId,
- },
- }));
-
- // Show notification based on execution status
- switch (execution.action) {
- case 'started':
- toast.info(
- `Schedule started on device ${execution.displayId?.substring(0, 8)}...`
- );
- break;
- case 'completed':
- toast.success(
- `Schedule completed on device ${execution.displayId?.substring(0, 8)}...`
- );
- break;
- case 'failed':
- toast.error(
- `Schedule failed: ${execution.error || 'Unknown error'}`
- );
- break;
- }
-
- // Update schedule status if needed
- setSchedules((prev) =>
- prev.map((schedule) =>
- schedule.id === execution.scheduleId
- ? {
- ...schedule,
- lastExecution: {
- action: execution.action,
- timestamp: execution.timestamp,
- },
- }
- : schedule
- )
- );
- },
  onConnectionChange: (connected) => {
  setRealtimeStatus(connected ? 'connected' : 'offline');
  if (connected) {
