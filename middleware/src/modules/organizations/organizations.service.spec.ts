@@ -13,6 +13,8 @@ describe('OrganizationsService', () => {
     subscriptionTier: 'free',
     screenQuota: 5,
     subscriptionStatus: 'active',
+    storageUsedBytes: 0,
+    storageQuotaBytes: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
