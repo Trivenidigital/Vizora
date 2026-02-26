@@ -49,6 +49,8 @@ interface AuthUser {
     subscriptionTier: string;
     country?: string;
     settings?: Record<string, any>;
+    storageUsedBytes?: number;
+    storageQuotaBytes?: number;
   };
 }
 
