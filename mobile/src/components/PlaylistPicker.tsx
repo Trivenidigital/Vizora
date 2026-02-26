@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { api } from '../api/client';
 import { colors, spacing, fontSize, borderRadius } from '../constants/theme';
+import { logger } from '../utils/logger';
 import type { Playlist } from '../types';
 
 type Props = {
@@ -31,7 +32,7 @@ export function PlaylistPicker({ visible, currentPlaylistId, onSelect, onClose }
         .then((result) => {
           setPlaylists(Array.isArray(result) ? result : []);
         })
-        .catch(() => {})
+        .catch((err) => logger.warn('Failed to fetch playlists', err))
         .finally(() => setLoading(false));
     }
   }, [visible]);

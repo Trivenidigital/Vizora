@@ -23,6 +23,7 @@ import { ContentPushModal } from '../src/components/ContentPushModal';
 import { showConfirmDialog } from '../src/components/ConfirmDialog';
 import { timeAgo, formatDate } from '../src/utils/formatters';
 import { colors, spacing, fontSize, borderRadius } from '../src/constants/theme';
+import { logger } from '../src/utils/logger';
 import type { Display } from '../src/types';
 
 export default function DeviceDetailScreen() {
@@ -93,7 +94,7 @@ export default function DeviceDetailScreen() {
     if (!id) return;
     api.getScreenshot(id).then((data) => {
       if (data?.url) setScreenshotUrl(data.url);
-    }).catch(() => {});
+    }).catch((err) => logger.warn('Failed to fetch screenshot', err));
   }, [id]);
 
   const handleSaveNickname = async () => {

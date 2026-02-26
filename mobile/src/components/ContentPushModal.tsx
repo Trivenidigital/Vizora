@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { api } from '../api/client';
 import { colors, spacing, fontSize, borderRadius } from '../constants/theme';
+import { logger } from '../utils/logger';
 import type { Content } from '../types';
 
 type Props = {
@@ -37,7 +38,7 @@ export function ContentPushModal({ visible, displayId, onClose }: Props) {
         .then((result) => {
           setContent(Array.isArray(result) ? result : []);
         })
-        .catch(() => {})
+        .catch((err) => logger.warn('Failed to fetch content list', err))
         .finally(() => setLoading(false));
     }
   }, [visible]);

@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api, ApiError } from '../../src/api/client';
 import { useAuthStore } from '../../src/stores/auth';
+import { validateEmail } from '../../src/utils/validation';
 import { colors, spacing, fontSize, borderRadius } from '../../src/constants/theme';
 
 export default function LoginScreen() {
@@ -25,8 +26,13 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please enter email and password.');
+    const emailError = validateEmail(email);
+    if (emailError) {
+      Alert.alert('Error', emailError);
+      return;
+    }
+    if (!password.trim()) {
+      Alert.alert('Error', 'Please enter your password.');
       return;
     }
 

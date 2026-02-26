@@ -96,7 +96,7 @@ export default function DevicesScreen() {
           <ConnectionStatus isConnected={isConnected} />
           <View>
             <Text style={styles.headerTitle}>Displays</Text>
-            <Text style={styles.headerSubtitle}>{user?.name ?? 'My Organization'}</Text>
+            <Text style={styles.headerSubtitle}>{user ? `${user.firstName} ${user.lastName}` : 'My Organization'}</Text>
           </View>
         </View>
         <TouchableOpacity onPress={handleLogout} activeOpacity={0.7}>
