@@ -410,11 +410,10 @@ class ApiClient {
   }
 
   async completePairing(data: { code: string; nickname: string; location?: string }): Promise<Display> {
-    // Only send fields the backend DTO accepts (code, nickname)
-    const { code, nickname } = data;
+    const { code, nickname, location } = data;
     return this.request<Display>('/devices/pairing/complete', {
       method: 'POST',
-      body: JSON.stringify({ code, nickname }),
+      body: JSON.stringify({ code, nickname, ...(location && { location }) }),
     });
   }
 

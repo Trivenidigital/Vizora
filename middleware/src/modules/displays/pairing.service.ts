@@ -262,6 +262,7 @@ export class PairingService implements OnModuleDestroy {
           jwtToken: hashedToken, // Store hash, not plaintext
           pairedAt: new Date(),
           status: 'pairing',
+          location: completeDto.location || display.location,
         },
       });
     } else {

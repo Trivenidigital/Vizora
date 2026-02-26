@@ -8,4 +8,8 @@ export class CompletePairingDto {
   @IsString()
   @IsOptional()
   nickname?: string;
+
+  @IsString()
+  @IsOptional()
+  location?: string;
 }
