@@ -265,11 +265,31 @@ export class DeviceGateway
   }
 
   /**
+   * Extract JWT token from client connection.
+   * Tries auth.token first (device clients), then falls back to httpOnly cookie (dashboard clients).
+   */
+  private getTokenFromClient(client: Socket): string | null {
+    // Try auth.token first (device clients)
+    if (client.handshake.auth?.token) {
+      return client.handshake.auth.token;
+    }
+
+    // Fall back to httpOnly cookie (dashboard clients)
+    const cookies = client.handshake.headers?.cookie;
+    if (cookies) {
+      const match = cookies.match(/vizora_token=([^;]+)/);
+      if (match) return match[1];
+    }
+
+    return null;
+  }
+
+  /**
    * Authenticate the connection: verify JWT (device or user), check revocation, deduplicate sockets.
    * Returns a discriminated union on success, or null if connection was rejected.
    */
   private async authenticateConnection(client: Socket): Promise<AuthPayload | null> {
-    const token = client.handshake.auth.token;
+    const token = this.getTokenFromClient(client);
 
     if (!token) {
       this.logger.warn('Connection rejected: No token provided');
