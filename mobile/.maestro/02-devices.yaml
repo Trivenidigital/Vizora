@@ -1,0 +1,25 @@
+appId: com.vizora.companion
+name: Devices List
+---
+# Prerequisite: user must be logged in
+- launchApp
+
+# Wait for Displays screen
+- assertVisible:
+    text: "Displays"
+    timeout: 10000
+
+# Verify header elements
+- assertVisible: "Sign Out"
+
+# If devices exist, tap the first one
+- tapOn:
+    index: 0
+    optional: true
+    id: "device-card"
+
+# Verify device detail screen loads (if a device was tapped)
+- assertVisible:
+    text: "Device Info"
+    timeout: 5000
+    optional: true
