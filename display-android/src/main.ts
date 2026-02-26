@@ -759,7 +759,7 @@ class VizoraAndroidTV {
       ? currentItem.content.url
       : transformContentUrl(currentItem.content.url, this.config.apiUrl, this.deviceToken);
 
-    // Check cache for media content
+    // Check cache for media content, download if not cached
     let resolvedUrl = contentUrl;
     if (contentType === 'image' || contentType === 'video') {
       try {
@@ -768,12 +768,18 @@ class VizoraAndroidTV {
           resolvedUrl = cachedUri;
           console.log('[Vizora] Using cached content:', cachedUri);
         } else {
-          // Background download
-          this.cacheManager.downloadContent(
+          // Download and cache before rendering
+          const downloaded = await this.cacheManager.downloadContent(
             currentItem.content.id,
             contentUrl,
             currentItem.content.mimeType || (contentType === 'video' ? 'video/mp4' : 'image/jpeg')
-          ).catch(err => console.warn('[Vizora] Background cache failed:', err));
+          );
+          if (downloaded) {
+            resolvedUrl = downloaded;
+            console.log('[Vizora] Downloaded and cached playlist content:', downloaded);
+          } else {
+            console.warn('[Vizora] Cache download failed, using direct URL:', contentUrl);
+          }
         }
       } catch (err) {
         console.warn('[Vizora] Cache check failed:', err);
@@ -787,7 +793,9 @@ class VizoraAndroidTV {
         img.alt = currentItem.content.name;
         img.onerror = () => {
           console.error('[Vizora] Image load failed:', resolvedUrl);
-          this.nextContent();
+          this.showContentError(container, currentItem.content!.name);
+          // Delay before next to prevent tight loop when all items fail
+          setTimeout(() => this.nextContent(), 5000);
         };
         contentDiv.appendChild(img);
         break;
@@ -803,7 +811,9 @@ class VizoraAndroidTV {
         video.setAttribute('x5-video-player-fullscreen', 'true');
         video.onerror = () => {
           console.error('[Vizora] Video load failed:', resolvedUrl);
-          this.nextContent();
+          this.showContentError(container, currentItem.content!.name);
+          // Delay before next to prevent tight loop when all items fail
+          setTimeout(() => this.nextContent(), 5000);
         };
         video.onended = () => this.nextContent();
         contentDiv.appendChild(video);
@@ -1001,7 +1011,9 @@ class VizoraAndroidTV {
 
     // Show temporary content
     this.temporaryContent = content;
-    this.renderTemporaryContent(content);
+    this.renderTemporaryContent(content).catch(err =>
+      console.error('[Vizora] Error rendering temporary content:', err)
+    );
 
     // Set timer to resume playlist after duration (convert minutes to ms)
     this.temporaryContentTimer = setTimeout(() => {
@@ -1009,13 +1021,13 @@ class VizoraAndroidTV {
     }, duration * 60 * 1000);
   }
 
-  private renderTemporaryContent(content: PushContent) {
+  private async renderTemporaryContent(content: PushContent) {
     const container = document.getElementById('content-container');
     if (!container) return;
 
     // Clear current content
     this.cleanupMediaElements(container);
-    container.innerHTML = '';
+    while (container.firstChild) container.removeChild(container.firstChild);
 
     const contentDiv = document.createElement('div');
     contentDiv.className = 'content-item';
@@ -1027,7 +1039,34 @@ class VizoraAndroidTV {
       ? content.url
       : transformContentUrl(content.url, this.config.apiUrl, this.deviceToken);
 
-    console.log(`[Vizora] Rendering temporary content: ${contentType} - ${contentUrl}`);
+    // Resolve URL through cache for media content (download if needed)
+    let resolvedUrl = contentUrl;
+    if (contentType === 'image' || contentType === 'video') {
+      try {
+        const cachedUri = await this.cacheManager.getCachedUri(content.id);
+        if (cachedUri) {
+          resolvedUrl = cachedUri;
+          console.log('[Vizora] Using cached content for push:', cachedUri);
+        } else {
+          // Try to download and cache before rendering
+          const downloaded = await this.cacheManager.downloadContent(
+            content.id,
+            contentUrl,
+            content.mimeType || (contentType === 'video' ? 'video/mp4' : 'image/jpeg')
+          );
+          if (downloaded) {
+            resolvedUrl = downloaded;
+            console.log('[Vizora] Downloaded and cached push content:', downloaded);
+          } else {
+            console.warn('[Vizora] Cache download failed, using direct URL:', contentUrl);
+          }
+        }
+      } catch (err) {
+        console.warn('[Vizora] Push content cache check failed:', err);
+      }
+    }
+
+    console.log(`[Vizora] Rendering temporary content: ${contentType} - ${resolvedUrl}`);
 
     // Track current content for heartbeat reporting
     this.currentContentId = content.id;
@@ -1043,24 +1082,26 @@ class VizoraAndroidTV {
     switch (contentType) {
       case 'image':
         const img = document.createElement('img');
-        img.src = contentUrl;
+        img.src = resolvedUrl;
         img.alt = content.name;
         img.onerror = () => {
-          console.error('[Vizora] Temporary image load failed:', contentUrl);
+          console.error('[Vizora] Temporary image load failed:', resolvedUrl);
+          this.showContentError(container, content.name);
         };
         contentDiv.appendChild(img);
         break;
 
       case 'video':
         const video = document.createElement('video');
-        video.src = contentUrl;
+        video.src = resolvedUrl;
         video.autoplay = true;
         video.muted = false;
         video.playsInline = true;
         video.setAttribute('x5-video-player-type', 'h5');
         video.setAttribute('x5-video-player-fullscreen', 'true');
         video.onerror = () => {
-          console.error('[Vizora] Temporary video load failed:', contentUrl);
+          console.error('[Vizora] Temporary video load failed:', resolvedUrl);
+          this.showContentError(container, content.name);
         };
         // For video, resume playlist when video ends OR when timer fires (whichever comes first)
         video.onended = () => {
@@ -1098,6 +1139,14 @@ class VizoraAndroidTV {
 
     container.appendChild(contentDiv);
     this.showScreen('content');
+  }
+
+  private showContentError(container: HTMLElement, contentName: string) {
+    while (container.firstChild) container.removeChild(container.firstChild);
+    const errorDiv = document.createElement('div');
+    errorDiv.style.cssText = 'display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:#111;color:#888;font-family:sans-serif;font-size:24px;text-align:center;padding:40px;';
+    errorDiv.textContent = `Unable to load: ${contentName}`;
+    container.appendChild(errorDiv);
   }
 
   private resumePlaylist() {

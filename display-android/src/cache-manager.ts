@@ -1,5 +1,5 @@
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
-import { CapacitorHttp } from '@capacitor/core';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 
 interface CacheManifestEntry {
   contentId: string;
@@ -118,14 +118,15 @@ export class AndroidCacheManager {
       await this.saveManifest();
       await this.enforceMaxCacheSize();
 
-      // Get the URI for the cached file
+      // Get the URI for the cached file and convert for WebView access
       const uriResult = await Filesystem.getUri({
         path: `${this.cacheDir}/${fileName}`,
         directory: Directory.Data,
       });
+      const webViewUrl = Capacitor.convertFileSrc(uriResult.uri);
 
-      console.log(`[AndroidCache] Cached: ${id}`);
-      return uriResult.uri;
+      console.log(`[AndroidCache] Cached: ${id} -> ${webViewUrl}`);
+      return webViewUrl;
     } catch (error) {
       console.error(`[AndroidCache] Failed to cache ${id}:`, error);
       return null;
@@ -154,7 +155,7 @@ export class AndroidCacheManager {
         path: `${this.cacheDir}/${entry.fileName}`,
         directory: Directory.Data,
       });
-      return uriResult.uri;
+      return Capacitor.convertFileSrc(uriResult.uri);
     } catch (e) {
       delete this.manifest.entries[id];
       await this.saveManifest();
