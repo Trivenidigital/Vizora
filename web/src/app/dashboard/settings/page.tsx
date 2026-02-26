@@ -36,12 +36,16 @@ export default function SettingsPage() {
    async function loadSettings() {
      try {
        const user = await apiClient.getCurrentUser();
+       const orgSettings = (user.organization?.settings as Record<string, any>) || {};
        setSettings(prev => ({
          ...prev,
          email: user.email || prev.email,
          organizationName: user.organization?.name || prev.organizationName,
          organizationId: user.organizationId || prev.organizationId,
          country: user.organization?.country || prev.country,
+         defaultDuration: orgSettings.defaultDuration ?? prev.defaultDuration,
+         timezone: orgSettings.timezone ?? prev.timezone,
+         notifications: orgSettings.notifications ?? prev.notifications,
        }));
      } catch (err) {
        console.error('Failed to load settings:', err);
@@ -329,6 +333,11 @@ export default function SettingsPage() {
        await apiClient.updateOrganization(settings.organizationId, {
          name: settings.organizationName,
          country: settings.country,
+         settings: {
+           defaultDuration: settings.defaultDuration,
+           timezone: settings.timezone,
+           notifications: settings.notifications,
+         },
        });
        toast.success('Settings saved successfully');
      } catch (error: any) {

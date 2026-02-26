@@ -113,12 +113,16 @@ describe('JwtStrategy', () => {
       const mockUser = {
         id: 'user-123',
         email: 'test@example.com',
+        firstName: 'Test',
+        lastName: 'User',
         organizationId: 'org-123',
         role: 'admin',
         isActive: true,
         organization: {
           id: 'org-123',
           name: 'Test Organization',
+          storageUsedBytes: BigInt(0),
+          storageQuotaBytes: BigInt(1073741824),
         },
       };
 
@@ -130,9 +134,16 @@ describe('JwtStrategy', () => {
         expect(result).toEqual({
           id: mockUser.id,
           email: mockUser.email,
+          firstName: mockUser.firstName,
+          lastName: mockUser.lastName,
           organizationId: mockUser.organizationId,
           role: mockUser.role,
-          organization: mockUser.organization,
+          organization: {
+            id: 'org-123',
+            name: 'Test Organization',
+            storageUsedBytes: 0,
+            storageQuotaBytes: 1073741824,
+          },
         });
       });
 
@@ -175,13 +186,21 @@ describe('JwtStrategy', () => {
             id: 'org-123',
             name: 'Test Org',
             subscriptionTier: 'pro',
+            storageUsedBytes: BigInt(500),
+            storageQuotaBytes: BigInt(2000),
           },
         };
         mockDatabaseService.user.findUnique.mockResolvedValue(userWithOrg as any);
 
         const result = await strategy.validate(userPayload);
 
-        expect(result.organization).toEqual(userWithOrg.organization);
+        expect(result.organization).toEqual({
+          id: 'org-123',
+          name: 'Test Org',
+          subscriptionTier: 'pro',
+          storageUsedBytes: 500,
+          storageQuotaBytes: 2000,
+        });
       });
     });
 
@@ -189,12 +208,16 @@ describe('JwtStrategy', () => {
       const mockUser = {
         id: 'user-123',
         email: 'test@example.com',
+        firstName: 'Test',
+        lastName: 'User',
         organizationId: 'org-123',
         role: 'admin',
         isActive: true,
         organization: {
           id: 'org-123',
           name: 'Test Organization',
+          storageUsedBytes: BigInt(0),
+          storageQuotaBytes: BigInt(1073741824),
         },
       };
 
@@ -263,9 +286,16 @@ describe('JwtStrategy', () => {
         expect(result).toEqual({
           id: mockUser.id,
           email: mockUser.email,
+          firstName: mockUser.firstName,
+          lastName: mockUser.lastName,
           organizationId: mockUser.organizationId,
           role: mockUser.role,
-          organization: mockUser.organization,
+          organization: {
+            id: 'org-123',
+            name: 'Test Organization',
+            storageUsedBytes: 0,
+            storageQuotaBytes: 1073741824,
+          },
         });
       });
 
@@ -298,10 +328,12 @@ describe('JwtStrategy', () => {
         mockDatabaseService.user.findUnique.mockResolvedValue({
           id: 'user-123',
           email: 'test@example.com',
+          firstName: 'Test',
+          lastName: 'User',
           organizationId: 'org-123',
           role: 'admin',
           isActive: true,
-          organization: { id: 'org-123', name: 'Test Org' },
+          organization: { id: 'org-123', name: 'Test Org', storageUsedBytes: BigInt(0), storageQuotaBytes: BigInt(0) },
         } as any);
 
         await strategy.validate(payload);
@@ -321,10 +353,12 @@ describe('JwtStrategy', () => {
         mockDatabaseService.user.findUnique.mockResolvedValue({
           id: 'user-123',
           email: 'test@example.com',
+          firstName: 'Test',
+          lastName: 'User',
           organizationId: 'org-123',
           role: 'admin',
           isActive: true,
-          organization: { id: 'org-123', name: 'Test Org' },
+          organization: { id: 'org-123', name: 'Test Org', storageUsedBytes: BigInt(0), storageQuotaBytes: BigInt(0) },
         } as any);
 
         await strategy.validate(payload);
@@ -344,10 +378,12 @@ describe('JwtStrategy', () => {
         mockDatabaseService.user.findUnique.mockResolvedValue({
           id: 'user-123',
           email: 'test@example.com',
+          firstName: 'Test',
+          lastName: 'User',
           organizationId: 'org-123',
           role: 'admin',
           isActive: true,
-          organization: { id: 'org-123', name: 'Test Org' },
+          organization: { id: 'org-123', name: 'Test Org', storageUsedBytes: BigInt(0), storageQuotaBytes: BigInt(0) },
         } as any);
 
         await strategy.validate(payload);
@@ -382,10 +418,12 @@ describe('JwtStrategy', () => {
         mockDatabaseService.user.findUnique.mockResolvedValue({
           id: 'user-123',
           email: 'test@example.com',
+          firstName: 'Test',
+          lastName: 'User',
           organizationId: 'org-123',
           role: 'admin',
           isActive: true,
-          organization: { id: 'org-123', name: 'Test Org' },
+          organization: { id: 'org-123', name: 'Test Org', storageUsedBytes: BigInt(0), storageQuotaBytes: BigInt(0) },
         } as any);
 
         // Simulate concurrent requests

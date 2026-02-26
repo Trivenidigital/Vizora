@@ -78,7 +78,7 @@ export class OrganizationsService {
   }
 
   async update(id: string, updateOrganizationDto: UpdateOrganizationDto) {
-    await this.findOne(id);
+    const org = await this.findOne(id);
 
     if (updateOrganizationDto.slug) {
       const existing = await this.db.organization.findFirst({
@@ -93,9 +93,17 @@ export class OrganizationsService {
       }
     }
 
+    // Merge settings with existing to avoid overwriting branding etc.
+    const { settings: incomingSettings, ...rest } = updateOrganizationDto;
+    const data: Record<string, any> = { ...rest };
+    if (incomingSettings) {
+      const currentSettings = (org.settings as Record<string, unknown>) || {};
+      data.settings = { ...currentSettings, ...incomingSettings };
+    }
+
     return this.db.organization.update({
       where: { id },
-      data: updateOrganizationDto,
+      data,
     });
   }
 

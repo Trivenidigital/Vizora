@@ -4,6 +4,13 @@
  */
 
 import 'dotenv/config';
+
+// Global BigInt serialization support — Prisma BigInt fields crash JSON.stringify without this
+// eslint-disable-next-line no-extend-native
+(BigInt.prototype as any).toJSON = function () {
+  return Number(this);
+};
+
 import { initializeSentry } from './config/sentry.config';
 
 // Initialize Sentry before NestJS bootstrap

@@ -48,6 +48,7 @@ interface AuthUser {
     name: string;
     subscriptionTier: string;
     country?: string;
+    settings?: Record<string, any>;
   };
 }
 
@@ -60,6 +61,7 @@ interface Organization {
   trialEndsAt: string;
   country?: string;
   gstin?: string;
+  settings?: Record<string, any>;
 }
 
 interface LoginResponse {
@@ -326,7 +328,7 @@ class ApiClient {
     return this.request<Organization>('/organizations/current');
   }
 
-  async updateOrganization(id: string, data: Partial<{ name: string; country: string; gstin: string }>): Promise<Organization> {
+  async updateOrganization(id: string, data: Partial<{ name: string; country: string; gstin: string; settings: Record<string, any> }>): Promise<Organization> {
     return this.request<Organization>(`/organizations/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),

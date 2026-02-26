@@ -10,7 +10,7 @@ import {
   ApiCookieAuth,
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto } from './dto';
+import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto, ChangePasswordDto } from './dto';
 import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -227,6 +227,27 @@ export class AuthController {
     return {
       success: true,
       data: { user: safeUser },
+    };
+  }
+
+  @ApiOperation({ summary: 'Change password for authenticated user' })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth()
+  @ApiBody({ type: ChangePasswordDto })
+  @ApiResponse({ status: 200, description: 'Password changed successfully.' })
+  @ApiResponse({ status: 401, description: 'Current password is incorrect.' })
+  @UseGuards(JwtAuthGuard)
+  @Post('change-password')
+  async changePassword(
+    @CurrentUser('id') userId: string,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    await this.authService.changePassword(userId, dto.currentPassword, dto.newPassword);
+    return {
+      success: true,
+      data: {
+        message: 'Password changed successfully.',
+      },
     };
   }
 

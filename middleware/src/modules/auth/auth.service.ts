@@ -347,55 +347,84 @@ export class AuthService {
   async resetPassword(rawToken: string, newPassword: string): Promise<void> {
     const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
 
-    const tokenRecord = await this.databaseService.passwordResetToken.findUnique({
-      where: { token: hashedToken },
-      include: { user: true },
-    });
-
-    if (!tokenRecord) {
-      throw new UnauthorizedException('Invalid or expired reset token');
-    }
-
-    if (tokenRecord.usedAt) {
-      throw new UnauthorizedException('This reset link has already been used');
-    }
-
-    if (new Date() > tokenRecord.expiresAt) {
-      throw new UnauthorizedException('This reset link has expired');
-    }
-
-    // Hash new password
+    // Hash new password before transaction to minimize lock duration
     const bcryptRounds = parseInt(process.env.BCRYPT_ROUNDS || '14', 10);
     const passwordHash = await bcrypt.hash(newPassword, bcryptRounds);
 
-    // Update password and mark token as used in a transaction
-    await this.databaseService.$transaction(async (tx) => {
+    // Lookup, validate, update user, and mark token used — all inside a
+    // single transaction to prevent race conditions (double-use of token)
+    const tokenRecord = await this.databaseService.$transaction(async (tx) => {
+      const record = await tx.passwordResetToken.findUnique({
+        where: { token: hashedToken },
+        include: { user: true },
+      });
+
+      if (!record) {
+        throw new UnauthorizedException('Invalid or expired reset token');
+      }
+
+      if (record.usedAt) {
+        throw new UnauthorizedException('This reset link has already been used');
+      }
+
+      if (new Date() > record.expiresAt) {
+        throw new UnauthorizedException('This reset link has expired');
+      }
+
       // Update user's password
       await tx.user.update({
-        where: { id: tokenRecord.userId },
+        where: { id: record.userId },
         data: { passwordHash },
       });
 
       // Mark token as used
       await tx.passwordResetToken.update({
-        where: { id: tokenRecord.id },
+        where: { id: record.id },
         data: { usedAt: new Date() },
       });
 
       // Log audit event
       await tx.auditLog.create({
         data: {
-          organizationId: tokenRecord.user.organizationId,
-          userId: tokenRecord.userId,
+          organizationId: record.user.organizationId,
+          userId: record.userId,
           action: 'password_reset',
           entityType: 'user',
-          entityId: tokenRecord.userId,
+          entityId: record.userId,
         },
       });
+
+      return record;
     });
 
     // Clear login attempt counter for this user
     await this.redisService.del(`login_attempts:${tokenRecord.user.email}`);
+  }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await this.databaseService.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const isValid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isValid) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    const bcryptRounds = parseInt(process.env.BCRYPT_ROUNDS || '14', 10);
+    const passwordHash = await bcrypt.hash(newPassword, bcryptRounds);
+
+    await this.databaseService.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
+
+    // Invalidate user cache so next auth uses fresh data
+    await this.redisService.del(`user_auth:${userId}`);
   }
 
   private generateToken(user: any, organization: any): string {

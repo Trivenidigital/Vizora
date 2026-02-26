@@ -86,6 +86,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         return {
           id: userData.id,
           email: userData.email,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
           organizationId: userData.organizationId,
           role: userData.role,
           organization: userData.organization,
@@ -106,23 +108,35 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('User not found or inactive');
     }
 
+    // Convert BigInt fields to numbers before caching/returning
+    // Use ?? 0 to guard against null/undefined → NaN from Number(null)
+    const safeOrganization = user.organization ? {
+      ...user.organization,
+      storageUsedBytes: Number(user.organization.storageUsedBytes ?? 0),
+      storageQuotaBytes: Number(user.organization.storageQuotaBytes ?? 0),
+    } : null;
+
     // Cache the user data in Redis
     const userDataToCache = {
       id: user.id,
       email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
       organizationId: user.organizationId,
       role: user.role,
       isActive: user.isActive,
-      organization: user.organization,
+      organization: safeOrganization,
     };
     await this.redisService.set(cacheKey, JSON.stringify(userDataToCache), JwtStrategy.USER_CACHE_TTL);
 
     return {
       id: user.id,
       email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
       organizationId: user.organizationId,
       role: user.role,
-      organization: user.organization,
+      organization: safeOrganization,
     };
   }
 }
