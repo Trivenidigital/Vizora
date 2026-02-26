@@ -13,8 +13,7 @@ interface PlanCardProps {
 }
 
 export function PlanCard({ plan, onSelect, onContactSales, isCurrentPlan, isLoading }: PlanCardProps) {
-  const formatPrice = (priceInSmallestUnit: number, currency: string) => {
-    const price = priceInSmallestUnit / 100; // cents/paise → dollars/rupees
+  const formatPrice = (price: number, currency: string) => {
     if (currency === 'INR' || currency === 'inr') {
       return new Intl.NumberFormat('en-IN', {
         style: 'currency',
@@ -26,7 +25,7 @@ export function PlanCard({ plan, onSelect, onContactSales, isCurrentPlan, isLoad
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: currency.toUpperCase(),
-      minimumFractionDigits: price % 1 === 0 ? 0 : 2,
+      minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(price);
   };
@@ -93,12 +92,13 @@ export function PlanCard({ plan, onSelect, onContactSales, isCurrentPlan, isLoad
 
       <div className="p-6 pt-0">
         {isEnterprise ? (
-          <button
-            onClick={onContactSales}
-            className="w-full py-3 px-4 bg-[var(--surface-hover)] text-[var(--foreground)] font-semibold rounded-lg hover:bg-[var(--border)] transition"
+          <a
+            href="mailto:sales@vizora.cloud"
+            role="link"
+            className="w-full py-3 px-4 bg-[var(--surface-hover)] text-[var(--foreground)] font-semibold rounded-lg hover:bg-[var(--border)] transition block text-center"
           >
             Contact Sales
-          </button>
+          </a>
         ) : isCurrentPlan ? (
           <button
             disabled
