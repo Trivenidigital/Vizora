@@ -1193,10 +1193,16 @@ export class ContentService {
    * Load a Handlebars template file from the widget-templates directory.
    */
   private loadWidgetTemplate(templateName: string): string {
+    // Sanitize template name to prevent path traversal
+    const safeName = templateName.replace(/[^a-zA-Z0-9_-]/g, '');
+    if (!safeName) {
+      throw new BadRequestException('Invalid widget template name');
+    }
+
     const templatePath = path.join(
       __dirname,
       'widget-templates',
-      `${templateName}.hbs`,
+      `${safeName}.hbs`,
     );
 
     try {
