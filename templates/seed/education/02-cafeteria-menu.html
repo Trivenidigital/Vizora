@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800;900&family=Inter:wght@400;500;600&family=Caveat:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(ellipse at 20% 80%, rgba(251, 191, 36, 0.12) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 30%, rgba(52, 211, 153, 0.1) 0%, transparent 45%),
+        linear-gradient(160deg, #fefce8 0%, #fff7ed 30%, #f0fdf4 60%, #fffbeb 100%);
+      color: #1e293b;
+    }
+
+    /* Dot grid texture */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image: radial-gradient(circle, rgba(245, 158, 11, 0.06) 1px, transparent 1px);
+      background-size: 28px 28px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Glowing circle bottom-left */
+    body::after {
+      content: '';
+      position: absolute;
+      bottom: -150px;
+      left: -100px;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(251, 191, 36, 0.15) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      height: 100%;
+      padding: 50px 70px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Header section */
+    .header {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 40px;
+      margin-bottom: 40px;
+      position: relative;
+    }
+
+    .header-emoji {
+      font-size: 100px;
+      filter: drop-shadow(0 6px 16px rgba(0,0,0,0.15));
+    }
+
+    .header-text {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .menu-title {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 900;
+      font-size: 72px;
+      line-height: 1;
+      color: #92400e;
+      letter-spacing: -1px;
+    }
+
+    .menu-subtitle {
+      font-family: 'Caveat', cursive;
+      font-weight: 600;
+      font-size: 34px;
+      color: #b45309;
+      margin-top: 4px;
+    }
+
+    .header-week {
+      background: rgba(255, 255, 255, 0.6);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      border-radius: 20px;
+      padding: 20px 36px;
+      box-shadow: 0 8px 32px rgba(245, 158, 11, 0.1);
+      text-align: center;
+    }
+
+    .week-label {
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 16px;
+      color: #78716c;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .week-date {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 700;
+      font-size: 22px;
+      color: #92400e;
+      margin-top: 4px;
+    }
+
+    /* Ornamental line under header */
+    .header-ornament {
+      position: absolute;
+      bottom: -20px;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.3), rgba(52, 211, 153, 0.3), rgba(245, 158, 11, 0.3), transparent);
+    }
+
+    /* SVG decoration */
+    .svg-decor {
+      position: absolute;
+      top: 20px;
+      right: 380px;
+      opacity: 0.1;
+      z-index: 0;
+    }
+
+    /* Day columns grid */
+    .days-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 24px;
+      align-items: start;
+      padding-top: 10px;
+    }
+
+    .day-card {
+      background: rgba(255, 255, 255, 0.55);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      border-radius: 22px;
+      padding: 30px 26px;
+      box-shadow:
+        0 4px 6px rgba(0, 0, 0, 0.03),
+        0 12px 40px rgba(0, 0, 0, 0.05);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .day-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 6px;
+      border-radius: 22px 22px 0 0;
+    }
+
+    .day-card:nth-child(1)::before { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+    .day-card:nth-child(2)::before { background: linear-gradient(90deg, #10b981, #34d399); }
+    .day-card:nth-child(3)::before { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+    .day-card:nth-child(4)::before { background: linear-gradient(90deg, #8b5cf6, #a78bfa); }
+    .day-card:nth-child(5)::before { background: linear-gradient(90deg, #ef4444, #f87171); }
+
+    .day-name {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 800;
+      font-size: 26px;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      margin-bottom: 16px;
+    }
+
+    .day-card:nth-child(1) .day-name { color: #b45309; }
+    .day-card:nth-child(2) .day-name { color: #059669; }
+    .day-card:nth-child(3) .day-name { color: #2563eb; }
+    .day-card:nth-child(4) .day-name { color: #7c3aed; }
+    .day-card:nth-child(5) .day-name { color: #dc2626; }
+
+    .day-emoji {
+      font-size: 80px;
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.12));
+      margin-bottom: 18px;
+    }
+
+    .meal-item {
+      width: 100%;
+      text-align: center;
+      padding: 10px 0;
+      border-bottom: 1px dashed rgba(0,0,0,0.08);
+    }
+
+    .meal-item:last-of-type {
+      border-bottom: none;
+    }
+
+    .meal-name {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 600;
+      font-size: 22px;
+      color: #334155;
+      line-height: 1.3;
+    }
+
+    .meal-price {
+      font-family: 'Caveat', cursive;
+      font-weight: 700;
+      font-size: 24px;
+      color: #b45309;
+      margin-top: 2px;
+    }
+
+    /* Footer */
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 24px;
+      margin-top: 10px;
+    }
+
+    .footer-note {
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+      font-size: 20px;
+      color: #78716c;
+    }
+
+    .footer-badge {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 700;
+      font-size: 17px;
+      color: white;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      padding: 10px 28px;
+      border-radius: 50px;
+      box-shadow: 0 4px 16px rgba(245, 158, 11, 0.3);
+    }
+
+    /* Floating decorative elements */
+    .decor-circle {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .decor-1 {
+      width: 180px; height: 180px;
+      top: -60px; right: 100px;
+      border: 3px solid rgba(52, 211, 153, 0.08);
+    }
+
+    .decor-2 {
+      width: 100px; height: 100px;
+      bottom: 80px; right: 60px;
+      background: radial-gradient(circle, rgba(251, 191, 36, 0.08) 0%, transparent 70%);
+    }
+  </style>
+</head>
+<body>
+  <div class="decor-circle decor-1"></div>
+  <div class="decor-circle decor-2"></div>
+
+  <div class="layout">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-emoji">&#x1F37D;&#xFE0F;</div>
+      <div class="header-text">
+        <div class="menu-title" data-editable="true" data-field="title">Weekly Lunch Menu</div>
+        <div class="menu-subtitle" data-editable="true" data-field="subtitle">Fresh, nutritious meals made daily!</div>
+      </div>
+      <div class="header-week">
+        <div class="week-label">Week of</div>
+        <div class="week-date" data-editable="true" data-field="weekDate">March 2 &ndash; 6, 2026</div>
+      </div>
+      <div class="header-ornament"></div>
+      <!-- Inline SVG decoration -->
+      <svg class="svg-decor" width="100" height="100" viewBox="0 0 100 100" fill="none">
+        <path d="M50 5 L61 39 L97 39 L68 61 L79 95 L50 73 L21 95 L32 61 L3 39 L39 39 Z" stroke="#d97706" stroke-width="2" fill="none"/>
+      </svg>
+    </div>
+
+    <!-- Day Columns -->
+    <div class="days-grid">
+      <!-- Monday -->
+      <div class="day-card">
+        <div class="day-name" data-editable="true" data-field="day1Name">Mon</div>
+        <div class="day-emoji">&#x1F354;</div>
+        <div class="meal-item">
+          <div class="meal-name" data-editable="true" data-field="day1Meal1">Grilled Chicken Burger</div>
+          <div class="meal-price" data-editable="true" data-field="day1Price1">$4.50</div>
+        </div>
+        <div class="meal-item">
+          <div class="meal-name" data-editable="true" data-field="day1Meal2">Garden Salad</div>
+          <div class="meal-price" data-editable="true" data-field="day1Price2">$3.00</div>
+        </div>
+        <div class="meal-item">
+          <div class="meal-name" data-editable="true" data-field="day1Meal3">Fresh Fruit Cup</div>
+          <div class="meal-price" data-editable="true" data-field="day1Price3">$2.00</div>
+        </div>
+      </div>
+
+      <!-- Tuesday -->
+      <div class="day-card">
+        <div class="day-name" data-editable="true" data-field="day2Name">Tue</div>
+        <div class="day-emoji">&#x1F35D;</div>
+        <div class="meal-item">
+          <div class="meal-name" data-editable="true" data-field="day2Meal1">Spaghetti Bolognese</div>
+          <div class="meal-price" data-editable="true" data-field="day2Price1">$4.75</div>
+        </div>
+        <div class="meal-item">
+          <div class="meal-name" data-editable="true" data-field="day2Meal2">Garlic Bread</div>
+          <div class="meal-price" data-editable="true" data-field="day2Price2">$1.50</div>
+        </div>
+        <div class="meal-item">
+          <div class="meal-name" data-editable="true" data-field="day2Meal3">Yogurt Parfait</div>
+          <div class="meal-price" data-editable="true" data-field="day2Price3">$2.50</div>
+        </div>
+      </div>
+
+      <!-- Wednesday -->
+      <div class="day-card">
+        <div class="day-name" data-editable="true" data-field="day3Name">Wed</div>
+        <div class="day-emoji">&#x1F32E;</div>
+        <div class="meal-item">
+          <div class="meal-name" data-editable="true" data-field="day3Meal1">Chicken Tacos</div>
+          <div class="meal-price" data-editable="true" data-field="day3Price1">$5.00</div>
+        </div>
+        <div class="meal-item">
+          <div class="meal-name" data-editable="true" data-field="day3Meal2">Rice &amp; Beans</div>
+          <div class="meal-price" data-editable="true" data-field="day3Price2">$2.50</div>
+        </div>
+        <div class="meal-item">
+          <div class="meal-name" data-editable="true" data-field="day3Meal3">Churros</div>
+          <div class="meal-price" data-editable="true" data-field="day3Price3">$2.00</div>
+        </div>
+      </div>
+
+      <!-- Thursday -->
+      <div class="day-card">
+        <div class="day-name" data-editable="true" data-field="day4Name">Thu</div>
+        <div class="day-emoji">&#x1F355;</div>
+        <div class="meal-item">
+          <div class="meal-name" data-editable="true" data-field="day4Meal1">Margherita Pizza</div>
+          <div class="meal-price" data-editable="true" data-field="day4Price1">$4.25</div>
+        </div>
+        <div class="meal-item">
+          <div class="meal-name" data-editable="true" data-field="day4Meal2">Caesar Salad</div>
+          <div class="meal-price" data-editable="true" data-field="day4Price2">$3.25</div>
+        </div>
+        <div class="meal-item">
+          <div class="meal-name" data-editable="true" data-field="day4Meal3">Brownie</div>
+          <div class="meal-price" data-editable="true" data-field="day4Price3">$1.75</div>
+        </div>
+      </div>
+
+      <!-- Friday -->
+      <div class="day-card">
+        <div class="day-name" data-editable="true" data-field="day5Name">Fri</div>
+        <div class="day-emoji">&#x1F363;</div>
+        <div class="meal-item">
+          <div class="meal-name" data-editable="true" data-field="day5Meal1">Fish &amp; Chips</div>
+          <div class="meal-price" data-editable="true" data-field="day5Price1">$5.25</div>
+        </div>
+        <div class="meal-item">
+          <div class="meal-name" data-editable="true" data-field="day5Meal2">Coleslaw</div>
+          <div class="meal-price" data-editable="true" data-field="day5Price2">$1.50</div>
+        </div>
+        <div class="meal-item">
+          <div class="meal-name" data-editable="true" data-field="day5Meal3">Ice Cream Cup</div>
+          <div class="meal-price" data-editable="true" data-field="day5Price3">$2.25</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <span class="footer-note" data-editable="true" data-field="footerNote">Allergen info available at the cafeteria counter &bull; All meals include a drink</span>
+      <span class="footer-badge" data-editable="true" data-field="footerBadge">FREE FOR MEAL PLAN HOLDERS</span>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(ellipse at 30% 20%, rgba(99, 102, 241, 0.25) 0%, transparent 50%),
+        radial-gradient(ellipse at 70% 80%, rgba(56, 189, 248, 0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 90% 10%, rgba(139, 92, 246, 0.12) 0%, transparent 40%),
+        linear-gradient(175deg, #0c1445 0%, #1a237e 30%, #0d47a1 60%, #1565c0 100%);
+      color: #e0e7ff;
+    }
+
+    /* Dot grid overlay */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image: radial-gradient(circle, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+      background-size: 24px 24px;
+      z-index: 0;
+    }
+
+    /* Glowing orb top-left */
+    .glow-orb-1 {
+      position: absolute;
+      top: 60px;
+      left: 120px;
+      width: 400px;
+      height: 400px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(96, 165, 250, 0.2), transparent 70%);
+      filter: blur(60px);
+      z-index: 0;
+    }
+
+    /* Glowing orb bottom-right */
+    .glow-orb-2 {
+      position: absolute;
+      bottom: 40px;
+      right: 200px;
+      width: 300px;
+      height: 300px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(139, 92, 246, 0.15), transparent 70%);
+      filter: blur(50px);
+      z-index: 0;
+    }
+
+    /* Decorative horizontal line */
+    .deco-line {
+      position: absolute;
+      top: 50%;
+      left: 60px;
+      right: 60px;
+      height: 1px;
+      background: linear-gradient(to right, transparent, rgba(96, 165, 250, 0.2), rgba(139, 92, 246, 0.2), transparent);
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      height: 100%;
+      padding: 60px 100px;
+      gap: 40px;
+    }
+
+    /* Top bar */
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .location {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .location-pin {
+      font-size: 36px;
+      filter: drop-shadow(0 2px 8px rgba(96, 165, 250, 0.4));
+    }
+
+    .location-name {
+      font-family: 'Poppins', sans-serif;
+      font-size: 28px;
+      font-weight: 600;
+      color: #f1f5f9;
+    }
+
+    .location-date {
+      font-family: 'Inter', sans-serif;
+      font-size: 16px;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+
+    .last-updated {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      color: #64748b;
+      background: rgba(30, 41, 59, 0.5);
+      backdrop-filter: blur(10px);
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid rgba(148, 163, 184, 0.08);
+    }
+
+    /* Main weather area */
+    .main-weather {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 80px;
+      align-items: center;
+    }
+
+    .current-temp-section {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 20px;
+    }
+
+    .weather-emoji {
+      font-size: 120px;
+      filter: drop-shadow(0 8px 30px rgba(250, 204, 21, 0.3));
+      line-height: 1;
+    }
+
+    .temp-display {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 180px;
+      font-weight: 700;
+      color: #ffffff;
+      line-height: 1;
+      text-shadow:
+        0 0 40px rgba(96, 165, 250, 0.3),
+        0 0 80px rgba(96, 165, 250, 0.15),
+        0 4px 8px rgba(0, 0, 0, 0.3);
+      letter-spacing: -8px;
+    }
+
+    .temp-unit {
+      font-size: 60px;
+      font-weight: 300;
+      color: #93c5fd;
+      vertical-align: super;
+      letter-spacing: 0;
+    }
+
+    .weather-condition {
+      font-family: 'Poppins', sans-serif;
+      font-size: 32px;
+      font-weight: 500;
+      color: #cbd5e1;
+    }
+
+    /* Details grid */
+    .details-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .detail-card {
+      background: rgba(30, 41, 59, 0.5);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(148, 163, 184, 0.08);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow:
+        0 4px 20px rgba(0, 0, 0, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    }
+
+    .detail-label {
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #64748b;
+      margin-bottom: 8px;
+    }
+
+    .detail-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 28px;
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+
+    .detail-emoji {
+      font-size: 28px;
+      margin-right: 8px;
+    }
+
+    /* Forecast row */
+    .forecast-row {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 20px;
+    }
+
+    .forecast-card {
+      background: rgba(30, 41, 59, 0.45);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(148, 163, 184, 0.06);
+      border-radius: 20px;
+      padding: 28px 20px;
+      text-align: center;
+      box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    }
+
+    .forecast-day {
+      font-family: 'Poppins', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+    }
+
+    .forecast-emoji {
+      font-size: 80px;
+      display: block;
+      margin: 8px 0;
+      filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.2));
+    }
+
+    .forecast-temp {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 24px;
+      font-weight: 600;
+      color: #f1f5f9;
+      margin-top: 8px;
+    }
+
+    .forecast-temp-low {
+      font-size: 18px;
+      color: #64748b;
+      font-weight: 400;
+    }
+
+    /* SVG wave decoration */
+    .wave-deco {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      z-index: 1;
+      opacity: 0.15;
+    }
+
+    /* Stripe accent top */
+    .stripe-top {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: repeating-linear-gradient(
+        90deg,
+        #3b82f6 0px,
+        #3b82f6 60px,
+        transparent 60px,
+        transparent 64px,
+        #8b5cf6 64px,
+        #8b5cf6 124px,
+        transparent 124px,
+        transparent 128px
+      );
+      z-index: 3;
+    }
+  </style>
+</head>
+<body>
+  <div class="glow-orb-1"></div>
+  <div class="glow-orb-2"></div>
+  <div class="deco-line"></div>
+  <div class="stripe-top"></div>
+
+  <!-- SVG wave -->
+  <svg class="wave-deco" viewBox="0 0 1920 120" fill="none">
+    <path d="M0 80 Q480 0 960 60 Q1440 120 1920 40 L1920 120 L0 120 Z" fill="rgba(59,130,246,0.15)"/>
+    <path d="M0 100 Q480 40 960 80 Q1440 120 1920 60 L1920 120 L0 120 Z" fill="rgba(139,92,246,0.1)"/>
+  </svg>
+
+  <!-- SVG corner brackets -->
+  <svg style="position:absolute;top:20px;left:20px;z-index:1;" width="50" height="50" viewBox="0 0 50 50" fill="none">
+    <path d="M0 50 L0 0 L50 0" stroke="rgba(96,165,250,0.3)" stroke-width="2" fill="none"/>
+  </svg>
+  <svg style="position:absolute;bottom:20px;right:20px;z-index:1;" width="50" height="50" viewBox="0 0 50 50" fill="none">
+    <path d="M50 0 L50 50 L0 50" stroke="rgba(139,92,246,0.3)" stroke-width="2" fill="none"/>
+  </svg>
+
+  <div class="container">
+    <!-- Top bar -->
+    <div class="top-bar">
+      <div class="location">
+        <span class="location-pin">📍</span>
+        <div>
+          <div class="location-name" data-editable="true" data-field="locationName">San Francisco, CA</div>
+          <div class="location-date" data-editable="true" data-field="currentDate">Wednesday, January 15, 2026</div>
+        </div>
+      </div>
+      <div class="last-updated" data-editable="true" data-field="lastUpdated">Updated 2:30 PM</div>
+    </div>
+
+    <!-- Main weather -->
+    <div class="main-weather">
+      <div class="current-temp-section">
+        <div class="weather-emoji">☀️</div>
+        <div class="temp-display" data-editable="true" data-field="temperature">72<span class="temp-unit">&deg;F</span></div>
+        <div class="weather-condition" data-editable="true" data-field="condition">Clear & Sunny</div>
+      </div>
+      <div class="details-grid">
+        <div class="detail-card">
+          <div class="detail-label">Humidity</div>
+          <div class="detail-value"><span class="detail-emoji">💧</span><span data-editable="true" data-field="humidity">45%</span></div>
+        </div>
+        <div class="detail-card">
+          <div class="detail-label">Wind</div>
+          <div class="detail-value"><span class="detail-emoji">💨</span><span data-editable="true" data-field="wind">12 mph</span></div>
+        </div>
+        <div class="detail-card">
+          <div class="detail-label">UV Index</div>
+          <div class="detail-value"><span class="detail-emoji">🌞</span><span data-editable="true" data-field="uvIndex">6 High</span></div>
+        </div>
+        <div class="detail-card">
+          <div class="detail-label">Feels Like</div>
+          <div class="detail-value"><span class="detail-emoji">🌡️</span><span data-editable="true" data-field="feelsLike">70&deg;F</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5-day forecast -->
+    <div class="forecast-row">
+      <div class="forecast-card">
+        <div class="forecast-day" data-editable="true" data-field="day1Name">Thu</div>
+        <span class="forecast-emoji">☀️</span>
+        <div class="forecast-temp" data-editable="true" data-field="day1Temp">74&deg; <span class="forecast-temp-low">/ 58&deg;</span></div>
+      </div>
+      <div class="forecast-card">
+        <div class="forecast-day" data-editable="true" data-field="day2Name">Fri</div>
+        <span class="forecast-emoji">🌤️</span>
+        <div class="forecast-temp" data-editable="true" data-field="day2Temp">68&deg; <span class="forecast-temp-low">/ 55&deg;</span></div>
+      </div>
+      <div class="forecast-card">
+        <div class="forecast-day" data-editable="true" data-field="day3Name">Sat</div>
+        <span class="forecast-emoji">⛅</span>
+        <div class="forecast-temp" data-editable="true" data-field="day3Temp">65&deg; <span class="forecast-temp-low">/ 52&deg;</span></div>
+      </div>
+      <div class="forecast-card">
+        <div class="forecast-day" data-editable="true" data-field="day4Name">Sun</div>
+        <span class="forecast-emoji">🌧️</span>
+        <div class="forecast-temp" data-editable="true" data-field="day4Temp">60&deg; <span class="forecast-temp-low">/ 49&deg;</span></div>
+      </div>
+      <div class="forecast-card">
+        <div class="forecast-day" data-editable="true" data-field="day5Name">Mon</div>
+        <span class="forecast-emoji">❄️</span>
+        <div class="forecast-temp" data-editable="true" data-field="day5Temp">45&deg; <span class="forecast-temp-low">/ 32&deg;</span></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

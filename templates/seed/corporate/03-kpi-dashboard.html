@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>KPI Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            width: 1920px;
+            height: 1080px;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+            background:
+                radial-gradient(ellipse at 10% 90%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 90% 10%, rgba(16, 185, 129, 0.06) 0%, transparent 40%),
+                linear-gradient(180deg, #09090b 0%, #0f0f14 50%, #09090b 100%);
+            color: #e4e4e7;
+            position: relative;
+        }
+
+        /* Dot grid texture */
+        body::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image: radial-gradient(circle, rgba(161, 161, 170, 0.06) 1px, transparent 1px);
+            background-size: 32px 32px;
+            z-index: 0;
+        }
+
+        /* Subtle scan line effect */
+        body::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 3px,
+                rgba(0, 0, 0, 0.03) 3px,
+                rgba(0, 0, 0, 0.03) 4px
+            );
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* Decorative glow orbs */
+        .glow-orb-1 {
+            position: absolute;
+            top: -80px;
+            left: 50%;
+            width: 600px;
+            height: 200px;
+            background: radial-gradient(ellipse, rgba(99, 102, 241, 0.12) 0%, transparent 70%);
+            filter: blur(40px);
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            height: 100%;
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            padding: 48px 64px;
+            gap: 36px;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .header-emoji {
+            font-size: 48px;
+            filter: drop-shadow(0 4px 12px rgba(99, 102, 241, 0.4));
+        }
+
+        .header-title {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 32px;
+            font-weight: 700;
+            color: #fafafa;
+        }
+
+        .header-subtitle {
+            font-family: 'Inter', sans-serif;
+            font-size: 16px;
+            color: #71717a;
+            margin-top: 4px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 32px;
+        }
+
+        .live-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 20px;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 20px;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+            color: #ef4444;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ef4444;
+            box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+        }
+
+        .timestamp {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 18px;
+            color: #52525b;
+        }
+
+        /* Main metrics grid */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            gap: 24px;
+        }
+
+        .metric-card {
+            background: rgba(24, 24, 27, 0.8);
+            border: 1px solid rgba(63, 63, 70, 0.4);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 36px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-shadow:
+                0 10px 40px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.03);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            border-radius: 20px 20px 0 0;
+        }
+
+        .metric-card:nth-child(1)::before { background: linear-gradient(90deg, #6366f1, #818cf8); }
+        .metric-card:nth-child(2)::before { background: linear-gradient(90deg, #10b981, #34d399); }
+        .metric-card:nth-child(3)::before { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+        .metric-card:nth-child(4)::before { background: linear-gradient(90deg, #06b6d4, #22d3ee); }
+        .metric-card:nth-child(5)::before { background: linear-gradient(90deg, #ec4899, #f472b6); }
+        .metric-card:nth-child(6)::before { background: linear-gradient(90deg, #8b5cf6, #a78bfa); }
+
+        .metric-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .metric-label {
+            font-family: 'Inter', sans-serif;
+            font-size: 16px;
+            font-weight: 500;
+            color: #a1a1aa;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .metric-emoji {
+            font-size: 36px;
+            filter: drop-shadow(0 2px 8px rgba(0,0,0,0.3));
+        }
+
+        .metric-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 64px;
+            font-weight: 700;
+            color: #fafafa;
+            line-height: 1;
+            margin: 16px 0;
+        }
+
+        .metric-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .metric-trend {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 18px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .trend-up { color: #34d399; }
+        .trend-down { color: #f87171; }
+        .trend-flat { color: #a1a1aa; }
+
+        .metric-target {
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            color: #52525b;
+        }
+
+        /* Progress bar */
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: rgba(63, 63, 70, 0.5);
+            border-radius: 3px;
+            margin-top: 16px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 3px;
+        }
+
+        .fill-indigo { background: linear-gradient(90deg, #6366f1, #818cf8); }
+        .fill-green { background: linear-gradient(90deg, #10b981, #34d399); }
+        .fill-amber { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+        .fill-cyan { background: linear-gradient(90deg, #06b6d4, #22d3ee); }
+        .fill-pink { background: linear-gradient(90deg, #ec4899, #f472b6); }
+        .fill-violet { background: linear-gradient(90deg, #8b5cf6, #a78bfa); }
+
+        /* Bottom bar */
+        .bottom-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 16px;
+            border-top: 1px solid rgba(63, 63, 70, 0.3);
+        }
+
+        .dept-label {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            color: #52525b;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+        }
+
+        .update-info {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            color: #3f3f46;
+        }
+
+        /* Decorative SVG */
+        .deco-svg {
+            position: absolute;
+            z-index: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="glow-orb-1"></div>
+
+    <!-- Decorative SVG grid lines -->
+    <svg class="deco-svg" style="top:0;left:0;width:100%;height:100%;" viewBox="0 0 1920 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <line x1="640" y1="0" x2="640" y2="1080" stroke="rgba(63,63,70,0.12)" stroke-width="1"/>
+        <line x1="1280" y1="0" x2="1280" y2="1080" stroke="rgba(63,63,70,0.12)" stroke-width="1"/>
+        <line x1="0" y1="360" x2="1920" y2="360" stroke="rgba(63,63,70,0.08)" stroke-width="1"/>
+        <line x1="0" y1="720" x2="1920" y2="720" stroke="rgba(63,63,70,0.08)" stroke-width="1"/>
+    </svg>
+
+    <div class="container">
+        <div class="header">
+            <div class="header-left">
+                <span class="header-emoji">📊</span>
+                <div>
+                    <div class="header-title" data-editable="true" data-field="dashboard-title">Performance Dashboard</div>
+                    <div class="header-subtitle" data-editable="true" data-field="dashboard-subtitle">Real-time business metrics and KPIs</div>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="live-badge">
+                    <span class="live-dot"></span>
+                    Live
+                </div>
+                <div class="timestamp" data-editable="true" data-field="timestamp">2026-02-26 09:30:00</div>
+            </div>
+        </div>
+
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-header">
+                    <div class="metric-label" data-editable="true" data-field="metric-1-label">Revenue</div>
+                    <span class="metric-emoji">💰</span>
+                </div>
+                <div class="metric-value" data-editable="true" data-field="metric-1-value">$2.4M</div>
+                <div class="metric-footer">
+                    <div class="metric-trend trend-up" data-editable="true" data-field="metric-1-trend">↑ 12.5%</div>
+                    <div class="metric-target" data-editable="true" data-field="metric-1-target">Target: $2.8M</div>
+                </div>
+                <div class="progress-bar"><div class="progress-fill fill-indigo" style="width: 85%"></div></div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-header">
+                    <div class="metric-label" data-editable="true" data-field="metric-2-label">Active Users</div>
+                    <span class="metric-emoji">👥</span>
+                </div>
+                <div class="metric-value" data-editable="true" data-field="metric-2-value">48.2K</div>
+                <div class="metric-footer">
+                    <div class="metric-trend trend-up" data-editable="true" data-field="metric-2-trend">↑ 8.3%</div>
+                    <div class="metric-target" data-editable="true" data-field="metric-2-target">Target: 50K</div>
+                </div>
+                <div class="progress-bar"><div class="progress-fill fill-green" style="width: 96%"></div></div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-header">
+                    <div class="metric-label" data-editable="true" data-field="metric-3-label">Conversion Rate</div>
+                    <span class="metric-emoji">🎯</span>
+                </div>
+                <div class="metric-value" data-editable="true" data-field="metric-3-value">3.8%</div>
+                <div class="metric-footer">
+                    <div class="metric-trend trend-down" data-editable="true" data-field="metric-3-trend">↓ 0.4%</div>
+                    <div class="metric-target" data-editable="true" data-field="metric-3-target">Target: 4.2%</div>
+                </div>
+                <div class="progress-bar"><div class="progress-fill fill-amber" style="width: 90%"></div></div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-header">
+                    <div class="metric-label" data-editable="true" data-field="metric-4-label">Avg Response Time</div>
+                    <span class="metric-emoji">⚡</span>
+                </div>
+                <div class="metric-value" data-editable="true" data-field="metric-4-value">142ms</div>
+                <div class="metric-footer">
+                    <div class="metric-trend trend-up" data-editable="true" data-field="metric-4-trend">↑ 23ms faster</div>
+                    <div class="metric-target" data-editable="true" data-field="metric-4-target">Target: &lt;150ms</div>
+                </div>
+                <div class="progress-bar"><div class="progress-fill fill-cyan" style="width: 95%"></div></div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-header">
+                    <div class="metric-label" data-editable="true" data-field="metric-5-label">NPS Score</div>
+                    <span class="metric-emoji">⭐</span>
+                </div>
+                <div class="metric-value" data-editable="true" data-field="metric-5-value">72</div>
+                <div class="metric-footer">
+                    <div class="metric-trend trend-up" data-editable="true" data-field="metric-5-trend">↑ 5 pts</div>
+                    <div class="metric-target" data-editable="true" data-field="metric-5-target">Target: 75</div>
+                </div>
+                <div class="progress-bar"><div class="progress-fill fill-pink" style="width: 96%"></div></div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-header">
+                    <div class="metric-label" data-editable="true" data-field="metric-6-label">Uptime</div>
+                    <span class="metric-emoji">🛡️</span>
+                </div>
+                <div class="metric-value" data-editable="true" data-field="metric-6-value">99.97%</div>
+                <div class="metric-footer">
+                    <div class="metric-trend trend-flat" data-editable="true" data-field="metric-6-trend">→ Stable</div>
+                    <div class="metric-target" data-editable="true" data-field="metric-6-target">SLA: 99.9%</div>
+                </div>
+                <div class="progress-bar"><div class="progress-fill fill-violet" style="width: 99%"></div></div>
+            </div>
+        </div>
+
+        <div class="bottom-bar">
+            <div class="dept-label" data-editable="true" data-field="department">Engineering & Product Division</div>
+            <div class="update-info" data-editable="true" data-field="update-info">Auto-refresh: 60s | Source: Analytics API v3</div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(ellipse at 50% 40%, rgba(0, 200, 255, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 20% 80%, rgba(255, 0, 200, 0.06) 0%, transparent 45%),
+        radial-gradient(ellipse at 80% 20%, rgba(0, 255, 150, 0.04) 0%, transparent 40%),
+        linear-gradient(160deg, #050510 0%, #0a0a1a 30%, #080815 60%, #050508 100%);
+      color: #e0e8ff;
+    }
+
+    /* Scanline texture */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 3px,
+        rgba(0, 200, 255, 0.008) 3px,
+        rgba(0, 200, 255, 0.008) 4px
+      );
+      z-index: 0;
+    }
+
+    /* Grid texture */
+    body::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image: radial-gradient(circle, rgba(0, 200, 255, 0.015) 1px, transparent 1px);
+      background-size: 40px 40px;
+      z-index: 0;
+    }
+
+    /* Neon glow spots */
+    .neon-glow {
+      position: absolute;
+      border-radius: 50%;
+      z-index: 0;
+    }
+
+    .neon-cyan {
+      top: 30%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 800px;
+      height: 400px;
+      background: radial-gradient(ellipse, rgba(0, 200, 255, 0.1) 0%, transparent 70%);
+      filter: blur(80px);
+    }
+
+    .neon-magenta {
+      bottom: 10%;
+      left: 10%;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(255, 0, 200, 0.08) 0%, transparent 70%);
+      filter: blur(60px);
+    }
+
+    .neon-magenta-2 {
+      top: 10%;
+      right: 15%;
+      width: 300px;
+      height: 300px;
+      background: radial-gradient(circle, rgba(255, 0, 200, 0.06) 0%, transparent 70%);
+      filter: blur(50px);
+    }
+
+    /* Lightning emoji */
+    .emoji-lightning {
+      position: absolute;
+      font-size: 160px;
+      z-index: 2;
+    }
+
+    .emoji-lightning.l1 {
+      top: 60px;
+      left: 80px;
+      filter: drop-shadow(0 0 40px rgba(0, 200, 255, 0.6));
+      transform: rotate(-15deg);
+    }
+
+    .emoji-lightning.l2 {
+      bottom: 60px;
+      right: 100px;
+      font-size: 120px;
+      filter: drop-shadow(0 0 35px rgba(255, 0, 200, 0.5));
+      transform: rotate(10deg);
+      opacity: 0.8;
+    }
+
+    .emoji-lightning.l3 {
+      top: 300px;
+      right: 200px;
+      font-size: 80px;
+      filter: drop-shadow(0 0 25px rgba(0, 200, 255, 0.4));
+      opacity: 0.5;
+    }
+
+    /* Main layout */
+    .layout {
+      position: relative;
+      z-index: 3;
+      display: grid;
+      grid-template-rows: auto 1fr auto auto;
+      height: 100%;
+      padding: 50px 100px;
+      gap: 25px;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .store-name {
+      font-family: 'Inter', sans-serif;
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: 6px;
+      text-transform: uppercase;
+      color: rgba(224, 232, 255, 0.4);
+    }
+
+    .live-badge {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 16px;
+      font-weight: 600;
+      color: #00c8ff;
+      background: rgba(0, 200, 255, 0.08);
+      border: 1px solid rgba(0, 200, 255, 0.2);
+      padding: 8px 20px;
+      border-radius: 4px;
+    }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #00ff88;
+      box-shadow: 0 0 10px rgba(0, 255, 136, 0.6);
+    }
+
+    /* Center content */
+    .center-content {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      gap: 30px;
+    }
+
+    .flash-label {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 48px;
+      letter-spacing: 20px;
+      text-transform: uppercase;
+      color: #ff00c8;
+      text-shadow: 0 0 30px rgba(255, 0, 200, 0.5);
+    }
+
+    .flash-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 140px;
+      line-height: 0.9;
+      letter-spacing: 8px;
+      color: #ffffff;
+      text-shadow:
+        0 0 40px rgba(0, 200, 255, 0.4),
+        0 0 80px rgba(0, 200, 255, 0.2);
+    }
+
+    .flash-title .neon-text {
+      color: #00c8ff;
+      text-shadow:
+        0 0 20px rgba(0, 200, 255, 0.8),
+        0 0 40px rgba(0, 200, 255, 0.5),
+        0 0 80px rgba(0, 200, 255, 0.3);
+    }
+
+    /* Countdown */
+    .countdown-area {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      margin-top: 10px;
+    }
+
+    .countdown-label {
+      font-family: 'Inter', sans-serif;
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: rgba(224, 232, 255, 0.4);
+    }
+
+    .countdown-display {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .countdown-block {
+      background: rgba(0, 200, 255, 0.08);
+      border: 1px solid rgba(0, 200, 255, 0.2);
+      border-radius: 12px;
+      padding: 15px 22px;
+      text-align: center;
+      box-shadow:
+        0 0 20px rgba(0, 200, 255, 0.1),
+        inset 0 0 20px rgba(0, 200, 255, 0.03);
+    }
+
+    .countdown-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 64px;
+      font-weight: 800;
+      color: #00c8ff;
+      text-shadow: 0 0 20px rgba(0, 200, 255, 0.5);
+      line-height: 1;
+    }
+
+    .countdown-unit {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: rgba(0, 200, 255, 0.5);
+      margin-top: 5px;
+    }
+
+    .countdown-separator {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 48px;
+      color: rgba(0, 200, 255, 0.3);
+      margin-bottom: 20px;
+    }
+
+    /* Deals row */
+    .deals-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+    }
+
+    .deal-card {
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(0, 200, 255, 0.1);
+      border-radius: 16px;
+      padding: 24px 20px;
+      text-align: center;
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    .deal-emoji {
+      font-size: 44px;
+      margin-bottom: 10px;
+      filter: drop-shadow(0 2px 10px rgba(0,0,0,0.3));
+    }
+
+    .deal-name {
+      font-family: 'Inter', sans-serif;
+      font-size: 18px;
+      font-weight: 600;
+      color: #ffffff;
+      margin-bottom: 6px;
+    }
+
+    .deal-discount {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 36px;
+      color: #ff00c8;
+      text-shadow: 0 0 15px rgba(255, 0, 200, 0.4);
+    }
+
+    /* Footer */
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid rgba(0, 200, 255, 0.08);
+      padding-top: 15px;
+    }
+
+    .footer-terms {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: rgba(224, 232, 255, 0.25);
+    }
+
+    .footer-code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 18px;
+      font-weight: 700;
+      color: #00c8ff;
+      background: rgba(0, 200, 255, 0.08);
+      border: 1px solid rgba(0, 200, 255, 0.2);
+      padding: 8px 20px;
+      border-radius: 4px;
+      letter-spacing: 3px;
+    }
+
+    /* SVG decorations */
+    .svg-deco {
+      position: absolute;
+      z-index: 1;
+    }
+
+    /* Neon border bars */
+    .neon-bar-top {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent 10%, #00c8ff 30%, #ff00c8 70%, transparent 90%);
+      opacity: 0.6;
+      z-index: 5;
+    }
+
+    .neon-bar-bottom {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent 10%, #ff00c8 30%, #00c8ff 70%, transparent 90%);
+      opacity: 0.6;
+      z-index: 5;
+    }
+  </style>
+</head>
+<body>
+  <!-- Neon glows -->
+  <div class="neon-glow neon-cyan"></div>
+  <div class="neon-glow neon-magenta"></div>
+  <div class="neon-glow neon-magenta-2"></div>
+
+  <!-- Neon bars -->
+  <div class="neon-bar-top"></div>
+  <div class="neon-bar-bottom"></div>
+
+  <!-- SVG hexagon pattern -->
+  <svg class="svg-deco" style="top:80px;right:400px;opacity:0.06;" width="120" height="120" viewBox="0 0 120 120">
+    <polygon points="60,5 110,30 110,90 60,115 10,90 10,30" fill="none" stroke="#00c8ff" stroke-width="1"/>
+    <polygon points="60,25 90,40 90,80 60,95 30,80 30,40" fill="none" stroke="#ff00c8" stroke-width="0.5"/>
+  </svg>
+
+  <svg class="svg-deco" style="bottom:100px;left:400px;opacity:0.05;" width="80" height="80" viewBox="0 0 80 80">
+    <rect x="5" y="5" width="70" height="70" fill="none" stroke="#00c8ff" stroke-width="1" transform="rotate(45 40 40)"/>
+  </svg>
+
+  <svg class="svg-deco" style="top:50%;left:40px;transform:translateY(-50%);opacity:0.04;" width="40" height="300" viewBox="0 0 40 300">
+    <line x1="20" y1="0" x2="20" y2="300" stroke="#00c8ff" stroke-width="1"/>
+    <circle cx="20" cy="50" r="3" fill="#00c8ff"/>
+    <circle cx="20" cy="150" r="3" fill="#ff00c8"/>
+    <circle cx="20" cy="250" r="3" fill="#00c8ff"/>
+  </svg>
+
+  <!-- Lightning emojis -->
+  <div class="emoji-lightning l1">⚡</div>
+  <div class="emoji-lightning l2">⚡</div>
+  <div class="emoji-lightning l3">⚡</div>
+
+  <div class="layout">
+    <div class="header">
+      <div class="store-name" data-editable="true" data-field="store_name">YOUR STORE NAME</div>
+      <div class="live-badge">
+        <div class="live-dot"></div>
+        <span data-editable="true" data-field="live_text">SALE IS LIVE</span>
+      </div>
+    </div>
+
+    <div class="center-content">
+      <div class="flash-label" data-editable="true" data-field="flash_label">LIMITED TIME ONLY</div>
+      <div class="flash-title" data-editable="true" data-field="flash_title">FLASH <span class="neon-text">SALE</span></div>
+
+      <div class="countdown-area">
+        <div class="countdown-label" data-editable="true" data-field="countdown_label">ENDS IN</div>
+        <div class="countdown-display">
+          <div class="countdown-block">
+            <div class="countdown-value" data-editable="true" data-field="hours">04</div>
+            <div class="countdown-unit">HOURS</div>
+          </div>
+          <div class="countdown-separator">:</div>
+          <div class="countdown-block">
+            <div class="countdown-value" data-editable="true" data-field="minutes">32</div>
+            <div class="countdown-unit">MINS</div>
+          </div>
+          <div class="countdown-separator">:</div>
+          <div class="countdown-block">
+            <div class="countdown-value" data-editable="true" data-field="seconds">17</div>
+            <div class="countdown-unit">SECS</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="deals-row">
+      <div class="deal-card">
+        <div class="deal-emoji">🎧</div>
+        <div class="deal-name" data-editable="true" data-field="deal1_name">Headphones</div>
+        <div class="deal-discount" data-editable="true" data-field="deal1_discount">60% OFF</div>
+      </div>
+      <div class="deal-card">
+        <div class="deal-emoji">👟</div>
+        <div class="deal-name" data-editable="true" data-field="deal2_name">Sneakers</div>
+        <div class="deal-discount" data-editable="true" data-field="deal2_discount">45% OFF</div>
+      </div>
+      <div class="deal-card">
+        <div class="deal-emoji">⌚</div>
+        <div class="deal-name" data-editable="true" data-field="deal3_name">Smartwatches</div>
+        <div class="deal-discount" data-editable="true" data-field="deal3_discount">50% OFF</div>
+      </div>
+      <div class="deal-card">
+        <div class="deal-emoji">🎮</div>
+        <div class="deal-name" data-editable="true" data-field="deal4_name">Gaming</div>
+        <div class="deal-discount" data-editable="true" data-field="deal4_discount">40% OFF</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="footer-terms" data-editable="true" data-field="terms">// While supplies last. In-store and online. Cannot combine with other offers.</div>
+      <div class="footer-code" data-editable="true" data-field="promo_code">USE CODE: FLASH60</div>
+    </div>
+  </div>
+</body>
+</html>

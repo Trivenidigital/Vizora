@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>Office Directory</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            width: 1920px;
+            height: 1080px;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+            background:
+                radial-gradient(ellipse at 50% 0%, rgba(37, 99, 235, 0.06) 0%, transparent 50%),
+                radial-gradient(ellipse at 0% 100%, rgba(16, 185, 129, 0.05) 0%, transparent 40%),
+                linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+            color: #f1f5f9;
+            position: relative;
+        }
+
+        /* Dot grid texture */
+        body::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image: radial-gradient(circle, rgba(148, 163, 184, 0.05) 1px, transparent 1px);
+            background-size: 36px 36px;
+            z-index: 0;
+        }
+
+        /* Decorative horizontal accent lines */
+        .h-line-1 {
+            position: absolute;
+            top: 100px;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(37, 99, 235, 0.15) 20%, rgba(37, 99, 235, 0.15) 80%, transparent);
+            z-index: 0;
+        }
+
+        .h-line-2 {
+            position: absolute;
+            bottom: 60px;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(37, 99, 235, 0.1) 20%, rgba(37, 99, 235, 0.1) 80%, transparent);
+            z-index: 0;
+        }
+
+        /* Glowing orb */
+        .glow-orb {
+            position: absolute;
+            top: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 800px;
+            height: 300px;
+            background: radial-gradient(ellipse, rgba(37, 99, 235, 0.08) 0%, transparent 70%);
+            filter: blur(40px);
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            height: 100%;
+            display: grid;
+            grid-template-rows: auto 1fr;
+            padding: 32px 64px 28px;
+            gap: 28px;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 20px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .header-emoji {
+            font-size: 48px;
+            filter: drop-shadow(0 3px 10px rgba(37, 99, 235, 0.3));
+        }
+
+        .header-title {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 36px;
+            font-weight: 700;
+            color: #f8fafc;
+        }
+
+        .header-right {
+            font-family: 'Inter', sans-serif;
+            font-size: 16px;
+            color: #64748b;
+        }
+
+        .floor-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 20px;
+            background: rgba(37, 99, 235, 0.1);
+            border: 1px solid rgba(37, 99, 235, 0.2);
+            border-radius: 10px;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            color: #60a5fa;
+        }
+
+        /* Department grid */
+        .dept-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            gap: 20px;
+        }
+
+        .dept-card {
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px solid rgba(71, 85, 105, 0.25);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 32px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-shadow:
+                0 8px 32px rgba(0, 0, 0, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.03);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .dept-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+        }
+
+        .dept-card:nth-child(1)::before { background: linear-gradient(90deg, #6366f1, #818cf8); }
+        .dept-card:nth-child(2)::before { background: linear-gradient(90deg, #10b981, #34d399); }
+        .dept-card:nth-child(3)::before { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+        .dept-card:nth-child(4)::before { background: linear-gradient(90deg, #ec4899, #f472b6); }
+        .dept-card:nth-child(5)::before { background: linear-gradient(90deg, #06b6d4, #22d3ee); }
+        .dept-card:nth-child(6)::before { background: linear-gradient(90deg, #8b5cf6, #a78bfa); }
+        .dept-card:nth-child(7)::before { background: linear-gradient(90deg, #ef4444, #f87171); }
+        .dept-card:nth-child(8)::before { background: linear-gradient(90deg, #84cc16, #a3e635); }
+
+        .dept-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+
+        .dept-icon {
+            font-size: 48px;
+            filter: drop-shadow(0 3px 8px rgba(0,0,0,0.3));
+        }
+
+        .dept-floor {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 32px;
+            font-weight: 800;
+            color: rgba(255, 255, 255, 0.12);
+        }
+
+        .dept-name {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 22px;
+            font-weight: 700;
+            color: #f8fafc;
+            margin-bottom: 8px;
+        }
+
+        .dept-desc {
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            color: #94a3b8;
+            margin-bottom: 20px;
+            line-height: 1.4;
+        }
+
+        .dept-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .dept-meta-item {
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            color: #64748b;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .meta-icon {
+            font-size: 14px;
+        }
+
+        /* SVG decoration */
+        .deco-svg {
+            position: absolute;
+            z-index: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="h-line-1"></div>
+    <div class="h-line-2"></div>
+    <div class="glow-orb"></div>
+
+    <!-- Decorative SVG compass rose -->
+    <svg class="deco-svg" style="bottom:20px;right:40px;opacity:0.06;" width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="100" cy="100" r="80" stroke="#60a5fa" stroke-width="1"/>
+        <circle cx="100" cy="100" r="60" stroke="#60a5fa" stroke-width="0.5"/>
+        <line x1="100" y1="10" x2="100" y2="190" stroke="#60a5fa" stroke-width="0.5"/>
+        <line x1="10" y1="100" x2="190" y2="100" stroke="#60a5fa" stroke-width="0.5"/>
+        <polygon points="100,20 105,50 100,40 95,50" fill="rgba(96,165,250,0.3)"/>
+        <text x="100" y="15" text-anchor="middle" fill="rgba(96,165,250,0.4)" font-size="12" font-family="Inter">N</text>
+    </svg>
+
+    <!-- Decorative SVG building outline -->
+    <svg class="deco-svg" style="bottom:80px;left:40px;opacity:0.04;" width="160" height="200" viewBox="0 0 160 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="20" y="40" width="120" height="160" rx="4" stroke="#60a5fa" stroke-width="2"/>
+        <rect x="40" y="60" width="20" height="20" rx="2" stroke="#60a5fa" stroke-width="1"/>
+        <rect x="80" y="60" width="20" height="20" rx="2" stroke="#60a5fa" stroke-width="1"/>
+        <rect x="40" y="100" width="20" height="20" rx="2" stroke="#60a5fa" stroke-width="1"/>
+        <rect x="80" y="100" width="20" height="20" rx="2" stroke="#60a5fa" stroke-width="1"/>
+        <rect x="60" y="160" width="30" height="40" rx="2" stroke="#60a5fa" stroke-width="1"/>
+        <polygon points="10,40 80,0 150,40" stroke="#60a5fa" stroke-width="1.5" fill="none"/>
+    </svg>
+
+    <div class="container">
+        <div class="header">
+            <div class="header-left">
+                <span class="header-emoji">🏢</span>
+                <div class="header-title" data-editable="true" data-field="directory-title">Office Directory</div>
+            </div>
+            <div class="header-right">
+                <div class="floor-indicator">
+                    <span>🗺️</span>
+                    <span data-editable="true" data-field="building-info">Building A - Main Campus</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="dept-grid">
+            <div class="dept-card">
+                <div class="dept-top">
+                    <span class="dept-icon" data-editable="true" data-field="dept-1-icon">💻</span>
+                    <span class="dept-floor" data-editable="true" data-field="dept-1-floor">F3</span>
+                </div>
+                <div class="dept-name" data-editable="true" data-field="dept-1-name">Engineering</div>
+                <div class="dept-desc" data-editable="true" data-field="dept-1-desc">Software development, infrastructure, and QA teams</div>
+                <div class="dept-meta">
+                    <div class="dept-meta-item"><span class="meta-icon">📍</span> <span data-editable="true" data-field="dept-1-location">Rooms 301-320</span></div>
+                    <div class="dept-meta-item"><span class="meta-icon">📞</span> <span data-editable="true" data-field="dept-1-phone">Ext. 3000</span></div>
+                </div>
+            </div>
+
+            <div class="dept-card">
+                <div class="dept-top">
+                    <span class="dept-icon" data-editable="true" data-field="dept-2-icon">📊</span>
+                    <span class="dept-floor" data-editable="true" data-field="dept-2-floor">F4</span>
+                </div>
+                <div class="dept-name" data-editable="true" data-field="dept-2-name">Marketing</div>
+                <div class="dept-desc" data-editable="true" data-field="dept-2-desc">Brand strategy, content, and digital marketing</div>
+                <div class="dept-meta">
+                    <div class="dept-meta-item"><span class="meta-icon">📍</span> <span data-editable="true" data-field="dept-2-location">Rooms 401-412</span></div>
+                    <div class="dept-meta-item"><span class="meta-icon">📞</span> <span data-editable="true" data-field="dept-2-phone">Ext. 4000</span></div>
+                </div>
+            </div>
+
+            <div class="dept-card">
+                <div class="dept-top">
+                    <span class="dept-icon" data-editable="true" data-field="dept-3-icon">💰</span>
+                    <span class="dept-floor" data-editable="true" data-field="dept-3-floor">F5</span>
+                </div>
+                <div class="dept-name" data-editable="true" data-field="dept-3-name">Finance</div>
+                <div class="dept-desc" data-editable="true" data-field="dept-3-desc">Accounting, budgeting, and financial planning</div>
+                <div class="dept-meta">
+                    <div class="dept-meta-item"><span class="meta-icon">📍</span> <span data-editable="true" data-field="dept-3-location">Rooms 501-508</span></div>
+                    <div class="dept-meta-item"><span class="meta-icon">📞</span> <span data-editable="true" data-field="dept-3-phone">Ext. 5000</span></div>
+                </div>
+            </div>
+
+            <div class="dept-card">
+                <div class="dept-top">
+                    <span class="dept-icon" data-editable="true" data-field="dept-4-icon">🎨</span>
+                    <span class="dept-floor" data-editable="true" data-field="dept-4-floor">F2</span>
+                </div>
+                <div class="dept-name" data-editable="true" data-field="dept-4-name">Design</div>
+                <div class="dept-desc" data-editable="true" data-field="dept-4-desc">Product design, UX research, and creative</div>
+                <div class="dept-meta">
+                    <div class="dept-meta-item"><span class="meta-icon">📍</span> <span data-editable="true" data-field="dept-4-location">Rooms 201-210</span></div>
+                    <div class="dept-meta-item"><span class="meta-icon">📞</span> <span data-editable="true" data-field="dept-4-phone">Ext. 2000</span></div>
+                </div>
+            </div>
+
+            <div class="dept-card">
+                <div class="dept-top">
+                    <span class="dept-icon" data-editable="true" data-field="dept-5-icon">🤝</span>
+                    <span class="dept-floor" data-editable="true" data-field="dept-5-floor">F1</span>
+                </div>
+                <div class="dept-name" data-editable="true" data-field="dept-5-name">Human Resources</div>
+                <div class="dept-desc" data-editable="true" data-field="dept-5-desc">Recruitment, benefits, and employee relations</div>
+                <div class="dept-meta">
+                    <div class="dept-meta-item"><span class="meta-icon">📍</span> <span data-editable="true" data-field="dept-5-location">Rooms 101-108</span></div>
+                    <div class="dept-meta-item"><span class="meta-icon">📞</span> <span data-editable="true" data-field="dept-5-phone">Ext. 1000</span></div>
+                </div>
+            </div>
+
+            <div class="dept-card">
+                <div class="dept-top">
+                    <span class="dept-icon" data-editable="true" data-field="dept-6-icon">📞</span>
+                    <span class="dept-floor" data-editable="true" data-field="dept-6-floor">F2</span>
+                </div>
+                <div class="dept-name" data-editable="true" data-field="dept-6-name">Sales</div>
+                <div class="dept-desc" data-editable="true" data-field="dept-6-desc">Business development and client relations</div>
+                <div class="dept-meta">
+                    <div class="dept-meta-item"><span class="meta-icon">📍</span> <span data-editable="true" data-field="dept-6-location">Rooms 211-224</span></div>
+                    <div class="dept-meta-item"><span class="meta-icon">📞</span> <span data-editable="true" data-field="dept-6-phone">Ext. 2100</span></div>
+                </div>
+            </div>
+
+            <div class="dept-card">
+                <div class="dept-top">
+                    <span class="dept-icon" data-editable="true" data-field="dept-7-icon">⚖️</span>
+                    <span class="dept-floor" data-editable="true" data-field="dept-7-floor">F5</span>
+                </div>
+                <div class="dept-name" data-editable="true" data-field="dept-7-name">Legal</div>
+                <div class="dept-desc" data-editable="true" data-field="dept-7-desc">Contracts, compliance, and corporate governance</div>
+                <div class="dept-meta">
+                    <div class="dept-meta-item"><span class="meta-icon">📍</span> <span data-editable="true" data-field="dept-7-location">Rooms 509-514</span></div>
+                    <div class="dept-meta-item"><span class="meta-icon">📞</span> <span data-editable="true" data-field="dept-7-phone">Ext. 5100</span></div>
+                </div>
+            </div>
+
+            <div class="dept-card">
+                <div class="dept-top">
+                    <span class="dept-icon" data-editable="true" data-field="dept-8-icon">🔧</span>
+                    <span class="dept-floor" data-editable="true" data-field="dept-8-floor">B1</span>
+                </div>
+                <div class="dept-name" data-editable="true" data-field="dept-8-name">Facilities</div>
+                <div class="dept-desc" data-editable="true" data-field="dept-8-desc">Building maintenance and office management</div>
+                <div class="dept-meta">
+                    <div class="dept-meta-item"><span class="meta-icon">📍</span> <span data-editable="true" data-field="dept-8-location">Basement Level 1</span></div>
+                    <div class="dept-meta-item"><span class="meta-icon">📞</span> <span data-editable="true" data-field="dept-8-phone">Ext. 9000</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

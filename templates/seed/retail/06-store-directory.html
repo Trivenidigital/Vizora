@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Montserrat:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(ellipse at 15% 25%, rgba(99, 102, 241, 0.1) 0%, transparent 50%),
+        radial-gradient(ellipse at 85% 75%, rgba(168, 85, 247, 0.08) 0%, transparent 45%),
+        radial-gradient(ellipse at 50% 50%, rgba(59, 130, 246, 0.06) 0%, transparent 55%),
+        linear-gradient(160deg, #0f0f1a 0%, #141428 30%, #0f0f1a 60%, #111122 100%);
+      color: #e8edf5;
+    }
+
+    /* Grid dot texture */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image: radial-gradient(circle, rgba(255,255,255,0.025) 1px, transparent 1px);
+      background-size: 36px 36px;
+      z-index: 0;
+    }
+
+    /* Vertical stripe accent */
+    body::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 240px,
+        rgba(99, 102, 241, 0.02) 240px,
+        rgba(99, 102, 241, 0.02) 241px
+      );
+      z-index: 0;
+    }
+
+    /* Glow accents */
+    .glow {
+      position: absolute;
+      border-radius: 50%;
+      z-index: 0;
+    }
+
+    .glow-1 {
+      top: -100px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 800px;
+      height: 300px;
+      background: radial-gradient(ellipse, rgba(99, 102, 241, 0.08) 0%, transparent 70%);
+      filter: blur(40px);
+    }
+
+    .glow-2 {
+      bottom: -100px;
+      right: 200px;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(168, 85, 247, 0.06) 0%, transparent 70%);
+      filter: blur(50px);
+    }
+
+    /* Layout */
+    .layout {
+      position: relative;
+      z-index: 3;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      height: 100%;
+      padding: 50px 70px;
+      gap: 35px;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 30px;
+    }
+
+    .store-logo {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 28px;
+      font-weight: 900;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: #ffffff;
+    }
+
+    .header-divider {
+      width: 2px;
+      height: 40px;
+      background: linear-gradient(180deg, transparent, rgba(99, 102, 241, 0.5), transparent);
+    }
+
+    .page-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 36px;
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .header-info {
+      font-family: 'Inter', sans-serif;
+      font-size: 18px;
+      color: rgba(255, 255, 255, 0.4);
+      text-align: right;
+      line-height: 1.5;
+    }
+
+    /* Department grid */
+    .dept-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      grid-template-rows: repeat(2, 1fr);
+      gap: 20px;
+    }
+
+    .dept-card {
+      background: rgba(255, 255, 255, 0.04);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      padding: 30px 28px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Color-coded top accent per department */
+    .dept-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+    }
+
+    .dept-card.fashion::before { background: linear-gradient(90deg, #ec4899, #f472b6); }
+    .dept-card.shoes::before { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+    .dept-card.jewelry::before { background: linear-gradient(90deg, #8b5cf6, #a78bfa); }
+    .dept-card.beauty::before { background: linear-gradient(90deg, #14b8a6, #5eead4); }
+    .dept-card.home::before { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+    .dept-card.electronics::before { background: linear-gradient(90deg, #6366f1, #818cf8); }
+    .dept-card.kids::before { background: linear-gradient(90deg, #f43f5e, #fb7185); }
+    .dept-card.sports::before { background: linear-gradient(90deg, #22c55e, #4ade80); }
+
+    .dept-emoji {
+      font-size: 60px;
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.3));
+      margin-bottom: 15px;
+    }
+
+    .dept-name {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 24px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 6px;
+    }
+
+    .dept-desc {
+      font-family: 'Inter', sans-serif;
+      font-size: 15px;
+      color: rgba(255, 255, 255, 0.45);
+      line-height: 1.4;
+      margin-bottom: 15px;
+    }
+
+    .dept-floor {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .floor-badge {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: 12px;
+      letter-spacing: 1px;
+    }
+
+    .dept-card.fashion .floor-badge { background: rgba(236, 72, 153, 0.15); color: #f472b6; }
+    .dept-card.shoes .floor-badge { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+    .dept-card.jewelry .floor-badge { background: rgba(139, 92, 246, 0.15); color: #a78bfa; }
+    .dept-card.beauty .floor-badge { background: rgba(20, 184, 166, 0.15); color: #5eead4; }
+    .dept-card.home .floor-badge { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+    .dept-card.electronics .floor-badge { background: rgba(99, 102, 241, 0.15); color: #818cf8; }
+    .dept-card.kids .floor-badge { background: rgba(244, 63, 94, 0.15); color: #fb7185; }
+    .dept-card.sports .floor-badge { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
+
+    .floor-label {
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.35);
+    }
+
+    /* Footer */
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      padding-top: 20px;
+    }
+
+    .footer-help {
+      font-family: 'Inter', sans-serif;
+      font-size: 18px;
+      color: rgba(255, 255, 255, 0.4);
+    }
+
+    .footer-help strong {
+      color: rgba(255, 255, 255, 0.7);
+      font-weight: 600;
+    }
+
+    .footer-logo {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 6px;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.2);
+    }
+
+    /* SVG decorations */
+    .svg-deco {
+      position: absolute;
+      z-index: 1;
+    }
+  </style>
+</head>
+<body>
+  <!-- Glows -->
+  <div class="glow glow-1"></div>
+  <div class="glow glow-2"></div>
+
+  <!-- SVG compass rose -->
+  <svg class="svg-deco" style="top:50%;right:30px;transform:translateY(-50%);opacity:0.06;" width="80" height="80" viewBox="0 0 80 80">
+    <circle cx="40" cy="40" r="35" fill="none" stroke="#6366f1" stroke-width="1"/>
+    <line x1="40" y1="5" x2="40" y2="75" stroke="#6366f1" stroke-width="0.5"/>
+    <line x1="5" y1="40" x2="75" y2="40" stroke="#6366f1" stroke-width="0.5"/>
+    <polygon points="40,8 43,25 37,25" fill="#6366f1" opacity="0.5"/>
+    <text x="40" y="4" text-anchor="middle" fill="#6366f1" font-size="8" font-family="Inter">N</text>
+  </svg>
+
+  <!-- SVG grid pattern -->
+  <svg class="svg-deco" style="bottom:80px;left:30px;opacity:0.05;" width="100" height="100" viewBox="0 0 100 100">
+    <rect x="0" y="0" width="100" height="100" fill="none" stroke="#a78bfa" stroke-width="0.5"/>
+    <line x1="50" y1="0" x2="50" y2="100" stroke="#a78bfa" stroke-width="0.5"/>
+    <line x1="0" y1="50" x2="100" y2="50" stroke="#a78bfa" stroke-width="0.5"/>
+    <line x1="25" y1="0" x2="25" y2="100" stroke="#a78bfa" stroke-width="0.3"/>
+    <line x1="75" y1="0" x2="75" y2="100" stroke="#a78bfa" stroke-width="0.3"/>
+    <line x1="0" y1="25" x2="100" y2="25" stroke="#a78bfa" stroke-width="0.3"/>
+    <line x1="0" y1="75" x2="100" y2="75" stroke="#a78bfa" stroke-width="0.3"/>
+  </svg>
+
+  <!-- SVG arrow indicator -->
+  <svg class="svg-deco" style="top:120px;right:80px;opacity:0.1;" width="60" height="60" viewBox="0 0 60 60">
+    <path d="M30,5 L55,50 L30,40 L5,50 Z" fill="none" stroke="#6366f1" stroke-width="1.5"/>
+  </svg>
+
+  <div class="layout">
+    <div class="header">
+      <div class="header-left">
+        <div class="store-logo" data-editable="true" data-field="store_name">STORE NAME</div>
+        <div class="header-divider"></div>
+        <div class="page-title" data-editable="true" data-field="page_title">Store Directory</div>
+      </div>
+      <div class="header-info" data-editable="true" data-field="header_info">3 Floors | 120+ Brands<br>Open Daily 10AM — 9PM</div>
+    </div>
+
+    <div class="dept-grid">
+      <div class="dept-card fashion">
+        <div>
+          <div class="dept-emoji">🧥</div>
+          <div class="dept-name" data-editable="true" data-field="dept1_name">Fashion</div>
+          <div class="dept-desc" data-editable="true" data-field="dept1_desc">Men's & women's apparel, designer collections</div>
+        </div>
+        <div class="dept-floor">
+          <span class="floor-badge" data-editable="true" data-field="dept1_floor">FLOOR 1</span>
+          <span class="floor-label" data-editable="true" data-field="dept1_location">North Wing</span>
+        </div>
+      </div>
+
+      <div class="dept-card shoes">
+        <div>
+          <div class="dept-emoji">👠</div>
+          <div class="dept-name" data-editable="true" data-field="dept2_name">Footwear</div>
+          <div class="dept-desc" data-editable="true" data-field="dept2_desc">Shoes, sneakers, boots, and sandals</div>
+        </div>
+        <div class="dept-floor">
+          <span class="floor-badge" data-editable="true" data-field="dept2_floor">FLOOR 1</span>
+          <span class="floor-label" data-editable="true" data-field="dept2_location">South Wing</span>
+        </div>
+      </div>
+
+      <div class="dept-card jewelry">
+        <div>
+          <div class="dept-emoji">💎</div>
+          <div class="dept-name" data-editable="true" data-field="dept3_name">Jewelry</div>
+          <div class="dept-desc" data-editable="true" data-field="dept3_desc">Fine jewelry, watches, and accessories</div>
+        </div>
+        <div class="dept-floor">
+          <span class="floor-badge" data-editable="true" data-field="dept3_floor">FLOOR 1</span>
+          <span class="floor-label" data-editable="true" data-field="dept3_location">Center Atrium</span>
+        </div>
+      </div>
+
+      <div class="dept-card beauty">
+        <div>
+          <div class="dept-emoji">🧴</div>
+          <div class="dept-name" data-editable="true" data-field="dept4_name">Beauty</div>
+          <div class="dept-desc" data-editable="true" data-field="dept4_desc">Skincare, cosmetics, and fragrances</div>
+        </div>
+        <div class="dept-floor">
+          <span class="floor-badge" data-editable="true" data-field="dept4_floor">FLOOR 1</span>
+          <span class="floor-label" data-editable="true" data-field="dept4_location">East Entrance</span>
+        </div>
+      </div>
+
+      <div class="dept-card home">
+        <div>
+          <div class="dept-emoji">🏠</div>
+          <div class="dept-name" data-editable="true" data-field="dept5_name">Home & Living</div>
+          <div class="dept-desc" data-editable="true" data-field="dept5_desc">Furniture, decor, bedding, and kitchenware</div>
+        </div>
+        <div class="dept-floor">
+          <span class="floor-badge" data-editable="true" data-field="dept5_floor">FLOOR 2</span>
+          <span class="floor-label" data-editable="true" data-field="dept5_location">Full Floor</span>
+        </div>
+      </div>
+
+      <div class="dept-card electronics">
+        <div>
+          <div class="dept-emoji">🎮</div>
+          <div class="dept-name" data-editable="true" data-field="dept6_name">Electronics</div>
+          <div class="dept-desc" data-editable="true" data-field="dept6_desc">Gadgets, gaming, audio, and smart devices</div>
+        </div>
+        <div class="dept-floor">
+          <span class="floor-badge" data-editable="true" data-field="dept6_floor">FLOOR 3</span>
+          <span class="floor-label" data-editable="true" data-field="dept6_location">North Wing</span>
+        </div>
+      </div>
+
+      <div class="dept-card kids">
+        <div>
+          <div class="dept-emoji">🧸</div>
+          <div class="dept-name" data-editable="true" data-field="dept7_name">Kids & Toys</div>
+          <div class="dept-desc" data-editable="true" data-field="dept7_desc">Children's clothing, toys, and baby gear</div>
+        </div>
+        <div class="dept-floor">
+          <span class="floor-badge" data-editable="true" data-field="dept7_floor">FLOOR 3</span>
+          <span class="floor-label" data-editable="true" data-field="dept7_location">South Wing</span>
+        </div>
+      </div>
+
+      <div class="dept-card sports">
+        <div>
+          <div class="dept-emoji">⚽</div>
+          <div class="dept-name" data-editable="true" data-field="dept8_name">Sports & Fitness</div>
+          <div class="dept-desc" data-editable="true" data-field="dept8_desc">Athletic wear, equipment, and outdoor gear</div>
+        </div>
+        <div class="dept-floor">
+          <span class="floor-badge" data-editable="true" data-field="dept8_floor">FLOOR 3</span>
+          <span class="floor-label" data-editable="true" data-field="dept8_location">West Wing</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="footer-help" data-editable="true" data-field="footer_help"><strong>Need help?</strong> Visit our Information Desk at the Main Entrance or call ext. 100</div>
+      <div class="footer-logo" data-editable="true" data-field="footer_logo">YOUR STORE</div>
+    </div>
+  </div>
+</body>
+</html>

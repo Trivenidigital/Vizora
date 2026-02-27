@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Montserrat:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(ellipse at 25% 35%, rgba(59, 130, 246, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 75% 65%, rgba(99, 102, 241, 0.06) 0%, transparent 45%),
+        radial-gradient(ellipse at 50% 90%, rgba(59, 130, 246, 0.04) 0%, transparent 40%),
+        linear-gradient(155deg, #f8fafc 0%, #f1f5f9 30%, #e8eef5 60%, #f0f4f8 100%);
+      color: #1e293b;
+    }
+
+    /* Grid texture */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image: radial-gradient(circle, rgba(0,0,0,0.02) 1px, transparent 1px);
+      background-size: 24px 24px;
+      z-index: 0;
+    }
+
+    /* Light stripe pattern */
+    body::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 120px,
+        rgba(59, 130, 246, 0.015) 120px,
+        rgba(59, 130, 246, 0.015) 121px
+      );
+      z-index: 0;
+    }
+
+    /* Light blue glow */
+    .glow-blue {
+      position: absolute;
+      top: 50%;
+      left: 40%;
+      transform: translate(-50%, -50%);
+      width: 800px;
+      height: 600px;
+      background: radial-gradient(ellipse, rgba(59, 130, 246, 0.04) 0%, transparent 70%);
+      filter: blur(60px);
+      z-index: 0;
+    }
+
+    /* Layout - 3 columns */
+    .layout {
+      position: relative;
+      z-index: 3;
+      display: grid;
+      grid-template-columns: 320px 1fr 320px;
+      grid-template-rows: auto 1fr auto;
+      height: 100%;
+      padding: 40px 50px;
+      gap: 25px;
+    }
+
+    /* Header - full width */
+    .header {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 25px;
+    }
+
+    .store-name {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #1e293b;
+    }
+
+    .floor-selector {
+      display: flex;
+      gap: 8px;
+    }
+
+    .floor-btn {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      padding: 8px 18px;
+      border-radius: 8px;
+      letter-spacing: 1px;
+    }
+
+    .floor-btn.active {
+      background: #3b82f6;
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+
+    .floor-btn.inactive {
+      background: rgba(59, 130, 246, 0.08);
+      color: #3b82f6;
+    }
+
+    .header-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      color: rgba(30, 41, 59, 0.5);
+      letter-spacing: 4px;
+      text-transform: uppercase;
+    }
+
+    /* Left legend panel */
+    .legend-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .legend-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: rgba(30, 41, 59, 0.4);
+      margin-bottom: 5px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(0, 0, 0, 0.05);
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .legend-color {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+
+    .legend-label {
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      color: #1e293b;
+    }
+
+    /* Center - floor plan */
+    .floor-plan {
+      background: rgba(255, 255, 255, 0.6);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      gap: 12px;
+      position: relative;
+    }
+
+    .zone {
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      gap: 6px;
+      position: relative;
+      border: 2px solid transparent;
+    }
+
+    .zone-emoji {
+      font-size: 32px;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.1));
+    }
+
+    .zone-name {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    /* Zone colors */
+    .zone.fashion { background: rgba(236, 72, 153, 0.08); border-color: rgba(236, 72, 153, 0.2); }
+    .zone.fashion .zone-name { color: #be185d; }
+    .zone.shoes { background: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.2); }
+    .zone.shoes .zone-name { color: #b45309; }
+    .zone.beauty { background: rgba(20, 184, 166, 0.08); border-color: rgba(20, 184, 166, 0.2); }
+    .zone.beauty .zone-name { color: #0d9488; }
+    .zone.electronics { background: rgba(99, 102, 241, 0.08); border-color: rgba(99, 102, 241, 0.2); }
+    .zone.electronics .zone-name { color: #4338ca; }
+    .zone.home { background: rgba(59, 130, 246, 0.08); border-color: rgba(59, 130, 246, 0.2); }
+    .zone.home .zone-name { color: #1d4ed8; }
+    .zone.food { background: rgba(234, 88, 12, 0.08); border-color: rgba(234, 88, 12, 0.2); }
+    .zone.food .zone-name { color: #c2410c; }
+    .zone.entrance { background: rgba(30, 41, 59, 0.06); border-color: rgba(30, 41, 59, 0.15); }
+    .zone.entrance .zone-name { color: #475569; }
+    .zone.service { background: rgba(34, 197, 94, 0.08); border-color: rgba(34, 197, 94, 0.2); }
+    .zone.service .zone-name { color: #15803d; }
+    .zone.kids { background: rgba(244, 63, 94, 0.08); border-color: rgba(244, 63, 94, 0.2); }
+    .zone.kids .zone-name { color: #be123c; }
+    .zone.sports { background: rgba(139, 92, 246, 0.08); border-color: rgba(139, 92, 246, 0.2); }
+    .zone.sports .zone-name { color: #6d28d9; }
+
+    /* Span adjustments */
+    .zone.wide { grid-column: span 2; }
+    .zone.tall { grid-row: span 2; }
+
+    /* Directional arrows SVG overlay */
+    .arrows-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    /* Right info panel */
+    .info-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .info-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: rgba(30, 41, 59, 0.4);
+      margin-bottom: 5px;
+    }
+
+    .info-card {
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(0, 0, 0, 0.05);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .info-card-icon {
+      font-size: 28px;
+      margin-bottom: 8px;
+    }
+
+    .info-card-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 4px;
+    }
+
+    .info-card-text {
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      color: rgba(30, 41, 59, 0.5);
+      line-height: 1.4;
+    }
+
+    /* Footer */
+    .footer {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid rgba(0, 0, 0, 0.06);
+      padding-top: 15px;
+    }
+
+    .footer-text {
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      color: rgba(30, 41, 59, 0.35);
+    }
+
+    .footer-help {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      color: #3b82f6;
+    }
+
+    /* SVG decorations */
+    .svg-deco {
+      position: absolute;
+      z-index: 1;
+    }
+  </style>
+</head>
+<body>
+  <!-- Glow -->
+  <div class="glow-blue"></div>
+
+  <!-- SVG compass -->
+  <svg class="svg-deco" style="top:30px;right:30px;opacity:0.1;" width="70" height="70" viewBox="0 0 70 70">
+    <circle cx="35" cy="35" r="30" fill="none" stroke="#3b82f6" stroke-width="1"/>
+    <polygon points="35,8 38,28 35,32 32,28" fill="#3b82f6" opacity="0.6"/>
+    <polygon points="35,62 38,42 35,38 32,42" fill="#94a3b8" opacity="0.4"/>
+    <text x="35" y="5" text-anchor="middle" fill="#3b82f6" font-size="7" font-family="Montserrat" font-weight="700">N</text>
+  </svg>
+
+  <!-- SVG scale indicator -->
+  <svg class="svg-deco" style="bottom:60px;left:380px;opacity:0.15;" width="200" height="30" viewBox="0 0 200 30">
+    <line x1="10" y1="15" x2="190" y2="15" stroke="#1e293b" stroke-width="1"/>
+    <line x1="10" y1="8" x2="10" y2="22" stroke="#1e293b" stroke-width="1"/>
+    <line x1="190" y1="8" x2="190" y2="22" stroke="#1e293b" stroke-width="1"/>
+    <line x1="100" y1="10" x2="100" y2="20" stroke="#1e293b" stroke-width="0.5"/>
+    <text x="100" y="28" text-anchor="middle" fill="#1e293b" font-size="8" font-family="Inter">~200 ft</text>
+  </svg>
+
+  <div class="layout">
+    <div class="header">
+      <div class="header-left">
+        <div class="store-name" data-editable="true" data-field="store_name">STORE NAME</div>
+        <div class="floor-selector">
+          <div class="floor-btn active" data-editable="true" data-field="floor1_label">FLOOR 1</div>
+          <div class="floor-btn inactive" data-editable="true" data-field="floor2_label">FLOOR 2</div>
+          <div class="floor-btn inactive" data-editable="true" data-field="floor3_label">FLOOR 3</div>
+        </div>
+      </div>
+      <div class="header-title" data-editable="true" data-field="header_title">STORE MAP — FLOOR PLAN</div>
+    </div>
+
+    <!-- Legend -->
+    <div class="legend-panel">
+      <div class="legend-title">Department Legend</div>
+      <div class="legend-item">
+        <div class="legend-color" style="background:#ec4899;"></div>
+        <div class="legend-label" data-editable="true" data-field="legend1">Women's Fashion</div>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background:#f59e0b;"></div>
+        <div class="legend-label" data-editable="true" data-field="legend2">Shoes & Footwear</div>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background:#14b8a6;"></div>
+        <div class="legend-label" data-editable="true" data-field="legend3">Beauty & Skincare</div>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background:#6366f1;"></div>
+        <div class="legend-label" data-editable="true" data-field="legend4">Electronics & Tech</div>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background:#3b82f6;"></div>
+        <div class="legend-label" data-editable="true" data-field="legend5">Home & Living</div>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background:#ea580c;"></div>
+        <div class="legend-label" data-editable="true" data-field="legend6">Food Court</div>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background:#22c55e;"></div>
+        <div class="legend-label" data-editable="true" data-field="legend7">Customer Service</div>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background:#f43f5e;"></div>
+        <div class="legend-label" data-editable="true" data-field="legend8">Kids & Family</div>
+      </div>
+    </div>
+
+    <!-- Floor plan grid -->
+    <div class="floor-plan">
+      <div class="zone entrance">
+        <div class="zone-emoji">🚪</div>
+        <div class="zone-name" data-editable="true" data-field="zone1">Main Entrance</div>
+      </div>
+      <div class="zone beauty wide">
+        <div class="zone-emoji">💄</div>
+        <div class="zone-name" data-editable="true" data-field="zone2">Beauty & Cosmetics</div>
+      </div>
+      <div class="zone service">
+        <div class="zone-emoji">ℹ️</div>
+        <div class="zone-name" data-editable="true" data-field="zone3">Info Desk</div>
+      </div>
+
+      <div class="zone fashion tall">
+        <div class="zone-emoji">👗</div>
+        <div class="zone-name" data-editable="true" data-field="zone4">Women's Fashion</div>
+      </div>
+      <div class="zone home">
+        <div class="zone-emoji">🏠</div>
+        <div class="zone-name" data-editable="true" data-field="zone5">Home</div>
+      </div>
+      <div class="zone electronics">
+        <div class="zone-emoji">📱</div>
+        <div class="zone-name" data-editable="true" data-field="zone6">Electronics</div>
+      </div>
+      <div class="zone shoes">
+        <div class="zone-emoji">👟</div>
+        <div class="zone-name" data-editable="true" data-field="zone7">Footwear</div>
+      </div>
+
+      <div class="zone kids">
+        <div class="zone-emoji">🧸</div>
+        <div class="zone-name" data-editable="true" data-field="zone8">Kids</div>
+      </div>
+      <div class="zone food">
+        <div class="zone-emoji">🍔</div>
+        <div class="zone-name" data-editable="true" data-field="zone9">Food Court</div>
+      </div>
+      <div class="zone entrance">
+        <div class="zone-emoji">🚪</div>
+        <div class="zone-name" data-editable="true" data-field="zone10">Exit</div>
+      </div>
+
+      <!-- Directional arrows overlay -->
+      <svg class="arrows-overlay" viewBox="0 0 800 500">
+        <defs>
+          <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#3b82f6" opacity="0.4"/>
+          </marker>
+        </defs>
+        <line x1="100" y1="80" x2="100" y2="420" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="6,4" marker-end="url(#arrowhead)" opacity="0.3"/>
+        <line x1="200" y1="250" x2="600" y2="250" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="6,4" marker-end="url(#arrowhead)" opacity="0.3"/>
+      </svg>
+    </div>
+
+    <!-- Info panel -->
+    <div class="info-panel">
+      <div class="info-title">Quick Guide</div>
+      <div class="info-card">
+        <div class="info-card-icon">🚻</div>
+        <div class="info-card-title" data-editable="true" data-field="info1_title">Restrooms</div>
+        <div class="info-card-text" data-editable="true" data-field="info1_text">Located near Food Court and Main Entrance</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-icon">🛗</div>
+        <div class="info-card-title" data-editable="true" data-field="info2_title">Elevators</div>
+        <div class="info-card-text" data-editable="true" data-field="info2_text">Center of store, near Electronics dept.</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-icon">🅿️</div>
+        <div class="info-card-title" data-editable="true" data-field="info3_title">Parking</div>
+        <div class="info-card-text" data-editable="true" data-field="info3_text">Levels P1-P3. Closest to Main Entrance.</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-icon">♿</div>
+        <div class="info-card-title" data-editable="true" data-field="info4_title">Accessibility</div>
+        <div class="info-card-text" data-editable="true" data-field="info4_text">Wheelchair accessible on all floors</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-icon">📞</div>
+        <div class="info-card-title" data-editable="true" data-field="info5_title">Assistance</div>
+        <div class="info-card-text" data-editable="true" data-field="info5_text">Dial ext. 100 from any house phone</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="footer-text" data-editable="true" data-field="footer_text">Floor plan is approximate. Ask any associate for directions.</div>
+      <div class="footer-help" data-editable="true" data-field="footer_help">NEED HELP? VISIT CUSTOMER SERVICE →</div>
+    </div>
+  </div>
+</body>
+</html>

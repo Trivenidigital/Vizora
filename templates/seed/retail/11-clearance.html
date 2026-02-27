@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Bebas+Neue&family=Poppins:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(ellipse at 30% 40%, rgba(239, 68, 68, 0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 70% 60%, rgba(251, 191, 36, 0.1) 0%, transparent 45%),
+        radial-gradient(ellipse at 90% 20%, rgba(220, 38, 38, 0.08) 0%, transparent 40%),
+        linear-gradient(160deg, #1a0808 0%, #2d0f0f 25%, #261010 50%, #1f0a0a 75%, #140505 100%);
+      color: #fef2f2;
+    }
+
+    /* Striped texture */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        -45deg,
+        transparent,
+        transparent 50px,
+        rgba(255, 0, 0, 0.015) 50px,
+        rgba(255, 0, 0, 0.015) 52px
+      );
+      z-index: 0;
+    }
+
+    /* Dot grid */
+    body::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image: radial-gradient(circle, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size: 26px 26px;
+      z-index: 0;
+    }
+
+    /* Red glows */
+    .glow-red {
+      position: absolute;
+      top: -80px;
+      left: 40%;
+      width: 600px;
+      height: 400px;
+      background: radial-gradient(ellipse, rgba(239, 68, 68, 0.1) 0%, transparent 70%);
+      filter: blur(50px);
+      z-index: 0;
+    }
+
+    .glow-yellow {
+      position: absolute;
+      bottom: -60px;
+      right: 30%;
+      width: 500px;
+      height: 400px;
+      background: radial-gradient(ellipse, rgba(251, 191, 36, 0.08) 0%, transparent 70%);
+      filter: blur(60px);
+      z-index: 0;
+    }
+
+    /* Tag emoji */
+    .emoji-tag {
+      position: absolute;
+      font-size: 150px;
+      z-index: 2;
+    }
+
+    .emoji-tag.t1 {
+      top: 60px;
+      right: 100px;
+      filter: drop-shadow(0 6px 25px rgba(239, 68, 68, 0.4));
+      transform: rotate(15deg);
+    }
+
+    .emoji-tag.t2 {
+      bottom: 100px;
+      left: 80px;
+      font-size: 100px;
+      filter: drop-shadow(0 4px 15px rgba(251, 191, 36, 0.3));
+      opacity: 0.7;
+      transform: rotate(-10deg);
+    }
+
+    /* Layout */
+    .layout {
+      position: relative;
+      z-index: 3;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto 1fr auto;
+      height: 100%;
+      padding: 50px 80px;
+      gap: 25px;
+    }
+
+    /* Header */
+    .header {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .store-name {
+      font-family: 'Poppins', sans-serif;
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: 5px;
+      text-transform: uppercase;
+      color: rgba(254, 242, 242, 0.5);
+    }
+
+    .urgency-badge {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: 'Poppins', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      color: #fbbf24;
+      background: rgba(251, 191, 36, 0.1);
+      border: 1px solid rgba(251, 191, 36, 0.25);
+      padding: 10px 24px;
+      border-radius: 8px;
+      letter-spacing: 2px;
+    }
+
+    /* Left - big text */
+    .hero-left {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 15px;
+    }
+
+    .clearance-label {
+      font-family: 'Poppins', sans-serif;
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: 10px;
+      text-transform: uppercase;
+      color: #fbbf24;
+      text-shadow: 0 0 30px rgba(251, 191, 36, 0.3);
+    }
+
+    .clearance-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 160px;
+      line-height: 0.9;
+      color: #ffffff;
+      text-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .clearance-subtitle {
+      font-family: 'Inter', sans-serif;
+      font-size: 26px;
+      font-weight: 400;
+      color: rgba(254, 242, 242, 0.6);
+      line-height: 1.5;
+      max-width: 550px;
+    }
+
+    /* Right - tiered discount badges */
+    .tiers {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 24px;
+      padding-left: 40px;
+    }
+
+    .tier-card {
+      background: rgba(255, 255, 255, 0.04);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      padding: 30px 35px;
+      display: flex;
+      align-items: center;
+      gap: 25px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .tier-card::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 5px;
+      height: 100%;
+    }
+
+    .tier-card.tier-30::before { background: #fbbf24; }
+    .tier-card.tier-50::before { background: #f97316; }
+    .tier-card.tier-70::before { background: #ef4444; }
+
+    .tier-percent {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 72px;
+      line-height: 1;
+      min-width: 180px;
+    }
+
+    .tier-card.tier-30 .tier-percent { color: #fbbf24; }
+    .tier-card.tier-50 .tier-percent { color: #f97316; }
+    .tier-card.tier-70 .tier-percent { color: #ef4444; text-shadow: 0 0 20px rgba(239, 68, 68, 0.3); }
+
+    .tier-info h3 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 4px;
+    }
+
+    .tier-info p {
+      font-family: 'Inter', sans-serif;
+      font-size: 16px;
+      color: rgba(254, 242, 242, 0.5);
+      line-height: 1.4;
+    }
+
+    .tier-tag {
+      font-family: 'Poppins', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 4px;
+      margin-left: auto;
+      white-space: nowrap;
+    }
+
+    .tier-card.tier-30 .tier-tag { background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
+    .tier-card.tier-50 .tier-tag { background: rgba(249, 115, 22, 0.15); color: #f97316; }
+    .tier-card.tier-70 .tier-tag { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+
+    /* Footer */
+    .footer {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid rgba(239, 68, 68, 0.1);
+      padding-top: 18px;
+    }
+
+    .footer-terms {
+      font-family: 'Inter', sans-serif;
+      font-size: 15px;
+      color: rgba(254, 242, 242, 0.3);
+    }
+
+    .footer-dates {
+      font-family: 'Poppins', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: #ef4444;
+    }
+
+    /* SVG decorations */
+    .svg-deco {
+      position: absolute;
+      z-index: 1;
+    }
+
+    /* Red accent bar */
+    .accent-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: linear-gradient(90deg, #ef4444, #fbbf24, #ef4444);
+      z-index: 5;
+    }
+  </style>
+</head>
+<body>
+  <!-- Glows -->
+  <div class="glow-red"></div>
+  <div class="glow-yellow"></div>
+  <div class="accent-bar"></div>
+
+  <!-- Tag emojis -->
+  <div class="emoji-tag t1">🏷️</div>
+  <div class="emoji-tag t2">🏷️</div>
+
+  <!-- SVG decorations -->
+  <svg class="svg-deco" style="top:30px;left:30px;opacity:0.08;" width="120" height="120" viewBox="0 0 120 120">
+    <polygon points="60,5 115,30 115,90 60,115 5,90 5,30" fill="none" stroke="#ef4444" stroke-width="1"/>
+    <polygon points="60,25 95,40 95,80 60,95 25,80 25,40" fill="none" stroke="#fbbf24" stroke-width="0.5"/>
+  </svg>
+
+  <svg class="svg-deco" style="bottom:50px;right:50px;opacity:0.06;" width="100" height="100" viewBox="0 0 100 100">
+    <circle cx="50" cy="50" r="45" fill="none" stroke="#ef4444" stroke-width="1"/>
+    <line x1="50" y1="5" x2="50" y2="95" stroke="#ef4444" stroke-width="0.5"/>
+    <line x1="5" y1="50" x2="95" y2="50" stroke="#ef4444" stroke-width="0.5"/>
+  </svg>
+
+  <svg class="svg-deco" style="top:50%;right:480px;transform:translateY(-50%);opacity:0.05;" width="60" height="200" viewBox="0 0 60 200">
+    <path d="M30,0 L60,40 L30,80 L0,40 Z" fill="none" stroke="#fbbf24" stroke-width="1"/>
+    <path d="M30,60 L60,100 L30,140 L0,100 Z" fill="none" stroke="#ef4444" stroke-width="1"/>
+    <path d="M30,120 L60,160 L30,200 L0,160 Z" fill="none" stroke="#fbbf24" stroke-width="0.5"/>
+  </svg>
+
+  <div class="layout">
+    <div class="header">
+      <div class="store-name" data-editable="true" data-field="store_name">YOUR STORE NAME</div>
+      <div class="urgency-badge" data-editable="true" data-field="urgency_text">⏰ LIMITED TIME REMAINING</div>
+    </div>
+
+    <div class="hero-left">
+      <div class="clearance-label" data-editable="true" data-field="clearance_label">END OF SEASON</div>
+      <div class="clearance-title" data-editable="true" data-field="clearance_title">CLEARANCE<br>EVENT</div>
+      <div class="clearance-subtitle" data-editable="true" data-field="clearance_subtitle">Everything must go. Deep discounts across all departments. Once it's gone, it's gone forever.</div>
+    </div>
+
+    <div class="tiers">
+      <div class="tier-card tier-30">
+        <div class="tier-percent" data-editable="true" data-field="tier1_percent">30% OFF</div>
+        <div class="tier-info">
+          <h3 data-editable="true" data-field="tier1_title">Spring Collection</h3>
+          <p data-editable="true" data-field="tier1_desc">Current season styles and new markdowns</p>
+        </div>
+        <div class="tier-tag" data-editable="true" data-field="tier1_tag">YELLOW TAG</div>
+      </div>
+
+      <div class="tier-card tier-50">
+        <div class="tier-percent" data-editable="true" data-field="tier2_percent">50% OFF</div>
+        <div class="tier-info">
+          <h3 data-editable="true" data-field="tier2_title">Winter Collection</h3>
+          <p data-editable="true" data-field="tier2_desc">Last season outerwear, boots, and knitwear</p>
+        </div>
+        <div class="tier-tag" data-editable="true" data-field="tier2_tag">ORANGE TAG</div>
+      </div>
+
+      <div class="tier-card tier-70">
+        <div class="tier-percent" data-editable="true" data-field="tier3_percent">70% OFF</div>
+        <div class="tier-info">
+          <h3 data-editable="true" data-field="tier3_title">Final Clearance</h3>
+          <p data-editable="true" data-field="tier3_desc">All remaining inventory — deepest discounts ever</p>
+        </div>
+        <div class="tier-tag" data-editable="true" data-field="tier3_tag">RED TAG</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="footer-terms" data-editable="true" data-field="terms">*All sales final on clearance items. No returns or exchanges. While supplies last.</div>
+      <div class="footer-dates" data-editable="true" data-field="dates">ENDS THIS SUNDAY</div>
+    </div>
+  </div>
+</body>
+</html>

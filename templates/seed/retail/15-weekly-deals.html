@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1080, height=1920">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Bebas+Neue&family=Poppins:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1080px;
+      height: 1920px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(ellipse at 50% 10%, rgba(239, 68, 68, 0.12) 0%, transparent 40%),
+        radial-gradient(ellipse at 20% 50%, rgba(251, 191, 36, 0.06) 0%, transparent 40%),
+        radial-gradient(ellipse at 80% 80%, rgba(239, 68, 68, 0.08) 0%, transparent 40%),
+        linear-gradient(170deg, #ffffff 0%, #fef9f0 20%, #fff5f5 50%, #fefce8 80%, #ffffff 100%);
+      color: #1a1a1a;
+    }
+
+    /* Newsprint dot pattern */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image: radial-gradient(circle, rgba(0,0,0,0.02) 1px, transparent 1px);
+      background-size: 20px 20px;
+      z-index: 0;
+    }
+
+    /* Subtle vertical stripes */
+    body::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 108px,
+        rgba(0, 0, 0, 0.01) 108px,
+        rgba(0, 0, 0, 0.01) 109px
+      );
+      z-index: 0;
+    }
+
+    /* Warm glow */
+    .glow-warm {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 800px;
+      height: 400px;
+      background: radial-gradient(ellipse, rgba(239, 68, 68, 0.06) 0%, transparent 70%);
+      filter: blur(50px);
+      z-index: 0;
+    }
+
+    /* Layout */
+    .layout {
+      position: relative;
+      z-index: 3;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      padding: 40px 50px;
+      gap: 20px;
+    }
+
+    /* Header banner */
+    .header-banner {
+      background: linear-gradient(135deg, #dc2626, #ef4444, #b91c1c);
+      border-radius: 20px;
+      padding: 35px 40px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 8px 30px rgba(220, 38, 38, 0.25);
+    }
+
+    /* Banner texture */
+    .header-banner::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 20px,
+        rgba(255,255,255,0.03) 20px,
+        rgba(255,255,255,0.03) 22px
+      );
+    }
+
+    .header-store {
+      font-family: 'Poppins', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 6px;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.7);
+      position: relative;
+    }
+
+    .header-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 72px;
+      color: #ffffff;
+      letter-spacing: 4px;
+      line-height: 1;
+      margin-top: 5px;
+      position: relative;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .header-dates {
+      font-family: 'Poppins', sans-serif;
+      font-size: 20px;
+      font-weight: 600;
+      color: #fbbf24;
+      margin-top: 8px;
+      position: relative;
+    }
+
+    /* Deal cards */
+    .deals-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .deal-row {
+      background: rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      border-radius: 16px;
+      padding: 22px 24px;
+      display: grid;
+      grid-template-columns: 60px 1fr auto;
+      gap: 18px;
+      align-items: center;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+      position: relative;
+    }
+
+    .deal-emoji {
+      font-size: 44px;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.1));
+      text-align: center;
+    }
+
+    .deal-info {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .deal-name {
+      font-family: 'Poppins', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: #1a1a1a;
+    }
+
+    .deal-desc {
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      color: rgba(26, 26, 26, 0.5);
+    }
+
+    .deal-pricing {
+      text-align: right;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+    }
+
+    .deal-original {
+      font-family: 'Inter', sans-serif;
+      font-size: 16px;
+      color: rgba(26, 26, 26, 0.35);
+      text-decoration: line-through;
+    }
+
+    .deal-sale {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 36px;
+      color: #dc2626;
+      line-height: 1;
+    }
+
+    .deal-savings {
+      font-family: 'Poppins', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      color: #16a34a;
+      background: rgba(34, 197, 94, 0.1);
+      padding: 2px 8px;
+      border-radius: 8px;
+      letter-spacing: 1px;
+    }
+
+    /* Highlight deal */
+    .deal-row.highlight {
+      background: linear-gradient(135deg, rgba(254, 243, 199, 0.8), rgba(254, 249, 195, 0.6));
+      border-color: rgba(251, 191, 36, 0.2);
+    }
+
+    .deal-row.highlight::after {
+      content: 'HOT DEAL';
+      position: absolute;
+      top: 8px;
+      right: 12px;
+      font-family: 'Poppins', sans-serif;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: #b45309;
+      background: rgba(251, 191, 36, 0.2);
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+
+    /* CTA banner */
+    .cta-banner {
+      background: rgba(26, 26, 26, 0.95);
+      border-radius: 16px;
+      padding: 25px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    .cta-left {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .cta-text {
+      font-family: 'Poppins', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .cta-sub {
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.45);
+    }
+
+    .cta-code {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 32px;
+      color: #fbbf24;
+      letter-spacing: 4px;
+    }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      padding-top: 10px;
+    }
+
+    .footer-text {
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      color: rgba(26, 26, 26, 0.3);
+      line-height: 1.6;
+    }
+
+    /* SVG decorations */
+    .svg-deco {
+      position: absolute;
+      z-index: 1;
+    }
+
+    /* Decorative scissors icon */
+    .scissors-deco {
+      position: absolute;
+      top: 350px;
+      left: -10px;
+      z-index: 4;
+      font-size: 24px;
+      transform: rotate(90deg);
+    }
+
+    .cut-line {
+      position: absolute;
+      top: 360px;
+      left: 20px;
+      right: 50px;
+      height: 1px;
+      background: repeating-linear-gradient(
+        90deg,
+        rgba(0,0,0,0.15),
+        rgba(0,0,0,0.15) 8px,
+        transparent 8px,
+        transparent 14px
+      );
+      z-index: 4;
+    }
+  </style>
+</head>
+<body>
+  <!-- Warm glow -->
+  <div class="glow-warm"></div>
+
+  <!-- SVG corner decorations -->
+  <svg class="svg-deco" style="top:20px;left:20px;opacity:0.08;" width="80" height="80" viewBox="0 0 80 80">
+    <path d="M0,0 L80,0 L80,10 L10,10 L10,80 L0,80 Z" fill="#dc2626"/>
+  </svg>
+
+  <svg class="svg-deco" style="top:20px;right:20px;opacity:0.08;" width="80" height="80" viewBox="0 0 80 80">
+    <path d="M80,0 L0,0 L0,10 L70,10 L70,80 L80,80 Z" fill="#dc2626"/>
+  </svg>
+
+  <svg class="svg-deco" style="bottom:20px;left:20px;opacity:0.06;" width="80" height="80" viewBox="0 0 80 80">
+    <path d="M0,80 L80,80 L80,70 L10,70 L10,0 L0,0 Z" fill="#dc2626"/>
+  </svg>
+
+  <svg class="svg-deco" style="bottom:20px;right:20px;opacity:0.06;" width="80" height="80" viewBox="0 0 80 80">
+    <path d="M80,80 L0,80 L0,70 L70,70 L70,0 L80,0 Z" fill="#dc2626"/>
+  </svg>
+
+  <!-- SVG price tag shape -->
+  <svg class="svg-deco" style="top:200px;right:30px;opacity:0.06;" width="60" height="80" viewBox="0 0 60 80">
+    <path d="M0,0 L60,0 L60,60 L30,80 L0,60 Z" fill="none" stroke="#dc2626" stroke-width="1.5"/>
+    <circle cx="30" cy="20" r="8" fill="none" stroke="#dc2626" stroke-width="1"/>
+  </svg>
+
+  <div class="layout">
+    <div class="header-banner">
+      <div class="header-store" data-editable="true" data-field="store_name">YOUR STORE NAME</div>
+      <div class="header-title" data-editable="true" data-field="header_title">WEEKLY DEALS</div>
+      <div class="header-dates" data-editable="true" data-field="date_range">January 15 — January 21, 2026</div>
+    </div>
+
+    <div class="deals-list">
+      <div class="deal-row highlight">
+        <div class="deal-emoji">🥩</div>
+        <div class="deal-info">
+          <div class="deal-name" data-editable="true" data-field="deal1_name">Premium Ground Beef</div>
+          <div class="deal-desc" data-editable="true" data-field="deal1_desc">Fresh, 85/15 lean, family pack</div>
+        </div>
+        <div class="deal-pricing">
+          <div class="deal-original" data-editable="true" data-field="deal1_original">$8.99/lb</div>
+          <div class="deal-sale" data-editable="true" data-field="deal1_sale">$4.99/LB</div>
+          <div class="deal-savings" data-editable="true" data-field="deal1_savings">SAVE $4.00</div>
+        </div>
+      </div>
+
+      <div class="deal-row">
+        <div class="deal-emoji">🧴</div>
+        <div class="deal-info">
+          <div class="deal-name" data-editable="true" data-field="deal2_name">Signature Shampoo Set</div>
+          <div class="deal-desc" data-editable="true" data-field="deal2_desc">Shampoo + conditioner combo pack</div>
+        </div>
+        <div class="deal-pricing">
+          <div class="deal-original" data-editable="true" data-field="deal2_original">$24.99</div>
+          <div class="deal-sale" data-editable="true" data-field="deal2_sale">$14.99</div>
+          <div class="deal-savings" data-editable="true" data-field="deal2_savings">SAVE 40%</div>
+        </div>
+      </div>
+
+      <div class="deal-row highlight">
+        <div class="deal-emoji">🍕</div>
+        <div class="deal-info">
+          <div class="deal-name" data-editable="true" data-field="deal3_name">Frozen Pizza Variety</div>
+          <div class="deal-desc" data-editable="true" data-field="deal3_desc">Select brands, all sizes</div>
+        </div>
+        <div class="deal-pricing">
+          <div class="deal-original" data-editable="true" data-field="deal3_original">$9.99</div>
+          <div class="deal-sale" data-editable="true" data-field="deal3_sale">$5.99</div>
+          <div class="deal-savings" data-editable="true" data-field="deal3_savings">SAVE $4.00</div>
+        </div>
+      </div>
+
+      <div class="deal-row">
+        <div class="deal-emoji">👕</div>
+        <div class="deal-info">
+          <div class="deal-name" data-editable="true" data-field="deal4_name">Basic Tees — 3 Pack</div>
+          <div class="deal-desc" data-editable="true" data-field="deal4_desc">100% cotton, assorted colors</div>
+        </div>
+        <div class="deal-pricing">
+          <div class="deal-original" data-editable="true" data-field="deal4_original">$29.99</div>
+          <div class="deal-sale" data-editable="true" data-field="deal4_sale">$16.99</div>
+          <div class="deal-savings" data-editable="true" data-field="deal4_savings">SAVE 43%</div>
+        </div>
+      </div>
+
+      <div class="deal-row">
+        <div class="deal-emoji">🧹</div>
+        <div class="deal-info">
+          <div class="deal-name" data-editable="true" data-field="deal5_name">Cleaning Essentials Kit</div>
+          <div class="deal-desc" data-editable="true" data-field="deal5_desc">Spray, wipes, and refills bundle</div>
+        </div>
+        <div class="deal-pricing">
+          <div class="deal-original" data-editable="true" data-field="deal5_original">$18.99</div>
+          <div class="deal-sale" data-editable="true" data-field="deal5_sale">$11.99</div>
+          <div class="deal-savings" data-editable="true" data-field="deal5_savings">SAVE 37%</div>
+        </div>
+      </div>
+
+      <div class="deal-row highlight">
+        <div class="deal-emoji">☕</div>
+        <div class="deal-info">
+          <div class="deal-name" data-editable="true" data-field="deal6_name">Premium Coffee Pods</div>
+          <div class="deal-desc" data-editable="true" data-field="deal6_desc">72-count variety box</div>
+        </div>
+        <div class="deal-pricing">
+          <div class="deal-original" data-editable="true" data-field="deal6_original">$44.99</div>
+          <div class="deal-sale" data-editable="true" data-field="deal6_sale">$29.99</div>
+          <div class="deal-savings" data-editable="true" data-field="deal6_savings">SAVE $15</div>
+        </div>
+      </div>
+
+      <div class="deal-row">
+        <div class="deal-emoji">🧃</div>
+        <div class="deal-info">
+          <div class="deal-name" data-editable="true" data-field="deal7_name">Organic Juice Pack</div>
+          <div class="deal-desc" data-editable="true" data-field="deal7_desc">12-pack, assorted flavors</div>
+        </div>
+        <div class="deal-pricing">
+          <div class="deal-original" data-editable="true" data-field="deal7_original">$12.99</div>
+          <div class="deal-sale" data-editable="true" data-field="deal7_sale">$7.99</div>
+          <div class="deal-savings" data-editable="true" data-field="deal7_savings">SAVE 38%</div>
+        </div>
+      </div>
+
+      <div class="deal-row">
+        <div class="deal-emoji">🔋</div>
+        <div class="deal-info">
+          <div class="deal-name" data-editable="true" data-field="deal8_name">Batteries Mega Pack</div>
+          <div class="deal-desc" data-editable="true" data-field="deal8_desc">AA & AAA 48-count combo</div>
+        </div>
+        <div class="deal-pricing">
+          <div class="deal-original" data-editable="true" data-field="deal8_original">$24.99</div>
+          <div class="deal-sale" data-editable="true" data-field="deal8_sale">$14.99</div>
+          <div class="deal-savings" data-editable="true" data-field="deal8_savings">SAVE 40%</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cta-banner">
+      <div class="cta-left">
+        <div class="cta-text" data-editable="true" data-field="cta_text">Extra 10% off with your loyalty card</div>
+        <div class="cta-sub" data-editable="true" data-field="cta_sub">Scan your card at checkout or use code online</div>
+      </div>
+      <div class="cta-code" data-editable="true" data-field="cta_code">WEEKLY10</div>
+    </div>
+
+    <div class="footer">
+      <div class="footer-text" data-editable="true" data-field="footer_text">Prices valid through listed dates only. While supplies last. Rain checks available on select items. Loyalty card savings applied at register. Cannot be combined with other coupons unless noted. See store for complete details.</div>
+    </div>
+  </div>
+</body>
+</html>

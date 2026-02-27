@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;700;900&family=Montserrat:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(ellipse at 20% 50%, rgba(255, 0, 0, 0.3) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 30%, rgba(255, 60, 0, 0.25) 0%, transparent 45%),
+        radial-gradient(ellipse at 50% 90%, rgba(180, 0, 0, 0.2) 0%, transparent 50%),
+        linear-gradient(135deg, #1a0000 0%, #2d0a0a 30%, #0d0000 60%, #1a0505 100%);
+      color: #ffffff;
+    }
+
+    /* Dot grid texture */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image: radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 30px 30px;
+      z-index: 0;
+    }
+
+    /* Glowing circle top-right */
+    .glow-circle-1 {
+      position: absolute;
+      top: -120px;
+      right: -80px;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255, 50, 50, 0.4) 0%, transparent 70%);
+      filter: blur(40px);
+      z-index: 0;
+    }
+
+    /* Glowing circle bottom-left */
+    .glow-circle-2 {
+      position: absolute;
+      bottom: -150px;
+      left: -100px;
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255, 200, 0, 0.2) 0%, transparent 70%);
+      filter: blur(60px);
+      z-index: 0;
+    }
+
+    /* Starburst shape */
+    .starburst {
+      position: absolute;
+      top: 80px;
+      right: 120px;
+      width: 320px;
+      height: 320px;
+      background: linear-gradient(135deg, #ff0000, #ff4400, #ffcc00);
+      clip-path: polygon(
+        50% 0%, 61% 25%, 85% 10%, 73% 35%, 100% 40%,
+        78% 55%, 95% 75%, 68% 65%, 60% 90%, 50% 70%,
+        40% 90%, 32% 65%, 5% 75%, 22% 55%, 0% 40%,
+        27% 35%, 15% 10%, 39% 25%
+      );
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      filter: drop-shadow(0 0 30px rgba(255, 0, 0, 0.6));
+    }
+
+    .starburst-text {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 52px;
+      color: #fff;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+      text-align: center;
+      line-height: 1;
+      transform: rotate(-10deg);
+    }
+
+    /* Diagonal stripe accent */
+    .diagonal-stripe {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: repeating-linear-gradient(
+        -45deg,
+        transparent,
+        transparent 80px,
+        rgba(255, 0, 0, 0.03) 80px,
+        rgba(255, 0, 0, 0.03) 82px
+      );
+      z-index: 0;
+    }
+
+    /* Main content grid */
+    .content {
+      position: relative;
+      z-index: 3;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto 1fr auto;
+      height: 100%;
+      padding: 60px 80px;
+      gap: 20px;
+    }
+
+    /* Top bar */
+    .top-bar {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .store-name {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: 6px;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .promo-code {
+      font-family: 'Inter', sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 12px 30px;
+      border-radius: 50px;
+      letter-spacing: 3px;
+    }
+
+    /* Left column - main sale text */
+    .sale-main {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 20px;
+    }
+
+    .sale-label {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 48px;
+      font-weight: 900;
+      letter-spacing: 12px;
+      text-transform: uppercase;
+      color: #ffcc00;
+      text-shadow: 0 0 40px rgba(255, 204, 0, 0.4);
+    }
+
+    .sale-percent {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 280px;
+      line-height: 0.85;
+      background: linear-gradient(180deg, #ffffff 0%, #ff4444 40%, #cc0000 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 8px 30px rgba(255, 0, 0, 0.5));
+      letter-spacing: -5px;
+    }
+
+    .sale-off {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 140px;
+      line-height: 0.9;
+      color: #ffffff;
+      text-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      letter-spacing: 15px;
+    }
+
+    /* Right column - details */
+    .sale-details {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding-left: 40px;
+      gap: 30px;
+    }
+
+    .detail-item {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 28px 35px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .detail-category {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 18px;
+      font-weight: 600;
+      color: #ffcc00;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      margin-bottom: 8px;
+    }
+
+    .detail-text {
+      font-family: 'Inter', sans-serif;
+      font-size: 26px;
+      font-weight: 400;
+      color: rgba(255, 255, 255, 0.85);
+      line-height: 1.4;
+    }
+
+    /* Bottom bar */
+    .bottom-bar {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      padding-top: 25px;
+    }
+
+    .terms {
+      font-family: 'Inter', sans-serif;
+      font-size: 18px;
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .dates {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 24px;
+      font-weight: 700;
+      color: #ffcc00;
+      letter-spacing: 2px;
+    }
+
+    /* SVG decorative elements */
+    .svg-deco {
+      position: absolute;
+      z-index: 1;
+    }
+
+    .ornamental-line {
+      position: absolute;
+      bottom: 120px;
+      left: 80px;
+      z-index: 1;
+    }
+
+    /* Red accent bar */
+    .accent-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 6px;
+      background: linear-gradient(90deg, #ff0000, #ffcc00, #ff0000);
+      z-index: 5;
+    }
+
+    /* Emoji decoration */
+    .emoji-deco {
+      position: absolute;
+      font-size: 120px;
+      filter: drop-shadow(0 4px 20px rgba(0,0,0,0.4));
+      z-index: 1;
+    }
+
+    .emoji-deco.fire1 {
+      bottom: 160px;
+      right: 80px;
+      font-size: 100px;
+      transform: rotate(-15deg);
+    }
+
+    .emoji-deco.fire2 {
+      top: 120px;
+      left: 60px;
+      font-size: 80px;
+      transform: rotate(10deg);
+      opacity: 0.7;
+    }
+  </style>
+</head>
+<body>
+  <!-- Decorative layers -->
+  <div class="glow-circle-1"></div>
+  <div class="glow-circle-2"></div>
+  <div class="diagonal-stripe"></div>
+
+  <!-- Starburst badge -->
+  <div class="starburst">
+    <div class="starburst-text" data-editable="true" data-field="badge_text">LIMITED<br>TIME!</div>
+  </div>
+
+  <!-- SVG diamond pattern -->
+  <svg class="svg-deco" style="top:40px;left:40px;opacity:0.15;" width="120" height="120" viewBox="0 0 120 120">
+    <polygon points="60,0 120,60 60,120 0,60" fill="none" stroke="#ff4444" stroke-width="2"/>
+    <polygon points="60,20 100,60 60,100 20,60" fill="none" stroke="#ff4444" stroke-width="1"/>
+    <polygon points="60,40 80,60 60,80 40,60" fill="none" stroke="#ffcc00" stroke-width="1"/>
+  </svg>
+
+  <!-- SVG ornamental corners -->
+  <svg class="svg-deco" style="bottom:40px;right:40px;opacity:0.2;" width="150" height="150" viewBox="0 0 150 150">
+    <path d="M150,0 L150,150 L0,150" fill="none" stroke="#ffcc00" stroke-width="2"/>
+    <path d="M150,30 L150,150 L30,150" fill="none" stroke="#ff4444" stroke-width="1"/>
+    <circle cx="150" cy="150" r="4" fill="#ffcc00"/>
+  </svg>
+
+  <svg class="svg-deco" style="top:40px;right:500px;opacity:0.1;" width="80" height="80" viewBox="0 0 80 80">
+    <line x1="0" y1="40" x2="80" y2="40" stroke="#ffcc00" stroke-width="1"/>
+    <line x1="40" y1="0" x2="40" y2="80" stroke="#ffcc00" stroke-width="1"/>
+    <circle cx="40" cy="40" r="20" fill="none" stroke="#ff4444" stroke-width="1"/>
+  </svg>
+
+  <!-- Emoji decorations -->
+  <div class="emoji-deco fire1">🔥</div>
+  <div class="emoji-deco fire2">🔥</div>
+
+  <!-- Main content -->
+  <div class="content">
+    <div class="top-bar">
+      <div class="store-name" data-editable="true" data-field="store_name">YOUR STORE NAME</div>
+      <div class="promo-code" data-editable="true" data-field="promo_code">CODE: SAVE50</div>
+    </div>
+
+    <div class="sale-main">
+      <div class="sale-label" data-editable="true" data-field="sale_label">MEGA SALE</div>
+      <div class="sale-percent" data-editable="true" data-field="sale_percent">50%</div>
+      <div class="sale-off" data-editable="true" data-field="sale_off_text">OFF</div>
+    </div>
+
+    <div class="sale-details">
+      <div class="detail-item">
+        <div class="detail-category" data-editable="true" data-field="category_1">ELECTRONICS</div>
+        <div class="detail-text" data-editable="true" data-field="detail_1">Up to 50% off all TVs, speakers, and smart home devices</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-category" data-editable="true" data-field="category_2">FASHION</div>
+        <div class="detail-text" data-editable="true" data-field="detail_2">Designer brands at unbeatable prices this season</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-category" data-editable="true" data-field="category_3">HOME & LIVING</div>
+        <div class="detail-text" data-editable="true" data-field="detail_3">Furniture, decor, and kitchen essentials on sale</div>
+      </div>
+    </div>
+
+    <div class="bottom-bar">
+      <div class="terms" data-editable="true" data-field="terms">*Terms and conditions apply. While supplies last. Cannot be combined with other offers.</div>
+      <div class="dates" data-editable="true" data-field="sale_dates">JAN 15 — JAN 31</div>
+    </div>
+  </div>
+
+  <div class="accent-bar"></div>
+</body>
+</html>

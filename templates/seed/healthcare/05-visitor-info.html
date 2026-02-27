@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&family=Montserrat:wght@700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(ellipse at 20% 20%, rgba(59, 130, 246, 0.06) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(168, 85, 247, 0.05) 0%, transparent 50%),
+        linear-gradient(150deg, #fef9f0 0%, #fdf4e8 25%, #faf5ff 50%, #f0f9ff 75%, #fef9f0 100%);
+      color: #1e293b;
+    }
+
+    /* Dot pattern */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image: radial-gradient(circle, rgba(168, 85, 247, 0.035) 1.2px, transparent 1.2px);
+      background-size: 34px 34px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Diagonal stripes */
+    body::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        135deg,
+        transparent,
+        transparent 50px,
+        rgba(59, 130, 246, 0.01) 50px,
+        rgba(59, 130, 246, 0.01) 51px
+      );
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Glow orbs */
+    .glow-a {
+      position: absolute;
+      top: 100px; right: -60px;
+      width: 350px; height: 350px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(251, 146, 60, 0.08), transparent 60%);
+      filter: blur(50px);
+      z-index: 0;
+    }
+
+    .glow-b {
+      position: absolute;
+      bottom: -50px; left: 300px;
+      width: 400px; height: 400px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(59, 130, 246, 0.06), transparent 60%);
+      filter: blur(60px);
+      z-index: 0;
+    }
+
+    .glow-c {
+      position: absolute;
+      top: 50%; left: -80px;
+      width: 250px; height: 250px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(168, 85, 247, 0.06), transparent 60%);
+      filter: blur(40px);
+      z-index: 0;
+    }
+
+    /* Top bar */
+    .top-bar {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 6px;
+      background: linear-gradient(90deg, #f59e0b, #3b82f6, #a855f7, #f59e0b);
+      z-index: 3;
+    }
+
+    .layout {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto 1fr;
+      height: 100%;
+      padding: 6px 0 0 0;
+    }
+
+    /* Full-width header */
+    .header {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 36px 80px 28px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .header-emoji {
+      font-size: 72px;
+      filter: drop-shadow(0 4px 16px rgba(59, 130, 246, 0.2));
+    }
+
+    .header h1 {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 800;
+      font-size: 52px;
+      color: #1e293b;
+      letter-spacing: -1.5px;
+    }
+
+    .header p {
+      font-size: 18px;
+      color: #64748b;
+      margin-top: 4px;
+    }
+
+    .welcome-badge {
+      padding: 12px 28px;
+      background: linear-gradient(135deg, rgba(251, 146, 60, 0.1), rgba(251, 146, 60, 0.05));
+      border: 1px solid rgba(251, 146, 60, 0.2);
+      border-radius: 14px;
+      text-align: center;
+    }
+
+    .welcome-badge .emoji { font-size: 32px; }
+    .welcome-badge .text {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 600;
+      font-size: 16px;
+      color: #c2410c;
+      margin-top: 4px;
+    }
+
+    /* Left column */
+    .left-col {
+      padding: 36px 40px 40px 80px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Right column */
+    .right-col {
+      padding: 36px 80px 40px 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .section-label {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      color: #94a3b8;
+      margin-bottom: 4px;
+    }
+
+    /* Info card */
+    .info-card {
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      border-radius: 20px;
+      padding: 30px 28px;
+      box-shadow:
+        0 4px 16px rgba(0, 0, 0, 0.03),
+        0 1px 4px rgba(0, 0, 0, 0.02),
+        inset 0 1px 0 rgba(255, 255, 255, 0.9);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .info-card::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 5px;
+    }
+
+    .card-hours::before { background: linear-gradient(180deg, #3b82f6, #60a5fa); }
+    .card-rules::before { background: linear-gradient(180deg, #a855f7, #c084fc); }
+    .card-parking::before { background: linear-gradient(180deg, #f59e0b, #fbbf24); }
+    .card-amenities::before { background: linear-gradient(180deg, #10b981, #34d399); }
+    .card-contact::before { background: linear-gradient(180deg, #ec4899, #f472b6); }
+
+    .card-title {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 700;
+      font-size: 24px;
+      color: #0f2942;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .card-title-icon {
+      font-size: 28px;
+    }
+
+    .hours-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .hour-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 14px;
+      background: rgba(59, 130, 246, 0.04);
+      border-radius: 10px;
+      font-size: 15px;
+    }
+
+    .hour-label { color: #475569; font-weight: 500; }
+    .hour-value { color: #1e3a5f; font-weight: 700; }
+
+    .rules-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .rules-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 16px;
+      color: #475569;
+      line-height: 1.5;
+    }
+
+    .rule-bullet {
+      flex-shrink: 0;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: rgba(168, 85, 247, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 1px;
+    }
+
+    .rule-bullet svg { width: 12px; height: 12px; }
+
+    .parking-info {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .parking-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 16px;
+      color: #475569;
+    }
+
+    .parking-icon {
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+
+    .amenities-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .amenity-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: rgba(16, 185, 129, 0.04);
+      border-radius: 10px;
+      font-size: 15px;
+      color: #475569;
+    }
+
+    .amenity-icon { font-size: 20px; }
+
+    .contact-info {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .contact-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 16px;
+      color: #475569;
+    }
+
+    .contact-row svg { flex-shrink: 0; }
+
+    /* SVG decoration */
+    .svg-deco {
+      position: absolute;
+      opacity: 0.03;
+      z-index: 0;
+    }
+
+    .svg-deco-tr { top: 140px; right: 20px; }
+    .svg-deco-bl { bottom: 40px; left: 20px; }
+  </style>
+</head>
+<body>
+  <div class="top-bar"></div>
+  <div class="glow-a"></div>
+  <div class="glow-b"></div>
+  <div class="glow-c"></div>
+
+  <!-- SVG decorations -->
+  <svg class="svg-deco svg-deco-tr" width="180" height="180" viewBox="0 0 180 180" fill="none">
+    <circle cx="90" cy="90" r="80" stroke="#3b82f6" stroke-width="2"/>
+    <circle cx="90" cy="90" r="60" stroke="#3b82f6" stroke-width="1.5"/>
+    <circle cx="90" cy="90" r="40" stroke="#3b82f6" stroke-width="1"/>
+    <path d="M90 10v160M10 90h160" stroke="#3b82f6" stroke-width="1"/>
+  </svg>
+  <svg class="svg-deco svg-deco-bl" width="150" height="150" viewBox="0 0 150 150" fill="none">
+    <rect x="20" y="20" width="110" height="110" rx="20" stroke="#a855f7" stroke-width="2" fill="none"/>
+    <rect x="40" y="40" width="70" height="70" rx="12" stroke="#a855f7" stroke-width="1.5" fill="none"/>
+    <circle cx="75" cy="75" r="15" stroke="#a855f7" stroke-width="1.5" fill="none"/>
+  </svg>
+
+  <div class="layout">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <span class="header-emoji">🏥</span>
+        <div>
+          <h1 data-editable="true" data-field="title">Visitor Information</h1>
+          <p data-editable="true" data-field="subtitle">Everything you need for a comfortable visit to Meridian Health</p>
+        </div>
+      </div>
+      <div class="welcome-badge">
+        <div class="emoji">👋</div>
+        <div class="text" data-editable="true" data-field="welcomeText">Welcome, Visitors!</div>
+      </div>
+    </div>
+
+    <!-- Left Column -->
+    <div class="left-col">
+      <div class="section-label">Hours &amp; Access</div>
+
+      <!-- Visiting Hours -->
+      <div class="info-card card-hours">
+        <div class="card-title">
+          <span class="card-title-icon">🕐</span>
+          <span data-editable="true" data-field="hoursTitle">Visiting Hours</span>
+        </div>
+        <div class="hours-grid">
+          <div class="hour-row">
+            <span class="hour-label" data-editable="true" data-field="hours1Label">General Wards</span>
+            <span class="hour-value" data-editable="true" data-field="hours1Value">10 AM &ndash; 8 PM</span>
+          </div>
+          <div class="hour-row">
+            <span class="hour-label" data-editable="true" data-field="hours2Label">ICU / CCU</span>
+            <span class="hour-value" data-editable="true" data-field="hours2Value">11 AM &ndash; 1 PM</span>
+          </div>
+          <div class="hour-row">
+            <span class="hour-label" data-editable="true" data-field="hours3Label">Maternity</span>
+            <span class="hour-value" data-editable="true" data-field="hours3Value">9 AM &ndash; 9 PM</span>
+          </div>
+          <div class="hour-row">
+            <span class="hour-label" data-editable="true" data-field="hours4Label">Pediatrics</span>
+            <span class="hour-value" data-editable="true" data-field="hours4Value">8 AM &ndash; 8 PM</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Visitor Rules -->
+      <div class="info-card card-rules">
+        <div class="card-title">
+          <span class="card-title-icon">📋</span>
+          <span data-editable="true" data-field="rulesTitle">Visitor Guidelines</span>
+        </div>
+        <ul class="rules-list">
+          <li>
+            <span class="rule-bullet"><svg viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#a855f7" stroke-width="2" stroke-linecap="round"/></svg></span>
+            <span data-editable="true" data-field="rule1">Maximum 2 visitors per patient at a time</span>
+          </li>
+          <li>
+            <span class="rule-bullet"><svg viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#a855f7" stroke-width="2" stroke-linecap="round"/></svg></span>
+            <span data-editable="true" data-field="rule2">Please use hand sanitizer upon entering each ward</span>
+          </li>
+          <li>
+            <span class="rule-bullet"><svg viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#a855f7" stroke-width="2" stroke-linecap="round"/></svg></span>
+            <span data-editable="true" data-field="rule3">Children under 12 must be accompanied by an adult</span>
+          </li>
+          <li>
+            <span class="rule-bullet"><svg viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#a855f7" stroke-width="2" stroke-linecap="round"/></svg></span>
+            <span data-editable="true" data-field="rule4">Please silence mobile phones in patient areas</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Right Column -->
+    <div class="right-col">
+      <div class="section-label">Services &amp; Contact</div>
+
+      <!-- Parking -->
+      <div class="info-card card-parking">
+        <div class="card-title">
+          <span class="card-title-icon">🅿️</span>
+          <span data-editable="true" data-field="parkingTitle">Parking Information</span>
+        </div>
+        <div class="parking-info">
+          <div class="parking-row">
+            <span class="parking-icon">📍</span>
+            <span data-editable="true" data-field="parking1">Visitor Parking: Lot A (Main Entrance) &mdash; First 2 hours free</span>
+          </div>
+          <div class="parking-row">
+            <span class="parking-icon">♿</span>
+            <span data-editable="true" data-field="parking2">Accessible spaces available near all entrances</span>
+          </div>
+          <div class="parking-row">
+            <span class="parking-icon">🚌</span>
+            <span data-editable="true" data-field="parking3">Free shuttle runs every 15 min from Lot C overflow</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Amenities -->
+      <div class="info-card card-amenities">
+        <div class="card-title">
+          <span class="card-title-icon">✨</span>
+          <span data-editable="true" data-field="amenitiesTitle">Visitor Amenities</span>
+        </div>
+        <div class="amenities-grid">
+          <div class="amenity-item">
+            <span class="amenity-icon">☕</span>
+            <span data-editable="true" data-field="amenity1">Cafeteria &mdash; Lobby Level</span>
+          </div>
+          <div class="amenity-item">
+            <span class="amenity-icon">📶</span>
+            <span data-editable="true" data-field="amenity2">Free Wi-Fi: MeridianGuest</span>
+          </div>
+          <div class="amenity-item">
+            <span class="amenity-icon">🎁</span>
+            <span data-editable="true" data-field="amenity3">Gift Shop &mdash; Floor 1</span>
+          </div>
+          <div class="amenity-item">
+            <span class="amenity-icon">🙏</span>
+            <span data-editable="true" data-field="amenity4">Chapel &mdash; Floor 2</span>
+          </div>
+          <div class="amenity-item">
+            <span class="amenity-icon">🛋️</span>
+            <span data-editable="true" data-field="amenity5">Waiting Lounges &mdash; Each floor</span>
+          </div>
+          <div class="amenity-item">
+            <span class="amenity-icon">🏧</span>
+            <span data-editable="true" data-field="amenity6">ATM &mdash; Main Lobby</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Contact -->
+      <div class="info-card card-contact">
+        <div class="card-title">
+          <span class="card-title-icon">📞</span>
+          <span data-editable="true" data-field="contactTitle">Need Help?</span>
+        </div>
+        <div class="contact-info">
+          <div class="contact-row">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M11 1H7a2 2 0 00-2 2v12a2 2 0 002 2h4a2 2 0 002-2V3a2 2 0 00-2-2z" stroke="#ec4899" stroke-width="1.5"/><path d="M8 14h2" stroke="#ec4899" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <span data-editable="true" data-field="contact1">Main Reception: (555) 234-5678</span>
+          </div>
+          <div class="contact-row">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 4l7 5 7-5" stroke="#ec4899" stroke-width="1.5" stroke-linecap="round"/><rect x="1" y="3" width="16" height="12" rx="2" stroke="#ec4899" stroke-width="1.5"/></svg>
+            <span data-editable="true" data-field="contact2">Patient Info: info@meridianhealth.com</span>
+          </div>
+          <div class="contact-row">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7.5" stroke="#ec4899" stroke-width="1.5"/><path d="M9 5v4l3 2" stroke="#ec4899" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <span data-editable="true" data-field="contact3">Visitor Services Desk: Open 8 AM &ndash; 10 PM daily</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

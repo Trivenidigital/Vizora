@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=Inter:wght@400;500;600&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(ellipse at 10% 90%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 90% 20%, rgba(147, 197, 253, 0.2) 0%, transparent 45%),
+        linear-gradient(135deg, #f0f7ff 0%, #e0edff 40%, #f5f9ff 70%, #dbeafe 100%);
+      color: #1e293b;
+    }
+
+    /* Dot grid pattern overlay */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image: radial-gradient(circle, rgba(59, 130, 246, 0.08) 1.5px, transparent 1.5px);
+      background-size: 32px 32px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Decorative glowing circle top-right */
+    body::after {
+      content: '';
+      position: absolute;
+      top: -120px;
+      right: -80px;
+      width: 450px;
+      height: 450px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(59, 130, 246, 0.18) 0%, rgba(96, 165, 250, 0.08) 50%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 520px 1fr;
+      grid-template-rows: 1fr;
+      height: 100%;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Left sidebar panel */
+    .sidebar {
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.05) 100%),
+        linear-gradient(135deg, #2563eb 0%, #1d4ed8 40%, #1e40af 100%);
+      padding: 70px 50px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Decorative stripe pattern on sidebar */
+    .sidebar::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        -45deg,
+        transparent,
+        transparent 20px,
+        rgba(255,255,255,0.03) 20px,
+        rgba(255,255,255,0.03) 40px
+      );
+      pointer-events: none;
+    }
+
+    /* Glowing orb on sidebar */
+    .sidebar::after {
+      content: '';
+      position: absolute;
+      bottom: -100px;
+      left: -60px;
+      width: 350px;
+      height: 350px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(96, 165, 250, 0.3) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .emoji-hero {
+      font-size: 160px;
+      line-height: 1;
+      filter: drop-shadow(0 8px 24px rgba(0,0,0,0.3));
+      position: relative;
+      z-index: 2;
+      margin-bottom: 30px;
+    }
+
+    .sidebar-label {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 800;
+      font-size: 42px;
+      color: #ffffff;
+      text-transform: uppercase;
+      letter-spacing: 4px;
+      position: relative;
+      z-index: 2;
+      line-height: 1.2;
+    }
+
+    .sidebar-sublabel {
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+      font-size: 18px;
+      color: rgba(255, 255, 255, 0.75);
+      margin-top: 12px;
+      position: relative;
+      z-index: 2;
+      letter-spacing: 1px;
+    }
+
+    /* Ornamental line */
+    .ornament-line {
+      width: 80px;
+      height: 4px;
+      background: linear-gradient(90deg, #93c5fd, rgba(255,255,255,0.4));
+      border-radius: 2px;
+      margin-top: 20px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .sidebar-bottom {
+      position: relative;
+      z-index: 2;
+    }
+
+    .sidebar-date {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 600;
+      font-size: 22px;
+      color: rgba(255,255,255,0.9);
+    }
+
+    .sidebar-school {
+      font-family: 'Inter', sans-serif;
+      font-size: 16px;
+      color: rgba(255,255,255,0.6);
+      margin-top: 6px;
+    }
+
+    /* Inline SVG decoration */
+    .svg-decoration {
+      position: absolute;
+      bottom: 60px;
+      right: 30px;
+      z-index: 2;
+      opacity: 0.15;
+    }
+
+    /* Main content area */
+    .main-content {
+      padding: 70px 80px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      position: relative;
+    }
+
+    /* Glass card for title */
+    .title-card {
+      background: rgba(255, 255, 255, 0.6);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      border-radius: 24px;
+      padding: 48px 56px;
+      box-shadow:
+        0 4px 6px rgba(0, 0, 0, 0.04),
+        0 20px 60px rgba(37, 99, 235, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.9);
+      margin-bottom: 40px;
+    }
+
+    .announcement-title {
+      font-family: 'Playfair Display', serif;
+      font-weight: 800;
+      font-size: 78px;
+      line-height: 1.1;
+      color: #1e3a5f;
+      margin-bottom: 10px;
+    }
+
+    .announcement-subtitle {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 600;
+      font-size: 28px;
+      color: #2563eb;
+      letter-spacing: 1px;
+    }
+
+    /* Body text area */
+    .body-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 36px;
+      margin-bottom: 40px;
+    }
+
+    .body-card {
+      background: rgba(255, 255, 255, 0.5);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      border-radius: 18px;
+      padding: 36px 40px;
+      box-shadow: 0 8px 32px rgba(37, 99, 235, 0.06);
+    }
+
+    .body-text {
+      font-family: 'Inter', sans-serif;
+      font-weight: 400;
+      font-size: 26px;
+      line-height: 1.7;
+      color: #334155;
+    }
+
+    .highlight-text {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 600;
+      font-size: 30px;
+      color: #1d4ed8;
+      line-height: 1.5;
+    }
+
+    /* Footer bar */
+    .footer-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 0;
+      border-top: 2px solid rgba(37, 99, 235, 0.12);
+    }
+
+    .footer-attribution {
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+      font-size: 20px;
+      color: #64748b;
+    }
+
+    .footer-tag {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 700;
+      font-size: 18px;
+      color: #ffffff;
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      padding: 10px 28px;
+      border-radius: 50px;
+      box-shadow: 0 4px 16px rgba(37, 99, 235, 0.3);
+    }
+
+    /* Decorative corner accent */
+    .corner-accent {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 200px;
+      height: 200px;
+      overflow: hidden;
+      z-index: 0;
+    }
+
+    .corner-accent::before {
+      content: '';
+      position: absolute;
+      top: -100px;
+      right: -100px;
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      border: 40px solid rgba(37, 99, 235, 0.06);
+    }
+
+    /* Decorative floating dots */
+    .float-dot {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .float-dot-1 {
+      width: 16px; height: 16px;
+      background: rgba(59, 130, 246, 0.2);
+      top: 120px; right: 200px;
+    }
+
+    .float-dot-2 {
+      width: 10px; height: 10px;
+      background: rgba(59, 130, 246, 0.15);
+      top: 300px; right: 100px;
+    }
+
+    .float-dot-3 {
+      width: 22px; height: 22px;
+      background: rgba(59, 130, 246, 0.1);
+      bottom: 180px; right: 280px;
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <!-- Left Sidebar -->
+    <div class="sidebar">
+      <div>
+        <div class="emoji-hero" data-editable="true" data-field="heroEmoji">&#x1F4E2;</div>
+        <div class="sidebar-label" data-editable="true" data-field="sidebarLabel">Campus<br>News</div>
+        <div class="ornament-line"></div>
+        <div class="sidebar-sublabel" data-editable="true" data-field="sidebarSubtitle">Official Announcement</div>
+      </div>
+      <div class="sidebar-bottom">
+        <div class="sidebar-date" data-editable="true" data-field="date">February 26, 2026</div>
+        <div class="sidebar-school" data-editable="true" data-field="schoolName">Westfield Academy</div>
+      </div>
+      <!-- Inline SVG decoration -->
+      <svg class="svg-decoration" width="120" height="120" viewBox="0 0 120 120" fill="none">
+        <circle cx="60" cy="60" r="55" stroke="white" stroke-width="2" stroke-dasharray="8 6"/>
+        <circle cx="60" cy="60" r="35" stroke="white" stroke-width="1.5" stroke-dasharray="4 4"/>
+        <line x1="60" y1="5" x2="60" y2="25" stroke="white" stroke-width="1.5"/>
+        <line x1="60" y1="95" x2="60" y2="115" stroke="white" stroke-width="1.5"/>
+        <line x1="5" y1="60" x2="25" y2="60" stroke="white" stroke-width="1.5"/>
+        <line x1="95" y1="60" x2="115" y2="60" stroke="white" stroke-width="1.5"/>
+      </svg>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+      <div class="corner-accent"></div>
+      <div class="float-dot float-dot-1"></div>
+      <div class="float-dot float-dot-2"></div>
+      <div class="float-dot float-dot-3"></div>
+
+      <!-- Title Card -->
+      <div class="title-card">
+        <div class="announcement-title" data-editable="true" data-field="title">Spring Semester Registration Now Open</div>
+        <div class="announcement-subtitle" data-editable="true" data-field="subtitle">Important Update for All Students &amp; Families</div>
+      </div>
+
+      <!-- Body Section -->
+      <div class="body-section">
+        <div class="body-card">
+          <p class="body-text" data-editable="true" data-field="bodyLeft">Registration for the upcoming Spring semester is now open. All students must complete their course selections by March 15th through the student portal. Please consult with your academic advisor before finalizing your schedule.</p>
+        </div>
+        <div class="body-card">
+          <p class="highlight-text" data-editable="true" data-field="bodyRight">New courses include Advanced Robotics, Creative Writing Workshop, and Environmental Science Lab. Limited seats available &mdash; register early!</p>
+        </div>
+      </div>
+
+      <!-- Footer Bar -->
+      <div class="footer-bar">
+        <span class="footer-attribution" data-editable="true" data-field="attribution">Office of the Registrar &bull; Questions? Visit Room 204</span>
+        <span class="footer-tag" data-editable="true" data-field="tag">ACTION REQUIRED</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

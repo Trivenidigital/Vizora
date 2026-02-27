@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(ellipse at 50% 40%, rgba(239, 68, 68, 0.2) 0%, transparent 55%),
+        radial-gradient(ellipse at 20% 80%, rgba(249, 115, 22, 0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 20%, rgba(234, 179, 8, 0.12) 0%, transparent 45%),
+        linear-gradient(160deg, #1c0a00 0%, #2d1810 30%, #1a0e0a 60%, #0f0805 100%);
+      color: #fef2e8;
+    }
+
+    /* Dot grid texture */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image: radial-gradient(circle, rgba(239, 68, 68, 0.04) 1px, transparent 1px);
+      background-size: 36px 36px;
+      z-index: 0;
+    }
+
+    /* Horizontal stripe overlay */
+    body::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent 0px,
+        transparent 3px,
+        rgba(239, 68, 68, 0.015) 3px,
+        rgba(239, 68, 68, 0.015) 4px
+      );
+      z-index: 0;
+    }
+
+    /* Glowing orbs */
+    .glow-center {
+      position: absolute;
+      top: 250px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 800px;
+      height: 400px;
+      border-radius: 50%;
+      background: radial-gradient(ellipse, rgba(239, 68, 68, 0.2) 0%, transparent 70%);
+      filter: blur(80px);
+      z-index: 0;
+    }
+
+    .glow-left {
+      position: absolute;
+      top: 100px;
+      left: -50px;
+      width: 300px;
+      height: 300px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(249, 115, 22, 0.2) 0%, transparent 70%);
+      filter: blur(50px);
+      z-index: 0;
+    }
+
+    .glow-right {
+      position: absolute;
+      bottom: 50px;
+      right: -30px;
+      width: 250px;
+      height: 250px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(234, 179, 8, 0.15) 0%, transparent 70%);
+      filter: blur(40px);
+      z-index: 0;
+    }
+
+    /* Ornamental lines */
+    .orn-top {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, transparent, #ef4444, #f97316, #eab308, transparent);
+      z-index: 3;
+    }
+
+    .orn-line-h {
+      position: absolute;
+      top: 480px;
+      left: 200px;
+      right: 200px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(239, 68, 68, 0.2), transparent);
+      z-index: 1;
+    }
+
+    /* Main grid layout */
+    .layout {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: 1fr;
+      grid-template-rows: auto auto 1fr auto auto;
+      height: 100%;
+      padding: 70px 120px;
+      gap: 0;
+      align-items: center;
+      justify-items: center;
+    }
+
+    /* Top section label */
+    .top-section {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      width: 100%;
+      justify-content: center;
+    }
+
+    .section-line {
+      width: 120px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(239, 68, 68, 0.4));
+    }
+
+    .section-line.right {
+      background: linear-gradient(90deg, rgba(239, 68, 68, 0.4), transparent);
+    }
+
+    .section-label {
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: 16px;
+      letter-spacing: 8px;
+      text-transform: uppercase;
+      color: rgba(239, 68, 68, 0.8);
+    }
+
+    /* Event name */
+    .event-name {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 90px;
+      letter-spacing: 8px;
+      color: #fef2e8;
+      text-shadow: 0 0 40px rgba(239, 68, 68, 0.3), 0 4px 20px rgba(0,0,0,0.5);
+      text-align: center;
+      margin-top: 10px;
+    }
+
+    /* Countdown container */
+    .countdown-container {
+      display: grid;
+      grid-template-columns: repeat(4, 280px);
+      gap: 40px;
+      justify-content: center;
+      align-self: center;
+    }
+
+    .countdown-unit {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .countdown-box {
+      width: 280px;
+      height: 200px;
+      background: rgba(255, 255, 255, 0.04);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(239, 68, 68, 0.15);
+      border-radius: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow:
+        0 8px 40px rgba(0, 0, 0, 0.3),
+        0 0 60px rgba(239, 68, 68, 0.06),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      position: relative;
+    }
+
+    /* Separator between boxes */
+    .countdown-unit:not(:last-child) .countdown-box::after {
+      content: ':';
+      position: absolute;
+      right: -30px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 800;
+      font-size: 64px;
+      color: rgba(239, 68, 68, 0.5);
+    }
+
+    .countdown-number {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 800;
+      font-size: 120px;
+      letter-spacing: -2px;
+      background: linear-gradient(180deg, #fef2e8 0%, rgba(239, 68, 68, 0.9) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: none;
+      filter: drop-shadow(0 0 20px rgba(239, 68, 68, 0.2));
+    }
+
+    .countdown-label {
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: 16px;
+      letter-spacing: 6px;
+      text-transform: uppercase;
+      color: rgba(254, 242, 232, 0.4);
+    }
+
+    /* Event date */
+    .event-date-row {
+      display: flex;
+      align-items: center;
+      gap: 40px;
+      justify-content: center;
+    }
+
+    .event-date {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 36px;
+      letter-spacing: 4px;
+      color: rgba(249, 115, 22, 0.8);
+    }
+
+    .event-venue {
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+      font-size: 20px;
+      color: rgba(254, 242, 232, 0.5);
+    }
+
+    .date-separator {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: rgba(239, 68, 68, 0.5);
+    }
+
+    /* Bottom CTA */
+    .bottom-cta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+    }
+
+    .cta-text {
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: 22px;
+      color: rgba(254, 242, 232, 0.7);
+    }
+
+    .cta-url {
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 20px;
+      color: rgba(239, 68, 68, 0.8);
+    }
+
+    /* Emoji decorations */
+    .emoji-fire {
+      position: absolute;
+      font-size: 160px;
+      filter: drop-shadow(0 0 30px rgba(239, 68, 68, 0.4)) drop-shadow(0 8px 20px rgba(0,0,0,0.4));
+      z-index: 2;
+    }
+
+    .emoji-fire-left {
+      top: 80px;
+      left: 100px;
+      opacity: 0.3;
+    }
+
+    .emoji-fire-right {
+      bottom: 80px;
+      right: 100px;
+      opacity: 0.25;
+      font-size: 130px;
+    }
+
+    /* SVG decorations */
+    .svg-decor {
+      position: absolute;
+      z-index: 1;
+    }
+
+    /* Bottom stripe */
+    .stripe-bottom {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 5px;
+      background: linear-gradient(90deg, #ef4444, #f97316, #eab308, #f97316, #ef4444);
+      z-index: 3;
+    }
+  </style>
+</head>
+<body>
+  <!-- Glowing orbs -->
+  <div class="glow-center"></div>
+  <div class="glow-left"></div>
+  <div class="glow-right"></div>
+
+  <!-- Ornamental lines -->
+  <div class="orn-top"></div>
+  <div class="orn-line-h"></div>
+
+  <!-- SVG decorations -->
+  <svg class="svg-decor" style="top:20px; left:20px;" width="70" height="70" viewBox="0 0 70 70" fill="none">
+    <path d="M0 35 L0 0 L35 0" stroke="rgba(239,68,68,0.3)" stroke-width="2" fill="none"/>
+    <circle cx="4" cy="4" r="3" fill="rgba(249,115,22,0.5)"/>
+  </svg>
+  <svg class="svg-decor" style="bottom:20px; right:20px; transform:rotate(180deg);" width="70" height="70" viewBox="0 0 70 70" fill="none">
+    <path d="M0 35 L0 0 L35 0" stroke="rgba(239,68,68,0.3)" stroke-width="2" fill="none"/>
+    <circle cx="4" cy="4" r="3" fill="rgba(249,115,22,0.5)"/>
+  </svg>
+  <svg class="svg-decor" style="top:200px; right:160px;" width="40" height="40" viewBox="0 0 40 40" fill="none">
+    <path d="M20 0 L22 16 L40 20 L22 22 L20 40 L18 22 L0 20 L18 16 Z" fill="rgba(234,179,8,0.15)"/>
+  </svg>
+  <svg class="svg-decor" style="bottom:200px; left:160px;" width="30" height="30" viewBox="0 0 30 30" fill="none">
+    <circle cx="15" cy="15" r="12" stroke="rgba(239,68,68,0.12)" stroke-width="1" fill="none"/>
+    <circle cx="15" cy="15" r="6" stroke="rgba(249,115,22,0.1)" stroke-width="1" fill="none"/>
+    <circle cx="15" cy="15" r="2" fill="rgba(239,68,68,0.25)"/>
+  </svg>
+
+  <!-- Emoji decorations -->
+  <div class="emoji-fire emoji-fire-left">&#128293;</div>
+  <div class="emoji-fire emoji-fire-right">&#9200;</div>
+
+  <!-- Main layout -->
+  <div class="layout">
+    <!-- Top section label -->
+    <div class="top-section">
+      <span class="section-line"></span>
+      <span class="section-label" data-editable="true" data-field="sectionLabel">Countdown to Launch</span>
+      <span class="section-line right"></span>
+    </div>
+
+    <!-- Event name -->
+    <h1 class="event-name" data-editable="true" data-field="eventName">INNOVATION SUMMIT 2026</h1>
+
+    <!-- Countdown display -->
+    <div class="countdown-container">
+      <div class="countdown-unit">
+        <div class="countdown-box">
+          <span class="countdown-number" data-editable="true" data-field="countdownDays">42</span>
+        </div>
+        <span class="countdown-label">Days</span>
+      </div>
+      <div class="countdown-unit">
+        <div class="countdown-box">
+          <span class="countdown-number" data-editable="true" data-field="countdownHours">08</span>
+        </div>
+        <span class="countdown-label">Hours</span>
+      </div>
+      <div class="countdown-unit">
+        <div class="countdown-box">
+          <span class="countdown-number" data-editable="true" data-field="countdownMinutes">15</span>
+        </div>
+        <span class="countdown-label">Minutes</span>
+      </div>
+      <div class="countdown-unit">
+        <div class="countdown-box">
+          <span class="countdown-number" data-editable="true" data-field="countdownSeconds">30</span>
+        </div>
+        <span class="countdown-label">Seconds</span>
+      </div>
+    </div>
+
+    <!-- Event date row -->
+    <div class="event-date-row">
+      <span class="event-date" data-editable="true" data-field="eventDate">APRIL 22-23, 2026</span>
+      <span class="date-separator"></span>
+      <span class="event-venue" data-editable="true" data-field="eventVenue">Grand Pavilion, San Francisco</span>
+    </div>
+
+    <!-- Bottom CTA -->
+    <div class="bottom-cta">
+      <span class="cta-text" data-editable="true" data-field="ctaText">Don't miss out &mdash; Register today</span>
+      <span class="cta-url" data-editable="true" data-field="ctaUrl">innovationsummit.io/register</span>
+    </div>
+  </div>
+
+  <!-- Bottom stripe -->
+  <div class="stripe-bottom"></div>
+</body>
+</html>

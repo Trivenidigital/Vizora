@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(ellipse at 50% 0%, rgba(220, 38, 38, 0.12) 0%, transparent 50%),
+        radial-gradient(ellipse at 30% 80%, rgba(217, 170, 83, 0.08) 0%, transparent 40%),
+        radial-gradient(ellipse at 80% 60%, rgba(220, 38, 38, 0.06) 0%, transparent 40%),
+        linear-gradient(175deg, #0a0a0a 0%, #141414 30%, #1a1a1a 50%, #0a0a0a 100%);
+      color: #e5e5e5;
+    }
+
+    /* Fine noise texture */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image: radial-gradient(circle, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+      background-size: 16px 16px;
+      z-index: 0;
+    }
+
+    /* Spotlight effect */
+    .spotlight {
+      position: absolute;
+      top: -200px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 800px;
+      height: 600px;
+      background: radial-gradient(ellipse, rgba(220, 38, 38, 0.08) 0%, transparent 70%);
+      filter: blur(40px);
+      z-index: 0;
+    }
+
+    /* Glowing side accents */
+    .side-glow-left {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      transform: translateY(-50%);
+      width: 8px;
+      height: 400px;
+      background: linear-gradient(to bottom, transparent, rgba(220, 38, 38, 0.4), transparent);
+      box-shadow: 0 0 30px rgba(220, 38, 38, 0.2);
+      z-index: 1;
+    }
+
+    .side-glow-right {
+      position: absolute;
+      top: 50%;
+      right: 0;
+      transform: translateY(-50%);
+      width: 8px;
+      height: 400px;
+      background: linear-gradient(to bottom, transparent, rgba(217, 170, 83, 0.4), transparent);
+      box-shadow: 0 0 30px rgba(217, 170, 83, 0.2);
+      z-index: 1;
+    }
+
+    /* Ornamental curtain stripes */
+    .curtain-stripe {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      z-index: 0;
+    }
+
+    .curtain-stripe-1 { left: 40px; background: linear-gradient(to bottom, rgba(220, 38, 38, 0.1), transparent 30%); }
+    .curtain-stripe-2 { left: 50px; background: linear-gradient(to bottom, rgba(217, 170, 83, 0.08), transparent 25%); }
+    .curtain-stripe-3 { right: 40px; background: linear-gradient(to bottom, rgba(220, 38, 38, 0.1), transparent 30%); }
+    .curtain-stripe-4 { right: 50px; background: linear-gradient(to bottom, rgba(217, 170, 83, 0.08), transparent 25%); }
+
+    .container {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      height: 100%;
+      padding: 50px 80px;
+      gap: 40px;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .cinema-emoji {
+      font-size: 60px;
+      filter: drop-shadow(0 4px 12px rgba(220, 38, 38, 0.3));
+    }
+
+    .header-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 72px;
+      color: #dc2626;
+      letter-spacing: 6px;
+      text-shadow: 0 0 20px rgba(220, 38, 38, 0.3);
+    }
+
+    .header-venue {
+      font-family: 'Playfair Display', serif;
+      font-size: 24px;
+      font-weight: 600;
+      color: #d9aa53;
+      letter-spacing: 2px;
+    }
+
+    .header-right {
+      text-align: right;
+    }
+
+    .header-date {
+      font-family: 'Inter', sans-serif;
+      font-size: 18px;
+      color: #737373;
+    }
+
+    /* Movies grid */
+    .movies-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 30px;
+      align-items: stretch;
+    }
+
+    .movie-card {
+      background: rgba(26, 26, 26, 0.8);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 20px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow:
+        0 8px 40px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    }
+
+    /* Poster placeholder */
+    .movie-poster {
+      height: 320px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .movie-poster-1 { background: linear-gradient(135deg, #1e3a5f, #2d1b4e); }
+    .movie-poster-2 { background: linear-gradient(135deg, #3b1d1d, #4a2c14); }
+    .movie-poster-3 { background: linear-gradient(135deg, #1a3a2a, #0f2b3d); }
+    .movie-poster-4 { background: linear-gradient(135deg, #2d1052, #1e3a5f); }
+
+    .movie-poster-emoji {
+      font-size: 100px;
+      filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.4));
+    }
+
+    .movie-rating-badge {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: rgba(220, 38, 38, 0.9);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 16px;
+      color: #ffffff;
+      letter-spacing: 1px;
+    }
+
+    .movie-info {
+      padding: 24px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .movie-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 24px;
+      font-weight: 700;
+      color: #f5f5f5;
+      line-height: 1.2;
+    }
+
+    .movie-genre {
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      color: #737373;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    /* Star rating */
+    .movie-stars {
+      font-size: 20px;
+      letter-spacing: 2px;
+      filter: drop-shadow(0 1px 4px rgba(217, 170, 83, 0.3));
+    }
+
+    .movie-showtimes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: auto;
+    }
+
+    .showtime {
+      background: rgba(220, 38, 38, 0.1);
+      border: 1px solid rgba(220, 38, 38, 0.2);
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 18px;
+      color: #dc2626;
+      letter-spacing: 1px;
+    }
+
+    /* SVG film reel decoration */
+    .svg-reel {
+      position: absolute;
+      z-index: 1;
+      opacity: 0.06;
+    }
+
+    .svg-reel-left {
+      bottom: 30px;
+      left: 30px;
+    }
+
+    .svg-reel-right {
+      top: 30px;
+      right: 30px;
+    }
+
+    /* Bottom stripe */
+    .marquee-stripe {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 6px;
+      background: repeating-linear-gradient(
+        90deg,
+        #dc2626 0px,
+        #dc2626 20px,
+        #d9aa53 20px,
+        #d9aa53 40px,
+        #0a0a0a 40px,
+        #0a0a0a 50px
+      );
+      z-index: 3;
+    }
+
+    .marquee-stripe-top {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 6px;
+      background: repeating-linear-gradient(
+        90deg,
+        #dc2626 0px,
+        #dc2626 20px,
+        #d9aa53 20px,
+        #d9aa53 40px,
+        #0a0a0a 40px,
+        #0a0a0a 50px
+      );
+      z-index: 3;
+    }
+  </style>
+</head>
+<body>
+  <div class="spotlight"></div>
+  <div class="side-glow-left"></div>
+  <div class="side-glow-right"></div>
+  <div class="curtain-stripe curtain-stripe-1"></div>
+  <div class="curtain-stripe curtain-stripe-2"></div>
+  <div class="curtain-stripe curtain-stripe-3"></div>
+  <div class="curtain-stripe curtain-stripe-4"></div>
+  <div class="marquee-stripe"></div>
+  <div class="marquee-stripe-top"></div>
+
+  <!-- SVG film reels -->
+  <svg class="svg-reel svg-reel-left" width="120" height="120" viewBox="0 0 120 120" fill="none">
+    <circle cx="60" cy="60" r="55" stroke="#dc2626" stroke-width="2"/>
+    <circle cx="60" cy="60" r="40" stroke="#dc2626" stroke-width="1"/>
+    <circle cx="60" cy="60" r="12" fill="#dc2626"/>
+    <circle cx="60" cy="25" r="8" stroke="#dc2626" stroke-width="1.5" fill="none"/>
+    <circle cx="60" cy="95" r="8" stroke="#dc2626" stroke-width="1.5" fill="none"/>
+    <circle cx="25" cy="60" r="8" stroke="#dc2626" stroke-width="1.5" fill="none"/>
+    <circle cx="95" cy="60" r="8" stroke="#dc2626" stroke-width="1.5" fill="none"/>
+  </svg>
+
+  <svg class="svg-reel svg-reel-right" width="100" height="100" viewBox="0 0 100 100" fill="none">
+    <circle cx="50" cy="50" r="45" stroke="#d9aa53" stroke-width="1.5"/>
+    <circle cx="50" cy="50" r="32" stroke="#d9aa53" stroke-width="1"/>
+    <circle cx="50" cy="50" r="10" fill="#d9aa53"/>
+    <circle cx="50" cy="15" r="6" stroke="#d9aa53" stroke-width="1" fill="none"/>
+    <circle cx="50" cy="85" r="6" stroke="#d9aa53" stroke-width="1" fill="none"/>
+    <circle cx="15" cy="50" r="6" stroke="#d9aa53" stroke-width="1" fill="none"/>
+    <circle cx="85" cy="50" r="6" stroke="#d9aa53" stroke-width="1" fill="none"/>
+  </svg>
+
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <span class="cinema-emoji">🎬</span>
+        <div>
+          <div class="header-title" data-editable="true" data-field="headerTitle">Now Showing</div>
+          <div class="header-venue" data-editable="true" data-field="venueName">Grand Cinema Meridian</div>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="header-date" data-editable="true" data-field="showDate">Today &mdash; Wednesday, January 15</div>
+      </div>
+    </div>
+
+    <!-- Movies -->
+    <div class="movies-grid">
+      <!-- Movie 1 -->
+      <div class="movie-card">
+        <div class="movie-poster movie-poster-1">
+          <span class="movie-poster-emoji">🚀</span>
+          <div class="movie-rating-badge" data-editable="true" data-field="movie1Rating">PG-13</div>
+        </div>
+        <div class="movie-info">
+          <div class="movie-title" data-editable="true" data-field="movie1Title">Stellar Odyssey</div>
+          <div class="movie-genre" data-editable="true" data-field="movie1Genre">Sci-Fi &middot; Adventure</div>
+          <div class="movie-stars">⭐⭐⭐⭐⭐</div>
+          <div class="movie-showtimes">
+            <span class="showtime" data-editable="true" data-field="movie1Time1">2:00 PM</span>
+            <span class="showtime" data-editable="true" data-field="movie1Time2">5:30 PM</span>
+            <span class="showtime" data-editable="true" data-field="movie1Time3">9:00 PM</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Movie 2 -->
+      <div class="movie-card">
+        <div class="movie-poster movie-poster-2">
+          <span class="movie-poster-emoji">🗡️</span>
+          <div class="movie-rating-badge" data-editable="true" data-field="movie2Rating">R</div>
+        </div>
+        <div class="movie-info">
+          <div class="movie-title" data-editable="true" data-field="movie2Title">The Last Kingdom</div>
+          <div class="movie-genre" data-editable="true" data-field="movie2Genre">Drama &middot; Historical</div>
+          <div class="movie-stars">⭐⭐⭐⭐</div>
+          <div class="movie-showtimes">
+            <span class="showtime" data-editable="true" data-field="movie2Time1">1:30 PM</span>
+            <span class="showtime" data-editable="true" data-field="movie2Time2">6:00 PM</span>
+            <span class="showtime" data-editable="true" data-field="movie2Time3">9:30 PM</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Movie 3 -->
+      <div class="movie-card">
+        <div class="movie-poster movie-poster-3">
+          <span class="movie-poster-emoji">🌊</span>
+          <div class="movie-rating-badge" data-editable="true" data-field="movie3Rating">PG</div>
+        </div>
+        <div class="movie-info">
+          <div class="movie-title" data-editable="true" data-field="movie3Title">Ocean's Whisper</div>
+          <div class="movie-genre" data-editable="true" data-field="movie3Genre">Animation &middot; Family</div>
+          <div class="movie-stars">⭐⭐⭐⭐⭐</div>
+          <div class="movie-showtimes">
+            <span class="showtime" data-editable="true" data-field="movie3Time1">12:00 PM</span>
+            <span class="showtime" data-editable="true" data-field="movie3Time2">3:30 PM</span>
+            <span class="showtime" data-editable="true" data-field="movie3Time3">7:00 PM</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Movie 4 -->
+      <div class="movie-card">
+        <div class="movie-poster movie-poster-4">
+          <span class="movie-poster-emoji">🔮</span>
+          <div class="movie-rating-badge" data-editable="true" data-field="movie4Rating">PG-13</div>
+        </div>
+        <div class="movie-info">
+          <div class="movie-title" data-editable="true" data-field="movie4Title">Midnight Enchant</div>
+          <div class="movie-genre" data-editable="true" data-field="movie4Genre">Fantasy &middot; Thriller</div>
+          <div class="movie-stars">⭐⭐⭐⭐</div>
+          <div class="movie-showtimes">
+            <span class="showtime" data-editable="true" data-field="movie4Time1">4:00 PM</span>
+            <span class="showtime" data-editable="true" data-field="movie4Time2">7:30 PM</span>
+            <span class="showtime" data-editable="true" data-field="movie4Time3">10:30 PM</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

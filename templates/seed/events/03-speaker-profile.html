@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800;900&family=Inter:wght@400;500;600;700&family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(ellipse at 30% 40%, rgba(212, 175, 55, 0.15) 0%, transparent 55%),
+        radial-gradient(ellipse at 75% 70%, rgba(168, 85, 247, 0.12) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 100%, rgba(212, 175, 55, 0.08) 0%, transparent 40%),
+        linear-gradient(150deg, #0c0a1a 0%, #1a1333 35%, #0f0d1f 65%, #0c0a1a 100%);
+      color: #f0ece2;
+    }
+
+    /* Dot grid texture */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image: radial-gradient(circle, rgba(212, 175, 55, 0.04) 1px, transparent 1px);
+      background-size: 28px 28px;
+      z-index: 0;
+    }
+
+    /* Gold accent stripes at top */
+    body::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 5px;
+      background: linear-gradient(90deg, transparent, #d4af37, #f0d060, #d4af37, transparent);
+      z-index: 3;
+    }
+
+    /* Decorative glowing orbs */
+    .glow-gold {
+      position: absolute;
+      top: 200px;
+      left: 350px;
+      width: 400px;
+      height: 400px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(212, 175, 55, 0.2) 0%, transparent 70%);
+      filter: blur(60px);
+      z-index: 0;
+    }
+
+    .glow-purple {
+      position: absolute;
+      bottom: 100px;
+      right: 200px;
+      width: 300px;
+      height: 300px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(168, 85, 247, 0.2) 0%, transparent 70%);
+      filter: blur(45px);
+      z-index: 0;
+    }
+
+    .glow-warm {
+      position: absolute;
+      top: 50px;
+      right: 500px;
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(244, 196, 48, 0.15) 0%, transparent 70%);
+      filter: blur(30px);
+      z-index: 0;
+    }
+
+    /* Ornamental gold lines */
+    .orn-line-left {
+      position: absolute;
+      top: 120px;
+      left: 80px;
+      bottom: 120px;
+      width: 1px;
+      background: linear-gradient(180deg, transparent, rgba(212, 175, 55, 0.4), transparent);
+      z-index: 1;
+    }
+
+    .orn-line-right {
+      position: absolute;
+      top: 120px;
+      right: 80px;
+      bottom: 120px;
+      width: 1px;
+      background: linear-gradient(180deg, transparent, rgba(212, 175, 55, 0.4), transparent);
+      z-index: 1;
+    }
+
+    /* Main layout grid */
+    .layout {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: 650px 1fr;
+      grid-template-rows: auto 1fr auto;
+      height: 100%;
+      padding: 80px 120px;
+      gap: 60px;
+    }
+
+    /* Top label */
+    .top-label {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .speaker-label {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 6px;
+      text-transform: uppercase;
+      color: #d4af37;
+    }
+
+    .label-line {
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, rgba(212, 175, 55, 0.5), transparent);
+    }
+
+    /* Profile area (left column) */
+    .profile-area {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 30px;
+    }
+
+    /* Profile circle placeholder */
+    .profile-circle-wrapper {
+      position: relative;
+      width: 380px;
+      height: 380px;
+    }
+
+    .profile-circle {
+      width: 380px;
+      height: 380px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(212, 175, 55, 0.15), rgba(168, 85, 247, 0.1));
+      border: 3px solid rgba(212, 175, 55, 0.4);
+      box-shadow:
+        0 0 60px rgba(212, 175, 55, 0.15),
+        0 20px 60px rgba(0, 0, 0, 0.4),
+        inset 0 0 80px rgba(212, 175, 55, 0.05);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .profile-placeholder {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 600;
+      font-size: 16px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: rgba(212, 175, 55, 0.5);
+    }
+
+    /* Decorative ring around profile */
+    .profile-ring {
+      position: absolute;
+      top: -15px;
+      left: -15px;
+      width: 410px;
+      height: 410px;
+      border-radius: 50%;
+      border: 1px solid rgba(212, 175, 55, 0.2);
+    }
+
+    .profile-ring-2 {
+      position: absolute;
+      top: -30px;
+      left: -30px;
+      width: 440px;
+      height: 440px;
+      border-radius: 50%;
+      border: 1px dashed rgba(212, 175, 55, 0.1);
+    }
+
+    .speaker-company {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 600;
+      font-size: 18px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: rgba(212, 175, 55, 0.8);
+    }
+
+    /* Bio area (right column) */
+    .bio-area {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 28px;
+    }
+
+    .speaker-name {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 72px;
+      line-height: 1.1;
+      color: #f0ece2;
+      text-shadow: 0 2px 20px rgba(0,0,0,0.4);
+    }
+
+    .speaker-title {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      font-size: 22px;
+      color: rgba(212, 175, 55, 0.9);
+    }
+
+    .talk-title-label {
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: rgba(168, 85, 247, 0.8);
+      margin-bottom: -16px;
+    }
+
+    .talk-title {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 36px;
+      font-style: italic;
+      line-height: 1.3;
+      color: rgba(240, 236, 226, 0.95);
+    }
+
+    .speaker-bio {
+      font-family: 'Inter', sans-serif;
+      font-size: 20px;
+      font-weight: 400;
+      line-height: 1.8;
+      color: rgba(240, 236, 226, 0.65);
+      max-width: 680px;
+    }
+
+    /* Credentials pills */
+    .credentials {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .credential-pill {
+      background: rgba(212, 175, 55, 0.1);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(212, 175, 55, 0.25);
+      border-radius: 30px;
+      padding: 10px 24px;
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 14px;
+      color: rgba(212, 175, 55, 0.9);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Bottom info bar */
+    .bottom-bar {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .event-info {
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+      font-size: 18px;
+      color: rgba(240, 236, 226, 0.5);
+    }
+
+    .event-logo-text {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 800;
+      font-size: 20px;
+      color: rgba(212, 175, 55, 0.7);
+      letter-spacing: 3px;
+    }
+
+    /* SVG decorations */
+    .svg-star {
+      position: absolute;
+      z-index: 1;
+    }
+
+    /* Emoji decorations */
+    .emoji-star {
+      position: absolute;
+      font-size: 120px;
+      filter: drop-shadow(0 0 25px rgba(212, 175, 55, 0.4));
+      z-index: 1;
+      top: 60px;
+      right: 140px;
+      opacity: 0.3;
+    }
+
+    /* Gold stripe bottom */
+    .gold-stripe {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, transparent, #d4af37, #f0d060, #d4af37, transparent);
+      z-index: 3;
+    }
+  </style>
+</head>
+<body>
+  <!-- Glowing orbs -->
+  <div class="glow-gold"></div>
+  <div class="glow-purple"></div>
+  <div class="glow-warm"></div>
+
+  <!-- Ornamental lines -->
+  <div class="orn-line-left"></div>
+  <div class="orn-line-right"></div>
+
+  <!-- SVG star decoration -->
+  <svg class="svg-star" style="top:100px; left:130px;" width="40" height="40" viewBox="0 0 40 40" fill="none">
+    <path d="M20 0 L22 16 L40 20 L22 22 L20 40 L18 22 L0 20 L18 16 Z" fill="rgba(212,175,55,0.3)"/>
+  </svg>
+  <svg class="svg-star" style="bottom:150px; right:150px;" width="30" height="30" viewBox="0 0 30 30" fill="none">
+    <path d="M15 0 L17 12 L30 15 L17 17 L15 30 L13 17 L0 15 L13 12 Z" fill="rgba(168,85,247,0.25)"/>
+  </svg>
+  <svg class="svg-star" style="top:300px; right:100px;" width="24" height="24" viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="2" fill="rgba(212,175,55,0.4)"/>
+    <circle cx="12" cy="12" r="8" stroke="rgba(212,175,55,0.15)" stroke-width="1" fill="none"/>
+    <circle cx="12" cy="12" r="11" stroke="rgba(212,175,55,0.08)" stroke-width="1" fill="none"/>
+  </svg>
+
+  <!-- Emoji decoration -->
+  <div class="emoji-star">&#11088;</div>
+
+  <!-- Main layout -->
+  <div class="layout">
+    <!-- Top label -->
+    <div class="top-label">
+      <span class="speaker-label" data-editable="true" data-field="sectionLabel">Featured Speaker</span>
+      <span class="label-line"></span>
+    </div>
+
+    <!-- Profile area -->
+    <div class="profile-area">
+      <div class="profile-circle-wrapper">
+        <div class="profile-ring-2"></div>
+        <div class="profile-ring"></div>
+        <div class="profile-circle">
+          <span class="profile-placeholder">Speaker Photo</span>
+        </div>
+      </div>
+      <span class="speaker-company" data-editable="true" data-field="speakerCompany">Nexawave Technologies</span>
+    </div>
+
+    <!-- Bio area -->
+    <div class="bio-area">
+      <h1 class="speaker-name" data-editable="true" data-field="speakerName">Dr. Sarah<br>Chen</h1>
+      <p class="speaker-title" data-editable="true" data-field="speakerTitle">Chief Technology Officer &amp; Co-Founder</p>
+      <span class="talk-title-label">Presenting</span>
+      <p class="talk-title" data-editable="true" data-field="talkTitle">"Building the Next Generation of Intelligent Systems"</p>
+      <p class="speaker-bio" data-editable="true" data-field="speakerBio">With over 15 years in AI research and distributed systems, Dr. Chen has led teams at Google Brain and MIT before co-founding Nexawave. Her work on neural architecture search has been cited over 12,000 times.</p>
+      <div class="credentials">
+        <span class="credential-pill" data-editable="true" data-field="credential1">MIT PhD, Computer Science</span>
+        <span class="credential-pill" data-editable="true" data-field="credential2">Forbes 40 Under 40</span>
+        <span class="credential-pill" data-editable="true" data-field="credential3">3x Best Paper Award</span>
+      </div>
+    </div>
+
+    <!-- Bottom bar -->
+    <div class="bottom-bar">
+      <span class="event-info" data-editable="true" data-field="eventInfo">Main Stage &bull; April 22, 2026 &bull; 9:00 AM</span>
+      <span class="event-logo-text" data-editable="true" data-field="eventName">DEVFORWARD 2026</span>
+    </div>
+  </div>
+
+  <!-- Gold stripe bottom -->
+  <div class="gold-stripe"></div>
+</body>
+</html>

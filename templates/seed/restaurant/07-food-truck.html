@@ -3,399 +3,316 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1080, height=1920">
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Roboto+Condensed:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700;800&family=Barlow:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       width: 1080px;
       height: 1920px;
       overflow: hidden;
-      font-family: 'Roboto Condensed', 'Arial Narrow', Arial, sans-serif;
-      color: #ffffff;
+      position: relative;
+      font-family: 'Inter', sans-serif;
       background:
-        /* Grunge noise texture */
         repeating-linear-gradient(
-          45deg,
+          -45deg,
           transparent,
-          transparent 2px,
-          rgba(0,0,0,0.04) 2px,
-          rgba(0,0,0,0.04) 4px
+          transparent 30px,
+          rgba(255,60,40,0.04) 30px,
+          rgba(255,60,40,0.04) 32px
         ),
-        repeating-linear-gradient(
-          -30deg,
-          transparent,
-          transparent 3px,
-          rgba(255,215,0,0.02) 3px,
-          rgba(255,215,0,0.02) 5px
-        ),
-        repeating-linear-gradient(
-          90deg,
-          transparent,
-          transparent 6px,
-          rgba(0,0,0,0.03) 6px,
-          rgba(0,0,0,0.03) 8px
-        ),
-        linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%);
+        radial-gradient(ellipse at 50% 20%, rgba(255,200,0,0.12) 0%, transparent 50%),
+        radial-gradient(ellipse at 20% 80%, rgba(255,60,40,0.08) 0%, transparent 50%),
+        linear-gradient(180deg, #1a1a2e 0%, #16132b 50%, #0f0d20 100%);
+      color: #f0ece4;
     }
 
-    /* Top flame accent bar */
+    /* Grunge overlay texture */
     body::before {
       content: '';
       position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 12px;
-      background: linear-gradient(90deg, #ff3b30, #ffd700, #ff3b30, #ffd700, #ff3b30);
-      z-index: 10;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background:
+        radial-gradient(circle, rgba(255,255,255,0.02) 1px, transparent 1px),
+        radial-gradient(circle, rgba(255,255,255,0.015) 1px, transparent 1px);
+      background-size: 16px 16px, 25px 25px;
+      background-position: 0 0, 8px 8px;
+      pointer-events: none;
+      z-index: 0;
     }
 
-    /* Bottom flame accent bar */
-    body::after {
-      content: '';
+    /* Bright glow spots */
+    .glow-yellow {
       position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 12px;
-      background: linear-gradient(90deg, #ffd700, #ff3b30, #ffd700, #ff3b30, #ffd700);
-      z-index: 10;
+      top: -100px; left: 50%;
+      transform: translateX(-50%);
+      width: 700px; height: 500px;
+      background: radial-gradient(ellipse, rgba(255,200,0,0.15) 0%, transparent 60%);
+      z-index: 1;
+    }
+    .glow-red {
+      position: absolute;
+      bottom: 200px; left: -100px;
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(255,60,40,0.1) 0%, transparent 60%);
+      border-radius: 50%;
+      z-index: 1;
+    }
+    .glow-blue {
+      position: absolute;
+      bottom: -100px; right: -50px;
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, rgba(50,150,255,0.06) 0%, transparent 60%);
+      border-radius: 50%;
+      z-index: 1;
     }
 
     .container {
-      width: 100%;
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
       height: 100%;
-      display: flex;
-      flex-direction: column;
-      padding: 24px 48px;
+      padding: 50px 40px;
+      gap: 30px;
     }
 
-    /* ---- HEADER ---- */
+    /* Header section */
     .header {
       text-align: center;
-      padding: 28px 0 20px;
     }
 
-    .fire-emoji-top {
-      font-size: 52px;
-      letter-spacing: 12px;
-      display: block;
-      margin-bottom: 4px;
+    .truck-emoji {
+      font-size: 100px;
+      filter: drop-shadow(0 4px 20px rgba(255,200,0,0.3));
+      margin-bottom: 10px;
     }
 
     .truck-name {
-      font-family: 'Bebas Neue', 'Impact', sans-serif;
-      font-size: 120px;
-      line-height: 1;
-      color: #ffd700;
-      letter-spacing: 10px;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 96px;
+      color: #ffc800;
+      letter-spacing: 8px;
       text-shadow:
-        3px 3px 0 #ff3b30,
-        6px 6px 0 rgba(255,59,48,0.4);
+        0 0 30px rgba(255,200,0,0.4),
+        0 4px 20px rgba(0,0,0,0.5);
+      line-height: 0.9;
+      margin-bottom: 6px;
     }
 
-    .tagline {
-      font-family: 'Bebas Neue', 'Impact', sans-serif;
-      font-size: 44px;
-      color: #ff3b30;
-      letter-spacing: 16px;
-      margin-top: 2px;
+    .truck-tagline {
+      font-family: 'Barlow', sans-serif;
+      font-weight: 500;
+      font-size: 22px;
+      color: rgba(240,236,228,0.5);
+      letter-spacing: 8px;
+      text-transform: uppercase;
     }
 
-    .header-divider {
+    .header-line {
       width: 100%;
-      height: 6px;
-      margin: 20px 0;
-      background: repeating-linear-gradient(
-        90deg,
-        #ffd700,
-        #ffd700 20px,
-        transparent 20px,
-        transparent 28px
-      );
+      height: 3px;
+      background: linear-gradient(90deg, transparent, #ffc800, transparent);
+      margin-top: 20px;
     }
 
-    /* ---- COMBOS SECTION ---- */
-    .combos {
-      flex: 1;
+    /* Menu items */
+    .menu-list {
       display: flex;
       flex-direction: column;
       gap: 14px;
-      padding: 10px 0;
+      overflow: hidden;
     }
 
     .combo-item {
-      display: flex;
-      align-items: flex-start;
+      display: grid;
+      grid-template-columns: 80px 1fr auto;
       gap: 20px;
-      padding: 16px 20px;
-      background: linear-gradient(135deg, rgba(255,215,0,0.06) 0%, rgba(255,59,48,0.04) 100%);
-      border-left: 5px solid #ff3b30;
-      border-radius: 0 8px 8px 0;
+      align-items: center;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,200,0,0.1);
+      border-radius: 20px;
+      padding: 24px 28px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
     }
 
-    .combo-badge {
-      flex-shrink: 0;
-      width: 64px;
-      height: 64px;
-      background: #ff3b30;
+    .combo-number {
+      width: 70px;
+      height: 70px;
       border-radius: 50%;
+      background: linear-gradient(135deg, #ffc800, #ff8c00);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-family: 'Bebas Neue', 'Impact', sans-serif;
+      font-family: 'Bebas Neue', sans-serif;
       font-size: 36px;
-      color: #ffffff;
-      border: 3px solid #ffd700;
-      margin-top: 2px;
+      color: #1a1a2e;
+      box-shadow: 0 4px 15px rgba(255,200,0,0.3);
+      flex-shrink: 0;
     }
 
-    .combo-details {
-      flex: 1;
-    }
-
-    .combo-name-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      margin-bottom: 4px;
-    }
+    .combo-info { flex: 1; }
 
     .combo-name {
-      font-family: 'Bebas Neue', 'Impact', sans-serif;
-      font-size: 44px;
-      color: #ffd700;
-      letter-spacing: 2px;
-      line-height: 1.1;
-    }
-
-    .combo-price {
-      font-family: 'Bebas Neue', 'Impact', sans-serif;
-      font-size: 44px;
-      color: #ffffff;
+      font-family: 'Barlow', sans-serif;
+      font-weight: 800;
+      font-size: 32px;
+      color: #f0ece4;
+      text-transform: uppercase;
       letter-spacing: 1px;
-      flex-shrink: 0;
-      margin-left: 16px;
+      line-height: 1;
     }
 
     .combo-desc {
-      font-size: 28px;
-      color: #cccccc;
-      line-height: 1.3;
-      font-weight: 400;
-    }
-
-    /* ---- SIDES & DRINKS ---- */
-    .extras-row {
-      display: flex;
-      gap: 32px;
-      padding: 16px 0 8px;
-    }
-
-    .extras-col {
-      flex: 1;
-    }
-
-    .extras-title {
-      font-family: 'Bebas Neue', 'Impact', sans-serif;
-      font-size: 48px;
-      color: #ff3b30;
-      letter-spacing: 6px;
-      margin-bottom: 12px;
-      padding-bottom: 8px;
-      border-bottom: 3px solid rgba(255,215,0,0.3);
-    }
-
-    .extras-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      padding: 6px 0;
-      font-size: 30px;
-    }
-
-    .extras-item-name {
-      color: #ffffff;
-      font-weight: 700;
-    }
-
-    .extras-item-price {
-      color: #ffd700;
-      font-family: 'Bebas Neue', 'Impact', sans-serif;
-      font-size: 32px;
-      letter-spacing: 1px;
-    }
-
-    .extras-divider {
-      flex: 1;
-      border-bottom: 1px dashed rgba(255,255,255,0.15);
-      margin: 0 12px;
-      min-width: 20px;
-      align-self: center;
-      transform: translateY(-4px);
-    }
-
-    /* ---- BOTTOM CTA ---- */
-    .bottom-divider {
-      width: 100%;
-      height: 6px;
-      margin: 16px 0 12px;
-      background: repeating-linear-gradient(
-        90deg,
-        #ff3b30,
-        #ff3b30 20px,
-        transparent 20px,
-        transparent 28px
-      );
-    }
-
-    .order-cta {
-      text-align: center;
-      padding: 16px 0 24px;
-    }
-
-    .order-text {
-      font-family: 'Bebas Neue', 'Impact', sans-serif;
-      font-size: 72px;
-      color: #ffd700;
-      letter-spacing: 8px;
-      text-shadow: 2px 2px 0 #ff3b30;
-      animation: pulse-cta 2s ease-in-out infinite;
-    }
-
-    @keyframes pulse-cta {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.7; }
-    }
-
-    .cta-subtext {
-      font-size: 28px;
-      color: #999999;
-      letter-spacing: 4px;
+      font-family: 'Inter', sans-serif;
+      font-weight: 300;
+      font-size: 16px;
+      color: rgba(240,236,228,0.45);
       margin-top: 4px;
+      line-height: 1.3;
+    }
+
+    .combo-price {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 48px;
+      color: #ffc800;
+      text-shadow: 0 0 20px rgba(255,200,0,0.3);
+      white-space: nowrap;
+    }
+
+    /* Footer CTA */
+    .footer-cta {
+      text-align: center;
+    }
+
+    .order-arrow {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 60px;
+      color: #ffc800;
+      letter-spacing: 6px;
+      text-shadow: 0 0 30px rgba(255,200,0,0.4);
+    }
+
+    .social-handle {
+      font-family: 'Inter', sans-serif;
+      font-weight: 400;
+      font-size: 20px;
+      color: rgba(240,236,228,0.4);
+      letter-spacing: 3px;
+      margin-top: 8px;
+    }
+
+    /* SVG geometric decoration */
+    .geo-deco {
+      position: absolute;
+      z-index: 1;
+      opacity: 0.06;
+    }
+    .geo-1 { top: 50px; right: 30px; }
+    .geo-2 { bottom: 80px; left: 20px; transform: rotate(45deg); }
+
+    /* Side stripe accents */
+    .side-stripe-left {
+      position: absolute;
+      top: 0; left: 0;
+      width: 6px; height: 100%;
+      background: linear-gradient(180deg, #ffc800, #ff3c28, #ffc800);
+      z-index: 3;
+    }
+    .side-stripe-right {
+      position: absolute;
+      top: 0; right: 0;
+      width: 6px; height: 100%;
+      background: linear-gradient(180deg, #ffc800, #ff3c28, #ffc800);
+      z-index: 3;
     }
   </style>
 </head>
 <body>
+  <div class="glow-yellow"></div>
+  <div class="glow-red"></div>
+  <div class="glow-blue"></div>
+  <div class="side-stripe-left"></div>
+  <div class="side-stripe-right"></div>
+
+  <!-- SVG geometric decorations -->
+  <svg class="geo-deco geo-1" width="120" height="120" viewBox="0 0 120 120" fill="none" stroke="#ffc800" stroke-width="2">
+    <polygon points="60,5 115,90 5,90"/>
+    <polygon points="60,30 95,82 25,82"/>
+  </svg>
+  <svg class="geo-deco geo-2" width="100" height="100" viewBox="0 0 100 100" fill="none" stroke="#ff3c28" stroke-width="2">
+    <rect x="10" y="10" width="80" height="80"/>
+    <rect x="25" y="25" width="50" height="50"/>
+  </svg>
+
   <div class="container">
-
-    <!-- HEADER -->
     <div class="header">
-      <span class="fire-emoji-top" aria-hidden="true">🔥🔥🔥</span>
-      <div class="truck-name" data-editable="true" data-field="truck_name">BLAZE BITES</div>
-      <div class="tagline" data-editable="true" data-field="tagline">STREET EATS</div>
+      <div class="truck-emoji">&#128666;</div>
+      <h1 class="truck-name" data-editable="true" data-field="truckName">STREET EATS</h1>
+      <p class="truck-tagline" data-editable="true" data-field="tagline">Fresh from the grill</p>
+      <div class="header-line"></div>
     </div>
 
-    <div class="header-divider" aria-hidden="true"></div>
-
-    <!-- COMBO ITEMS -->
-    <div class="combos">
-
+    <div class="menu-list">
       <div class="combo-item">
-        <div class="combo-badge">#1</div>
-        <div class="combo-details">
-          <div class="combo-name-row">
-            <span class="combo-name" data-editable="true" data-field="combo1_name">THE CLASSIC</span>
-            <span class="combo-price" data-editable="true" data-field="combo1_price">$9.50</span>
-          </div>
-          <div class="combo-desc" data-editable="true" data-field="combo1_desc">Double smash burger, American cheese, secret sauce, pickles</div>
+        <div class="combo-number">#1</div>
+        <div class="combo-info">
+          <div class="combo-name" data-editable="true" data-field="combo1Name">Classic Smash Burger</div>
+          <div class="combo-desc" data-editable="true" data-field="combo1Desc">Double patty, American cheese, pickles, special sauce, fries</div>
         </div>
+        <div class="combo-price" data-editable="true" data-field="combo1Price">$12</div>
       </div>
 
       <div class="combo-item">
-        <div class="combo-badge">#2</div>
-        <div class="combo-details">
-          <div class="combo-name-row">
-            <span class="combo-name" data-editable="true" data-field="combo2_name">LOADED FRIES</span>
-            <span class="combo-price" data-editable="true" data-field="combo2_price">$7.00</span>
-          </div>
-          <div class="combo-desc" data-editable="true" data-field="combo2_desc">Cheese sauce, bacon bits, jalape&ntilde;os, sour cream</div>
+        <div class="combo-number">#2</div>
+        <div class="combo-info">
+          <div class="combo-name" data-editable="true" data-field="combo2Name">Korean BBQ Tacos</div>
+          <div class="combo-desc" data-editable="true" data-field="combo2Desc">Bulgogi beef, kimchi slaw, gochujang mayo, three tacos</div>
         </div>
+        <div class="combo-price" data-editable="true" data-field="combo2Price">$14</div>
       </div>
 
       <div class="combo-item">
-        <div class="combo-badge">#3</div>
-        <div class="combo-details">
-          <div class="combo-name-row">
-            <span class="combo-name" data-editable="true" data-field="combo3_name">CRISPY CHICKEN</span>
-            <span class="combo-price" data-editable="true" data-field="combo3_price">$10.50</span>
-          </div>
-          <div class="combo-desc" data-editable="true" data-field="combo3_desc">Fried chicken sandwich, slaw, spicy mayo, brioche bun</div>
+        <div class="combo-number">#3</div>
+        <div class="combo-info">
+          <div class="combo-name" data-editable="true" data-field="combo3Name">Nashville Hot Chicken</div>
+          <div class="combo-desc" data-editable="true" data-field="combo3Desc">Spicy fried chicken, coleslaw, pickles, brioche bun, fries</div>
         </div>
+        <div class="combo-price" data-editable="true" data-field="combo3Price">$15</div>
       </div>
 
       <div class="combo-item">
-        <div class="combo-badge">#4</div>
-        <div class="combo-details">
-          <div class="combo-name-row">
-            <span class="combo-name" data-editable="true" data-field="combo4_name">STREET TACOS (3)</span>
-            <span class="combo-price" data-editable="true" data-field="combo4_price">$11.00</span>
-          </div>
-          <div class="combo-desc" data-editable="true" data-field="combo4_desc">Carne asada, cilantro, onion, lime, corn tortillas</div>
+        <div class="combo-number">#4</div>
+        <div class="combo-info">
+          <div class="combo-name" data-editable="true" data-field="combo4Name">Loaded Fries</div>
+          <div class="combo-desc" data-editable="true" data-field="combo4Desc">Crispy fries, cheese sauce, bacon bits, jalapenos, sour cream</div>
         </div>
+        <div class="combo-price" data-editable="true" data-field="combo4Price">$10</div>
       </div>
 
       <div class="combo-item">
-        <div class="combo-badge">#5</div>
-        <div class="combo-details">
-          <div class="combo-name-row">
-            <span class="combo-name" data-editable="true" data-field="combo5_name">VEGGIE WRAP</span>
-            <span class="combo-price" data-editable="true" data-field="combo5_price">$8.50</span>
-          </div>
-          <div class="combo-desc" data-editable="true" data-field="combo5_desc">Grilled veggies, hummus, feta, spinach tortilla</div>
+        <div class="combo-number">#5</div>
+        <div class="combo-info">
+          <div class="combo-name" data-editable="true" data-field="combo5Name">Fish and Chips</div>
+          <div class="combo-desc" data-editable="true" data-field="combo5Desc">Beer-battered cod, hand-cut fries, tartar sauce, lemon</div>
         </div>
+        <div class="combo-price" data-editable="true" data-field="combo5Price">$13</div>
       </div>
 
-    </div>
-
-    <!-- SIDES & DRINKS -->
-    <div class="extras-row">
-      <div class="extras-col">
-        <div class="extras-title" data-editable="true" data-field="sides_title">SIDES</div>
-        <div class="extras-item">
-          <span class="extras-item-name" data-editable="true" data-field="side1_name">Regular Fries</span>
-          <span class="extras-divider"></span>
-          <span class="extras-item-price" data-editable="true" data-field="side1_price">$4.00</span>
+      <div class="combo-item">
+        <div class="combo-number">#6</div>
+        <div class="combo-info">
+          <div class="combo-name" data-editable="true" data-field="combo6Name">Veggie Wrap</div>
+          <div class="combo-desc" data-editable="true" data-field="combo6Desc">Grilled halloumi, roasted veg, hummus, arugula, whole wheat</div>
         </div>
-        <div class="extras-item">
-          <span class="extras-item-name" data-editable="true" data-field="side2_name">Onion Rings</span>
-          <span class="extras-divider"></span>
-          <span class="extras-item-price" data-editable="true" data-field="side2_price">$5.00</span>
-        </div>
-        <div class="extras-item">
-          <span class="extras-item-name" data-editable="true" data-field="side3_name">Mac &amp; Cheese</span>
-          <span class="extras-divider"></span>
-          <span class="extras-item-price" data-editable="true" data-field="side3_price">$5.50</span>
-        </div>
-      </div>
-      <div class="extras-col">
-        <div class="extras-title" data-editable="true" data-field="drinks_title">DRINKS</div>
-        <div class="extras-item">
-          <span class="extras-item-name" data-editable="true" data-field="drink1_name">Fountain Soda</span>
-          <span class="extras-divider"></span>
-          <span class="extras-item-price" data-editable="true" data-field="drink1_price">$2.50</span>
-        </div>
-        <div class="extras-item">
-          <span class="extras-item-name" data-editable="true" data-field="drink2_name">Fresh Lemonade</span>
-          <span class="extras-divider"></span>
-          <span class="extras-item-price" data-editable="true" data-field="drink2_price">$4.00</span>
-        </div>
-        <div class="extras-item">
-          <span class="extras-item-name" data-editable="true" data-field="drink3_name">Bottled Water</span>
-          <span class="extras-divider"></span>
-          <span class="extras-item-price" data-editable="true" data-field="drink3_price">$2.00</span>
-        </div>
+        <div class="combo-price" data-editable="true" data-field="combo6Price">$11</div>
       </div>
     </div>
 
-    <div class="bottom-divider" aria-hidden="true"></div>
-
-    <!-- ORDER CTA -->
-    <div class="order-cta">
-      <div class="order-text" data-editable="true" data-field="cta_text">ORDER HERE &rarr;</div>
-      <div class="cta-subtext" data-editable="true" data-field="cta_subtext">CASH &amp; CARD ACCEPTED</div>
+    <div class="footer-cta">
+      <div class="order-arrow" data-editable="true" data-field="ctaText">ORDER HERE &#10148;</div>
+      <div class="social-handle" data-editable="true" data-field="social">@STREETEATS</div>
     </div>
-
   </div>
 </body>
 </html>

@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>Training Schedule</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            width: 1920px;
+            height: 1080px;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+            background:
+                radial-gradient(ellipse at 50% 0%, rgba(37, 99, 235, 0.06) 0%, transparent 50%),
+                radial-gradient(ellipse at 0% 100%, rgba(16, 185, 129, 0.04) 0%, transparent 40%),
+                linear-gradient(180deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%);
+            color: #1e293b;
+            position: relative;
+        }
+
+        /* Dot grid */
+        body::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image: radial-gradient(circle, rgba(100, 116, 139, 0.08) 1px, transparent 1px);
+            background-size: 32px 32px;
+            z-index: 0;
+        }
+
+        /* Decorative color bar */
+        .top-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: linear-gradient(90deg, #2563eb, #6366f1, #8b5cf6, #ec4899, #10b981);
+            z-index: 2;
+        }
+
+        /* Ornamental line */
+        .orn-line {
+            position: absolute;
+            bottom: 80px;
+            left: 60px;
+            right: 60px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(37, 99, 235, 0.15) 20%, rgba(37, 99, 235, 0.15) 80%, transparent);
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            height: 100%;
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            padding: 32px 60px 24px;
+            gap: 24px;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .header-emoji {
+            font-size: 44px;
+            filter: drop-shadow(0 3px 8px rgba(37, 99, 235, 0.2));
+        }
+
+        .header-title {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 34px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .header-subtitle {
+            font-family: 'Inter', sans-serif;
+            font-size: 16px;
+            color: #64748b;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .week-badge {
+            padding: 10px 24px;
+            background: linear-gradient(135deg, #2563eb, #3b82f6);
+            border-radius: 12px;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 15px;
+            font-weight: 700;
+            color: white;
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+        }
+
+        /* Weekly grid */
+        .schedule-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 16px;
+        }
+
+        .day-column {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .day-header {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(226, 232, 240, 0.6);
+            border-radius: 14px;
+            padding: 16px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+        }
+
+        .day-name {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            color: #0f172a;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .day-date {
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            color: #94a3b8;
+            margin-top: 4px;
+        }
+
+        .session-card {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(226, 232, 240, 0.5);
+            border-radius: 14px;
+            padding: 18px;
+            box-shadow:
+                0 2px 12px rgba(0, 0, 0, 0.04),
+                0 1px 3px rgba(0, 0, 0, 0.02);
+            position: relative;
+            overflow: hidden;
+            flex: 1;
+        }
+
+        .session-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+        }
+
+        .session-tech::before { background: linear-gradient(90deg, #2563eb, #3b82f6); }
+        .session-soft::before { background: linear-gradient(90deg, #ec4899, #f472b6); }
+        .session-safety::before { background: linear-gradient(90deg, #10b981, #34d399); }
+        .session-leadership::before { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+        .session-wellness::before { background: linear-gradient(90deg, #8b5cf6, #a78bfa); }
+
+        .session-time {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .session-tech .session-time { color: #2563eb; }
+        .session-soft .session-time { color: #ec4899; }
+        .session-safety .session-time { color: #10b981; }
+        .session-leadership .session-time { color: #d97706; }
+        .session-wellness .session-time { color: #8b5cf6; }
+
+        .session-title {
+            font-family: 'Inter', sans-serif;
+            font-size: 15px;
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 10px;
+            line-height: 1.3;
+        }
+
+        .session-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .session-detail {
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            color: #64748b;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .session-detail-icon {
+            font-size: 12px;
+        }
+
+        .session-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 6px;
+            font-family: 'Inter', sans-serif;
+            font-size: 11px;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+
+        .badge-tech { background: rgba(37, 99, 235, 0.08); color: #2563eb; }
+        .badge-soft { background: rgba(236, 72, 153, 0.08); color: #ec4899; }
+        .badge-safety { background: rgba(16, 185, 129, 0.08); color: #10b981; }
+        .badge-leadership { background: rgba(245, 158, 11, 0.08); color: #d97706; }
+        .badge-wellness { background: rgba(139, 92, 246, 0.08); color: #8b5cf6; }
+
+        /* Footer */
+        .footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .legend {
+            display: flex;
+            gap: 24px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            color: #64748b;
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 3px;
+        }
+
+        .dot-tech { background: #2563eb; }
+        .dot-soft { background: #ec4899; }
+        .dot-safety { background: #10b981; }
+        .dot-leadership { background: #f59e0b; }
+        .dot-wellness { background: #8b5cf6; }
+
+        .footer-info {
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            color: #94a3b8;
+        }
+
+        /* SVG decoration */
+        .deco-svg { position: absolute; z-index: 0; }
+    </style>
+</head>
+<body>
+    <div class="top-bar"></div>
+    <div class="orn-line"></div>
+
+    <!-- Decorative SVG book -->
+    <svg class="deco-svg" style="bottom:20px;right:40px;opacity:0.04;" width="180" height="160" viewBox="0 0 180 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M90 20 C60 10, 20 15, 10 30 L10 140 C20 125, 60 120, 90 130" stroke="#2563eb" stroke-width="2" fill="none"/>
+        <path d="M90 20 C120 10, 160 15, 170 30 L170 140 C160 125, 120 120, 90 130" stroke="#2563eb" stroke-width="2" fill="none"/>
+        <line x1="90" y1="20" x2="90" y2="130" stroke="#2563eb" stroke-width="1.5"/>
+        <path d="M40 50 L75 50" stroke="rgba(37,99,235,0.3)" stroke-width="1"/>
+        <path d="M40 65 L70 65" stroke="rgba(37,99,235,0.2)" stroke-width="1"/>
+        <path d="M105 50 L140 50" stroke="rgba(37,99,235,0.3)" stroke-width="1"/>
+        <path d="M110 65 L145 65" stroke="rgba(37,99,235,0.2)" stroke-width="1"/>
+    </svg>
+
+    <!-- Corner SVG ornament -->
+    <svg class="deco-svg" style="top:20px;right:40px;" width="60" height="60" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M60 0 L60 60" stroke="rgba(37,99,235,0.1)" stroke-width="1"/>
+        <path d="M0 0 L60 0" stroke="rgba(37,99,235,0.1)" stroke-width="1"/>
+        <circle cx="60" cy="0" r="3" fill="rgba(37,99,235,0.2)"/>
+    </svg>
+
+    <div class="container">
+        <div class="header">
+            <div class="header-left">
+                <span class="header-emoji">📚</span>
+                <div>
+                    <div class="header-title" data-editable="true" data-field="schedule-title">Training Schedule</div>
+                    <div class="header-subtitle" data-editable="true" data-field="schedule-subtitle">Professional Development & Learning Programs</div>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="week-badge" data-editable="true" data-field="week-label">Week of March 2 - 6, 2026</div>
+            </div>
+        </div>
+
+        <div class="schedule-grid">
+            <!-- Monday -->
+            <div class="day-column">
+                <div class="day-header">
+                    <div class="day-name" data-editable="true" data-field="day-1-name">Monday</div>
+                    <div class="day-date" data-editable="true" data-field="day-1-date">March 2</div>
+                </div>
+                <div class="session-card session-tech">
+                    <div class="session-time" data-editable="true" data-field="mon-1-time">9:00 - 11:00 AM</div>
+                    <div class="session-title" data-editable="true" data-field="mon-1-title">Cloud Architecture Fundamentals</div>
+                    <div class="session-meta">
+                        <div class="session-detail"><span class="session-detail-icon">👤</span> <span data-editable="true" data-field="mon-1-instructor">Dr. James Park</span></div>
+                        <div class="session-detail"><span class="session-detail-icon">📍</span> <span data-editable="true" data-field="mon-1-room">Room 301</span></div>
+                    </div>
+                    <span class="session-badge badge-tech">Technical</span>
+                </div>
+                <div class="session-card session-soft">
+                    <div class="session-time" data-editable="true" data-field="mon-2-time">2:00 - 3:30 PM</div>
+                    <div class="session-title" data-editable="true" data-field="mon-2-title">Effective Communication</div>
+                    <div class="session-meta">
+                        <div class="session-detail"><span class="session-detail-icon">👤</span> <span data-editable="true" data-field="mon-2-instructor">Lisa Chen</span></div>
+                        <div class="session-detail"><span class="session-detail-icon">📍</span> <span data-editable="true" data-field="mon-2-room">Room 205</span></div>
+                    </div>
+                    <span class="session-badge badge-soft">Soft Skills</span>
+                </div>
+            </div>
+
+            <!-- Tuesday -->
+            <div class="day-column">
+                <div class="day-header">
+                    <div class="day-name" data-editable="true" data-field="day-2-name">Tuesday</div>
+                    <div class="day-date" data-editable="true" data-field="day-2-date">March 3</div>
+                </div>
+                <div class="session-card session-safety">
+                    <div class="session-time" data-editable="true" data-field="tue-1-time">9:00 - 10:30 AM</div>
+                    <div class="session-title" data-editable="true" data-field="tue-1-title">Fire Safety & Evacuation Drill</div>
+                    <div class="session-meta">
+                        <div class="session-detail"><span class="session-detail-icon">👤</span> <span data-editable="true" data-field="tue-1-instructor">Mark Thompson</span></div>
+                        <div class="session-detail"><span class="session-detail-icon">📍</span> <span data-editable="true" data-field="tue-1-room">Main Lobby</span></div>
+                    </div>
+                    <span class="session-badge badge-safety">Safety</span>
+                </div>
+                <div class="session-card session-tech">
+                    <div class="session-time" data-editable="true" data-field="tue-2-time">1:00 - 3:00 PM</div>
+                    <div class="session-title" data-editable="true" data-field="tue-2-title">Data Analytics with Python</div>
+                    <div class="session-meta">
+                        <div class="session-detail"><span class="session-detail-icon">👤</span> <span data-editable="true" data-field="tue-2-instructor">Anika Patel</span></div>
+                        <div class="session-detail"><span class="session-detail-icon">📍</span> <span data-editable="true" data-field="tue-2-room">Lab 401</span></div>
+                    </div>
+                    <span class="session-badge badge-tech">Technical</span>
+                </div>
+            </div>
+
+            <!-- Wednesday -->
+            <div class="day-column">
+                <div class="day-header">
+                    <div class="day-name" data-editable="true" data-field="day-3-name">Wednesday</div>
+                    <div class="day-date" data-editable="true" data-field="day-3-date">March 4</div>
+                </div>
+                <div class="session-card session-leadership">
+                    <div class="session-time" data-editable="true" data-field="wed-1-time">10:00 - 12:00 PM</div>
+                    <div class="session-title" data-editable="true" data-field="wed-1-title">Management Essentials</div>
+                    <div class="session-meta">
+                        <div class="session-detail"><span class="session-detail-icon">👤</span> <span data-editable="true" data-field="wed-1-instructor">Robert Garcia</span></div>
+                        <div class="session-detail"><span class="session-detail-icon">📍</span> <span data-editable="true" data-field="wed-1-room">Exec Suite</span></div>
+                    </div>
+                    <span class="session-badge badge-leadership">Leadership</span>
+                </div>
+                <div class="session-card session-wellness">
+                    <div class="session-time" data-editable="true" data-field="wed-2-time">12:30 - 1:30 PM</div>
+                    <div class="session-title" data-editable="true" data-field="wed-2-title">Mindfulness & Stress Mgmt</div>
+                    <div class="session-meta">
+                        <div class="session-detail"><span class="session-detail-icon">👤</span> <span data-editable="true" data-field="wed-2-instructor">Maya Williams</span></div>
+                        <div class="session-detail"><span class="session-detail-icon">📍</span> <span data-editable="true" data-field="wed-2-room">Wellness Room</span></div>
+                    </div>
+                    <span class="session-badge badge-wellness">Wellness</span>
+                </div>
+            </div>
+
+            <!-- Thursday -->
+            <div class="day-column">
+                <div class="day-header">
+                    <div class="day-name" data-editable="true" data-field="day-4-name">Thursday</div>
+                    <div class="day-date" data-editable="true" data-field="day-4-date">March 5</div>
+                </div>
+                <div class="session-card session-tech">
+                    <div class="session-time" data-editable="true" data-field="thu-1-time">9:00 - 11:30 AM</div>
+                    <div class="session-title" data-editable="true" data-field="thu-1-title">Cybersecurity Awareness</div>
+                    <div class="session-meta">
+                        <div class="session-detail"><span class="session-detail-icon">👤</span> <span data-editable="true" data-field="thu-1-instructor">David Kim</span></div>
+                        <div class="session-detail"><span class="session-detail-icon">📍</span> <span data-editable="true" data-field="thu-1-room">Room 302</span></div>
+                    </div>
+                    <span class="session-badge badge-tech">Technical</span>
+                </div>
+                <div class="session-card session-soft">
+                    <div class="session-time" data-editable="true" data-field="thu-2-time">2:00 - 4:00 PM</div>
+                    <div class="session-title" data-editable="true" data-field="thu-2-title">Presentation Skills Workshop</div>
+                    <div class="session-meta">
+                        <div class="session-detail"><span class="session-detail-icon">👤</span> <span data-editable="true" data-field="thu-2-instructor">Sarah Adams</span></div>
+                        <div class="session-detail"><span class="session-detail-icon">📍</span> <span data-editable="true" data-field="thu-2-room">Room 205</span></div>
+                    </div>
+                    <span class="session-badge badge-soft">Soft Skills</span>
+                </div>
+            </div>
+
+            <!-- Friday -->
+            <div class="day-column">
+                <div class="day-header">
+                    <div class="day-name" data-editable="true" data-field="day-5-name">Friday</div>
+                    <div class="day-date" data-editable="true" data-field="day-5-date">March 6</div>
+                </div>
+                <div class="session-card session-leadership">
+                    <div class="session-time" data-editable="true" data-field="fri-1-time">9:30 - 11:00 AM</div>
+                    <div class="session-title" data-editable="true" data-field="fri-1-title">Project Management Agile</div>
+                    <div class="session-meta">
+                        <div class="session-detail"><span class="session-detail-icon">👤</span> <span data-editable="true" data-field="fri-1-instructor">Tom Wilson</span></div>
+                        <div class="session-detail"><span class="session-detail-icon">📍</span> <span data-editable="true" data-field="fri-1-room">Room 310</span></div>
+                    </div>
+                    <span class="session-badge badge-leadership">Leadership</span>
+                </div>
+                <div class="session-card session-wellness">
+                    <div class="session-time" data-editable="true" data-field="fri-2-time">3:00 - 4:00 PM</div>
+                    <div class="session-title" data-editable="true" data-field="fri-2-title">Friday Yoga & Stretch</div>
+                    <div class="session-meta">
+                        <div class="session-detail"><span class="session-detail-icon">👤</span> <span data-editable="true" data-field="fri-2-instructor">Maya Williams</span></div>
+                        <div class="session-detail"><span class="session-detail-icon">📍</span> <span data-editable="true" data-field="fri-2-room">Rooftop Terrace</span></div>
+                    </div>
+                    <span class="session-badge badge-wellness">Wellness</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <div class="legend">
+                <div class="legend-item"><span class="legend-dot dot-tech"></span> Technical</div>
+                <div class="legend-item"><span class="legend-dot dot-soft"></span> Soft Skills</div>
+                <div class="legend-item"><span class="legend-dot dot-safety"></span> Safety</div>
+                <div class="legend-item"><span class="legend-dot dot-leadership"></span> Leadership</div>
+                <div class="legend-item"><span class="legend-dot dot-wellness"></span> Wellness</div>
+            </div>
+            <div class="footer-info" data-editable="true" data-field="footer-info">Register via the Learning Portal | Questions? learning@company.com</div>
+        </div>
+    </div>
+</body>
+</html>

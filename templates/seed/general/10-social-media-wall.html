@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(ellipse at 20% 20%, rgba(236, 72, 153, 0.10) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 30%, rgba(59, 130, 246, 0.08) 0%, transparent 45%),
+        radial-gradient(ellipse at 50% 80%, rgba(34, 197, 94, 0.06) 0%, transparent 40%),
+        radial-gradient(ellipse at 70% 60%, rgba(168, 85, 247, 0.06) 0%, transparent 35%),
+        linear-gradient(170deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+      color: #e2e8f0;
+    }
+
+    /* Grid dot pattern */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image: radial-gradient(circle, rgba(148, 163, 184, 0.04) 1px, transparent 1px);
+      background-size: 24px 24px;
+      z-index: 0;
+    }
+
+    /* Glowing orbs */
+    .glow-pink {
+      position: absolute;
+      top: 80px;
+      left: 150px;
+      width: 300px;
+      height: 300px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(236, 72, 153, 0.08), transparent 70%);
+      filter: blur(50px);
+      z-index: 0;
+    }
+
+    .glow-blue {
+      position: absolute;
+      top: 200px;
+      right: 200px;
+      width: 250px;
+      height: 250px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(59, 130, 246, 0.06), transparent 70%);
+      filter: blur(40px);
+      z-index: 0;
+    }
+
+    .glow-purple {
+      position: absolute;
+      bottom: 100px;
+      left: 50%;
+      width: 350px;
+      height: 250px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(168, 85, 247, 0.06), transparent 70%);
+      filter: blur(50px);
+      z-index: 0;
+    }
+
+    /* Decorative lines */
+    .h-line-deco {
+      position: absolute;
+      left: 80px;
+      right: 80px;
+      height: 1px;
+      z-index: 0;
+    }
+
+    .h-line-1 { top: 80px; background: linear-gradient(to right, transparent, rgba(236, 72, 153, 0.12), transparent); }
+    .h-line-2 { bottom: 60px; background: linear-gradient(to right, transparent, rgba(59, 130, 246, 0.12), transparent); }
+
+    .container {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      height: 100%;
+      padding: 50px 80px;
+      gap: 40px;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .header-emoji {
+      font-size: 48px;
+      filter: drop-shadow(0 4px 12px rgba(236, 72, 153, 0.3));
+    }
+
+    .header-title {
+      font-family: 'Poppins', sans-serif;
+      font-size: 42px;
+      font-weight: 700;
+      color: #f8fafc;
+    }
+
+    .header-hashtag {
+      font-family: 'Poppins', sans-serif;
+      font-size: 24px;
+      font-weight: 600;
+      color: #3b82f6;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .platform-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+    }
+
+    .pi-instagram { background: linear-gradient(135deg, #f59e0b, #ec4899, #a855f7); }
+    .pi-twitter { background: #1d9bf0; }
+    .pi-facebook { background: #1877f2; }
+    .pi-linkedin { background: #0a66c2; }
+
+    /* Posts grid - magazine layout */
+    .posts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 24px;
+    }
+
+    .post-card {
+      background: rgba(30, 41, 59, 0.5);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(148, 163, 184, 0.06);
+      border-radius: 20px;
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    }
+
+    /* Featured card spans 2 rows */
+    .post-card.featured {
+      grid-row: 1 / 3;
+    }
+
+    .post-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .post-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+    }
+
+    .avatar-1 { background: linear-gradient(135deg, #ec4899, #a855f7); }
+    .avatar-2 { background: linear-gradient(135deg, #3b82f6, #06b6d4); }
+    .avatar-3 { background: linear-gradient(135deg, #f59e0b, #ef4444); }
+    .avatar-4 { background: linear-gradient(135deg, #22c55e, #0ea5e9); }
+    .avatar-5 { background: linear-gradient(135deg, #a855f7, #6366f1); }
+    .avatar-6 { background: linear-gradient(135deg, #ec4899, #f59e0b); }
+
+    .post-user-info {
+      flex: 1;
+    }
+
+    .post-username {
+      font-family: 'Poppins', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      color: #f1f5f9;
+    }
+
+    .post-handle {
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      color: #64748b;
+    }
+
+    .post-platform-badge {
+      font-size: 20px;
+    }
+
+    .post-content {
+      font-family: 'Inter', sans-serif;
+      font-size: 17px;
+      color: #cbd5e1;
+      line-height: 1.6;
+      flex: 1;
+    }
+
+    .post-content .highlight {
+      color: #3b82f6;
+      font-weight: 500;
+    }
+
+    /* Image placeholder */
+    .post-image {
+      height: 120px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 48px;
+    }
+
+    .post-image-1 { background: linear-gradient(135deg, rgba(236, 72, 153, 0.15), rgba(168, 85, 247, 0.15)); }
+    .post-image-2 { background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(14, 165, 233, 0.15)); }
+
+    .post-card.featured .post-image {
+      height: 200px;
+      font-size: 72px;
+    }
+
+    .post-engagement {
+      display: flex;
+      gap: 24px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(148, 163, 184, 0.06);
+    }
+
+    .engagement-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      color: #64748b;
+    }
+
+    .engagement-emoji {
+      font-size: 16px;
+    }
+
+    .post-time {
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      color: #475569;
+      margin-top: auto;
+    }
+
+    /* SVG decorations */
+    .svg-hash {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      z-index: 1;
+      opacity: 0.04;
+    }
+
+    /* Top gradient stripe */
+    .top-gradient {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #ec4899, #a855f7, #3b82f6, #22c55e, #f59e0b);
+      z-index: 3;
+    }
+
+    /* Bottom stripe */
+    .bottom-stripe {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: repeating-linear-gradient(
+        90deg,
+        #ec4899 0px,
+        #ec4899 30px,
+        transparent 30px,
+        transparent 36px,
+        #3b82f6 36px,
+        #3b82f6 66px,
+        transparent 66px,
+        transparent 72px,
+        #22c55e 72px,
+        #22c55e 102px,
+        transparent 102px,
+        transparent 108px
+      );
+      opacity: 0.5;
+      z-index: 3;
+    }
+  </style>
+</head>
+<body>
+  <div class="glow-pink"></div>
+  <div class="glow-blue"></div>
+  <div class="glow-purple"></div>
+  <div class="h-line-deco h-line-1"></div>
+  <div class="h-line-deco h-line-2"></div>
+  <div class="top-gradient"></div>
+  <div class="bottom-stripe"></div>
+
+  <!-- SVG hashtag decoration -->
+  <svg class="svg-hash" width="200" height="200" viewBox="0 0 200 200" fill="none">
+    <line x1="60" y1="20" x2="40" y2="180" stroke="#94a3b8" stroke-width="8"/>
+    <line x1="140" y1="20" x2="120" y2="180" stroke="#94a3b8" stroke-width="8"/>
+    <line x1="20" y1="70" x2="180" y2="70" stroke="#94a3b8" stroke-width="8"/>
+    <line x1="20" y1="130" x2="180" y2="130" stroke="#94a3b8" stroke-width="8"/>
+  </svg>
+
+  <!-- SVG corner decorations -->
+  <svg style="position:absolute;top:20px;left:20px;z-index:1;" width="40" height="40" viewBox="0 0 40 40" fill="none">
+    <path d="M0 40 L0 0 L40 0" stroke="rgba(236,72,153,0.25)" stroke-width="2" fill="none"/>
+  </svg>
+  <svg style="position:absolute;top:20px;right:20px;z-index:1;" width="40" height="40" viewBox="0 0 40 40" fill="none">
+    <path d="M40 40 L40 0 L0 0" stroke="rgba(59,130,246,0.25)" stroke-width="2" fill="none"/>
+  </svg>
+
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <span class="header-emoji">💬</span>
+        <div>
+          <div class="header-title" data-editable="true" data-field="wallTitle">Social Wall</div>
+          <div class="header-hashtag" data-editable="true" data-field="hashtag">#OurCompany</div>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="platform-icon pi-instagram">📸</div>
+        <div class="platform-icon pi-twitter">🐦</div>
+        <div class="platform-icon pi-facebook">👤</div>
+        <div class="platform-icon pi-linkedin">💼</div>
+      </div>
+    </div>
+
+    <!-- Posts grid -->
+    <div class="posts-grid">
+      <!-- Featured post (spans 2 rows) -->
+      <div class="post-card featured">
+        <div class="post-header">
+          <div class="post-avatar avatar-1">👩</div>
+          <div class="post-user-info">
+            <div class="post-username" data-editable="true" data-field="post1User">Sarah Johnson</div>
+            <div class="post-handle" data-editable="true" data-field="post1Handle">@sarahj_design</div>
+          </div>
+          <span class="post-platform-badge">📸</span>
+        </div>
+        <div class="post-image post-image-1">🏢</div>
+        <div class="post-content" data-editable="true" data-field="post1Content">Amazing team retreat this week! So grateful for the incredible people I get to work with every day. <span class="highlight">#TeamSpirit #CompanyCulture #WorkFamily</span></div>
+        <div class="post-engagement">
+          <div class="engagement-item"><span class="engagement-emoji">❤️</span> <span data-editable="true" data-field="post1Likes">2.4K</span></div>
+          <div class="engagement-item"><span class="engagement-emoji">💬</span> <span data-editable="true" data-field="post1Comments">186</span></div>
+          <div class="engagement-item"><span class="engagement-emoji">🔄</span> <span data-editable="true" data-field="post1Shares">52</span></div>
+        </div>
+        <div class="post-time" data-editable="true" data-field="post1Time">2 hours ago</div>
+      </div>
+
+      <!-- Post 2 -->
+      <div class="post-card">
+        <div class="post-header">
+          <div class="post-avatar avatar-2">👨</div>
+          <div class="post-user-info">
+            <div class="post-username" data-editable="true" data-field="post2User">Mike Chen</div>
+            <div class="post-handle" data-editable="true" data-field="post2Handle">@mikechen_dev</div>
+          </div>
+          <span class="post-platform-badge">🐦</span>
+        </div>
+        <div class="post-content" data-editable="true" data-field="post2Content">Just shipped our biggest feature update yet! Months of hard work paying off. <span class="highlight">#ProductLaunch #Innovation</span></div>
+        <div class="post-engagement">
+          <div class="engagement-item"><span class="engagement-emoji">❤️</span> <span data-editable="true" data-field="post2Likes">892</span></div>
+          <div class="engagement-item"><span class="engagement-emoji">💬</span> <span data-editable="true" data-field="post2Comments">67</span></div>
+        </div>
+        <div class="post-time" data-editable="true" data-field="post2Time">4 hours ago</div>
+      </div>
+
+      <!-- Post 3 -->
+      <div class="post-card">
+        <div class="post-header">
+          <div class="post-avatar avatar-3">👩</div>
+          <div class="post-user-info">
+            <div class="post-username" data-editable="true" data-field="post3User">Elena Rodriguez</div>
+            <div class="post-handle" data-editable="true" data-field="post3Handle">@elena_creates</div>
+          </div>
+          <span class="post-platform-badge">📸</span>
+        </div>
+        <div class="post-content" data-editable="true" data-field="post3Content">Our new office space is absolutely stunning. The design team outdid themselves! <span class="highlight">#OfficeGoals #ModernWorkplace</span></div>
+        <div class="post-engagement">
+          <div class="engagement-item"><span class="engagement-emoji">❤️</span> <span data-editable="true" data-field="post3Likes">1.1K</span></div>
+          <div class="engagement-item"><span class="engagement-emoji">💬</span> <span data-editable="true" data-field="post3Comments">94</span></div>
+        </div>
+        <div class="post-time" data-editable="true" data-field="post3Time">6 hours ago</div>
+      </div>
+
+      <!-- Post 4 -->
+      <div class="post-card">
+        <div class="post-header">
+          <div class="post-avatar avatar-4">👨</div>
+          <div class="post-user-info">
+            <div class="post-username" data-editable="true" data-field="post4User">David Park</div>
+            <div class="post-handle" data-editable="true" data-field="post4Handle">@dpark_marketing</div>
+          </div>
+          <span class="post-platform-badge">💼</span>
+        </div>
+        <div class="post-content" data-editable="true" data-field="post4Content">Proud to announce our company was named a Top 50 Workplace! Thank you to everyone who makes this possible.</div>
+        <div class="post-engagement">
+          <div class="engagement-item"><span class="engagement-emoji">👍</span> <span data-editable="true" data-field="post4Likes">3.2K</span></div>
+          <div class="engagement-item"><span class="engagement-emoji">💬</span> <span data-editable="true" data-field="post4Comments">210</span></div>
+        </div>
+        <div class="post-time" data-editable="true" data-field="post4Time">Yesterday</div>
+      </div>
+
+      <!-- Post 5 -->
+      <div class="post-card">
+        <div class="post-header">
+          <div class="post-avatar avatar-5">👩</div>
+          <div class="post-user-info">
+            <div class="post-username" data-editable="true" data-field="post5User">Aria Thompson</div>
+            <div class="post-handle" data-editable="true" data-field="post5Handle">@aria_t</div>
+          </div>
+          <span class="post-platform-badge">🐦</span>
+        </div>
+        <div class="post-image post-image-2">🎉</div>
+        <div class="post-content" data-editable="true" data-field="post5Content">Celebrating our 5th anniversary milestone! Here's to the next 5 years. <span class="highlight">#Anniversary #Growth</span></div>
+        <div class="post-engagement">
+          <div class="engagement-item"><span class="engagement-emoji">❤️</span> <span data-editable="true" data-field="post5Likes">1.8K</span></div>
+          <div class="engagement-item"><span class="engagement-emoji">💬</span> <span data-editable="true" data-field="post5Comments">143</span></div>
+        </div>
+        <div class="post-time" data-editable="true" data-field="post5Time">Yesterday</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
