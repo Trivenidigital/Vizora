@@ -513,3 +513,72 @@ export interface PlatformHealth {
   uptime: number;
   timestamp: string;
 }
+
+// === Support ===
+
+export type SupportCategory = 'bug_report' | 'feature_request' | 'help_question' | 'template_request' | 'feedback' | 'urgent_issue' | 'account_issue';
+export type SupportPriority = 'critical' | 'high' | 'medium' | 'low';
+export type SupportStatus = 'open' | 'in_progress' | 'resolved' | 'closed' | 'wont_fix';
+
+export interface SupportRequest {
+  id: string;
+  organizationId: string;
+  userId: string;
+  category: SupportCategory;
+  priority: SupportPriority;
+  status: SupportStatus;
+  title: string | null;
+  description: string;
+  aiSummary: string | null;
+  aiSuggestedAction: string | null;
+  pageUrl: string | null;
+  browserInfo: string | null;
+  consoleErrors: string | null;
+  resolutionNotes: string | null;
+  resolvedById: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  messages?: SupportMessage[];
+  user?: { firstName: string; lastName: string; email: string };
+  resolvedBy?: { firstName: string; lastName: string; email: string } | null;
+}
+
+export interface SupportMessage {
+  id: string;
+  requestId: string;
+  organizationId: string;
+  userId: string;
+  role: 'user' | 'assistant' | 'admin';
+  content: string;
+  createdAt: string;
+}
+
+export interface SupportContext {
+  pageUrl: string;
+  browserInfo: string;
+  consoleErrors: string;
+}
+
+export interface SupportStats {
+  open: number;
+  inProgress: number;
+  resolvedThisWeek: number;
+  total: number;
+  byCategory: Record<SupportCategory, number>;
+  byPriority: Record<SupportPriority, number>;
+}
+
+export interface SupportRequestResponse {
+  request: SupportRequest;
+  response: string;
+}
+
+export interface SupportQueryParams {
+  status?: SupportStatus;
+  priority?: SupportPriority;
+  category?: SupportCategory;
+  search?: string;
+  page?: number;
+  limit?: number;
+}

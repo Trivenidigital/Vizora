@@ -51,6 +51,7 @@ model Organization {
   billingTransactions BillingTransaction[]
   impressions         ContentImpression[]
   promotionRedemptions PromotionRedemption[]
+  supportRequests      SupportRequest[]
 
   @@index([slug])
   @@index([stripeCustomerId])
@@ -80,6 +81,8 @@ model User {
   notifications  Notification[]
   apiKeys        ApiKey[]
   passwordResetTokens PasswordResetToken[]
+  supportRequests          SupportRequest[] @relation("SupportRequestUser")
+  resolvedSupportRequests  SupportRequest[] @relation("SupportRequestResolver")
 
   @@index([organizationId])
   @@index([email])
@@ -708,4 +711,63 @@ model IpBlocklist {
   @@unique([ipAddress])
   @@index([isActive])
   @@map("ip_blocklist")
+}
+
+// ============================================================================
+// SUPPORT SYSTEM
+// ============================================================================
+
+model SupportRequest {
+  id               String    @id @default(uuid())
+  organizationId   String
+  userId           String
+
+  category         String    // bug_report, feature_request, help_question, template_request, feedback, urgent_issue, account_issue
+  priority         String    @default("medium") // critical, high, medium, low
+  status           String    @default("open")   // open, in_progress, resolved, closed, wont_fix
+
+  title            String?   @db.VarChar(255)
+  description      String
+  aiSummary        String?
+  aiSuggestedAction String?
+
+  pageUrl          String?   @db.VarChar(500)
+  browserInfo      String?   @db.VarChar(255)
+  consoleErrors    String?
+
+  resolutionNotes  String?
+  resolvedById     String?
+  resolvedAt       DateTime?
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  organization     Organization @relation(fields: [organizationId], references: [id])
+  user             User         @relation("SupportRequestUser", fields: [userId], references: [id])
+  resolvedBy       User?        @relation("SupportRequestResolver", fields: [resolvedById], references: [id])
+  messages         SupportMessage[]
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([priority])
+  @@index([userId])
+  @@index([organizationId, status])
+  @@index([organizationId, createdAt])
+}
+
+model SupportMessage {
+  id               String    @id @default(uuid())
+  requestId        String
+  organizationId   String
+  userId           String
+
+  role             String    // 'user', 'assistant', 'admin'
+  content          String
+
+  createdAt        DateTime  @default(now())
+
+  request          SupportRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@index([organizationId])
 }

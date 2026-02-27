@@ -13,6 +13,8 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import { Icon } from '@/theme/icons';
 import type { IconName } from '@/theme/icons';
 import TrialBanner from '@/components/TrialBanner';
+import { SupportChatProvider } from '@/components/support/SupportChatProvider';
+import { SupportChat } from '@/components/support/SupportChat';
 
 const navigation: Array<{ name: string; href: string; icon: IconName; exactMatch?: boolean }> = [
   { name: 'Overview', href: '/dashboard', icon: 'overview', exactMatch: true },
@@ -60,6 +62,7 @@ export default function DashboardLayout({
   };
 
   return (
+    <SupportChatProvider>
     <div className="min-h-screen bg-[var(--background)]">
       {/* Header */}
       <header className="bg-[var(--surface)]/90 backdrop-blur-xl border-b border-[var(--border)] fixed top-0 left-0 right-0 z-30">
@@ -240,6 +243,10 @@ export default function DashboardLayout({
           </QueryProvider>
         )}
       </div>
+
+      {/* Support Chat Widget */}
+      <SupportChat />
     </div>
+    </SupportChatProvider>
   );
 }
