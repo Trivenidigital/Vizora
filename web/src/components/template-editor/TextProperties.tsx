@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 interface TextPropertiesProps {
   elementId: string;
@@ -55,7 +55,32 @@ export default function TextProperties({
   onPropertyChange,
 }: TextPropertiesProps) {
   const [localText, setLocalText] = useState(textContent);
-  useEffect(() => { setLocalText(textContent); }, [textContent]);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastPropagated = useRef(textContent);
+
+  useEffect(() => {
+    setLocalText(textContent);
+    lastPropagated.current = textContent;
+  }, [textContent]);
+
+  const propagateText = useCallback(
+    (value: string) => {
+      if (value !== lastPropagated.current) {
+        lastPropagated.current = value;
+        onPropertyChange(elementId, 'textContent', textContent, value);
+      }
+    },
+    [elementId, textContent, onPropertyChange],
+  );
+
+  // Debounced propagation as user types
+  useEffect(() => {
+    if (localText === lastPropagated.current) return;
+    debounceRef.current = setTimeout(() => propagateText(localText), 300);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [localText, propagateText]);
 
   const fontSize = parseInt(styles.fontSize || '16', 10);
   const colorHex = rgbToHex(styles.color || '#ffffff');
@@ -75,10 +100,16 @@ export default function TextProperties({
           className={`${inputClass} resize-none`}
           value={localText}
           onChange={(e) => setLocalText(e.target.value)}
-          onBlur={() => {
-            if (localText !== textContent) {
-              onPropertyChange(elementId, 'textContent', textContent, localText);
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              if (debounceRef.current) clearTimeout(debounceRef.current);
+              propagateText(localText);
             }
+          }}
+          onBlur={() => {
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+            propagateText(localText);
           }}
         />
       </div>

@@ -288,59 +288,15 @@ describe('TemplateLibraryService', () => {
   });
 
   describe('getPreview', () => {
-    it('should render template with sample data', async () => {
+    it('should return raw templateHtml directly', async () => {
       const template = makeTemplate();
       mockDb.content.findFirst.mockResolvedValue(template);
 
       const result = await service.getPreview('tmpl-1');
 
-      expect(result.html).toBe('<h1>Rendered</h1>');
-      expect(mockTemplateRendering.processTemplate).toHaveBeenCalledWith(
-        '<h1>{{title}}</h1>',
-        { title: 'Sample' },
-      );
-    });
-
-    it('should fall back to manualData when no sampleData', async () => {
-      const template = makeTemplate({
-        metadata: {
-          templateHtml: '<h1>{{title}}</h1>',
-          dataSource: { type: 'manual', manualData: { title: 'Manual' } },
-          refreshConfig: { enabled: false, intervalMinutes: 0 },
-          isLibraryTemplate: true,
-          category: 'retail',
-          libraryTags: [],
-        },
-      });
-      mockDb.content.findFirst.mockResolvedValue(template);
-
-      await service.getPreview('tmpl-1');
-
-      expect(mockTemplateRendering.processTemplate).toHaveBeenCalledWith(
-        '<h1>{{title}}</h1>',
-        { title: 'Manual' },
-      );
-    });
-
-    it('should fall back to empty object when no data source', async () => {
-      const template = makeTemplate({
-        metadata: {
-          templateHtml: '<h1>Static</h1>',
-          isLibraryTemplate: true,
-          category: 'retail',
-          libraryTags: [],
-          dataSource: { type: 'manual' },
-          refreshConfig: { enabled: false, intervalMinutes: 0 },
-        },
-      });
-      mockDb.content.findFirst.mockResolvedValue(template);
-
-      await service.getPreview('tmpl-1');
-
-      expect(mockTemplateRendering.processTemplate).toHaveBeenCalledWith(
-        '<h1>Static</h1>',
-        {},
-      );
+      expect(result.html).toBe('<h1>{{title}}</h1>');
+      // Should NOT call processTemplate — raw HTML preserves data-editable attrs
+      expect(mockTemplateRendering.processTemplate).not.toHaveBeenCalled();
     });
 
     it('should return fallback when no templateHtml', async () => {
@@ -358,18 +314,6 @@ describe('TemplateLibraryService', () => {
       const result = await service.getPreview('tmpl-1');
 
       expect(result.html).toBe('<p>No preview available</p>');
-    });
-
-    it('should return raw templateHtml when rendering fails', async () => {
-      const template = makeTemplate();
-      mockDb.content.findFirst.mockResolvedValue(template);
-      mockTemplateRendering.processTemplate.mockImplementation(() => {
-        throw new Error('Template syntax error');
-      });
-
-      const result = await service.getPreview('tmpl-1');
-
-      expect(result.html).toBe('<h1>{{title}}</h1>');
     });
   });
 

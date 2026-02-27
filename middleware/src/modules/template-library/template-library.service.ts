@@ -161,16 +161,10 @@ export class TemplateLibraryService {
       return { html: '<p>No preview available</p>' };
     }
 
-    try {
-      const data = metadata.sampleData || metadata.dataSource?.manualData || {};
-      const html = this.templateRendering.processTemplate(metadata.templateHtml, data);
-      return { html };
-    } catch (error) {
-      // If Handlebars rendering fails, return the raw templateHtml
-      // (data-editable templates don't use Handlebars)
-      this.logger.warn(`Preview render fell back to raw HTML for template ${id}: ${error}`);
-      return { html: metadata.templateHtml };
-    }
+    // Return raw templateHtml directly — the editor needs data-editable
+    // attributes preserved. DOMPurify sanitization in processTemplate
+    // strips data-* attributes which breaks the editor.
+    return { html: metadata.templateHtml };
   }
 
   /**
