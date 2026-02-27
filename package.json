@@ -26,7 +26,8 @@
       "nx",
       "@parcel/watcher",
       "msgpackr-extract",
-      "unrs-resolver"
+      "unrs-resolver",
+      "puppeteer"
     ]
   },
   "devDependencies": {
@@ -55,8 +56,10 @@
     "nx": "22.4.2",
     "playwright": "^1.58.0",
     "prettier": "~3.6.2",
+    "puppeteer": "^24.37.5",
     "swc-loader": "0.1.15",
     "tslib": "^2.3.0",
+    "tsx": "^4.21.0",
     "typescript": "~5.9.2",
     "webpack-cli": "^5.1.4"
   },

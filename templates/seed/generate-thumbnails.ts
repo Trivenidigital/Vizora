@@ -12,10 +12,10 @@
  *   pnpm add -D puppeteer
  */
 
-import * as puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as sharp from 'sharp';
+import sharp from 'sharp';
 
 const SEED_DIR = path.resolve(__dirname);
 const CATEGORIES = ['restaurant', 'retail', 'general', 'corporate', 'education', 'healthcare', 'events'];
