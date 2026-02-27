@@ -177,8 +177,7 @@ export class AppController {
     const content = { ...data.content };
     this.logger.log(`Push content received - original URL: ${content.url?.substring(0, 80)}`);
     if (content.url && content.url.startsWith('minio://')) {
-      const apiBaseUrl = process.env.API_BASE_URL
-        || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3000');
+      const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:3000';
       content.url = `${apiBaseUrl}/api/v1/device-content/${content.id}/file`;
       this.logger.log(`Resolved to: ${content.url}`);
     }

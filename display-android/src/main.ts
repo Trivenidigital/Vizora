@@ -33,7 +33,11 @@ const DEFAULT_CONFIG = {
 function transformContentUrl(url: string, apiUrl: string, deviceToken?: string | null): string {
   if (!url) return url;
   let result: string;
-  if (apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1')) {
+
+  // Handle relative URLs (e.g. /api/v1/...) by prepending apiUrl
+  if (url.startsWith('/') && apiUrl) {
+    result = apiUrl.replace(/\/$/, '') + url;
+  } else if (apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1')) {
     result = url.replace(/http:\/\/localhost/g, 'http://10.0.2.2')
                 .replace(/http:\/\/127\.0\.0\.1/g, 'http://10.0.2.2');
   } else {
@@ -502,6 +506,7 @@ class VizoraAndroidTV {
           this.pairingRetryCount = 0;
 
           this.deviceToken = data.deviceToken;
+          this.deviceId = data.deviceId || this.deviceId;
 
           // Store credentials in encrypted storage
           await SecureStorage.set({ key: 'device_token', value: data.deviceToken });

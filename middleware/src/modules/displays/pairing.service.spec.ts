@@ -312,7 +312,7 @@ describe('PairingService', () => {
 
       expect(status.status).toBe('paired');
       expect(status.deviceToken).toBe('mock-jwt-token'); // plaintext token from jwtService.sign mock
-      expect(status.displayId).toBe('display-id');
+      expect(status.deviceId).toBe('display-id');
       expect(status.organizationId).toBe('org-123');
     });
 

@@ -123,8 +123,7 @@ export class DeviceGateway
    * Resolve minio:// URLs to API-served URLs that devices can access.
    */
   private resolveContentUrl(item: any): string {
-    const apiBaseUrl = process.env.API_BASE_URL
-      || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3000');
+    const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:3000';
     if (item.content?.url?.startsWith('minio://')) {
       return `${apiBaseUrl}/api/v1/device-content/${item.content.id}/file`;
     }
@@ -1155,8 +1154,7 @@ export class DeviceGateway
             });
 
             if (zoneContent) {
-              const apiBaseUrl = process.env.API_BASE_URL
-                || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3000');
+              const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:3000';
               let contentUrl = zoneContent.url || '';
               if (contentUrl.startsWith('minio://')) {
                 contentUrl = `${apiBaseUrl}/api/v1/device-content/${zoneContent.id}/file`;
