@@ -7,6 +7,7 @@ import type { CanvasHandle } from '@/components/template-editor/TemplateEditorCa
 import PropertyPanel from '@/components/template-editor/PropertyPanel';
 import type { SelectedElement } from '@/components/template-editor/PropertyPanel';
 import DisplayPickerModal from '@/components/template-editor/DisplayPickerModal';
+import FloatingToolbar from '@/components/template-editor/FloatingToolbar';
 import { useEditorHistory } from '@/components/template-editor/useEditorHistory';
 import { apiClient } from '@/lib/api';
 import { useToast } from '@/lib/hooks/useToast';
@@ -114,15 +115,14 @@ export default function EditPageClient({ templateId }: EditPageClientProps) {
     try {
       const renderedHtml = await canvasRef.current.serialize();
 
-      await apiClient.publishTemplate(templateId, {
-        renderedHtml,
-        name: `${templateName} - Edited`,
-        displayIds: [],
+      // Save the edited HTML back to the template
+      await apiClient.updateTemplate(templateId, {
+        templateHtml: renderedHtml,
       });
 
-      toast.success('Draft saved successfully');
+      toast.success('Template saved successfully');
     } catch (err: any) {
-      toast.error(err.message || 'Failed to save draft');
+      toast.error(err.message || 'Failed to save template');
     } finally {
       setSaving(false);
     }
@@ -287,6 +287,17 @@ export default function EditPageClient({ templateId }: EditPageClientProps) {
           />
         </div>
       </div>
+
+      {/* ── Floating Toolbar ──────────────────────────────────────────── */}
+      <FloatingToolbar
+        iframeRef={iframeRef}
+        selectedElement={selectedElement ? {
+          elementId: selectedElement.elementId,
+          elementType: selectedElement.elementType,
+          styles: selectedElement.styles,
+        } : null}
+        onPropertyChange={handlePropertyChange}
+      />
 
       {/* ── Display Picker Modal ─────────────────────────────────────── */}
       <DisplayPickerModal
