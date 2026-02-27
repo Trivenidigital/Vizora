@@ -402,9 +402,16 @@ export class DisplaysService {
   }
 
   async bulkAssignPlaylist(organizationId: string, displayIds: string[], playlistId: string) {
-    // Verify playlist belongs to org
+    // Verify playlist belongs to org (include items for realtime notification)
     const playlist = await this.db.playlist.findFirst({
       where: { id: playlistId, organizationId },
+      include: {
+        items: {
+          include: {
+            content: true,
+          },
+        },
+      },
     });
     if (!playlist) {
       throw new NotFoundException('Playlist not found or does not belong to your organization');
@@ -417,6 +424,14 @@ export class DisplaysService {
       },
       data: { currentPlaylistId: playlistId },
     });
+
+    // Notify each device via realtime gateway (fire-and-forget)
+    for (const displayId of displayIds) {
+      this.notifyPlaylistUpdate(displayId, playlist).catch(error => {
+        this.logger.error(`Failed to notify realtime for display ${displayId}: ${error.message}`);
+      });
+    }
+
     return { updated: result.count };
   }
 
