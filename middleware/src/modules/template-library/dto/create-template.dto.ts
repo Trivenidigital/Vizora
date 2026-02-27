@@ -13,7 +13,7 @@ export class CreateTemplateDto {
   @MinLength(1)
   templateHtml!: string;
 
-  @IsEnum(['retail', 'restaurant', 'corporate', 'education', 'healthcare', 'events', 'general'])
+  @IsEnum(['retail', 'restaurant', 'corporate', 'education', 'healthcare', 'events', 'general', 'indian'])
   category!: string;
 
   @IsOptional()
