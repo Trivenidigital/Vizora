@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@300;400;500;600&family=Caveat:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        repeating-linear-gradient(
+          90deg,
+          transparent,
+          transparent 59px,
+          rgba(139,105,20,0.04) 59px,
+          rgba(139,105,20,0.04) 60px
+        ),
+        repeating-linear-gradient(
+          0deg,
+          transparent,
+          transparent 59px,
+          rgba(139,105,20,0.03) 59px,
+          rgba(139,105,20,0.03) 60px
+        ),
+        radial-gradient(ellipse at 25% 30%, rgba(200,148,62,0.1) 0%, transparent 50%),
+        radial-gradient(ellipse at 75% 60%, rgba(200,148,62,0.08) 0%, transparent 50%),
+        linear-gradient(170deg, #1a0f08 0%, #150c06 40%, #0f0904 100%);
+      color: #FFF8E7;
+    }
+
+    /* Coffee bean speckle texture */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background:
+        radial-gradient(circle, rgba(139,105,20,0.08) 1px, transparent 1px),
+        radial-gradient(circle, rgba(92,70,14,0.06) 1px, transparent 1px);
+      background-size: 40px 40px, 67px 67px;
+      background-position: 0 0, 20px 20px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Warm lamplight glow spots */
+    .glow-1 {
+      position: absolute;
+      top: -80px; left: 300px;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(232,185,49,0.1) 0%, transparent 65%);
+      border-radius: 50%;
+      z-index: 1;
+    }
+    .glow-2 {
+      position: absolute;
+      bottom: -100px; right: 250px;
+      width: 550px; height: 550px;
+      background: radial-gradient(circle, rgba(200,148,62,0.08) 0%, transparent 65%);
+      border-radius: 50%;
+      z-index: 1;
+    }
+    .glow-3 {
+      position: absolute;
+      top: 300px; left: 50%;
+      transform: translateX(-50%);
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, rgba(232,185,49,0.06) 0%, transparent 60%);
+      border-radius: 50%;
+      z-index: 1;
+    }
+    .glow-4 {
+      position: absolute;
+      top: 50px; right: 100px;
+      width: 350px; height: 350px;
+      background: radial-gradient(circle, rgba(200,148,62,0.05) 0%, transparent 60%);
+      border-radius: 50%;
+      z-index: 1;
+    }
+
+    /* Header strip */
+    .header-strip {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 100px;
+      background: linear-gradient(180deg, rgba(139,105,20,0.15) 0%, transparent 100%);
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 30px;
+    }
+
+    .header-line {
+      width: 200px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(200,148,62,0.5), transparent);
+    }
+
+    .header-text {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 28px;
+      color: #C8943E;
+      letter-spacing: 8px;
+      text-transform: uppercase;
+      text-shadow: 0 0 30px rgba(200,148,62,0.3);
+    }
+
+    .header-diamond {
+      width: 8px; height: 8px;
+      background: #C8943E;
+      transform: rotate(45deg);
+      flex-shrink: 0;
+    }
+
+    /* Main container */
+    .container {
+      position: relative;
+      z-index: 3;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      height: 100%;
+      padding: 120px 60px 60px;
+      gap: 50px;
+    }
+
+    /* Glass morphism panels */
+    .panel {
+      background: rgba(255,248,231,0.04);
+      border: 1px solid rgba(200,148,62,0.15);
+      border-radius: 20px;
+      padding: 40px 36px;
+      backdrop-filter: blur(15px);
+      box-shadow:
+        0 20px 60px rgba(0,0,0,0.3),
+        inset 0 1px 0 rgba(200,148,62,0.1);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Panel inner glow */
+    .panel::before {
+      content: '';
+      position: absolute;
+      top: -50%; left: -50%;
+      width: 200%; height: 200%;
+      background: radial-gradient(ellipse at 50% 0%, rgba(200,148,62,0.04) 0%, transparent 50%);
+      pointer-events: none;
+    }
+
+    .panel-coffee {
+      border-color: rgba(139,105,20,0.25);
+    }
+
+    .panel-snacks {
+      border-color: rgba(200,148,62,0.2);
+    }
+
+    /* Panel headers */
+    .panel-header {
+      text-align: center;
+      margin-bottom: 24px;
+      position: relative;
+    }
+
+    .panel-emoji {
+      font-size: 100px;
+      line-height: 1;
+      filter: drop-shadow(0 0 30px rgba(232,185,49,0.4)) drop-shadow(0 6px 12px rgba(0,0,0,0.5));
+      margin-bottom: 10px;
+    }
+
+    .panel-title {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 40px;
+      color: #C8943E;
+      text-shadow: 0 2px 20px rgba(200,148,62,0.3);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .panel-subtitle {
+      font-family: 'Caveat', cursive;
+      font-size: 24px;
+      color: rgba(255,248,231,0.5);
+    }
+
+    .panel-divider {
+      width: 120px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(200,148,62,0.4), transparent);
+      margin: 16px auto 20px;
+    }
+
+    /* Menu items */
+    .menu-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+    }
+
+    .menu-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      grid-template-rows: auto auto;
+      gap: 0 16px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      position: relative;
+    }
+
+    .menu-item:nth-child(odd) {
+      background: rgba(255,255,255,0.02);
+    }
+
+    .item-name {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 24px;
+      color: #FFF8E7;
+      grid-column: 1;
+      grid-row: 1;
+      display: flex;
+      align-items: baseline;
+    }
+
+    .item-name::after {
+      content: '';
+      flex: 1;
+      margin: 0 12px;
+      border-bottom: 1px dotted rgba(200,148,62,0.3);
+      position: relative;
+      top: -4px;
+    }
+
+    .item-price {
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 24px;
+      color: #E8B931;
+      grid-column: 2;
+      grid-row: 1;
+      text-align: right;
+      text-shadow: 0 0 15px rgba(232,185,49,0.2);
+    }
+
+    .item-desc {
+      font-family: 'Inter', sans-serif;
+      font-weight: 300;
+      font-size: 14px;
+      color: rgba(255,248,231,0.4);
+      grid-column: 1 / -1;
+      grid-row: 2;
+      margin-top: 2px;
+    }
+
+    /* CSS tumbler-davara shape */
+    .tumbler-davara {
+      position: absolute;
+      top: 12px;
+      right: 24px;
+      z-index: 1;
+      opacity: 0.15;
+    }
+    .tumbler {
+      width: 50px;
+      height: 70px;
+      background: linear-gradient(135deg, #C8943E, #8B6914, #C8943E);
+      border-radius: 4px 4px 8px 8px;
+      position: relative;
+      margin: 0 auto;
+    }
+    .tumbler::after {
+      content: '';
+      position: absolute;
+      top: 5px; left: 5px; right: 5px; bottom: 5px;
+      border: 1px solid rgba(255,248,231,0.3);
+      border-radius: 2px 2px 6px 6px;
+    }
+    .davara {
+      width: 80px;
+      height: 20px;
+      background: linear-gradient(135deg, #8B6914, #C8943E, #8B6914);
+      border-radius: 50%;
+      margin: -4px auto 0;
+      position: relative;
+    }
+    .davara::before {
+      content: '';
+      position: absolute;
+      top: -10px; left: 10px; right: 10px;
+      height: 14px;
+      border: 2px solid rgba(200,148,62,0.5);
+      border-bottom: none;
+      border-radius: 50% 50% 0 0;
+    }
+
+    /* Coffee bean scattered dots */
+    .bean-dot {
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(139,105,20,0.15);
+      z-index: 0;
+    }
+
+    /* Steam wisps SVG */
+    .steam-svg {
+      position: absolute;
+      z-index: 1;
+      opacity: 0.12;
+    }
+
+    /* Brass tray circle */
+    .brass-tray {
+      position: absolute;
+      bottom: 60px; left: 50%;
+      transform: translateX(-50%);
+      width: 300px; height: 300px;
+      border-radius: 50%;
+      border: 2px solid rgba(200,148,62,0.06);
+      background: radial-gradient(circle, rgba(200,148,62,0.03) 0%, transparent 70%);
+      z-index: 0;
+    }
+
+    /* Section subheader */
+    .section-subheader {
+      font-family: 'Caveat', cursive;
+      font-size: 20px;
+      color: rgba(200,148,62,0.6);
+      text-align: center;
+      margin-bottom: 12px;
+      letter-spacing: 1px;
+    }
+
+    /* Bottom ornamental strip */
+    .bottom-strip {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #1a0f08, #8B6914, #C8943E, #E8B931, #C8943E, #8B6914, #1a0f08);
+      z-index: 4;
+    }
+
+    /* SVG corner decorations */
+    .corner-ornament {
+      position: absolute;
+      z-index: 4;
+      opacity: 0.2;
+    }
+    .corner-tl { top: 100px; left: 20px; }
+    .corner-tr { top: 100px; right: 20px; transform: scaleX(-1); }
+    .corner-bl { bottom: 20px; left: 20px; transform: scaleY(-1); }
+    .corner-br { bottom: 20px; right: 20px; transform: scale(-1,-1); }
+
+    /* Beverage section separator */
+    .bev-separator {
+      width: 80%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(200,148,62,0.25), transparent);
+      margin: 8px auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="glow-1"></div>
+  <div class="glow-2"></div>
+  <div class="glow-3"></div>
+  <div class="glow-4"></div>
+
+  <!-- Coffee bean scattered dots -->
+  <div class="bean-dot" style="width:6px;height:6px;top:180px;left:120px;"></div>
+  <div class="bean-dot" style="width:8px;height:8px;top:350px;left:80px;"></div>
+  <div class="bean-dot" style="width:5px;height:5px;top:500px;left:200px;"></div>
+  <div class="bean-dot" style="width:7px;height:7px;top:700px;left:50px;"></div>
+  <div class="bean-dot" style="width:6px;height:6px;top:250px;right:100px;"></div>
+  <div class="bean-dot" style="width:8px;height:8px;top:600px;right:60px;"></div>
+  <div class="bean-dot" style="width:5px;height:5px;top:800px;right:180px;"></div>
+  <div class="bean-dot" style="width:7px;height:7px;top:150px;left:900px;"></div>
+  <div class="bean-dot" style="width:6px;height:6px;top:450px;left:960px;"></div>
+  <div class="bean-dot" style="width:4px;height:4px;top:900px;left:400px;"></div>
+  <div class="bean-dot" style="width:5px;height:5px;top:950px;right:300px;"></div>
+  <div class="bean-dot" style="width:7px;height:7px;top:100px;left:600px;"></div>
+
+  <!-- Steam wisps SVG -->
+  <svg class="steam-svg" style="top:140px;left:380px;" width="60" height="100" viewBox="0 0 60 100" fill="none" stroke="#C8943E" stroke-width="1.5">
+    <path d="M10 95 Q10 70 20 60 Q30 50 25 30 Q20 10 30 0"/>
+    <path d="M30 95 Q30 75 38 65 Q46 55 42 35 Q38 15 45 0"/>
+    <path d="M50 95 Q50 78 55 68 Q60 58 56 40 Q52 20 58 5"/>
+  </svg>
+
+  <!-- SVG corner ornaments -->
+  <svg class="corner-ornament corner-tl" width="70" height="70" viewBox="0 0 70 70" fill="none" stroke="#C8943E" stroke-width="1.5">
+    <path d="M5 5 L5 35 Q5 5 35 5"/>
+    <path d="M12 12 L12 25 Q12 12 25 12"/>
+    <circle cx="7" cy="7" r="2.5" fill="#C8943E"/>
+  </svg>
+  <svg class="corner-ornament corner-tr" width="70" height="70" viewBox="0 0 70 70" fill="none" stroke="#C8943E" stroke-width="1.5">
+    <path d="M5 5 L5 35 Q5 5 35 5"/>
+    <path d="M12 12 L12 25 Q12 12 25 12"/>
+    <circle cx="7" cy="7" r="2.5" fill="#C8943E"/>
+  </svg>
+  <svg class="corner-ornament corner-bl" width="70" height="70" viewBox="0 0 70 70" fill="none" stroke="#C8943E" stroke-width="1.5">
+    <path d="M5 5 L5 35 Q5 5 35 5"/>
+    <path d="M12 12 L12 25 Q12 12 25 12"/>
+    <circle cx="7" cy="7" r="2.5" fill="#C8943E"/>
+  </svg>
+  <svg class="corner-ornament corner-br" width="70" height="70" viewBox="0 0 70 70" fill="none" stroke="#C8943E" stroke-width="1.5">
+    <path d="M5 5 L5 35 Q5 5 35 5"/>
+    <path d="M12 12 L12 25 Q12 12 25 12"/>
+    <circle cx="7" cy="7" r="2.5" fill="#C8943E"/>
+  </svg>
+
+  <!-- Header strip -->
+  <div class="header-strip">
+    <span class="header-line"></span>
+    <span class="header-diamond"></span>
+    <span class="header-text" data-editable="true" data-field="restaurantName">Madras Filter House</span>
+    <span class="header-diamond"></span>
+    <span class="header-line"></span>
+  </div>
+
+  <div class="container">
+    <!-- Left panel: Coffee menu -->
+    <div class="panel panel-coffee">
+      <div class="brass-tray"></div>
+
+      <!-- Tumbler-Davara decoration -->
+      <div class="tumbler-davara">
+        <div class="tumbler"></div>
+        <div class="davara"></div>
+      </div>
+
+      <div class="panel-header">
+        <div class="panel-emoji">&#9749;</div>
+        <h2 class="panel-title" data-editable="true" data-field="coffeeSectionTitle">Filter Kaapi</h2>
+        <p class="panel-subtitle" data-editable="true" data-field="coffeeSubtitle">Brewed Fresh &bull; Decoction Style</p>
+        <div class="panel-divider"></div>
+      </div>
+
+      <div class="menu-list">
+        <div class="menu-item">
+          <span class="item-name" data-editable="true" data-field="coffee1Name">Traditional Filter Coffee</span>
+          <span class="item-price" data-editable="true" data-field="coffee1Price">$2.99</span>
+          <span class="item-desc" data-editable="true" data-field="coffee1Desc">Strong South Indian brew with chicory</span>
+        </div>
+
+        <div class="menu-item">
+          <span class="item-name" data-editable="true" data-field="coffee2Name">Double Strong</span>
+          <span class="item-price" data-editable="true" data-field="coffee2Price">$3.49</span>
+          <span class="item-desc" data-editable="true" data-field="coffee2Desc">Extra decoction, bold &amp; aromatic</span>
+        </div>
+
+        <div class="menu-item">
+          <span class="item-name" data-editable="true" data-field="coffee3Name">Mylapur Special</span>
+          <span class="item-price" data-editable="true" data-field="coffee3Price">$3.99</span>
+          <span class="item-desc" data-editable="true" data-field="coffee3Desc">Coffee with palm jaggery sweetness</span>
+        </div>
+
+        <div class="menu-item">
+          <span class="item-name" data-editable="true" data-field="coffee4Name">Degree Coffee</span>
+          <span class="item-price" data-editable="true" data-field="coffee4Price">$3.49</span>
+          <span class="item-desc" data-editable="true" data-field="coffee4Desc">Traditional fresh milk coffee</span>
+        </div>
+
+        <div class="bev-separator"></div>
+
+        <div class="section-subheader" data-editable="true" data-field="otherBevTitle">More Beverages</div>
+
+        <div class="menu-item">
+          <span class="item-name" data-editable="true" data-field="bev1Name">Masala Chai</span>
+          <span class="item-price" data-editable="true" data-field="bev1Price">$2.49</span>
+          <span class="item-desc" data-editable="true" data-field="bev1Desc">Cardamom, ginger &amp; cinnamon spiced tea</span>
+        </div>
+
+        <div class="menu-item">
+          <span class="item-name" data-editable="true" data-field="bev2Name">Ginger Tea</span>
+          <span class="item-price" data-editable="true" data-field="bev2Price">$2.49</span>
+          <span class="item-desc" data-editable="true" data-field="bev2Desc">Fresh ginger-infused black tea</span>
+        </div>
+
+        <div class="menu-item">
+          <span class="item-name" data-editable="true" data-field="bev3Name">Fresh Lime Soda</span>
+          <span class="item-price" data-editable="true" data-field="bev3Price">$2.99</span>
+          <span class="item-desc" data-editable="true" data-field="bev3Desc">Sweet or salty, freshly squeezed</span>
+        </div>
+
+        <div class="menu-item">
+          <span class="item-name" data-editable="true" data-field="bev4Name">Rose Milk</span>
+          <span class="item-price" data-editable="true" data-field="bev4Price">$2.99</span>
+          <span class="item-desc" data-editable="true" data-field="bev4Desc">Chilled rose syrup with fresh milk</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right panel: Snacks menu -->
+    <div class="panel panel-snacks">
+      <div class="panel-header">
+        <div class="panel-emoji">&#127871;</div>
+        <h2 class="panel-title" data-editable="true" data-field="snacksSectionTitle">Evening Tiffin</h2>
+        <p class="panel-subtitle" data-editable="true" data-field="snacksSubtitle">4:00 PM - 7:00 PM Specials</p>
+        <div class="panel-divider"></div>
+      </div>
+
+      <div class="menu-list">
+        <div class="menu-item">
+          <span class="item-name" data-editable="true" data-field="snack1Name">Bajji Plate</span>
+          <span class="item-price" data-editable="true" data-field="snack1Price">$4.99</span>
+          <span class="item-desc" data-editable="true" data-field="snack1Desc">Mixed vegetable fritters with chutney</span>
+        </div>
+
+        <div class="menu-item">
+          <span class="item-name" data-editable="true" data-field="snack2Name">Bonda (4 pcs)</span>
+          <span class="item-price" data-editable="true" data-field="snack2Price">$4.49</span>
+          <span class="item-desc" data-editable="true" data-field="snack2Desc">Crispy potato dumplings, golden fried</span>
+        </div>
+
+        <div class="menu-item">
+          <span class="item-name" data-editable="true" data-field="snack3Name">Murukku Plate</span>
+          <span class="item-price" data-editable="true" data-field="snack3Price">$3.99</span>
+          <span class="item-desc" data-editable="true" data-field="snack3Desc">Assorted crispy spiral snacks</span>
+        </div>
+
+        <div class="menu-item">
+          <span class="item-name" data-editable="true" data-field="snack4Name">Masala Sundal</span>
+          <span class="item-price" data-editable="true" data-field="snack4Price">$3.49</span>
+          <span class="item-desc" data-editable="true" data-field="snack4Desc">Spiced chickpea snack with coconut</span>
+        </div>
+
+        <div class="menu-item">
+          <span class="item-name" data-editable="true" data-field="snack5Name">Medhu Pakoda</span>
+          <span class="item-price" data-editable="true" data-field="snack5Price">$4.99</span>
+          <span class="item-desc" data-editable="true" data-field="snack5Desc">Spicy lentil fritters, extra crunchy</span>
+        </div>
+
+        <div class="menu-item">
+          <span class="item-name" data-editable="true" data-field="snack6Name">Mixture (Large)</span>
+          <span class="item-price" data-editable="true" data-field="snack6Price">$3.99</span>
+          <span class="item-desc" data-editable="true" data-field="snack6Desc">Classic South Indian savory mix</span>
+        </div>
+
+        <div class="menu-item">
+          <span class="item-name" data-editable="true" data-field="snack7Name">Banana Chips</span>
+          <span class="item-price" data-editable="true" data-field="snack7Price">$2.99</span>
+          <span class="item-desc" data-editable="true" data-field="snack7Desc">Kerala-style thin-sliced, salt &amp; pepper</span>
+        </div>
+
+        <div class="bev-separator"></div>
+
+        <div class="section-subheader" data-editable="true" data-field="comboTitle">Combo Special</div>
+
+        <div class="menu-item">
+          <span class="item-name" data-editable="true" data-field="combo1Name">Coffee + Bajji Combo</span>
+          <span class="item-price" data-editable="true" data-field="combo1Price">$6.49</span>
+          <span class="item-desc" data-editable="true" data-field="combo1Desc">Filter coffee with bajji plate &amp; chutney</span>
+        </div>
+
+        <div class="menu-item">
+          <span class="item-name" data-editable="true" data-field="combo2Name">Chai + Bonda Combo</span>
+          <span class="item-price" data-editable="true" data-field="combo2Price">$5.99</span>
+          <span class="item-desc" data-editable="true" data-field="combo2Desc">Masala chai with 4 pcs bonda &amp; chutney</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-strip"></div>
+</body>
+</html>

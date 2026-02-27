@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@300;400;500;600;700&family=Caveat:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        /* Subtle leaf vein texture */
+        repeating-linear-gradient(
+          75deg,
+          transparent,
+          transparent 20px,
+          rgba(255,255,255,0.012) 20px,
+          rgba(255,255,255,0.012) 21px
+        ),
+        repeating-linear-gradient(
+          105deg,
+          transparent,
+          transparent 26px,
+          rgba(255,255,255,0.008) 26px,
+          rgba(255,255,255,0.008) 27px
+        ),
+        /* Warm golden spots */
+        radial-gradient(ellipse at 20% 30%, rgba(184,134,11,0.1) 0%, transparent 45%),
+        radial-gradient(ellipse at 80% 70%, rgba(232,185,49,0.06) 0%, transparent 40%),
+        radial-gradient(ellipse at 50% 100%, rgba(196,30,58,0.04) 0%, transparent 30%),
+        /* Dark green base */
+        linear-gradient(165deg, #1a2510 0%, #1e2c14 30%, #1a2510 50%, #1c2812 70%, #1a2510 100%);
+      color: #FFF8E7;
+    }
+
+    /* Turmeric glow top-left */
+    body::before {
+      content: '';
+      position: absolute;
+      top: -100px; left: -50px;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(232,185,49,0.12) 0%, rgba(184,134,11,0.04) 40%, transparent 65%);
+      border-radius: 50%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* Gold glow bottom-right */
+    body::after {
+      content: '';
+      position: absolute;
+      bottom: -80px; right: 50px;
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(232,185,49,0.08) 0%, transparent 55%);
+      border-radius: 50%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* Bright turmeric glow center */
+    .glow-center {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 800px; height: 600px;
+      background: radial-gradient(ellipse, rgba(232,185,49,0.04) 0%, transparent 60%);
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* Banana leaf accent curve — top-right */
+    .leaf-curve-tr {
+      position: absolute;
+      top: -30px; right: -30px;
+      width: 300px; height: 180px;
+      border-radius: 0 0 0 100%;
+      background: linear-gradient(210deg, rgba(45,80,22,0.3) 0%, transparent 60%);
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* Banana leaf accent curve — bottom-left */
+    .leaf-curve-bl {
+      position: absolute;
+      bottom: -30px; left: -30px;
+      width: 250px; height: 150px;
+      border-radius: 0 100% 0 0;
+      background: linear-gradient(30deg, rgba(45,80,22,0.25) 0%, transparent 60%);
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* Banana leaf midrib line */
+    .leaf-midrib {
+      position: absolute;
+      top: 0; bottom: 0;
+      left: 50%;
+      width: 3px;
+      background: linear-gradient(180deg,
+        rgba(60,100,30,0.15) 0%,
+        rgba(80,130,40,0.08) 50%,
+        rgba(60,100,30,0.15) 100%
+      );
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* Main layout */
+    .container {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      height: 100%;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      padding: 40px 50px 30px 50px;
+      gap: 20px;
+    }
+
+    /* Header strip */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 30px;
+      padding: 20px 40px;
+      background: rgba(232,185,49,0.05);
+      border: 1px solid rgba(184,134,11,0.15);
+      border-radius: 18px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 6px 30px rgba(0,0,0,0.25);
+      position: relative;
+    }
+
+    /* Gold accent line top */
+    .header::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 40px; right: 40px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #B8860B, #E8B931, #B8860B, transparent);
+    }
+
+    .header-emoji {
+      font-size: 80px;
+      line-height: 1;
+      filter: drop-shadow(0 0 20px rgba(232,185,49,0.25)) drop-shadow(0 4px 8px rgba(0,0,0,0.4));
+    }
+
+    .header-text {
+      text-align: center;
+    }
+
+    .title {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 68px;
+      color: #E8B931;
+      text-shadow: 0 2px 20px rgba(232,185,49,0.3), 0 0 60px rgba(232,185,49,0.1);
+      letter-spacing: 8px;
+      line-height: 1;
+    }
+
+    .subtitle {
+      font-family: 'Caveat', cursive;
+      font-size: 28px;
+      color: rgba(255,248,231,0.55);
+      letter-spacing: 3px;
+    }
+
+    /* Combos grid — 4 equal columns */
+    .combos-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 28px;
+      align-items: start;
+    }
+
+    /* Individual combo card */
+    .combo-card {
+      background: rgba(255,248,231,0.04);
+      border: 1px solid rgba(184,134,11,0.15);
+      border-radius: 22px;
+      padding: 0;
+      backdrop-filter: blur(10px);
+      box-shadow:
+        0 8px 30px rgba(0,0,0,0.25),
+        inset 0 1px 0 rgba(255,255,255,0.04);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .combo-card:nth-child(3) {
+      border-color: rgba(232,185,49,0.35);
+      box-shadow:
+        0 8px 40px rgba(0,0,0,0.3),
+        0 0 30px rgba(232,185,49,0.08),
+        inset 0 1px 0 rgba(255,255,255,0.05);
+    }
+
+    /* Top gradient on card */
+    .combo-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 140px;
+      background: linear-gradient(180deg, rgba(45,80,22,0.12) 0%, transparent 100%);
+      pointer-events: none;
+    }
+
+    /* Combo number badge */
+    .combo-badge {
+      width: 80px; height: 80px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 36px;
+      color: #1a2510;
+      margin: 28px auto 16px auto;
+      position: relative;
+      z-index: 1;
+      background: linear-gradient(135deg, #E8B931 0%, #B8860B 50%, #E8B931 100%);
+      box-shadow:
+        0 4px 15px rgba(184,134,11,0.3),
+        0 0 25px rgba(232,185,49,0.15),
+        inset 0 1px 0 rgba(255,255,255,0.3);
+    }
+
+    /* Outer ring on badge */
+    .combo-badge::before {
+      content: '';
+      position: absolute;
+      top: -5px; left: -5px; right: -5px; bottom: -5px;
+      border-radius: 50%;
+      border: 2px solid rgba(232,185,49,0.3);
+    }
+
+    .combo-name {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 28px;
+      color: #E8B931;
+      text-align: center;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      padding: 0 20px;
+      margin-bottom: 6px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Best value ribbon */
+    .best-value {
+      position: absolute;
+      top: 18px; right: -32px;
+      background: linear-gradient(90deg, #C41E3A, #e02050);
+      color: #fff;
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 6px 40px;
+      transform: rotate(35deg);
+      z-index: 3;
+      box-shadow: 0 3px 10px rgba(196,30,58,0.4);
+    }
+
+    /* Star burst behind best value */
+    .combo-card:nth-child(3) .combo-badge {
+      background: linear-gradient(135deg, #FFD700 0%, #FF9933 50%, #FFD700 100%);
+      box-shadow:
+        0 4px 20px rgba(255,215,0,0.4),
+        0 0 40px rgba(255,215,0,0.15),
+        inset 0 1px 0 rgba(255,255,255,0.4);
+    }
+
+    /* Divider line */
+    .combo-divider {
+      width: 60%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(184,134,11,0.3), transparent);
+      margin: 8px auto 14px auto;
+    }
+
+    /* Items list */
+    .combo-items {
+      flex: 1;
+      padding: 0 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .combo-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: 'Inter', sans-serif;
+      font-size: 20px;
+      color: #FFF8E7;
+      font-weight: 400;
+      line-height: 1.3;
+    }
+
+    /* Green check dot */
+    .combo-item::before {
+      content: '';
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #4CAF50, #2D5016);
+      flex-shrink: 0;
+      box-shadow: 0 0 6px rgba(76,175,80,0.3);
+    }
+
+    /* Price at bottom */
+    .combo-price-section {
+      padding: 18px 24px 24px 24px;
+      text-align: center;
+      margin-top: auto;
+    }
+
+    .combo-price-divider {
+      width: 80%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(184,134,11,0.25), transparent);
+      margin: 0 auto 14px auto;
+    }
+
+    .combo-price {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 46px;
+      color: #E8B931;
+      text-shadow: 0 0 20px rgba(232,185,49,0.25);
+      line-height: 1;
+    }
+
+    /* Footer */
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 40px;
+      padding: 16px 40px;
+      background: rgba(232,185,49,0.04);
+      border: 1px solid rgba(184,134,11,0.1);
+      border-radius: 14px;
+      backdrop-filter: blur(8px);
+    }
+
+    .footer-note {
+      font-family: 'Caveat', cursive;
+      font-size: 26px;
+      color: #E8B931;
+      letter-spacing: 1px;
+    }
+
+    .footer-divider {
+      width: 2px; height: 24px;
+      background: rgba(184,134,11,0.3);
+    }
+
+    .footer-info {
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+      font-size: 18px;
+      color: rgba(255,248,231,0.55);
+      letter-spacing: 2px;
+    }
+
+    /* Plate emoji accent */
+    .plate-accent {
+      position: absolute;
+      bottom: 80px; right: 50px;
+      font-size: 100px;
+      line-height: 1;
+      opacity: 0.15;
+      filter: drop-shadow(0 0 20px rgba(232,185,49,0.2));
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .plate-accent-left {
+      position: absolute;
+      top: 80px; left: 30px;
+      font-size: 80px;
+      line-height: 1;
+      opacity: 0.12;
+      filter: drop-shadow(0 0 15px rgba(232,185,49,0.15));
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* SVG decorative corner elements */
+    .corner-svg {
+      position: absolute;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* Bottom accent bar */
+    .bottom-bar {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #2D5016, #B8860B, #E8B931, #B8860B, #2D5016);
+      z-index: 5;
+    }
+
+    /* Red accent stripe top */
+    .red-accent-top {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, transparent, #C41E3A, #B8860B, #C41E3A, transparent);
+      z-index: 5;
+    }
+
+    /* Value arrows / burst near best deal */
+    .value-burst {
+      position: absolute;
+      z-index: 2;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="glow-center"></div>
+  <div class="leaf-curve-tr"></div>
+  <div class="leaf-curve-bl"></div>
+  <div class="leaf-midrib"></div>
+  <div class="red-accent-top"></div>
+
+  <!-- Emoji accents -->
+  <div class="plate-accent">&#127869;</div>
+  <div class="plate-accent-left">&#9749;</div>
+
+  <!-- Corner SVGs -->
+  <svg class="corner-svg" style="top:12px;left:12px;opacity:0.2;" width="90" height="90" viewBox="0 0 90 90" fill="none">
+    <path d="M10 80 Q10 40 30 25 Q50 10 80 10" stroke="#B8860B" stroke-width="1.5" fill="none"/>
+    <path d="M10 65 Q15 35 30 25 Q50 15 70 12" stroke="#E8B931" stroke-width="1" fill="none" opacity="0.6"/>
+    <circle cx="12" cy="78" r="4" fill="#B8860B" opacity="0.4"/>
+    <circle cx="78" cy="12" r="3" fill="#B8860B" opacity="0.3"/>
+  </svg>
+  <svg class="corner-svg" style="top:12px;right:12px;opacity:0.2;transform:scaleX(-1);" width="90" height="90" viewBox="0 0 90 90" fill="none">
+    <path d="M10 80 Q10 40 30 25 Q50 10 80 10" stroke="#B8860B" stroke-width="1.5" fill="none"/>
+    <path d="M10 65 Q15 35 30 25 Q50 15 70 12" stroke="#E8B931" stroke-width="1" fill="none" opacity="0.6"/>
+    <circle cx="12" cy="78" r="4" fill="#B8860B" opacity="0.4"/>
+  </svg>
+  <svg class="corner-svg" style="bottom:12px;left:12px;opacity:0.2;transform:scaleY(-1);" width="90" height="90" viewBox="0 0 90 90" fill="none">
+    <path d="M10 80 Q10 40 30 25 Q50 10 80 10" stroke="#B8860B" stroke-width="1.5" fill="none"/>
+    <path d="M10 65 Q15 35 30 25 Q50 15 70 12" stroke="#E8B931" stroke-width="1" fill="none" opacity="0.6"/>
+    <circle cx="12" cy="78" r="4" fill="#B8860B" opacity="0.4"/>
+  </svg>
+  <svg class="corner-svg" style="bottom:12px;right:12px;opacity:0.2;transform:scale(-1,-1);" width="90" height="90" viewBox="0 0 90 90" fill="none">
+    <path d="M10 80 Q10 40 30 25 Q50 10 80 10" stroke="#B8860B" stroke-width="1.5" fill="none"/>
+    <path d="M10 65 Q15 35 30 25 Q50 15 70 12" stroke="#E8B931" stroke-width="1" fill="none" opacity="0.6"/>
+    <circle cx="12" cy="78" r="4" fill="#B8860B" opacity="0.4"/>
+  </svg>
+
+  <!-- Value burst SVG near combo 3 -->
+  <svg class="value-burst" style="top:180px;left:980px;opacity:0.15;" width="120" height="120" viewBox="0 0 120 120" fill="none">
+    <polygon points="60,5 68,42 105,42 75,65 85,100 60,78 35,100 45,65 15,42 52,42" stroke="#FFD700" stroke-width="1" fill="none"/>
+  </svg>
+
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-emoji">&#127869;</div>
+      <div class="header-text">
+        <h1 class="title" data-editable="true" data-field="title">COMBO MEALS</h1>
+        <p class="subtitle" data-editable="true" data-field="subtitle">Complete Meals &bull; Great Value</p>
+      </div>
+      <div class="header-emoji">&#127869;</div>
+    </div>
+
+    <!-- 4 Combo cards -->
+    <div class="combos-grid">
+      <!-- Combo #1 -->
+      <div class="combo-card">
+        <div class="combo-badge">1</div>
+        <div class="combo-name" data-editable="true" data-field="combo1Name">TIFFIN COMBO</div>
+        <div class="combo-divider"></div>
+        <div class="combo-items">
+          <div class="combo-item" data-editable="true" data-field="combo1Item1">2 Idli</div>
+          <div class="combo-item" data-editable="true" data-field="combo1Item2">1 Vada</div>
+          <div class="combo-item" data-editable="true" data-field="combo1Item3">Sambar</div>
+          <div class="combo-item" data-editable="true" data-field="combo1Item4">Chutney</div>
+          <div class="combo-item" data-editable="true" data-field="combo1Item5">Filter Coffee</div>
+        </div>
+        <div class="combo-price-section">
+          <div class="combo-price-divider"></div>
+          <div class="combo-price" data-editable="true" data-field="combo1Price">$7.99</div>
+        </div>
+      </div>
+
+      <!-- Combo #2 -->
+      <div class="combo-card">
+        <div class="combo-badge">2</div>
+        <div class="combo-name" data-editable="true" data-field="combo2Name">DOSA COMBO</div>
+        <div class="combo-divider"></div>
+        <div class="combo-items">
+          <div class="combo-item" data-editable="true" data-field="combo2Item1">Masala Dosa</div>
+          <div class="combo-item" data-editable="true" data-field="combo2Item2">1 Vada</div>
+          <div class="combo-item" data-editable="true" data-field="combo2Item3">Sambar &amp; Chutney</div>
+          <div class="combo-item" data-editable="true" data-field="combo2Item4">Filter Coffee</div>
+        </div>
+        <div class="combo-price-section">
+          <div class="combo-price-divider"></div>
+          <div class="combo-price" data-editable="true" data-field="combo2Price">$9.99</div>
+        </div>
+      </div>
+
+      <!-- Combo #3 (BEST VALUE) -->
+      <div class="combo-card">
+        <div class="best-value" data-editable="true" data-field="bestValueLabel">BEST VALUE</div>
+        <div class="combo-badge">3</div>
+        <div class="combo-name" data-editable="true" data-field="combo3Name">MEALS COMBO</div>
+        <div class="combo-divider"></div>
+        <div class="combo-items">
+          <div class="combo-item" data-editable="true" data-field="combo3Item1">Full Meals (Banana Leaf)</div>
+          <div class="combo-item" data-editable="true" data-field="combo3Item2">Unlimited Rice</div>
+          <div class="combo-item" data-editable="true" data-field="combo3Item3">Sambar &amp; Rasam</div>
+          <div class="combo-item" data-editable="true" data-field="combo3Item4">Payasam</div>
+          <div class="combo-item" data-editable="true" data-field="combo3Item5">Buttermilk</div>
+        </div>
+        <div class="combo-price-section">
+          <div class="combo-price-divider"></div>
+          <div class="combo-price" data-editable="true" data-field="combo3Price">$12.99</div>
+        </div>
+      </div>
+
+      <!-- Combo #4 -->
+      <div class="combo-card">
+        <div class="combo-badge">4</div>
+        <div class="combo-name" data-editable="true" data-field="combo4Name">FAMILY COMBO</div>
+        <div class="combo-divider"></div>
+        <div class="combo-items">
+          <div class="combo-item" data-editable="true" data-field="combo4Item1">2 Masala Dosa</div>
+          <div class="combo-item" data-editable="true" data-field="combo4Item2">4 Idli</div>
+          <div class="combo-item" data-editable="true" data-field="combo4Item3">2 Vada</div>
+          <div class="combo-item" data-editable="true" data-field="combo4Item4">4 Chutney</div>
+          <div class="combo-item" data-editable="true" data-field="combo4Item5">2 Filter Coffee</div>
+        </div>
+        <div class="combo-price-section">
+          <div class="combo-price-divider"></div>
+          <div class="combo-price" data-editable="true" data-field="combo4Price">$19.99</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <span class="footer-note" data-editable="true" data-field="footerNote">Add Filter Coffee to any combo for $1.99</span>
+      <div class="footer-divider"></div>
+      <span class="footer-info" data-editable="true" data-field="footerInfo">Dine-in Only &bull; 11 AM &ndash; 9 PM</span>
+    </div>
+  </div>
+
+  <div class="bottom-bar"></div>
+</body>
+</html>

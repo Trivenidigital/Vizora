@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@300;400;500;600;700&family=Caveat:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        /* Subtle shimmer pattern — tiny gold dots */
+        radial-gradient(circle, rgba(255,215,0,0.06) 1px, transparent 1px),
+        /* Cross-hatch festive texture */
+        repeating-linear-gradient(
+          45deg,
+          transparent,
+          transparent 30px,
+          rgba(255,153,51,0.02) 30px,
+          rgba(255,153,51,0.02) 31px
+        ),
+        repeating-linear-gradient(
+          -45deg,
+          transparent,
+          transparent 30px,
+          rgba(255,215,0,0.02) 30px,
+          rgba(255,215,0,0.02) 31px
+        ),
+        /* Deep warm base */
+        radial-gradient(ellipse at 30% 20%, rgba(255,153,51,0.12) 0%, transparent 50%),
+        radial-gradient(ellipse at 70% 80%, rgba(233,30,139,0.06) 0%, transparent 40%),
+        linear-gradient(160deg, #1a0a02 0%, #2a1005 25%, #1a0a02 50%, #200d04 75%, #1a0a02 100%);
+      background-size: 24px 24px, auto, auto, auto, auto, auto;
+      color: #FFF8E7;
+    }
+
+    /* Saffron glow — top left */
+    body::before {
+      content: '';
+      position: absolute;
+      top: -120px; left: -80px;
+      width: 700px; height: 700px;
+      background: radial-gradient(circle, rgba(255,153,51,0.18) 0%, rgba(255,215,0,0.06) 40%, transparent 65%);
+      border-radius: 50%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* Golden glow — bottom right */
+    body::after {
+      content: '';
+      position: absolute;
+      bottom: -100px; right: -60px;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(255,215,0,0.12) 0%, rgba(184,134,11,0.04) 40%, transparent 60%);
+      border-radius: 50%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* Pink festive glow center-right */
+    .glow-pink {
+      position: absolute;
+      top: 300px; right: 200px;
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(233,30,139,0.06) 0%, transparent 55%);
+      border-radius: 50%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* CSS Rangoli pattern — concentric rotated squares */
+    .rangoli {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 1920px; height: 1080px;
+      z-index: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .rangoli-diamond {
+      position: absolute;
+      top: 50%; left: 50%;
+      border: 1px solid rgba(255,215,0,0.04);
+      transform: translate(-50%, -50%) rotate(45deg);
+    }
+    .rangoli-diamond:nth-child(1) { width: 200px; height: 200px; border-color: rgba(255,215,0,0.07); }
+    .rangoli-diamond:nth-child(2) { width: 350px; height: 350px; border-color: rgba(255,153,51,0.05); }
+    .rangoli-diamond:nth-child(3) { width: 500px; height: 500px; border-color: rgba(255,215,0,0.04); }
+    .rangoli-diamond:nth-child(4) { width: 700px; height: 700px; border-color: rgba(233,30,139,0.03); }
+    .rangoli-diamond:nth-child(5) { width: 900px; height: 900px; border-color: rgba(255,215,0,0.03); }
+    .rangoli-diamond:nth-child(6) { width: 1100px; height: 1100px; border-color: rgba(255,153,51,0.02); }
+
+    /* Rangoli center dot cluster */
+    .rangoli-center {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 40px; height: 40px;
+      background: radial-gradient(circle, rgba(255,215,0,0.12) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+
+    /* Sparkle CSS elements — small gold glow dots */
+    .sparkle {
+      position: absolute;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,215,0,0.8) 0%, rgba(255,215,0,0.2) 40%, transparent 70%);
+      z-index: 1;
+      pointer-events: none;
+    }
+    .sparkle:nth-child(1) { top: 80px; left: 300px; width: 4px; height: 4px; }
+    .sparkle:nth-child(2) { top: 150px; right: 250px; width: 5px; height: 5px; }
+    .sparkle:nth-child(3) { top: 500px; left: 180px; width: 3px; height: 3px; }
+    .sparkle:nth-child(4) { bottom: 200px; right: 400px; width: 6px; height: 6px; }
+    .sparkle:nth-child(5) { top: 350px; left: 700px; width: 4px; height: 4px; }
+    .sparkle:nth-child(6) { bottom: 120px; left: 500px; width: 5px; height: 5px; }
+    .sparkle:nth-child(7) { top: 200px; right: 600px; width: 3px; height: 3px; }
+    .sparkle:nth-child(8) { bottom: 350px; right: 150px; width: 4px; height: 4px; }
+
+    /* Main layout */
+    .container {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      height: 100%;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      padding: 40px 60px 30px 60px;
+    }
+
+    /* Hero / featured section */
+    .hero {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 30px;
+      padding: 25px 40px;
+      margin-bottom: 25px;
+      background: rgba(255,215,0,0.04);
+      border: 1px solid rgba(255,215,0,0.12);
+      border-radius: 20px;
+      backdrop-filter: blur(10px);
+      box-shadow:
+        0 8px 40px rgba(0,0,0,0.3),
+        inset 0 1px 0 rgba(255,215,0,0.08);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Gold shimmer line across hero top */
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent 0%, #FFD700 20%, #FF9933 50%, #FFD700 80%, transparent 100%);
+    }
+
+    .hero-emoji {
+      font-size: 100px;
+      line-height: 1;
+      filter: drop-shadow(0 0 25px rgba(255,215,0,0.4)) drop-shadow(0 4px 10px rgba(0,0,0,0.5));
+    }
+
+    .hero-content {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .hero-label {
+      font-family: 'Caveat', cursive;
+      font-size: 26px;
+      color: #FF9933;
+      letter-spacing: 2px;
+    }
+
+    .title {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 64px;
+      color: #FFD700;
+      text-shadow: 0 2px 20px rgba(255,215,0,0.3), 0 0 60px rgba(255,215,0,0.1);
+      letter-spacing: 6px;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+
+    .subtitle {
+      font-family: 'Caveat', cursive;
+      font-size: 26px;
+      color: rgba(255,248,231,0.55);
+      letter-spacing: 2px;
+    }
+
+    .special-section {
+      text-align: right;
+      min-width: 350px;
+    }
+
+    .special-badge {
+      display: inline-block;
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: 14px;
+      color: #1a0a02;
+      background: linear-gradient(135deg, #FFD700 0%, #FF9933 100%);
+      padding: 5px 18px;
+      border-radius: 20px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .special-name {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 34px;
+      color: #FFF8E7;
+      line-height: 1.1;
+    }
+
+    .special-price {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 40px;
+      color: #FFD700;
+      text-shadow: 0 0 20px rgba(255,215,0,0.3);
+    }
+
+    .special-desc {
+      font-family: 'Caveat', cursive;
+      font-size: 22px;
+      color: rgba(255,248,231,0.5);
+    }
+
+    /* Sweets grid */
+    .sweets-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+
+    .category-col {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .category-header {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 26px;
+      color: #FF9933;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      padding-bottom: 8px;
+      border-bottom: 2px solid rgba(255,153,51,0.3);
+      text-align: center;
+    }
+
+    .sweet-card {
+      background: rgba(255,215,0,0.03);
+      border: 1px solid rgba(255,215,0,0.1);
+      border-radius: 14px;
+      padding: 16px 20px;
+      backdrop-filter: blur(8px);
+      box-shadow:
+        0 4px 16px rgba(0,0,0,0.2),
+        inset 0 1px 0 rgba(255,255,255,0.03);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Double gold border effect */
+    .sweet-card::before {
+      content: '';
+      position: absolute;
+      top: 3px; left: 3px; right: 3px; bottom: 3px;
+      border: 1px solid rgba(255,215,0,0.06);
+      border-radius: 11px;
+      pointer-events: none;
+    }
+
+    .sweet-card:nth-child(odd) {
+      background: rgba(255,215,0,0.05);
+    }
+
+    .sweet-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 4px;
+    }
+
+    .sweet-name {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 22px;
+      color: #FFF8E7;
+    }
+
+    .sweet-name::after {
+      content: '';
+      flex: 1;
+      margin: 0 8px;
+      border-bottom: 1px dotted rgba(184,134,11,0.3);
+    }
+
+    .sweet-price {
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: 22px;
+      color: #FFD700;
+      white-space: nowrap;
+    }
+
+    .sweet-desc {
+      font-family: 'Caveat', cursive;
+      font-size: 19px;
+      color: rgba(255,248,231,0.45);
+      line-height: 1.2;
+    }
+
+    /* Gift box CTA footer */
+    .footer-cta {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 40px;
+      margin-top: 20px;
+      padding: 20px 40px;
+      background: linear-gradient(90deg, rgba(255,215,0,0.03) 0%, rgba(255,215,0,0.08) 50%, rgba(255,215,0,0.03) 100%);
+      border: 1px solid rgba(255,215,0,0.12);
+      border-radius: 16px;
+      backdrop-filter: blur(8px);
+    }
+
+    .footer-cta::before {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, #FFD700, #FF9933, #E91E8B, #FF9933, #FFD700, transparent);
+    }
+
+    .gift-emoji {
+      font-size: 60px;
+      line-height: 1;
+      filter: drop-shadow(0 0 15px rgba(255,215,0,0.3));
+    }
+
+    .gift-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .gift-title {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 30px;
+      color: #FFD700;
+      letter-spacing: 6px;
+    }
+
+    .gift-prices {
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 22px;
+      color: #FFF8E7;
+      letter-spacing: 1px;
+    }
+
+    .gift-prices .price-highlight {
+      color: #FFD700;
+      font-weight: 700;
+    }
+
+    .gift-note {
+      font-family: 'Caveat', cursive;
+      font-size: 22px;
+      color: rgba(255,248,231,0.5);
+    }
+
+    /* Ornate corner SVG elements */
+    .corner-ornament {
+      position: absolute;
+      z-index: 1;
+      pointer-events: none;
+    }
+    .corner-tl { top: 10px; left: 10px; }
+    .corner-tr { top: 10px; right: 10px; transform: scaleX(-1); }
+    .corner-bl { bottom: 10px; left: 10px; transform: scaleY(-1); }
+    .corner-br { bottom: 10px; right: 10px; transform: scale(-1, -1); }
+
+    /* Lamp emoji accent */
+    .lamp-accent {
+      position: absolute;
+      top: 40px; right: 80px;
+      font-size: 120px;
+      line-height: 1;
+      filter: drop-shadow(0 0 40px rgba(255,215,0,0.25)) drop-shadow(0 8px 16px rgba(0,0,0,0.4));
+      z-index: 1;
+      pointer-events: none;
+      opacity: 0.35;
+    }
+
+    /* Bottom accent bar */
+    .bottom-bar {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #FF9933, #FFD700, #E91E8B, #FFD700, #FF9933);
+      z-index: 5;
+    }
+  </style>
+</head>
+<body>
+  <div class="glow-pink"></div>
+
+  <!-- CSS Rangoli pattern -->
+  <div class="rangoli">
+    <div class="rangoli-diamond"></div>
+    <div class="rangoli-diamond"></div>
+    <div class="rangoli-diamond"></div>
+    <div class="rangoli-diamond"></div>
+    <div class="rangoli-diamond"></div>
+    <div class="rangoli-diamond"></div>
+    <div class="rangoli-center"></div>
+  </div>
+
+  <!-- Sparkle dots -->
+  <div class="sparkle"></div>
+  <div class="sparkle"></div>
+  <div class="sparkle"></div>
+  <div class="sparkle"></div>
+  <div class="sparkle"></div>
+  <div class="sparkle"></div>
+  <div class="sparkle"></div>
+  <div class="sparkle"></div>
+
+  <!-- Ornate paisley-curve corner SVGs -->
+  <svg class="corner-ornament corner-tl" width="120" height="120" viewBox="0 0 120 120" fill="none">
+    <path d="M10 110 Q10 50 40 30 Q60 15 90 10" stroke="#FFD700" stroke-width="1.5" fill="none" opacity="0.25"/>
+    <path d="M10 90 Q15 50 35 35 Q55 20 80 15" stroke="#FF9933" stroke-width="1" fill="none" opacity="0.2"/>
+    <circle cx="15" cy="105" r="4" fill="#FFD700" opacity="0.3"/>
+    <circle cx="95" cy="12" r="3" fill="#FFD700" opacity="0.2"/>
+    <!-- Paisley teardrop -->
+    <path d="M50 60 Q55 40 70 35 Q85 30 80 50 Q75 70 50 60Z" stroke="#FFD700" stroke-width="1" fill="none" opacity="0.12"/>
+    <circle cx="65" cy="48" r="3" fill="#FFD700" opacity="0.1"/>
+  </svg>
+  <svg class="corner-ornament corner-tr" width="120" height="120" viewBox="0 0 120 120" fill="none">
+    <path d="M10 110 Q10 50 40 30 Q60 15 90 10" stroke="#FFD700" stroke-width="1.5" fill="none" opacity="0.25"/>
+    <path d="M10 90 Q15 50 35 35 Q55 20 80 15" stroke="#FF9933" stroke-width="1" fill="none" opacity="0.2"/>
+    <circle cx="15" cy="105" r="4" fill="#FFD700" opacity="0.3"/>
+    <circle cx="95" cy="12" r="3" fill="#FFD700" opacity="0.2"/>
+    <path d="M50 60 Q55 40 70 35 Q85 30 80 50 Q75 70 50 60Z" stroke="#FFD700" stroke-width="1" fill="none" opacity="0.12"/>
+  </svg>
+  <svg class="corner-ornament corner-bl" width="120" height="120" viewBox="0 0 120 120" fill="none">
+    <path d="M10 110 Q10 50 40 30 Q60 15 90 10" stroke="#FFD700" stroke-width="1.5" fill="none" opacity="0.25"/>
+    <path d="M10 90 Q15 50 35 35 Q55 20 80 15" stroke="#FF9933" stroke-width="1" fill="none" opacity="0.2"/>
+    <circle cx="15" cy="105" r="4" fill="#FFD700" opacity="0.3"/>
+  </svg>
+  <svg class="corner-ornament corner-br" width="120" height="120" viewBox="0 0 120 120" fill="none">
+    <path d="M10 110 Q10 50 40 30 Q60 15 90 10" stroke="#FFD700" stroke-width="1.5" fill="none" opacity="0.25"/>
+    <path d="M10 90 Q15 50 35 35 Q55 20 80 15" stroke="#FF9933" stroke-width="1" fill="none" opacity="0.2"/>
+    <circle cx="15" cy="105" r="4" fill="#FFD700" opacity="0.3"/>
+  </svg>
+
+  <!-- Lamp emoji accent -->
+  <div class="lamp-accent">&#129684;</div>
+
+  <div class="container">
+    <!-- Hero / Featured Sweet -->
+    <div class="hero">
+      <div class="hero-emoji">&#10024;</div>
+      <div class="hero-content">
+        <h1 class="title" data-editable="true" data-field="title">SOUTH INDIAN SWEETS</h1>
+        <p class="subtitle" data-editable="true" data-field="subtitle">Made Fresh Daily &bull; Perfect for Celebrations</p>
+      </div>
+      <div class="special-section">
+        <div class="special-badge" data-editable="true" data-field="specialBadge">&#11088; TODAY'S SPECIAL</div>
+        <div class="special-name" data-editable="true" data-field="specialName">Mysore Pak</div>
+        <div class="special-price" data-editable="true" data-field="specialPrice">$6.99/lb</div>
+        <div class="special-desc" data-editable="true" data-field="specialDesc">Melt-in-mouth ghee &amp; gram flour delight</div>
+      </div>
+    </div>
+
+    <!-- Sweets grid: 3 columns x 4 rows -->
+    <div class="sweets-grid">
+      <!-- Column 1: Traditional -->
+      <div class="category-col">
+        <div class="category-header" data-editable="true" data-field="cat1Title">TRADITIONAL</div>
+        <div class="sweet-card">
+          <div class="sweet-header">
+            <span class="sweet-name" data-editable="true" data-field="trad1Name">Kesari Bath</span>
+            <span class="sweet-price" data-editable="true" data-field="trad1Price">$4.99</span>
+          </div>
+          <div class="sweet-desc" data-editable="true" data-field="trad1Desc">Saffron semolina</div>
+        </div>
+        <div class="sweet-card">
+          <div class="sweet-header">
+            <span class="sweet-name" data-editable="true" data-field="trad2Name">Payasam (Cup)</span>
+            <span class="sweet-price" data-editable="true" data-field="trad2Price">$3.99</span>
+          </div>
+          <div class="sweet-desc" data-editable="true" data-field="trad2Desc">Vermicelli kheer</div>
+        </div>
+        <div class="sweet-card">
+          <div class="sweet-header">
+            <span class="sweet-name" data-editable="true" data-field="trad3Name">Jangiri</span>
+            <span class="sweet-price" data-editable="true" data-field="trad3Price">$1.99/pc</span>
+          </div>
+          <div class="sweet-desc" data-editable="true" data-field="trad3Desc">South Indian jalebi</div>
+        </div>
+        <div class="sweet-card">
+          <div class="sweet-header">
+            <span class="sweet-name" data-editable="true" data-field="trad4Name">Ladoo</span>
+            <span class="sweet-price" data-editable="true" data-field="trad4Price">$1.49/pc</span>
+          </div>
+          <div class="sweet-desc" data-editable="true" data-field="trad4Desc">Golden gram balls</div>
+        </div>
+      </div>
+
+      <!-- Column 2: Milk Sweets -->
+      <div class="category-col">
+        <div class="category-header" data-editable="true" data-field="cat2Title">MILK SWEETS</div>
+        <div class="sweet-card">
+          <div class="sweet-header">
+            <span class="sweet-name" data-editable="true" data-field="milk1Name">Badam Halwa</span>
+            <span class="sweet-price" data-editable="true" data-field="milk1Price">$7.99</span>
+          </div>
+          <div class="sweet-desc" data-editable="true" data-field="milk1Desc">Almond milk fudge</div>
+        </div>
+        <div class="sweet-card">
+          <div class="sweet-header">
+            <span class="sweet-name" data-editable="true" data-field="milk2Name">Paal Kozhukattai</span>
+            <span class="sweet-price" data-editable="true" data-field="milk2Price">$5.99</span>
+          </div>
+          <div class="sweet-desc" data-editable="true" data-field="milk2Desc">Rice milk dumplings</div>
+        </div>
+        <div class="sweet-card">
+          <div class="sweet-header">
+            <span class="sweet-name" data-editable="true" data-field="milk3Name">Thirattipaal</span>
+            <span class="sweet-price" data-editable="true" data-field="milk3Price">$8.99</span>
+          </div>
+          <div class="sweet-desc" data-editable="true" data-field="milk3Desc">Reduced milk sweet</div>
+        </div>
+        <div class="sweet-card">
+          <div class="sweet-header">
+            <span class="sweet-name" data-editable="true" data-field="milk4Name">Milk Peda</span>
+            <span class="sweet-price" data-editable="true" data-field="milk4Price">$6.99</span>
+          </div>
+          <div class="sweet-desc" data-editable="true" data-field="milk4Desc">Cardamom milk fudge</div>
+        </div>
+      </div>
+
+      <!-- Column 3: Festival Special -->
+      <div class="category-col">
+        <div class="category-header" data-editable="true" data-field="cat3Title">FESTIVAL SPECIAL</div>
+        <div class="sweet-card">
+          <div class="sweet-header">
+            <span class="sweet-name" data-editable="true" data-field="fest1Name">Sweet Pongal</span>
+            <span class="sweet-price" data-editable="true" data-field="fest1Price">$4.99</span>
+          </div>
+          <div class="sweet-desc" data-editable="true" data-field="fest1Desc">Jaggery &amp; rice</div>
+        </div>
+        <div class="sweet-card">
+          <div class="sweet-header">
+            <span class="sweet-name" data-editable="true" data-field="fest2Name">Adhirasam</span>
+            <span class="sweet-price" data-editable="true" data-field="fest2Price">$5.99</span>
+          </div>
+          <div class="sweet-desc" data-editable="true" data-field="fest2Desc">Jaggery rice cake</div>
+        </div>
+        <div class="sweet-card">
+          <div class="sweet-header">
+            <span class="sweet-name" data-editable="true" data-field="fest3Name">Kozhukattai</span>
+            <span class="sweet-price" data-editable="true" data-field="fest3Price">$4.99</span>
+          </div>
+          <div class="sweet-desc" data-editable="true" data-field="fest3Desc">Modak steamed sweet</div>
+        </div>
+        <div class="sweet-card">
+          <div class="sweet-header">
+            <span class="sweet-name" data-editable="true" data-field="fest4Name">Boli / Obbattu</span>
+            <span class="sweet-price" data-editable="true" data-field="fest4Price">$2.99</span>
+          </div>
+          <div class="sweet-desc" data-editable="true" data-field="fest4Desc">Stuffed sweet flatbread</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gift box CTA strip -->
+    <div class="footer-cta">
+      <div class="gift-emoji">&#127873;</div>
+      <div class="gift-content">
+        <div class="gift-title" data-editable="true" data-field="giftTitle">GIFT BOXES</div>
+        <div class="gift-prices" data-editable="true" data-field="giftPrices">Small <span class="price-highlight">$14.99</span> &nbsp;|&nbsp; Medium <span class="price-highlight">$24.99</span> &nbsp;|&nbsp; Large <span class="price-highlight">$39.99</span></div>
+      </div>
+      <div class="gift-note" data-editable="true" data-field="giftNote">Custom assortment for weddings &amp; festivals</div>
+    </div>
+  </div>
+
+  <div class="bottom-bar"></div>
+</body>
+</html>

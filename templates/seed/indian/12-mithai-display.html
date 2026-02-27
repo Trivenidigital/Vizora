@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@300;400;500;600;700&family=Caveat:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        /* CSS rangoli — concentric geometric pattern */
+        radial-gradient(circle at 50% 50%, transparent 340px, rgba(255,215,0,0.015) 342px, transparent 344px),
+        radial-gradient(circle at 50% 50%, transparent 420px, rgba(255,153,51,0.012) 422px, transparent 424px),
+        radial-gradient(circle at 50% 50%, transparent 500px, rgba(255,215,0,0.01) 502px, transparent 504px),
+        radial-gradient(circle at 50% 50%, transparent 580px, rgba(233,30,139,0.008) 582px, transparent 584px),
+        /* Diagonal festive shimmer lines */
+        repeating-linear-gradient(
+          30deg,
+          transparent,
+          transparent 80px,
+          rgba(255,215,0,0.015) 80px,
+          rgba(255,215,0,0.015) 81px
+        ),
+        repeating-linear-gradient(
+          -30deg,
+          transparent,
+          transparent 80px,
+          rgba(233,30,139,0.01) 80px,
+          rgba(233,30,139,0.01) 81px
+        ),
+        /* Deep magenta/purple base */
+        linear-gradient(160deg, #4A0E2E 0%, #350a20 25%, #2c0819 50%, #4A0E2E 75%, #3a0b24 100%);
+      color: #FFF8E7;
+    }
+
+    /* Golden sparkle spots scattered */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background:
+        radial-gradient(circle at 5% 8%, rgba(255,215,0,0.3) 1px, transparent 1px),
+        radial-gradient(circle at 12% 35%, rgba(255,215,0,0.25) 1.5px, transparent 1.5px),
+        radial-gradient(circle at 8% 65%, rgba(255,215,0,0.2) 1px, transparent 1px),
+        radial-gradient(circle at 15% 88%, rgba(255,215,0,0.3) 1px, transparent 1px),
+        radial-gradient(circle at 25% 15%, rgba(255,215,0,0.2) 1.5px, transparent 1.5px),
+        radial-gradient(circle at 35% 50%, rgba(255,215,0,0.15) 1px, transparent 1px),
+        radial-gradient(circle at 45% 5%, rgba(255,215,0,0.25) 1px, transparent 1px),
+        radial-gradient(circle at 55% 92%, rgba(255,215,0,0.3) 1.5px, transparent 1.5px),
+        radial-gradient(circle at 62% 28%, rgba(255,215,0,0.2) 1px, transparent 1px),
+        radial-gradient(circle at 72% 60%, rgba(255,215,0,0.25) 1px, transparent 1px),
+        radial-gradient(circle at 78% 12%, rgba(255,215,0,0.3) 1.5px, transparent 1.5px),
+        radial-gradient(circle at 85% 42%, rgba(255,215,0,0.2) 1px, transparent 1px),
+        radial-gradient(circle at 88% 78%, rgba(255,215,0,0.25) 1px, transparent 1px),
+        radial-gradient(circle at 92% 18%, rgba(255,215,0,0.15) 1.5px, transparent 1.5px),
+        radial-gradient(circle at 95% 55%, rgba(255,215,0,0.3) 1px, transparent 1px),
+        radial-gradient(circle at 98% 88%, rgba(255,215,0,0.2) 1px, transparent 1px),
+        radial-gradient(circle at 20% 72%, rgba(255,215,0,0.15) 1px, transparent 1px),
+        radial-gradient(circle at 40% 38%, rgba(255,215,0,0.2) 1.5px, transparent 1.5px),
+        radial-gradient(circle at 50% 70%, rgba(255,215,0,0.25) 1px, transparent 1px),
+        radial-gradient(circle at 68% 85%, rgba(255,215,0,0.15) 1px, transparent 1px);
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* Saffron glow center */
+    body::after {
+      content: '';
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 1200px; height: 800px;
+      background: radial-gradient(ellipse, rgba(255,153,51,0.06) 0%, rgba(255,215,0,0.03) 30%, transparent 60%);
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* Festival gold glow — top */
+    .glow-top {
+      position: absolute;
+      top: -100px; left: 50%;
+      transform: translateX(-50%);
+      width: 1000px; height: 400px;
+      background: radial-gradient(ellipse, rgba(255,215,0,0.08) 0%, transparent 60%);
+      z-index: 1; pointer-events: none;
+    }
+
+    /* Festive pink glow — bottom right */
+    .glow-pink {
+      position: absolute;
+      bottom: -80px; right: 100px;
+      width: 500px; height: 400px;
+      background: radial-gradient(circle, rgba(233,30,139,0.05) 0%, transparent 60%);
+      border-radius: 50%;
+      z-index: 1; pointer-events: none;
+    }
+
+    /* Saffron glow — left */
+    .glow-saffron {
+      position: absolute;
+      top: 300px; left: -60px;
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, rgba(255,153,51,0.05) 0%, transparent 60%);
+      border-radius: 50%;
+      z-index: 1; pointer-events: none;
+    }
+
+    .container {
+      position: relative;
+      z-index: 2;
+      height: 100%;
+      display: grid;
+      grid-template-columns: 1fr;
+      grid-template-rows: auto 1fr auto;
+      padding: 35px 55px 28px 55px;
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+      position: relative;
+    }
+
+    .header-deco {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      margin-bottom: 8px;
+    }
+
+    .deco-line {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,215,0,0.4), transparent);
+    }
+    .deco-line-long { width: 250px; }
+    .deco-line-short { width: 100px; }
+    .deco-diamond {
+      width: 8px; height: 8px;
+      background: #FFD700;
+      transform: rotate(45deg);
+      flex-shrink: 0;
+    }
+
+    .lamp-emoji {
+      font-size: 50px;
+      filter: drop-shadow(0 0 20px rgba(255,215,0,0.5));
+    }
+
+    .sparkle-hero {
+      font-size: 90px;
+      line-height: 1;
+      filter: drop-shadow(0 0 35px rgba(255,215,0,0.4)) drop-shadow(0 6px 12px rgba(0,0,0,0.5));
+      display: block;
+      margin: 0 auto 4px;
+    }
+
+    .title {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 68px;
+      color: #FFD700;
+      text-shadow: 0 2px 25px rgba(255,215,0,0.3), 0 0 60px rgba(255,153,51,0.15);
+      letter-spacing: 8px;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+
+    .subtitle {
+      font-family: 'Caveat', cursive;
+      font-size: 26px;
+      color: rgba(255,248,231,0.5);
+      letter-spacing: 2px;
+    }
+
+    /* 4x3 sweet card grid */
+    .sweet-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      gap: 16px;
+      align-content: start;
+    }
+
+    /* Sweet card with ornate gold frame */
+    .sweet-card {
+      background: rgba(255,248,231,0.03);
+      border: 2px solid rgba(255,215,0,0.15);
+      border-radius: 14px;
+      padding: 18px 16px 14px 16px;
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(10px);
+      box-shadow:
+        0 6px 30px rgba(0,0,0,0.2),
+        inset 0 1px 0 rgba(255,215,0,0.08);
+      display: flex;
+      flex-direction: column;
+      text-align: center;
+    }
+
+    /* Gold top shimmer line */
+    .sweet-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 15%; right: 15%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #FFD700, transparent);
+    }
+
+    /* Gold bottom shimmer line */
+    .sweet-card::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 15%; right: 15%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,215,0,0.3), transparent);
+    }
+
+    /* Corner flourish — top-left of each card */
+    .card-corner-tl {
+      position: absolute;
+      top: 4px; left: 4px;
+      width: 20px; height: 20px;
+      border-top: 2px solid rgba(255,215,0,0.3);
+      border-left: 2px solid rgba(255,215,0,0.3);
+      border-radius: 4px 0 0 0;
+    }
+
+    /* Corner flourish — top-right of each card */
+    .card-corner-tr {
+      position: absolute;
+      top: 4px; right: 4px;
+      width: 20px; height: 20px;
+      border-top: 2px solid rgba(255,215,0,0.3);
+      border-right: 2px solid rgba(255,215,0,0.3);
+      border-radius: 0 4px 0 0;
+    }
+
+    /* Corner flourish — bottom-left */
+    .card-corner-bl {
+      position: absolute;
+      bottom: 4px; left: 4px;
+      width: 20px; height: 20px;
+      border-bottom: 2px solid rgba(255,215,0,0.3);
+      border-left: 2px solid rgba(255,215,0,0.3);
+      border-radius: 0 0 0 4px;
+    }
+
+    /* Corner flourish — bottom-right */
+    .card-corner-br {
+      position: absolute;
+      bottom: 4px; right: 4px;
+      width: 20px; height: 20px;
+      border-bottom: 2px solid rgba(255,215,0,0.3);
+      border-right: 2px solid rgba(255,215,0,0.3);
+      border-radius: 0 0 4px 0;
+    }
+
+    .sweet-emoji {
+      font-size: 40px;
+      margin-bottom: 6px;
+      filter: drop-shadow(0 2px 8px rgba(0,0,0,0.3));
+    }
+
+    .sweet-name {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 22px;
+      color: #FFD700;
+      margin-bottom: 4px;
+      line-height: 1.1;
+    }
+
+    .sweet-desc {
+      font-family: 'Caveat', cursive;
+      font-size: 17px;
+      color: rgba(255,248,231,0.45);
+      line-height: 1.2;
+      flex: 1;
+      margin-bottom: 8px;
+    }
+
+    .sweet-price {
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: 22px;
+      color: #FF9933;
+      text-shadow: 0 0 12px rgba(255,153,51,0.3);
+    }
+
+    /* Alternating card tint */
+    .sweet-card:nth-child(even) {
+      background: rgba(255,215,0,0.03);
+    }
+
+    /* Gift Box Footer */
+    .gift-footer {
+      margin-top: 16px;
+      position: relative;
+    }
+
+    .gift-banner {
+      background:
+        linear-gradient(135deg, rgba(255,215,0,0.08) 0%, rgba(184,134,11,0.06) 50%, rgba(255,215,0,0.08) 100%);
+      border: 2px solid rgba(255,215,0,0.2);
+      border-radius: 16px;
+      padding: 18px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 40px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 6px 30px rgba(0,0,0,0.2);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Ribbon diagonal stripes on gift banner */
+    .gift-banner::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background:
+        repeating-linear-gradient(
+          45deg,
+          transparent,
+          transparent 20px,
+          rgba(255,215,0,0.03) 20px,
+          rgba(255,215,0,0.03) 22px
+        );
+      pointer-events: none;
+    }
+
+    /* Top gold line on banner */
+    .gift-banner::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 10%; right: 10%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #FFD700, transparent);
+    }
+
+    .gift-emoji {
+      font-size: 50px;
+      filter: drop-shadow(0 0 15px rgba(255,215,0,0.4));
+    }
+
+    .gift-title {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 30px;
+      color: #FFD700;
+      letter-spacing: 4px;
+    }
+
+    .gift-options {
+      display: flex;
+      gap: 30px;
+      align-items: center;
+    }
+
+    .gift-option {
+      text-align: center;
+    }
+
+    .gift-option-name {
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 16px;
+      color: #FFF8E7;
+      margin-bottom: 2px;
+    }
+
+    .gift-option-price {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 24px;
+      color: #FF9933;
+    }
+
+    .gift-divider {
+      width: 1px;
+      height: 40px;
+      background: rgba(255,215,0,0.2);
+    }
+
+    .gift-custom {
+      font-family: 'Caveat', cursive;
+      font-size: 22px;
+      color: rgba(255,248,231,0.5);
+    }
+
+    .gift-notice {
+      font-family: 'Caveat', cursive;
+      font-size: 19px;
+      color: rgba(255,248,231,0.35);
+      text-align: center;
+      margin-top: 8px;
+    }
+
+    /* Ornate page frame */
+    .page-frame {
+      position: absolute;
+      top: 10px; left: 10px; right: 10px; bottom: 10px;
+      border: 1px solid rgba(255,215,0,0.1);
+      border-radius: 8px;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .page-frame::before {
+      content: '';
+      position: absolute;
+      top: 5px; left: 5px; right: 5px; bottom: 5px;
+      border: 1px solid rgba(255,215,0,0.06);
+      border-radius: 4px;
+    }
+
+    /* Bottom gold festive stripe */
+    .festive-stripe {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #4A0E2E, #FFD700, #FF9933, #E91E8B, #FFD700, #4A0E2E);
+      z-index: 4;
+    }
+
+    .festive-stripe-top {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #4A0E2E, #E91E8B, #FFD700, #FF9933, #FFD700, #E91E8B, #4A0E2E);
+      z-index: 4;
+    }
+  </style>
+</head>
+<body>
+  <div class="glow-top"></div>
+  <div class="glow-pink"></div>
+  <div class="glow-saffron"></div>
+  <div class="page-frame"></div>
+  <div class="festive-stripe"></div>
+  <div class="festive-stripe-top"></div>
+
+  <!-- Corner ornament SVGs — ornate flourishes -->
+  <svg style="position:absolute;top:16px;left:16px;z-index:3;opacity:0.25;" width="90" height="90" viewBox="0 0 90 90" fill="none">
+    <path d="M5 50 Q5 5 50 5" stroke="#FFD700" stroke-width="2" fill="none"/>
+    <path d="M12 40 Q12 12 40 12" stroke="#B8860B" stroke-width="1" fill="none"/>
+    <circle cx="8" cy="8" r="3" fill="#FFD700"/>
+    <circle cx="5" cy="50" r="2" fill="#FFD700"/>
+    <circle cx="50" cy="5" r="2" fill="#FFD700"/>
+    <path d="M5 5 L20 20" stroke="#FFD700" stroke-width="1" fill="none" opacity="0.5"/>
+  </svg>
+  <svg style="position:absolute;top:16px;right:16px;z-index:3;opacity:0.25;" width="90" height="90" viewBox="0 0 90 90" fill="none">
+    <path d="M85 50 Q85 5 40 5" stroke="#FFD700" stroke-width="2" fill="none"/>
+    <path d="M78 40 Q78 12 50 12" stroke="#B8860B" stroke-width="1" fill="none"/>
+    <circle cx="82" cy="8" r="3" fill="#FFD700"/>
+    <circle cx="85" cy="50" r="2" fill="#FFD700"/>
+    <circle cx="40" cy="5" r="2" fill="#FFD700"/>
+    <path d="M85 5 L70 20" stroke="#FFD700" stroke-width="1" fill="none" opacity="0.5"/>
+  </svg>
+  <svg style="position:absolute;bottom:16px;left:16px;z-index:3;opacity:0.25;" width="90" height="90" viewBox="0 0 90 90" fill="none">
+    <path d="M5 40 Q5 85 50 85" stroke="#FFD700" stroke-width="2" fill="none"/>
+    <path d="M12 50 Q12 78 40 78" stroke="#B8860B" stroke-width="1" fill="none"/>
+    <circle cx="8" cy="82" r="3" fill="#FFD700"/>
+    <circle cx="5" cy="40" r="2" fill="#FFD700"/>
+    <circle cx="50" cy="85" r="2" fill="#FFD700"/>
+    <path d="M5 85 L20 70" stroke="#FFD700" stroke-width="1" fill="none" opacity="0.5"/>
+  </svg>
+  <svg style="position:absolute;bottom:16px;right:16px;z-index:3;opacity:0.25;" width="90" height="90" viewBox="0 0 90 90" fill="none">
+    <path d="M85 40 Q85 85 40 85" stroke="#FFD700" stroke-width="2" fill="none"/>
+    <path d="M78 50 Q78 78 50 78" stroke="#B8860B" stroke-width="1" fill="none"/>
+    <circle cx="82" cy="82" r="3" fill="#FFD700"/>
+    <circle cx="85" cy="40" r="2" fill="#FFD700"/>
+    <circle cx="40" cy="85" r="2" fill="#FFD700"/>
+    <path d="M85 85 L70 70" stroke="#FFD700" stroke-width="1" fill="none" opacity="0.5"/>
+  </svg>
+
+  <!-- Festival lamp decorations -->
+  <span style="position:absolute;top:95px;left:35px;font-size:120px;z-index:3;opacity:0.1;pointer-events:none;filter:drop-shadow(0 0 30px rgba(255,215,0,0.3));">&#128684;</span>
+  <span style="position:absolute;top:95px;right:35px;font-size:120px;z-index:3;opacity:0.1;pointer-events:none;filter:drop-shadow(0 0 30px rgba(255,215,0,0.3));transform:scaleX(-1);">&#128684;</span>
+
+  <!-- Rangoli SVG — center background -->
+  <svg style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:0;opacity:0.04;" width="600" height="600" viewBox="0 0 600 600" fill="none">
+    <!-- Outer circle -->
+    <circle cx="300" cy="300" r="280" stroke="#FFD700" stroke-width="2"/>
+    <!-- Inner circles -->
+    <circle cx="300" cy="300" r="220" stroke="#FF9933" stroke-width="1.5"/>
+    <circle cx="300" cy="300" r="160" stroke="#FFD700" stroke-width="1"/>
+    <circle cx="300" cy="300" r="100" stroke="#E91E8B" stroke-width="1"/>
+    <!-- Diamond shapes -->
+    <rect x="250" y="250" width="100" height="100" stroke="#FFD700" stroke-width="1.5" fill="none" transform="rotate(45 300 300)"/>
+    <rect x="230" y="230" width="140" height="140" stroke="#FF9933" stroke-width="1" fill="none" transform="rotate(45 300 300)"/>
+    <!-- Petal shapes -->
+    <ellipse cx="300" cy="180" rx="30" ry="60" stroke="#FFD700" stroke-width="1" fill="none"/>
+    <ellipse cx="300" cy="420" rx="30" ry="60" stroke="#FFD700" stroke-width="1" fill="none"/>
+    <ellipse cx="180" cy="300" rx="60" ry="30" stroke="#FFD700" stroke-width="1" fill="none"/>
+    <ellipse cx="420" cy="300" rx="60" ry="30" stroke="#FFD700" stroke-width="1" fill="none"/>
+    <!-- Diagonal petals -->
+    <ellipse cx="215" cy="215" rx="25" ry="50" stroke="#FF9933" stroke-width="1" fill="none" transform="rotate(45 215 215)"/>
+    <ellipse cx="385" cy="215" rx="25" ry="50" stroke="#FF9933" stroke-width="1" fill="none" transform="rotate(-45 385 215)"/>
+    <ellipse cx="215" cy="385" rx="25" ry="50" stroke="#FF9933" stroke-width="1" fill="none" transform="rotate(-45 215 385)"/>
+    <ellipse cx="385" cy="385" rx="25" ry="50" stroke="#FF9933" stroke-width="1" fill="none" transform="rotate(45 385 385)"/>
+    <!-- Center dot -->
+    <circle cx="300" cy="300" r="8" fill="#FFD700"/>
+  </svg>
+
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-deco">
+        <span class="deco-line deco-line-long"></span>
+        <span class="deco-diamond"></span>
+        <span class="lamp-emoji">&#128684;</span>
+        <span class="deco-diamond"></span>
+        <span class="deco-line deco-line-short"></span>
+        <span class="deco-diamond"></span>
+        <span class="deco-line deco-line-long"></span>
+      </div>
+      <span class="sparkle-hero">&#10024;</span>
+      <h1 class="title" data-editable="true" data-field="title">SWEETS &amp; MITHAI</h1>
+      <p class="subtitle" data-editable="true" data-field="subtitle">Handcrafted Daily &bull; Pure Ghee &bull; Premium Ingredients</p>
+      <div class="header-deco" style="margin-top:8px;">
+        <span class="deco-line deco-line-long"></span>
+        <span class="deco-diamond"></span>
+        <span class="deco-line deco-line-short"></span>
+        <span class="deco-diamond"></span>
+        <span class="deco-line deco-line-long"></span>
+      </div>
+    </div>
+
+    <!-- 4x3 Sweet Card Grid -->
+    <div class="sweet-grid">
+      <!-- Row 1 -->
+      <div class="sweet-card">
+        <span class="card-corner-tl"></span>
+        <span class="card-corner-tr"></span>
+        <span class="card-corner-bl"></span>
+        <span class="card-corner-br"></span>
+        <span class="sweet-emoji">&#127849;</span>
+        <div class="sweet-name" data-editable="true" data-field="sweet1Name">Gulab Jamun (4 pcs)</div>
+        <div class="sweet-desc" data-editable="true" data-field="sweet1Desc">Deep-fried milk dumplings in rose syrup</div>
+        <div class="sweet-price" data-editable="true" data-field="sweet1Price">$5.99</div>
+      </div>
+
+      <div class="sweet-card">
+        <span class="card-corner-tl"></span>
+        <span class="card-corner-tr"></span>
+        <span class="card-corner-bl"></span>
+        <span class="card-corner-br"></span>
+        <span class="sweet-emoji">&#128142;</span>
+        <div class="sweet-name" data-editable="true" data-field="sweet2Name">Kaju Katli (&frac12; lb)</div>
+        <div class="sweet-desc" data-editable="true" data-field="sweet2Desc">Cashew diamond slices with silver leaf</div>
+        <div class="sweet-price" data-editable="true" data-field="sweet2Price">$8.99</div>
+      </div>
+
+      <div class="sweet-card">
+        <span class="card-corner-tl"></span>
+        <span class="card-corner-tr"></span>
+        <span class="card-corner-bl"></span>
+        <span class="card-corner-br"></span>
+        <span class="sweet-emoji">&#127856;</span>
+        <div class="sweet-name" data-editable="true" data-field="sweet3Name">Jalebi (&frac14; lb)</div>
+        <div class="sweet-desc" data-editable="true" data-field="sweet3Desc">Crispy saffron spirals in sugar syrup</div>
+        <div class="sweet-price" data-editable="true" data-field="sweet3Price">$4.99</div>
+      </div>
+
+      <div class="sweet-card">
+        <span class="card-corner-tl"></span>
+        <span class="card-corner-tr"></span>
+        <span class="card-corner-bl"></span>
+        <span class="card-corner-br"></span>
+        <span class="sweet-emoji">&#9898;</span>
+        <div class="sweet-name" data-editable="true" data-field="sweet4Name">Rasgulla (4 pcs)</div>
+        <div class="sweet-desc" data-editable="true" data-field="sweet4Desc">Bengali cottage cheese in light syrup</div>
+        <div class="sweet-price" data-editable="true" data-field="sweet4Price">$5.99</div>
+      </div>
+
+      <!-- Row 2 -->
+      <div class="sweet-card">
+        <span class="card-corner-tl"></span>
+        <span class="card-corner-tr"></span>
+        <span class="card-corner-bl"></span>
+        <span class="card-corner-br"></span>
+        <span class="sweet-emoji">&#127760;</span>
+        <div class="sweet-name" data-editable="true" data-field="sweet5Name">Ladoo (4 pcs)</div>
+        <div class="sweet-desc" data-editable="true" data-field="sweet5Desc">Boondi or Motichur golden balls</div>
+        <div class="sweet-price" data-editable="true" data-field="sweet5Price">$5.49</div>
+      </div>
+
+      <div class="sweet-card">
+        <span class="card-corner-tl"></span>
+        <span class="card-corner-tr"></span>
+        <span class="card-corner-bl"></span>
+        <span class="card-corner-br"></span>
+        <span class="sweet-emoji">&#127851;</span>
+        <div class="sweet-name" data-editable="true" data-field="sweet6Name">Barfi (&frac12; lb)</div>
+        <div class="sweet-desc" data-editable="true" data-field="sweet6Desc">Milk fudge with pistachios</div>
+        <div class="sweet-price" data-editable="true" data-field="sweet6Price">$7.99</div>
+      </div>
+
+      <div class="sweet-card">
+        <span class="card-corner-tl"></span>
+        <span class="card-corner-tr"></span>
+        <span class="card-corner-bl"></span>
+        <span class="card-corner-br"></span>
+        <span class="sweet-emoji">&#129368;</span>
+        <div class="sweet-name" data-editable="true" data-field="sweet7Name">Rasmalai (3 pcs)</div>
+        <div class="sweet-desc" data-editable="true" data-field="sweet7Desc">Cream-soaked cheese patties with cardamom</div>
+        <div class="sweet-price" data-editable="true" data-field="sweet7Price">$6.99</div>
+      </div>
+
+      <div class="sweet-card">
+        <span class="card-corner-tl"></span>
+        <span class="card-corner-tr"></span>
+        <span class="card-corner-bl"></span>
+        <span class="card-corner-br"></span>
+        <span class="sweet-emoji">&#128993;</span>
+        <div class="sweet-name" data-editable="true" data-field="sweet8Name">Peda (6 pcs)</div>
+        <div class="sweet-desc" data-editable="true" data-field="sweet8Desc">Cardamom milk fudge rounds</div>
+        <div class="sweet-price" data-editable="true" data-field="sweet8Price">$4.99</div>
+      </div>
+
+      <!-- Row 3 -->
+      <div class="sweet-card">
+        <span class="card-corner-tl"></span>
+        <span class="card-corner-tr"></span>
+        <span class="card-corner-bl"></span>
+        <span class="card-corner-br"></span>
+        <span class="sweet-emoji">&#127857;</span>
+        <div class="sweet-name" data-editable="true" data-field="sweet9Name">Soan Papdi (box)</div>
+        <div class="sweet-desc" data-editable="true" data-field="sweet9Desc">Flaky layered sweet with almonds</div>
+        <div class="sweet-price" data-editable="true" data-field="sweet9Price">$6.99</div>
+      </div>
+
+      <div class="sweet-card">
+        <span class="card-corner-tl"></span>
+        <span class="card-corner-tr"></span>
+        <span class="card-corner-bl"></span>
+        <span class="card-corner-br"></span>
+        <span class="sweet-emoji">&#127858;</span>
+        <div class="sweet-name" data-editable="true" data-field="sweet10Name">Halwa (Cup)</div>
+        <div class="sweet-desc" data-editable="true" data-field="sweet10Desc">Gajar / Moong / Suji dal options</div>
+        <div class="sweet-price" data-editable="true" data-field="sweet10Price">$4.99</div>
+      </div>
+
+      <div class="sweet-card">
+        <span class="card-corner-tl"></span>
+        <span class="card-corner-tr"></span>
+        <span class="card-corner-bl"></span>
+        <span class="card-corner-br"></span>
+        <span class="sweet-emoji">&#127846;</span>
+        <div class="sweet-name" data-editable="true" data-field="sweet11Name">Kulfi (stick)</div>
+        <div class="sweet-desc" data-editable="true" data-field="sweet11Desc">Traditional Indian ice cream</div>
+        <div class="sweet-price" data-editable="true" data-field="sweet11Price">$3.99</div>
+      </div>
+
+      <div class="sweet-card">
+        <span class="card-corner-tl"></span>
+        <span class="card-corner-tr"></span>
+        <span class="card-corner-bl"></span>
+        <span class="card-corner-br"></span>
+        <span class="sweet-emoji">&#127856;</span>
+        <div class="sweet-name" data-editable="true" data-field="sweet12Name">Ras Malai Cake</div>
+        <div class="sweet-desc" data-editable="true" data-field="sweet12Desc">Fusion dessert special</div>
+        <div class="sweet-price" data-editable="true" data-field="sweet12Price">$7.99</div>
+      </div>
+    </div>
+
+    <!-- Gift Box Footer -->
+    <div class="gift-footer">
+      <div class="gift-banner">
+        <span class="gift-emoji">&#127873;</span>
+        <span class="gift-title" data-editable="true" data-field="giftTitle">GIFT BOXES</span>
+        <div class="gift-options">
+          <div class="gift-option">
+            <div class="gift-option-name" data-editable="true" data-field="gift1Name">Festival Box</div>
+            <div class="gift-option-price" data-editable="true" data-field="gift1Price">$24.99</div>
+          </div>
+          <span class="gift-divider"></span>
+          <div class="gift-option">
+            <div class="gift-option-name" data-editable="true" data-field="gift2Name">Wedding Box</div>
+            <div class="gift-option-price" data-editable="true" data-field="gift2Price">$49.99</div>
+          </div>
+          <span class="gift-divider"></span>
+          <div class="gift-option">
+            <span class="gift-custom" data-editable="true" data-field="giftCustom">Custom Assortment &mdash; Ask Us!</span>
+          </div>
+        </div>
+        <span class="gift-emoji">&#127873;</span>
+      </div>
+      <p class="gift-notice" data-editable="true" data-field="giftNotice">&ldquo;Bulk orders for events &bull; 48-hour advance notice&rdquo;</p>
+    </div>
+  </div>
+</body>
+</html>

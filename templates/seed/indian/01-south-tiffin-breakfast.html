@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@300;400;500;600;700&family=Caveat:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        /* Banana leaf vein texture — diagonal lines */
+        repeating-linear-gradient(
+          70deg,
+          transparent,
+          transparent 18px,
+          rgba(255,255,255,0.015) 18px,
+          rgba(255,255,255,0.015) 19px
+        ),
+        repeating-linear-gradient(
+          110deg,
+          transparent,
+          transparent 24px,
+          rgba(255,255,255,0.01) 24px,
+          rgba(255,255,255,0.01) 25px
+        ),
+        /* Leaf green gradient */
+        linear-gradient(160deg, #2D5016 0%, #1e3a0f 35%, #243f12 60%, #2D5016 100%);
+      color: #FFF8E7;
+    }
+
+    /* Banana leaf midrib — thick center vein */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; bottom: 0;
+      left: 196px;
+      width: 6px;
+      background: linear-gradient(180deg,
+        rgba(60,100,30,0.6) 0%,
+        rgba(80,130,40,0.4) 50%,
+        rgba(60,100,30,0.6) 100%
+      );
+      z-index: 0;
+    }
+
+    /* Morning glow — brass lamp light */
+    body::after {
+      content: '';
+      position: absolute;
+      top: -100px; left: -50px;
+      width: 700px; height: 700px;
+      background: radial-gradient(circle, rgba(232,185,49,0.14) 0%, rgba(184,134,11,0.06) 40%, transparent 70%);
+      border-radius: 50%;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* Secondary warm glow right side */
+    .glow-right {
+      position: absolute;
+      bottom: -80px; right: 100px;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(232,185,49,0.08) 0%, transparent 60%);
+      border-radius: 50%;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* Kolam dot pattern — top-left corner */
+    .kolam-tl {
+      position: absolute;
+      top: 30px; left: 220px;
+      width: 120px; height: 120px;
+      background:
+        radial-gradient(circle, #E8B931 2px, transparent 2px),
+        radial-gradient(circle, #E8B931 2px, transparent 2px),
+        radial-gradient(circle, #E8B931 2px, transparent 2px),
+        radial-gradient(circle, #E8B931 2px, transparent 2px),
+        radial-gradient(circle, #E8B931 2px, transparent 2px),
+        radial-gradient(circle, #E8B931 2px, transparent 2px);
+      background-position:
+        0px 0px, 20px 0px, 40px 0px,
+        10px 17px, 30px 17px,
+        0px 34px;
+      background-size: 4px 4px;
+      background-repeat: no-repeat;
+      opacity: 0.5;
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    /* Kolam dot pattern — bottom-right corner */
+    .kolam-br {
+      position: absolute;
+      bottom: 30px; right: 40px;
+      width: 120px; height: 120px;
+      background:
+        radial-gradient(circle, #E8B931 2px, transparent 2px),
+        radial-gradient(circle, #E8B931 2px, transparent 2px),
+        radial-gradient(circle, #E8B931 2px, transparent 2px),
+        radial-gradient(circle, #E8B931 2px, transparent 2px),
+        radial-gradient(circle, #E8B931 2px, transparent 2px),
+        radial-gradient(circle, #E8B931 2px, transparent 2px);
+      background-position:
+        80px 86px, 100px 86px, 120px 86px,
+        90px 69px, 110px 69px,
+        80px 52px;
+      background-size: 4px 4px;
+      background-repeat: no-repeat;
+      opacity: 0.5;
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    /* Left sidebar — ornamental kolam border */
+    .sidebar {
+      position: absolute;
+      top: 0; left: 0;
+      width: 200px; height: 100%;
+      background:
+        linear-gradient(180deg, rgba(184,134,11,0.15) 0%, rgba(92,51,23,0.1) 50%, rgba(184,134,11,0.15) 100%);
+      border-right: 3px solid rgba(184,134,11,0.4);
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+    }
+
+    /* Repeating kolam diamond border in sidebar */
+    .sidebar::before {
+      content: '';
+      position: absolute;
+      top: 0; right: -2px;
+      width: 40px; height: 100%;
+      background:
+        repeating-linear-gradient(
+          180deg,
+          transparent 0px,
+          transparent 28px,
+          rgba(232,185,49,0.25) 28px,
+          rgba(232,185,49,0.25) 30px,
+          transparent 30px,
+          transparent 58px
+        );
+      pointer-events: none;
+    }
+
+    .sidebar::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background:
+        /* kolam-style diamond dots repeated vertically */
+        radial-gradient(circle, rgba(232,185,49,0.35) 3px, transparent 3px);
+      background-size: 30px 60px;
+      background-position: center 0;
+      pointer-events: none;
+    }
+
+    .sidebar-text {
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 22px;
+      letter-spacing: 10px;
+      color: rgba(232,185,49,0.6);
+      text-transform: uppercase;
+      z-index: 1;
+    }
+
+    /* Main container */
+    .container {
+      position: relative;
+      z-index: 2;
+      margin-left: 200px;
+      height: 100%;
+      display: grid;
+      grid-template-columns: 480px 1fr;
+      grid-template-rows: auto 1fr auto;
+      padding: 50px 60px 40px 60px;
+      gap: 0 50px;
+    }
+
+    /* Header area — spans both columns */
+    .header {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 30px;
+      margin-bottom: 30px;
+      padding-bottom: 25px;
+      border-bottom: 2px solid rgba(184,134,11,0.3);
+    }
+
+    .emoji-hero {
+      font-size: 120px;
+      line-height: 1;
+      filter: drop-shadow(0 0 30px rgba(232,185,49,0.35)) drop-shadow(0 6px 12px rgba(0,0,0,0.5));
+    }
+
+    .header-text {
+      flex: 1;
+    }
+
+    .title {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 72px;
+      color: #E8B931;
+      text-shadow: 0 2px 20px rgba(232,185,49,0.3), 0 0 60px rgba(232,185,49,0.1);
+      letter-spacing: 4px;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      font-family: 'Caveat', cursive;
+      font-size: 30px;
+      color: rgba(255,248,231,0.65);
+      letter-spacing: 2px;
+    }
+
+    .timing-badge {
+      background: rgba(184,134,11,0.15);
+      border: 1px solid rgba(184,134,11,0.35);
+      border-radius: 12px;
+      padding: 12px 28px;
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 16px;
+      color: #E8B931;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      backdrop-filter: blur(10px);
+      white-space: nowrap;
+    }
+
+    /* Left column — menu items */
+    .menu-col {
+      grid-column: 1;
+      grid-row: 2;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    /* Right column — menu items */
+    .menu-col-right {
+      grid-column: 2;
+      grid-row: 2;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .menu-card {
+      background: rgba(255,248,231,0.04);
+      border: 1px solid rgba(184,134,11,0.12);
+      border-radius: 16px;
+      padding: 18px 24px;
+      backdrop-filter: blur(8px);
+      box-shadow:
+        0 4px 20px rgba(0,0,0,0.15),
+        inset 0 1px 0 rgba(255,255,255,0.04);
+      display: grid;
+      grid-template-columns: 1fr auto;
+      grid-template-rows: auto auto;
+      gap: 0 16px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .menu-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 4px; height: 100%;
+      background: linear-gradient(180deg, #E8B931, #B8860B);
+      border-radius: 4px 0 0 4px;
+    }
+
+    .menu-card:nth-child(even) {
+      background: rgba(255,248,231,0.06);
+    }
+
+    .item-name {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 26px;
+      color: #FFF8E7;
+      grid-column: 1;
+      grid-row: 1;
+      display: flex;
+      align-items: baseline;
+    }
+
+    .item-name::after {
+      content: '';
+      flex: 1;
+      margin: 0 12px;
+      border-bottom: 2px dotted rgba(184,134,11,0.35);
+      position: relative;
+      top: -4px;
+    }
+
+    .item-price {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 28px;
+      color: #E8B931;
+      grid-column: 2;
+      grid-row: 1;
+      text-align: right;
+      text-shadow: 0 0 15px rgba(232,185,49,0.3);
+    }
+
+    .item-desc {
+      font-family: 'Caveat', cursive;
+      font-size: 20px;
+      color: rgba(255,248,231,0.5);
+      grid-column: 1 / -1;
+      grid-row: 2;
+      margin-top: 2px;
+      line-height: 1.3;
+    }
+
+    /* Beverages section */
+    .beverages-header {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 32px;
+      color: #E8B931;
+      margin-top: 16px;
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid rgba(184,134,11,0.25);
+      letter-spacing: 3px;
+    }
+
+    .bev-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 8px 0;
+    }
+
+    .bev-name {
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+      font-size: 22px;
+      color: #FFF8E7;
+    }
+
+    .bev-price {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 24px;
+      color: #E8B931;
+    }
+
+    /* Footer */
+    .footer {
+      grid-column: 1 / -1;
+      grid-row: 3;
+      display: flex;
+      justify-content: center;
+      margin-top: 20px;
+      padding-top: 15px;
+      border-top: 1px solid rgba(184,134,11,0.2);
+    }
+
+    .footer-line {
+      width: 400px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(232,185,49,0.4), transparent);
+    }
+
+    /* Banana leaf curve accent — top right */
+    .leaf-curve {
+      position: absolute;
+      top: -40px; right: -40px;
+      width: 350px; height: 200px;
+      border-radius: 0 0 0 100%;
+      background: linear-gradient(200deg, rgba(45,80,22,0.4) 0%, transparent 60%);
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* Brass lamp glow accent */
+    .lamp-glow {
+      position: absolute;
+      top: 20px; left: 230px;
+      width: 300px; height: 200px;
+      background: radial-gradient(ellipse at 50% 0%, rgba(232,185,49,0.12) 0%, transparent 70%);
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* Temple red accent stripe */
+    .red-accent {
+      position: absolute;
+      bottom: 0; left: 200px; right: 0;
+      height: 5px;
+      background: linear-gradient(90deg, #C41E3A, #B8860B, #C41E3A);
+      z-index: 3;
+    }
+
+    /* SVG coffee filter decoration */
+    .coffee-filter-svg {
+      position: absolute;
+      bottom: 60px; left: 40px;
+      z-index: 3;
+      opacity: 0.3;
+    }
+  </style>
+</head>
+<body>
+  <div class="glow-right"></div>
+  <div class="leaf-curve"></div>
+  <div class="lamp-glow"></div>
+  <div class="kolam-tl"></div>
+  <div class="kolam-br"></div>
+  <div class="red-accent"></div>
+
+  <!-- Left sidebar with ornamental kolam border -->
+  <div class="sidebar">
+    <span class="sidebar-text">TIFFIN ROOM</span>
+    <!-- Inline SVG: brass coffee filter vessel silhouette -->
+    <svg class="coffee-filter-svg" width="80" height="120" viewBox="0 0 80 120" fill="none" style="position:relative; bottom:auto; left:auto; margin-top:30px;">
+      <!-- Top cup / davara -->
+      <ellipse cx="40" cy="18" rx="28" ry="10" stroke="#E8B931" stroke-width="1.5" fill="none"/>
+      <path d="M12 18 L12 48 Q12 58 40 58 Q68 58 68 48 L68 18" stroke="#E8B931" stroke-width="1.5" fill="none"/>
+      <ellipse cx="40" cy="48" rx="28" ry="10" stroke="#E8B931" stroke-width="1" fill="none" opacity="0.5"/>
+      <!-- Bottom tumbler -->
+      <ellipse cx="40" cy="72" rx="22" ry="8" stroke="#E8B931" stroke-width="1.5" fill="none"/>
+      <path d="M18 72 L14 108 Q14 116 40 116 Q66 116 66 108 L62 72" stroke="#E8B931" stroke-width="1.5" fill="none"/>
+      <ellipse cx="40" cy="108" rx="26" ry="8" stroke="#E8B931" stroke-width="1" fill="none" opacity="0.5"/>
+      <!-- Steam lines -->
+      <path d="M30 8 Q32 0 34 8" stroke="#E8B931" stroke-width="1" fill="none" opacity="0.4"/>
+      <path d="M40 5 Q42 -3 44 5" stroke="#E8B931" stroke-width="1" fill="none" opacity="0.4"/>
+      <path d="M50 8 Q52 0 54 8" stroke="#E8B931" stroke-width="1" fill="none" opacity="0.4"/>
+    </svg>
+  </div>
+
+  <!-- Corner ornament SVGs -->
+  <svg style="position:absolute;top:15px;right:15px;z-index:3;opacity:0.2;" width="70" height="70" viewBox="0 0 70 70" fill="none">
+    <path d="M65 5 L65 35 Q65 5 35 5" stroke="#E8B931" stroke-width="2" fill="none"/>
+    <path d="M55 15 L55 30 Q55 15 40 15" stroke="#E8B931" stroke-width="1" fill="none"/>
+    <circle cx="62" cy="8" r="3" fill="#E8B931"/>
+  </svg>
+  <svg style="position:absolute;bottom:15px;left:210px;z-index:3;opacity:0.2;" width="70" height="70" viewBox="0 0 70 70" fill="none">
+    <path d="M5 65 L5 35 Q5 65 35 65" stroke="#E8B931" stroke-width="2" fill="none"/>
+    <path d="M15 55 L15 40 Q15 55 30 55" stroke="#E8B931" stroke-width="1" fill="none"/>
+    <circle cx="8" cy="62" r="3" fill="#E8B931"/>
+  </svg>
+
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="emoji-hero">&#9749;</div>
+      <div class="header-text">
+        <h1 class="title" data-editable="true" data-field="title">SOUTH INDIAN TIFFIN</h1>
+        <p class="subtitle" data-editable="true" data-field="subtitle">Authentic Breakfast &bull; Served Fresh Daily</p>
+      </div>
+      <div class="timing-badge" data-editable="true" data-field="timing">7:00 AM &ndash; 11:00 AM</div>
+    </div>
+
+    <!-- Left column menu -->
+    <div class="menu-col">
+      <div class="menu-card">
+        <span class="item-name" data-editable="true" data-field="item1Name">Idli (2 pcs)</span>
+        <span class="item-price" data-editable="true" data-field="item1Price">$4.99</span>
+        <span class="item-desc" data-editable="true" data-field="item1Desc">Soft steamed rice cakes with sambar &amp; coconut chutney</span>
+      </div>
+
+      <div class="menu-card">
+        <span class="item-name" data-editable="true" data-field="item2Name">Masala Dosa</span>
+        <span class="item-price" data-editable="true" data-field="item2Price">$7.99</span>
+        <span class="item-desc" data-editable="true" data-field="item2Desc">Crispy golden crepe with spiced potato filling</span>
+      </div>
+
+      <div class="menu-card">
+        <span class="item-name" data-editable="true" data-field="item3Name">Medu Vada (2 pcs)</span>
+        <span class="item-price" data-editable="true" data-field="item3Price">$5.49</span>
+        <span class="item-desc" data-editable="true" data-field="item3Desc">Crispy lentil fritters with coconut chutney</span>
+      </div>
+
+      <div class="menu-card">
+        <span class="item-name" data-editable="true" data-field="item4Name">Pongal</span>
+        <span class="item-price" data-editable="true" data-field="item4Price">$5.99</span>
+        <span class="item-desc" data-editable="true" data-field="item4Desc">Creamy rice &amp; lentil porridge tempered with ghee</span>
+      </div>
+    </div>
+
+    <!-- Right column menu -->
+    <div class="menu-col-right">
+      <div class="menu-card">
+        <span class="item-name" data-editable="true" data-field="item5Name">Upma</span>
+        <span class="item-price" data-editable="true" data-field="item5Price">$4.99</span>
+        <span class="item-desc" data-editable="true" data-field="item5Desc">Seasoned semolina with vegetables &amp; cashews</span>
+      </div>
+
+      <div class="menu-card">
+        <span class="item-name" data-editable="true" data-field="item6Name">Rava Dosa</span>
+        <span class="item-price" data-editable="true" data-field="item6Price">$7.99</span>
+        <span class="item-desc" data-editable="true" data-field="item6Desc">Crispy semolina crepe with onions &amp; green chilies</span>
+      </div>
+
+      <div class="menu-card">
+        <span class="item-name" data-editable="true" data-field="item7Name">Poori Masala (2 pcs)</span>
+        <span class="item-price" data-editable="true" data-field="item7Price">$6.49</span>
+        <span class="item-desc" data-editable="true" data-field="item7Desc">Puffed golden bread with potato curry</span>
+      </div>
+
+      <div class="menu-card">
+        <span class="item-name" data-editable="true" data-field="item8Name">Set Dosa (3 pcs)</span>
+        <span class="item-price" data-editable="true" data-field="item8Price">$6.99</span>
+        <span class="item-desc" data-editable="true" data-field="item8Desc">Soft, spongy pancakes with chutney trio</span>
+      </div>
+
+      <!-- Beverages -->
+      <h3 class="beverages-header" data-editable="true" data-field="beveragesTitle">BEVERAGES</h3>
+      <div class="bev-item">
+        <span class="bev-name" data-editable="true" data-field="bev1Name">&#9749; Filter Coffee</span>
+        <span class="bev-price" data-editable="true" data-field="bev1Price">$2.99</span>
+      </div>
+      <div class="bev-item">
+        <span class="bev-name" data-editable="true" data-field="bev2Name">Masala Chai</span>
+        <span class="bev-price" data-editable="true" data-field="bev2Price">$2.49</span>
+      </div>
+      <div class="bev-item">
+        <span class="bev-name" data-editable="true" data-field="bev3Name">Fresh Buttermilk</span>
+        <span class="bev-price" data-editable="true" data-field="bev3Price">$1.99</span>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <div class="footer-line"></div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@300;400;500;600;700&family=Caveat:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        /* Subtle woven texture */
+        repeating-linear-gradient(
+          0deg,
+          transparent,
+          transparent 3px,
+          rgba(255,255,255,0.008) 3px,
+          rgba(255,255,255,0.008) 4px
+        ),
+        repeating-linear-gradient(
+          90deg,
+          transparent,
+          transparent 3px,
+          rgba(255,255,255,0.006) 3px,
+          rgba(255,255,255,0.006) 4px
+        ),
+        linear-gradient(160deg, #2D5016 0%, #1e3a0f 30%, #1a3310 60%, #2D5016 100%);
+      color: #FFF8E7;
+    }
+
+    /* Banana leaf central element -- large decorative ellipse */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%) rotate(-5deg);
+      width: 900px; height: 500px;
+      border-radius: 50% / 40%;
+      background:
+        /* Leaf veins */
+        repeating-linear-gradient(
+          75deg,
+          transparent,
+          transparent 22px,
+          rgba(100,160,50,0.08) 22px,
+          rgba(100,160,50,0.08) 23px
+        ),
+        repeating-linear-gradient(
+          105deg,
+          transparent,
+          transparent 22px,
+          rgba(100,160,50,0.06) 22px,
+          rgba(100,160,50,0.06) 23px
+        ),
+        /* Midrib */
+        linear-gradient(90deg,
+          transparent 0%,
+          transparent 48%,
+          rgba(80,130,40,0.25) 48%,
+          rgba(80,130,40,0.3) 50%,
+          rgba(80,130,40,0.25) 52%,
+          transparent 52%,
+          transparent 100%
+        ),
+        /* Leaf color gradient */
+        linear-gradient(90deg,
+          rgba(35,70,18,0.6) 0%,
+          rgba(50,95,25,0.5) 30%,
+          rgba(55,100,28,0.55) 50%,
+          rgba(50,95,25,0.5) 70%,
+          rgba(35,70,18,0.6) 100%
+        );
+      border: 2px solid rgba(80,130,40,0.2);
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* Warm festive glow -- center */
+    body::after {
+      content: '';
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(232,185,49,0.08) 0%, transparent 60%);
+      border-radius: 50%;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* Temple red glow -- top right */
+    .glow-red {
+      position: absolute;
+      top: -80px; right: -30px;
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, rgba(196,30,58,0.08) 0%, transparent 60%);
+      border-radius: 50%;
+      z-index: 1; pointer-events: none;
+    }
+
+    /* Gold glow -- left */
+    .glow-gold {
+      position: absolute;
+      top: 100px; left: -40px;
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(232,185,49,0.08) 0%, transparent 60%);
+      border-radius: 50%;
+      z-index: 1; pointer-events: none;
+    }
+
+    /* Small circular bowls on the banana leaf */
+    .bowl {
+      position: absolute;
+      border-radius: 50%;
+      z-index: 2;
+      pointer-events: none;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3), inset 0 -2px 6px rgba(0,0,0,0.2);
+    }
+
+    .bowl-sambar {
+      top: 380px; left: 640px;
+      width: 70px; height: 70px;
+      background: radial-gradient(circle at 35% 35%, #e8a020, #c47010);
+    }
+    .bowl-rasam {
+      top: 360px; left: 740px;
+      width: 65px; height: 65px;
+      background: radial-gradient(circle at 35% 35%, #cc3020, #992010);
+    }
+    .bowl-kootu {
+      top: 400px; left: 830px;
+      width: 60px; height: 60px;
+      background: radial-gradient(circle at 35% 35%, #c8a040, #a08030);
+    }
+    .bowl-poriyal {
+      top: 350px; left: 920px;
+      width: 60px; height: 60px;
+      background: radial-gradient(circle at 35% 35%, #508030, #3a6020);
+    }
+    .bowl-curd {
+      top: 390px; left: 1010px;
+      width: 65px; height: 65px;
+      background: radial-gradient(circle at 35% 35%, #f0ece0, #d8d0c0);
+    }
+    .bowl-pickle {
+      top: 440px; left: 750px;
+      width: 45px; height: 45px;
+      background: radial-gradient(circle at 35% 35%, #8b2010, #601008);
+    }
+    .bowl-payasam {
+      top: 440px; left: 870px;
+      width: 55px; height: 55px;
+      background: radial-gradient(circle at 35% 35%, #e8c870, #c8a850);
+    }
+    /* Rice mound -- center */
+    .bowl-rice {
+      top: 490px; left: 800px;
+      width: 90px; height: 70px;
+      border-radius: 50%;
+      background: radial-gradient(ellipse at 40% 30%, #fff8f0, #e8e0d0);
+    }
+    /* Papad */
+    .bowl-papad {
+      top: 340px; left: 1080px;
+      width: 55px; height: 55px;
+      background: radial-gradient(circle at 35% 35%, #e8c870, #c8a040);
+      opacity: 0.8;
+    }
+    /* Banana */
+    .bowl-banana {
+      top: 480px; left: 1050px;
+      width: 50px; height: 30px;
+      border-radius: 50%;
+      background: linear-gradient(90deg, #e8c830, #d4b020);
+    }
+
+    /* Kolam border pattern -- top */
+    .kolam-top {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 20px;
+      background:
+        radial-gradient(circle, rgba(232,185,49,0.4) 2.5px, transparent 2.5px);
+      background-size: 24px 20px;
+      background-position: 0 10px;
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    /* Kolam border pattern -- bottom */
+    .kolam-bottom {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 20px;
+      background:
+        radial-gradient(circle, rgba(232,185,49,0.4) 2.5px, transparent 2.5px);
+      background-size: 24px 20px;
+      background-position: 12px 10px;
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    /* Main layout grid -- asymmetric editorial */
+    .layout {
+      position: relative;
+      z-index: 5;
+      display: grid;
+      grid-template-columns: 380px 1fr 420px;
+      grid-template-rows: auto 1fr;
+      height: 100%;
+      padding: 50px 55px;
+      gap: 30px 40px;
+    }
+
+    /* Header -- spans full width */
+    .header {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      padding-bottom: 20px;
+      border-bottom: 2px solid rgba(184,134,11,0.3);
+    }
+
+    .rice-emoji {
+      font-size: 100px;
+      line-height: 1;
+      filter: drop-shadow(0 0 30px rgba(232,185,49,0.4)) drop-shadow(0 4px 12px rgba(0,0,0,0.5));
+    }
+
+    .header-content {
+      flex: 1;
+    }
+
+    .main-title {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 68px;
+      color: #E8B931;
+      text-shadow:
+        0 2px 20px rgba(232,185,49,0.35),
+        0 0 60px rgba(232,185,49,0.1);
+      letter-spacing: 4px;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+
+    .main-subtitle {
+      font-family: 'Caveat', cursive;
+      font-size: 30px;
+      color: rgba(255,248,231,0.6);
+      letter-spacing: 2px;
+    }
+
+    .serving-badge {
+      background: rgba(196,30,58,0.2);
+      border: 1px solid rgba(196,30,58,0.4);
+      border-radius: 12px;
+      padding: 12px 24px;
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 15px;
+      color: #FFF8E7;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      backdrop-filter: blur(10px);
+      white-space: nowrap;
+    }
+
+    /* Left panel -- pricing cards */
+    .pricing-panel {
+      grid-column: 1;
+      grid-row: 2;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      justify-content: center;
+    }
+
+    .meal-card {
+      background: rgba(255,248,231,0.05);
+      border: 1px solid rgba(184,134,11,0.15);
+      border-radius: 20px;
+      padding: 24px 28px;
+      backdrop-filter: blur(12px);
+      box-shadow:
+        0 8px 32px rgba(0,0,0,0.2),
+        inset 0 1px 0 rgba(255,255,255,0.05);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .meal-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 4px;
+      background: linear-gradient(90deg, #C41E3A, #E8B931);
+    }
+
+    .meal-card.featured {
+      background: rgba(232,185,49,0.08);
+      border-color: rgba(232,185,49,0.25);
+    }
+
+    .meal-card.featured::before {
+      background: linear-gradient(90deg, #E8B931, #B8860B, #E8B931);
+    }
+
+    .meal-emoji {
+      font-size: 40px;
+      margin-bottom: 8px;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.3));
+    }
+
+    .meal-type {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 24px;
+      color: #E8B931;
+      letter-spacing: 2px;
+      margin-bottom: 4px;
+    }
+
+    .meal-price {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 42px;
+      color: #FFF8E7;
+      text-shadow: 0 0 20px rgba(255,248,231,0.2);
+      margin-bottom: 10px;
+      line-height: 1;
+    }
+
+    .meal-items {
+      font-family: 'Inter', sans-serif;
+      font-weight: 400;
+      font-size: 15px;
+      color: rgba(255,248,231,0.6);
+      line-height: 1.6;
+    }
+
+    /* Center panel -- decorative / visual */
+    .center-panel {
+      grid-column: 2;
+      grid-row: 2;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .leaf-label {
+      font-family: 'Caveat', cursive;
+      font-size: 28px;
+      color: rgba(255,248,231,0.35);
+      text-align: center;
+      position: absolute;
+      bottom: 30px;
+      letter-spacing: 3px;
+    }
+
+    /* Right panel -- additional info */
+    .info-panel {
+      grid-column: 3;
+      grid-row: 2;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      justify-content: center;
+    }
+
+    .premium-card {
+      background: rgba(196,30,58,0.08);
+      border: 1px solid rgba(196,30,58,0.2);
+      border-radius: 20px;
+      padding: 24px 28px;
+      backdrop-filter: blur(12px);
+      box-shadow:
+        0 8px 32px rgba(0,0,0,0.2),
+        inset 0 1px 0 rgba(255,255,255,0.04);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .premium-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 4px;
+      background: linear-gradient(90deg, #C41E3A, #B8860B);
+    }
+
+    .premium-title {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 24px;
+      color: #C41E3A;
+      letter-spacing: 2px;
+      margin-bottom: 4px;
+    }
+
+    .premium-price {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 42px;
+      color: #FFF8E7;
+      text-shadow: 0 0 20px rgba(255,248,231,0.2);
+      margin-bottom: 10px;
+      line-height: 1;
+    }
+
+    .premium-items {
+      font-family: 'Inter', sans-serif;
+      font-weight: 400;
+      font-size: 15px;
+      color: rgba(255,248,231,0.6);
+      line-height: 1.6;
+    }
+
+    .choice-label {
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 14px;
+      color: #E8B931;
+      letter-spacing: 1px;
+      margin-top: 10px;
+    }
+
+    .choice-items {
+      font-family: 'Inter', sans-serif;
+      font-weight: 400;
+      font-size: 15px;
+      color: rgba(255,248,231,0.7);
+    }
+
+    /* Unlimited refills note card */
+    .refills-card {
+      background: rgba(232,185,49,0.08);
+      border: 1px solid rgba(232,185,49,0.2);
+      border-radius: 16px;
+      padding: 20px 24px;
+      backdrop-filter: blur(10px);
+      text-align: center;
+    }
+
+    .refills-text {
+      font-family: 'Caveat', cursive;
+      font-size: 26px;
+      color: #E8B931;
+      line-height: 1.4;
+    }
+
+    .refills-time {
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 16px;
+      color: rgba(255,248,231,0.5);
+      margin-top: 8px;
+      letter-spacing: 2px;
+    }
+
+    /* SVG temple gopuram arch */
+    .gopuram-svg {
+      position: absolute;
+      top: 50px; right: 50px;
+      z-index: 4;
+      opacity: 0.12;
+    }
+
+    /* Red accent bars -- left and right edges */
+    .red-bar-left {
+      position: absolute;
+      top: 20px; bottom: 20px; left: 0;
+      width: 5px;
+      background: linear-gradient(180deg, transparent, #C41E3A, #B8860B, #C41E3A, transparent);
+      z-index: 3;
+    }
+    .red-bar-right {
+      position: absolute;
+      top: 20px; bottom: 20px; right: 0;
+      width: 5px;
+      background: linear-gradient(180deg, transparent, #B8860B, #C41E3A, #B8860B, transparent);
+      z-index: 3;
+    }
+  </style>
+</head>
+<body>
+  <div class="glow-red"></div>
+  <div class="glow-gold"></div>
+  <div class="kolam-top"></div>
+  <div class="kolam-bottom"></div>
+  <div class="red-bar-left"></div>
+  <div class="red-bar-right"></div>
+
+  <!-- Decorative bowls on the banana leaf -->
+  <div class="bowl bowl-sambar"></div>
+  <div class="bowl bowl-rasam"></div>
+  <div class="bowl bowl-kootu"></div>
+  <div class="bowl bowl-poriyal"></div>
+  <div class="bowl bowl-curd"></div>
+  <div class="bowl bowl-pickle"></div>
+  <div class="bowl bowl-payasam"></div>
+  <div class="bowl bowl-rice"></div>
+  <div class="bowl bowl-papad"></div>
+  <div class="bowl bowl-banana"></div>
+
+  <!-- Inline SVG: Temple gopuram arch silhouette -->
+  <svg class="gopuram-svg" width="140" height="200" viewBox="0 0 140 200" fill="none">
+    <!-- Base -->
+    <rect x="20" y="170" width="100" height="30" rx="2" stroke="#E8B931" stroke-width="1.5" fill="none"/>
+    <!-- Tier 1 -->
+    <path d="M25 170 L25 140 L115 140 L115 170" stroke="#E8B931" stroke-width="1.5" fill="none"/>
+    <rect x="30" y="145" width="15" height="20" rx="7.5" stroke="#E8B931" stroke-width="0.8" fill="none" opacity="0.5"/>
+    <rect x="55" y="145" width="15" height="20" rx="7.5" stroke="#E8B931" stroke-width="0.8" fill="none" opacity="0.5"/>
+    <rect x="80" y="145" width="15" height="20" rx="7.5" stroke="#E8B931" stroke-width="0.8" fill="none" opacity="0.5"/>
+    <!-- Tier 2 -->
+    <path d="M30 140 L30 110 L110 110 L110 140" stroke="#E8B931" stroke-width="1.5" fill="none"/>
+    <rect x="40" y="115" width="12" height="18" rx="6" stroke="#E8B931" stroke-width="0.8" fill="none" opacity="0.5"/>
+    <rect x="60" y="115" width="12" height="18" rx="6" stroke="#E8B931" stroke-width="0.8" fill="none" opacity="0.5"/>
+    <rect x="80" y="115" width="12" height="18" rx="6" stroke="#E8B931" stroke-width="0.8" fill="none" opacity="0.5"/>
+    <!-- Tier 3 -->
+    <path d="M38 110 L38 82 L102 82 L102 110" stroke="#E8B931" stroke-width="1.5" fill="none"/>
+    <rect x="48" y="86" width="10" height="16" rx="5" stroke="#E8B931" stroke-width="0.8" fill="none" opacity="0.5"/>
+    <rect x="65" y="86" width="10" height="16" rx="5" stroke="#E8B931" stroke-width="0.8" fill="none" opacity="0.5"/>
+    <rect x="82" y="86" width="10" height="16" rx="5" stroke="#E8B931" stroke-width="0.8" fill="none" opacity="0.5"/>
+    <!-- Tier 4 -->
+    <path d="M46 82 L46 58 L94 58 L94 82" stroke="#E8B931" stroke-width="1.5" fill="none"/>
+    <rect x="55" y="62" width="8" height="14" rx="4" stroke="#E8B931" stroke-width="0.8" fill="none" opacity="0.5"/>
+    <rect x="70" y="62" width="8" height="14" rx="4" stroke="#E8B931" stroke-width="0.8" fill="none" opacity="0.5"/>
+    <!-- Crown -- dome -->
+    <path d="M52 58 Q52 38 70 28 Q88 38 88 58" stroke="#E8B931" stroke-width="1.5" fill="none"/>
+    <!-- Kalasam (pot) at top -->
+    <ellipse cx="70" cy="22" rx="8" ry="6" stroke="#E8B931" stroke-width="1" fill="none"/>
+    <line x1="70" y1="16" x2="70" y2="5" stroke="#E8B931" stroke-width="1.5"/>
+    <path d="M65 5 L70 0 L75 5" stroke="#E8B931" stroke-width="1" fill="none"/>
+  </svg>
+
+  <!-- Main layout -->
+  <div class="layout">
+    <!-- Header -->
+    <div class="header">
+      <div class="rice-emoji">&#127834;</div>
+      <div class="header-content">
+        <h1 class="main-title" data-editable="true" data-field="title">SOUTH INDIAN MEALS</h1>
+        <p class="main-subtitle" data-editable="true" data-field="subtitle">Served on Banana Leaf &bull; Unlimited Rice &amp; Sambar</p>
+      </div>
+      <div class="serving-badge" data-editable="true" data-field="servingTime">12:00 PM &ndash; 3:30 PM</div>
+    </div>
+
+    <!-- Left panel -- pricing cards -->
+    <div class="pricing-panel">
+      <div class="meal-card featured">
+        <div class="meal-emoji">&#127834;</div>
+        <div class="meal-type" data-editable="true" data-field="meal1Type">LUNCH SPECIAL</div>
+        <div class="meal-price" data-editable="true" data-field="meal1Price">$12.99</div>
+        <div class="meal-items" data-editable="true" data-field="meal1Items">Rice &bull; Sambar &bull; Rasam &bull; Kootu<br>Poriyal &bull; Curd &bull; Pickle &bull; Papad<br>Payasam &bull; Banana</div>
+      </div>
+
+      <div class="meal-card">
+        <div class="meal-emoji">&#127834;</div>
+        <div class="meal-type" data-editable="true" data-field="meal2Type">MINI MEALS</div>
+        <div class="meal-price" data-editable="true" data-field="meal2Price">$9.99</div>
+        <div class="meal-items" data-editable="true" data-field="meal2Items">Rice &bull; Sambar &bull; Rasam<br>Poriyal &bull; Curd &bull; Papad</div>
+      </div>
+    </div>
+
+    <!-- Center panel -- visual area -->
+    <div class="center-panel">
+      <span class="leaf-label" data-editable="true" data-field="leafLabel">Traditional Banana Leaf Service</span>
+    </div>
+
+    <!-- Right panel -- premium and info -->
+    <div class="info-panel">
+      <div class="premium-card">
+        <div class="meal-emoji">&#127834;</div>
+        <div class="premium-title" data-editable="true" data-field="premiumType">PREMIUM THALI</div>
+        <div class="premium-price" data-editable="true" data-field="premiumPrice">$16.99</div>
+        <div class="premium-items" data-editable="true" data-field="premiumItems">All of Lunch Special PLUS:</div>
+        <div class="choice-label" data-editable="true" data-field="choiceLabel">Choice of:</div>
+        <div class="choice-items" data-editable="true" data-field="choiceItems">Chettinad Chicken / Fish Fry / Paneer Butter Masala</div>
+      </div>
+
+      <div class="refills-card">
+        <div class="refills-text" data-editable="true" data-field="refillsNote">Unlimited refills on rice, sambar &amp; rasam</div>
+        <div class="refills-time" data-editable="true" data-field="refillsTime">SERVED 12:00 PM &ndash; 3:30 PM</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
