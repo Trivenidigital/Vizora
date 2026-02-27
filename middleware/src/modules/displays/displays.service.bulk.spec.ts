@@ -67,8 +67,8 @@ describe('DisplaysService - Bulk Operations', () => {
   });
 
   describe('bulkAssignPlaylist', () => {
-    it('should assign playlist to multiple displays', async () => {
-      mockDb.playlist.findFirst.mockResolvedValue({ id: 'p1', organizationId: 'org-1' });
+    it('should assign playlist to multiple displays and notify realtime', async () => {
+      mockDb.playlist.findFirst.mockResolvedValue({ id: 'p1', organizationId: 'org-1', items: [] });
       mockDb.display.updateMany.mockResolvedValue({ count: 2 });
 
       const result = await service.bulkAssignPlaylist('org-1', ['d1', 'd2'], 'p1');
