@@ -143,6 +143,23 @@ const CATEGORIES: CategoryConfig[] = [
       { filename: '08-thank-you.html', name: 'Thank You / Wrap-Up', description: 'Event closing and appreciation', tags: ['thank-you', 'closing', 'appreciation', 'event'], difficulty: 'beginner', orientation: 'landscape', duration: 30 },
     ],
   },
+  {
+    category: 'indian',
+    templates: [
+      { filename: '01-south-tiffin-breakfast.html', name: 'South Indian Tiffin', description: 'Authentic South Indian breakfast menu with brass and banana-leaf aesthetic', tags: ['menu', 'breakfast', 'south-indian', 'tiffin', 'indian', 'restaurant'], difficulty: 'beginner', orientation: 'landscape', duration: 30, isFeatured: true },
+      { filename: '02-dosa-varieties.html', name: 'Dosa Varieties', description: 'Golden crispy dosa varieties menu with tawa-inspired design', tags: ['menu', 'dosa', 'south-indian', 'indian', 'restaurant'], difficulty: 'beginner', orientation: 'landscape', duration: 30 },
+      { filename: '03-south-meals-thali.html', name: 'South Indian Meals', description: 'Banana leaf meals display with temple-town aesthetic', tags: ['menu', 'thali', 'meals', 'south-indian', 'indian', 'restaurant'], difficulty: 'beginner', orientation: 'landscape', duration: 30 },
+      { filename: '04-filter-coffee-snacks.html', name: 'Filter Coffee & Snacks', description: 'South Indian coffee house with evening tiffin snacks', tags: ['menu', 'coffee', 'snacks', 'south-indian', 'indian', 'cafe'], difficulty: 'beginner', orientation: 'landscape', duration: 30 },
+      { filename: '05-south-lunch-specials.html', name: 'Weekly Lunch Specials', description: 'Daily rotating South Indian lunch specials with temple-town design', tags: ['menu', 'lunch', 'specials', 'south-indian', 'indian', 'restaurant'], difficulty: 'beginner', orientation: 'landscape', duration: 30 },
+      { filename: '06-chettinad-kerala.html', name: 'Chettinad & Kerala Specials', description: 'Bold spicy Chettinad and coastal Kerala non-veg specialties', tags: ['menu', 'chettinad', 'kerala', 'non-veg', 'south-indian', 'indian', 'restaurant'], difficulty: 'beginner', orientation: 'landscape', duration: 30 },
+      { filename: '07-south-sweets.html', name: 'South Indian Sweets', description: 'Festive South Indian sweet shop with rangoli-inspired design', tags: ['menu', 'sweets', 'dessert', 'south-indian', 'indian', 'restaurant'], difficulty: 'beginner', orientation: 'landscape', duration: 30 },
+      { filename: '08-south-combo-meals.html', name: 'South Indian Combos', description: 'Value combo meals with authentic South Indian canteen feel', tags: ['menu', 'combo', 'value', 'south-indian', 'indian', 'restaurant'], difficulty: 'beginner', orientation: 'landscape', duration: 30 },
+      { filename: '09-tandoor-kebab.html', name: 'Tandoor & Kebab', description: 'Dramatic smoky tandoor and kebab menu with Mughal arch design', tags: ['menu', 'tandoor', 'kebab', 'north-indian', 'indian', 'restaurant'], difficulty: 'beginner', orientation: 'landscape', duration: 30, isFeatured: true },
+      { filename: '10-biryani-specialty.html', name: 'Dum Biryani', description: 'Royal Hyderabadi biryani menu with saffron and Mughal aesthetic', tags: ['menu', 'biryani', 'hyderabadi', 'north-indian', 'indian', 'restaurant'], difficulty: 'beginner', orientation: 'landscape', duration: 30 },
+      { filename: '11-chaat-street-food.html', name: 'Chaat & Street Food', description: 'Vibrant colorful Indian street food menu with market energy', tags: ['menu', 'chaat', 'street-food', 'north-indian', 'indian', 'restaurant'], difficulty: 'beginner', orientation: 'landscape', duration: 30 },
+      { filename: '12-mithai-display.html', name: 'Sweets & Mithai', description: 'Luxurious North Indian mithai display with festive gold aesthetic', tags: ['menu', 'mithai', 'sweets', 'north-indian', 'indian', 'restaurant'], difficulty: 'beginner', orientation: 'landscape', duration: 30 },
+    ],
+  },
 ];
 
 // ── Main ──────────────────────────────────────────────────────────────────────

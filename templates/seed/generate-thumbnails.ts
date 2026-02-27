@@ -18,7 +18,7 @@ import * as path from 'path';
 import sharp from 'sharp';
 
 const SEED_DIR = path.resolve(__dirname);
-const CATEGORIES = ['restaurant', 'retail', 'general', 'corporate', 'education', 'healthcare', 'events'];
+const CATEGORIES = ['restaurant', 'retail', 'general', 'corporate', 'education', 'healthcare', 'events', 'indian'];
 const LANDSCAPE = { width: 1920, height: 1080 };
 const PORTRAIT = { width: 1080, height: 1920 };
 const THUMB_WIDTH = 400;

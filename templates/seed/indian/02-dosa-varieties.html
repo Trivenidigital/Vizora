@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@300;400;500;600;700&family=Caveat:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        /* Diagonal stripe pattern — subtle ghee-roasted texture */
+        repeating-linear-gradient(
+          45deg,
+          transparent,
+          transparent 30px,
+          rgba(232,185,49,0.02) 30px,
+          rgba(232,185,49,0.02) 31px
+        ),
+        repeating-linear-gradient(
+          -45deg,
+          transparent,
+          transparent 30px,
+          rgba(200,148,62,0.015) 30px,
+          rgba(200,148,62,0.015) 31px
+        ),
+        /* Warm dark base */
+        linear-gradient(160deg, #1a1005 0%, #120c03 40%, #1a1005 70%, #0f0a02 100%);
+      color: #FFF8E7;
+    }
+
+    /* Tawa concentric circles — center background */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 1200px; height: 1200px;
+      background:
+        radial-gradient(circle, transparent 180px, rgba(232,185,49,0.04) 182px, transparent 184px),
+        radial-gradient(circle, transparent 260px, rgba(232,185,49,0.03) 262px, transparent 264px),
+        radial-gradient(circle, transparent 340px, rgba(232,185,49,0.025) 342px, transparent 344px),
+        radial-gradient(circle, transparent 420px, rgba(232,185,49,0.02) 422px, transparent 424px),
+        radial-gradient(circle, transparent 500px, rgba(232,185,49,0.015) 502px, transparent 504px),
+        radial-gradient(circle, transparent 580px, rgba(200,148,62,0.01) 582px, transparent 584px);
+      border-radius: 50%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* Central tawa glow — golden heat */
+    body::after {
+      content: '';
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 700px; height: 700px;
+      background: radial-gradient(circle, rgba(232,185,49,0.1) 0%, rgba(184,134,11,0.05) 40%, transparent 70%);
+      border-radius: 50%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* Warm golden glow — top left */
+    .glow-1 {
+      position: absolute;
+      top: -100px; left: -50px;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(232,185,49,0.1) 0%, transparent 60%);
+      border-radius: 50%;
+      z-index: 1; pointer-events: none;
+    }
+
+    /* Warm golden glow — bottom right */
+    .glow-2 {
+      position: absolute;
+      bottom: -120px; right: -60px;
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(200,148,62,0.08) 0%, transparent 60%);
+      border-radius: 50%;
+      z-index: 1; pointer-events: none;
+    }
+
+    /* Green chutney accent glow */
+    .glow-3 {
+      position: absolute;
+      top: 200px; right: 100px;
+      width: 300px; height: 300px;
+      background: radial-gradient(circle, rgba(45,80,22,0.06) 0%, transparent 60%);
+      border-radius: 50%;
+      z-index: 1; pointer-events: none;
+    }
+
+    .container {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: 42% 58%;
+      grid-template-rows: 1fr;
+      height: 100%;
+      padding: 60px;
+      gap: 50px;
+    }
+
+    /* Left hero area */
+    .hero {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      position: relative;
+    }
+
+    .emoji-accent {
+      font-size: 140px;
+      line-height: 1;
+      filter: drop-shadow(0 0 40px rgba(232,185,49,0.4)) drop-shadow(0 8px 20px rgba(0,0,0,0.6));
+      margin-bottom: 24px;
+    }
+
+    .hero-title {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 96px;
+      line-height: 0.9;
+      color: #E8B931;
+      text-shadow:
+        0 2px 20px rgba(232,185,49,0.4),
+        0 0 60px rgba(232,185,49,0.15);
+      letter-spacing: 3px;
+      margin-bottom: 14px;
+    }
+
+    .hero-tagline {
+      font-family: 'Caveat', cursive;
+      font-size: 36px;
+      color: rgba(255,248,231,0.6);
+      margin-bottom: 40px;
+      letter-spacing: 2px;
+    }
+
+    /* Tawa circle decoration behind hero */
+    .tawa-decor {
+      position: absolute;
+      bottom: 40px; left: 30px;
+      width: 260px; height: 260px;
+      border-radius: 50%;
+      border: 2px solid rgba(232,185,49,0.08);
+      box-shadow:
+        0 0 40px rgba(232,185,49,0.05),
+        inset 0 0 60px rgba(232,185,49,0.03);
+      z-index: 0;
+      pointer-events: none;
+    }
+    .tawa-decor::before {
+      content: '';
+      position: absolute;
+      top: 15px; left: 15px; right: 15px; bottom: 15px;
+      border-radius: 50%;
+      border: 1px solid rgba(232,185,49,0.05);
+    }
+
+    /* Inline SVG spatula */
+    .spatula-svg {
+      position: absolute;
+      bottom: 60px; left: 240px;
+      z-index: 1;
+      opacity: 0.2;
+    }
+
+    /* Chutney note */
+    .chutney-note {
+      background: rgba(232,185,49,0.1);
+      border: 1px solid rgba(232,185,49,0.25);
+      border-radius: 12px;
+      padding: 14px 24px;
+      font-family: 'Caveat', cursive;
+      font-size: 22px;
+      color: rgba(255,248,231,0.7);
+      backdrop-filter: blur(10px);
+      display: inline-block;
+    }
+
+    /* Right side — 3 column dosa grid */
+    .dosa-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-rows: auto 1fr auto;
+      gap: 20px;
+      align-content: center;
+    }
+
+    .col-header {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 28px;
+      text-align: center;
+      padding-bottom: 12px;
+      border-bottom: 2px solid rgba(232,185,49,0.25);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+    .col-header.classic { color: #E8B931; }
+    .col-header.special { color: #C8943E; }
+    .col-header.premium { color: #B8860B; }
+
+    .dosa-col {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .dosa-card {
+      background: rgba(255,248,231,0.03);
+      border: 1px solid rgba(232,185,49,0.08);
+      border-radius: 14px;
+      padding: 16px 20px;
+      backdrop-filter: blur(10px);
+      box-shadow:
+        0 4px 20px rgba(0,0,0,0.2),
+        inset 0 1px 0 rgba(255,255,255,0.03);
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 10px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .dosa-card::before {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(232,185,49,0.15), transparent);
+    }
+
+    .dosa-card:nth-child(even) {
+      background: rgba(255,248,231,0.05);
+    }
+
+    .dosa-name {
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+      font-size: 20px;
+      color: #FFF8E7;
+      white-space: nowrap;
+    }
+
+    .dosa-price {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 22px;
+      color: #E8B931;
+      text-shadow: 0 0 12px rgba(232,185,49,0.25);
+      white-space: nowrap;
+    }
+
+    /* Footer strip */
+    .footer-strip {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding-top: 12px;
+      border-top: 1px solid rgba(232,185,49,0.15);
+    }
+
+    .footer-text {
+      font-family: 'Caveat', cursive;
+      font-size: 24px;
+      color: rgba(255,248,231,0.5);
+      letter-spacing: 1px;
+    }
+
+    /* Neon frame SVG */
+    .frame-svg {
+      position: absolute;
+      top: 20px; left: 20px; right: 20px; bottom: 20px;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* Top accent gradient bar */
+    .top-accent {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #B8860B, #E8B931, #C8943E, #B8860B);
+      z-index: 3;
+    }
+
+    /* Bottom accent gradient bar */
+    .bottom-accent {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #2D5016, #E8B931, #C8943E, #2D5016);
+      z-index: 3;
+    }
+  </style>
+</head>
+<body>
+  <div class="glow-1"></div>
+  <div class="glow-2"></div>
+  <div class="glow-3"></div>
+  <div class="top-accent"></div>
+  <div class="bottom-accent"></div>
+
+  <!-- SVG golden frame -->
+  <svg class="frame-svg" viewBox="0 0 1880 1040" fill="none" preserveAspectRatio="none">
+    <rect x="1" y="1" width="1878" height="1038" rx="12" stroke="url(#goldGrad)" stroke-width="1" opacity="0.15"/>
+    <defs>
+      <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#B8860B"/>
+        <stop offset="50%" stop-color="#E8B931"/>
+        <stop offset="100%" stop-color="#B8860B"/>
+      </linearGradient>
+    </defs>
+  </svg>
+
+  <!-- Corner ornaments -->
+  <svg style="position:absolute;top:14px;left:14px;z-index:3;opacity:0.2;" width="60" height="60" viewBox="0 0 60 60" fill="none">
+    <path d="M5 5 L5 30 Q5 5 30 5" stroke="#E8B931" stroke-width="2" fill="none"/>
+    <circle cx="7" cy="7" r="2.5" fill="#E8B931"/>
+  </svg>
+  <svg style="position:absolute;top:14px;right:14px;z-index:3;opacity:0.2;" width="60" height="60" viewBox="0 0 60 60" fill="none">
+    <path d="M55 5 L55 30 Q55 5 30 5" stroke="#E8B931" stroke-width="2" fill="none"/>
+    <circle cx="53" cy="7" r="2.5" fill="#E8B931"/>
+  </svg>
+  <svg style="position:absolute;bottom:14px;left:14px;z-index:3;opacity:0.2;" width="60" height="60" viewBox="0 0 60 60" fill="none">
+    <path d="M5 55 L5 30 Q5 55 30 55" stroke="#E8B931" stroke-width="2" fill="none"/>
+    <circle cx="7" cy="53" r="2.5" fill="#E8B931"/>
+  </svg>
+  <svg style="position:absolute;bottom:14px;right:14px;z-index:3;opacity:0.2;" width="60" height="60" viewBox="0 0 60 60" fill="none">
+    <path d="M55 55 L55 30 Q55 55 30 55" stroke="#E8B931" stroke-width="2" fill="none"/>
+    <circle cx="53" cy="53" r="2.5" fill="#E8B931"/>
+  </svg>
+
+  <div class="container">
+    <!-- Left hero -->
+    <div class="hero">
+      <div class="tawa-decor"></div>
+
+      <!-- Inline SVG: brass spatula/ladle silhouette -->
+      <svg class="spatula-svg" width="100" height="180" viewBox="0 0 100 180" fill="none">
+        <!-- Handle -->
+        <rect x="44" y="60" width="12" height="110" rx="6" stroke="#E8B931" stroke-width="1.5" fill="none"/>
+        <!-- Spatula head -->
+        <ellipse cx="50" cy="30" rx="35" ry="28" stroke="#E8B931" stroke-width="1.5" fill="none"/>
+        <ellipse cx="50" cy="30" rx="25" ry="18" stroke="#E8B931" stroke-width="0.8" fill="none" opacity="0.4"/>
+        <!-- Holes in spatula -->
+        <circle cx="40" cy="24" r="4" stroke="#E8B931" stroke-width="0.8" fill="none" opacity="0.3"/>
+        <circle cx="55" cy="20" r="3" stroke="#E8B931" stroke-width="0.8" fill="none" opacity="0.3"/>
+        <circle cx="50" cy="36" r="3.5" stroke="#E8B931" stroke-width="0.8" fill="none" opacity="0.3"/>
+        <!-- Hook at bottom -->
+        <path d="M50 170 Q50 178 42 178 Q34 178 34 170" stroke="#E8B931" stroke-width="1.5" fill="none"/>
+      </svg>
+
+      <div class="emoji-accent">&#129368;</div>
+      <h1 class="hero-title" data-editable="true" data-field="title">DOSA<br>VARIETIES</h1>
+      <p class="hero-tagline" data-editable="true" data-field="tagline">Crispy &bull; Golden &bull; Made to Order</p>
+      <div class="chutney-note" data-editable="true" data-field="chutneyNote">All dosas served with sambar, coconut chutney &amp; tomato chutney</div>
+    </div>
+
+    <!-- Right side — 3-column dosa grid -->
+    <div class="dosa-grid">
+      <!-- Column headers -->
+      <h3 class="col-header classic" data-editable="true" data-field="col1Title">CLASSIC</h3>
+      <h3 class="col-header special" data-editable="true" data-field="col2Title">SPECIAL</h3>
+      <h3 class="col-header premium" data-editable="true" data-field="col3Title">PREMIUM</h3>
+
+      <!-- Classic column -->
+      <div class="dosa-col">
+        <div class="dosa-card">
+          <span class="dosa-name" data-editable="true" data-field="c1Name">Plain Dosa</span>
+          <span class="dosa-price" data-editable="true" data-field="c1Price">$5.99</span>
+        </div>
+        <div class="dosa-card">
+          <span class="dosa-name" data-editable="true" data-field="c2Name">Masala Dosa</span>
+          <span class="dosa-price" data-editable="true" data-field="c2Price">$7.99</span>
+        </div>
+        <div class="dosa-card">
+          <span class="dosa-name" data-editable="true" data-field="c3Name">Paper Dosa</span>
+          <span class="dosa-price" data-editable="true" data-field="c3Price">$7.49</span>
+        </div>
+        <div class="dosa-card">
+          <span class="dosa-name" data-editable="true" data-field="c4Name">Rava Dosa</span>
+          <span class="dosa-price" data-editable="true" data-field="c4Price">$7.99</span>
+        </div>
+        <div class="dosa-card">
+          <span class="dosa-name" data-editable="true" data-field="c5Name">Set Dosa (3)</span>
+          <span class="dosa-price" data-editable="true" data-field="c5Price">$6.99</span>
+        </div>
+        <div class="dosa-card">
+          <span class="dosa-name" data-editable="true" data-field="c6Name">Neer Dosa (3)</span>
+          <span class="dosa-price" data-editable="true" data-field="c6Price">$6.99</span>
+        </div>
+      </div>
+
+      <!-- Special column -->
+      <div class="dosa-col">
+        <div class="dosa-card">
+          <span class="dosa-name" data-editable="true" data-field="s1Name">Mysore Masala</span>
+          <span class="dosa-price" data-editable="true" data-field="s1Price">$8.99</span>
+        </div>
+        <div class="dosa-card">
+          <span class="dosa-name" data-editable="true" data-field="s2Name">Onion Dosa</span>
+          <span class="dosa-price" data-editable="true" data-field="s2Price">$7.49</span>
+        </div>
+        <div class="dosa-card">
+          <span class="dosa-name" data-editable="true" data-field="s3Name">Tomato Dosa</span>
+          <span class="dosa-price" data-editable="true" data-field="s3Price">$7.49</span>
+        </div>
+        <div class="dosa-card">
+          <span class="dosa-name" data-editable="true" data-field="s4Name">Egg Dosa</span>
+          <span class="dosa-price" data-editable="true" data-field="s4Price">$8.49</span>
+        </div>
+        <div class="dosa-card">
+          <span class="dosa-name" data-editable="true" data-field="s5Name">Spring Dosa</span>
+          <span class="dosa-price" data-editable="true" data-field="s5Price">$8.49</span>
+        </div>
+        <div class="dosa-card">
+          <span class="dosa-name" data-editable="true" data-field="s6Name">Uttapam</span>
+          <span class="dosa-price" data-editable="true" data-field="s6Price">$7.99</span>
+        </div>
+      </div>
+
+      <!-- Premium column -->
+      <div class="dosa-col">
+        <div class="dosa-card">
+          <span class="dosa-name" data-editable="true" data-field="p1Name">Ghee Roast</span>
+          <span class="dosa-price" data-editable="true" data-field="p1Price">$9.99</span>
+        </div>
+        <div class="dosa-card">
+          <span class="dosa-name" data-editable="true" data-field="p2Name">Cheese Dosa</span>
+          <span class="dosa-price" data-editable="true" data-field="p2Price">$9.49</span>
+        </div>
+        <div class="dosa-card">
+          <span class="dosa-name" data-editable="true" data-field="p3Name">Paneer Dosa</span>
+          <span class="dosa-price" data-editable="true" data-field="p3Price">$9.99</span>
+        </div>
+        <div class="dosa-card">
+          <span class="dosa-name" data-editable="true" data-field="p4Name">Family Dosa</span>
+          <span class="dosa-price" data-editable="true" data-field="p4Price">$14.99</span>
+        </div>
+        <div class="dosa-card">
+          <span class="dosa-name" data-editable="true" data-field="p5Name">Chettinad Dosa</span>
+          <span class="dosa-price" data-editable="true" data-field="p5Price">$10.99</span>
+        </div>
+        <div class="dosa-card">
+          <span class="dosa-name" data-editable="true" data-field="p6Name">Kothu Parotta</span>
+          <span class="dosa-price" data-editable="true" data-field="p6Price">$8.99</span>
+        </div>
+      </div>
+
+      <!-- Footer strip -->
+      <div class="footer-strip">
+        <p class="footer-text" data-editable="true" data-field="footerNote">Served with sambar, coconut chutney &amp; tomato chutney &bull; Extra chutney $0.99</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
