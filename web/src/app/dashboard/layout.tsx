@@ -61,6 +61,26 @@ export default function DashboardLayout({
     return user.email.substring(0, 2).toUpperCase();
   };
 
+  // Editor route gets full viewport — no header/sidebar
+  const isEditorRoute = pathname?.match(/\/dashboard\/templates\/[^/]+\/edit$/);
+  if (isEditorRoute) {
+    return (
+      <SupportChatProvider>
+        <QueryProvider>
+          <DeviceStatusProvider user={user}>
+            {authLoading ? (
+              <div className="flex h-screen items-center justify-center">
+                <LoadingSpinner size="lg" />
+              </div>
+            ) : (
+              children
+            )}
+          </DeviceStatusProvider>
+        </QueryProvider>
+      </SupportChatProvider>
+    );
+  }
+
   return (
     <SupportChatProvider>
     <div className="min-h-screen bg-[var(--background)]">

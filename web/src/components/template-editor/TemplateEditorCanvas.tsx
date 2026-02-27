@@ -9,6 +9,7 @@ import {
   useRef,
 } from 'react';
 import type { SelectedElement } from './PropertyPanel';
+import { TEMPLATE_WIDTH, TEMPLATE_HEIGHT } from './useCanvasZoom';
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
@@ -21,6 +22,8 @@ interface TemplateEditorCanvasProps {
   templateHtml: string;
   onElementSelected: (element: SelectedElement | null) => void;
   onReady: () => void;
+  scale?: number;
+  isScrollable?: boolean;
 }
 
 // ── Editor Runtime (inlined) ──────────────────────────────────────────────────
@@ -390,7 +393,7 @@ const EDITOR_RUNTIME_CODE = `(function () {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const TemplateEditorCanvas = forwardRef<CanvasHandle, TemplateEditorCanvasProps>(
-  function TemplateEditorCanvas({ templateHtml, onElementSelected, onReady }, ref) {
+  function TemplateEditorCanvas({ templateHtml, onElementSelected, onReady, scale = 1, isScrollable = false }, ref) {
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const serializeResolverRef = useRef<((html: string) => void) | null>(null);
 
@@ -429,6 +432,7 @@ const TemplateEditorCanvas = forwardRef<CanvasHandle, TemplateEditorCanvasProps>
               textContent: data.textContent ?? '',
               src: data.src ?? '',
               styles: data.styles ?? {},
+              rect: data.rect ?? undefined,
             };
             onElementSelected(element);
             break;
@@ -521,15 +525,43 @@ const TemplateEditorCanvas = forwardRef<CanvasHandle, TemplateEditorCanvasProps>
 
     // ── Render ────────────────────────────────────────────────────────
 
+    const scaledW = TEMPLATE_WIDTH * scale;
+    const scaledH = TEMPLATE_HEIGHT * scale;
+
     return (
-      <div className="relative w-full h-full bg-gray-900 rounded-xl overflow-hidden border border-gray-700">
-        <iframe
-          ref={iframeRef}
-          srcDoc={editorHtml}
-          className="w-full h-full border-0"
-          sandbox="allow-scripts"
-          title="Template Editor"
-        />
+      <div
+        className={`relative w-full h-full bg-gray-900 rounded-xl border border-gray-700 ${
+          isScrollable ? 'overflow-auto' : 'overflow-hidden'
+        }`}
+      >
+        {/* Centering layer — flexbox center when fit, padding when scrollable */}
+        <div
+          className={
+            isScrollable
+              ? 'p-4'
+              : 'flex items-center justify-center w-full h-full'
+          }
+        >
+          {/* Scale box — tells layout engine the visual size */}
+          <div
+            style={{ width: scaledW, height: scaledH, flexShrink: 0 }}
+            className="relative"
+          >
+            <iframe
+              ref={iframeRef}
+              srcDoc={editorHtml}
+              style={{
+                width: TEMPLATE_WIDTH,
+                height: TEMPLATE_HEIGHT,
+                transform: `scale(${scale})`,
+                transformOrigin: 'top left',
+              }}
+              className="border-0 block"
+              sandbox="allow-scripts"
+              title="Template Editor"
+            />
+          </div>
+        </div>
       </div>
     );
   },

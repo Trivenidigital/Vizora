@@ -11,6 +11,7 @@ export interface SelectedElement {
   textContent: string;
   src: string;
   styles: Record<string, string>;
+  rect?: { top: number; left: number; width: number; height: number };
 }
 
 interface PropertyPanelProps {
