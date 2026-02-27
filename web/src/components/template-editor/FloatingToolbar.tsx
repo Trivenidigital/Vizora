@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface FloatingToolbarProps {
   /** The iframe containing the editor */
@@ -14,6 +14,10 @@ interface FloatingToolbarProps {
   } | null;
   /** Callback when a property changes */
   onPropertyChange: (elementId: string, property: string, oldValue: string, newValue: string) => void;
+  /** Current canvas scale factor */
+  scale?: number;
+  /** Ref to the scrollable canvas container (for scroll-aware positioning) */
+  scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 const FONT_SIZES = [16, 20, 24, 28, 32, 36, 40, 48, 56, 64, 72, 96, 120];
@@ -31,12 +35,13 @@ export default function FloatingToolbar({
   iframeRef,
   selectedElement,
   onPropertyChange,
+  scale = 1,
+  scrollContainerRef,
 }: FloatingToolbarProps) {
   const toolbarRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
 
-  // Calculate toolbar position based on selected element rect + iframe offset
-  useEffect(() => {
+  const calcPosition = useCallback(() => {
     if (!selectedElement?.rect || !iframeRef.current) {
       setPosition(null);
       return;
@@ -46,15 +51,33 @@ export default function FloatingToolbar({
     const iframeRect = iframe.getBoundingClientRect();
     const elRect = selectedElement.rect;
 
-    // Position toolbar above the selected element
-    const top = iframeRect.top + elRect.top - 48; // 48px above element
-    const left = iframeRect.left + elRect.left + elRect.width / 2;
+    // Scale the element rect from native coords to visual coords
+    const scaledTop = elRect.top * scale;
+    const scaledLeft = elRect.left * scale;
+    const scaledWidth = elRect.width * scale;
+
+    const top = iframeRect.top + scaledTop - 48;
+    const left = iframeRect.left + scaledLeft + scaledWidth / 2;
 
     setPosition({
       top: Math.max(4, top),
       left: Math.max(100, Math.min(left, window.innerWidth - 200)),
     });
-  }, [selectedElement, iframeRef]);
+  }, [selectedElement, iframeRef, scale]);
+
+  // Recalculate on selection/scale change
+  useEffect(() => {
+    calcPosition();
+  }, [calcPosition]);
+
+  // Recalculate on scroll
+  useEffect(() => {
+    const container = scrollContainerRef?.current;
+    if (!container) return;
+
+    container.addEventListener('scroll', calcPosition);
+    return () => container.removeEventListener('scroll', calcPosition);
+  }, [scrollContainerRef, calcPosition]);
 
   if (!selectedElement || selectedElement.elementType !== 'text' || !position) {
     return null;

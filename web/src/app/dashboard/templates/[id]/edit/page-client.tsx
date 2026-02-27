@@ -9,6 +9,8 @@ import type { SelectedElement } from '@/components/template-editor/PropertyPanel
 import DisplayPickerModal from '@/components/template-editor/DisplayPickerModal';
 import FloatingToolbar from '@/components/template-editor/FloatingToolbar';
 import { useEditorHistory } from '@/components/template-editor/useEditorHistory';
+import { useCanvasZoom } from '@/components/template-editor/useCanvasZoom';
+import type { ZoomPreset } from '@/components/template-editor/useCanvasZoom';
 import { apiClient } from '@/lib/api';
 import { useToast } from '@/lib/hooks/useToast';
 
@@ -33,7 +35,9 @@ export default function EditPageClient({ templateId }: EditPageClientProps) {
   // ── Refs ──────────────────────────────────────────────────────────────
   const canvasRef = useRef<CanvasHandle>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+
+  // ── Zoom ────────────────────────────────────────────────────────────────
+  const zoom = useCanvasZoom();
 
   // ── Editor History (undo/redo) ────────────────────────────────────────
   const history = useEditorHistory(iframeRef);
@@ -41,13 +45,13 @@ export default function EditPageClient({ templateId }: EditPageClientProps) {
   // Populate iframeRef by finding the iframe inside the canvas container
   // after the editor is ready.
   useEffect(() => {
-    if (editorReady && containerRef.current) {
-      const iframe = containerRef.current.querySelector('iframe');
+    if (editorReady && zoom.containerRef.current) {
+      const iframe = zoom.containerRef.current.querySelector('iframe');
       if (iframe) {
         (iframeRef as React.MutableRefObject<HTMLIFrameElement | null>).current = iframe;
       }
     }
-  }, [editorReady]);
+  }, [editorReady, zoom.containerRef]);
 
   // ── Load template data on mount ──────────────────────────────────────
   useEffect(() => {
@@ -243,6 +247,26 @@ export default function EditPageClient({ templateId }: EditPageClientProps) {
           )}
         </div>
 
+        {/* Center: zoom controls */}
+        <div className="flex items-center gap-1">
+          {(['fit', '50', '75', '100'] as ZoomPreset[]).map((preset) => (
+            <button
+              key={preset}
+              onClick={() => zoom.setZoomPreset(preset)}
+              className={`rounded px-2.5 py-1 text-xs font-medium transition ${
+                zoom.zoomPreset === preset
+                  ? 'bg-emerald-600 text-white'
+                  : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+              }`}
+            >
+              {preset === 'fit' ? 'Fit' : `${preset}%`}
+            </button>
+          ))}
+          <span className="ml-2 text-xs text-gray-500 tabular-nums">
+            {Math.round(zoom.scale * 100)}%
+          </span>
+        </div>
+
         {/* Right: actions */}
         <div className="flex items-center gap-3">
           <button
@@ -265,12 +289,14 @@ export default function EditPageClient({ templateId }: EditPageClientProps) {
       {/* ── Main content area ────────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden">
         {/* Canvas */}
-        <div ref={containerRef} className="flex-1 p-4">
+        <div ref={zoom.containerRef} className="flex-1 p-4">
           <TemplateEditorCanvas
             ref={canvasRef}
             templateHtml={previewHtml}
             onElementSelected={handleElementSelected}
             onReady={handleEditorReady}
+            scale={zoom.scale}
+            isScrollable={zoom.isScrollable}
           />
         </div>
 
@@ -294,9 +320,12 @@ export default function EditPageClient({ templateId }: EditPageClientProps) {
         selectedElement={selectedElement ? {
           elementId: selectedElement.elementId,
           elementType: selectedElement.elementType,
+          rect: selectedElement.rect,
           styles: selectedElement.styles,
         } : null}
         onPropertyChange={handlePropertyChange}
+        scale={zoom.scale}
+        scrollContainerRef={zoom.containerRef}
       />
 
       {/* ── Display Picker Modal ─────────────────────────────────────── */}
