@@ -360,7 +360,7 @@ describe('TemplateLibraryService', () => {
       expect(result.html).toBe('<p>No preview available</p>');
     });
 
-    it('should return fallback when rendering fails', async () => {
+    it('should return raw templateHtml when rendering fails', async () => {
       const template = makeTemplate();
       mockDb.content.findFirst.mockResolvedValue(template);
       mockTemplateRendering.processTemplate.mockImplementation(() => {
@@ -369,7 +369,7 @@ describe('TemplateLibraryService', () => {
 
       const result = await service.getPreview('tmpl-1');
 
-      expect(result.html).toBe('<p>Preview generation failed</p>');
+      expect(result.html).toBe('<h1>{{title}}</h1>');
     });
   });
 
@@ -738,6 +738,53 @@ describe('TemplateLibraryService', () => {
 
       await expect(
         service.updateTemplate('nonexistent', { name: 'Foo' }),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('saveUserTemplate', () => {
+    it('should save a user-owned template with org verification', async () => {
+      const template = makeTemplate({ isGlobal: false, organizationId: 'org-1' });
+      mockDb.content.findFirst.mockResolvedValue(template);
+      const updated = makeTemplate({ isGlobal: false, organizationId: 'org-1', name: 'New Name' });
+      mockDb.content.update.mockResolvedValue(updated);
+
+      const result = await service.saveUserTemplate('tmpl-1', { name: 'New Name' }, 'org-1');
+
+      expect(mockDb.content.findFirst).toHaveBeenCalledWith({
+        where: { id: 'tmpl-1', type: 'template' },
+      });
+      expect(mockDb.content.update).toHaveBeenCalledWith({
+        where: { id: 'tmpl-1' },
+        data: expect.objectContaining({ name: 'New Name' }),
+      });
+      expect(result.id).toBe('tmpl-1');
+    });
+
+    it('should reject when org does not match', async () => {
+      const template = makeTemplate({ isGlobal: false, organizationId: 'org-other' });
+      mockDb.content.findFirst.mockResolvedValue(template);
+
+      await expect(
+        service.saveUserTemplate('tmpl-1', { name: 'Hack' }, 'org-1'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should allow saving global templates', async () => {
+      const template = makeTemplate({ isGlobal: true });
+      mockDb.content.findFirst.mockResolvedValue(template);
+      mockDb.content.update.mockResolvedValue(template);
+
+      const result = await service.saveUserTemplate('tmpl-1', { templateHtml: '<p>new</p>' }, 'org-1');
+
+      expect(result.id).toBe('tmpl-1');
+    });
+
+    it('should throw NotFoundException for missing template', async () => {
+      mockDb.content.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.saveUserTemplate('nonexistent', { name: 'Foo' }, 'org-1'),
       ).rejects.toThrow(NotFoundException);
     });
   });
