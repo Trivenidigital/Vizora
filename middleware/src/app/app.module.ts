@@ -27,6 +27,7 @@ import { TemplateLibraryModule } from '../modules/template-library/template-libr
 import { StorageModule } from '../modules/storage/storage.module';
 import { MetricsModule } from '../modules/metrics/metrics.module';
 import { MailModule } from '../modules/mail/mail.module';
+import { SupportModule } from '../modules/support/support.module';
 
 @Module({
   imports: [
@@ -96,6 +97,7 @@ import { MailModule } from '../modules/mail/mail.module';
     AdminModule,
     TemplateLibraryModule,
     MetricsModule,
+    SupportModule,
   ],
   controllers: [AppController],
   providers: [
