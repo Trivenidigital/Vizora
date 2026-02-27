@@ -10,7 +10,7 @@ const quickActions = [
 ];
 
 export default function SupportQuickActions() {
-  const { setInputText } = useSupportChat();
+  const { startComposing } = useSupportChat();
 
   return (
     <div className="px-4 py-3 border-t border-white/5">
@@ -19,7 +19,7 @@ export default function SupportQuickActions() {
         {quickActions.map((action) => (
           <button
             key={action.label}
-            onClick={() => setInputText(action.prefill)}
+            onClick={() => startComposing(action.prefill)}
             className="px-3 py-1.5 text-sm text-gray-300 border border-white/10 rounded-full hover:bg-white/10 transition-all duration-200"
           >
             {action.label}

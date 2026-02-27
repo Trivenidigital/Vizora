@@ -97,10 +97,10 @@ describe('SupportChat', () => {
     expect(screen.getByText('Template suggestion')).toBeInTheDocument();
   });
 
-  it('quick action buttons are clickable and set input text in the provider', async () => {
+  it('quick action buttons are clickable and switch to compose view', async () => {
     // Quick actions are shown in the conversation list view.
-    // When clicked, they call setInputText with a prefill value.
-    // Verify the buttons render and can be clicked without error.
+    // When clicked, they call startComposing which switches to the active chat view
+    // with the input prefilled.
     await act(async () => {
       renderChat();
     });
@@ -113,22 +113,16 @@ describe('SupportChat', () => {
     const reportBugButton = screen.getByText('Report a bug');
     expect(reportBugButton).toBeInTheDocument();
 
-    // Clicking the quick action should not throw
+    // Clicking the quick action should switch to the compose view
     await act(async () => {
       fireEvent.click(reportBugButton);
     });
 
-    // The quick action sets inputText in the provider context.
-    // We can verify this by checking the label text for the other quick actions
-    // (they should still be rendered and clickable).
-    const featureButton = screen.getByText('Request a feature');
-    await act(async () => {
-      fireEvent.click(featureButton);
-    });
-
-    // Both clicks should have worked without error
-    expect(reportBugButton).toBeInTheDocument();
-    expect(featureButton).toBeInTheDocument();
+    // After clicking, the view should switch to active chat with textarea visible
+    const textarea = screen.getByPlaceholderText('Type a message...');
+    expect(textarea).toBeInTheDocument();
+    // Input should be prefilled with the quick action text
+    expect(textarea).toHaveValue('I found a bug: ');
   });
 
   it('shows conversation list when no active conversation', async () => {

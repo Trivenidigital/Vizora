@@ -18,12 +18,14 @@ interface SupportChatState {
   isLoading: boolean;
   unreadCount: number;
   conversations: ConversationSummary[];
+  isComposing: boolean;
 }
 
 interface SupportChatContextValue extends SupportChatState {
   toggleChat: () => void;
   sendMessage: (content: string) => Promise<void>;
   startNewConversation: () => void;
+  startComposing: (prefill?: string) => void;
   selectConversation: (id: string) => Promise<void>;
   setInputText: (text: string) => void;
   inputText: string;
@@ -65,6 +67,7 @@ export function SupportChatProvider({ children }: { children: React.ReactNode })
   const [unreadCount, setUnreadCount] = useState(0);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [inputText, setInputText] = useState('');
+  const [isComposing, setIsComposing] = useState(false);
   const loadedRef = useRef(false);
 
   // Intercept console errors on mount
@@ -118,6 +121,14 @@ export function SupportChatProvider({ children }: { children: React.ReactNode })
     setActiveRequestId(null);
     setMessages([]);
     setInputText('');
+    setIsComposing(false);
+  }, []);
+
+  const startComposing = useCallback((prefill?: string) => {
+    setActiveRequestId(null);
+    setMessages([]);
+    setIsComposing(true);
+    setInputText(prefill || '');
   }, []);
 
   const selectConversation = useCallback(async (id: string) => {
@@ -240,10 +251,12 @@ export function SupportChatProvider({ children }: { children: React.ReactNode })
     isLoading,
     unreadCount,
     conversations,
+    isComposing,
     inputText,
     toggleChat,
     sendMessage,
     startNewConversation,
+    startComposing,
     selectConversation,
     setInputText,
   };
