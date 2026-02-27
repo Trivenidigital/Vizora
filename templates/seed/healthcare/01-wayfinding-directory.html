@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(ellipse at 10% 90%, rgba(16, 185, 129, 0.12) 0%, transparent 50%),
+        radial-gradient(ellipse at 90% 20%, rgba(59, 130, 246, 0.10) 0%, transparent 50%),
+        linear-gradient(165deg, #f0f9ff 0%, #e0f2fe 30%, #f0fdf4 70%, #ecfdf5 100%);
+      color: #1e293b;
+    }
+
+    /* Dot grid pattern overlay */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image: radial-gradient(circle, rgba(59, 130, 246, 0.06) 1.5px, transparent 1.5px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Decorative glowing circle top-right */
+    .glow-circle-1 {
+      position: absolute;
+      top: -80px;
+      right: -80px;
+      width: 350px;
+      height: 350px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(59, 130, 246, 0.15), transparent 70%);
+      filter: blur(40px);
+      z-index: 0;
+    }
+
+    /* Decorative glowing circle bottom-left */
+    .glow-circle-2 {
+      position: absolute;
+      bottom: -60px;
+      left: -60px;
+      width: 300px;
+      height: 300px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.18), transparent 70%);
+      filter: blur(35px);
+      z-index: 0;
+    }
+
+    /* Ornamental line */
+    .ornament-line {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 6px;
+      background: linear-gradient(90deg, #3b82f6, #10b981, #06b6d4, #3b82f6);
+      z-index: 2;
+    }
+
+    .layout {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      grid-template-rows: 1fr;
+      height: 100%;
+      padding-top: 6px;
+    }
+
+    /* Left sidebar */
+    .sidebar {
+      background: linear-gradient(180deg, #1e3a5f 0%, #0f2942 60%, #0a1f35 100%);
+      padding: 60px 40px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .sidebar::after {
+      content: '';
+      position: absolute;
+      top: 0; right: 0;
+      width: 1px;
+      height: 100%;
+      background: linear-gradient(180deg, transparent, rgba(59, 130, 246, 0.4), rgba(16, 185, 129, 0.4), transparent);
+    }
+
+    /* Stripe pattern on sidebar */
+    .sidebar::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        -45deg,
+        transparent,
+        transparent 20px,
+        rgba(255, 255, 255, 0.015) 20px,
+        rgba(255, 255, 255, 0.015) 22px
+      );
+      pointer-events: none;
+    }
+
+    .hospital-emoji {
+      font-size: 160px;
+      filter: drop-shadow(0 8px 24px rgba(59, 130, 246, 0.3));
+      line-height: 1;
+      margin-bottom: 30px;
+    }
+
+    .sidebar-title {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 800;
+      font-size: 48px;
+      color: #ffffff;
+      line-height: 1.15;
+      margin-bottom: 12px;
+      letter-spacing: -1px;
+    }
+
+    .sidebar-subtitle {
+      font-size: 18px;
+      color: rgba(255, 255, 255, 0.6);
+      font-weight: 400;
+      line-height: 1.5;
+    }
+
+    .sidebar-footer {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 14px;
+    }
+
+    .sidebar-footer svg {
+      flex-shrink: 0;
+    }
+
+    /* Main content area */
+    .main-content {
+      padding: 50px 60px;
+      display: flex;
+      flex-direction: column;
+      gap: 30px;
+    }
+
+    .header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .page-title {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      font-size: 36px;
+      color: #0f2942;
+    }
+
+    .floor-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 16px;
+      color: #64748b;
+      font-weight: 500;
+    }
+
+    /* Department cards grid */
+    .dept-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      gap: 22px;
+      flex: 1;
+    }
+
+    .dept-card {
+      background: rgba(255, 255, 255, 0.65);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      border-radius: 20px;
+      padding: 28px 30px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 10px;
+      box-shadow:
+        0 4px 16px rgba(0, 0, 0, 0.04),
+        0 1px 4px rgba(0, 0, 0, 0.02),
+        inset 0 1px 0 rgba(255, 255, 255, 0.9);
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s;
+    }
+
+    .dept-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 5px;
+      height: 100%;
+      border-radius: 20px 0 0 20px;
+    }
+
+    .dept-card:nth-child(1)::before,
+    .dept-card:nth-child(2)::before { background: #3b82f6; }
+    .dept-card:nth-child(3)::before,
+    .dept-card:nth-child(4)::before { background: #10b981; }
+    .dept-card:nth-child(5)::before,
+    .dept-card:nth-child(6)::before { background: #06b6d4; }
+    .dept-card:nth-child(7)::before,
+    .dept-card:nth-child(8)::before { background: #8b5cf6; }
+
+    .dept-name {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      font-size: 26px;
+      color: #0f2942;
+      line-height: 1.2;
+    }
+
+    .dept-info {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .floor-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: #fff;
+      font-weight: 700;
+      font-size: 16px;
+      padding: 6px 16px;
+      border-radius: 30px;
+      letter-spacing: 0.5px;
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+    }
+
+    .dept-location {
+      font-size: 16px;
+      color: #64748b;
+      font-weight: 500;
+    }
+
+    /* SVG decoration */
+    .svg-decoration {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      opacity: 0.06;
+      z-index: 0;
+    }
+
+    /* Info strip at bottom of main */
+    .info-strip {
+      display: flex;
+      align-items: center;
+      gap: 30px;
+      padding: 16px 24px;
+      background: rgba(255, 255, 255, 0.5);
+      backdrop-filter: blur(12px);
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.6);
+    }
+
+    .info-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 15px;
+      color: #475569;
+    }
+
+    .info-item svg {
+      flex-shrink: 0;
+    }
+
+    .info-separator {
+      width: 1px;
+      height: 24px;
+      background: #cbd5e1;
+    }
+  </style>
+</head>
+<body>
+  <div class="ornament-line"></div>
+  <div class="glow-circle-1"></div>
+  <div class="glow-circle-2"></div>
+
+  <!-- SVG cross decoration -->
+  <svg class="svg-decoration" width="300" height="300" viewBox="0 0 300 300" fill="none">
+    <path d="M120 30h60v240h-60z" fill="#3b82f6"/>
+    <path d="M30 120h240v60H30z" fill="#3b82f6"/>
+    <circle cx="150" cy="150" r="140" stroke="#3b82f6" stroke-width="4" fill="none"/>
+  </svg>
+
+  <div class="layout">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div>
+        <div class="hospital-emoji">🏥</div>
+        <h1 class="sidebar-title" data-editable="true" data-field="hospitalName">Meridian Health Medical Center</h1>
+        <p class="sidebar-subtitle" data-editable="true" data-field="hospitalTagline">Your trusted partner in healthcare excellence since 1985</p>
+      </div>
+      <div class="sidebar-footer">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <circle cx="10" cy="10" r="9" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"/>
+          <path d="M10 5v5l3 3" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <span data-editable="true" data-field="updateNote">Directory updated daily</span>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+      <div class="header-row">
+        <h2 class="page-title" data-editable="true" data-field="directoryTitle">Department Directory</h2>
+        <div class="floor-indicator">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <rect x="2" y="10" width="6" height="8" rx="1" stroke="#64748b" stroke-width="1.5"/>
+            <rect x="10" y="4" width="6" height="14" rx="1" stroke="#64748b" stroke-width="1.5"/>
+          </svg>
+          <span data-editable="true" data-field="buildingInfo">Main Building &mdash; 4 Floors</span>
+        </div>
+      </div>
+
+      <div class="dept-grid">
+        <div class="dept-card">
+          <div class="dept-name" data-editable="true" data-field="dept1Name">Emergency Department</div>
+          <div class="dept-info">
+            <span class="floor-badge" data-editable="true" data-field="dept1Floor">Floor 1</span>
+            <span class="dept-location" data-editable="true" data-field="dept1Location">Wing A &bull; Suite 100</span>
+          </div>
+        </div>
+
+        <div class="dept-card">
+          <div class="dept-name" data-editable="true" data-field="dept2Name">Cardiology</div>
+          <div class="dept-info">
+            <span class="floor-badge" data-editable="true" data-field="dept2Floor">Floor 3</span>
+            <span class="dept-location" data-editable="true" data-field="dept2Location">Wing B &bull; Suite 310</span>
+          </div>
+        </div>
+
+        <div class="dept-card">
+          <div class="dept-name" data-editable="true" data-field="dept3Name">Radiology &amp; Imaging</div>
+          <div class="dept-info">
+            <span class="floor-badge" data-editable="true" data-field="dept3Floor">Floor 1</span>
+            <span class="dept-location" data-editable="true" data-field="dept3Location">Wing C &bull; Suite 120</span>
+          </div>
+        </div>
+
+        <div class="dept-card">
+          <div class="dept-name" data-editable="true" data-field="dept4Name">Pediatrics</div>
+          <div class="dept-info">
+            <span class="floor-badge" data-editable="true" data-field="dept4Floor">Floor 2</span>
+            <span class="dept-location" data-editable="true" data-field="dept4Location">Wing A &bull; Suite 205</span>
+          </div>
+        </div>
+
+        <div class="dept-card">
+          <div class="dept-name" data-editable="true" data-field="dept5Name">Orthopedics</div>
+          <div class="dept-info">
+            <span class="floor-badge" data-editable="true" data-field="dept5Floor">Floor 3</span>
+            <span class="dept-location" data-editable="true" data-field="dept5Location">Wing A &bull; Suite 315</span>
+          </div>
+        </div>
+
+        <div class="dept-card">
+          <div class="dept-name" data-editable="true" data-field="dept6Name">Laboratory Services</div>
+          <div class="dept-info">
+            <span class="floor-badge" data-editable="true" data-field="dept6Floor">Floor 1</span>
+            <span class="dept-location" data-editable="true" data-field="dept6Location">Wing B &bull; Suite 105</span>
+          </div>
+        </div>
+
+        <div class="dept-card">
+          <div class="dept-name" data-editable="true" data-field="dept7Name">Maternity &amp; NICU</div>
+          <div class="dept-info">
+            <span class="floor-badge" data-editable="true" data-field="dept7Floor">Floor 4</span>
+            <span class="dept-location" data-editable="true" data-field="dept7Location">Wing B &bull; Suite 400</span>
+          </div>
+        </div>
+
+        <div class="dept-card">
+          <div class="dept-name" data-editable="true" data-field="dept8Name">Outpatient Surgery</div>
+          <div class="dept-info">
+            <span class="floor-badge" data-editable="true" data-field="dept8Floor">Floor 2</span>
+            <span class="dept-location" data-editable="true" data-field="dept8Location">Wing C &bull; Suite 210</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="info-strip">
+        <div class="info-item">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <path d="M9 1.5a7.5 7.5 0 100 15 7.5 7.5 0 000-15zm0 3.75v3.75l2.625 2.625" stroke="#3b82f6" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <span data-editable="true" data-field="infoHours">Open 24 Hours</span>
+        </div>
+        <div class="info-separator"></div>
+        <div class="info-item">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <path d="M2.25 6.75l6.75-5.25 6.75 5.25v8.25a1.5 1.5 0 01-1.5 1.5H3.75a1.5 1.5 0 01-1.5-1.5V6.75z" stroke="#10b981" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <span data-editable="true" data-field="infoReception">Main Reception: Lobby Level</span>
+        </div>
+        <div class="info-separator"></div>
+        <div class="info-item">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <path d="M14.25 7.5c0 5.25-5.25 9-5.25 9S3.75 12.75 3.75 7.5a5.25 5.25 0 1110.5 0z" stroke="#8b5cf6" stroke-width="1.5"/>
+            <circle cx="9" cy="7.5" r="1.5" stroke="#8b5cf6" stroke-width="1.5"/>
+          </svg>
+          <span data-editable="true" data-field="infoParking">Parking: Levels P1 &amp; P2</span>
+        </div>
+        <div class="info-separator"></div>
+        <div class="info-item">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <path d="M13.5 8.25H4.5M13.5 8.25L9.75 4.5M13.5 8.25l-3.75 3.75" stroke="#06b6d4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span data-editable="true" data-field="infoElevator">Elevators: Near each wing entrance</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

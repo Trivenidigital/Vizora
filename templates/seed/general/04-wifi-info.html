@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Montserrat:wght@300;400;500;600;700;800&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(ellipse at 25% 30%, rgba(14, 165, 233, 0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 75% 70%, rgba(34, 197, 94, 0.10) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 50%, rgba(99, 102, 241, 0.08) 0%, transparent 60%),
+        linear-gradient(160deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+      color: #e2e8f0;
+    }
+
+    /* Diagonal stripe texture */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 40px,
+        rgba(148, 163, 184, 0.02) 40px,
+        rgba(148, 163, 184, 0.02) 41px
+      );
+      z-index: 0;
+    }
+
+    /* Glowing orbs */
+    .glow-1 {
+      position: absolute;
+      top: 100px;
+      left: 300px;
+      width: 350px;
+      height: 350px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(14, 165, 233, 0.12), transparent 70%);
+      filter: blur(50px);
+      z-index: 0;
+    }
+
+    .glow-2 {
+      position: absolute;
+      bottom: 80px;
+      right: 250px;
+      width: 280px;
+      height: 280px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(34, 197, 94, 0.1), transparent 70%);
+      filter: blur(40px);
+      z-index: 0;
+    }
+
+    /* Decorative line */
+    .deco-line-v {
+      position: absolute;
+      top: 80px;
+      bottom: 80px;
+      left: 50%;
+      width: 1px;
+      background: linear-gradient(to bottom, transparent, rgba(14, 165, 233, 0.2), rgba(34, 197, 94, 0.2), transparent);
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto 1fr;
+      height: 100%;
+      padding: 70px 100px;
+      gap: 50px;
+    }
+
+    /* Header spans full width */
+    .header {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 30px;
+    }
+
+    .wifi-emoji {
+      font-size: 180px;
+      filter: drop-shadow(0 8px 30px rgba(14, 165, 233, 0.4));
+      line-height: 1;
+    }
+
+    .header-text {
+      flex: 1;
+    }
+
+    .header-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 72px;
+      font-weight: 800;
+      color: #f8fafc;
+      line-height: 1.1;
+      letter-spacing: -1px;
+    }
+
+    .header-subtitle {
+      font-family: 'Poppins', sans-serif;
+      font-size: 24px;
+      font-weight: 400;
+      color: #94a3b8;
+      margin-top: 8px;
+    }
+
+    /* Left panel - credentials */
+    .credentials {
+      display: flex;
+      flex-direction: column;
+      gap: 30px;
+    }
+
+    .credential-card {
+      background: rgba(30, 41, 59, 0.6);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(148, 163, 184, 0.08);
+      border-radius: 20px;
+      padding: 36px 40px;
+      box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    }
+
+    .credential-label {
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      color: #64748b;
+      margin-bottom: 12px;
+    }
+
+    .credential-value {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 40px;
+      font-weight: 700;
+      color: #f1f5f9;
+      letter-spacing: 2px;
+    }
+
+    .credential-card.network {
+      border-left: 4px solid rgba(14, 165, 233, 0.6);
+    }
+
+    .credential-card.password {
+      border-left: 4px solid rgba(34, 197, 94, 0.6);
+    }
+
+    .credential-card.network .credential-value {
+      color: #38bdf8;
+    }
+
+    .credential-card.password .credential-value {
+      color: #4ade80;
+      font-family: 'JetBrains Mono', 'Montserrat', monospace;
+      letter-spacing: 4px;
+    }
+
+    /* Right panel - steps */
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .steps-title {
+      font-family: 'Poppins', sans-serif;
+      font-size: 20px;
+      font-weight: 600;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 4px;
+      margin-bottom: 8px;
+    }
+
+    .step {
+      display: flex;
+      align-items: flex-start;
+      gap: 24px;
+      background: rgba(30, 41, 59, 0.4);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(148, 163, 184, 0.06);
+      border-radius: 16px;
+      padding: 28px 32px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    }
+
+    .step-number {
+      width: 56px;
+      height: 56px;
+      min-width: 56px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 24px;
+      font-weight: 700;
+      color: #ffffff;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    }
+
+    .step:nth-child(2) .step-number {
+      background: linear-gradient(135deg, #0ea5e9, #3b82f6);
+    }
+
+    .step:nth-child(3) .step-number {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    }
+
+    .step:nth-child(4) .step-number {
+      background: linear-gradient(135deg, #22c55e, #10b981);
+    }
+
+    .step-content {
+      flex: 1;
+    }
+
+    .step-title {
+      font-family: 'Inter', sans-serif;
+      font-size: 22px;
+      font-weight: 600;
+      color: #f1f5f9;
+      margin-bottom: 4px;
+    }
+
+    .step-desc {
+      font-family: 'Inter', sans-serif;
+      font-size: 16px;
+      color: #94a3b8;
+      line-height: 1.5;
+    }
+
+    /* SVG decorations */
+    .svg-signal {
+      position: absolute;
+      bottom: 60px;
+      left: 60px;
+      z-index: 1;
+      opacity: 0.12;
+    }
+
+    .svg-dots {
+      position: absolute;
+      top: 40px;
+      right: 40px;
+      z-index: 1;
+      opacity: 0.08;
+    }
+
+    /* Bottom accent stripe */
+    .accent-stripe {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 5px;
+      background: linear-gradient(90deg, #0ea5e9, #6366f1, #22c55e, #0ea5e9);
+      z-index: 3;
+    }
+  </style>
+</head>
+<body>
+  <div class="glow-1"></div>
+  <div class="glow-2"></div>
+  <div class="deco-line-v"></div>
+  <div class="accent-stripe"></div>
+
+  <!-- SVG signal waves -->
+  <svg class="svg-signal" width="200" height="200" viewBox="0 0 200 200" fill="none">
+    <path d="M100 180 C60 180 20 140 20 100 C20 60 60 20 100 20" stroke="#0ea5e9" stroke-width="2" fill="none" stroke-dasharray="8 4"/>
+    <path d="M100 150 C70 150 40 120 40 90 C40 60 70 30 100 30" stroke="#6366f1" stroke-width="1.5" fill="none" stroke-dasharray="6 4"/>
+    <path d="M100 120 C80 120 60 100 60 80 C60 60 80 40 100 40" stroke="#22c55e" stroke-width="1" fill="none" stroke-dasharray="4 4"/>
+    <circle cx="100" cy="100" r="8" fill="#0ea5e9" opacity="0.5"/>
+  </svg>
+
+  <!-- SVG dot grid decoration -->
+  <svg class="svg-dots" width="160" height="160" viewBox="0 0 160 160" fill="none">
+    <circle cx="20" cy="20" r="3" fill="#94a3b8"/><circle cx="60" cy="20" r="3" fill="#94a3b8"/>
+    <circle cx="100" cy="20" r="3" fill="#94a3b8"/><circle cx="140" cy="20" r="3" fill="#94a3b8"/>
+    <circle cx="20" cy="60" r="3" fill="#94a3b8"/><circle cx="60" cy="60" r="3" fill="#94a3b8"/>
+    <circle cx="100" cy="60" r="3" fill="#94a3b8"/><circle cx="140" cy="60" r="3" fill="#94a3b8"/>
+    <circle cx="20" cy="100" r="3" fill="#94a3b8"/><circle cx="60" cy="100" r="3" fill="#94a3b8"/>
+    <circle cx="100" cy="100" r="3" fill="#94a3b8"/><circle cx="140" cy="100" r="3" fill="#94a3b8"/>
+    <circle cx="20" cy="140" r="3" fill="#94a3b8"/><circle cx="60" cy="140" r="3" fill="#94a3b8"/>
+    <circle cx="100" cy="140" r="3" fill="#94a3b8"/><circle cx="140" cy="140" r="3" fill="#94a3b8"/>
+  </svg>
+
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="wifi-emoji">📶</div>
+      <div class="header-text">
+        <div class="header-title" data-editable="true" data-field="title">Free WiFi</div>
+        <div class="header-subtitle" data-editable="true" data-field="subtitle">Connect to our complimentary wireless network</div>
+      </div>
+    </div>
+
+    <!-- Credentials -->
+    <div class="credentials">
+      <div class="credential-card network">
+        <div class="credential-label">Network Name</div>
+        <div class="credential-value" data-editable="true" data-field="networkName">Meridian-Guest</div>
+      </div>
+      <div class="credential-card password">
+        <div class="credential-label">Password</div>
+        <div class="credential-value" data-editable="true" data-field="password">Welcome2026!</div>
+      </div>
+    </div>
+
+    <!-- Steps -->
+    <div class="steps">
+      <div class="steps-title">How to Connect</div>
+      <div class="step">
+        <div class="step-number">1</div>
+        <div class="step-content">
+          <div class="step-title" data-editable="true" data-field="step1Title">Open Wi-Fi Settings</div>
+          <div class="step-desc" data-editable="true" data-field="step1Desc">Go to your device's Wi-Fi settings and look for available networks</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-number">2</div>
+        <div class="step-content">
+          <div class="step-title" data-editable="true" data-field="step2Title">Select Our Network</div>
+          <div class="step-desc" data-editable="true" data-field="step2Desc">Tap or click on the network name shown above</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-number">3</div>
+        <div class="step-content">
+          <div class="step-title" data-editable="true" data-field="step3Title">Enter the Password</div>
+          <div class="step-desc" data-editable="true" data-field="step3Desc">Type the password exactly as shown and tap Connect</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

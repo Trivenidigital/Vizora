@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>Employee Recognition</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700;800&family=Playfair+Display:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            width: 1920px;
+            height: 1080px;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+            background:
+                radial-gradient(ellipse at 50% 30%, rgba(245, 158, 11, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 20% 80%, rgba(168, 85, 247, 0.06) 0%, transparent 40%),
+                linear-gradient(160deg, #0a0a0f 0%, #141420 50%, #0a0a0f 100%);
+            color: #f5f5f5;
+            position: relative;
+        }
+
+        /* Subtle diagonal stripe texture */
+        body::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: repeating-linear-gradient(
+                45deg,
+                transparent,
+                transparent 40px,
+                rgba(245, 158, 11, 0.015) 40px,
+                rgba(245, 158, 11, 0.015) 41px
+            );
+            z-index: 0;
+        }
+
+        /* Decorative gold sparkle orbs */
+        .sparkle-1 {
+            position: absolute;
+            top: 100px;
+            right: 200px;
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(245, 158, 11, 0.15) 0%, transparent 70%);
+            filter: blur(50px);
+            z-index: 0;
+        }
+
+        .sparkle-2 {
+            position: absolute;
+            bottom: 150px;
+            left: 150px;
+            width: 250px;
+            height: 250px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(168, 85, 247, 0.1) 0%, transparent 70%);
+            filter: blur(40px);
+            z-index: 0;
+        }
+
+        /* Ornamental gold line */
+        .gold-line {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 1px;
+            height: 100%;
+            background: linear-gradient(180deg, transparent 0%, rgba(245, 158, 11, 0.2) 20%, rgba(245, 158, 11, 0.2) 80%, transparent 100%);
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            height: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr;
+        }
+
+        /* Left side - Profile showcase */
+        .profile-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 80px;
+            position: relative;
+        }
+
+        .award-badge {
+            font-size: 160px;
+            filter: drop-shadow(0 8px 30px rgba(245, 158, 11, 0.5));
+            margin-bottom: 40px;
+            position: relative;
+        }
+
+        /* Profile circle placeholder */
+        .profile-circle {
+            width: 280px;
+            height: 280px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(168, 85, 247, 0.1));
+            border: 3px solid rgba(245, 158, 11, 0.3);
+            box-shadow:
+                0 0 40px rgba(245, 158, 11, 0.15),
+                inset 0 0 40px rgba(245, 158, 11, 0.05);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 40px;
+            position: relative;
+        }
+
+        .profile-circle::after {
+            content: '';
+            position: absolute;
+            inset: -12px;
+            border-radius: 50%;
+            border: 1px solid rgba(245, 158, 11, 0.15);
+        }
+
+        .profile-placeholder-emoji {
+            font-size: 120px;
+            filter: drop-shadow(0 4px 10px rgba(0,0,0,0.3));
+        }
+
+        .employee-name {
+            font-family: 'Playfair Display', serif;
+            font-size: 52px;
+            font-weight: 700;
+            color: #fafafa;
+            text-align: center;
+            margin-bottom: 12px;
+            text-shadow: 0 2px 16px rgba(245, 158, 11, 0.15);
+        }
+
+        .employee-title {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 22px;
+            font-weight: 500;
+            color: #a1a1aa;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        .employee-dept {
+            font-family: 'Inter', sans-serif;
+            font-size: 18px;
+            color: #71717a;
+            text-align: center;
+        }
+
+        /* Right side - Achievement details */
+        .achievement-section {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 80px 100px 80px 60px;
+        }
+
+        .section-header {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 6px;
+            color: #f59e0b;
+            margin-bottom: 20px;
+        }
+
+        .award-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 72px;
+            font-weight: 800;
+            color: #fafafa;
+            line-height: 1.1;
+            margin-bottom: 32px;
+        }
+
+        .award-title .gold-text {
+            color: #fbbf24;
+            text-shadow: 0 2px 20px rgba(245, 158, 11, 0.3);
+        }
+
+        .achievement-text {
+            font-family: 'Inter', sans-serif;
+            font-size: 24px;
+            font-weight: 400;
+            color: #a1a1aa;
+            line-height: 1.6;
+            margin-bottom: 48px;
+            max-width: 640px;
+        }
+
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            margin-bottom: 48px;
+        }
+
+        .stat-card {
+            background: rgba(24, 24, 27, 0.6);
+            border: 1px solid rgba(63, 63, 70, 0.3);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-radius: 16px;
+            padding: 24px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .stat-value {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 36px;
+            font-weight: 800;
+            color: #fbbf24;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            color: #71717a;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .quote-text {
+            font-family: 'Playfair Display', serif;
+            font-size: 22px;
+            font-style: italic;
+            color: #a1a1aa;
+            line-height: 1.5;
+            padding-left: 24px;
+            border-left: 3px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .quote-author {
+            font-family: 'Inter', sans-serif;
+            font-size: 16px;
+            color: #52525b;
+            margin-top: 16px;
+            padding-left: 24px;
+        }
+
+        /* Decorative confetti-style SVG */
+        .confetti-svg {
+            position: absolute;
+            z-index: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="sparkle-1"></div>
+    <div class="sparkle-2"></div>
+    <div class="gold-line"></div>
+
+    <!-- Decorative confetti SVG elements -->
+    <svg class="confetti-svg" style="top:40px;left:60px;" width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="20" y="30" width="12" height="12" rx="2" fill="rgba(245,158,11,0.2)" transform="rotate(30 26 36)"/>
+        <rect x="80" y="10" width="8" height="8" rx="1" fill="rgba(168,85,247,0.2)" transform="rotate(45 84 14)"/>
+        <rect x="140" y="50" width="10" height="10" rx="2" fill="rgba(245,158,11,0.15)" transform="rotate(60 145 55)"/>
+        <circle cx="50" cy="80" r="4" fill="rgba(168,85,247,0.15)"/>
+        <circle cx="160" cy="20" r="3" fill="rgba(245,158,11,0.2)"/>
+        <path d="M100 100 L108 116 L92 116 Z" fill="rgba(245,158,11,0.12)"/>
+    </svg>
+
+    <svg class="confetti-svg" style="top:60px;right:80px;" width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="30" y="20" width="10" height="10" rx="2" fill="rgba(245,158,11,0.15)" transform="rotate(15 35 25)"/>
+        <rect x="120" y="40" width="14" height="14" rx="2" fill="rgba(168,85,247,0.15)" transform="rotate(50 127 47)"/>
+        <circle cx="80" cy="10" r="5" fill="rgba(245,158,11,0.2)"/>
+        <circle cx="150" cy="80" r="3" fill="rgba(168,85,247,0.12)"/>
+        <path d="M60 60 L66 72 L54 72 Z" fill="rgba(245,158,11,0.1)" transform="rotate(20 60 66)"/>
+    </svg>
+
+    <svg class="confetti-svg" style="bottom:80px;right:120px;" width="160" height="160" viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="40" y="40" width="10" height="10" rx="2" fill="rgba(245,158,11,0.18)" transform="rotate(40 45 45)"/>
+        <rect x="100" y="20" width="8" height="8" rx="1" fill="rgba(168,85,247,0.12)" transform="rotate(25 104 24)"/>
+        <circle cx="20" cy="100" r="4" fill="rgba(245,158,11,0.15)"/>
+        <circle cx="130" cy="120" r="6" fill="rgba(168,85,247,0.1)"/>
+        <path d="M80 80 L86 96 L74 96 Z" fill="rgba(245,158,11,0.15)"/>
+    </svg>
+
+    <div class="container">
+        <div class="profile-section">
+            <div class="profile-circle">
+                <span class="profile-placeholder-emoji" data-editable="true" data-field="profile-emoji">👩</span>
+            </div>
+            <div class="employee-name" data-editable="true" data-field="employee-name">Sarah Mitchell</div>
+            <div class="employee-title" data-editable="true" data-field="employee-title">Senior Product Designer</div>
+            <div class="employee-dept" data-editable="true" data-field="employee-department">Design & UX Department</div>
+        </div>
+
+        <div class="achievement-section">
+            <div class="section-header" data-editable="true" data-field="section-header">Employee of the Month</div>
+            <div class="award-title">
+                <span data-editable="true" data-field="award-line-1">Outstanding</span><br>
+                <span class="gold-text" data-editable="true" data-field="award-line-2">Achievement</span>
+            </div>
+            <div class="achievement-text" data-editable="true" data-field="achievement-description">Recognized for leading the complete redesign of our customer dashboard, resulting in a 40% improvement in user satisfaction scores and significantly reducing support tickets.</div>
+
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-value" data-editable="true" data-field="stat-1-value">40%</div>
+                    <div class="stat-label" data-editable="true" data-field="stat-1-label">CSAT Increase</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" data-editable="true" data-field="stat-2-value">12</div>
+                    <div class="stat-label" data-editable="true" data-field="stat-2-label">Projects Led</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" data-editable="true" data-field="stat-3-value">5 yrs</div>
+                    <div class="stat-label" data-editable="true" data-field="stat-3-label">With Company</div>
+                </div>
+            </div>
+
+            <div class="quote-text" data-editable="true" data-field="quote">"Sarah exemplifies what it means to be a leader. Her dedication to quality and innovation inspires the entire team."</div>
+            <div class="quote-author" data-editable="true" data-field="quote-author">- James Torres, VP of Design</div>
+        </div>
+    </div>
+</body>
+</html>

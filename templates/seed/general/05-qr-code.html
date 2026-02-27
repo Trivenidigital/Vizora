@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(ellipse at 30% 50%, rgba(16, 185, 129, 0.10) 0%, transparent 50%),
+        radial-gradient(ellipse at 70% 30%, rgba(59, 130, 246, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 80%, rgba(99, 102, 241, 0.06) 0%, transparent 40%),
+        linear-gradient(155deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+      color: #e2e8f0;
+    }
+
+    /* Cross-hatch texture */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background:
+        repeating-linear-gradient(
+          0deg,
+          transparent,
+          transparent 60px,
+          rgba(148, 163, 184, 0.02) 60px,
+          rgba(148, 163, 184, 0.02) 61px
+        ),
+        repeating-linear-gradient(
+          90deg,
+          transparent,
+          transparent 60px,
+          rgba(148, 163, 184, 0.02) 60px,
+          rgba(148, 163, 184, 0.02) 61px
+        );
+      z-index: 0;
+    }
+
+    /* Glow spots */
+    .glow-spot-1 {
+      position: absolute;
+      top: 200px;
+      left: 400px;
+      width: 300px;
+      height: 300px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.1), transparent 70%);
+      filter: blur(50px);
+      z-index: 0;
+    }
+
+    .glow-spot-2 {
+      position: absolute;
+      bottom: 150px;
+      right: 300px;
+      width: 250px;
+      height: 250px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(59, 130, 246, 0.08), transparent 70%);
+      filter: blur(40px);
+      z-index: 0;
+    }
+
+    /* Ornamental line */
+    .orn-line {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 1px;
+      height: 60%;
+      background: linear-gradient(to bottom, transparent, rgba(16, 185, 129, 0.15), transparent);
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      height: 100%;
+      gap: 0;
+    }
+
+    /* Left panel - QR area */
+    .left-panel {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 80px;
+    }
+
+    .qr-frame {
+      position: relative;
+      width: 480px;
+      height: 480px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Corner brackets around QR */
+    .qr-bracket {
+      position: absolute;
+      width: 60px;
+      height: 60px;
+    }
+
+    .qr-bracket-tl { top: 0; left: 0; border-top: 4px solid #10b981; border-left: 4px solid #10b981; }
+    .qr-bracket-tr { top: 0; right: 0; border-top: 4px solid #10b981; border-right: 4px solid #10b981; }
+    .qr-bracket-bl { bottom: 0; left: 0; border-bottom: 4px solid #10b981; border-left: 4px solid #10b981; }
+    .qr-bracket-br { bottom: 0; right: 0; border-bottom: 4px solid #10b981; border-right: 4px solid #10b981; }
+
+    .qr-placeholder {
+      width: 400px;
+      height: 400px;
+      background: rgba(30, 41, 59, 0.6);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(148, 163, 184, 0.08);
+      border-radius: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      box-shadow:
+        0 8px 40px rgba(0, 0, 0, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    }
+
+    .qr-icon {
+      font-size: 120px;
+      filter: drop-shadow(0 4px 20px rgba(16, 185, 129, 0.3));
+    }
+
+    .qr-label {
+      font-family: 'Inter', sans-serif;
+      font-size: 16px;
+      font-weight: 500;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+    }
+
+    /* Right panel - info */
+    .right-panel {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 80px 100px 80px 60px;
+      gap: 40px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      border-radius: 100px;
+      padding: 8px 20px;
+      width: fit-content;
+    }
+
+    .badge-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+    }
+
+    .badge-text {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #10b981;
+    }
+
+    .main-heading {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 72px;
+      font-weight: 800;
+      color: #f8fafc;
+      line-height: 1.1;
+      letter-spacing: -1px;
+    }
+
+    .main-heading .accent {
+      color: #10b981;
+    }
+
+    .description {
+      font-family: 'Inter', sans-serif;
+      font-size: 24px;
+      font-weight: 400;
+      color: #94a3b8;
+      line-height: 1.6;
+      max-width: 600px;
+    }
+
+    .cta-section {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .cta-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      background: linear-gradient(135deg, #10b981, #059669);
+      border-radius: 16px;
+      padding: 20px 36px;
+      width: fit-content;
+      box-shadow:
+        0 8px 24px rgba(16, 185, 129, 0.25),
+        inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    }
+
+    .cta-text {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: 1px;
+    }
+
+    .cta-arrow {
+      font-size: 24px;
+    }
+
+    .cta-hint {
+      font-family: 'Inter', sans-serif;
+      font-size: 16px;
+      color: #64748b;
+    }
+
+    .info-cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 10px;
+    }
+
+    .info-card {
+      background: rgba(30, 41, 59, 0.4);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(148, 163, 184, 0.06);
+      border-radius: 12px;
+      padding: 18px 22px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+
+    .info-card-label {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #64748b;
+      margin-bottom: 6px;
+    }
+
+    .info-card-value {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 18px;
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+
+    /* SVG decorations */
+    .svg-circuit {
+      position: absolute;
+      bottom: 40px;
+      left: 40px;
+      z-index: 1;
+      opacity: 0.08;
+    }
+
+    .svg-hex {
+      position: absolute;
+      top: 40px;
+      right: 40px;
+      z-index: 1;
+      opacity: 0.06;
+    }
+
+    /* Top accent */
+    .top-accent {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, transparent, #10b981, #3b82f6, transparent);
+      z-index: 3;
+    }
+
+    /* Bottom stripe */
+    .bottom-stripe {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: repeating-linear-gradient(
+        90deg,
+        #10b981 0px,
+        #10b981 30px,
+        transparent 30px,
+        transparent 36px,
+        #3b82f6 36px,
+        #3b82f6 66px,
+        transparent 66px,
+        transparent 72px
+      );
+      opacity: 0.6;
+      z-index: 3;
+    }
+  </style>
+</head>
+<body>
+  <div class="glow-spot-1"></div>
+  <div class="glow-spot-2"></div>
+  <div class="orn-line"></div>
+  <div class="top-accent"></div>
+  <div class="bottom-stripe"></div>
+
+  <!-- SVG circuit lines -->
+  <svg class="svg-circuit" width="200" height="200" viewBox="0 0 200 200" fill="none">
+    <path d="M20 180 L20 100 L60 100 L60 60 L120 60" stroke="#10b981" stroke-width="1.5" fill="none"/>
+    <path d="M40 180 L40 140 L100 140 L100 100 L160 100" stroke="#3b82f6" stroke-width="1" fill="none"/>
+    <circle cx="120" cy="60" r="4" fill="#10b981"/><circle cx="160" cy="100" r="4" fill="#3b82f6"/>
+    <circle cx="60" cy="100" r="3" fill="#10b981" opacity="0.5"/>
+  </svg>
+
+  <!-- SVG hexagon -->
+  <svg class="svg-hex" width="180" height="180" viewBox="0 0 180 180" fill="none">
+    <polygon points="90,10 160,50 160,130 90,170 20,130 20,50" stroke="#94a3b8" stroke-width="1" fill="none"/>
+    <polygon points="90,30 145,60 145,120 90,150 35,120 35,60" stroke="#94a3b8" stroke-width="0.5" fill="none"/>
+    <polygon points="90,50 130,70 130,110 90,130 50,110 50,70" stroke="#94a3b8" stroke-width="0.5" fill="none"/>
+  </svg>
+
+  <div class="container">
+    <!-- Left - QR -->
+    <div class="left-panel">
+      <div class="qr-frame">
+        <div class="qr-bracket qr-bracket-tl"></div>
+        <div class="qr-bracket qr-bracket-tr"></div>
+        <div class="qr-bracket qr-bracket-bl"></div>
+        <div class="qr-bracket qr-bracket-br"></div>
+        <div class="qr-placeholder">
+          <div class="qr-icon">📱</div>
+          <div class="qr-label" data-editable="true" data-field="qrLabel">QR Code Here</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right - Info -->
+    <div class="right-panel">
+      <div class="badge">
+        <div class="badge-dot"></div>
+        <span class="badge-text" data-editable="true" data-field="badgeText">Quick Access</span>
+      </div>
+      <div class="main-heading" data-editable="true" data-field="heading">Scan to <span class="accent">Connect</span></div>
+      <div class="description" data-editable="true" data-field="description">Point your phone's camera at the QR code to instantly access our services. No app download required.</div>
+      <div class="cta-section">
+        <div class="cta-button">
+          <span class="cta-text" data-editable="true" data-field="ctaText">Scan with Camera</span>
+          <span class="cta-arrow">→</span>
+        </div>
+        <div class="cta-hint" data-editable="true" data-field="ctaHint">Works with iPhone, Android, and most modern devices</div>
+      </div>
+      <div class="info-cards">
+        <div class="info-card">
+          <div class="info-card-label">Type</div>
+          <div class="info-card-value" data-editable="true" data-field="infoType">Website URL</div>
+        </div>
+        <div class="info-card">
+          <div class="info-card-label">Access</div>
+          <div class="info-card-value" data-editable="true" data-field="infoAccess">Public</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

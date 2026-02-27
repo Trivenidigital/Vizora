@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Bebas+Neue&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(ellipse at 50% 50%, rgba(239, 68, 68, 0.25) 0%, transparent 60%),
+        radial-gradient(ellipse at 10% 90%, rgba(185, 28, 28, 0.15) 0%, transparent 50%),
+        linear-gradient(160deg, #7f1d1d 0%, #991b1b 20%, #b91c1c 40%, #dc2626 60%, #991b1b 80%, #7f1d1d 100%);
+      color: #ffffff;
+    }
+
+    /* Warning stripe pattern */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        -45deg,
+        transparent,
+        transparent 30px,
+        rgba(0, 0, 0, 0.08) 30px,
+        rgba(0, 0, 0, 0.08) 60px
+      );
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Pulsing glow effect */
+    body::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 900px;
+      height: 900px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(239, 68, 68, 0.15) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Hazard stripes top/bottom */
+    .hazard-stripe {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 30px;
+      z-index: 2;
+      background: repeating-linear-gradient(
+        -45deg,
+        #fbbf24,
+        #fbbf24 20px,
+        #1e293b 20px,
+        #1e293b 40px
+      );
+    }
+
+    .hazard-top { top: 0; }
+    .hazard-bottom { bottom: 0; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto 1fr auto;
+      height: 100%;
+      padding: 65px 80px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Header spans full width */
+    .header {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 40px;
+      margin-bottom: 40px;
+      position: relative;
+    }
+
+    .alert-emoji {
+      font-size: 200px;
+      filter: drop-shadow(0 8px 32px rgba(0,0,0,0.4));
+      line-height: 1;
+    }
+
+    .header-text {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .emergency-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 120px;
+      letter-spacing: 12px;
+      line-height: 1;
+      color: #ffffff;
+      text-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .emergency-type {
+      font-family: 'Inter', sans-serif;
+      font-weight: 800;
+      font-size: 38px;
+      color: #fbbf24;
+      text-transform: uppercase;
+      letter-spacing: 6px;
+      margin-top: 8px;
+    }
+
+    /* Ornamental line */
+    .alert-ornament {
+      width: 100px;
+      height: 5px;
+      background: linear-gradient(90deg, #fbbf24, rgba(251, 191, 36, 0.3));
+      border-radius: 3px;
+      margin-top: 16px;
+    }
+
+    .header-status {
+      background: rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 2px solid rgba(251, 191, 36, 0.4);
+      border-radius: 20px;
+      padding: 28px 36px;
+      text-align: center;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    }
+
+    .status-label {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 24px;
+      letter-spacing: 4px;
+      color: #fbbf24;
+    }
+
+    .status-time {
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: 20px;
+      color: rgba(255, 255, 255, 0.9);
+      margin-top: 6px;
+    }
+
+    .status-date {
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+      font-size: 16px;
+      color: rgba(255, 255, 255, 0.5);
+      margin-top: 2px;
+    }
+
+    /* Main content columns */
+    .instructions-panel {
+      background: rgba(0, 0, 0, 0.25);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 24px;
+      padding: 40px 44px;
+      box-shadow:
+        0 4px 6px rgba(0, 0, 0, 0.1),
+        0 16px 48px rgba(0, 0, 0, 0.2);
+      margin-right: 20px;
+    }
+
+    .info-panel {
+      background: rgba(0, 0, 0, 0.25);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 24px;
+      padding: 40px 44px;
+      box-shadow:
+        0 4px 6px rgba(0, 0, 0, 0.1),
+        0 16px 48px rgba(0, 0, 0, 0.2);
+      margin-left: 20px;
+    }
+
+    .panel-heading {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 40px;
+      letter-spacing: 4px;
+      color: #fbbf24;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .panel-heading-emoji {
+      font-size: 40px;
+    }
+
+    /* Instruction steps */
+    .instruction-list {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .instruction-item {
+      display: grid;
+      grid-template-columns: 50px 1fr;
+      gap: 18px;
+      align-items: start;
+    }
+
+    .instruction-num {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: rgba(251, 191, 36, 0.2);
+      border: 2px solid #fbbf24;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 28px;
+      color: #fbbf24;
+      flex-shrink: 0;
+    }
+
+    .instruction-text {
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 24px;
+      color: rgba(255, 255, 255, 0.95);
+      line-height: 1.5;
+      padding-top: 8px;
+    }
+
+    /* Contact info */
+    .contact-section {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .contact-item {
+      display: grid;
+      grid-template-columns: 50px 1fr;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .contact-icon {
+      font-size: 36px;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.2));
+    }
+
+    .contact-label {
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+      font-size: 16px;
+      color: rgba(255, 255, 255, 0.5);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .contact-value {
+      font-family: 'Inter', sans-serif;
+      font-weight: 800;
+      font-size: 26px;
+      color: #ffffff;
+    }
+
+    /* Location info */
+    .location-box {
+      background: rgba(251, 191, 36, 0.15);
+      border: 2px solid rgba(251, 191, 36, 0.3);
+      border-radius: 16px;
+      padding: 24px 28px;
+      margin-top: 24px;
+    }
+
+    .location-label {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 22px;
+      letter-spacing: 3px;
+      color: #fbbf24;
+      margin-bottom: 8px;
+    }
+
+    .location-value {
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: 22px;
+      color: rgba(255, 255, 255, 0.9);
+      line-height: 1.5;
+    }
+
+    /* Footer spans full width */
+    .footer {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 30px;
+      padding-top: 20px;
+      border-top: 2px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .footer-msg {
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: 22px;
+      color: #fbbf24;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+    }
+
+    .footer-org {
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+      font-size: 18px;
+      color: rgba(255, 255, 255, 0.4);
+    }
+
+    /* SVG decoration */
+    .svg-alert-decor {
+      position: absolute;
+      top: 100px;
+      right: 100px;
+      opacity: 0.06;
+      z-index: 0;
+    }
+
+    /* Glowing corner circles */
+    .corner-glow {
+      position: absolute;
+      width: 250px;
+      height: 250px;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .cg-tl { top: -80px; left: -80px; background: radial-gradient(circle, rgba(251, 191, 36, 0.1) 0%, transparent 60%); }
+    .cg-br { bottom: -80px; right: -80px; background: radial-gradient(circle, rgba(251, 191, 36, 0.1) 0%, transparent 60%); }
+  </style>
+</head>
+<body>
+  <div class="hazard-stripe hazard-top"></div>
+  <div class="hazard-stripe hazard-bottom"></div>
+  <div class="corner-glow cg-tl"></div>
+  <div class="corner-glow cg-br"></div>
+
+  <!-- SVG decoration -->
+  <svg class="svg-alert-decor" width="150" height="150" viewBox="0 0 150 150" fill="none">
+    <polygon points="75,10 140,130 10,130" stroke="white" stroke-width="3" fill="none"/>
+    <line x1="75" y1="50" x2="75" y2="95" stroke="white" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="75" cy="112" r="5" fill="white"/>
+  </svg>
+
+  <div class="layout">
+    <!-- Header -->
+    <div class="header">
+      <div class="alert-emoji">&#x26A0;&#xFE0F;</div>
+      <div class="header-text">
+        <div class="emergency-title" data-editable="true" data-field="title">EMERGENCY</div>
+        <div class="emergency-type" data-editable="true" data-field="alertType">Severe Weather Warning &mdash; Tornado Watch</div>
+        <div class="alert-ornament"></div>
+      </div>
+      <div class="header-status">
+        <div class="status-label" data-editable="true" data-field="statusLabel">ALERT ISSUED</div>
+        <div class="status-time" data-editable="true" data-field="statusTime">2:45 PM CST</div>
+        <div class="status-date" data-editable="true" data-field="statusDate">February 26, 2026</div>
+      </div>
+    </div>
+
+    <!-- Instructions Panel -->
+    <div class="instructions-panel">
+      <div class="panel-heading"><span class="panel-heading-emoji">&#x1F6A8;</span> <span data-editable="true" data-field="instructionsHeading">Immediate Actions</span></div>
+      <div class="instruction-list">
+        <div class="instruction-item">
+          <div class="instruction-num">1</div>
+          <div class="instruction-text" data-editable="true" data-field="step1">Remain calm. Move immediately to the nearest designated shelter area or interior hallway on the lowest floor.</div>
+        </div>
+        <div class="instruction-item">
+          <div class="instruction-num">2</div>
+          <div class="instruction-text" data-editable="true" data-field="step2">Stay away from windows, glass doors, and exterior walls. Crouch low, face down, and cover your head.</div>
+        </div>
+        <div class="instruction-item">
+          <div class="instruction-num">3</div>
+          <div class="instruction-text" data-editable="true" data-field="step3">Do NOT leave the building. Wait for the all-clear signal from emergency personnel.</div>
+        </div>
+        <div class="instruction-item">
+          <div class="instruction-num">4</div>
+          <div class="instruction-text" data-editable="true" data-field="step4">If outdoors, seek shelter in the nearest sturdy building. Do not attempt to outrun the storm.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Info Panel -->
+    <div class="info-panel">
+      <div class="panel-heading"><span class="panel-heading-emoji">&#x1F4DE;</span> <span data-editable="true" data-field="contactHeading">Emergency Contacts</span></div>
+      <div class="contact-section">
+        <div class="contact-item">
+          <div class="contact-icon">&#x1F6A8;</div>
+          <div>
+            <div class="contact-label" data-editable="true" data-field="contact1Label">Emergency Services</div>
+            <div class="contact-value" data-editable="true" data-field="contact1Value">911</div>
+          </div>
+        </div>
+        <div class="contact-item">
+          <div class="contact-icon">&#x1F3EB;</div>
+          <div>
+            <div class="contact-label" data-editable="true" data-field="contact2Label">Campus Security</div>
+            <div class="contact-value" data-editable="true" data-field="contact2Value">(555) 234-5678</div>
+          </div>
+        </div>
+        <div class="contact-item">
+          <div class="contact-icon">&#x1FA7A;</div>
+          <div>
+            <div class="contact-label" data-editable="true" data-field="contact3Label">School Nurse</div>
+            <div class="contact-value" data-editable="true" data-field="contact3Value">(555) 234-5680</div>
+          </div>
+        </div>
+        <div class="contact-item">
+          <div class="contact-icon">&#x1F4F1;</div>
+          <div>
+            <div class="contact-label" data-editable="true" data-field="contact4Label">Parent Hotline</div>
+            <div class="contact-value" data-editable="true" data-field="contact4Value">(555) 234-9999</div>
+          </div>
+        </div>
+      </div>
+      <div class="location-box">
+        <div class="location-label" data-editable="true" data-field="locationLabel">Designated Shelter Areas</div>
+        <div class="location-value" data-editable="true" data-field="locationValue">Building A: Basement Level &bull; Building B: Interior Hallways &bull; Gymnasium: Locker Rooms</div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <div class="footer-msg" data-editable="true" data-field="footerMsg">This is an active emergency &mdash; Follow all staff instructions</div>
+      <div class="footer-org" data-editable="true" data-field="footerOrg">Westfield Academy Emergency Management</div>
+    </div>
+  </div>
+</body>
+</html>

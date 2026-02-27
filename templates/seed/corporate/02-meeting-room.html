@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>Meeting Room Status</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            width: 1920px;
+            height: 1080px;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+            background:
+                radial-gradient(ellipse at 70% 30%, rgba(16, 185, 129, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 30% 80%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
+                linear-gradient(160deg, #0c1222 0%, #111827 50%, #0f172a 100%);
+            color: #f1f5f9;
+            position: relative;
+        }
+
+        /* Stripe texture */
+        body::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: repeating-linear-gradient(
+                90deg,
+                transparent,
+                transparent 119px,
+                rgba(148, 163, 184, 0.03) 119px,
+                rgba(148, 163, 184, 0.03) 120px
+            );
+            z-index: 0;
+        }
+
+        /* Glowing status circle top-right */
+        .status-glow {
+            position: absolute;
+            top: 60px;
+            right: 80px;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: #10b981;
+            box-shadow:
+                0 0 20px rgba(16, 185, 129, 0.6),
+                0 0 60px rgba(16, 185, 129, 0.3);
+            z-index: 2;
+        }
+
+        .status-glow::after {
+            content: '';
+            position: absolute;
+            inset: -6px;
+            border-radius: 50%;
+            border: 2px solid rgba(16, 185, 129, 0.3);
+        }
+
+        /* Decorative vertical accent line */
+        .accent-line-left {
+            position: absolute;
+            top: 0;
+            left: 80px;
+            width: 3px;
+            height: 100%;
+            background: linear-gradient(180deg, transparent, rgba(16, 185, 129, 0.3) 30%, rgba(99, 102, 241, 0.3) 70%, transparent);
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            height: 100%;
+            display: grid;
+            grid-template-columns: 420px 1fr;
+            grid-template-rows: 1fr;
+        }
+
+        /* Left sidebar */
+        .sidebar {
+            padding: 80px 50px 80px 120px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            border-right: 1px solid rgba(71, 85, 105, 0.2);
+        }
+
+        .room-emoji {
+            font-size: 140px;
+            filter: drop-shadow(0 6px 20px rgba(16, 185, 129, 0.3));
+            margin-bottom: 32px;
+        }
+
+        .room-name {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 72px;
+            font-weight: 800;
+            color: #f8fafc;
+            line-height: 1.1;
+            margin-bottom: 16px;
+        }
+
+        .room-floor {
+            font-family: 'Inter', sans-serif;
+            font-size: 22px;
+            font-weight: 400;
+            color: #64748b;
+            margin-bottom: 32px;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 28px;
+            border-radius: 40px;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .status-available {
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #34d399;
+        }
+
+        .status-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #10b981;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+        }
+
+        .capacity {
+            font-family: 'Inter', sans-serif;
+            font-size: 18px;
+            color: #64748b;
+            margin-top: 24px;
+        }
+
+        .capacity-icon {
+            font-size: 18px;
+            margin-right: 6px;
+        }
+
+        /* Right content area */
+        .content-area {
+            padding: 80px 80px 80px 60px;
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            gap: 40px;
+        }
+
+        .section-label {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            color: #64748b;
+            margin-bottom: 16px;
+        }
+
+        /* Current meeting card */
+        .current-meeting {
+            background: rgba(16, 185, 129, 0.06);
+            border: 1px solid rgba(16, 185, 129, 0.15);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow:
+                0 10px 40px rgba(0, 0, 0, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.03);
+        }
+
+        .meeting-title {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 36px;
+            font-weight: 700;
+            color: #f8fafc;
+            margin-bottom: 12px;
+        }
+
+        .meeting-time {
+            font-family: 'Inter', sans-serif;
+            font-size: 24px;
+            color: #34d399;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .meeting-organizer {
+            font-family: 'Inter', sans-serif;
+            font-size: 20px;
+            color: #94a3b8;
+        }
+
+        .organizer-icon {
+            font-size: 20px;
+            margin-right: 8px;
+        }
+
+        /* Upcoming meetings */
+        .upcoming-meetings {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .upcoming-card {
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid rgba(71, 85, 105, 0.2);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-radius: 16px;
+            padding: 28px 36px;
+            display: grid;
+            grid-template-columns: 160px 1fr auto;
+            align-items: center;
+            gap: 32px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .upcoming-time {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 22px;
+            font-weight: 600;
+            color: #94a3b8;
+        }
+
+        .upcoming-title {
+            font-family: 'Inter', sans-serif;
+            font-size: 24px;
+            font-weight: 500;
+            color: #e2e8f0;
+        }
+
+        .upcoming-organizer {
+            font-family: 'Inter', sans-serif;
+            font-size: 18px;
+            color: #64748b;
+        }
+
+        /* Bottom info bar */
+        .bottom-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 20px;
+            border-top: 1px solid rgba(71, 85, 105, 0.2);
+        }
+
+        .equipment-list {
+            display: flex;
+            gap: 24px;
+        }
+
+        .equipment-item {
+            font-size: 32px;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+        }
+
+        .current-time-small {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 24px;
+            font-weight: 600;
+            color: #64748b;
+        }
+
+        /* Decorative SVG */
+        .corner-svg {
+            position: absolute;
+            z-index: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="status-glow"></div>
+    <div class="accent-line-left"></div>
+
+    <!-- Decorative SVG corner -->
+    <svg class="corner-svg" style="bottom:0;right:0;" width="300" height="300" viewBox="0 0 300 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="300" cy="300" r="200" stroke="rgba(16,185,129,0.06)" stroke-width="1" fill="none"/>
+        <circle cx="300" cy="300" r="140" stroke="rgba(99,102,241,0.05)" stroke-width="1" fill="none"/>
+        <circle cx="300" cy="300" r="80" stroke="rgba(16,185,129,0.04)" stroke-width="1" fill="none"/>
+    </svg>
+
+    <!-- Decorative SVG diamond pattern -->
+    <svg class="corner-svg" style="top:40px;left:50%;transform:translateX(-50%);" width="200" height="40" viewBox="0 0 200 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M100 0 L110 20 L100 40 L90 20 Z" fill="rgba(16,185,129,0.1)"/>
+        <path d="M60 10 L68 20 L60 30 L52 20 Z" fill="rgba(99,102,241,0.08)"/>
+        <path d="M140 10 L148 20 L140 30 L132 20 Z" fill="rgba(99,102,241,0.08)"/>
+    </svg>
+
+    <div class="container">
+        <div class="sidebar">
+            <div class="room-emoji">🏠</div>
+            <div class="room-name" data-editable="true" data-field="room-name">Atlas</div>
+            <div class="room-floor" data-editable="true" data-field="room-floor">Building A - Floor 3, Room 312</div>
+            <div class="status-badge status-available">
+                <span class="status-dot"></span>
+                <span data-editable="true" data-field="status">Available</span>
+            </div>
+            <div class="capacity">
+                <span class="capacity-icon">👥</span>
+                <span data-editable="true" data-field="capacity">Capacity: 12 people</span>
+            </div>
+        </div>
+
+        <div class="content-area">
+            <div>
+                <div class="section-label">Current Meeting</div>
+                <div class="current-meeting">
+                    <div class="meeting-title" data-editable="true" data-field="current-meeting-title">Q1 Product Strategy Review</div>
+                    <div class="meeting-time" data-editable="true" data-field="current-meeting-time">10:00 AM - 11:30 AM</div>
+                    <div class="meeting-organizer">
+                        <span class="organizer-icon">👤</span>
+                        <span data-editable="true" data-field="current-meeting-organizer">Sarah Chen - Product Lead</span>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <div class="section-label">Upcoming</div>
+                <div class="upcoming-meetings">
+                    <div class="upcoming-card">
+                        <div class="upcoming-time" data-editable="true" data-field="upcoming-1-time">12:00 PM</div>
+                        <div class="upcoming-title" data-editable="true" data-field="upcoming-1-title">Design Sprint Kickoff</div>
+                        <div class="upcoming-organizer" data-editable="true" data-field="upcoming-1-organizer">Alex Rivera</div>
+                    </div>
+                    <div class="upcoming-card">
+                        <div class="upcoming-time" data-editable="true" data-field="upcoming-2-time">2:00 PM</div>
+                        <div class="upcoming-title" data-editable="true" data-field="upcoming-2-title">Engineering Standup</div>
+                        <div class="upcoming-organizer" data-editable="true" data-field="upcoming-2-organizer">Dev Team</div>
+                    </div>
+                    <div class="upcoming-card">
+                        <div class="upcoming-time" data-editable="true" data-field="upcoming-3-time">4:00 PM</div>
+                        <div class="upcoming-title" data-editable="true" data-field="upcoming-3-title">Client Onboarding Call</div>
+                        <div class="upcoming-organizer" data-editable="true" data-field="upcoming-3-organizer">Jessica Park</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bottom-bar">
+                <div class="equipment-list">
+                    <span class="equipment-item" title="Projector">📽️</span>
+                    <span class="equipment-item" title="Whiteboard">📋</span>
+                    <span class="equipment-item" title="Video Conference">📹</span>
+                    <span class="equipment-item" title="Phone">📞</span>
+                </div>
+                <div class="current-time-small" data-editable="true" data-field="current-time">9:45 AM</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Montserrat:wght@600;700;800;900&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(ellipse at 70% 30%, rgba(59, 130, 246, 0.2) 0%, transparent 55%),
+        radial-gradient(ellipse at 20% 80%, rgba(16, 185, 129, 0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 90% 90%, rgba(99, 102, 241, 0.12) 0%, transparent 45%),
+        linear-gradient(135deg, #020617 0%, #0f172a 40%, #1e293b 70%, #020617 100%);
+      color: #f8fafc;
+    }
+
+    /* Dot grid pattern */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image: radial-gradient(circle, rgba(59, 130, 246, 0.04) 1px, transparent 1px);
+      background-size: 32px 32px;
+      z-index: 0;
+    }
+
+    /* Decorative glowing orbs */
+    .glow-1 {
+      position: absolute;
+      top: 100px;
+      right: 300px;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(59, 130, 246, 0.2) 0%, transparent 70%);
+      filter: blur(60px);
+      z-index: 0;
+    }
+
+    .glow-2 {
+      position: absolute;
+      bottom: -50px;
+      left: 200px;
+      width: 350px;
+      height: 350px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.2) 0%, transparent 70%);
+      filter: blur(45px);
+      z-index: 0;
+    }
+
+    .glow-3 {
+      position: absolute;
+      top: 300px;
+      left: 600px;
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, transparent 70%);
+      filter: blur(30px);
+      z-index: 0;
+    }
+
+    /* Ornamental lines */
+    .orn-h-top {
+      position: absolute;
+      top: 50px;
+      left: 100px;
+      right: 100px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.3), transparent);
+      z-index: 1;
+    }
+
+    .orn-h-bottom {
+      position: absolute;
+      bottom: 50px;
+      left: 100px;
+      right: 100px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.3), transparent);
+      z-index: 1;
+    }
+
+    /* Vertical ornamental accent */
+    .orn-v-center {
+      position: absolute;
+      top: 150px;
+      bottom: 150px;
+      left: 50%;
+      width: 1px;
+      background: linear-gradient(180deg, transparent, rgba(59, 130, 246, 0.15), transparent);
+      z-index: 1;
+    }
+
+    /* Main grid layout */
+    .layout {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: 1fr 560px;
+      grid-template-rows: auto 1fr auto;
+      height: 100%;
+      padding: 80px 100px;
+      gap: 50px;
+    }
+
+    /* Header */
+    .header {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .event-badge {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 800;
+      font-size: 14px;
+      letter-spacing: 5px;
+      text-transform: uppercase;
+      color: #3b82f6;
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.25);
+      border-radius: 8px;
+      padding: 8px 20px;
+    }
+
+    .event-name-header {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 800;
+      font-size: 22px;
+      color: rgba(248, 250, 252, 0.7);
+      letter-spacing: 2px;
+    }
+
+    /* Left content area */
+    .content-left {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 32px;
+    }
+
+    .cta-heading {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 900;
+      font-size: 80px;
+      line-height: 1.05;
+      letter-spacing: -2px;
+      background: linear-gradient(135deg, #f8fafc 0%, #94a3b8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .cta-subheading {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 600;
+      font-size: 28px;
+      color: rgba(59, 130, 246, 0.9);
+    }
+
+    .cta-description {
+      font-family: 'Inter', sans-serif;
+      font-size: 22px;
+      line-height: 1.7;
+      color: rgba(248, 250, 252, 0.6);
+      max-width: 650px;
+    }
+
+    /* Info pills row */
+    .info-row {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .info-pill {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 14px;
+      padding: 16px 28px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    .info-pill-label {
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: 11px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: rgba(59, 130, 246, 0.7);
+      margin-bottom: 6px;
+    }
+
+    .info-pill-value {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      font-size: 18px;
+      color: #f8fafc;
+    }
+
+    /* QR code area (right) */
+    .qr-area {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 30px;
+    }
+
+    .qr-wrapper {
+      position: relative;
+      width: 400px;
+      height: 400px;
+    }
+
+    .qr-placeholder {
+      width: 400px;
+      height: 400px;
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 2px solid rgba(59, 130, 246, 0.2);
+      border-radius: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow:
+        0 8px 40px rgba(0, 0, 0, 0.3),
+        0 0 80px rgba(59, 130, 246, 0.08);
+    }
+
+    .qr-inner-text {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 600;
+      font-size: 18px;
+      color: rgba(148, 163, 184, 0.5);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+
+    /* Corner brackets for QR */
+    .corner-bracket {
+      position: absolute;
+      width: 40px;
+      height: 40px;
+    }
+
+    .corner-bracket.tl {
+      top: -6px; left: -6px;
+      border-top: 4px solid #3b82f6;
+      border-left: 4px solid #3b82f6;
+      border-radius: 4px 0 0 0;
+    }
+
+    .corner-bracket.tr {
+      top: -6px; right: -6px;
+      border-top: 4px solid #3b82f6;
+      border-right: 4px solid #3b82f6;
+      border-radius: 0 4px 0 0;
+    }
+
+    .corner-bracket.bl {
+      bottom: -6px; left: -6px;
+      border-bottom: 4px solid #10b981;
+      border-left: 4px solid #10b981;
+      border-radius: 0 0 0 4px;
+    }
+
+    .corner-bracket.br {
+      bottom: -6px; right: -6px;
+      border-bottom: 4px solid #10b981;
+      border-right: 4px solid #10b981;
+      border-radius: 0 0 4px 0;
+    }
+
+    .scan-label {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 800;
+      font-size: 26px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: #f8fafc;
+      text-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+    }
+
+    .scan-sublabel {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 500;
+      font-size: 18px;
+      color: rgba(148, 163, 184, 0.7);
+      text-align: center;
+    }
+
+    /* Bottom bar */
+    .bottom-bar {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .bottom-url {
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 20px;
+      color: rgba(59, 130, 246, 0.8);
+    }
+
+    .bottom-note {
+      font-family: 'Inter', sans-serif;
+      font-size: 16px;
+      color: rgba(148, 163, 184, 0.5);
+    }
+
+    /* SVG decorations */
+    .svg-decor {
+      position: absolute;
+      z-index: 1;
+    }
+
+    /* Emoji decoration */
+    .emoji-phone {
+      position: absolute;
+      font-size: 130px;
+      filter: drop-shadow(0 0 25px rgba(59, 130, 246, 0.3));
+      top: 110px;
+      left: 120px;
+      z-index: 2;
+      opacity: 0.25;
+    }
+
+    /* Stripe accent bottom */
+    .stripe-bottom {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 5px;
+      background: linear-gradient(90deg, #3b82f6, #10b981, #6366f1, #3b82f6);
+      z-index: 3;
+    }
+  </style>
+</head>
+<body>
+  <!-- Glowing orbs -->
+  <div class="glow-1"></div>
+  <div class="glow-2"></div>
+  <div class="glow-3"></div>
+
+  <!-- Ornamental lines -->
+  <div class="orn-h-top"></div>
+  <div class="orn-h-bottom"></div>
+  <div class="orn-v-center"></div>
+
+  <!-- SVG decorations -->
+  <svg class="svg-decor" style="top:70px; right:70px;" width="50" height="50" viewBox="0 0 50 50" fill="none">
+    <rect x="5" y="5" width="40" height="40" rx="8" stroke="rgba(59,130,246,0.25)" stroke-width="1.5" fill="none"/>
+    <rect x="15" y="15" width="20" height="20" rx="4" stroke="rgba(16,185,129,0.2)" stroke-width="1" fill="none"/>
+  </svg>
+  <svg class="svg-decor" style="bottom:90px; left:120px;" width="60" height="60" viewBox="0 0 60 60" fill="none">
+    <circle cx="30" cy="30" r="25" stroke="rgba(59,130,246,0.15)" stroke-width="1" fill="none"/>
+    <circle cx="30" cy="30" r="15" stroke="rgba(16,185,129,0.12)" stroke-width="1" fill="none"/>
+    <circle cx="30" cy="30" r="3" fill="rgba(59,130,246,0.3)"/>
+  </svg>
+  <svg class="svg-decor" style="top:350px; left:80px;" width="30" height="30" viewBox="0 0 30 30" fill="none">
+    <path d="M15 0 L17 12 L30 15 L17 17 L15 30 L13 17 L0 15 L13 12 Z" fill="rgba(99,102,241,0.2)"/>
+  </svg>
+
+  <!-- Emoji decoration -->
+  <div class="emoji-phone">&#128241;</div>
+
+  <!-- Main layout -->
+  <div class="layout">
+    <!-- Header -->
+    <div class="header">
+      <span class="event-badge" data-editable="true" data-field="eventBadge">Registration Open</span>
+      <span class="event-name-header" data-editable="true" data-field="eventName">DEVFORWARD 2026</span>
+    </div>
+
+    <!-- Left content -->
+    <div class="content-left">
+      <h1 class="cta-heading" data-editable="true" data-field="ctaHeading">Scan to<br>Register<br>Now</h1>
+      <p class="cta-subheading" data-editable="true" data-field="ctaSubheading">Secure your spot in seconds</p>
+      <p class="cta-description" data-editable="true" data-field="ctaDescription">Point your phone camera at the QR code to instantly access the registration page. Early bird pricing ends March 31st.</p>
+      <div class="info-row">
+        <div class="info-pill">
+          <div class="info-pill-label">Date</div>
+          <div class="info-pill-value" data-editable="true" data-field="eventDate">April 22-23, 2026</div>
+        </div>
+        <div class="info-pill">
+          <div class="info-pill-label">Venue</div>
+          <div class="info-pill-value" data-editable="true" data-field="eventVenue">Moscone Center, SF</div>
+        </div>
+        <div class="info-pill">
+          <div class="info-pill-label">Price</div>
+          <div class="info-pill-value" data-editable="true" data-field="ticketPrice">$299 Early Bird</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- QR area -->
+    <div class="qr-area">
+      <div class="qr-wrapper">
+        <div class="corner-bracket tl"></div>
+        <div class="corner-bracket tr"></div>
+        <div class="corner-bracket bl"></div>
+        <div class="corner-bracket br"></div>
+        <div class="qr-placeholder">
+          <span class="qr-inner-text">QR Code</span>
+        </div>
+      </div>
+      <div class="scan-label" data-editable="true" data-field="scanLabel">Scan to Register</div>
+      <div class="scan-sublabel" data-editable="true" data-field="scanSublabel">Use your phone camera to scan</div>
+    </div>
+
+    <!-- Bottom bar -->
+    <div class="bottom-bar">
+      <span class="bottom-url" data-editable="true" data-field="registrationUrl">register.devforward.io</span>
+      <span class="bottom-note" data-editable="true" data-field="bottomNote">Limited to 2,000 attendees &bull; First come, first served</span>
+    </div>
+  </div>
+
+  <!-- Bottom stripe -->
+  <div class="stripe-bottom"></div>
+</body>
+</html>

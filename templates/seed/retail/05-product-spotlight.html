@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(ellipse at 30% 50%, rgba(100, 140, 200, 0.12) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 20%, rgba(150, 120, 200, 0.08) 0%, transparent 45%),
+        radial-gradient(ellipse at 60% 90%, rgba(80, 120, 180, 0.1) 0%, transparent 40%),
+        linear-gradient(135deg, #0a0e17 0%, #111827 30%, #0f1520 60%, #0a0d14 100%);
+      color: #e8edf5;
+    }
+
+    /* Dot grid */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image: radial-gradient(circle, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size: 32px 32px;
+      z-index: 0;
+    }
+
+    /* Subtle stripe */
+    body::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 120px,
+        rgba(100, 140, 200, 0.015) 120px,
+        rgba(100, 140, 200, 0.015) 121px
+      );
+      z-index: 0;
+    }
+
+    /* Glowing accents */
+    .glow-1 {
+      position: absolute;
+      top: 50%;
+      left: 25%;
+      transform: translate(-50%, -50%);
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 70%);
+      filter: blur(60px);
+      z-index: 0;
+    }
+
+    .glow-2 {
+      position: absolute;
+      top: 20%;
+      right: 10%;
+      width: 300px;
+      height: 300px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(139, 92, 246, 0.06) 0%, transparent 70%);
+      filter: blur(40px);
+      z-index: 0;
+    }
+
+    /* Main split layout */
+    .layout {
+      position: relative;
+      z-index: 3;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      height: 100%;
+    }
+
+    /* Left panel - product showcase */
+    .product-panel {
+      background: rgba(255, 255, 255, 0.02);
+      border-right: 1px solid rgba(255, 255, 255, 0.06);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 80px;
+      position: relative;
+    }
+
+    .product-badge {
+      position: absolute;
+      top: 50px;
+      left: 50px;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: #3b82f6;
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      padding: 8px 20px;
+      border-radius: 4px;
+    }
+
+    .product-showcase {
+      width: 500px;
+      height: 500px;
+      background:
+        radial-gradient(circle, rgba(59, 130, 246, 0.05) 0%, transparent 70%);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    .product-emoji {
+      font-size: 200px;
+      filter: drop-shadow(0 10px 40px rgba(0, 0, 0, 0.4));
+    }
+
+    /* Decorative ring around product */
+    .product-showcase::before {
+      content: '';
+      position: absolute;
+      top: -20px; left: -20px; right: -20px; bottom: -20px;
+      border: 1px solid rgba(59, 130, 246, 0.1);
+      border-radius: 32px;
+    }
+
+    .product-label {
+      margin-top: 30px;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 6px;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.3);
+    }
+
+    /* Right panel - details */
+    .details-panel {
+      padding: 80px 70px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 35px;
+    }
+
+    .brand-name {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 6px;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.4);
+    }
+
+    .product-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 72px;
+      font-weight: 900;
+      line-height: 1.1;
+      color: #ffffff;
+    }
+
+    .product-tagline {
+      font-family: 'Playfair Display', serif;
+      font-size: 26px;
+      font-style: italic;
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .product-desc {
+      font-family: 'Inter', sans-serif;
+      font-size: 20px;
+      font-weight: 300;
+      line-height: 1.7;
+      color: rgba(255, 255, 255, 0.55);
+      max-width: 600px;
+    }
+
+    /* Feature list */
+    .features {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .feature {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .feature-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #3b82f6;
+      flex-shrink: 0;
+      box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+    }
+
+    .feature-text {
+      font-family: 'Inter', sans-serif;
+      font-size: 18px;
+      font-weight: 400;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    /* Pricing */
+    .pricing {
+      display: flex;
+      align-items: baseline;
+      gap: 20px;
+      margin-top: 10px;
+    }
+
+    .price-current {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 56px;
+      font-weight: 800;
+      color: #ffffff;
+    }
+
+    .price-original {
+      font-family: 'Inter', sans-serif;
+      font-size: 28px;
+      font-weight: 400;
+      color: rgba(255, 255, 255, 0.3);
+      text-decoration: line-through;
+    }
+
+    .price-save {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      color: #22c55e;
+      background: rgba(34, 197, 94, 0.1);
+      padding: 6px 16px;
+      border-radius: 20px;
+    }
+
+    /* Availability */
+    .availability {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .avail-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 10px rgba(34, 197, 94, 0.4);
+    }
+
+    .avail-text {
+      font-family: 'Inter', sans-serif;
+      font-size: 16px;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    /* SVG decorations */
+    .svg-deco {
+      position: absolute;
+      z-index: 1;
+    }
+
+    /* Decorative lines */
+    .vert-line {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      width: 1px;
+      height: 100%;
+      background: linear-gradient(180deg, transparent 10%, rgba(59, 130, 246, 0.1) 30%, rgba(59, 130, 246, 0.1) 70%, transparent 90%);
+      z-index: 1;
+    }
+
+    /* Accent bar */
+    .accent-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: linear-gradient(180deg, transparent 20%, #3b82f6 50%, transparent 80%);
+      z-index: 5;
+    }
+  </style>
+</head>
+<body>
+  <!-- Glows -->
+  <div class="glow-1"></div>
+  <div class="glow-2"></div>
+  <div class="vert-line"></div>
+  <div class="accent-bar"></div>
+
+  <!-- SVG decorations -->
+  <svg class="svg-deco" style="top:30px;right:30px;opacity:0.08;" width="120" height="120" viewBox="0 0 120 120">
+    <rect x="10" y="10" width="100" height="100" fill="none" stroke="#3b82f6" stroke-width="1"/>
+    <rect x="30" y="30" width="60" height="60" fill="none" stroke="#3b82f6" stroke-width="0.5"/>
+    <line x1="60" y1="0" x2="60" y2="120" stroke="#3b82f6" stroke-width="0.5"/>
+    <line x1="0" y1="60" x2="120" y2="60" stroke="#3b82f6" stroke-width="0.5"/>
+  </svg>
+
+  <svg class="svg-deco" style="bottom:30px;left:30px;opacity:0.06;" width="150" height="150" viewBox="0 0 150 150">
+    <circle cx="75" cy="75" r="70" fill="none" stroke="#3b82f6" stroke-width="0.5"/>
+    <circle cx="75" cy="75" r="50" fill="none" stroke="#3b82f6" stroke-width="0.5"/>
+    <circle cx="75" cy="75" r="30" fill="none" stroke="#3b82f6" stroke-width="0.5"/>
+    <circle cx="75" cy="75" r="10" fill="none" stroke="#3b82f6" stroke-width="1"/>
+  </svg>
+
+  <svg class="svg-deco" style="top:50%;right:50px;transform:translateY(-50%);opacity:0.05;" width="40" height="200" viewBox="0 0 40 200">
+    <line x1="20" y1="0" x2="20" y2="200" stroke="#8b5cf6" stroke-width="1"/>
+    <circle cx="20" cy="40" r="4" fill="none" stroke="#8b5cf6" stroke-width="1"/>
+    <circle cx="20" cy="100" r="4" fill="none" stroke="#8b5cf6" stroke-width="1"/>
+    <circle cx="20" cy="160" r="4" fill="none" stroke="#8b5cf6" stroke-width="1"/>
+  </svg>
+
+  <!-- Layout -->
+  <div class="layout">
+    <div class="product-panel">
+      <div class="product-badge" data-editable="true" data-field="product_badge">FEATURED PRODUCT</div>
+      <div class="product-showcase">
+        <div class="product-emoji">⌚</div>
+      </div>
+      <div class="product-label" data-editable="true" data-field="product_sku">SKU: WCH-PRO-2026</div>
+    </div>
+
+    <div class="details-panel">
+      <div class="brand-name" data-editable="true" data-field="brand_name">YOUR BRAND</div>
+
+      <div class="product-title" data-editable="true" data-field="product_name">Chronograph<br>Pro Elite</div>
+
+      <div class="product-tagline" data-editable="true" data-field="product_tagline">Precision meets elegance</div>
+
+      <div class="product-desc" data-editable="true" data-field="product_description">Crafted with Swiss movement and sapphire crystal glass. Water-resistant to 200m with a titanium case and Italian leather strap.</div>
+
+      <div class="features">
+        <div class="feature">
+          <div class="feature-dot"></div>
+          <div class="feature-text" data-editable="true" data-field="feature_1">Swiss automatic movement</div>
+        </div>
+        <div class="feature">
+          <div class="feature-dot"></div>
+          <div class="feature-text" data-editable="true" data-field="feature_2">Sapphire crystal face</div>
+        </div>
+        <div class="feature">
+          <div class="feature-dot"></div>
+          <div class="feature-text" data-editable="true" data-field="feature_3">200m water resistance</div>
+        </div>
+        <div class="feature">
+          <div class="feature-dot"></div>
+          <div class="feature-text" data-editable="true" data-field="feature_4">2-year international warranty</div>
+        </div>
+      </div>
+
+      <div class="pricing">
+        <div class="price-current" data-editable="true" data-field="price_current">$399</div>
+        <div class="price-original" data-editable="true" data-field="price_original">$599</div>
+        <div class="price-save" data-editable="true" data-field="price_savings">SAVE $200</div>
+      </div>
+
+      <div class="availability">
+        <div class="avail-dot"></div>
+        <div class="avail-text" data-editable="true" data-field="availability">In stock — Available for immediate pickup</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(ellipse at 20% 80%, rgba(30, 58, 138, 0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 20%, rgba(220, 38, 38, 0.1) 0%, transparent 45%),
+        linear-gradient(140deg, #0f172a 0%, #1e293b 30%, #0f172a 60%, #1a1a2e 100%);
+      color: #f8fafc;
+    }
+
+    /* Diagonal stripe pattern */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        -45deg,
+        transparent,
+        transparent 40px,
+        rgba(255, 255, 255, 0.015) 40px,
+        rgba(255, 255, 255, 0.015) 80px
+      );
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Glowing orb */
+    body::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 700px;
+      height: 700px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(37, 99, 235, 0.08) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      height: 100%;
+      padding: 45px 65px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Top bar */
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+    }
+
+    .league-badge {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 28px;
+      letter-spacing: 6px;
+      color: rgba(255, 255, 255, 0.5);
+      text-transform: uppercase;
+    }
+
+    .live-indicator {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 800;
+      font-size: 18px;
+      color: #ef4444;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+    }
+
+    .live-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #ef4444;
+      box-shadow: 0 0 12px rgba(239, 68, 68, 0.6);
+    }
+
+    /* Main scoreboard */
+    .scoreboard {
+      display: grid;
+      grid-template-columns: 1fr 380px 1fr;
+      align-items: center;
+      gap: 40px;
+      margin-bottom: 40px;
+    }
+
+    .team-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    .team-emoji {
+      font-size: 120px;
+      filter: drop-shadow(0 8px 24px rgba(0,0,0,0.4));
+      margin-bottom: 16px;
+    }
+
+    .team-name {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 56px;
+      letter-spacing: 4px;
+      line-height: 1;
+    }
+
+    .team-home .team-name { color: #60a5fa; }
+    .team-away .team-name { color: #f87171; }
+
+    .team-record {
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+      font-size: 18px;
+      color: rgba(255, 255, 255, 0.5);
+      margin-top: 6px;
+    }
+
+    /* Score center */
+    .score-center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+
+    .score-display {
+      display: flex;
+      align-items: center;
+      gap: 30px;
+    }
+
+    .score-num {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 160px;
+      line-height: 1;
+      letter-spacing: 4px;
+    }
+
+    .score-home { color: #60a5fa; text-shadow: 0 0 40px rgba(96, 165, 250, 0.4); }
+    .score-away { color: #f87171; text-shadow: 0 0 40px rgba(248, 113, 113, 0.4); }
+
+    .score-divider {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 80px;
+      color: rgba(255, 255, 255, 0.3);
+    }
+
+    .match-status {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 800;
+      font-size: 22px;
+      color: rgba(255, 255, 255, 0.6);
+      text-transform: uppercase;
+      letter-spacing: 4px;
+      margin-top: 16px;
+    }
+
+    .match-detail {
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+      font-size: 18px;
+      color: rgba(255, 255, 255, 0.35);
+      margin-top: 8px;
+    }
+
+    /* Glass border around score */
+    .score-glass {
+      background: rgba(255, 255, 255, 0.04);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 24px;
+      padding: 30px 50px;
+      box-shadow:
+        0 4px 6px rgba(0, 0, 0, 0.1),
+        0 20px 60px rgba(0, 0, 0, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    }
+
+    /* Bottom section - Standings & Upcoming */
+    .bottom-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+    }
+
+    .panel {
+      background: rgba(255, 255, 255, 0.04);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      padding: 28px 32px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    }
+
+    .panel-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 32px;
+      letter-spacing: 4px;
+      color: rgba(255, 255, 255, 0.7);
+      margin-bottom: 18px;
+      text-transform: uppercase;
+    }
+
+    /* Standings table */
+    .standings-row {
+      display: grid;
+      grid-template-columns: 40px 1fr 60px 60px 60px;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .standings-row:last-child { border-bottom: none; }
+
+    .standing-rank {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 800;
+      font-size: 18px;
+      color: #fbbf24;
+    }
+
+    .standing-team {
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 18px;
+      color: #e2e8f0;
+    }
+
+    .standing-stat {
+      font-family: 'JetBrains Mono', 'Inter', monospace;
+      font-weight: 600;
+      font-size: 16px;
+      color: rgba(255, 255, 255, 0.6);
+      text-align: center;
+    }
+
+    .standing-header {
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.35);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      text-align: center;
+    }
+
+    /* Upcoming games */
+    .upcoming-game {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 16px;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .upcoming-game:last-child { border-bottom: none; }
+
+    .upcoming-team {
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 18px;
+      color: #e2e8f0;
+    }
+
+    .upcoming-team-right { text-align: right; }
+
+    .upcoming-vs {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 22px;
+      color: rgba(255, 255, 255, 0.3);
+      letter-spacing: 2px;
+    }
+
+    .upcoming-date {
+      font-family: 'Inter', sans-serif;
+      font-weight: 400;
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.35);
+    }
+
+    /* Footer */
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 20px;
+      margin-top: 10px;
+    }
+
+    .footer-left {
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+      font-size: 16px;
+      color: rgba(255, 255, 255, 0.3);
+    }
+
+    .footer-right {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      font-size: 16px;
+      color: rgba(255, 255, 255, 0.3);
+      letter-spacing: 2px;
+    }
+
+    /* SVG decoration */
+    .svg-decor-left {
+      position: absolute;
+      top: 80px;
+      left: 80px;
+      opacity: 0.05;
+      z-index: 0;
+    }
+
+    .svg-decor-right {
+      position: absolute;
+      bottom: 80px;
+      right: 80px;
+      opacity: 0.05;
+      z-index: 0;
+    }
+
+    /* Decorative glowing circles */
+    .glow-circle {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .gc-1 {
+      width: 300px; height: 300px;
+      top: -80px; left: 300px;
+      background: radial-gradient(circle, rgba(96, 165, 250, 0.06) 0%, transparent 60%);
+    }
+
+    .gc-2 {
+      width: 250px; height: 250px;
+      top: -50px; right: 250px;
+      background: radial-gradient(circle, rgba(248, 113, 113, 0.06) 0%, transparent 60%);
+    }
+  </style>
+</head>
+<body>
+  <div class="glow-circle gc-1"></div>
+  <div class="glow-circle gc-2"></div>
+
+  <!-- SVG decorations -->
+  <svg class="svg-decor-left" width="120" height="120" viewBox="0 0 120 120" fill="none">
+    <circle cx="60" cy="60" r="55" stroke="white" stroke-width="2"/>
+    <circle cx="60" cy="60" r="30" stroke="white" stroke-width="1.5"/>
+    <line x1="60" y1="5" x2="60" y2="115" stroke="white" stroke-width="1"/>
+    <line x1="5" y1="60" x2="115" y2="60" stroke="white" stroke-width="1"/>
+  </svg>
+  <svg class="svg-decor-right" width="100" height="100" viewBox="0 0 100 100" fill="none">
+    <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5" stroke="white" stroke-width="2" fill="none"/>
+    <polygon points="50,20 80,35 80,65 50,80 20,65 20,35" stroke="white" stroke-width="1.5" fill="none"/>
+  </svg>
+
+  <div class="layout">
+    <!-- Top Bar -->
+    <div class="top-bar">
+      <div class="league-badge" data-editable="true" data-field="leagueName">Westfield Athletic Conference</div>
+      <div class="live-indicator">
+        <div class="live-dot"></div>
+        <span data-editable="true" data-field="liveStatus">LIVE</span>
+      </div>
+    </div>
+
+    <!-- Main Scoreboard -->
+    <div class="scoreboard">
+      <div class="team-section team-home">
+        <div class="team-emoji">&#x26BD;</div>
+        <div class="team-name" data-editable="true" data-field="homeTeam">EAGLES</div>
+        <div class="team-record" data-editable="true" data-field="homeRecord">Season: 12-3-1</div>
+      </div>
+
+      <div class="score-center">
+        <div class="score-glass">
+          <div class="score-display">
+            <div class="score-num score-home" data-editable="true" data-field="homeScore">3</div>
+            <div class="score-divider">:</div>
+            <div class="score-num score-away" data-editable="true" data-field="awayScore">2</div>
+          </div>
+          <div class="match-status" data-editable="true" data-field="matchStatus">2nd Half &bull; 78:24</div>
+          <div class="match-detail" data-editable="true" data-field="matchDetail">Varsity Soccer &mdash; Home Field</div>
+        </div>
+      </div>
+
+      <div class="team-section team-away">
+        <div class="team-emoji">&#x1F3C0;</div>
+        <div class="team-name" data-editable="true" data-field="awayTeam">HAWKS</div>
+        <div class="team-record" data-editable="true" data-field="awayRecord">Season: 10-5-1</div>
+      </div>
+    </div>
+
+    <!-- Bottom Section -->
+    <div class="bottom-section">
+      <!-- Standings -->
+      <div class="panel">
+        <div class="panel-title" data-editable="true" data-field="standingsTitle">League Standings</div>
+        <div class="standings-row">
+          <div class="standing-header">#</div>
+          <div class="standing-header" style="text-align:left;">Team</div>
+          <div class="standing-header">W</div>
+          <div class="standing-header">L</div>
+          <div class="standing-header">PTS</div>
+        </div>
+        <div class="standings-row">
+          <div class="standing-rank" data-editable="true" data-field="rank1">1</div>
+          <div class="standing-team" data-editable="true" data-field="standTeam1">Eagles</div>
+          <div class="standing-stat" data-editable="true" data-field="standW1">12</div>
+          <div class="standing-stat" data-editable="true" data-field="standL1">3</div>
+          <div class="standing-stat" data-editable="true" data-field="standPts1">37</div>
+        </div>
+        <div class="standings-row">
+          <div class="standing-rank" data-editable="true" data-field="rank2">2</div>
+          <div class="standing-team" data-editable="true" data-field="standTeam2">Hawks</div>
+          <div class="standing-stat" data-editable="true" data-field="standW2">10</div>
+          <div class="standing-stat" data-editable="true" data-field="standL2">5</div>
+          <div class="standing-stat" data-editable="true" data-field="standPts2">31</div>
+        </div>
+        <div class="standings-row">
+          <div class="standing-rank" data-editable="true" data-field="rank3">3</div>
+          <div class="standing-team" data-editable="true" data-field="standTeam3">Wolves</div>
+          <div class="standing-stat" data-editable="true" data-field="standW3">9</div>
+          <div class="standing-stat" data-editable="true" data-field="standL3">6</div>
+          <div class="standing-stat" data-editable="true" data-field="standPts3">28</div>
+        </div>
+        <div class="standings-row">
+          <div class="standing-rank" data-editable="true" data-field="rank4">4</div>
+          <div class="standing-team" data-editable="true" data-field="standTeam4">Panthers</div>
+          <div class="standing-stat" data-editable="true" data-field="standW4">7</div>
+          <div class="standing-stat" data-editable="true" data-field="standL4">8</div>
+          <div class="standing-stat" data-editable="true" data-field="standPts4">22</div>
+        </div>
+      </div>
+
+      <!-- Upcoming Games -->
+      <div class="panel">
+        <div class="panel-title" data-editable="true" data-field="upcomingTitle">Upcoming Games</div>
+        <div class="upcoming-game">
+          <div><div class="upcoming-team" data-editable="true" data-field="up1Home">Eagles</div><div class="upcoming-date" data-editable="true" data-field="up1Date">Mar 8 &bull; 4:00 PM</div></div>
+          <div class="upcoming-vs">VS</div>
+          <div class="upcoming-team-right"><div class="upcoming-team" data-editable="true" data-field="up1Away">Wolves</div></div>
+        </div>
+        <div class="upcoming-game">
+          <div><div class="upcoming-team" data-editable="true" data-field="up2Home">Hawks</div><div class="upcoming-date" data-editable="true" data-field="up2Date">Mar 10 &bull; 3:30 PM</div></div>
+          <div class="upcoming-vs">VS</div>
+          <div class="upcoming-team-right"><div class="upcoming-team" data-editable="true" data-field="up2Away">Panthers</div></div>
+        </div>
+        <div class="upcoming-game">
+          <div><div class="upcoming-team" data-editable="true" data-field="up3Home">Eagles</div><div class="upcoming-date" data-editable="true" data-field="up3Date">Mar 15 &bull; 5:00 PM</div></div>
+          <div class="upcoming-vs">VS</div>
+          <div class="upcoming-team-right"><div class="upcoming-team" data-editable="true" data-field="up3Away">Hawks</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <div class="footer-left" data-editable="true" data-field="footerLeft">Westfield Academy Athletics Department</div>
+      <div class="footer-right" data-editable="true" data-field="footerRight">#GoEagles</div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700;800;900&family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(ellipse at 5% 95%, rgba(139, 92, 246, 0.12) 0%, transparent 50%),
+        radial-gradient(ellipse at 95% 10%, rgba(59, 130, 246, 0.1) 0%, transparent 45%),
+        linear-gradient(150deg, #f5f3ff 0%, #ede9fe 25%, #eef2ff 50%, #f0fdf4 75%, #faf5ff 100%);
+      color: #1e293b;
+    }
+
+    /* Stripe pattern overlay */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 53px,
+        rgba(139, 92, 246, 0.03) 53px,
+        rgba(139, 92, 246, 0.03) 54px
+      );
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Glowing orb */
+    body::after {
+      content: '';
+      position: absolute;
+      top: 200px;
+      right: -150px;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(99, 102, 241, 0.1) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 440px 1fr;
+      grid-template-rows: 1fr;
+      height: 100%;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Left panel */
+    .left-panel {
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%),
+        linear-gradient(160deg, #7c3aed 0%, #6d28d9 30%, #5b21b6 60%, #4c1d95 100%);
+      padding: 60px 45px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Decorative circles on left panel */
+    .left-panel::before {
+      content: '';
+      position: absolute;
+      top: -80px;
+      right: -80px;
+      width: 300px;
+      height: 300px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.1);
+      pointer-events: none;
+    }
+
+    .left-panel::after {
+      content: '';
+      position: absolute;
+      bottom: -120px;
+      left: -60px;
+      width: 350px;
+      height: 350px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(167, 139, 250, 0.2) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .left-top {
+      position: relative;
+      z-index: 2;
+    }
+
+    .calendar-emoji {
+      font-size: 120px;
+      filter: drop-shadow(0 8px 24px rgba(0,0,0,0.3));
+      margin-bottom: 24px;
+    }
+
+    .events-title {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 900;
+      font-size: 52px;
+      color: #ffffff;
+      line-height: 1.1;
+      margin-bottom: 12px;
+    }
+
+    .events-period {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 600;
+      font-size: 22px;
+      color: rgba(255, 255, 255, 0.75);
+      letter-spacing: 1px;
+    }
+
+    .ornament-bar {
+      width: 60px;
+      height: 4px;
+      background: linear-gradient(90deg, #a78bfa, rgba(255,255,255,0.3));
+      border-radius: 2px;
+      margin-top: 20px;
+    }
+
+    .left-bottom {
+      position: relative;
+      z-index: 2;
+    }
+
+    .school-name {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      font-size: 20px;
+      color: rgba(255, 255, 255, 0.85);
+    }
+
+    .school-tagline {
+      font-family: 'Inter', sans-serif;
+      font-weight: 400;
+      font-size: 15px;
+      color: rgba(255, 255, 255, 0.5);
+      margin-top: 4px;
+    }
+
+    /* SVG decoration in left panel */
+    .svg-left-decor {
+      position: absolute;
+      bottom: 140px;
+      right: 20px;
+      opacity: 0.12;
+      z-index: 1;
+    }
+
+    /* Right content area */
+    .right-content {
+      padding: 55px 65px;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+      position: relative;
+    }
+
+    /* Event card */
+    .event-card {
+      display: grid;
+      grid-template-columns: 130px 1fr auto;
+      gap: 32px;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.55);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.75);
+      border-radius: 22px;
+      padding: 30px 36px;
+      box-shadow:
+        0 4px 6px rgba(0, 0, 0, 0.03),
+        0 12px 40px rgba(0, 0, 0, 0.05);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .event-card::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 6px;
+      border-radius: 22px 0 0 22px;
+    }
+
+    .event-card:nth-child(1)::before { background: linear-gradient(180deg, #7c3aed, #a78bfa); }
+    .event-card:nth-child(2)::before { background: linear-gradient(180deg, #2563eb, #60a5fa); }
+    .event-card:nth-child(3)::before { background: linear-gradient(180deg, #059669, #34d399); }
+    .event-card:nth-child(4)::before { background: linear-gradient(180deg, #dc2626, #f87171); }
+    .event-card:nth-child(5)::before { background: linear-gradient(180deg, #d97706, #fbbf24); }
+
+    .date-badge {
+      text-align: center;
+      background: rgba(255, 255, 255, 0.7);
+      border-radius: 16px;
+      padding: 16px 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .date-month {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      font-size: 16px;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+    }
+
+    .event-card:nth-child(1) .date-month { color: #7c3aed; }
+    .event-card:nth-child(2) .date-month { color: #2563eb; }
+    .event-card:nth-child(3) .date-month { color: #059669; }
+    .event-card:nth-child(4) .date-month { color: #dc2626; }
+    .event-card:nth-child(5) .date-month { color: #d97706; }
+
+    .date-day {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 900;
+      font-size: 52px;
+      color: #1e293b;
+      line-height: 1.1;
+    }
+
+    .event-info {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .event-name {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 800;
+      font-size: 28px;
+      color: #1e293b;
+      line-height: 1.2;
+    }
+
+    .event-details {
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+      font-size: 20px;
+      color: #64748b;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .event-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+    }
+
+    .event-card:nth-child(1) .event-dot { background: #7c3aed; }
+    .event-card:nth-child(2) .event-dot { background: #2563eb; }
+    .event-card:nth-child(3) .event-dot { background: #059669; }
+    .event-card:nth-child(4) .event-dot { background: #dc2626; }
+    .event-card:nth-child(5) .event-dot { background: #d97706; }
+
+    .event-category {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 600;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      padding: 8px 20px;
+      border-radius: 50px;
+      white-space: nowrap;
+    }
+
+    .cat-academic { background: rgba(124, 58, 237, 0.1); color: #7c3aed; }
+    .cat-social { background: rgba(37, 99, 235, 0.1); color: #2563eb; }
+    .cat-sports { background: rgba(5, 150, 105, 0.1); color: #059669; }
+    .cat-arts { background: rgba(220, 38, 38, 0.1); color: #dc2626; }
+    .cat-community { background: rgba(217, 119, 6, 0.1); color: #d97706; }
+
+    /* Floating decoration */
+    .float-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 2px solid rgba(139, 92, 246, 0.08);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .ring-1 { width: 160px; height: 160px; top: 40px; right: 80px; }
+    .ring-2 { width: 80px; height: 80px; bottom: 60px; right: 200px; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <!-- Left Panel -->
+    <div class="left-panel">
+      <div class="left-top">
+        <div class="calendar-emoji">&#x1F4C5;</div>
+        <div class="events-title" data-editable="true" data-field="title">Upcoming Events</div>
+        <div class="events-period" data-editable="true" data-field="period">March 2026</div>
+        <div class="ornament-bar"></div>
+      </div>
+      <div class="left-bottom">
+        <div class="school-name" data-editable="true" data-field="schoolName">Westfield Academy</div>
+        <div class="school-tagline" data-editable="true" data-field="tagline">Where future leaders grow</div>
+      </div>
+      <!-- SVG decoration -->
+      <svg class="svg-left-decor" width="100" height="100" viewBox="0 0 100 100" fill="none">
+        <rect x="10" y="10" width="80" height="80" rx="12" stroke="white" stroke-width="2"/>
+        <line x1="10" y1="35" x2="90" y2="35" stroke="white" stroke-width="1.5"/>
+        <circle cx="30" cy="55" r="6" stroke="white" stroke-width="1.5"/>
+        <circle cx="50" cy="70" r="6" stroke="white" stroke-width="1.5"/>
+        <circle cx="70" cy="55" r="6" stroke="white" stroke-width="1.5"/>
+      </svg>
+    </div>
+
+    <!-- Right Content -->
+    <div class="right-content">
+      <div class="float-ring ring-1"></div>
+      <div class="float-ring ring-2"></div>
+
+      <!-- Event 1 -->
+      <div class="event-card">
+        <div class="date-badge">
+          <div class="date-month" data-editable="true" data-field="event1Month">MAR</div>
+          <div class="date-day" data-editable="true" data-field="event1Day">05</div>
+        </div>
+        <div class="event-info">
+          <div class="event-name" data-editable="true" data-field="event1Name">Science Fair Exhibition</div>
+          <div class="event-details">
+            <span><span class="event-dot"></span><span data-editable="true" data-field="event1Location">Main Gymnasium</span></span>
+            <span data-editable="true" data-field="event1Time">9:00 AM &ndash; 3:00 PM</span>
+          </div>
+        </div>
+        <span class="event-category cat-academic" data-editable="true" data-field="event1Category">Academic</span>
+      </div>
+
+      <!-- Event 2 -->
+      <div class="event-card">
+        <div class="date-badge">
+          <div class="date-month" data-editable="true" data-field="event2Month">MAR</div>
+          <div class="date-day" data-editable="true" data-field="event2Day">12</div>
+        </div>
+        <div class="event-info">
+          <div class="event-name" data-editable="true" data-field="event2Name">Spring Dance Social</div>
+          <div class="event-details">
+            <span><span class="event-dot"></span><span data-editable="true" data-field="event2Location">Student Center</span></span>
+            <span data-editable="true" data-field="event2Time">6:00 PM &ndash; 10:00 PM</span>
+          </div>
+        </div>
+        <span class="event-category cat-social" data-editable="true" data-field="event2Category">Social</span>
+      </div>
+
+      <!-- Event 3 -->
+      <div class="event-card">
+        <div class="date-badge">
+          <div class="date-month" data-editable="true" data-field="event3Month">MAR</div>
+          <div class="date-day" data-editable="true" data-field="event3Day">18</div>
+        </div>
+        <div class="event-info">
+          <div class="event-name" data-editable="true" data-field="event3Name">Varsity Soccer Championship</div>
+          <div class="event-details">
+            <span><span class="event-dot"></span><span data-editable="true" data-field="event3Location">Athletic Field</span></span>
+            <span data-editable="true" data-field="event3Time">4:00 PM &ndash; 6:30 PM</span>
+          </div>
+        </div>
+        <span class="event-category cat-sports" data-editable="true" data-field="event3Category">Sports</span>
+      </div>
+
+      <!-- Event 4 -->
+      <div class="event-card">
+        <div class="date-badge">
+          <div class="date-month" data-editable="true" data-field="event4Month">MAR</div>
+          <div class="date-day" data-editable="true" data-field="event4Day">22</div>
+        </div>
+        <div class="event-info">
+          <div class="event-name" data-editable="true" data-field="event4Name">Spring Musical: Into the Woods</div>
+          <div class="event-details">
+            <span><span class="event-dot"></span><span data-editable="true" data-field="event4Location">Auditorium</span></span>
+            <span data-editable="true" data-field="event4Time">7:00 PM &ndash; 9:30 PM</span>
+          </div>
+        </div>
+        <span class="event-category cat-arts" data-editable="true" data-field="event4Category">Arts</span>
+      </div>
+
+      <!-- Event 5 -->
+      <div class="event-card">
+        <div class="date-badge">
+          <div class="date-month" data-editable="true" data-field="event5Month">MAR</div>
+          <div class="date-day" data-editable="true" data-field="event5Day">28</div>
+        </div>
+        <div class="event-info">
+          <div class="event-name" data-editable="true" data-field="event5Name">Community Service Day</div>
+          <div class="event-details">
+            <span><span class="event-dot"></span><span data-editable="true" data-field="event5Location">Campus-wide</span></span>
+            <span data-editable="true" data-field="event5Time">8:00 AM &ndash; 1:00 PM</span>
+          </div>
+        </div>
+        <span class="event-category cat-community" data-editable="true" data-field="event5Category">Community</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800;900&family=Inter:wght@400;500;600;700&family=Lora:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(ellipse at 10% 90%, rgba(180, 83, 9, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 85% 20%, rgba(120, 53, 15, 0.06) 0%, transparent 45%),
+        linear-gradient(145deg, #fdf8f0 0%, #fef3e2 25%, #fdf4e8 50%, #f5ebe0 75%, #fef9f3 100%);
+      color: #1e293b;
+    }
+
+    /* Subtle dot grid pattern */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image: radial-gradient(circle, rgba(120, 53, 15, 0.05) 1px, transparent 1px);
+      background-size: 30px 30px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Warm glow bottom-right */
+    body::after {
+      content: '';
+      position: absolute;
+      bottom: -120px;
+      right: -100px;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(217, 119, 6, 0.1) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 500px;
+      grid-template-rows: auto 1fr;
+      height: 100%;
+      padding: 55px 65px;
+      gap: 40px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Header spans full width */
+    .header {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 36px;
+      padding-bottom: 30px;
+      border-bottom: 3px solid rgba(180, 83, 9, 0.1);
+      position: relative;
+    }
+
+    .header-emoji {
+      font-size: 160px;
+      filter: drop-shadow(0 8px 20px rgba(0,0,0,0.15));
+      line-height: 1;
+    }
+
+    .header-text {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .lib-title {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 82px;
+      color: #78350f;
+      line-height: 1;
+      letter-spacing: -1px;
+    }
+
+    .lib-subtitle {
+      font-family: 'Lora', serif;
+      font-weight: 500;
+      font-size: 28px;
+      color: #92400e;
+      margin-top: 8px;
+      font-style: italic;
+    }
+
+    /* Ornamental divider */
+    .ornament {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .ornament-line-l {
+      width: 60px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(180, 83, 9, 0.3));
+    }
+
+    .ornament-diamond {
+      width: 8px;
+      height: 8px;
+      background: rgba(180, 83, 9, 0.4);
+      transform: rotate(45deg);
+    }
+
+    .ornament-line-r {
+      width: 60px;
+      height: 2px;
+      background: linear-gradient(90deg, rgba(180, 83, 9, 0.3), transparent);
+    }
+
+    .header-hours {
+      background: rgba(255, 255, 255, 0.6);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      border-radius: 22px;
+      padding: 28px 36px;
+      box-shadow:
+        0 4px 6px rgba(0, 0, 0, 0.03),
+        0 16px 48px rgba(180, 83, 9, 0.08);
+      text-align: center;
+    }
+
+    .hours-label {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 20px;
+      color: #78350f;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      margin-bottom: 12px;
+    }
+
+    .hours-item {
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+      font-size: 18px;
+      color: #57534e;
+      line-height: 1.8;
+    }
+
+    .hours-item strong {
+      font-weight: 700;
+      color: #44403c;
+    }
+
+    /* SVG decoration near header */
+    .svg-header {
+      position: absolute;
+      right: 320px;
+      top: 15px;
+      opacity: 0.07;
+    }
+
+    /* Main content - left column */
+    .main-content {
+      display: flex;
+      flex-direction: column;
+      gap: 30px;
+    }
+
+    /* Featured resources section */
+    .section-title {
+      font-family: 'Playfair Display', serif;
+      font-weight: 800;
+      font-size: 36px;
+      color: #78350f;
+      margin-bottom: 6px;
+    }
+
+    .section-subtitle {
+      font-family: 'Lora', serif;
+      font-weight: 400;
+      font-size: 18px;
+      color: #78716c;
+      font-style: italic;
+    }
+
+    .resources-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 22px;
+    }
+
+    .resource-card {
+      background: rgba(255, 255, 255, 0.55);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      border-radius: 18px;
+      padding: 28px 24px;
+      box-shadow:
+        0 4px 6px rgba(0, 0, 0, 0.03),
+        0 8px 24px rgba(180, 83, 9, 0.05);
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .resource-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+    }
+
+    .resource-card:nth-child(1)::before { background: linear-gradient(90deg, #b45309, #d97706); }
+    .resource-card:nth-child(2)::before { background: linear-gradient(90deg, #059669, #34d399); }
+    .resource-card:nth-child(3)::before { background: linear-gradient(90deg, #7c3aed, #a78bfa); }
+
+    .resource-emoji {
+      font-size: 56px;
+      filter: drop-shadow(0 3px 8px rgba(0,0,0,0.1));
+      margin-bottom: 14px;
+    }
+
+    .resource-name {
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: 20px;
+      color: #1e293b;
+      margin-bottom: 8px;
+    }
+
+    .resource-desc {
+      font-family: 'Lora', serif;
+      font-weight: 400;
+      font-size: 16px;
+      color: #64748b;
+      line-height: 1.5;
+    }
+
+    /* Reading recommendations */
+    .reading-section {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .book-item {
+      display: grid;
+      grid-template-columns: 60px 1fr;
+      gap: 18px;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.45);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      border-radius: 14px;
+      padding: 18px 22px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+    }
+
+    .book-emoji {
+      font-size: 44px;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.1));
+    }
+
+    .book-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .book-title {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 22px;
+      color: #1e293b;
+    }
+
+    .book-author {
+      font-family: 'Lora', serif;
+      font-weight: 400;
+      font-size: 17px;
+      color: #78716c;
+      font-style: italic;
+    }
+
+    /* Right sidebar */
+    .right-sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Info card */
+    .info-card {
+      background: rgba(255, 255, 255, 0.55);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      border-radius: 20px;
+      padding: 32px 30px;
+      box-shadow:
+        0 4px 6px rgba(0, 0, 0, 0.03),
+        0 12px 36px rgba(180, 83, 9, 0.06);
+    }
+
+    .info-card-title {
+      font-family: 'Playfair Display', serif;
+      font-weight: 800;
+      font-size: 26px;
+      color: #78350f;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .info-card-title-emoji {
+      font-size: 32px;
+    }
+
+    .info-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .info-list li {
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+      font-size: 18px;
+      color: #57534e;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      line-height: 1.4;
+    }
+
+    .info-bullet {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #b45309;
+      flex-shrink: 0;
+    }
+
+    /* Quote card */
+    .quote-card {
+      background:
+        linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%),
+        linear-gradient(135deg, #78350f 0%, #92400e 40%, #a16207 100%);
+      border-radius: 20px;
+      padding: 36px 32px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .quote-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 15px,
+        rgba(255,255,255,0.03) 15px,
+        rgba(255,255,255,0.03) 30px
+      );
+      pointer-events: none;
+    }
+
+    .quote-mark {
+      font-family: 'Playfair Display', serif;
+      font-size: 80px;
+      color: rgba(255, 255, 255, 0.2);
+      line-height: 0.6;
+      position: relative;
+      z-index: 1;
+    }
+
+    .quote-text {
+      font-family: 'Lora', serif;
+      font-weight: 500;
+      font-size: 24px;
+      color: rgba(255, 255, 255, 0.9);
+      line-height: 1.5;
+      margin-top: 12px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .quote-author {
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 16px;
+      color: rgba(255, 255, 255, 0.6);
+      margin-top: 16px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Decorative elements */
+    .decor-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 2px solid rgba(180, 83, 9, 0.06);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .dr-1 { width: 200px; height: 200px; top: -40px; right: 550px; }
+    .dr-2 { width: 120px; height: 120px; bottom: 100px; left: 480px; }
+
+    /* Glowing accent */
+    .glow-accent {
+      position: absolute;
+      top: 300px;
+      left: -80px;
+      width: 200px;
+      height: 400px;
+      border-radius: 50%;
+      background: radial-gradient(ellipse, rgba(217, 119, 6, 0.06) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="decor-ring dr-1"></div>
+  <div class="decor-ring dr-2"></div>
+  <div class="glow-accent"></div>
+
+  <div class="layout">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-emoji">&#x1F4DA;</div>
+      <div class="header-text">
+        <div class="lib-title" data-editable="true" data-field="title">Knowledge Hub</div>
+        <div class="lib-subtitle" data-editable="true" data-field="subtitle">Your gateway to discovery, learning, and imagination</div>
+        <div class="ornament">
+          <div class="ornament-line-l"></div>
+          <div class="ornament-diamond"></div>
+          <div class="ornament-line-r"></div>
+        </div>
+      </div>
+      <div class="header-hours">
+        <div class="hours-label" data-editable="true" data-field="hoursLabel">Library Hours</div>
+        <div class="hours-item" data-editable="true" data-field="hours1"><strong>Mon &ndash; Fri:</strong> 7:30 AM &ndash; 6:00 PM</div>
+        <div class="hours-item" data-editable="true" data-field="hours2"><strong>Saturday:</strong> 9:00 AM &ndash; 2:00 PM</div>
+        <div class="hours-item" data-editable="true" data-field="hours3"><strong>Sunday:</strong> Closed</div>
+      </div>
+      <!-- SVG decoration -->
+      <svg class="svg-header" width="110" height="110" viewBox="0 0 110 110" fill="none">
+        <rect x="10" y="25" width="60" height="75" rx="4" stroke="#78350f" stroke-width="2"/>
+        <rect x="20" y="15" width="60" height="75" rx="4" stroke="#78350f" stroke-width="2"/>
+        <rect x="30" y="5" width="60" height="75" rx="4" stroke="#78350f" stroke-width="2"/>
+        <line x1="40" y1="25" x2="80" y2="25" stroke="#78350f" stroke-width="1.5"/>
+        <line x1="40" y1="35" x2="75" y2="35" stroke="#78350f" stroke-width="1"/>
+        <line x1="40" y1="45" x2="70" y2="45" stroke="#78350f" stroke-width="1"/>
+      </svg>
+    </div>
+
+    <!-- Main Content - Left -->
+    <div class="main-content">
+      <!-- Featured Resources -->
+      <div>
+        <div class="section-title" data-editable="true" data-field="resourcesTitle">Featured Resources</div>
+        <div class="section-subtitle" data-editable="true" data-field="resourcesSubtitle">Explore our curated collection of learning tools</div>
+      </div>
+
+      <div class="resources-grid">
+        <div class="resource-card">
+          <div class="resource-emoji">&#x1F4BB;</div>
+          <div class="resource-name" data-editable="true" data-field="resource1Name">Digital Archives</div>
+          <div class="resource-desc" data-editable="true" data-field="resource1Desc">Access thousands of e-books, journals, and research databases from any device.</div>
+        </div>
+        <div class="resource-card">
+          <div class="resource-emoji">&#x1F3A7;</div>
+          <div class="resource-name" data-editable="true" data-field="resource2Name">Media Center</div>
+          <div class="resource-desc" data-editable="true" data-field="resource2Desc">Audiobooks, podcasts, and documentary films for immersive learning.</div>
+        </div>
+        <div class="resource-card">
+          <div class="resource-emoji">&#x1F9EA;</div>
+          <div class="resource-name" data-editable="true" data-field="resource3Name">Maker Space</div>
+          <div class="resource-desc" data-editable="true" data-field="resource3Desc">3D printers, robotics kits, and creative tools for hands-on projects.</div>
+        </div>
+      </div>
+
+      <!-- Reading Recommendations -->
+      <div>
+        <div class="section-title" data-editable="true" data-field="readingTitle">Staff Picks This Month</div>
+      </div>
+
+      <div class="reading-section">
+        <div class="book-item">
+          <div class="book-emoji">&#x1F4D6;</div>
+          <div class="book-info">
+            <span class="book-title" data-editable="true" data-field="book1Title">The Midnight Library</span>
+            <span class="book-author" data-editable="true" data-field="book1Author">by Matt Haig</span>
+          </div>
+        </div>
+        <div class="book-item">
+          <div class="book-emoji">&#x1F4D7;</div>
+          <div class="book-info">
+            <span class="book-title" data-editable="true" data-field="book2Title">Klara and the Sun</span>
+            <span class="book-author" data-editable="true" data-field="book2Author">by Kazuo Ishiguro</span>
+          </div>
+        </div>
+        <div class="book-item">
+          <div class="book-emoji">&#x1F4D8;</div>
+          <div class="book-info">
+            <span class="book-title" data-editable="true" data-field="book3Title">Project Hail Mary</span>
+            <span class="book-author" data-editable="true" data-field="book3Author">by Andy Weir</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Sidebar -->
+    <div class="right-sidebar">
+      <!-- Quick Info -->
+      <div class="info-card">
+        <div class="info-card-title"><span class="info-card-title-emoji">&#x2139;&#xFE0F;</span> <span data-editable="true" data-field="infoTitle">Quick Info</span></div>
+        <ul class="info-list">
+          <li><span class="info-bullet"></span><span data-editable="true" data-field="info1">Book limit: 5 per student</span></li>
+          <li><span class="info-bullet"></span><span data-editable="true" data-field="info2">Loan period: 14 days</span></li>
+          <li><span class="info-bullet"></span><span data-editable="true" data-field="info3">Study rooms: Book via app</span></li>
+          <li><span class="info-bullet"></span><span data-editable="true" data-field="info4">Printing: $0.10/page B&amp;W</span></li>
+          <li><span class="info-bullet"></span><span data-editable="true" data-field="info5">Free WiFi: Library-Guest</span></li>
+        </ul>
+      </div>
+
+      <!-- Upcoming Events -->
+      <div class="info-card">
+        <div class="info-card-title"><span class="info-card-title-emoji">&#x1F4C5;</span> <span data-editable="true" data-field="eventsTitle">Upcoming</span></div>
+        <ul class="info-list">
+          <li><span class="info-bullet"></span><span data-editable="true" data-field="event1">Mar 5 &mdash; Author Visit: Sarah J. Maas</span></li>
+          <li><span class="info-bullet"></span><span data-editable="true" data-field="event2">Mar 12 &mdash; Book Club: Sci-Fi Month</span></li>
+          <li><span class="info-bullet"></span><span data-editable="true" data-field="event3">Mar 20 &mdash; Poetry Slam Night</span></li>
+        </ul>
+      </div>
+
+      <!-- Quote -->
+      <div class="quote-card">
+        <div class="quote-mark">&ldquo;</div>
+        <div class="quote-text" data-editable="true" data-field="quote">A reader lives a thousand lives before he dies. The man who never reads lives only one.</div>
+        <div class="quote-author" data-editable="true" data-field="quoteAuthor">&mdash; George R.R. Martin</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

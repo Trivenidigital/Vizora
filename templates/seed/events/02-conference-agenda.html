@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@600;700;800&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(ellipse at 10% 90%, rgba(59, 130, 246, 0.2) 0%, transparent 50%),
+        radial-gradient(ellipse at 90% 10%, rgba(16, 185, 129, 0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 50%, rgba(99, 102, 241, 0.1) 0%, transparent 60%),
+        linear-gradient(160deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+      color: #f1f5f9;
+    }
+
+    /* Dot grid texture */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image: radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px);
+      background-size: 24px 24px;
+      z-index: 0;
+    }
+
+    /* Decorative glowing orbs */
+    .glow-orb-top {
+      position: absolute;
+      top: -100px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 300px;
+      border-radius: 50%;
+      background: radial-gradient(ellipse, rgba(99, 102, 241, 0.3) 0%, transparent 70%);
+      filter: blur(50px);
+      z-index: 0;
+    }
+
+    .glow-orb-left {
+      position: absolute;
+      top: 500px;
+      left: -100px;
+      width: 250px;
+      height: 250px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.3) 0%, transparent 70%);
+      filter: blur(40px);
+      z-index: 0;
+    }
+
+    .glow-orb-right {
+      position: absolute;
+      bottom: 100px;
+      right: -50px;
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(59, 130, 246, 0.3) 0%, transparent 70%);
+      filter: blur(35px);
+      z-index: 0;
+    }
+
+    /* Ornamental top line */
+    .orn-line-top {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #6366f1, #3b82f6, #10b981, #6366f1);
+      z-index: 3;
+    }
+
+    /* Main grid layout */
+    .layout {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      grid-template-rows: auto 1fr;
+      height: 100%;
+      padding: 50px 60px 50px 0;
+      gap: 0;
+    }
+
+    /* Header spanning full width */
+    .header {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 60px 40px 60px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      margin-bottom: 30px;
+    }
+
+    .header-left {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .conf-name {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 800;
+      font-size: 42px;
+      letter-spacing: -1px;
+      background: linear-gradient(135deg, #f1f5f9, #94a3b8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .conf-subtitle {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 500;
+      font-size: 18px;
+      color: rgba(99, 102, 241, 0.9);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+
+    .header-right {
+      text-align: right;
+    }
+
+    .conf-date {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      font-size: 24px;
+      color: #e2e8f0;
+    }
+
+    .conf-venue {
+      font-family: 'Inter', sans-serif;
+      font-size: 16px;
+      color: rgba(148, 163, 184, 0.8);
+      margin-top: 4px;
+    }
+
+    /* Time sidebar */
+    .time-sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      padding-left: 60px;
+    }
+
+    .time-slot {
+      display: flex;
+      align-items: flex-start;
+      gap: 20px;
+      padding: 22px 0;
+      border-left: 2px solid rgba(99, 102, 241, 0.2);
+      padding-left: 24px;
+      position: relative;
+    }
+
+    .time-slot::before {
+      content: '';
+      position: absolute;
+      left: -6px;
+      top: 28px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #6366f1;
+      box-shadow: 0 0 12px rgba(99, 102, 241, 0.5);
+    }
+
+    .time-label {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      font-size: 18px;
+      color: rgba(99, 102, 241, 0.9);
+      white-space: nowrap;
+      min-width: 80px;
+    }
+
+    .time-period {
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      color: rgba(148, 163, 184, 0.6);
+    }
+
+    /* Sessions grid */
+    .sessions-area {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: repeat(3, 1fr);
+      gap: 20px;
+      padding: 0 20px;
+    }
+
+    .session-card {
+      background: rgba(255, 255, 255, 0.04);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 28px 30px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: relative;
+      overflow: hidden;
+      transition: none;
+    }
+
+    .session-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+    }
+
+    .session-card.track-a::before { background: linear-gradient(180deg, #6366f1, #818cf8); }
+    .session-card.track-b::before { background: linear-gradient(180deg, #10b981, #34d399); }
+    .session-card.track-c::before { background: linear-gradient(180deg, #3b82f6, #60a5fa); }
+    .session-card.track-d::before { background: linear-gradient(180deg, #f59e0b, #fbbf24); }
+    .session-card.track-e::before { background: linear-gradient(180deg, #ec4899, #f472b6); }
+    .session-card.track-f::before { background: linear-gradient(180deg, #8b5cf6, #a78bfa); }
+
+    .track-badge {
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 6px;
+      display: inline-block;
+      width: fit-content;
+    }
+
+    .track-a .track-badge { background: rgba(99, 102, 241, 0.2); color: #818cf8; }
+    .track-b .track-badge { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+    .track-c .track-badge { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+    .track-d .track-badge { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+    .track-e .track-badge { background: rgba(236, 72, 153, 0.2); color: #f472b6; }
+    .track-f .track-badge { background: rgba(139, 92, 246, 0.2); color: #a78bfa; }
+
+    .session-title {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 700;
+      font-size: 22px;
+      line-height: 1.3;
+      color: #f1f5f9;
+    }
+
+    .session-speaker {
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+      font-size: 16px;
+      color: rgba(148, 163, 184, 0.85);
+    }
+
+    .session-time {
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      color: rgba(148, 163, 184, 0.55);
+      margin-top: auto;
+    }
+
+    /* SVG decorations */
+    .svg-corner-tl {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      z-index: 1;
+    }
+
+    .svg-corner-br {
+      position: absolute;
+      bottom: 15px;
+      right: 15px;
+      z-index: 1;
+      transform: rotate(180deg);
+    }
+
+    /* Diagonal stripe accent bottom */
+    .stripe-bottom {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 6px;
+      background: repeating-linear-gradient(
+        90deg,
+        #6366f1 0px, #6366f1 60px,
+        transparent 60px, transparent 70px,
+        #10b981 70px, #10b981 130px,
+        transparent 130px, transparent 140px,
+        #3b82f6 140px, #3b82f6 200px,
+        transparent 200px, transparent 210px
+      );
+      z-index: 3;
+    }
+  </style>
+</head>
+<body>
+  <!-- Glowing orbs -->
+  <div class="glow-orb-top"></div>
+  <div class="glow-orb-left"></div>
+  <div class="glow-orb-right"></div>
+
+  <!-- Top ornamental line -->
+  <div class="orn-line-top"></div>
+
+  <!-- SVG corner decorations -->
+  <svg class="svg-corner-tl" width="60" height="60" viewBox="0 0 60 60" fill="none">
+    <path d="M0 30 L0 0 L30 0" stroke="rgba(99,102,241,0.4)" stroke-width="2" fill="none"/>
+    <circle cx="3" cy="3" r="2.5" fill="rgba(99,102,241,0.6)"/>
+  </svg>
+  <svg class="svg-corner-br" width="60" height="60" viewBox="0 0 60 60" fill="none">
+    <path d="M0 30 L0 0 L30 0" stroke="rgba(16,185,129,0.4)" stroke-width="2" fill="none"/>
+    <circle cx="3" cy="3" r="2.5" fill="rgba(16,185,129,0.6)"/>
+  </svg>
+
+  <!-- Main layout -->
+  <div class="layout">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1 class="conf-name" data-editable="true" data-field="conferenceName">DevForward 2026</h1>
+        <p class="conf-subtitle" data-editable="true" data-field="conferenceSubtitle">Conference Agenda</p>
+      </div>
+      <div class="header-right">
+        <div class="conf-date" data-editable="true" data-field="conferenceDate">April 22-23, 2026</div>
+        <div class="conf-venue" data-editable="true" data-field="conferenceVenue">Moscone Center, San Francisco</div>
+      </div>
+    </div>
+
+    <!-- Time sidebar -->
+    <div class="time-sidebar">
+      <div class="time-slot">
+        <div>
+          <div class="time-label">9:00</div>
+          <div class="time-period">AM</div>
+        </div>
+      </div>
+      <div class="time-slot">
+        <div>
+          <div class="time-label">10:30</div>
+          <div class="time-period">AM</div>
+        </div>
+      </div>
+      <div class="time-slot">
+        <div>
+          <div class="time-label">1:00</div>
+          <div class="time-period">PM</div>
+        </div>
+      </div>
+      <div class="time-slot">
+        <div>
+          <div class="time-label">2:30</div>
+          <div class="time-period">PM</div>
+        </div>
+      </div>
+      <div class="time-slot">
+        <div>
+          <div class="time-label">4:00</div>
+          <div class="time-period">PM</div>
+        </div>
+      </div>
+      <div class="time-slot">
+        <div>
+          <div class="time-label">5:30</div>
+          <div class="time-period">PM</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sessions grid -->
+    <div class="sessions-area">
+      <div class="session-card track-a">
+        <span class="track-badge">Keynote</span>
+        <h3 class="session-title" data-editable="true" data-field="session1Title">Opening Keynote: The Future of Software</h3>
+        <p class="session-speaker" data-editable="true" data-field="session1Speaker">Dr. Sarah Chen, CTO Nexawave</p>
+        <span class="session-time" data-editable="true" data-field="session1Time">9:00 AM - 10:00 AM &bull; Main Hall</span>
+      </div>
+
+      <div class="session-card track-b">
+        <span class="track-badge">Workshop</span>
+        <h3 class="session-title" data-editable="true" data-field="session2Title">Building Resilient Microservices</h3>
+        <p class="session-speaker" data-editable="true" data-field="session2Speaker">Marcus Rivera, Principal Engineer</p>
+        <span class="session-time" data-editable="true" data-field="session2Time">10:30 AM - 12:00 PM &bull; Room 201</span>
+      </div>
+
+      <div class="session-card track-c">
+        <span class="track-badge">Deep Dive</span>
+        <h3 class="session-title" data-editable="true" data-field="session3Title">AI-Powered Developer Tools</h3>
+        <p class="session-speaker" data-editable="true" data-field="session3Speaker">Priya Sharma, ML Lead at DataFlow</p>
+        <span class="session-time" data-editable="true" data-field="session3Time">1:00 PM - 2:00 PM &bull; Room 305</span>
+      </div>
+
+      <div class="session-card track-d">
+        <span class="track-badge">Panel</span>
+        <h3 class="session-title" data-editable="true" data-field="session4Title">Scaling Teams & Culture</h3>
+        <p class="session-speaker" data-editable="true" data-field="session4Speaker">Panel: Johnson, Lee, Patel, Garcia</p>
+        <span class="session-time" data-editable="true" data-field="session4Time">2:30 PM - 3:30 PM &bull; Main Hall</span>
+      </div>
+
+      <div class="session-card track-e">
+        <span class="track-badge">Lightning Talks</span>
+        <h3 class="session-title" data-editable="true" data-field="session5Title">5 Talks in 50 Minutes</h3>
+        <p class="session-speaker" data-editable="true" data-field="session5Speaker">Community Speakers Showcase</p>
+        <span class="session-time" data-editable="true" data-field="session5Time">4:00 PM - 5:00 PM &bull; Room 102</span>
+      </div>
+
+      <div class="session-card track-f">
+        <span class="track-badge">Closing</span>
+        <h3 class="session-title" data-editable="true" data-field="session6Title">Closing Remarks &amp; Awards</h3>
+        <p class="session-speaker" data-editable="true" data-field="session6Speaker">James Walker, Conference Chair</p>
+        <span class="session-time" data-editable="true" data-field="session6Time">5:30 PM - 6:30 PM &bull; Main Hall</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom stripe -->
+  <div class="stripe-bottom"></div>
+</body>
+</html>

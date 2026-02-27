@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Montserrat:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(ellipse at 15% 85%, rgba(14, 165, 233, 0.1) 0%, transparent 50%),
+        radial-gradient(ellipse at 85% 15%, rgba(99, 102, 241, 0.08) 0%, transparent 45%),
+        linear-gradient(140deg, #f8fafc 0%, #eef2ff 30%, #f0f9ff 60%, #f5f3ff 100%);
+      color: #1e293b;
+    }
+
+    /* Grid pattern overlay */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image:
+        linear-gradient(rgba(99, 102, 241, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(99, 102, 241, 0.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Decorative glow */
+    body::after {
+      content: '';
+      position: absolute;
+      top: -100px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 300px;
+      border-radius: 50%;
+      background: radial-gradient(ellipse, rgba(99, 102, 241, 0.08) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      height: 100%;
+      padding: 40px 55px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Header */
+    .header {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 36px;
+      margin-bottom: 32px;
+      padding-bottom: 24px;
+      border-bottom: 2px solid rgba(99, 102, 241, 0.1);
+      position: relative;
+    }
+
+    .header-icon {
+      font-size: 80px;
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.15));
+    }
+
+    .header-title {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 900;
+      font-size: 56px;
+      color: #1e293b;
+      line-height: 1;
+    }
+
+    .header-sub {
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+      font-size: 20px;
+      color: #64748b;
+      margin-top: 6px;
+    }
+
+    .header-date-card {
+      background: rgba(255, 255, 255, 0.6);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      border-radius: 16px;
+      padding: 16px 30px;
+      box-shadow: 0 4px 20px rgba(99, 102, 241, 0.08);
+      text-align: center;
+    }
+
+    .header-date-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 500;
+      font-size: 14px;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .header-date-value {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      font-size: 22px;
+      color: #4f46e5;
+    }
+
+    /* SVG decoration */
+    .svg-header-decor {
+      position: absolute;
+      right: 260px;
+      top: 10px;
+      opacity: 0.08;
+    }
+
+    /* Schedule grid */
+    .schedule-grid {
+      display: grid;
+      grid-template-columns: 140px repeat(8, 1fr);
+      grid-template-rows: auto repeat(8, 1fr);
+      gap: 8px;
+      height: 100%;
+    }
+
+    /* Corner cell */
+    .corner-cell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Period headers */
+    .period-header {
+      background: rgba(255, 255, 255, 0.5);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+
+    .period-label {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 800;
+      font-size: 16px;
+      color: #4f46e5;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .period-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 14px;
+      color: #94a3b8;
+    }
+
+    /* Time labels */
+    .time-label {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 12px;
+    }
+
+    .time-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+      font-size: 18px;
+      color: #475569;
+    }
+
+    .time-ampm {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 500;
+      font-size: 13px;
+      color: #94a3b8;
+    }
+
+    /* Subject cells */
+    .subject-cell {
+      border-radius: 14px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      border: 1px solid rgba(255,255,255,0.5);
+    }
+
+    /* Subject color coding */
+    .subj-math { background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(129, 140, 248, 0.08)); border-left: 4px solid #6366f1; }
+    .subj-eng { background: linear-gradient(135deg, rgba(14, 165, 233, 0.15), rgba(56, 189, 248, 0.08)); border-left: 4px solid #0ea5e9; }
+    .subj-sci { background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(52, 211, 153, 0.08)); border-left: 4px solid #10b981; }
+    .subj-hist { background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(251, 191, 36, 0.08)); border-left: 4px solid #f59e0b; }
+    .subj-art { background: linear-gradient(135deg, rgba(236, 72, 153, 0.15), rgba(244, 114, 182, 0.08)); border-left: 4px solid #ec4899; }
+    .subj-pe { background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(248, 113, 113, 0.08)); border-left: 4px solid #ef4444; }
+    .subj-lang { background: linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(192, 132, 252, 0.08)); border-left: 4px solid #a855f7; }
+    .subj-lunch { background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(253, 224, 71, 0.1)); border-left: 4px solid #eab308; }
+
+    .subject-name {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      font-size: 17px;
+      color: #1e293b;
+      line-height: 1.2;
+    }
+
+    .subject-room {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 500;
+      font-size: 13px;
+      color: #64748b;
+      margin-top: 4px;
+    }
+
+    .subject-teacher {
+      font-family: 'Inter', sans-serif;
+      font-weight: 400;
+      font-size: 12px;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+
+    /* Decorative elements */
+    .decor-dot {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .dd-1 { width: 12px; height: 12px; background: rgba(99,102,241,0.15); bottom: 30px; left: 20px; }
+    .dd-2 { width: 18px; height: 18px; background: rgba(14,165,233,0.1); bottom: 50px; right: 40px; }
+  </style>
+</head>
+<body>
+  <div class="decor-dot dd-1"></div>
+  <div class="decor-dot dd-2"></div>
+
+  <div class="layout">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-icon">&#x1F4DA;</div>
+      <div>
+        <div class="header-title" data-editable="true" data-field="title">Daily Class Schedule</div>
+        <div class="header-sub" data-editable="true" data-field="subtitle">Grade 10 &mdash; Section A &bull; Room assignments &amp; instructors</div>
+      </div>
+      <div class="header-date-card">
+        <div class="header-date-label">Today</div>
+        <div class="header-date-value" data-editable="true" data-field="date">Mon, Mar 2</div>
+      </div>
+      <svg class="svg-header-decor" width="90" height="90" viewBox="0 0 90 90" fill="none">
+        <rect x="5" y="5" width="80" height="80" rx="8" stroke="#6366f1" stroke-width="2"/>
+        <line x1="5" y1="30" x2="85" y2="30" stroke="#6366f1" stroke-width="1"/>
+        <line x1="30" y1="5" x2="30" y2="85" stroke="#6366f1" stroke-width="1"/>
+        <line x1="55" y1="5" x2="55" y2="85" stroke="#6366f1" stroke-width="1"/>
+      </svg>
+    </div>
+
+    <!-- Schedule Grid -->
+    <div class="schedule-grid">
+      <!-- Corner -->
+      <div class="corner-cell"></div>
+
+      <!-- Period Headers -->
+      <div class="period-header"><span class="period-label">P1</span><span class="period-num">8:00</span></div>
+      <div class="period-header"><span class="period-label">P2</span><span class="period-num">9:00</span></div>
+      <div class="period-header"><span class="period-label">P3</span><span class="period-num">10:00</span></div>
+      <div class="period-header"><span class="period-label">P4</span><span class="period-num">11:00</span></div>
+      <div class="period-header"><span class="period-label">Lunch</span><span class="period-num">12:00</span></div>
+      <div class="period-header"><span class="period-label">P5</span><span class="period-num">1:00</span></div>
+      <div class="period-header"><span class="period-label">P6</span><span class="period-num">2:00</span></div>
+      <div class="period-header"><span class="period-label">P7</span><span class="period-num">3:00</span></div>
+
+      <!-- Monday -->
+      <div class="time-label"><span class="time-value" data-editable="true" data-field="day1">MON</span></div>
+      <div class="subject-cell subj-math"><span class="subject-name" data-editable="true" data-field="mon1Subj">Algebra II</span><span class="subject-room" data-editable="true" data-field="mon1Room">Rm 201</span><span class="subject-teacher" data-editable="true" data-field="mon1Teacher">Mr. Chen</span></div>
+      <div class="subject-cell subj-eng"><span class="subject-name" data-editable="true" data-field="mon2Subj">English Lit</span><span class="subject-room" data-editable="true" data-field="mon2Room">Rm 105</span><span class="subject-teacher" data-editable="true" data-field="mon2Teacher">Ms. Davis</span></div>
+      <div class="subject-cell subj-sci"><span class="subject-name" data-editable="true" data-field="mon3Subj">Chemistry</span><span class="subject-room" data-editable="true" data-field="mon3Room">Lab 3</span><span class="subject-teacher" data-editable="true" data-field="mon3Teacher">Dr. Patel</span></div>
+      <div class="subject-cell subj-hist"><span class="subject-name" data-editable="true" data-field="mon4Subj">World History</span><span class="subject-room" data-editable="true" data-field="mon4Room">Rm 302</span><span class="subject-teacher" data-editable="true" data-field="mon4Teacher">Mr. Wilson</span></div>
+      <div class="subject-cell subj-lunch"><span class="subject-name">Lunch Break</span><span class="subject-room">Cafeteria</span></div>
+      <div class="subject-cell subj-art"><span class="subject-name" data-editable="true" data-field="mon6Subj">Studio Art</span><span class="subject-room" data-editable="true" data-field="mon6Room">Art Rm</span><span class="subject-teacher" data-editable="true" data-field="mon6Teacher">Ms. Rivera</span></div>
+      <div class="subject-cell subj-pe"><span class="subject-name" data-editable="true" data-field="mon7Subj">Phys Ed</span><span class="subject-room" data-editable="true" data-field="mon7Room">Gym</span><span class="subject-teacher" data-editable="true" data-field="mon7Teacher">Coach Brown</span></div>
+      <div class="subject-cell subj-lang"><span class="subject-name" data-editable="true" data-field="mon8Subj">Spanish II</span><span class="subject-room" data-editable="true" data-field="mon8Room">Rm 108</span><span class="subject-teacher" data-editable="true" data-field="mon8Teacher">Sra. Lopez</span></div>
+
+      <!-- Tuesday -->
+      <div class="time-label"><span class="time-value" data-editable="true" data-field="day2">TUE</span></div>
+      <div class="subject-cell subj-eng"><span class="subject-name" data-editable="true" data-field="tue1Subj">English Lit</span><span class="subject-room" data-editable="true" data-field="tue1Room">Rm 105</span></div>
+      <div class="subject-cell subj-math"><span class="subject-name" data-editable="true" data-field="tue2Subj">Algebra II</span><span class="subject-room" data-editable="true" data-field="tue2Room">Rm 201</span></div>
+      <div class="subject-cell subj-pe"><span class="subject-name" data-editable="true" data-field="tue3Subj">Phys Ed</span><span class="subject-room" data-editable="true" data-field="tue3Room">Gym</span></div>
+      <div class="subject-cell subj-sci"><span class="subject-name" data-editable="true" data-field="tue4Subj">Chemistry</span><span class="subject-room" data-editable="true" data-field="tue4Room">Lab 3</span></div>
+      <div class="subject-cell subj-lunch"><span class="subject-name">Lunch Break</span><span class="subject-room">Cafeteria</span></div>
+      <div class="subject-cell subj-lang"><span class="subject-name" data-editable="true" data-field="tue6Subj">Spanish II</span><span class="subject-room" data-editable="true" data-field="tue6Room">Rm 108</span></div>
+      <div class="subject-cell subj-hist"><span class="subject-name" data-editable="true" data-field="tue7Subj">World History</span><span class="subject-room" data-editable="true" data-field="tue7Room">Rm 302</span></div>
+      <div class="subject-cell subj-art"><span class="subject-name" data-editable="true" data-field="tue8Subj">Studio Art</span><span class="subject-room" data-editable="true" data-field="tue8Room">Art Rm</span></div>
+
+      <!-- Wednesday -->
+      <div class="time-label"><span class="time-value" data-editable="true" data-field="day3">WED</span></div>
+      <div class="subject-cell subj-sci"><span class="subject-name" data-editable="true" data-field="wed1Subj">Chemistry</span><span class="subject-room" data-editable="true" data-field="wed1Room">Lab 3</span></div>
+      <div class="subject-cell subj-hist"><span class="subject-name" data-editable="true" data-field="wed2Subj">World History</span><span class="subject-room" data-editable="true" data-field="wed2Room">Rm 302</span></div>
+      <div class="subject-cell subj-math"><span class="subject-name" data-editable="true" data-field="wed3Subj">Algebra II</span><span class="subject-room" data-editable="true" data-field="wed3Room">Rm 201</span></div>
+      <div class="subject-cell subj-art"><span class="subject-name" data-editable="true" data-field="wed4Subj">Studio Art</span><span class="subject-room" data-editable="true" data-field="wed4Room">Art Rm</span></div>
+      <div class="subject-cell subj-lunch"><span class="subject-name">Lunch Break</span><span class="subject-room">Cafeteria</span></div>
+      <div class="subject-cell subj-eng"><span class="subject-name" data-editable="true" data-field="wed6Subj">English Lit</span><span class="subject-room" data-editable="true" data-field="wed6Room">Rm 105</span></div>
+      <div class="subject-cell subj-lang"><span class="subject-name" data-editable="true" data-field="wed7Subj">Spanish II</span><span class="subject-room" data-editable="true" data-field="wed7Room">Rm 108</span></div>
+      <div class="subject-cell subj-pe"><span class="subject-name" data-editable="true" data-field="wed8Subj">Phys Ed</span><span class="subject-room" data-editable="true" data-field="wed8Room">Gym</span></div>
+
+      <!-- Thursday -->
+      <div class="time-label"><span class="time-value" data-editable="true" data-field="day4">THU</span></div>
+      <div class="subject-cell subj-lang"><span class="subject-name" data-editable="true" data-field="thu1Subj">Spanish II</span><span class="subject-room" data-editable="true" data-field="thu1Room">Rm 108</span></div>
+      <div class="subject-cell subj-sci"><span class="subject-name" data-editable="true" data-field="thu2Subj">Chemistry</span><span class="subject-room" data-editable="true" data-field="thu2Room">Lab 3</span></div>
+      <div class="subject-cell subj-eng"><span class="subject-name" data-editable="true" data-field="thu3Subj">English Lit</span><span class="subject-room" data-editable="true" data-field="thu3Room">Rm 105</span></div>
+      <div class="subject-cell subj-pe"><span class="subject-name" data-editable="true" data-field="thu4Subj">Phys Ed</span><span class="subject-room" data-editable="true" data-field="thu4Room">Gym</span></div>
+      <div class="subject-cell subj-lunch"><span class="subject-name">Lunch Break</span><span class="subject-room">Cafeteria</span></div>
+      <div class="subject-cell subj-math"><span class="subject-name" data-editable="true" data-field="thu6Subj">Algebra II</span><span class="subject-room" data-editable="true" data-field="thu6Room">Rm 201</span></div>
+      <div class="subject-cell subj-art"><span class="subject-name" data-editable="true" data-field="thu7Subj">Studio Art</span><span class="subject-room" data-editable="true" data-field="thu7Room">Art Rm</span></div>
+      <div class="subject-cell subj-hist"><span class="subject-name" data-editable="true" data-field="thu8Subj">World History</span><span class="subject-room" data-editable="true" data-field="thu8Room">Rm 302</span></div>
+
+      <!-- Friday -->
+      <div class="time-label"><span class="time-value" data-editable="true" data-field="day5">FRI</span></div>
+      <div class="subject-cell subj-pe"><span class="subject-name" data-editable="true" data-field="fri1Subj">Phys Ed</span><span class="subject-room" data-editable="true" data-field="fri1Room">Gym</span></div>
+      <div class="subject-cell subj-lang"><span class="subject-name" data-editable="true" data-field="fri2Subj">Spanish II</span><span class="subject-room" data-editable="true" data-field="fri2Room">Rm 108</span></div>
+      <div class="subject-cell subj-hist"><span class="subject-name" data-editable="true" data-field="fri3Subj">World History</span><span class="subject-room" data-editable="true" data-field="fri3Room">Rm 302</span></div>
+      <div class="subject-cell subj-eng"><span class="subject-name" data-editable="true" data-field="fri4Subj">English Lit</span><span class="subject-room" data-editable="true" data-field="fri4Room">Rm 105</span></div>
+      <div class="subject-cell subj-lunch"><span class="subject-name">Lunch Break</span><span class="subject-room">Cafeteria</span></div>
+      <div class="subject-cell subj-sci"><span class="subject-name" data-editable="true" data-field="fri6Subj">Chemistry</span><span class="subject-room" data-editable="true" data-field="fri6Room">Lab 3</span></div>
+      <div class="subject-cell subj-math"><span class="subject-name" data-editable="true" data-field="fri7Subj">Algebra II</span><span class="subject-room" data-editable="true" data-field="fri7Room">Rm 201</span></div>
+      <div class="subject-cell subj-art"><span class="subject-name" data-editable="true" data-field="fri8Subj">Studio Art</span><span class="subject-room" data-editable="true" data-field="fri8Room">Art Rm</span></div>
+
+      <!-- Saturday -->
+      <div class="time-label"><span class="time-value" data-editable="true" data-field="day6">SAT</span></div>
+      <div class="subject-cell subj-math"><span class="subject-name" data-editable="true" data-field="sat1Subj">Math Club</span><span class="subject-room" data-editable="true" data-field="sat1Room">Rm 201</span></div>
+      <div class="subject-cell subj-sci"><span class="subject-name" data-editable="true" data-field="sat2Subj">Science Lab</span><span class="subject-room" data-editable="true" data-field="sat2Room">Lab 3</span></div>
+      <div class="subject-cell subj-art"><span class="subject-name" data-editable="true" data-field="sat3Subj">Art Workshop</span><span class="subject-room" data-editable="true" data-field="sat3Room">Art Rm</span></div>
+      <div class="subject-cell subj-pe"><span class="subject-name" data-editable="true" data-field="sat4Subj">Sports Practice</span><span class="subject-room" data-editable="true" data-field="sat4Room">Field</span></div>
+      <div class="subject-cell subj-lunch"><span class="subject-name">End</span></div>
+      <div class="subject-cell" style="background:rgba(0,0,0,0.02);border:1px dashed rgba(0,0,0,0.08);"></div>
+      <div class="subject-cell" style="background:rgba(0,0,0,0.02);border:1px dashed rgba(0,0,0,0.08);"></div>
+      <div class="subject-cell" style="background:rgba(0,0,0,0.02);border:1px dashed rgba(0,0,0,0.08);"></div>
+    </div>
+  </div>
+</body>
+</html>

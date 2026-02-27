@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800;900&family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(ellipse at 30% 30%, rgba(220, 38, 38, 0.12) 0%, transparent 55%),
+        radial-gradient(ellipse at 70% 60%, rgba(251, 146, 60, 0.1) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 90%, rgba(168, 85, 247, 0.08) 0%, transparent 45%),
+        linear-gradient(155deg, #1a0a1e 0%, #1e1028 30%, #15091e 60%, #0f0614 100%);
+      color: #fdf2f8;
+    }
+
+    /* Dot grid texture */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image: radial-gradient(circle, rgba(220, 38, 38, 0.03) 1px, transparent 1px);
+      background-size: 30px 30px;
+      z-index: 0;
+    }
+
+    /* Subtle stripe pattern */
+    body::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent 0px,
+        transparent 100px,
+        rgba(220, 38, 38, 0.01) 100px,
+        rgba(220, 38, 38, 0.01) 102px
+      );
+      z-index: 0;
+    }
+
+    /* Glowing orbs */
+    .glow-center {
+      position: absolute;
+      top: 200px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 700px;
+      height: 350px;
+      border-radius: 50%;
+      background: radial-gradient(ellipse, rgba(220, 38, 38, 0.12) 0%, transparent 70%);
+      filter: blur(70px);
+      z-index: 0;
+    }
+
+    .glow-tl {
+      position: absolute;
+      top: -50px;
+      left: -50px;
+      width: 300px;
+      height: 300px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(251, 146, 60, 0.15) 0%, transparent 70%);
+      filter: blur(45px);
+      z-index: 0;
+    }
+
+    .glow-br {
+      position: absolute;
+      bottom: -30px;
+      right: 200px;
+      width: 250px;
+      height: 250px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(168, 85, 247, 0.12) 0%, transparent 70%);
+      filter: blur(40px);
+      z-index: 0;
+    }
+
+    /* Ornamental lines */
+    .orn-top {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, transparent, #dc2626, #fb923c, #a855f7, transparent);
+      z-index: 3;
+    }
+
+    .orn-h {
+      position: absolute;
+      top: 500px;
+      left: 200px;
+      right: 200px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(220, 38, 38, 0.15), transparent);
+      z-index: 1;
+    }
+
+    /* Main grid layout */
+    .layout {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: 1fr 600px;
+      grid-template-rows: auto 1fr auto;
+      height: 100%;
+      padding: 70px 100px;
+      gap: 50px;
+    }
+
+    /* Header */
+    .header {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .event-name {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 800;
+      font-size: 22px;
+      letter-spacing: 4px;
+      color: rgba(253, 242, 248, 0.5);
+    }
+
+    .event-info-line {
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+      font-size: 16px;
+      color: rgba(253, 242, 248, 0.35);
+    }
+
+    /* Main content (left) */
+    .main-content {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 28px;
+    }
+
+    .emoji-row {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+
+    .emoji-heart {
+      font-size: 140px;
+      filter: drop-shadow(0 0 30px rgba(220, 38, 38, 0.4)) drop-shadow(0 6px 15px rgba(0,0,0,0.4));
+      line-height: 1;
+    }
+
+    .emoji-pray {
+      font-size: 140px;
+      filter: drop-shadow(0 0 25px rgba(251, 146, 60, 0.3)) drop-shadow(0 6px 15px rgba(0,0,0,0.4));
+      line-height: 1;
+    }
+
+    .gratitude-heading {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 80px;
+      line-height: 1.05;
+      background: linear-gradient(135deg, #fdf2f8, #fb923c);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .gratitude-sub {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 32px;
+      font-style: italic;
+      color: rgba(220, 38, 38, 0.7);
+    }
+
+    .gratitude-body {
+      font-family: 'Inter', sans-serif;
+      font-size: 22px;
+      line-height: 1.8;
+      color: rgba(253, 242, 248, 0.6);
+      max-width: 620px;
+    }
+
+    /* Stats and next event (right side) */
+    .right-panel {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 30px;
+      align-self: center;
+    }
+
+    /* Stats grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .stat-card {
+      background: rgba(255, 255, 255, 0.04);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      padding: 28px 24px;
+      text-align: center;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .stat-number {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 800;
+      font-size: 48px;
+      background: linear-gradient(180deg, #fdf2f8, rgba(220, 38, 38, 0.8));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .stat-label {
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 15px;
+      color: rgba(253, 242, 248, 0.5);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    /* Next event teaser */
+    .next-event {
+      background: rgba(255, 255, 255, 0.04);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(168, 85, 247, 0.15);
+      border-radius: 20px;
+      padding: 36px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .next-label {
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: 5px;
+      text-transform: uppercase;
+      color: rgba(168, 85, 247, 0.8);
+    }
+
+    .next-title {
+      font-family: 'Playfair Display', serif;
+      font-weight: 800;
+      font-size: 34px;
+      color: #fdf2f8;
+      line-height: 1.2;
+    }
+
+    .next-date {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      font-size: 20px;
+      color: rgba(251, 146, 60, 0.8);
+    }
+
+    .next-desc {
+      font-family: 'Inter', sans-serif;
+      font-size: 16px;
+      color: rgba(253, 242, 248, 0.5);
+      line-height: 1.6;
+    }
+
+    .next-cta {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      font-size: 15px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #a855f7;
+      margin-top: 4px;
+    }
+
+    /* Bottom bar */
+    .bottom-bar {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .closing-note {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 20px;
+      font-style: italic;
+      color: rgba(253, 242, 248, 0.4);
+    }
+
+    .social-handle {
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 18px;
+      color: rgba(220, 38, 38, 0.6);
+    }
+
+    /* SVG decorations */
+    .svg-decor { position: absolute; z-index: 1; }
+
+    /* Bottom stripe */
+    .stripe-bottom {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 5px;
+      background: linear-gradient(90deg, #dc2626, #fb923c, #a855f7, #fb923c, #dc2626);
+      z-index: 3;
+    }
+  </style>
+</head>
+<body>
+  <!-- Glowing orbs -->
+  <div class="glow-center"></div>
+  <div class="glow-tl"></div>
+  <div class="glow-br"></div>
+
+  <!-- Ornamental lines -->
+  <div class="orn-top"></div>
+  <div class="orn-h"></div>
+
+  <!-- SVG corner decorations -->
+  <svg class="svg-decor" style="top:15px; left:15px;" width="60" height="60" viewBox="0 0 60 60" fill="none">
+    <path d="M0 30 L0 0 L30 0" stroke="rgba(220,38,38,0.3)" stroke-width="2" fill="none"/>
+    <circle cx="3" cy="3" r="2.5" fill="rgba(251,146,60,0.5)"/>
+  </svg>
+  <svg class="svg-decor" style="bottom:15px; right:15px; transform:rotate(180deg);" width="60" height="60" viewBox="0 0 60 60" fill="none">
+    <path d="M0 30 L0 0 L30 0" stroke="rgba(168,85,247,0.3)" stroke-width="2" fill="none"/>
+    <circle cx="3" cy="3" r="2.5" fill="rgba(220,38,38,0.5)"/>
+  </svg>
+
+  <!-- Decorative SVG stars -->
+  <svg class="svg-decor" style="top:120px; right:100px;" width="40" height="40" viewBox="0 0 40 40" fill="none">
+    <path d="M20 0 L22 16 L40 20 L22 22 L20 40 L18 22 L0 20 L18 16 Z" fill="rgba(251,146,60,0.15)"/>
+  </svg>
+  <svg class="svg-decor" style="bottom:160px; left:100px;" width="30" height="30" viewBox="0 0 30 30" fill="none">
+    <circle cx="15" cy="15" r="12" stroke="rgba(220,38,38,0.1)" stroke-width="1" fill="none"/>
+    <circle cx="15" cy="15" r="6" stroke="rgba(168,85,247,0.08)" stroke-width="1" fill="none"/>
+    <circle cx="15" cy="15" r="2" fill="rgba(220,38,38,0.2)"/>
+  </svg>
+  <svg class="svg-decor" style="top:500px; right:60px;" width="50" height="50" viewBox="0 0 50 50" fill="none">
+    <path d="M25 5 C30 15, 45 15, 45 25 C45 35, 30 45, 25 45 C20 45, 5 35, 5 25 C5 15, 20 15, 25 5 Z" stroke="rgba(220,38,38,0.1)" stroke-width="1" fill="none"/>
+  </svg>
+
+  <!-- Main layout -->
+  <div class="layout">
+    <!-- Header -->
+    <div class="header">
+      <span class="event-name" data-editable="true" data-field="eventName">DEVFORWARD 2026</span>
+      <span class="event-info-line" data-editable="true" data-field="eventInfo">April 22-23, 2026 &bull; Moscone Center, San Francisco</span>
+    </div>
+
+    <!-- Main content -->
+    <div class="main-content">
+      <div class="emoji-row">
+        <span class="emoji-heart">&#10084;&#65039;</span>
+        <span class="emoji-pray">&#128591;</span>
+      </div>
+
+      <h1 class="gratitude-heading" data-editable="true" data-field="gratitudeHeading">Thank You<br>For Being Here</h1>
+      <p class="gratitude-sub" data-editable="true" data-field="gratitudeSub">What an incredible two days together</p>
+      <p class="gratitude-body" data-editable="true" data-field="gratitudeBody">To every attendee, speaker, sponsor, and volunteer who made DevForward 2026 our most impactful event yet: your energy, insights, and connections are what make this community extraordinary.</p>
+    </div>
+
+    <!-- Right panel: stats + next event -->
+    <div class="right-panel">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-number" data-editable="true" data-field="statAttendees">2,847</span>
+          <span class="stat-label">Attendees</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-number" data-editable="true" data-field="statSessions">48</span>
+          <span class="stat-label">Sessions</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-number" data-editable="true" data-field="statCountries">32</span>
+          <span class="stat-label">Countries</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-number" data-editable="true" data-field="statSpeakers">65</span>
+          <span class="stat-label">Speakers</span>
+        </div>
+      </div>
+
+      <div class="next-event">
+        <span class="next-label" data-editable="true" data-field="nextLabel">Coming Next</span>
+        <h2 class="next-title" data-editable="true" data-field="nextTitle">DevForward Europe 2026</h2>
+        <span class="next-date" data-editable="true" data-field="nextDate">September 15-16, 2026 &bull; Berlin</span>
+        <p class="next-desc" data-editable="true" data-field="nextDesc">Join us in Berlin for the European edition. Early bird tickets available now for DevForward 2026 attendees at 40% off.</p>
+        <span class="next-cta" data-editable="true" data-field="nextCta">Early access opens May 1st</span>
+      </div>
+    </div>
+
+    <!-- Bottom bar -->
+    <div class="bottom-bar">
+      <span class="closing-note" data-editable="true" data-field="closingNote">Until we meet again...</span>
+      <span class="social-handle" data-editable="true" data-field="socialHandle">#DevForward2026 &bull; @devforward</span>
+    </div>
+  </div>
+
+  <!-- Bottom stripe -->
+  <div class="stripe-bottom"></div>
+</body>
+</html>

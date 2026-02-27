@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=Inter:wght@300;400;500;600;700&family=Lora:ital,wght@0,400;0,600;1,400;1,600&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(ellipse at 20% 40%, rgba(219, 185, 145, 0.1) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 60%, rgba(180, 150, 115, 0.08) 0%, transparent 45%),
+        radial-gradient(ellipse at 50% 10%, rgba(200, 170, 130, 0.06) 0%, transparent 40%),
+        linear-gradient(155deg, #faf7f2 0%, #f5f0e8 30%, #efe8de 60%, #f8f4ed 100%);
+      color: #2a2420;
+    }
+
+    /* Subtle linen texture */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image:
+        radial-gradient(circle, rgba(0,0,0,0.015) 1px, transparent 1px),
+        radial-gradient(circle, rgba(0,0,0,0.01) 1px, transparent 1px);
+      background-size: 20px 20px, 35px 35px;
+      background-position: 0 0, 10px 10px;
+      z-index: 0;
+    }
+
+    /* Fine horizontal lines */
+    body::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 100px,
+        rgba(180, 150, 115, 0.04) 100px,
+        rgba(180, 150, 115, 0.04) 101px
+      );
+      z-index: 0;
+    }
+
+    /* Warm light spots */
+    .light-1 {
+      position: absolute;
+      top: -150px;
+      left: 400px;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(219, 185, 145, 0.12) 0%, transparent 70%);
+      filter: blur(60px);
+      z-index: 0;
+    }
+
+    .light-2 {
+      position: absolute;
+      bottom: -100px;
+      right: 200px;
+      width: 400px;
+      height: 400px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(200, 170, 130, 0.08) 0%, transparent 70%);
+      filter: blur(50px);
+      z-index: 0;
+    }
+
+    /* Decorative giant quote marks */
+    .quote-mark-left {
+      position: absolute;
+      top: 120px;
+      left: 100px;
+      font-family: 'Playfair Display', serif;
+      font-size: 400px;
+      line-height: 1;
+      color: rgba(180, 150, 115, 0.08);
+      z-index: 1;
+      user-select: none;
+    }
+
+    .quote-mark-right {
+      position: absolute;
+      bottom: 40px;
+      right: 100px;
+      font-family: 'Playfair Display', serif;
+      font-size: 400px;
+      line-height: 1;
+      color: rgba(180, 150, 115, 0.06);
+      z-index: 1;
+      user-select: none;
+      transform: rotate(180deg);
+    }
+
+    /* Layout */
+    .layout {
+      position: relative;
+      z-index: 3;
+      display: grid;
+      grid-template-columns: 1fr 420px;
+      grid-template-rows: auto 1fr auto;
+      height: 100%;
+      padding: 60px 100px;
+      gap: 30px;
+    }
+
+    /* Header */
+    .header {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .store-name {
+      font-family: 'Playfair Display', serif;
+      font-size: 28px;
+      font-weight: 700;
+      color: #8b7355;
+    }
+
+    .header-label {
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: rgba(42, 36, 32, 0.35);
+    }
+
+    /* Main testimonial area */
+    .testimonial-area {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 35px;
+      padding-right: 60px;
+    }
+
+    /* Star rating */
+    .star-rating {
+      display: flex;
+      gap: 8px;
+      font-size: 36px;
+      filter: drop-shadow(0 2px 6px rgba(251, 191, 36, 0.3));
+    }
+
+    /* Quote text */
+    .quote-text {
+      font-family: 'Lora', serif;
+      font-size: 38px;
+      font-weight: 400;
+      font-style: italic;
+      line-height: 1.6;
+      color: #2a2420;
+      max-width: 900px;
+    }
+
+    /* Attribution */
+    .attribution {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .avatar-area {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #dbb991, #c8a882);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 36px;
+      box-shadow: 0 4px 15px rgba(180, 150, 115, 0.3);
+    }
+
+    .attribution-text {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .customer-name {
+      font-family: 'Playfair Display', serif;
+      font-size: 26px;
+      font-weight: 700;
+      color: #2a2420;
+    }
+
+    .customer-detail {
+      font-family: 'Inter', sans-serif;
+      font-size: 16px;
+      color: rgba(42, 36, 32, 0.5);
+    }
+
+    .verified-badge {
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      color: #16a34a;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    /* Right panel - store info */
+    .info-panel {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 24px;
+      padding-left: 40px;
+      border-left: 1px solid rgba(180, 150, 115, 0.15);
+    }
+
+    .info-stat {
+      background: rgba(219, 185, 145, 0.08);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(180, 150, 115, 0.12);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+    }
+
+    .info-stat-value {
+      font-family: 'Playfair Display', serif;
+      font-size: 42px;
+      font-weight: 900;
+      color: #8b7355;
+    }
+
+    .info-stat-label {
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      color: rgba(42, 36, 32, 0.45);
+      margin-top: 4px;
+    }
+
+    .info-stars {
+      display: flex;
+      gap: 4px;
+      font-size: 20px;
+      margin-top: 6px;
+    }
+
+    .info-cta {
+      font-family: 'Playfair Display', serif;
+      font-size: 20px;
+      font-weight: 700;
+      font-style: italic;
+      color: #8b7355;
+      text-align: center;
+      margin-top: 10px;
+    }
+
+    /* Footer */
+    .footer {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid rgba(180, 150, 115, 0.15);
+      padding-top: 20px;
+    }
+
+    .footer-text {
+      font-family: 'Inter', sans-serif;
+      font-size: 15px;
+      color: rgba(42, 36, 32, 0.35);
+    }
+
+    .footer-logo {
+      font-family: 'Playfair Display', serif;
+      font-size: 18px;
+      font-weight: 700;
+      color: rgba(42, 36, 32, 0.25);
+    }
+
+    /* SVG decorations */
+    .svg-deco {
+      position: absolute;
+      z-index: 1;
+    }
+
+    /* Ornamental line */
+    .ornamental-divider {
+      width: 80px;
+      height: 2px;
+      background: linear-gradient(90deg, #c8a882, transparent);
+    }
+  </style>
+</head>
+<body>
+  <!-- Light spots -->
+  <div class="light-1"></div>
+  <div class="light-2"></div>
+
+  <!-- Giant decorative quote marks -->
+  <div class="quote-mark-left">"</div>
+  <div class="quote-mark-right">"</div>
+
+  <!-- SVG ornamental -->
+  <svg class="svg-deco" style="top:30px;right:30px;opacity:0.08;" width="100" height="100" viewBox="0 0 100 100">
+    <circle cx="50" cy="50" r="45" fill="none" stroke="#c8a882" stroke-width="1"/>
+    <circle cx="50" cy="50" r="30" fill="none" stroke="#c8a882" stroke-width="0.5"/>
+    <circle cx="50" cy="50" r="15" fill="none" stroke="#c8a882" stroke-width="0.5"/>
+  </svg>
+
+  <svg class="svg-deco" style="bottom:30px;left:30px;opacity:0.06;" width="120" height="60" viewBox="0 0 120 60">
+    <path d="M0,30 Q30,0 60,30 Q90,60 120,30" fill="none" stroke="#c8a882" stroke-width="1"/>
+    <path d="M0,40 Q30,10 60,40 Q90,70 120,40" fill="none" stroke="#c8a882" stroke-width="0.5"/>
+  </svg>
+
+  <svg class="svg-deco" style="top:50%;left:50px;transform:translateY(-50%);opacity:0.05;" width="40" height="200" viewBox="0 0 40 200">
+    <line x1="20" y1="0" x2="20" y2="200" stroke="#c8a882" stroke-width="0.5"/>
+    <circle cx="20" cy="50" r="3" fill="none" stroke="#c8a882" stroke-width="1"/>
+    <circle cx="20" cy="100" r="3" fill="none" stroke="#c8a882" stroke-width="1"/>
+    <circle cx="20" cy="150" r="3" fill="none" stroke="#c8a882" stroke-width="1"/>
+  </svg>
+
+  <div class="layout">
+    <div class="header">
+      <div class="store-name" data-editable="true" data-field="store_name">Your Store Name</div>
+      <div class="header-label" data-editable="true" data-field="header_label">CUSTOMER TESTIMONIAL</div>
+    </div>
+
+    <div class="testimonial-area">
+      <div class="star-rating">
+        <span>⭐</span><span>⭐</span><span>⭐</span><span>⭐</span><span>⭐</span>
+      </div>
+
+      <div class="ornamental-divider"></div>
+
+      <div class="quote-text" data-editable="true" data-field="quote_text">This store has completely transformed my shopping experience. The staff is incredibly knowledgeable, the selection is curated perfectly, and every visit feels like a personal styling session. I wouldn't shop anywhere else.</div>
+
+      <div class="attribution">
+        <div class="avatar-area">👤</div>
+        <div class="attribution-text">
+          <div class="customer-name" data-editable="true" data-field="customer_name">Sarah Mitchell</div>
+          <div class="customer-detail" data-editable="true" data-field="customer_detail">Loyal customer since 2019</div>
+          <div class="verified-badge">✓ Verified Purchase</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="info-panel">
+      <div class="info-stat">
+        <div class="info-stat-value" data-editable="true" data-field="stat1_value">4.9/5</div>
+        <div class="info-stat-label" data-editable="true" data-field="stat1_label">Average Customer Rating</div>
+        <div class="info-stars">⭐⭐⭐⭐⭐</div>
+      </div>
+
+      <div class="info-stat">
+        <div class="info-stat-value" data-editable="true" data-field="stat2_value">12,500+</div>
+        <div class="info-stat-label" data-editable="true" data-field="stat2_label">Verified Reviews</div>
+      </div>
+
+      <div class="info-stat">
+        <div class="info-stat-value" data-editable="true" data-field="stat3_value">97%</div>
+        <div class="info-stat-label" data-editable="true" data-field="stat3_label">Would Recommend to Friends</div>
+      </div>
+
+      <div class="info-cta" data-editable="true" data-field="info_cta">Experience the difference</div>
+    </div>
+
+    <div class="footer">
+      <div class="footer-text" data-editable="true" data-field="footer_text">Real reviews from real customers. Visit yourstore.com/reviews for more.</div>
+      <div class="footer-logo" data-editable="true" data-field="footer_logo">YOUR STORE</div>
+    </div>
+  </div>
+</body>
+</html>

@@ -3,375 +3,385 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1920, height=1080">
-  <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700;900&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       width: 1920px;
       height: 1080px;
       overflow: hidden;
-      font-family: 'Nunito', 'Segoe UI', sans-serif;
-      background: #fef9ef;
-      color: #2c1810;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        repeating-linear-gradient(
+          -45deg,
+          transparent,
+          transparent 40px,
+          rgba(180,30,20,0.03) 40px,
+          rgba(180,30,20,0.03) 42px
+        ),
+        radial-gradient(ellipse at 10% 50%, rgba(200,40,20,0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 90% 30%, rgba(34,120,50,0.06) 0%, transparent 40%),
+        linear-gradient(160deg, #fdf5e8 0%, #f8eed6 40%, #f2e4c4 100%);
+      color: #2d1810;
     }
 
-    /* Italian flag stripe at very top */
-    .flag-stripe {
-      width: 100%;
-      height: 12px;
-      display: flex;
+    /* Diagonal stripe pattern overlay */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background:
+        repeating-linear-gradient(
+          45deg,
+          transparent,
+          transparent 80px,
+          rgba(34,120,50,0.02) 80px,
+          rgba(34,120,50,0.02) 82px
+        );
+      pointer-events: none;
+      z-index: 0;
     }
-    .flag-stripe .green { flex: 1; background: #27ae60; }
-    .flag-stripe .white { flex: 1; background: #ffffff; }
-    .flag-stripe .red { flex: 1; background: #c0392b; }
 
-    /* Header area */
-    .header {
-      background: linear-gradient(135deg, #c0392b 0%, #a93226 60%, #922b21 100%);
-      padding: 28px 80px;
+    /* Warm glowing circles */
+    .glow-red {
+      position: absolute;
+      top: -100px; left: -100px;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(200,40,20,0.06) 0%, transparent 70%);
+      border-radius: 50%;
+      z-index: 1;
+    }
+    .glow-green {
+      position: absolute;
+      bottom: -80px; right: 200px;
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(34,120,50,0.05) 0%, transparent 70%);
+      border-radius: 50%;
+      z-index: 1;
+    }
+    .glow-gold {
+      position: absolute;
+      top: 200px; right: -50px;
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, rgba(220,180,80,0.08) 0%, transparent 60%);
+      border-radius: 50%;
+      z-index: 1;
+    }
+
+    .container {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: 480px 1fr;
+      grid-template-rows: 1fr;
+      height: 100%;
+      padding: 50px 60px;
+      gap: 50px;
+    }
+
+    /* Left hero panel */
+    .hero-panel {
       display: flex;
+      flex-direction: column;
+      justify-content: center;
       align-items: center;
-      justify-content: space-between;
+      text-align: center;
+      background: rgba(200,40,20,0.05);
+      border-radius: 28px;
+      border: 2px solid rgba(200,40,20,0.1);
+      padding: 40px;
       position: relative;
       overflow: hidden;
     }
-    .header::before {
+
+    .hero-panel::before {
       content: '';
       position: absolute;
-      top: -40px;
-      right: -40px;
-      width: 200px;
-      height: 200px;
-      background: rgba(255,255,255,0.06);
-      border-radius: 50%;
-    }
-    .header::after {
-      content: '';
-      position: absolute;
-      bottom: -60px;
-      right: 200px;
-      width: 150px;
-      height: 150px;
-      background: rgba(255,255,255,0.04);
-      border-radius: 50%;
+      top: -2px; left: -2px; right: -2px; bottom: -2px;
+      border-radius: 30px;
+      border: 3px solid transparent;
+      background: linear-gradient(135deg, rgba(200,40,20,0.3), transparent, rgba(34,120,50,0.3)) border-box;
+      -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+      mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
     }
 
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-    }
-    .brand-icon {
-      font-size: 52px;
-      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
-    }
-    .brand-text h1 {
-      font-family: 'Fredoka One', 'Arial Black', sans-serif;
-      font-size: 58px;
-      color: #fff;
-      text-shadow: 2px 3px 0 rgba(0,0,0,0.2);
-      letter-spacing: 2px;
+    .emoji-hero {
+      font-size: 180px;
       line-height: 1;
+      filter: drop-shadow(0 12px 24px rgba(200,40,20,0.2));
+      margin-bottom: 24px;
     }
-    .brand-text .tagline {
-      font-size: 28px;
-      color: rgba(255,255,255,0.85);
-      font-weight: 600;
+
+    .pizzeria-name {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 80px;
+      color: #b41e14;
+      letter-spacing: 6px;
+      line-height: 0.9;
+      text-shadow: 0 3px 15px rgba(180,30,20,0.15);
+      margin-bottom: 8px;
+    }
+
+    .pizzeria-subtitle {
+      font-family: 'Playfair Display', serif;
+      font-style: italic;
+      font-size: 24px;
+      color: #227832;
       letter-spacing: 4px;
-      text-transform: uppercase;
-      margin-top: 2px;
+      margin-bottom: 30px;
+    }
+
+    .italian-flag {
+      display: flex;
+      gap: 0;
+      border-radius: 4px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .flag-green { width: 40px; height: 8px; background: #227832; }
+    .flag-white { width: 40px; height: 8px; background: #f0ebe0; }
+    .flag-red { width: 40px; height: 8px; background: #b41e14; }
+
+    /* Right menu area */
+    .menu-area {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 20px;
     }
 
     .size-legend {
       display: flex;
-      gap: 24px;
+      gap: 32px;
       align-items: center;
-      background: rgba(255,255,255,0.15);
+      justify-content: center;
+      background: rgba(255,255,255,0.5);
       border-radius: 16px;
-      padding: 14px 32px;
-      backdrop-filter: blur(4px);
+      padding: 16px 32px;
+      border: 1px solid rgba(45,24,16,0.08);
+      backdrop-filter: blur(10px);
     }
-    .size-legend .size-item {
-      text-align: center;
-      color: #fff;
-    }
-    .size-legend .size-label {
-      font-family: 'Fredoka One', 'Arial Black', sans-serif;
-      font-size: 30px;
-      display: block;
-      line-height: 1.1;
-    }
-    .size-legend .size-dim {
-      font-size: 28px;
-      opacity: 0.85;
-      font-weight: 600;
-    }
-    .size-legend .divider {
-      width: 2px;
-      height: 40px;
-      background: rgba(255,255,255,0.3);
-      border-radius: 1px;
-    }
-
-    /* Menu body */
-    .menu-body {
-      padding: 24px 80px 20px;
-      height: calc(1080px - 12px - 120px);
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-    }
-
-    /* Column headers row */
-    .col-headers {
-      display: flex;
-      justify-content: flex-end;
-      padding-right: 12px;
-      margin-bottom: 8px;
-    }
-    .col-headers .price-headers {
-      display: flex;
-      gap: 0;
-      width: 300px;
-      flex-shrink: 0;
-    }
-    .col-headers .price-header {
-      flex: 1;
-      text-align: center;
-      font-family: 'Fredoka One', 'Arial Black', sans-serif;
-      font-size: 28px;
-      color: #c0392b;
-    }
-
-    /* Pizza row */
-    .pizza-row {
+    .size-item {
       display: flex;
       align-items: center;
-      padding: 12px 16px;
-      border-radius: 14px;
+      gap: 10px;
     }
-    .pizza-row:nth-child(odd) {
-      background: rgba(39, 174, 96, 0.06);
+    .size-circle {
+      border-radius: 50%;
+      border: 2px solid #b41e14;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Bebas Neue', sans-serif;
+      color: #b41e14;
+      font-size: 16px;
     }
-    .pizza-row:nth-child(even) {
-      background: rgba(192, 57, 43, 0.04);
+    .size-sm { width: 36px; height: 36px; }
+    .size-md { width: 44px; height: 44px; }
+    .size-lg { width: 52px; height: 52px; }
+    .size-label {
+      font-family: 'Inter', sans-serif;
+      font-size: 15px;
+      font-weight: 500;
+      color: #5a3a2a;
     }
 
-    .pizza-info {
-      flex: 1;
-      padding-right: 32px;
+    .pizza-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
     }
+
+    .pizza-card {
+      background: rgba(255,255,255,0.45);
+      border: 1px solid rgba(45,24,16,0.08);
+      border-radius: 18px;
+      padding: 24px 26px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 20px rgba(100,50,20,0.05);
+      display: grid;
+      grid-template-columns: 1fr auto;
+      grid-template-rows: auto auto auto;
+      gap: 2px 16px;
+    }
+
     .pizza-name {
-      font-family: 'Fredoka One', 'Arial Black', sans-serif;
-      font-size: 36px;
-      color: #2c1810;
-      line-height: 1.15;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 34px;
+      color: #b41e14;
+      letter-spacing: 2px;
+      grid-column: 1 / -1;
+      line-height: 1;
     }
+
     .pizza-desc {
-      font-size: 28px;
-      color: #6b5344;
-      font-weight: 600;
-      margin-top: 2px;
-      line-height: 1.3;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      font-weight: 300;
+      color: #6b4a38;
+      line-height: 1.4;
+      grid-column: 1 / -1;
+      margin: 4px 0 10px;
     }
 
     .pizza-prices {
       display: flex;
-      width: 300px;
-      flex-shrink: 0;
-      gap: 0;
+      gap: 20px;
+      grid-column: 1 / -1;
     }
-    .pizza-price {
-      flex: 1;
-      text-align: center;
-      font-family: 'Nunito', sans-serif;
-      font-size: 32px;
-      font-weight: 800;
-      color: #2c1810;
-    }
-
-    /* Decorative ribbon */
-    .ribbon {
-      position: absolute;
-      width: 100%;
-      bottom: 0;
-      left: 0;
-      height: 8px;
-      background: linear-gradient(90deg, #27ae60 0%, #27ae60 33%, #fef9ef 33%, #fef9ef 66%, #c0392b 66%, #c0392b 100%);
-    }
-
-    /* Footer */
-    .footer {
+    .price-tag {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 22px;
+      color: #227832;
       display: flex;
       align-items: center;
-      justify-content: center;
-      gap: 20px;
-      padding-top: 8px;
+      gap: 4px;
     }
-    .footer-text {
-      font-size: 28px;
-      color: #9b8578;
-      font-weight: 700;
+    .price-size {
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      color: #9a7a60;
+      text-transform: uppercase;
       letter-spacing: 1px;
     }
-    .footer-dot {
-      font-size: 28px;
-      color: #c0392b;
-    }
 
-    /* Subtle decorative elements */
-    .decor-left, .decor-right {
-      position: fixed;
-      font-size: 120px;
-      opacity: 0.04;
-      pointer-events: none;
+    /* SVG decorative wheat */
+    .wheat-deco {
+      position: absolute;
+      z-index: 1;
+      opacity: 0.06;
     }
-    .decor-left {
-      bottom: 40px;
-      left: 40px;
-      transform: rotate(-15deg);
-    }
-    .decor-right {
-      bottom: 100px;
-      right: 60px;
-      transform: rotate(20deg);
+    .wheat-1 { bottom: 40px; left: 40px; }
+    .wheat-2 { top: 40px; right: 40px; transform: rotate(180deg); }
+
+    /* Bottom Italian stripe */
+    .italian-stripe {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 6px;
+      background: linear-gradient(90deg, #227832 33%, #f0ebe0 33%, #f0ebe0 66%, #b41e14 66%);
+      z-index: 3;
     }
   </style>
 </head>
 <body>
-  <div class="flag-stripe">
-    <div class="green"></div>
-    <div class="white"></div>
-    <div class="red"></div>
-  </div>
+  <div class="glow-red"></div>
+  <div class="glow-green"></div>
+  <div class="glow-gold"></div>
 
-  <div class="header">
-    <div class="brand">
-      <span class="brand-icon">&#127829;</span>
-      <div class="brand-text">
-        <h1 data-editable="true" data-field="restaurant_name">Napoli Fire</h1>
-        <div class="tagline" data-editable="true" data-field="tagline">Wood-Fired Artisan Pizza</div>
-      </div>
-    </div>
-    <div class="size-legend">
-      <div class="size-item">
-        <span class="size-label">S</span>
-        <span class="size-dim" data-editable="true" data-field="size_small">10"</span>
-      </div>
-      <div class="divider"></div>
-      <div class="size-item">
-        <span class="size-label">M</span>
-        <span class="size-dim" data-editable="true" data-field="size_medium">14"</span>
-      </div>
-      <div class="divider"></div>
-      <div class="size-item">
-        <span class="size-label">L</span>
-        <span class="size-dim" data-editable="true" data-field="size_large">18"</span>
-      </div>
-    </div>
-  </div>
+  <!-- SVG wheat decorations -->
+  <svg class="wheat-deco wheat-1" width="150" height="200" viewBox="0 0 150 200" fill="#5a3a2a">
+    <path d="M75 200 L75 20" stroke="#5a3a2a" stroke-width="2" fill="none"/>
+    <ellipse cx="60" cy="30" rx="20" ry="12" transform="rotate(-30 60 30)"/>
+    <ellipse cx="90" cy="55" rx="18" ry="11" transform="rotate(30 90 55)"/>
+    <ellipse cx="60" cy="80" rx="20" ry="12" transform="rotate(-30 60 80)"/>
+    <ellipse cx="90" cy="105" rx="18" ry="11" transform="rotate(30 90 105)"/>
+    <ellipse cx="65" cy="130" rx="16" ry="10" transform="rotate(-25 65 130)"/>
+  </svg>
+  <svg class="wheat-deco wheat-2" width="150" height="200" viewBox="0 0 150 200" fill="#5a3a2a">
+    <path d="M75 200 L75 20" stroke="#5a3a2a" stroke-width="2" fill="none"/>
+    <ellipse cx="60" cy="30" rx="20" ry="12" transform="rotate(-30 60 30)"/>
+    <ellipse cx="90" cy="55" rx="18" ry="11" transform="rotate(30 90 55)"/>
+    <ellipse cx="60" cy="80" rx="20" ry="12" transform="rotate(-30 60 80)"/>
+    <ellipse cx="90" cy="105" rx="18" ry="11" transform="rotate(30 90 105)"/>
+    <ellipse cx="65" cy="130" rx="16" ry="10" transform="rotate(-25 65 130)"/>
+  </svg>
 
-  <div class="menu-body">
-    <div class="col-headers">
-      <div class="price-headers">
-        <div class="price-header">S</div>
-        <div class="price-header">M</div>
-        <div class="price-header">L</div>
+  <div class="container">
+    <div class="hero-panel">
+      <div class="emoji-hero">&#127829;</div>
+      <h1 class="pizzeria-name" data-editable="true" data-field="pizzeriaName">LUIGI'S<br>PIZZERIA</h1>
+      <p class="pizzeria-subtitle" data-editable="true" data-field="subtitle">Authentic Wood-Fired</p>
+      <div class="italian-flag">
+        <div class="flag-green"></div>
+        <div class="flag-white"></div>
+        <div class="flag-red"></div>
       </div>
     </div>
 
-    <div class="pizza-row">
-      <div class="pizza-info">
-        <div class="pizza-name" data-editable="true" data-field="pizza1_name">Margherita</div>
-        <div class="pizza-desc" data-editable="true" data-field="pizza1_desc">Fresh mozzarella, San Marzano tomatoes, basil</div>
+    <div class="menu-area">
+      <div class="size-legend">
+        <div class="size-item">
+          <div class="size-circle size-sm">S</div>
+          <span class="size-label" data-editable="true" data-field="sizeSmall">10" Personal</span>
+        </div>
+        <div class="size-item">
+          <div class="size-circle size-md">M</div>
+          <span class="size-label" data-editable="true" data-field="sizeMedium">14" Medium</span>
+        </div>
+        <div class="size-item">
+          <div class="size-circle size-lg">L</div>
+          <span class="size-label" data-editable="true" data-field="sizeLarge">18" Family</span>
+        </div>
       </div>
-      <div class="pizza-prices">
-        <div class="pizza-price" data-editable="true" data-field="pizza1_s">$12</div>
-        <div class="pizza-price" data-editable="true" data-field="pizza1_m">$16</div>
-        <div class="pizza-price" data-editable="true" data-field="pizza1_l">$20</div>
-      </div>
-    </div>
 
-    <div class="pizza-row">
-      <div class="pizza-info">
-        <div class="pizza-name" data-editable="true" data-field="pizza2_name">Pepperoni</div>
-        <div class="pizza-desc" data-editable="true" data-field="pizza2_desc">Classic pepperoni, mozzarella, marinara</div>
-      </div>
-      <div class="pizza-prices">
-        <div class="pizza-price" data-editable="true" data-field="pizza2_s">$13</div>
-        <div class="pizza-price" data-editable="true" data-field="pizza2_m">$17</div>
-        <div class="pizza-price" data-editable="true" data-field="pizza2_l">$21</div>
-      </div>
-    </div>
+      <div class="pizza-grid">
+        <div class="pizza-card">
+          <div class="pizza-name" data-editable="true" data-field="pizza1Name">MARGHERITA</div>
+          <p class="pizza-desc" data-editable="true" data-field="pizza1Desc">San Marzano tomato, fresh mozzarella, basil, extra virgin olive oil</p>
+          <div class="pizza-prices">
+            <span class="price-tag"><span class="price-size">S</span> <span data-editable="true" data-field="pizza1PriceS">$14</span></span>
+            <span class="price-tag"><span class="price-size">M</span> <span data-editable="true" data-field="pizza1PriceM">$20</span></span>
+            <span class="price-tag"><span class="price-size">L</span> <span data-editable="true" data-field="pizza1PriceL">$28</span></span>
+          </div>
+        </div>
 
-    <div class="pizza-row">
-      <div class="pizza-info">
-        <div class="pizza-name" data-editable="true" data-field="pizza3_name">Quattro Formaggi</div>
-        <div class="pizza-desc" data-editable="true" data-field="pizza3_desc">Mozzarella, gorgonzola, parmesan, fontina</div>
-      </div>
-      <div class="pizza-prices">
-        <div class="pizza-price" data-editable="true" data-field="pizza3_s">$14</div>
-        <div class="pizza-price" data-editable="true" data-field="pizza3_m">$18</div>
-        <div class="pizza-price" data-editable="true" data-field="pizza3_l">$22</div>
-      </div>
-    </div>
+        <div class="pizza-card">
+          <div class="pizza-name" data-editable="true" data-field="pizza2Name">DIAVOLA</div>
+          <p class="pizza-desc" data-editable="true" data-field="pizza2Desc">Spicy salami, roasted peppers, mozzarella, chili oil, fresh basil</p>
+          <div class="pizza-prices">
+            <span class="price-tag"><span class="price-size">S</span> <span data-editable="true" data-field="pizza2PriceS">$16</span></span>
+            <span class="price-tag"><span class="price-size">M</span> <span data-editable="true" data-field="pizza2PriceM">$23</span></span>
+            <span class="price-tag"><span class="price-size">L</span> <span data-editable="true" data-field="pizza2PriceL">$32</span></span>
+          </div>
+        </div>
 
-    <div class="pizza-row">
-      <div class="pizza-info">
-        <div class="pizza-name" data-editable="true" data-field="pizza4_name">Prosciutto e Rucola</div>
-        <div class="pizza-desc" data-editable="true" data-field="pizza4_desc">Prosciutto di Parma, arugula, shaved parmesan</div>
-      </div>
-      <div class="pizza-prices">
-        <div class="pizza-price" data-editable="true" data-field="pizza4_s">$15</div>
-        <div class="pizza-price" data-editable="true" data-field="pizza4_m">$19</div>
-        <div class="pizza-price" data-editable="true" data-field="pizza4_l">$23</div>
-      </div>
-    </div>
+        <div class="pizza-card">
+          <div class="pizza-name" data-editable="true" data-field="pizza3Name">QUATTRO FORMAGGI</div>
+          <p class="pizza-desc" data-editable="true" data-field="pizza3Desc">Mozzarella, gorgonzola, fontina, parmigiano, truffle honey drizzle</p>
+          <div class="pizza-prices">
+            <span class="price-tag"><span class="price-size">S</span> <span data-editable="true" data-field="pizza3PriceS">$17</span></span>
+            <span class="price-tag"><span class="price-size">M</span> <span data-editable="true" data-field="pizza3PriceM">$24</span></span>
+            <span class="price-tag"><span class="price-size">L</span> <span data-editable="true" data-field="pizza3PriceL">$34</span></span>
+          </div>
+        </div>
 
-    <div class="pizza-row">
-      <div class="pizza-info">
-        <div class="pizza-name" data-editable="true" data-field="pizza5_name">Diavola</div>
-        <div class="pizza-desc" data-editable="true" data-field="pizza5_desc">Spicy salami, nduja, chili flakes, honey drizzle</div>
-      </div>
-      <div class="pizza-prices">
-        <div class="pizza-price" data-editable="true" data-field="pizza5_s">$14</div>
-        <div class="pizza-price" data-editable="true" data-field="pizza5_m">$18</div>
-        <div class="pizza-price" data-editable="true" data-field="pizza5_l">$22</div>
-      </div>
-    </div>
+        <div class="pizza-card">
+          <div class="pizza-name" data-editable="true" data-field="pizza4Name">PROSCIUTTO E RUCOLA</div>
+          <p class="pizza-desc" data-editable="true" data-field="pizza4Desc">Parma ham, wild arugula, shaved parmesan, balsamic glaze</p>
+          <div class="pizza-prices">
+            <span class="price-tag"><span class="price-size">S</span> <span data-editable="true" data-field="pizza4PriceS">$18</span></span>
+            <span class="price-tag"><span class="price-size">M</span> <span data-editable="true" data-field="pizza4PriceM">$25</span></span>
+            <span class="price-tag"><span class="price-size">L</span> <span data-editable="true" data-field="pizza4PriceL">$35</span></span>
+          </div>
+        </div>
 
-    <div class="pizza-row">
-      <div class="pizza-info">
-        <div class="pizza-name" data-editable="true" data-field="pizza6_name">Supreme</div>
-        <div class="pizza-desc" data-editable="true" data-field="pizza6_desc">Pepperoni, sausage, peppers, onions, mushrooms, olives</div>
-      </div>
-      <div class="pizza-prices">
-        <div class="pizza-price" data-editable="true" data-field="pizza6_s">$15</div>
-        <div class="pizza-price" data-editable="true" data-field="pizza6_m">$19</div>
-        <div class="pizza-price" data-editable="true" data-field="pizza6_l">$24</div>
-      </div>
-    </div>
+        <div class="pizza-card">
+          <div class="pizza-name" data-editable="true" data-field="pizza5Name">FUNGHI TARTUFO</div>
+          <p class="pizza-desc" data-editable="true" data-field="pizza5Desc">Wild mushroom medley, truffle cream, mozzarella, thyme, garlic oil</p>
+          <div class="pizza-prices">
+            <span class="price-tag"><span class="price-size">S</span> <span data-editable="true" data-field="pizza5PriceS">$17</span></span>
+            <span class="price-tag"><span class="price-size">M</span> <span data-editable="true" data-field="pizza5PriceM">$24</span></span>
+            <span class="price-tag"><span class="price-size">L</span> <span data-editable="true" data-field="pizza5PriceL">$33</span></span>
+          </div>
+        </div>
 
-    <div class="pizza-row">
-      <div class="pizza-info">
-        <div class="pizza-name" data-editable="true" data-field="pizza7_name">Truffle Mushroom</div>
-        <div class="pizza-desc" data-editable="true" data-field="pizza7_desc">Wild mushrooms, truffle cream, fontina, thyme</div>
+        <div class="pizza-card">
+          <div class="pizza-name" data-editable="true" data-field="pizza6Name">NAPOLI SPECIAL</div>
+          <p class="pizza-desc" data-editable="true" data-field="pizza6Desc">Anchovies, capers, olives, San Marzano, oregano, garlic</p>
+          <div class="pizza-prices">
+            <span class="price-tag"><span class="price-size">S</span> <span data-editable="true" data-field="pizza6PriceS">$15</span></span>
+            <span class="price-tag"><span class="price-size">M</span> <span data-editable="true" data-field="pizza6PriceM">$22</span></span>
+            <span class="price-tag"><span class="price-size">L</span> <span data-editable="true" data-field="pizza6PriceL">$30</span></span>
+          </div>
+        </div>
       </div>
-      <div class="pizza-prices">
-        <div class="pizza-price" data-editable="true" data-field="pizza7_s">$16</div>
-        <div class="pizza-price" data-editable="true" data-field="pizza7_m">$20</div>
-        <div class="pizza-price" data-editable="true" data-field="pizza7_l">$25</div>
-      </div>
-    </div>
-
-    <div class="footer">
-      <span class="footer-text" data-editable="true" data-field="footer_note">Ask about our gluten-free cauliflower crust</span>
-      <span class="footer-dot">&#9679;</span>
-      <span class="footer-text" data-editable="true" data-field="footer_note2">Extra toppings $2 each</span>
     </div>
   </div>
 
-  <div class="decor-left">&#127829;</div>
-  <div class="decor-right">&#127830;</div>
+  <div class="italian-stripe"></div>
 </body>
 </html>

@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(ellipse at 50% 40%, rgba(124, 58, 237, 0.12) 0%, transparent 50%),
+        radial-gradient(ellipse at 20% 80%, rgba(59, 130, 246, 0.08) 0%, transparent 40%),
+        radial-gradient(ellipse at 80% 20%, rgba(236, 72, 153, 0.06) 0%, transparent 40%),
+        linear-gradient(170deg, #030712 0%, #0a0a1a 40%, #0f0f2e 70%, #030712 100%);
+      color: #e2e8f0;
+    }
+
+    /* Fine dot texture */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image: radial-gradient(circle, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+      background-size: 20px 20px;
+      z-index: 0;
+    }
+
+    /* Central glow behind clock */
+    .center-glow {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -55%);
+      width: 800px;
+      height: 400px;
+      border-radius: 50%;
+      background: radial-gradient(ellipse, rgba(124, 58, 237, 0.12) 0%, rgba(59, 130, 246, 0.06) 40%, transparent 70%);
+      filter: blur(80px);
+      z-index: 0;
+    }
+
+    /* Ambient glow rings */
+    .glow-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid;
+      z-index: 0;
+    }
+
+    .glow-ring-1 {
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 600px;
+      height: 600px;
+      border-color: rgba(124, 58, 237, 0.06);
+    }
+
+    .glow-ring-2 {
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 900px;
+      height: 900px;
+      border-color: rgba(59, 130, 246, 0.04);
+    }
+
+    .glow-ring-3 {
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 1200px;
+      height: 1200px;
+      border-color: rgba(236, 72, 153, 0.03);
+    }
+
+    /* Decorative corners */
+    .corner-deco {
+      position: absolute;
+      width: 120px;
+      height: 120px;
+      z-index: 1;
+    }
+
+    .corner-tl { top: 40px; left: 40px; }
+    .corner-tr { top: 40px; right: 40px; transform: scaleX(-1); }
+    .corner-bl { bottom: 40px; left: 40px; transform: scaleY(-1); }
+    .corner-br { bottom: 40px; right: 40px; transform: scale(-1, -1); }
+
+    /* Ornamental lines */
+    .h-line {
+      position: absolute;
+      left: 200px;
+      right: 200px;
+      height: 1px;
+      z-index: 1;
+    }
+
+    .h-line-top {
+      top: 200px;
+      background: linear-gradient(to right, transparent, rgba(124, 58, 237, 0.15), transparent);
+    }
+
+    .h-line-bottom {
+      bottom: 200px;
+      background: linear-gradient(to right, transparent, rgba(59, 130, 246, 0.15), transparent);
+    }
+
+    .container {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 30px;
+    }
+
+    /* Timezone label */
+    .timezone-label {
+      font-family: 'Inter', sans-serif;
+      font-size: 16px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 8px;
+      color: #64748b;
+    }
+
+    /* Clock display */
+    .clock-display {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 300px;
+      font-weight: 800;
+      color: #ffffff;
+      line-height: 1;
+      letter-spacing: -10px;
+      text-shadow:
+        0 0 30px rgba(124, 58, 237, 0.4),
+        0 0 60px rgba(124, 58, 237, 0.2),
+        0 0 120px rgba(124, 58, 237, 0.1),
+        0 0 200px rgba(59, 130, 246, 0.08),
+        0 8px 16px rgba(0, 0, 0, 0.5);
+    }
+
+    .clock-separator {
+      color: rgba(124, 58, 237, 0.6);
+      margin: 0 -5px;
+    }
+
+    .clock-ampm {
+      font-size: 60px;
+      font-weight: 400;
+      color: rgba(124, 58, 237, 0.5);
+      vertical-align: super;
+      margin-left: 20px;
+      letter-spacing: 4px;
+    }
+
+    /* Date display */
+    .date-display {
+      font-family: 'Playfair Display', serif;
+      font-size: 42px;
+      font-weight: 400;
+      color: #94a3b8;
+      letter-spacing: 2px;
+      margin-top: 10px;
+    }
+
+    /* Day of week */
+    .day-display {
+      font-family: 'Inter', sans-serif;
+      font-size: 20px;
+      font-weight: 300;
+      text-transform: uppercase;
+      letter-spacing: 12px;
+      color: #475569;
+      margin-top: 8px;
+    }
+
+    /* Info bar at bottom */
+    .info-bar {
+      position: absolute;
+      bottom: 50px;
+      left: 100px;
+      right: 100px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 2;
+      background: rgba(15, 15, 30, 0.5);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(148, 163, 184, 0.06);
+      border-radius: 16px;
+      padding: 20px 40px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    }
+
+    .info-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-family: 'Inter', sans-serif;
+      font-size: 16px;
+      color: #475569;
+    }
+
+    .info-emoji {
+      font-size: 24px;
+      filter: drop-shadow(0 2px 6px rgba(124, 58, 237, 0.2));
+    }
+
+    /* SVG geometric pattern behind clock */
+    .geo-pattern {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 0;
+      opacity: 0.06;
+    }
+
+    /* Stripe texture bottom */
+    .stripe-bottom {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: repeating-linear-gradient(
+        90deg,
+        rgba(124, 58, 237, 0.5) 0px,
+        rgba(124, 58, 237, 0.5) 4px,
+        transparent 4px,
+        transparent 12px
+      );
+      z-index: 3;
+    }
+  </style>
+</head>
+<body>
+  <div class="center-glow"></div>
+  <div class="glow-ring glow-ring-1"></div>
+  <div class="glow-ring glow-ring-2"></div>
+  <div class="glow-ring glow-ring-3"></div>
+  <div class="h-line h-line-top"></div>
+  <div class="h-line h-line-bottom"></div>
+  <div class="stripe-bottom"></div>
+
+  <!-- SVG corner decorations -->
+  <svg class="corner-deco corner-tl" viewBox="0 0 120 120" fill="none">
+    <path d="M0 120 L0 0 L120 0" stroke="rgba(124,58,237,0.15)" stroke-width="1" fill="none"/>
+    <circle cx="0" cy="0" r="4" fill="rgba(124,58,237,0.3)"/>
+    <path d="M0 40 L40 0" stroke="rgba(124,58,237,0.08)" stroke-width="1" fill="none"/>
+  </svg>
+  <svg class="corner-deco corner-tr" viewBox="0 0 120 120" fill="none">
+    <path d="M0 120 L0 0 L120 0" stroke="rgba(124,58,237,0.15)" stroke-width="1" fill="none"/>
+    <circle cx="0" cy="0" r="4" fill="rgba(124,58,237,0.3)"/>
+    <path d="M0 40 L40 0" stroke="rgba(124,58,237,0.08)" stroke-width="1" fill="none"/>
+  </svg>
+  <svg class="corner-deco corner-bl" viewBox="0 0 120 120" fill="none">
+    <path d="M0 120 L0 0 L120 0" stroke="rgba(59,130,246,0.15)" stroke-width="1" fill="none"/>
+    <circle cx="0" cy="0" r="4" fill="rgba(59,130,246,0.3)"/>
+  </svg>
+  <svg class="corner-deco corner-br" viewBox="0 0 120 120" fill="none">
+    <path d="M0 120 L0 0 L120 0" stroke="rgba(59,130,246,0.15)" stroke-width="1" fill="none"/>
+    <circle cx="0" cy="0" r="4" fill="rgba(59,130,246,0.3)"/>
+  </svg>
+
+  <!-- Geometric SVG pattern -->
+  <svg class="geo-pattern" width="500" height="500" viewBox="0 0 500 500" fill="none">
+    <polygon points="250,50 450,200 380,430 120,430 50,200" stroke="#7c3aed" stroke-width="1" fill="none"/>
+    <polygon points="250,100 400,220 350,400 150,400 100,220" stroke="#3b82f6" stroke-width="0.5" fill="none"/>
+    <circle cx="250" cy="250" r="200" stroke="#7c3aed" stroke-width="0.5" fill="none"/>
+    <circle cx="250" cy="250" r="150" stroke="#3b82f6" stroke-width="0.5" fill="none"/>
+  </svg>
+
+  <div class="container">
+    <div class="timezone-label" data-editable="true" data-field="timezone">Pacific Standard Time</div>
+    <div class="clock-display" data-editable="true" data-field="time">10<span class="clock-separator">:</span>30<span class="clock-ampm">AM</span></div>
+    <div class="date-display" data-editable="true" data-field="date">January 15, 2026</div>
+    <div class="day-display" data-editable="true" data-field="dayOfWeek">Wednesday</div>
+  </div>
+
+  <div class="info-bar">
+    <div class="info-item">
+      <span class="info-emoji">🌡️</span>
+      <span data-editable="true" data-field="temperature">72&deg;F / 22&deg;C</span>
+    </div>
+    <div class="info-item">
+      <span class="info-emoji">📍</span>
+      <span data-editable="true" data-field="location">San Francisco, CA</span>
+    </div>
+    <div class="info-item">
+      <span class="info-emoji">🌅</span>
+      <span data-editable="true" data-field="sunset">Sunset 5:18 PM</span>
+    </div>
+  </div>
+</body>
+</html>
