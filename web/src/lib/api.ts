@@ -13,6 +13,7 @@ import type {
   TemplateSearchResult, TemplateCategory, TemplateSummary, TemplateDetail, AIGenerateResponse,
   WidgetType, Widget, LayoutPreset, LayoutZone, Layout, ResolvedLayout, QrOverlayConfig,
   PlatformHealth,
+  SupportRequest, SupportMessage, SupportContext, SupportStats, SupportRequestResponse, SupportQueryParams,
 } from './types';
 
 // Use relative URL '/api' so requests go through the Next.js rewrite proxy,
@@ -1505,6 +1506,49 @@ class ApiClient {
 
       xhr.send(formData);
     });
+  }
+
+  // ========== Support API Methods ==========
+
+  async createSupportRequest(data: { message: string; context?: SupportContext }): Promise<SupportRequestResponse> {
+    return this.request<SupportRequestResponse>('/support/requests', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getSupportRequests(params?: SupportQueryParams): Promise<PaginatedResponse<SupportRequest>> {
+    const searchParams = new URLSearchParams();
+    if (params?.status) searchParams.set('status', params.status);
+    if (params?.priority) searchParams.set('priority', params.priority);
+    if (params?.category) searchParams.set('category', params.category);
+    if (params?.search) searchParams.set('search', params.search);
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+    const query = searchParams.toString();
+    return this.request<PaginatedResponse<SupportRequest>>(`/support/requests${query ? `?${query}` : ''}`);
+  }
+
+  async getSupportRequest(id: string): Promise<SupportRequest> {
+    return this.request<SupportRequest>(`/support/requests/${id}`);
+  }
+
+  async updateSupportRequest(id: string, data: { status?: string; priority?: string; resolutionNotes?: string }): Promise<SupportRequest> {
+    return this.request<SupportRequest>(`/support/requests/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async addSupportMessage(requestId: string, content: string): Promise<SupportMessage> {
+    return this.request<SupportMessage>(`/support/requests/${requestId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    });
+  }
+
+  async getSupportStats(): Promise<SupportStats> {
+    return this.request<SupportStats>('/support/stats');
   }
 }
 
