@@ -7,7 +7,7 @@ export class SearchTemplatesDto {
   search?: string;
 
   @IsOptional()
-  @IsEnum(['retail', 'restaurant', 'corporate', 'education', 'healthcare', 'events', 'general'])
+  @IsEnum(['retail', 'restaurant', 'corporate', 'education', 'healthcare', 'events', 'general', 'indian'])
   category?: string;
 
   @IsOptional()
