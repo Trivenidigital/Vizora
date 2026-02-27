@@ -292,7 +292,7 @@ async function stepCheckStatusPaired() {
     if (status === 'paired') {
       printSuccess('Device has been paired successfully!');
       console.log(`Device Token: ${response.body.deviceToken}`);
-      console.log(`Display ID: ${response.body.displayId}`);
+      console.log(`Display ID: ${response.body.deviceId}`);
     } else if (status === 'pending') {
       printWarning(
         'Pairing is still pending. The web UI step may not have been completed.'

@@ -214,7 +214,7 @@ step_check_status_paired() {
     if [ "$STATUS" = "paired" ]; then
         print_success "Device has been paired successfully!"
         DEVICE_TOKEN=$(echo "$RESPONSE" | jq -r '.deviceToken' 2>/dev/null)
-        DISPLAY_ID=$(echo "$RESPONSE" | jq -r '.displayId' 2>/dev/null)
+        DISPLAY_ID=$(echo "$RESPONSE" | jq -r '.deviceId' 2>/dev/null)
         echo -e "Device Token: ${DEVICE_TOKEN}"
         echo -e "Display ID: ${DISPLAY_ID}"
     elif [ "$STATUS" = "pending" ]; then

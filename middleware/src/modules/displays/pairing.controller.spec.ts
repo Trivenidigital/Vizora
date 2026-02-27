@@ -80,7 +80,7 @@ describe('PairingController', () => {
       const expectedResult = {
         status: 'paired',
         deviceToken: 'jwt-token-123',
-        displayId: 'display-123',
+        deviceId: 'display-123',
         organizationId: 'org-123',
       };
       mockPairingService.checkPairingStatus.mockResolvedValue(expectedResult);

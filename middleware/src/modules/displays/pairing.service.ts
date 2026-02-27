@@ -193,7 +193,7 @@ export class PairingService implements OnModuleDestroy {
       return {
         status: 'paired',
         deviceToken: request.plaintextToken,
-        displayId: display?.id,
+        deviceId: display?.id,
         organizationId: display?.organizationId,
       };
     }
