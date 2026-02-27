@@ -1,5 +1,5 @@
 -- CreateTable
-CREATE TABLE "SupportRequest" (
+CREATE TABLE "support_requests" (
     "id" TEXT NOT NULL,
     "organizationId" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
@@ -19,11 +19,11 @@ CREATE TABLE "SupportRequest" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "SupportRequest_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "support_requests_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "SupportMessage" (
+CREATE TABLE "support_messages" (
     "id" TEXT NOT NULL,
     "requestId" TEXT NOT NULL,
     "organizationId" TEXT NOT NULL,
@@ -32,25 +32,25 @@ CREATE TABLE "SupportMessage" (
     "content" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "SupportMessage_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "support_messages_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
-CREATE INDEX "SupportRequest_organizationId_idx" ON "SupportRequest"("organizationId");
-CREATE INDEX "SupportRequest_status_idx" ON "SupportRequest"("status");
-CREATE INDEX "SupportRequest_priority_idx" ON "SupportRequest"("priority");
-CREATE INDEX "SupportRequest_userId_idx" ON "SupportRequest"("userId");
-CREATE INDEX "SupportRequest_organizationId_status_idx" ON "SupportRequest"("organizationId", "status");
-CREATE INDEX "SupportRequest_organizationId_createdAt_idx" ON "SupportRequest"("organizationId", "createdAt");
+CREATE INDEX "support_requests_organizationId_idx" ON "support_requests"("organizationId");
+CREATE INDEX "support_requests_status_idx" ON "support_requests"("status");
+CREATE INDEX "support_requests_priority_idx" ON "support_requests"("priority");
+CREATE INDEX "support_requests_userId_idx" ON "support_requests"("userId");
+CREATE INDEX "support_requests_organizationId_status_idx" ON "support_requests"("organizationId", "status");
+CREATE INDEX "support_requests_organizationId_createdAt_idx" ON "support_requests"("organizationId", "createdAt");
 
 -- CreateIndex
-CREATE INDEX "SupportMessage_requestId_idx" ON "SupportMessage"("requestId");
-CREATE INDEX "SupportMessage_organizationId_idx" ON "SupportMessage"("organizationId");
+CREATE INDEX "support_messages_requestId_idx" ON "support_messages"("requestId");
+CREATE INDEX "support_messages_organizationId_idx" ON "support_messages"("organizationId");
 
 -- AddForeignKey
-ALTER TABLE "SupportRequest" ADD CONSTRAINT "SupportRequest_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-ALTER TABLE "SupportRequest" ADD CONSTRAINT "SupportRequest_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-ALTER TABLE "SupportRequest" ADD CONSTRAINT "SupportRequest_resolvedById_fkey" FOREIGN KEY ("resolvedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "support_requests" ADD CONSTRAINT "support_requests_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "support_requests" ADD CONSTRAINT "support_requests_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "support_requests" ADD CONSTRAINT "support_requests_resolvedById_fkey" FOREIGN KEY ("resolvedById") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "SupportMessage" ADD CONSTRAINT "SupportMessage_requestId_fkey" FOREIGN KEY ("requestId") REFERENCES "SupportRequest"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "support_messages" ADD CONSTRAINT "support_messages_requestId_fkey" FOREIGN KEY ("requestId") REFERENCES "support_requests"("id") ON DELETE CASCADE ON UPDATE CASCADE;
