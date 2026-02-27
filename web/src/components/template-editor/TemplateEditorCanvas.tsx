@@ -34,10 +34,15 @@ const EDITOR_RUNTIME_CODE = `(function () {
 
   var idCounter = 0;
   var selectedElement = null;
+  var editingElement = null; // Currently in contenteditable mode
 
-  var OUTLINE_COLOR = '#3B82F6';
-  var OUTLINE_STYLE = '2px solid ' + OUTLINE_COLOR;
-  var OUTLINE_OFFSET = '2px';
+  var SELECT_COLOR = '#3B82F6';
+  var SELECT_STYLE = '2px solid ' + SELECT_COLOR;
+  var SELECT_OFFSET = '2px';
+  var HOVER_COLOR = 'rgba(0, 229, 160, 0.5)';
+  var HOVER_STYLE = '2px dashed ' + HOVER_COLOR;
+  var EDIT_COLOR = '#00E5A0';
+  var EDIT_STYLE = '2px solid ' + EDIT_COLOR;
 
   var TEXT_TAGS = [
     'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
@@ -72,39 +77,36 @@ const EDITOR_RUNTIME_CODE = `(function () {
     return document.querySelector('[data-editor-id="' + editorId + '"]');
   }
 
+  // Find nearest ancestor (or self) with data-editable="true"
+  function findEditableAncestor(el) {
+    var current = el;
+    while (current && current !== document.body && current !== document.documentElement) {
+      if (current.getAttribute && current.getAttribute('data-editable') === 'true') {
+        return current;
+      }
+      current = current.parentElement;
+    }
+    return null;
+  }
+
   // ── Element Type Detection ─────────────────────────────────────────
 
   function detectElementType(el) {
     var tag = el.tagName.toLowerCase();
+    if (tag === 'img') return 'image';
 
-    // Image tag
-    if (tag === 'img') {
-      return 'image';
-    }
-
-    // Element with background-image and no child elements
     var computed = window.getComputedStyle(el);
     var bgImage = computed.backgroundImage;
-    if (bgImage && bgImage !== 'none' && el.children.length === 0) {
-      return 'image';
-    }
+    if (bgImage && bgImage !== 'none' && el.children.length === 0) return 'image';
 
-    // Known text tags
-    if (TEXT_TAGS.indexOf(tag) !== -1) {
-      return 'text';
-    }
+    if (TEXT_TAGS.indexOf(tag) !== -1) return 'text';
 
-    // Element with direct text node children (non-whitespace)
     var childNodes = el.childNodes;
     for (var i = 0; i < childNodes.length; i++) {
       if (childNodes[i].nodeType === Node.TEXT_NODE) {
-        var text = childNodes[i].textContent.trim();
-        if (text.length > 0) {
-          return 'text';
-        }
+        if (childNodes[i].textContent.trim().length > 0) return 'text';
       }
     }
-
     return 'container';
   }
 
@@ -120,21 +122,61 @@ const EDITOR_RUNTIME_CODE = `(function () {
     return styles;
   }
 
+  // ── Contenteditable ────────────────────────────────────────────────
+
+  function exitContentEditable() {
+    if (editingElement) {
+      editingElement.contentEditable = 'false';
+      editingElement.style.outline = SELECT_STYLE;
+      editingElement.style.outlineOffset = SELECT_OFFSET;
+      // Notify parent of text change
+      sendToParent({
+        type: 'text-changed',
+        elementId: editingElement.getAttribute('data-editor-id'),
+        textContent: editingElement.textContent || ''
+      });
+      editingElement = null;
+    }
+  }
+
+  function enterContentEditable(el) {
+    exitContentEditable();
+    if (detectElementType(el) !== 'text') return;
+    editingElement = el;
+    el.contentEditable = 'true';
+    el.style.outline = EDIT_STYLE;
+    el.style.outlineOffset = SELECT_OFFSET;
+    el.focus();
+    // Select all text for easy replacement
+    var range = document.createRange();
+    range.selectNodeContents(el);
+    var sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
   // ── Selection ──────────────────────────────────────────────────────
 
   function clearSelection() {
+    exitContentEditable();
     if (selectedElement) {
       selectedElement.style.outline = '';
       selectedElement.style.outlineOffset = '';
+      selectedElement.style.cursor = '';
       selectedElement = null;
     }
   }
 
   function selectElement(el) {
-    clearSelection();
+    exitContentEditable();
+    if (selectedElement && selectedElement !== el) {
+      selectedElement.style.outline = '';
+      selectedElement.style.outlineOffset = '';
+      selectedElement.style.cursor = '';
+    }
     selectedElement = el;
-    el.style.outline = OUTLINE_STYLE;
-    el.style.outlineOffset = OUTLINE_OFFSET;
+    el.style.outline = SELECT_STYLE;
+    el.style.outlineOffset = SELECT_OFFSET;
 
     var tag = el.tagName.toLowerCase();
     var rect = el.getBoundingClientRect();
@@ -158,14 +200,42 @@ const EDITOR_RUNTIME_CODE = `(function () {
     });
   }
 
+  // ── Hover Indicators for Editable Elements ─────────────────────────
+
+  function setupHoverIndicators() {
+    var editables = document.querySelectorAll('[data-editable="true"]');
+    for (var i = 0; i < editables.length; i++) {
+      (function(el) {
+        el.style.cursor = 'pointer';
+        el.addEventListener('mouseenter', function() {
+          if (el !== selectedElement && el !== editingElement) {
+            el.style.outline = HOVER_STYLE;
+            el.style.outlineOffset = '4px';
+          }
+        });
+        el.addEventListener('mouseleave', function() {
+          if (el !== selectedElement && el !== editingElement) {
+            el.style.outline = '';
+            el.style.outlineOffset = '';
+          }
+        });
+      })(editables[i]);
+    }
+  }
+
   // ── Click Handler (capture phase) ─────────────────────────────────
 
   function handleClick(e) {
-    e.preventDefault();
-    e.stopPropagation();
-
     var target = e.target;
     var tag = target.tagName.toLowerCase();
+
+    // If currently editing, allow normal click behavior within that element
+    if (editingElement && editingElement.contains(target)) {
+      return; // Let contenteditable handle it
+    }
+
+    e.preventDefault();
+    e.stopPropagation();
 
     // Clicking body or html deselects
     if (tag === 'body' || tag === 'html') {
@@ -174,13 +244,38 @@ const EDITOR_RUNTIME_CODE = `(function () {
       return;
     }
 
-    // Ensure the target has an editor ID
-    if (!target.hasAttribute('data-editor-id')) {
-      target.setAttribute('data-editor-id', 'e-' + idCounter);
+    // Find nearest editable ancestor
+    var editable = findEditableAncestor(target);
+    if (!editable) {
+      // Clicked a non-editable element — deselect
+      clearSelection();
+      sendToParent({ type: 'element-deselected' });
+      return;
+    }
+
+    // Ensure the editable target has an editor ID
+    if (!editable.hasAttribute('data-editor-id')) {
+      editable.setAttribute('data-editor-id', 'e-' + idCounter);
       idCounter++;
     }
 
-    selectElement(target);
+    selectElement(editable);
+  }
+
+  // ── Double-Click Handler — enter contenteditable ───────────────────
+
+  function handleDblClick(e) {
+    var target = e.target;
+
+    // Find nearest editable ancestor
+    var editable = findEditableAncestor(target);
+    if (!editable) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Enter inline editing mode
+    enterContentEditable(editable);
   }
 
   // ── Property Updates ───────────────────────────────────────────────
@@ -193,6 +288,8 @@ const EDITOR_RUNTIME_CODE = `(function () {
     var value = data.value;
 
     if (property === 'textContent') {
+      // If we're editing this element inline, exit first
+      if (editingElement === el) exitContentEditable();
       el.textContent = value;
     } else if (property === 'src' && el.tagName.toLowerCase() === 'img') {
       el.src = value;
@@ -200,7 +297,6 @@ const EDITOR_RUNTIME_CODE = `(function () {
       el.style[property] = value;
     }
 
-    // Re-read styles after the update and notify parent
     sendToParent({
       type: 'property-updated',
       elementId: data.elementId,
@@ -211,6 +307,9 @@ const EDITOR_RUNTIME_CODE = `(function () {
   // ── DOM Serialization ──────────────────────────────────────────────
 
   function serialize() {
+    // Exit any active editing first
+    exitContentEditable();
+
     var clone = document.documentElement.cloneNode(true);
 
     // Remove all data-editor-id attributes
@@ -219,23 +318,35 @@ const EDITOR_RUNTIME_CODE = `(function () {
       allElements[i].removeAttribute('data-editor-id');
     }
 
-    // Remove editor outline styles (look for the highlight color)
+    // Clean up editor-injected inline styles
     var styledElements = clone.querySelectorAll('[style]');
     for (var j = 0; j < styledElements.length; j++) {
       var el = styledElements[j];
       var styleText = el.getAttribute('style') || '';
 
-      // Remove outline properties that contain our editor color
-      if (styleText.indexOf(OUTLINE_COLOR) !== -1) {
+      // Remove outline, outlineOffset, and cursor set by editor
+      if (styleText.indexOf(SELECT_COLOR) !== -1 ||
+          styleText.indexOf(EDIT_COLOR) !== -1 ||
+          styleText.indexOf('dashed') !== -1) {
         el.style.outline = '';
         el.style.outlineOffset = '';
       }
+      if (styleText.indexOf('cursor') !== -1) {
+        el.style.cursor = '';
+      }
+      // Remove contentEditable attribute
+      el.removeAttribute('contenteditable');
 
-      // Remove empty style attributes
       var remaining = (el.getAttribute('style') || '').trim();
       if (remaining === '' || remaining === ';') {
         el.removeAttribute('style');
       }
+    }
+
+    // Also clean contenteditable from non-styled elements
+    var ceElements = clone.querySelectorAll('[contenteditable]');
+    for (var c = 0; c < ceElements.length; c++) {
+      ceElements[c].removeAttribute('contenteditable');
     }
 
     // Remove editor runtime script tags
@@ -267,9 +378,11 @@ const EDITOR_RUNTIME_CODE = `(function () {
   // ── Initialization ─────────────────────────────────────────────────
 
   document.addEventListener('click', handleClick, true);
+  document.addEventListener('dblclick', handleDblClick, true);
   window.addEventListener('message', handleMessage, false);
 
   assignEditorIds();
+  setupHoverIndicators();
 
   sendToParent({ type: 'editor-ready' });
 })();`;
@@ -329,6 +442,23 @@ const TemplateEditorCanvas = forwardRef<CanvasHandle, TemplateEditorCanvasProps>
             // No-op — could update local state if needed
             break;
 
+          case 'text-changed': {
+            // Inline contenteditable text was changed — update parent state
+            if (data.elementId && data.textContent !== undefined) {
+              // Re-select the element to refresh property panel with new text
+              const updatedElement: SelectedElement = {
+                elementId: data.elementId,
+                elementType: 'text',
+                tagName: '',
+                textContent: data.textContent ?? '',
+                src: '',
+                styles: {},
+              };
+              onElementSelected(updatedElement);
+            }
+            break;
+          }
+
           case 'serialized':
             if (serializeResolverRef.current) {
               serializeResolverRef.current(data.html ?? '');
@@ -360,21 +490,25 @@ const TemplateEditorCanvas = forwardRef<CanvasHandle, TemplateEditorCanvasProps>
         },
 
         serialize(): Promise<string> {
-          return new Promise<string>((resolve) => {
+          return new Promise<string>((resolve, reject) => {
             const iframe = iframeRef.current;
             if (!iframe?.contentWindow) {
-              resolve('');
+              reject(new Error('Editor iframe not available'));
               return;
             }
 
-            // 5-second timeout fallback
+            // 5-second timeout — reject instead of resolving empty
             const timeout = setTimeout(() => {
               serializeResolverRef.current = null;
-              resolve('');
+              reject(new Error('Editor serialize timed out — please try again'));
             }, 5000);
 
             serializeResolverRef.current = (html: string) => {
               clearTimeout(timeout);
+              if (!html) {
+                reject(new Error('Editor returned empty content'));
+                return;
+              }
               resolve(html);
             };
 
