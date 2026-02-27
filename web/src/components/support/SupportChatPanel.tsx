@@ -37,12 +37,14 @@ export default function SupportChatPanel() {
     messages,
     activeRequestId,
     isLoading,
+    isComposing,
     conversations,
     inputText,
     setInputText,
     toggleChat,
     sendMessage,
     startNewConversation,
+    startComposing,
     selectConversation,
   } = useSupportChat();
 
@@ -98,7 +100,7 @@ export default function SupportChatPanel() {
   );
 
   // Show conversation list or active chat
-  const showConversationList = activeRequestId === null && messages.length === 0;
+  const showConversationList = activeRequestId === null && messages.length === 0 && !isComposing;
 
   return (
     <div
@@ -126,7 +128,7 @@ export default function SupportChatPanel() {
         <div className="flex items-center gap-1">
           <button
             onClick={() => {
-              startNewConversation();
+              startComposing();
             }}
             className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors"
             aria-label="New conversation"
