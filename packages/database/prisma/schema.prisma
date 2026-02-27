@@ -753,6 +753,7 @@ model SupportRequest {
   @@index([userId])
   @@index([organizationId, status])
   @@index([organizationId, createdAt])
+  @@map("support_requests")
 }
 
 model SupportMessage {
@@ -770,4 +771,5 @@ model SupportMessage {
 
   @@index([requestId])
   @@index([organizationId])
+  @@map("support_messages")
 }
