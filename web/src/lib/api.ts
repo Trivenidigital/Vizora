@@ -1350,7 +1350,7 @@ class ApiClient {
     thumbnailUrl?: string;
     duration?: number;
   }): Promise<any> {
-    return this.request<any>(`/template-library/${id}`, {
+    return this.request<any>(`/template-library/${id}/save`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
