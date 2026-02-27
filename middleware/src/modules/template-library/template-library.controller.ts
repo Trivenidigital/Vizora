@@ -123,6 +123,17 @@ export class TemplateLibraryController {
     return this.templateLibraryService.publishTemplate(id, dto, organizationId, userId);
   }
 
+  @Patch(':id/save')
+  @Roles('admin', 'manager')
+  @SkipOutputSanitize()
+  saveUserTemplate(
+    @Param('id') id: string,
+    @CurrentUser('organizationId') organizationId: string,
+    @Body() dto: UpdateTemplateDto,
+  ) {
+    return this.templateLibraryService.saveUserTemplate(id, dto, organizationId);
+  }
+
   @Patch(':id/featured')
   @Roles('admin')
   @UseGuards(SuperAdminGuard)

@@ -137,8 +137,10 @@ export class TemplateLibraryService {
    * Get single template detail
    */
   async findOne(id: string) {
+    // Look for global library templates first, then fall back to any template by ID
+    // (cloned templates are non-global but should still be accessible via the editor)
     const template = await this.db.content.findFirst({
-      where: { id, isGlobal: true, type: 'template' },
+      where: { id, type: 'template' },
     });
 
     if (!template) {
@@ -164,8 +166,10 @@ export class TemplateLibraryService {
       const html = this.templateRendering.processTemplate(metadata.templateHtml, data);
       return { html };
     } catch (error) {
-      this.logger.warn(`Preview render failed for template ${id}: ${error}`);
-      return { html: '<p>Preview generation failed</p>' };
+      // If Handlebars rendering fails, return the raw templateHtml
+      // (data-editable templates don't use Handlebars)
+      this.logger.warn(`Preview render fell back to raw HTML for template ${id}: ${error}`);
+      return { html: metadata.templateHtml };
     }
   }
 
@@ -524,6 +528,48 @@ export class TemplateLibraryService {
     });
 
     return this.mapTemplateResponse(content);
+  }
+
+  /**
+   * Save a user's own template (cloned or created, org-scoped)
+   */
+  async saveUserTemplate(id: string, dto: UpdateTemplateDto, organizationId: string) {
+    const template = await this.db.content.findFirst({
+      where: { id, type: 'template' },
+    });
+
+    if (!template) {
+      throw new NotFoundException('Template not found');
+    }
+
+    // For non-global templates, verify org ownership
+    if (!template.isGlobal && template.organizationId !== organizationId) {
+      throw new NotFoundException('Template not found');
+    }
+
+    const existingMetadata = (template.metadata as Record<string, unknown>) || {};
+    const updatedMetadata = { ...existingMetadata };
+
+    if (dto.templateHtml !== undefined) {
+      updatedMetadata.templateHtml = dto.templateHtml;
+    }
+
+    const updateData: any = {
+      metadata: updatedMetadata as Prisma.InputJsonValue,
+    };
+    if (dto.name !== undefined) {
+      updateData.name = dto.name;
+    }
+    if (dto.description !== undefined) {
+      updateData.description = dto.description;
+    }
+
+    const updated = await this.db.content.update({
+      where: { id },
+      data: updateData,
+    });
+
+    return this.mapTemplateResponse(updated);
   }
 
   /**
