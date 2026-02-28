@@ -22,218 +22,252 @@
   "links": [],
   "panels": [
     {
-      "id": 1,
-      "title": "Device Status",
-      "description": "Count of devices by status (online / offline / error)",
-      "type": "stat",
-      "datasource": {
-        "type": "postgres",
-        "uid": "${DS_POSTGRESQL}"
-      },
+      "collapsed": false,
       "gridPos": {
-        "h": 6,
-        "w": 8,
+        "h": 1,
+        "w": 24,
         "x": 0,
         "y": 0
       },
+      "id": 100,
+      "title": "HTTP Metrics",
+      "type": "row"
+    },
+    {
+      "id": 1,
+      "title": "HTTP Request Rate",
+      "description": "Incoming HTTP requests per second, grouped by status code",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 1
+      },
       "fieldConfig": {
         "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "barAlignment": 0,
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "gradientMode": "scheme",
+            "spanNulls": true,
+            "insertNulls": false,
+            "showPoints": "never",
+            "pointSize": 5,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "axisPlacement": "auto",
+            "axisLabel": "req/s",
+            "axisColorMode": "text",
+            "axisBorderShow": false,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "axisCenteredZero": false,
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               { "color": "green", "value": null }
             ]
           },
-          "mappings": [],
-          "color": {
-            "mode": "fixed"
-          }
+          "unit": "reqps",
+          "min": 0
         },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "online" },
-            "properties": [
-              { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "offline" },
-            "properties": [
-              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "error" },
-            "properties": [
-              { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": ["lastNotNull"],
-          "fields": ""
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
         },
-        "orientation": "horizontal",
-        "textMode": "auto",
-        "wideLayout": true,
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto"
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": ["lastNotNull"]
+        }
       },
       "targets": [
         {
           "datasource": {
-            "type": "postgres",
-            "uid": "${DS_POSTGRESQL}"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
           "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT\n  COALESCE(SUM(CASE WHEN status = 'online' THEN 1 ELSE 0 END), 0) AS \"online\",\n  COALESCE(SUM(CASE WHEN status = 'offline' THEN 1 ELSE 0 END), 0) AS \"offline\",\n  COALESCE(SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END), 0) AS \"error\"\nFROM devices;",
+          "expr": "sum(rate(vizora_http_requests_total[5m])) by (status_code)",
+          "legendFormat": "{{status_code}}",
+          "range": true,
           "refId": "A"
         }
       ]
     },
     {
       "id": 2,
-      "title": "Active Content",
-      "description": "Total number of active content items across all organizations",
-      "type": "stat",
+      "title": "Error Rate %",
+      "description": "Percentage of HTTP requests resulting in errors (4xx/5xx)",
+      "type": "timeseries",
       "datasource": {
-        "type": "postgres",
-        "uid": "${DS_POSTGRESQL}"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "gridPos": {
-        "h": 6,
+        "h": 8,
         "w": 8,
         "x": 8,
-        "y": 0
+        "y": 1
       },
       "fieldConfig": {
         "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "barAlignment": 0,
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "gradientMode": "scheme",
+            "spanNulls": true,
+            "insertNulls": false,
+            "showPoints": "never",
+            "pointSize": 5,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "axisPlacement": "auto",
+            "axisLabel": "%",
+            "axisColorMode": "text",
+            "axisBorderShow": false,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "axisCenteredZero": false,
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "thresholdsStyle": {
+              "mode": "line+area"
+            }
+          },
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "red"
+          },
+          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "blue", "value": null }
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 2 },
+              { "color": "red", "value": 5 }
             ]
           },
-          "mappings": [],
-          "color": {
-            "mode": "thresholds"
-          }
+          "unit": "percent",
+          "min": 0,
+          "max": 100
         },
         "overrides": []
       },
       "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": ["lastNotNull"],
-          "fields": ""
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
         },
-        "orientation": "auto",
-        "textMode": "auto",
-        "wideLayout": true,
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto"
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": ["lastNotNull", "max"]
+        }
       },
       "targets": [
         {
           "datasource": {
-            "type": "postgres",
-            "uid": "${DS_POSTGRESQL}"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
           "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT COUNT(*) AS \"active_content\"\nFROM \"Content\"\nWHERE status = 'active';",
+          "expr": "(\n  sum(rate(vizora_http_errors_total[5m]))\n  /\n  sum(rate(vizora_http_requests_total[5m]))\n) * 100",
+          "legendFormat": "Error Rate",
+          "range": true,
           "refId": "A"
         }
       ]
     },
     {
       "id": 3,
-      "title": "Organizations",
-      "description": "Total number of organizations on the platform",
-      "type": "stat",
+      "title": "Request Latency",
+      "description": "HTTP request duration percentiles (p50, p95, p99)",
+      "type": "timeseries",
       "datasource": {
-        "type": "postgres",
-        "uid": "${DS_POSTGRESQL}"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "gridPos": {
-        "h": 6,
+        "h": 8,
         "w": 8,
         "x": 16,
-        "y": 0
-      },
-      "fieldConfig": {
-        "defaults": {
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "purple", "value": null }
-            ]
-          },
-          "mappings": [],
-          "color": {
-            "mode": "thresholds"
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": ["lastNotNull"],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "wideLayout": true,
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "postgres",
-            "uid": "${DS_POSTGRESQL}"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT COUNT(*) AS \"organizations\"\nFROM organizations;",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 4,
-      "title": "Recent Activity",
-      "description": "Last 20 audit log entries across the platform",
-      "type": "table",
-      "datasource": {
-        "type": "postgres",
-        "uid": "${DS_POSTGRESQL}"
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 24,
-        "x": 0,
-        "y": 6
+        "y": 1
       },
       "fieldConfig": {
         "defaults": {
           "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "barAlignment": 0,
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "scheme",
+            "spanNulls": true,
+            "insertNulls": false,
+            "showPoints": "never",
+            "pointSize": 5,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
             },
-            "inspect": false
+            "axisPlacement": "auto",
+            "axisLabel": "duration",
+            "axisColorMode": "text",
+            "axisBorderShow": false,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "axisCenteredZero": false,
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
           },
           "mappings": [],
           "thresholds": {
@@ -241,157 +275,196 @@
             "steps": [
               { "color": "green", "value": null }
             ]
-          }
+          },
+          "unit": "s",
+          "min": 0
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "action" },
+            "matcher": { "id": "byName", "options": "p99" },
             "properties": [
-              { "id": "custom.width", "value": 100 }
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } },
+              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "entity_type" },
+            "matcher": { "id": "byName", "options": "p95" },
             "properties": [
-              { "id": "custom.width", "value": 120 }
+              { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "timestamp" },
+            "matcher": { "id": "byName", "options": "p50" },
             "properties": [
-              { "id": "custom.width", "value": 180 }
+              { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }
             ]
           }
         ]
       },
       "options": {
-        "showHeader": true,
-        "cellHeight": "sm",
-        "footer": {
-          "show": false,
-          "reducer": ["sum"],
-          "countRows": false
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
         },
-        "sortBy": []
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": ["lastNotNull"]
+        }
       },
       "targets": [
         {
           "datasource": {
-            "type": "postgres",
-            "uid": "${DS_POSTGRESQL}"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
           "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT\n  al.\"createdAt\" AS \"timestamp\",\n  al.action,\n  al.\"entityType\" AS \"entity_type\",\n  al.\"entityId\" AS \"entity_id\",\n  COALESCE(u.\"firstName\" || ' ' || u.\"lastName\", 'System') AS \"user\",\n  o.name AS \"organization\"\nFROM \"AuditLog\" al\nLEFT JOIN users u ON al.\"userId\" = u.id\nLEFT JOIN organizations o ON al.\"organizationId\" = o.id\nORDER BY al.\"createdAt\" DESC\nLIMIT 20;",
+          "expr": "histogram_quantile(0.5, sum(rate(vizora_http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p50",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.95, sum(rate(vizora_http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.99, sum(rate(vizora_http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p99",
+          "range": true,
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
+      "id": 101,
+      "title": "System Resources",
+      "type": "row"
+    },
+    {
+      "id": 4,
+      "title": "Memory Usage",
+      "description": "Resident memory (RSS) per service",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "barAlignment": 0,
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "gradientMode": "scheme",
+            "spanNulls": true,
+            "insertNulls": false,
+            "showPoints": "never",
+            "pointSize": 5,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "axisPlacement": "auto",
+            "axisLabel": "memory",
+            "axisColorMode": "text",
+            "axisBorderShow": false,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "axisCenteredZero": false,
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null }
+            ]
+          },
+          "unit": "bytes",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": ["lastNotNull", "max"]
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "process_resident_memory_bytes",
+          "legendFormat": "{{job}}",
+          "range": true,
           "refId": "A"
         }
       ]
     },
     {
       "id": 5,
-      "title": "Device Status Over Time",
-      "description": "Number of connected devices over time (requires Prometheus)",
+      "title": "Active Connections",
+      "description": "Active handles and file descriptors per service",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 16
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "smooth",
-            "barAlignment": 0,
-            "lineWidth": 2,
-            "fillOpacity": 15,
-            "gradientMode": "scheme",
-            "spanNulls": true,
-            "insertNulls": false,
-            "showPoints": "auto",
-            "pointSize": 5,
-            "stacking": {
-              "mode": "none",
-              "group": "A"
-            },
-            "axisPlacement": "auto",
-            "axisLabel": "",
-            "axisColorMode": "text",
-            "axisBorderShow": false,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "axisCenteredZero": false,
-            "hideFrom": {
-              "tooltip": false,
-              "viz": false,
-              "legend": false
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "color": {
-            "mode": "palette-classic"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null }
-            ]
-          },
-          "unit": "short",
-          "min": 0
-        },
-        "overrides": []
-      },
-      "options": {
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        },
-        "legend": {
-          "showLegend": true,
-          "displayMode": "list",
-          "placement": "bottom",
-          "calcs": ["lastNotNull"]
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "expr": "vizora_devices_connected",
-          "legendFormat": "Connected Devices",
-          "range": true,
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 6,
-      "title": "WebSocket Connections",
-      "description": "Active WebSocket connections over time (requires Prometheus)",
-      "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 16
+        "y": 10
       },
       "fieldConfig": {
         "defaults": {
@@ -404,14 +477,14 @@
             "gradientMode": "scheme",
             "spanNulls": true,
             "insertNulls": false,
-            "showPoints": "auto",
+            "showPoints": "never",
             "pointSize": 5,
             "stacking": {
               "mode": "none",
               "group": "A"
             },
             "axisPlacement": "auto",
-            "axisLabel": "",
+            "axisLabel": "handles",
             "axisColorMode": "text",
             "axisBorderShow": false,
             "scaleDistribution": {
@@ -458,40 +531,36 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "vizora_websocket_connections",
-          "legendFormat": "WebSocket Connections",
+          "expr": "nodejs_active_handles_total",
+          "legendFormat": "{{job}} - active handles",
           "range": true,
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "process_open_fds",
+          "legendFormat": "{{job}} - open fds",
+          "range": true,
+          "refId": "B"
         }
       ]
     }
   ],
   "refresh": "30s",
   "schemaVersion": 39,
-  "tags": ["vizora", "overview"],
+  "tags": ["vizora", "overview", "http", "performance"],
   "templating": {
-    "list": [
-      {
-        "current": {},
-        "hide": 2,
-        "name": "DS_POSTGRESQL",
-        "query": "postgres",
-        "type": "datasource"
-      },
-      {
-        "current": {},
-        "hide": 2,
-        "name": "DS_PROMETHEUS",
-        "query": "prometheus",
-        "type": "datasource"
-      }
-    ]
+    "list": []
   },
   "time": {
-    "from": "now-6h",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {
@@ -506,7 +575,7 @@
     ]
   },
   "timezone": "browser",
-  "title": "Vizora Platform Overview",
-  "uid": "vizora-platform-overview",
+  "title": "Vizora Overview",
+  "uid": "vizora-overview",
   "version": 1
 }
