@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from '../modules/config/config.module';
@@ -35,6 +36,8 @@ import { SupportModule } from '../modules/support/support.module';
     ConfigModule,
     // Scheduled tasks for content expiration, etc.
     ScheduleModule.forRoot(),
+    // Event-driven validation monitoring (Tier 2)
+    EventEmitterModule.forRoot(),
     // Rate limiting - RELAXED for development/testing, STRICT for production
     ThrottlerModule.forRoot(
       process.env.NODE_ENV === 'production'

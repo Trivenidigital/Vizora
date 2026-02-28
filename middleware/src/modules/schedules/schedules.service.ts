@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DatabaseService } from '../database/database.service';
 import { CreateScheduleDto } from './dto/create-schedule.dto';
 import { UpdateScheduleDto } from './dto/update-schedule.dto';
@@ -7,7 +8,10 @@ import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
 
 @Injectable()
 export class SchedulesService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   async create(organizationId: string, createScheduleDto: CreateScheduleDto) {
     if (!createScheduleDto.displayId && !createScheduleDto.displayGroupId) {
@@ -46,7 +50,7 @@ export class SchedulesService {
       }
     }
 
-    return this.db.schedule.create({
+    const schedule = await this.db.schedule.create({
       data: {
         ...createScheduleDto,
         startDate: new Date(createScheduleDto.startDate),
@@ -59,6 +63,8 @@ export class SchedulesService {
         displayGroup: true,
       },
     });
+    this.eventEmitter.emit('schedule.created', { entityId: schedule.id, organizationId });
+    return schedule;
   }
 
   async findAll(
@@ -218,7 +224,7 @@ export class SchedulesService {
       }
     }
 
-    return this.db.schedule.update({
+    const updated = await this.db.schedule.update({
       where: { id },
       data: {
         ...updateScheduleDto,
@@ -231,6 +237,8 @@ export class SchedulesService {
         displayGroup: true,
       },
     });
+    this.eventEmitter.emit('schedule.updated', { entityId: id, organizationId });
+    return updated;
   }
 
   async duplicate(organizationId: string, id: string) {
@@ -321,8 +329,10 @@ export class SchedulesService {
 
   async remove(organizationId: string, id: string) {
     await this.findOne(organizationId, id);
-    return this.db.schedule.delete({
+    const result = await this.db.schedule.delete({
       where: { id },
     });
+    this.eventEmitter.emit('schedule.deleted', { entityId: id, organizationId });
+    return result;
   }
 }

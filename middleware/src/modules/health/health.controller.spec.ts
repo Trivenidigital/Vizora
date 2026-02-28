@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { HealthController } from './health.controller';
 import { HealthService } from './health.service';
+import { ValidationMonitorService } from './validation-monitor.service';
 
 describe('HealthController', () => {
   let controller: HealthController;
@@ -63,6 +64,10 @@ describe('HealthController', () => {
         {
           provide: HealthService,
           useValue: mockHealthService,
+        },
+        {
+          provide: ValidationMonitorService,
+          useValue: { getValidationState: jest.fn().mockResolvedValue(null) },
         },
       ],
     }).compile();

@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma } from '@vizora/database';
 import { JwtService } from '@nestjs/jwt';
 import { HttpService } from '@nestjs/axios';
@@ -44,13 +45,14 @@ export class DisplaysService {
     private readonly httpService: HttpService,
     private readonly circuitBreaker: CircuitBreakerService,
     private readonly storageService: StorageService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async create(organizationId: string, createDisplayDto: CreateDisplayDto) {
     const { deviceId, name, ...rest } = createDisplayDto;
 
     try {
-      return await this.db.display.create({
+      const display = await this.db.display.create({
         data: {
           ...rest,
           deviceIdentifier: deviceId,
@@ -58,6 +60,8 @@ export class DisplaysService {
           organizationId,
         },
       });
+      this.emitDisplayEvent('created', display.id, organizationId);
+      return display;
     } catch (error) {
       // Handle unique constraint violation (race condition on deviceIdentifier)
       if (error.code === 'P2002') {
@@ -65,6 +69,10 @@ export class DisplaysService {
       }
       throw error;
     }
+  }
+
+  private emitDisplayEvent(action: string, entityId: string, organizationId: string) {
+    this.eventEmitter.emit(`display.${action}`, { action, entityType: 'display', entityId, organizationId });
   }
 
   async findAll(organizationId: string, pagination: PaginationDto) {
@@ -181,6 +189,7 @@ export class DisplaysService {
       });
     }
 
+    this.emitDisplayEvent('updated', id, organizationId);
     return updatedDisplay;
   }
 
@@ -274,9 +283,11 @@ export class DisplaysService {
 
   async remove(organizationId: string, id: string) {
     await this.findOne(organizationId, id);
-    return this.db.display.delete({
+    const deleted = await this.db.display.delete({
       where: { id },
     });
+    this.emitDisplayEvent('deleted', id, organizationId);
+    return deleted;
   }
 
   async getTags(organizationId: string, displayId: string) {

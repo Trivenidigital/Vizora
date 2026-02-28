@@ -1,12 +1,16 @@
-import { Controller, Get, HttpStatus, HttpException } from '@nestjs/common';
+import { Controller, Get, HttpStatus, HttpException, Req } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { HealthService } from './health.service';
+import { ValidationMonitorService } from './validation-monitor.service';
 import { Public } from '../auth/decorators/public.decorator';
 
 @Controller('health')
 @SkipThrottle() // Health checks should not be rate limited
 export class HealthController {
-  constructor(private readonly healthService: HealthService) {}
+  constructor(
+    private readonly healthService: HealthService,
+    private readonly validationMonitor: ValidationMonitorService,
+  ) {}
 
   /**
    * Basic liveness probe - always returns 200 if the server is running
@@ -39,5 +43,19 @@ export class HealthController {
   @Public()
   async live() {
     return { status: 'ok', timestamp: new Date().toISOString() };
+  }
+
+  /**
+   * Content validation status for the authenticated user's organization.
+   * Returns latest validation state (READY/DEGRADED/NOT READY) with issues.
+   */
+  @Get('validation')
+  async validation(@Req() req: { user?: { organizationId?: string } }) {
+    const orgId = req.user?.organizationId;
+    if (!orgId) {
+      return { status: 'unknown', message: 'No organization context' };
+    }
+    const state = await this.validationMonitor.getValidationState(orgId);
+    return state || { status: 'unknown', message: 'No validation data available' };
   }
 }

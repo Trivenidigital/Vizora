@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SchedulesService } from './schedules.service';
 import { DatabaseService } from '../database/database.service';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
@@ -60,6 +61,10 @@ describe('SchedulesService', () => {
         {
           provide: DatabaseService,
           useValue: mockDatabaseService,
+        },
+        {
+          provide: EventEmitter2,
+          useValue: { emit: jest.fn() },
         },
       ],
     }).compile();

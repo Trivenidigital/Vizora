@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { HttpService } from '@nestjs/axios';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { of } from 'rxjs';
 import { DisplaysService } from './displays.service';
 import { DatabaseService } from '../database/database.service';
@@ -91,6 +92,10 @@ describe('DisplaysService', () => {
             getSignedUrl: jest.fn().mockResolvedValue('https://example.com/signed'),
             resolveUrl: jest.fn().mockImplementation((url) => url),
           },
+        },
+        {
+          provide: EventEmitter2,
+          useValue: { emit: jest.fn() },
         },
       ],
     }).compile();

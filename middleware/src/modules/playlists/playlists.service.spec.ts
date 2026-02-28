@@ -51,7 +51,8 @@ describe('PlaylistsService', () => {
       },
     };
 
-    service = new PlaylistsService(mockDatabaseService as DatabaseService, {} as any);
+    const mockEventEmitter = { emit: jest.fn() };
+    service = new PlaylistsService(mockDatabaseService as DatabaseService, {} as any, mockEventEmitter as any);
   });
 
   it('should be defined', () => {

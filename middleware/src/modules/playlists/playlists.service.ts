@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { DatabaseService } from '../database/database.service';
@@ -14,6 +15,7 @@ export class PlaylistsService {
   constructor(
     private readonly db: DatabaseService,
     private readonly httpService: HttpService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async create(organizationId: string, createPlaylistDto: CreatePlaylistDto) {
@@ -66,6 +68,7 @@ export class PlaylistsService {
         },
       });
 
+      this.eventEmitter.emit('playlist.created', { entityId: playlist.id, organizationId });
       return playlist;
     } catch (error) {
       // Handle database constraint violations
@@ -233,6 +236,8 @@ export class PlaylistsService {
           },
         });
 
+    this.eventEmitter.emit('playlist.updated', { entityId: id, organizationId });
+
     // Notify all displays using this playlist
     this.notifyDisplaysOfPlaylistUpdate(id, updatedPlaylist).catch(error => {
       this.logger.error(`Failed to notify displays of playlist update: ${error.message}`);
@@ -391,9 +396,11 @@ export class PlaylistsService {
 
   async remove(organizationId: string, id: string) {
     await this.findOne(organizationId, id);
-    return this.db.playlist.delete({
+    const result = await this.db.playlist.delete({
       where: { id },
     });
+    this.eventEmitter.emit('playlist.deleted', { entityId: id, organizationId });
+    return result;
   }
 
   /**

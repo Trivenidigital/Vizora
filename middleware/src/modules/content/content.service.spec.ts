@@ -128,12 +128,14 @@ describe('ContentService', () => {
       isMinioAvailable: jest.fn().mockReturnValue(false),
     } as any;
 
+    const mockEventEmitter = { emit: jest.fn() };
     service = new ContentService(
       mockDatabaseService as DatabaseService,
       mockTemplateRendering,
       mockDataSourceRegistry,
       mockStorageQuotaService,
       mockStorageService,
+      mockEventEmitter as any,
     );
   });
 

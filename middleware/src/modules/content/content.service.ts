@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma } from '@vizora/database';
 import { DatabaseService } from '../database/database.service';
 import { CreateContentDto } from './dto/create-content.dto';
@@ -68,6 +69,7 @@ export class ContentService {
     private readonly dataSourceRegistry: DataSourceRegistryService,
     private readonly storageQuotaService: StorageQuotaService,
     private readonly storageService: StorageService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   // Map database content to API response format
@@ -87,6 +89,7 @@ export class ContentService {
         organizationId,
       },
     });
+    this.eventEmitter.emit('content.created', { action: 'created', entityType: 'content', entityId: content.id, organizationId });
     return this.mapContentResponse(content);
   }
 
@@ -177,6 +180,7 @@ export class ContentService {
       where: { id },
       data: updateContentDto,
     });
+    this.eventEmitter.emit('content.updated', { action: 'updated', entityType: 'content', entityId: id, organizationId });
     return this.mapContentResponse(content);
   }
 
@@ -209,6 +213,7 @@ export class ContentService {
       await this.storageQuotaService.decrementUsage(organizationId, content.fileSize);
     }
 
+    this.eventEmitter.emit('content.deleted', { action: 'deleted', entityType: 'content', entityId: id, organizationId });
     return deleted;
   }
 
