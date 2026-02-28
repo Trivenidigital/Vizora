@@ -23,6 +23,7 @@
  * Security: Read-only. No remediation actions, no execSync, no user input.
  */
 
+import 'dotenv/config';
 import type { SystemStatus, Incident } from './lib/types.js';
 import {
   readOpsState,

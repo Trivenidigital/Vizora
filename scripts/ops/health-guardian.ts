@@ -20,6 +20,7 @@
  * no user input interpolation. This is safe — no injection risk.
  */
 
+import 'dotenv/config';
 import { execSync } from 'node:child_process';
 import type { Incident, AgentResult, RemediationAction } from './lib/types.js';
 import {

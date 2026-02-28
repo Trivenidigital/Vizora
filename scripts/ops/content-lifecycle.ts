@@ -17,6 +17,7 @@
  *   2 — fatal error (agent could not complete)
  */
 
+import 'dotenv/config';
 import type { Incident, AgentResult } from './lib/types.js';
 import {
   readOpsState,

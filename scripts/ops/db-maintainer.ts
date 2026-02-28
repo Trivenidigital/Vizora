@@ -17,6 +17,7 @@
  * Arguments are passed as arrays — no shell injection risk.
  */
 
+import 'dotenv/config';
 import { execFileSync } from 'node:child_process';
 import { readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
