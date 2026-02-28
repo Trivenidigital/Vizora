@@ -154,3 +154,20 @@ Developer-facing Claude Code workflow that turns support requests into code chan
 - **Slash command:** `.claude/commands/support.md` — entry point
 
 **Constraint:** Never auto-implements. Every change requires explicit developer approval before any code is written.
+
+## Content Validator Agent
+
+Automated deployment readiness checker. Runs 30 validation rules across content, displays, schedules, and storage.
+
+**Usage:** `/validate [scope] [--token TOKEN] [--base-url URL]`
+
+**Workflow:** health check → authenticate → run validators in parallel → generate readiness report (READY / DEGRADED / NOT READY)
+
+**Components:**
+- **Skill:** `.claude/skills/content-validator/SKILL.md` — orchestration with Level 3 reference files
+- **Scripts:** `.claude/skills/content-validator/scripts/` — 5 TypeScript validation scripts (zero deps, read-only)
+- **Subagents:** `.claude/agents/{infra-checker,content-auditor,display-inspector,schedule-analyzer,report-compiler}.md`
+- **Slash command:** `.claude/commands/validate.md` — entry point
+- **Rules catalog:** `.claude/skills/content-validator/validation-rules.md` — 30 rules (10 critical, 14 warning, 5 info)
+
+**Constraint:** Read-only. Scripts only use GET requests. No data is ever modified. No AI API costs.
