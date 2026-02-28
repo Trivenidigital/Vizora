@@ -31,6 +31,9 @@ const HEALTH_CIRCUIT_CONFIG = {
 
 @Injectable()
 export class HealthService {
+  private static readonly OPS_STATUS_KEY = 'vizora:ops:status';
+  private static readonly OPS_STATUS_TTL = 3600;
+
   private readonly startTime = Date.now();
   private readonly logger = new Logger(HealthService.name);
 
@@ -269,5 +272,23 @@ export class HealthService {
         error: `High memory usage: ${heapUsedMB}MB / ${heapTotalMB}MB (${heapUsagePercent.toFixed(1)}%)`,
       }),
     };
+  }
+
+  async setOpsStatus(data: Record<string, unknown>): Promise<void> {
+    if (this.redis) {
+      await this.redis.set(
+        HealthService.OPS_STATUS_KEY,
+        JSON.stringify(data),
+        HealthService.OPS_STATUS_TTL,
+      );
+    }
+  }
+
+  async getOpsStatus(): Promise<Record<string, unknown>> {
+    if (this.redis) {
+      const cached = await this.redis.get(HealthService.OPS_STATUS_KEY);
+      if (cached) return JSON.parse(cached);
+    }
+    return { systemStatus: 'unknown', message: 'No ops data available' };
   }
 }

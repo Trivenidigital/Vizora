@@ -1,4 +1,4 @@
-import { Controller, Get, HttpStatus, HttpException, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, HttpStatus, HttpException, Req } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { HealthService } from './health.service';
 import { ValidationMonitorService } from './validation-monitor.service';
@@ -57,5 +57,24 @@ export class HealthController {
     }
     const state = await this.validationMonitor.getValidationState(orgId);
     return state || { status: 'unknown', message: 'No validation data available' };
+  }
+
+  /**
+   * Update ops status data (stored in Redis with TTL).
+   * Auth-protected — no @Public() decorator.
+   */
+  @Post('ops-status')
+  async updateOpsStatus(@Body() body: Record<string, unknown>) {
+    await this.healthService.setOpsStatus(body);
+    return { status: 'ok' };
+  }
+
+  /**
+   * Retrieve current ops status data from Redis.
+   * Auth-protected — no @Public() decorator.
+   */
+  @Get('ops-status')
+  async getOpsStatus() {
+    return this.healthService.getOpsStatus();
   }
 }
