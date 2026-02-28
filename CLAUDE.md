@@ -139,3 +139,18 @@ Available at `http://localhost:3000/api/v1/docs` in development mode only.
 - **Web**: 40+ suites pass. 2 admin test suites fail (async Client Component in jsdom — tied to RSC migration deferral)
 - **Display**: No test coverage yet
 - **Builds**: All 3 services compile via `npx nx build @vizora/{middleware,web,realtime}`
+
+## Support Agent System
+
+Developer-facing Claude Code workflow that turns support requests into code changes.
+
+**Usage:** `/support "description of the issue"`
+
+**Workflow:** classify → locate code → generate plan → **developer approval** → implement with git commits → verify
+
+**Components:**
+- **Skill:** `.claude/skills/support-agent/SKILL.md` — orchestration logic with Level 3 reference files
+- **Subagents:** `.claude/agents/request-analyzer.md`, `code-scout.md`, `plan-writer.md` — read-only specialists
+- **Slash command:** `.claude/commands/support.md` — entry point
+
+**Constraint:** Never auto-implements. Every change requires explicit developer approval before any code is written.
