@@ -289,7 +289,7 @@ export default function EditPageClient({ templateId }: EditPageClientProps) {
       {/* ── Main content area ────────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden">
         {/* Canvas */}
-        <div ref={zoom.containerRef} className="flex-1 p-4">
+        <div ref={zoom.containerRef} className="flex-1 min-w-0 overflow-hidden p-4">
           <TemplateEditorCanvas
             ref={canvasRef}
             templateHtml={previewHtml}
