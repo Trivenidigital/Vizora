@@ -15,7 +15,7 @@
  *   SMTP_TO            — Recipient email address(es), comma-separated
  */
 
-import type { SystemStatus, Incident } from './types.js';
+import type { SystemStatus, Incident, RemediationAction } from './types.js';
 
 // ─── Logging ────────────────────────────────────────────────────────────────
 
@@ -242,14 +242,14 @@ export async function sendEmailAlert(
 // ─── Dashboard ──────────────────────────────────────────────────────────────
 
 /**
- * POST ops state summary to the dashboard health endpoint.
+ * POST full ops state to the dashboard health endpoint.
  * No-op on any error — dashboard updates are best-effort.
  *
- * @param state  Serializable ops state summary
+ * @param state  Full OpsState object (incidents, agentResults, remediations)
  * @param token  Bearer token for API auth
  */
 export async function updateDashboard(
-  state: { systemStatus: string; incidents: Incident[]; lastUpdated: string },
+  state: { systemStatus: string; incidents: Incident[]; lastUpdated: string; lastRun?: Record<string, string>; recentRemediations?: RemediationAction[]; agentResults?: Record<string, unknown> },
   token: string,
 ): Promise<void> {
   const baseUrl = process.env.VALIDATOR_BASE_URL || 'http://localhost:3000';
@@ -266,10 +266,11 @@ export async function updateDashboard(
       },
       body: JSON.stringify({
         systemStatus: state.systemStatus,
-        openIncidents: state.incidents.filter(i => i.status === 'open').length,
-        criticalCount: state.incidents.filter(i => i.status === 'open' && i.severity === 'critical').length,
-        warningCount: state.incidents.filter(i => i.status === 'open' && i.severity === 'warning').length,
         lastUpdated: state.lastUpdated,
+        lastRun: state.lastRun ?? {},
+        incidents: state.incidents ?? [],
+        recentRemediations: state.recentRemediations ?? [],
+        agentResults: state.agentResults ?? {},
       }),
       signal: controller.signal,
     });
