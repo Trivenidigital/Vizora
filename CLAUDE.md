@@ -171,3 +171,32 @@ Automated deployment readiness checker. Runs 30 validation rules across content,
 - **Rules catalog:** `.claude/skills/content-validator/validation-rules.md` — 30 rules (10 critical, 14 warning, 5 info)
 
 **Constraint:** Read-only. Scripts only use GET requests. No data is ever modified. No AI API costs.
+
+## Autonomous Operations System
+
+6 PM2 cron-managed agents providing 24/7 monitoring, auto-remediation, and alerting.
+
+**Scripts:** `scripts/ops/` — 6 agent scripts + shared library in `scripts/ops/lib/`
+
+| Agent | Schedule | Responsibility |
+|-------|----------|---------------|
+| health-guardian | Every 5min | Service health, PM2 restarts, memory monitoring |
+| content-lifecycle | Every 15min | Archive expired/orphaned content, storage monitoring |
+| fleet-manager | Every 10min | Offline display detection, ping reconnect, error reset |
+| schedule-doctor | Every 15min | Deactivate broken schedules, coverage gaps |
+| ops-reporter | Every 30min | Aggregate status, Slack/email alerts, dashboard update |
+| db-maintainer | Daily 3am | PostgreSQL vacuum, Redis cleanup, log rotation |
+
+**State:** `logs/ops-state.json` — shared state file with incidents and remediation audit trail
+
+**Dashboard:** `GET /api/v1/health/ops-status` — Redis-cached ops status for web dashboard at `/dashboard/ops`
+
+**New environment variables:**
+```
+SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS  # Email alerts (optional)
+OPS_ALERT_EMAIL                               # Alert recipient email (optional)
+REALTIME_URL                                  # Realtime gateway (default: http://localhost:3002)
+WEB_URL                                       # Web dashboard (default: http://localhost:3001)
+```
+
+**Design:** `docs/plans/2026-02-28-autonomous-ops-design.md`
