@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vizora E2E Test Report — Device Pairing &amp; Content Streaming</title>
+<style>
+  :root {
+    --green: #16a34a;
+    --green-bg: #dcfce7;
+    --red: #dc2626;
+    --red-bg: #fee2e2;
+    --amber: #d97706;
+    --amber-bg: #fef3c7;
+    --blue: #2563eb;
+    --blue-bg: #dbeafe;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-500: #6b7280;
+    --gray-700: #374151;
+    --gray-900: #111827;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    color: var(--gray-900);
+    background: var(--gray-50);
+    line-height: 1.6;
+    padding: 0;
+  }
+
+  .header {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    color: #fff;
+    padding: 2.5rem 2rem;
+    border-bottom: 4px solid var(--green);
+  }
+  .header h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.25rem; }
+  .header .subtitle { color: #94a3b8; font-size: 0.95rem; }
+  .header .meta { display: flex; flex-wrap: wrap; gap: 1.5rem; margin-top: 1rem; font-size: 0.85rem; color: #cbd5e1; }
+  .header .meta span { display: flex; align-items: center; gap: 0.35rem; }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+  /* Verdict banner */
+  .verdict {
+    display: flex; align-items: center; gap: 1rem;
+    background: var(--green-bg); border: 1px solid var(--green); border-radius: 0.75rem;
+    padding: 1.25rem 1.5rem; margin-bottom: 2rem;
+  }
+  .verdict .badge {
+    background: var(--green); color: #fff; font-weight: 700; font-size: 1rem;
+    padding: 0.4rem 1rem; border-radius: 9999px; white-space: nowrap;
+  }
+  .verdict .text { font-size: 1rem; color: var(--gray-700); }
+
+  /* Summary cards */
+  .summary-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem; margin-bottom: 2rem;
+  }
+  .card {
+    background: #fff; border: 1px solid var(--gray-200); border-radius: 0.75rem;
+    padding: 1.25rem; text-align: center;
+  }
+  .card .label { font-size: 0.8rem; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
+  .card .value { font-size: 1.75rem; font-weight: 700; }
+  .card .value.pass { color: var(--green); }
+  .card .value.fail { color: var(--red); }
+  .card .value.fixed { color: var(--blue); }
+  .card .value.open { color: var(--amber); }
+
+  /* Section */
+  section { margin-bottom: 2.5rem; }
+  h2 {
+    font-size: 1.35rem; font-weight: 700; color: var(--gray-900);
+    padding-bottom: 0.5rem; border-bottom: 2px solid var(--gray-200);
+    margin-bottom: 1.25rem;
+  }
+  h3 { font-size: 1.05rem; font-weight: 600; color: var(--gray-700); margin: 1.25rem 0 0.75rem; }
+
+  /* Tables */
+  table {
+    width: 100%; border-collapse: collapse; font-size: 0.9rem;
+    background: #fff; border-radius: 0.5rem; overflow: hidden;
+    border: 1px solid var(--gray-200); margin-bottom: 1rem;
+  }
+  thead th {
+    background: var(--gray-100); text-align: left; padding: 0.65rem 0.85rem;
+    font-weight: 600; color: var(--gray-700); font-size: 0.8rem;
+    text-transform: uppercase; letter-spacing: 0.04em;
+    border-bottom: 2px solid var(--gray-200);
+  }
+  tbody td {
+    padding: 0.6rem 0.85rem; border-bottom: 1px solid var(--gray-100);
+    vertical-align: top;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--gray-50); }
+
+  /* Status pills */
+  .pill {
+    display: inline-block; font-size: 0.75rem; font-weight: 600;
+    padding: 0.2rem 0.6rem; border-radius: 9999px; white-space: nowrap;
+  }
+  .pill-pass { background: var(--green-bg); color: var(--green); }
+  .pill-fail { background: var(--red-bg); color: var(--red); }
+  .pill-fixed { background: var(--blue-bg); color: var(--blue); }
+  .pill-open { background: var(--amber-bg); color: var(--amber); }
+
+  /* Code blocks */
+  pre {
+    background: #1e293b; color: #e2e8f0; padding: 1rem 1.25rem;
+    border-radius: 0.5rem; overflow-x: auto; font-size: 0.82rem;
+    line-height: 1.5; margin: 0.75rem 0 1rem;
+  }
+  code { font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace; }
+  p code, li code {
+    background: var(--gray-100); color: var(--red);
+    padding: 0.15rem 0.35rem; border-radius: 0.25rem; font-size: 0.85em;
+  }
+
+  /* Key fixes list */
+  .fix-list { list-style: none; padding: 0; margin: 0.75rem 0 1.5rem; }
+  .fix-list li {
+    padding: 0.75rem 1rem; background: #fff; border: 1px solid var(--gray-200);
+    border-radius: 0.5rem; margin-bottom: 0.5rem;
+    display: flex; gap: 0.75rem; align-items: flex-start;
+  }
+  .fix-list .tag {
+    flex-shrink: 0; font-size: 0.7rem; font-weight: 700;
+    padding: 0.2rem 0.5rem; border-radius: 0.25rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .tag-critical { background: var(--red-bg); color: var(--red); }
+  .tag-high { background: var(--amber-bg); color: var(--amber); }
+
+  /* Screenshots */
+  .screenshots { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; }
+  .screenshot-card {
+    background: #fff; border: 1px solid var(--gray-200); border-radius: 0.75rem;
+    overflow: hidden;
+  }
+  .screenshot-card img { width: 100%; display: block; }
+  .screenshot-card .caption {
+    padding: 0.6rem 0.85rem; font-size: 0.82rem; color: var(--gray-500);
+    background: var(--gray-50); border-top: 1px solid var(--gray-200);
+  }
+
+  /* Bug detail card */
+  .bug-card {
+    background: #fff; border: 1px solid var(--gray-200); border-radius: 0.75rem;
+    padding: 1.25rem 1.5rem; margin-bottom: 1rem;
+  }
+  .bug-card .bug-header {
+    display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; flex-wrap: wrap;
+  }
+  .bug-card .bug-id { font-weight: 700; font-size: 1rem; }
+  .bug-card .bug-title { font-weight: 600; color: var(--gray-700); }
+  .bug-card p { font-size: 0.9rem; color: var(--gray-700); margin: 0.5rem 0; }
+
+  /* Collapsible */
+  details { margin-bottom: 1.5rem; }
+  details summary {
+    cursor: pointer; font-size: 1.1rem; font-weight: 600;
+    color: var(--gray-700); padding: 0.5rem 0;
+    list-style: none; display: flex; align-items: center; gap: 0.5rem;
+  }
+  details summary::before { content: '▸'; transition: transform 0.2s; display: inline-block; }
+  details[open] summary::before { transform: rotate(90deg); }
+  details summary::-webkit-details-marker { display: none; }
+
+  /* Comparison row highlighting */
+  .comparison-table tbody tr:last-child { font-weight: 600; }
+  .comparison-table tbody tr:last-child td { background: var(--green-bg); }
+
+  /* Responsive */
+  @media (max-width: 700px) {
+    .header { padding: 1.5rem 1rem; }
+    .header h1 { font-size: 1.35rem; }
+    .container { padding: 1rem; }
+    .screenshots { grid-template-columns: 1fr; }
+    .summary-grid { grid-template-columns: 1fr 1fr; }
+  }
+
+  @media print {
+    body { background: #fff; }
+    .header { border-bottom-color: #000; }
+    details { open: true; }
+    details[open] summary::before { content: '▾'; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Vizora E2E Test Report</h1>
+  <div class="subtitle">Device Pairing &amp; Content Streaming Pipeline</div>
+  <div class="meta">
+    <span><strong>Date:</strong> February 27, 2026 (Run 5)</span>
+    <span><strong>Tester:</strong> Claude Code (automated E2E)</span>
+    <span><strong>Environment:</strong> vizora.cloud + Android TV Emulator</span>
+    <span><strong>Duration:</strong> ~60 min</span>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Verdict -->
+  <div class="verdict">
+    <span class="badge">ALL PASS</span>
+    <span class="text">Full pipeline working: Pairing → Content Push → Playlist Push. 3 bugs fixed this run.</span>
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="summary-grid">
+    <div class="card">
+      <div class="label">Steps Passed</div>
+      <div class="value pass">8 / 8</div>
+    </div>
+    <div class="card">
+      <div class="label">Steps Failed</div>
+      <div class="value" style="color:var(--gray-300)">0</div>
+    </div>
+    <div class="card">
+      <div class="label">Bugs Fixed</div>
+      <div class="value fixed">3</div>
+    </div>
+    <div class="card">
+      <div class="label">Bugs Open</div>
+      <div class="value open">3</div>
+    </div>
+  </div>
+
+  <!-- Key Fixes -->
+  <section>
+    <h2>Fixes Applied This Run</h2>
+    <ul class="fix-list">
+      <li>
+        <span class="tag tag-critical">Critical</span>
+        <div><strong>BUG-007:</strong> Fixed <code>displayId</code> → <code>deviceId</code> field name in pairing API response. Android app now reads and persists the device ID correctly across restarts.</div>
+      </li>
+      <li>
+        <span class="tag tag-high">High</span>
+        <div><strong>BUG-008:</strong> Removed empty-string URL fallback in realtime gateway that produced unresolvable relative URLs. Added relative URL handling in Android <code>transformContentUrl()</code>.</div>
+      </li>
+      <li>
+        <span class="tag tag-high">High</span>
+        <div><strong>BUG-009:</strong> <code>bulkAssignPlaylist</code> now notifies the realtime gateway for each device instead of only updating the database silently.</div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Run 5 Results -->
+  <section>
+    <h2>Run 5: Verification Results</h2>
+
+    <h3>Test Environment</h3>
+    <table>
+      <tbody>
+        <tr><td style="width:200px;font-weight:600">App Data</td><td>Fresh — cleared before test</td></tr>
+        <tr><td style="font-weight:600">Emulator</td><td>Cold-booted with <code>-dns-server 8.8.8.8 -no-snapshot-load</code></td></tr>
+        <tr><td style="font-weight:600">APK</td><td><code>vizora-display-1.0.0-debug.apk</code> (rebuilt with fixes)</td></tr>
+        <tr><td style="font-weight:600">Production Server</td><td>Middleware + realtime reloaded via PM2</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Step-by-Step Results</h3>
+    <table>
+      <thead>
+        <tr><th>Step</th><th>Description</th><th>Result</th><th>Evidence</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>1</td><td>User Authentication</td><td><span class="pill pill-pass">PASS</span></td><td>Login via API, JWT token obtained</td></tr>
+        <tr><td>2</td><td>Initiate Device Pairing</td><td><span class="pill pill-pass">PASS</span></td><td>Pairing form accessible on dashboard</td></tr>
+        <tr><td>3</td><td>Retrieve Pairing Code</td><td><span class="pill pill-pass">PASS</span></td><td>Code <code>GF9TTC</code> displayed on emulator</td></tr>
+        <tr><td>4</td><td>Complete Device Pairing</td><td><span class="pill pill-pass">PASS</span></td><td>Device ID: <code>40f404bc-cac1-41d0-9845-f08da16a4f8b</code></td></tr>
+        <tr><td>5</td><td>Upload Content</td><td><span class="pill pill-pass">PASS</span></td><td>Content <code>cmm53cfwa0002rxkgraact7l1</code> (99,532 bytes)</td></tr>
+        <tr><td>6</td><td>Push Content to Android</td><td><span class="pill pill-pass">PASS</span></td><td>Downloaded, cached, and rendered on screen</td></tr>
+        <tr><td>7</td><td>Create a Playlist</td><td><span class="pill pill-pass">PASS</span></td><td>Playlist <code>cmm53ptnu0004rxkgtkeydjge</code> with 1 item</td></tr>
+        <tr><td>8</td><td>Push Playlist to Android</td><td><span class="pill pill-pass">PASS</span></td><td>Received via WebSocket, persisted, content playing</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Key Verification Points</h3>
+
+    <p><strong>BUG-007 FIXED — Device ID Persisted:</strong></p>
+    <pre><code>Logcat: SecureStorage.set: {"key":"device_id","value":"40f404bc-cac1-41d0-9845-f08da16a4f8b"}</code></pre>
+
+    <p><strong>Step 6 — Content Push Pipeline:</strong></p>
+    <pre><code>[Vizora] WebSocket received push_content command
+Cache miss for cmm53cfwa0002rxkgraact7l1 — downloading...
+Downloaded from https://www.vizora.cloud/api/v1/device-content/cmm53cfwa0002rxkgraact7l1/file?token=...
+Saved to content-cache/cmm53cfwa0002rxkgraact7l1.png (99,532 bytes)
+Rendering from local cache: https://localhost/_capacitor_file_/...</code></pre>
+
+    <p><strong>Step 8 — Playlist Push Pipeline:</strong></p>
+    <pre><code>Logcat: Preferences.set: {"key":"last_playlist","value":"{\"id\":\"cmm53ptnu0004rxkgtkeydjge\",\"name\":\"Run4 E2E Playlist\",...}"}</code></pre>
+
+    <h3>Screenshots</h3>
+    <div class="screenshots">
+      <div class="screenshot-card">
+        <img src="screenshots/run5_push_content.png" alt="Content push screenshot">
+        <div class="caption"><strong>Step 6:</strong> Test image "VIZORA E2E RUN 4" rendered after content push</div>
+      </div>
+      <div class="screenshot-card">
+        <img src="screenshots/run5_push_playlist.png" alt="Playlist push screenshot">
+        <div class="caption"><strong>Step 8:</strong> Same content playing via playlist rotation</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Run 4 (collapsed) -->
+  <section>
+    <details>
+      <summary>Run 4: Regression Test (Feb 27) — 5 Pass / 2 Fail</summary>
+
+      <h3>Test Account</h3>
+      <table>
+        <tbody>
+          <tr><td style="width:180px;font-weight:600">Account</td><td><code>e2etest@vizora.cloud</code></td></tr>
+          <tr><td style="font-weight:600">Pairing Codes</td><td>9RPX2U (expired), 36GRMU, HCM3HZ, 7X6VUT, 8E52VV</td></tr>
+          <tr><td style="font-weight:600">Content</td><td>"Run4 E2E Test Image" (99KB PNG)</td></tr>
+          <tr><td style="font-weight:600">Playlist</td><td>"Run4 E2E Playlist"</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Step Results</h3>
+      <table>
+        <thead>
+          <tr><th>Step</th><th>Description</th><th>Result</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1</td><td>User Authentication</td><td><span class="pill pill-pass">PASS</span></td><td>Login + dashboard load</td></tr>
+          <tr><td>2</td><td>Initiate Device Pairing</td><td><span class="pill pill-pass">PASS</span></td><td>Pairing form accessible</td></tr>
+          <tr><td>3</td><td>Retrieve Pairing Code</td><td><span class="pill pill-pass">PASS</span></td><td>Multiple codes due to TTL</td></tr>
+          <tr><td>4</td><td>Complete Device Pairing</td><td><span class="pill pill-pass">PASS</span></td><td>Paired via API (form unreliable)</td></tr>
+          <tr><td>5</td><td>Upload Content</td><td><span class="pill pill-pass">PASS</span></td><td>Canvas-generated PNG uploaded</td></tr>
+          <tr><td>6</td><td>Push Content to Android</td><td><span class="pill pill-fail">FAIL</span></td><td>Black screen — BUG-007</td></tr>
+          <tr><td>7</td><td>Create a Playlist</td><td><span class="pill pill-pass">PASS</span></td><td>Server OK, device untestable</td></tr>
+          <tr><td>8</td><td>Push Playlist to Android</td><td><span class="pill pill-fail">FAIL</span></td><td>App reverted to pairing screen</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Root Cause (BUG-007)</h3>
+      <p>Logcat revealed <code>device_id</code> stored as empty string in SecureStorage:</p>
+      <pre><code>SecureStorage.set: {"key":"device_id","value":""}
+
+// API returns "displayId" but Android reads "deviceId"
+// middleware pairing.service.ts:195 → displayId: display?.id
+// display-android main.ts:406     → data.deviceId (undefined)
+// Result: stores empty string, loses pairing on restart</code></pre>
+    </details>
+  </section>
+
+  <!-- Bug Tracker -->
+  <section>
+    <h2>Bug Tracker</h2>
+
+    <div class="bug-card">
+      <div class="bug-header">
+        <span class="bug-id">BUG-007</span>
+        <span class="pill pill-fixed">FIXED</span>
+        <span class="tag tag-critical" style="font-size:0.7rem;padding:0.15rem 0.4rem;border-radius:0.25rem">CRITICAL</span>
+        <span class="bug-title"><code>device_id</code> Field Name Mismatch — Empty Device ID Stored</span>
+      </div>
+      <p>Middleware API returned <code>displayId</code> in pairing status response; Android app read <code>deviceId</code>. Resulted in empty string stored in SecureStorage. Every app restart lost pairing state.</p>
+      <p><strong>Fix:</strong> Renamed to <code>deviceId</code> in API + added <code>this.deviceId = data.deviceId</code> in Android paired handler.</p>
+    </div>
+
+    <div class="bug-card">
+      <div class="bug-header">
+        <span class="bug-id">BUG-008</span>
+        <span class="pill pill-fixed">FIXED</span>
+        <span class="tag tag-high" style="font-size:0.7rem;padding:0.15rem 0.4rem;border-radius:0.25rem">HIGH</span>
+        <span class="bug-title">Empty URL Fallback in Realtime Gateway</span>
+      </div>
+      <p>Production fallback was <code>NODE_ENV === 'production' ? '' : 'http://localhost:3000'</code> — produced relative URLs like <code>/api/v1/device-content/{id}/file</code> that Android WebView couldn't resolve.</p>
+      <p><strong>Fix:</strong> Removed empty-string fallback in 3 locations (<code>app.controller.ts:180</code>, <code>device.gateway.ts:126</code>, <code>device.gateway.ts:1157</code>). Added <code>API_BASE_URL=https://www.vizora.cloud</code> to production <code>.env</code>. Added relative URL handling in Android <code>transformContentUrl()</code>.</p>
+      <p><strong>Verified:</strong> Code confirmed — all 3 locations use <code>process.env.API_BASE_URL || 'http://localhost:3000'</code>. No empty-string fallback remains. Production server <code>.env</code> confirmed with <code>API_BASE_URL=https://www.vizora.cloud</code>.</p>
+    </div>
+
+    <div class="bug-card">
+      <div class="bug-header">
+        <span class="bug-id">BUG-009</span>
+        <span class="pill pill-fixed">FIXED</span>
+        <span class="tag tag-high" style="font-size:0.7rem;padding:0.15rem 0.4rem;border-radius:0.25rem">HIGH</span>
+        <span class="bug-title">Bulk Playlist Assignment Does Not Notify Devices</span>
+      </div>
+      <p><code>bulkAssignPlaylist()</code> updated <code>display.currentPlaylistId</code> in the database but did NOT call <code>notifyPlaylistUpdate()</code>. Devices never received playlists in real-time.</p>
+      <p><strong>Fix:</strong> Added loop over <code>displayIds</code> calling <code>notifyPlaylistUpdate()</code> for each (fire-and-forget). Included <code>items</code> with <code>content</code> in Prisma query so full playlist data is sent.</p>
+      <p><strong>Verified:</strong> Code confirmed — <code>displays.service.ts:430</code> calls <code>notifyPlaylistUpdate()</code> inside <code>bulkAssignPlaylist()</code>. Run 5 logcat shows playlist received and persisted by device.</p>
+    </div>
+
+    <div class="bug-card">
+      <div class="bug-header">
+        <span class="bug-id">BUG-001</span>
+        <span class="pill pill-fixed">FIXED</span>
+        <span class="tag tag-critical" style="font-size:0.7rem;padding:0.15rem 0.4rem;border-radius:0.25rem">CRITICAL</span>
+        <span class="bug-title">Content Never Renders on Android Device</span>
+      </div>
+      <p>Fixed in PR #11. Verified in Run 3.</p>
+    </div>
+
+    <div class="bug-card">
+      <div class="bug-header">
+        <span class="bug-id">BUG-003</span>
+        <span class="pill pill-fixed">FIXED</span>
+        <span class="tag tag-critical" style="font-size:0.7rem;padding:0.15rem 0.4rem;border-radius:0.25rem">CRITICAL</span>
+        <span class="bug-title">Infinite Filesystem.stat Polling Loop</span>
+      </div>
+      <p>Fixed in PR #11. Verified in Run 3.</p>
+    </div>
+
+    <div class="bug-card">
+      <div class="bug-header">
+        <span class="bug-id">BUG-002</span>
+        <span class="pill pill-open">OPEN</span>
+        <span class="tag tag-high" style="font-size:0.7rem;padding:0.15rem 0.4rem;border-radius:0.25rem">HIGH</span>
+        <span class="bug-title">Device Status Inconsistency Between Dashboard Views</span>
+      </div>
+      <p>Device shows "Offline" on dashboard immediately after pairing while emulator shows "Connected". Confirmed in Run 4. Non-blocking for content delivery.</p>
+    </div>
+
+    <div class="bug-card">
+      <div class="bug-header">
+        <span class="bug-id">BUG-006</span>
+        <span class="pill pill-open">OPEN</span>
+        <span class="tag tag-high" style="font-size:0.7rem;padding:0.15rem 0.4rem;border-radius:0.25rem">HIGH</span>
+        <span class="bug-title">Push Dialog Shows Device Online While Devices Page Shows Offline</span>
+      </div>
+      <p>Related to BUG-002. Different dashboard views read from different data sources.</p>
+    </div>
+
+    <div class="bug-card">
+      <div class="bug-header">
+        <span class="bug-id">BUG-004</span>
+        <span class="pill pill-open">OPEN</span>
+        <span class="tag" style="font-size:0.7rem;padding:0.15rem 0.4rem;border-radius:0.25rem;background:#e0e7ff;color:#4338ca">MEDIUM</span>
+        <span class="bug-title">Persistent "Reconnecting..." Status on Content Library</span>
+      </div>
+      <p>Dashboard WebSocket shows "Reconnecting..." even after successful reconnect. Confirmed in Run 4.</p>
+    </div>
+
+    <div class="bug-card">
+      <div class="bug-header">
+        <span class="bug-id">BUG-005</span>
+        <span class="pill pill-open">OPEN</span>
+        <span class="tag" style="font-size:0.7rem;padding:0.15rem 0.4rem;border-radius:0.25rem;background:var(--gray-100);color:var(--gray-500)">LOW</span>
+        <span class="bug-title">Content Upload Title Ignored</span>
+      </div>
+      <p>User-provided title in upload form is not used. Not re-tested in Run 4/5.</p>
+    </div>
+  </section>
+
+  <!-- Comparison -->
+  <section>
+    <h2>Comparison Across Runs</h2>
+    <table class="comparison-table">
+      <thead>
+        <tr><th>Aspect</th><th>Run 1</th><th>Run 2</th><th>Run 3</th><th>Run 4</th><th>Run 5</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="font-weight:600">Date</td>
+          <td>Feb 26</td><td>Feb 26</td><td>Feb 26</td><td>Feb 27</td><td>Feb 27</td>
+        </tr>
+        <tr>
+          <td style="font-weight:600">App Restarted?</td>
+          <td>No</td><td>No</td><td>No</td><td>Yes</td><td>Yes (fresh)</td>
+        </tr>
+        <tr>
+          <td style="font-weight:600">Pairing Code</td>
+          <td><code>868A39</code></td><td><code>EDM7T3</code></td><td><code>DTYUB9</code></td><td><code>HCM3HZ</code></td><td><code>GF9TTC</code></td>
+        </tr>
+        <tr>
+          <td style="font-weight:600">Push Content</td>
+          <td><span class="pill pill-pass">PASS</span>*</td>
+          <td><span class="pill pill-fail">FAIL</span></td>
+          <td><span class="pill pill-pass">PASS</span></td>
+          <td><span class="pill pill-fail">FAIL</span></td>
+          <td><span class="pill pill-pass">PASS</span></td>
+        </tr>
+        <tr>
+          <td style="font-weight:600">Push Playlist</td>
+          <td>Partial</td>
+          <td><span class="pill pill-fail">FAIL</span></td>
+          <td><span class="pill pill-pass">PASS</span></td>
+          <td><span class="pill pill-fail">FAIL</span></td>
+          <td><span class="pill pill-pass">PASS</span></td>
+        </tr>
+        <tr>
+          <td style="font-weight:600">Fixes Applied</td>
+          <td>None</td><td>None</td><td>PR #11</td><td>PR #11</td><td>+BUG-007/008/009</td>
+        </tr>
+        <tr>
+          <td style="font-weight:600">Root Cause</td>
+          <td>Pre-cached</td><td>No download</td><td>Fixed</td><td>Empty device_id</td><td>All fixed</td>
+        </tr>
+        <tr>
+          <td style="font-weight:600">Verdict</td>
+          <td><span class="pill pill-fail">FAIL</span></td>
+          <td><span class="pill pill-fail">FAIL</span></td>
+          <td><span class="pill pill-pass">PASS</span></td>
+          <td><span class="pill pill-fail">FAIL</span></td>
+          <td><span class="pill pill-pass">PASS</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Recommendations -->
+  <section>
+    <h2>Remaining Recommendations</h2>
+
+    <h3>P1 — Degrades UX (Non-Blocking)</h3>
+    <table>
+      <thead><tr><th>Item</th><th>Description</th><th>Related Bug</th></tr></thead>
+      <tbody>
+        <tr><td>Unify device status data source</td><td>Devices page should read from Redis or subscribe to WebSocket status events. Initial WebSocket connect should write status to PostgreSQL.</td><td>BUG-002, BUG-006</td></tr>
+        <tr><td>Fix WebSocket reconnection state</td><td>"Reconnecting..." should clear after successful reconnect.</td><td>BUG-004</td></tr>
+      </tbody>
+    </table>
+
+    <h3>P2 — Polish</h3>
+    <table>
+      <thead><tr><th>Item</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td>Defensive validation in Android app</td><td>Validate <code>device_id</code> is not empty before storing. If token exists but ID is empty on restart, re-derive from token.</td></tr>
+        <tr><td>Content delivery acknowledgment</td><td>Device should ACK content receipt via WebSocket. Dashboard shows per-device delivery status.</td></tr>
+        <tr><td>Respect content title</td><td>Use user-provided title from upload form. (BUG-005)</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Conclusion -->
+  <section>
+    <h2>Conclusion</h2>
+    <p><strong>Run 5 confirms all 8 steps of the device pairing and content streaming pipeline are working end-to-end.</strong> Three critical/high bugs were fixed:</p>
+    <ol style="margin:0.75rem 0 0.75rem 1.5rem; font-size:0.9rem;">
+      <li><strong>BUG-007 (CRITICAL):</strong> Device ID field name mismatch — devices now persist their identity across restarts</li>
+      <li><strong>BUG-008 (HIGH):</strong> Empty URL fallback in production — content URLs are now absolute and resolvable</li>
+      <li><strong>BUG-009 (HIGH):</strong> Bulk playlist assignment missing realtime notification — devices now receive playlists in real-time</li>
+    </ol>
+    <p>The full pipeline is verified: <strong>User login → Device pairing → Content upload → Content push (download + cache + render) → Playlist creation → Playlist push (receive + persist + playback)</strong>.</p>
+    <p style="margin-top:0.75rem"><strong>Remaining open bugs (non-blocking):</strong> BUG-002/006 (status inconsistency — HIGH), BUG-004 (reconnecting status — MEDIUM), BUG-005 (title ignored — LOW). None block content delivery but BUG-002/006 should be addressed before production launch.</p>
+  </section>
+
+  <footer style="text-align:center;padding:2rem 0 1rem;color:var(--gray-500);font-size:0.8rem;border-top:1px solid var(--gray-200)">
+    Generated by Claude Code &middot; February 27, 2026
+  </footer>
+
+</div>
+</body>
+</html>
