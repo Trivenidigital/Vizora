@@ -227,7 +227,7 @@ async function main() {
   }, startTime);
 
   outputJson(result);
-  process.exit(issues.some((i) => i.severity === 'critical') ? 1 : 0);
+  process.exitCode = issues.some((i) => i.severity === 'critical') ? 1 : 0;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

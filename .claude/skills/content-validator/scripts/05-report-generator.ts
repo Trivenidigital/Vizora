@@ -108,7 +108,7 @@ async function main() {
   };
 
   outputJson(report);
-  process.exit(readiness === 'NOT READY' ? 1 : 0);
+  process.exitCode = readiness === 'NOT READY' ? 1 : 0;
 }
 
 function generateMarkdown(

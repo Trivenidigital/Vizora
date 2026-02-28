@@ -45,7 +45,8 @@ async function main() {
       services,
     };
     outputJson(result);
-    process.exit(2);
+    process.exitCode = 2;
+    return;
   }
 
   // 2. Readiness probe (checks DB, Redis, etc.)
@@ -130,7 +131,7 @@ async function main() {
   };
 
   outputJson(result);
-  process.exit(overall === 'healthy' ? 0 : overall === 'degraded' ? 1 : 2);
+  process.exitCode = overall === 'healthy' ? 0 : overall === 'degraded' ? 1 : 2;
 }
 
 main().catch((err) => fail(err.message));

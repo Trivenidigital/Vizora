@@ -291,7 +291,7 @@ async function main() {
 
   outputJson(result);
   const hasCritical = issues.some((i) => i.severity === 'critical');
-  process.exit(hasCritical ? 1 : 0);
+  process.exitCode = hasCritical ? 1 : 0;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

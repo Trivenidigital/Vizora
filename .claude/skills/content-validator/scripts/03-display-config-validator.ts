@@ -65,7 +65,7 @@ async function main() {
   // Fetch data in parallel
   const [displays, schedules, playlists] = await Promise.all([
     api.getAll<Display>('/displays', {}, args.limit),
-    api.getAll<Schedule>('/schedules', { isActive: 'true' }, args.limit),
+    api.getAll<Schedule>('/schedules', {}, args.limit).then(s => s.filter(x => x.isActive !== false)),
     api.getAll<Playlist>('/playlists', {}, args.limit),
   ]);
 
@@ -229,7 +229,7 @@ async function main() {
   }, startTime);
 
   outputJson(result);
-  process.exit(issues.some((i) => i.severity === 'critical') ? 1 : 0);
+  process.exitCode = issues.some((i) => i.severity === 'critical') ? 1 : 0;
 }
 
 main().catch((err) => fail(err.message));

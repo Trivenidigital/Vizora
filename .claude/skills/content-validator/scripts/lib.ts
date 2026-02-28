@@ -197,7 +197,9 @@ export function outputJson(data: unknown): void {
 
 export function fail(message: string): never {
   process.stderr.write(`ERROR: ${message}\n`);
-  process.exit(2);
+  process.exitCode = 2;
+  // Use exitCode instead of process.exit() to avoid Windows Node.js assertion crash
+  throw new Error(message);
 }
 
 export function makeResult(
