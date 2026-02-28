@@ -109,6 +109,31 @@ module.exports = {
       max_restarts: 10,
       min_uptime: '10s',
     },
+    {
+      name: 'vizora-validator',
+      script: 'npx',
+      args: 'tsx scripts/validate-monitor.ts',
+      instances: 1,
+      exec_mode: 'fork',
+      cron_restart: '*/15 * * * *', // Run every 15 minutes
+      autorestart: false, // Don't restart on exit — cron handles scheduling
+      watch: false,
+      max_memory_restart: '256M',
+      env: {
+        NODE_ENV: 'development',
+        VALIDATOR_BASE_URL: 'http://localhost:3000',
+      },
+      env_production: {
+        NODE_ENV: 'production',
+        VALIDATOR_BASE_URL: 'http://localhost:3000',
+      },
+      // Logging
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      max_size: '10M',
+      error_file: './logs/validator-error.log',
+      out_file: './logs/validator-out.log',
+      merge_logs: true,
+    },
   ],
 
   // Deployment configuration (optional)
