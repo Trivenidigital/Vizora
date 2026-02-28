@@ -261,8 +261,8 @@ async function main(): Promise<void> {
 
   // ─── 6. Update Dashboard ──────────────────────────────────────────────────
 
-  const dashEmail = process.env.VALIDATOR_EMAIL;
-  const dashPassword = process.env.VALIDATOR_PASSWORD;
+  const dashEmail = process.env.OPS_EMAIL || process.env.VALIDATOR_EMAIL;
+  const dashPassword = process.env.OPS_PASSWORD || process.env.VALIDATOR_PASSWORD;
 
   if (dashEmail && dashPassword) {
     const baseUrl = process.env.VALIDATOR_BASE_URL || 'http://localhost:3000';
@@ -275,7 +275,7 @@ async function main(): Promise<void> {
       log(AGENT, `Dashboard update failed: ${err instanceof Error ? err.message : err}`);
     }
   } else {
-    log(AGENT, 'Dashboard update skipped (VALIDATOR_EMAIL/VALIDATOR_PASSWORD not set)');
+    log(AGENT, 'Dashboard update skipped (OPS_EMAIL/VALIDATOR_EMAIL not set)');
   }
 
   // ─── 7. Prune Old Data ────────────────────────────────────────────────────

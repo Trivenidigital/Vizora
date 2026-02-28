@@ -8,7 +8,7 @@
  * Uses Windows-safe path resolution (same pattern as validate-monitor.ts).
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, openSync, closeSync, unlinkSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import type {
   OpsState,
@@ -22,6 +22,8 @@ import type {
 
 const MAX_INCIDENTS = 200;
 const MAX_REMEDIATIONS = 100;
+const LOCK_TIMEOUT_MS = 5_000;
+const LOCK_RETRY_MS = 50;
 
 /**
  * State file path — resolves to `<project-root>/logs/ops-state.json`.
@@ -32,6 +34,46 @@ const STATE_FILE = join(
   dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1')),
   '..', '..', '..', 'logs', 'ops-state.json',
 );
+
+const LOCK_FILE = STATE_FILE + '.lock';
+
+// ─── File Locking ───────────────────────────────────────────────────────────
+
+/**
+ * Acquire an exclusive file lock using atomic `wx` flag.
+ * Spins with short sleeps until the lock is acquired or timeout expires.
+ * Stale locks (>30s old) are automatically removed.
+ */
+function acquireLock(): void {
+  const deadline = Date.now() + LOCK_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    try {
+      const fd = openSync(LOCK_FILE, 'wx');
+      closeSync(fd);
+      return;
+    } catch {
+      // Check for stale lock (>30s old — agent probably crashed)
+      try {
+        if (existsSync(LOCK_FILE)) {
+          const { mtimeMs } = statSync(LOCK_FILE);
+          if (Date.now() - mtimeMs > 30_000) {
+            try { unlinkSync(LOCK_FILE); } catch { /* race with another agent */ }
+            continue;
+          }
+        }
+      } catch { /* lock file gone — retry will succeed */ }
+
+      // Busy wait with small random jitter
+      const waitEnd = Date.now() + LOCK_RETRY_MS + Math.random() * 50;
+      while (Date.now() < waitEnd) { /* spin */ }
+    }
+  }
+  // Timeout — proceed without lock (better than crashing)
+}
+
+function releaseLock(): void {
+  try { unlinkSync(LOCK_FILE); } catch { /* ignore */ }
+}
 
 // ─── Empty State ────────────────────────────────────────────────────────────
 
@@ -50,9 +92,11 @@ function emptyState(): OpsState {
 
 /**
  * Read the ops state file. Returns an empty state if the file does not
- * exist or cannot be parsed.
+ * exist or cannot be parsed. Acquires file lock to prevent concurrent
+ * read-modify-write races between agents.
  */
 export function readOpsState(): OpsState {
+  acquireLock();
   try {
     if (!existsSync(STATE_FILE)) return emptyState();
     const raw = readFileSync(STATE_FILE, 'utf-8');
@@ -69,21 +113,28 @@ export function readOpsState(): OpsState {
   } catch {
     return emptyState();
   }
+  // Note: lock is NOT released here — caller must call writeOpsState()
+  // to complete the atomic read-modify-write cycle.
 }
 
 /**
- * Write ops state to disk. Trims incidents to MAX_INCIDENTS and
- * remediations to MAX_REMEDIATIONS (keeping most recent).
+ * Write ops state to disk and release the file lock. Trims incidents
+ * to MAX_INCIDENTS and remediations to MAX_REMEDIATIONS (keeping most recent).
+ * Must be called after readOpsState() to release the lock.
  */
 export function writeOpsState(state: OpsState): void {
-  // Enforce size limits — keep most recent entries
-  state.incidents = state.incidents.slice(-MAX_INCIDENTS);
-  state.recentRemediations = state.recentRemediations.slice(-MAX_REMEDIATIONS);
-  state.lastUpdated = new Date().toISOString();
+  try {
+    // Enforce size limits — keep most recent entries
+    state.incidents = state.incidents.slice(-MAX_INCIDENTS);
+    state.recentRemediations = state.recentRemediations.slice(-MAX_REMEDIATIONS);
+    state.lastUpdated = new Date().toISOString();
 
-  const dir = dirname(STATE_FILE);
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
+    const dir = dirname(STATE_FILE);
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
+  } finally {
+    releaseLock();
+  }
 }
 
 // ─── State Mutations ────────────────────────────────────────────────────────

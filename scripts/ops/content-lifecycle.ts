@@ -17,7 +17,7 @@
  *   2 — fatal error (agent could not complete)
  */
 
-import type { Incident, AgentResult, RemediationAction } from './lib/types.js';
+import type { Incident, AgentResult } from './lib/types.js';
 import {
   readOpsState,
   writeOpsState,
@@ -68,7 +68,6 @@ async function checkExpiredContent(
   api: OpsApiClient,
   content: ContentItem[],
   incidents: Incident[],
-  remediations: RemediationAction[],
   state: { issuesFound: number; issuesFixed: number },
 ): Promise<void> {
   const now = new Date();
@@ -151,7 +150,6 @@ async function checkOrphanedContent(
   content: ContentItem[],
   playlists: Playlist[],
   incidents: Incident[],
-  remediations: RemediationAction[],
   state: { issuesFound: number; issuesFixed: number },
 ): Promise<void> {
   // Build a set of all content IDs referenced by any playlist
@@ -345,11 +343,11 @@ async function main(): Promise<void> {
   // ─── 1. Auth ──────────────────────────────────────────────────────────────
 
   const baseUrl = process.env.VALIDATOR_BASE_URL || 'http://localhost:3000';
-  const email = process.env.VALIDATOR_EMAIL || '';
-  const password = process.env.VALIDATOR_PASSWORD || '';
+  const email = process.env.OPS_EMAIL || process.env.VALIDATOR_EMAIL || '';
+  const password = process.env.OPS_PASSWORD || process.env.VALIDATOR_PASSWORD || '';
 
   if (!email || !password) {
-    log(AGENT, 'FATAL: VALIDATOR_EMAIL and VALIDATOR_PASSWORD must be set');
+    log(AGENT, 'FATAL: No credentials — set OPS_EMAIL/OPS_PASSWORD or VALIDATOR_EMAIL/VALIDATOR_PASSWORD');
     process.exitCode = 2;
     return;
   }
@@ -388,22 +386,16 @@ async function main(): Promise<void> {
 
   const opsState = readOpsState();
   const incidents: Incident[] = [];
-  const remediations: RemediationAction[] = [];
   const counters = { issuesFound: 0, issuesFixed: 0, issuesEscalated: 0 };
 
   // 3a. Expired content
-  await checkExpiredContent(api, content, incidents, remediations, counters);
+  await checkExpiredContent(api, content, incidents, counters);
 
   // 3b. Orphaned content
-  await checkOrphanedContent(api, content, playlists, incidents, remediations, counters);
+  await checkOrphanedContent(api, content, playlists, incidents, counters);
 
   // 3c. Storage monitoring
   await checkStorageUsage(api, incidents, counters);
-
-  // Collect audit log from API client
-  for (const entry of api.auditLog) {
-    remediations.push(entry);
-  }
 
   // ─── 4. Record Results & Write State ──────────────────────────────────────
 
@@ -421,7 +413,7 @@ async function main(): Promise<void> {
 
   recordAgentRun(opsState, result);
 
-  for (const r of remediations) {
+  for (const r of api.auditLog) {
     addRemediation(opsState, r);
   }
 

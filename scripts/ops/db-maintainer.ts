@@ -13,14 +13,11 @@
  *   0 — maintenance completed successfully
  *   2 — fatal error (agent could not complete)
  *
- * Security note: All execSync calls use hardcoded command strings or
- * environment variable references — no user input interpolation.
- * This is safe — no injection risk. execSync is required here because
- * we need to invoke system tools (psql, redis-cli, pm2) that are not
- * available through the application's execFileNoThrow utility.
+ * Security note: Uses execFileSync (no shell) for psql, redis-cli, and pm2.
+ * Arguments are passed as arrays — no shell injection risk.
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import type { AgentResult } from './lib/types.js';
@@ -83,12 +80,11 @@ function vacuumAnalyze(): VacuumResult[] {
 
   for (const table of VACUUM_TABLES) {
     try {
-      // Hardcoded table names from VACUUM_TABLES constant — safe, no user input.
-      // execSync is required to invoke psql CLI tool.
-      execSync(
-        `psql "${databaseUrl}" -c 'VACUUM ANALYZE "${table}";'`,
-        { timeout: VACUUM_TIMEOUT_MS, stdio: 'pipe', shell: '/bin/bash' },
-      );
+      // execFileSync avoids shell — no injection risk from DATABASE_URL.
+      execFileSync('psql', [databaseUrl, '-c', `VACUUM ANALYZE "${table}";`], {
+        timeout: VACUUM_TIMEOUT_MS,
+        stdio: 'pipe',
+      });
       log(AGENT, `  VACUUM ANALYZE "${table}" — OK`);
       results.push({ table, success: true });
     } catch (err) {
@@ -123,11 +119,12 @@ function checkRedis(): RedisStatus {
   const status: RedisStatus = { memoryHuman: 'unknown', dbSize: 'unknown' };
 
   try {
-    // Hardcoded redis-cli command with env var — safe, no user input.
-    const memoryOutput = execSync(
-      `redis-cli -u "${redisUrl}" info memory`,
-      { timeout: 10_000, stdio: 'pipe', shell: '/bin/bash', encoding: 'utf-8' },
-    );
+    // execFileSync avoids shell — no injection risk from REDIS_URL.
+    const memoryOutput = execFileSync('redis-cli', ['-u', redisUrl, 'info', 'memory'], {
+      timeout: 10_000,
+      stdio: 'pipe',
+      encoding: 'utf-8',
+    });
     const memoryMatch = memoryOutput.match(/used_memory_human:(.+)/);
     if (memoryMatch) {
       status.memoryHuman = memoryMatch[1].trim();
@@ -139,11 +136,11 @@ function checkRedis(): RedisStatus {
   }
 
   try {
-    // Hardcoded redis-cli command with env var — safe, no user input.
-    const dbsizeOutput = execSync(
-      `redis-cli -u "${redisUrl}" dbsize`,
-      { timeout: 10_000, stdio: 'pipe', shell: '/bin/bash', encoding: 'utf-8' },
-    );
+    const dbsizeOutput = execFileSync('redis-cli', ['-u', redisUrl, 'dbsize'], {
+      timeout: 10_000,
+      stdio: 'pipe',
+      encoding: 'utf-8',
+    });
     status.dbSize = dbsizeOutput.trim();
   } catch (err) {
     if (!status.error) {
@@ -211,11 +208,9 @@ function rotateLogs(): LogRotationResult {
 function pm2Flush(): boolean {
   log(AGENT, 'Flushing PM2 logs');
   try {
-    // Hardcoded command — safe, no user input.
-    execSync('pm2 flush', {
+    execFileSync('pm2', ['flush'], {
       timeout: PM2_FLUSH_TIMEOUT_MS,
       stdio: 'pipe',
-      shell: '/bin/bash',
     });
     log(AGENT, '  PM2 flush — OK');
     return true;

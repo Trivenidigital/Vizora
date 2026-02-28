@@ -103,11 +103,11 @@ async function main(): Promise<void> {
   // ─── Auth ────────────────────────────────────────────────────────────────
 
   const baseUrl = process.env.VALIDATOR_BASE_URL || 'http://localhost:3000';
-  const email = process.env.VALIDATOR_EMAIL || process.env.OPS_EMAIL || '';
-  const password = process.env.VALIDATOR_PASSWORD || process.env.OPS_PASSWORD || '';
+  const email = process.env.OPS_EMAIL || process.env.VALIDATOR_EMAIL || '';
+  const password = process.env.OPS_PASSWORD || process.env.VALIDATOR_PASSWORD || '';
 
   if (!email || !password) {
-    log(AGENT, 'FATAL: No credentials — set VALIDATOR_EMAIL/VALIDATOR_PASSWORD or OPS_EMAIL/OPS_PASSWORD');
+    log(AGENT, 'FATAL: No credentials — set OPS_EMAIL/OPS_PASSWORD or VALIDATOR_EMAIL/VALIDATOR_PASSWORD');
     process.exitCode = 2;
     return;
   }
@@ -231,12 +231,12 @@ async function main(): Promise<void> {
           target: 'display',
           targetId: display.id,
           detected: existing?.detected ?? new Date().toISOString(),
-          message: `Display "${label}" offline for ${Math.round(mins)}min — ping sent`,
+          message: `Display "${label}" offline for ${Math.round(mins)}min — ping sent, awaiting reconnect`,
           remediation: 'POST /displays/ping — reconnect attempt',
           status: 'open',
           attempts: (existing?.attempts ?? 0) + 1,
         });
-        issuesFixed++; // Ping was sent (partial fix — awaiting reconnect)
+        // Note: not counted as issuesFixed — ping was sent but display hasn't reconnected yet
       } else {
         incidents.push({
           id: incidentId,
