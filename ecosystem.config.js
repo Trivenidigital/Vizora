@@ -134,6 +134,156 @@ module.exports = {
       out_file: './logs/validator-out.log',
       merge_logs: true,
     },
+    {
+      name: 'ops-health-guardian',
+      script: 'npx',
+      args: 'tsx scripts/ops/health-guardian.ts',
+      instances: 1,
+      exec_mode: 'fork',
+      cron_restart: '*/5 * * * *', // Run every 5 minutes
+      autorestart: false, // Don't restart on exit — cron handles scheduling
+      watch: false,
+      max_memory_restart: '256M',
+      env: {
+        NODE_ENV: 'development',
+        VALIDATOR_BASE_URL: 'http://localhost:3000',
+      },
+      env_production: {
+        NODE_ENV: 'production',
+        VALIDATOR_BASE_URL: 'http://localhost:3000',
+      },
+      // Logging
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      max_size: '10M',
+      error_file: './logs/ops-health-guardian-error.log',
+      out_file: './logs/ops-health-guardian-out.log',
+      merge_logs: true,
+    },
+    {
+      name: 'ops-content-lifecycle',
+      script: 'npx',
+      args: 'tsx scripts/ops/content-lifecycle.ts',
+      instances: 1,
+      exec_mode: 'fork',
+      cron_restart: '*/15 * * * *', // Run every 15 minutes
+      autorestart: false, // Don't restart on exit — cron handles scheduling
+      watch: false,
+      max_memory_restart: '256M',
+      env: {
+        NODE_ENV: 'development',
+        VALIDATOR_BASE_URL: 'http://localhost:3000',
+      },
+      env_production: {
+        NODE_ENV: 'production',
+        VALIDATOR_BASE_URL: 'http://localhost:3000',
+      },
+      // Logging
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      max_size: '10M',
+      error_file: './logs/ops-content-lifecycle-error.log',
+      out_file: './logs/ops-content-lifecycle-out.log',
+      merge_logs: true,
+    },
+    {
+      name: 'ops-fleet-manager',
+      script: 'npx',
+      args: 'tsx scripts/ops/fleet-manager.ts',
+      instances: 1,
+      exec_mode: 'fork',
+      cron_restart: '*/10 * * * *', // Run every 10 minutes
+      autorestart: false, // Don't restart on exit — cron handles scheduling
+      watch: false,
+      max_memory_restart: '256M',
+      env: {
+        NODE_ENV: 'development',
+        VALIDATOR_BASE_URL: 'http://localhost:3000',
+      },
+      env_production: {
+        NODE_ENV: 'production',
+        VALIDATOR_BASE_URL: 'http://localhost:3000',
+      },
+      // Logging
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      max_size: '10M',
+      error_file: './logs/ops-fleet-manager-error.log',
+      out_file: './logs/ops-fleet-manager-out.log',
+      merge_logs: true,
+    },
+    {
+      name: 'ops-schedule-doctor',
+      script: 'npx',
+      args: 'tsx scripts/ops/schedule-doctor.ts',
+      instances: 1,
+      exec_mode: 'fork',
+      cron_restart: '*/15 * * * *', // Run every 15 minutes
+      autorestart: false, // Don't restart on exit — cron handles scheduling
+      watch: false,
+      max_memory_restart: '256M',
+      env: {
+        NODE_ENV: 'development',
+        VALIDATOR_BASE_URL: 'http://localhost:3000',
+      },
+      env_production: {
+        NODE_ENV: 'production',
+        VALIDATOR_BASE_URL: 'http://localhost:3000',
+      },
+      // Logging
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      max_size: '10M',
+      error_file: './logs/ops-schedule-doctor-error.log',
+      out_file: './logs/ops-schedule-doctor-out.log',
+      merge_logs: true,
+    },
+    {
+      name: 'ops-reporter',
+      script: 'npx',
+      args: 'tsx scripts/ops/ops-reporter.ts',
+      instances: 1,
+      exec_mode: 'fork',
+      cron_restart: '*/30 * * * *', // Run every 30 minutes
+      autorestart: false, // Don't restart on exit — cron handles scheduling
+      watch: false,
+      max_memory_restart: '256M',
+      env: {
+        NODE_ENV: 'development',
+        VALIDATOR_BASE_URL: 'http://localhost:3000',
+      },
+      env_production: {
+        NODE_ENV: 'production',
+        VALIDATOR_BASE_URL: 'http://localhost:3000',
+      },
+      // Logging
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      max_size: '10M',
+      error_file: './logs/ops-reporter-error.log',
+      out_file: './logs/ops-reporter-out.log',
+      merge_logs: true,
+    },
+    {
+      name: 'ops-db-maintainer',
+      script: 'npx',
+      args: 'tsx scripts/ops/db-maintainer.ts',
+      instances: 1,
+      exec_mode: 'fork',
+      cron_restart: '0 3 * * *', // Run daily at 3 AM
+      autorestart: false, // Don't restart on exit — cron handles scheduling
+      watch: false,
+      max_memory_restart: '256M',
+      env: {
+        NODE_ENV: 'development',
+        VALIDATOR_BASE_URL: 'http://localhost:3000',
+      },
+      env_production: {
+        NODE_ENV: 'production',
+        VALIDATOR_BASE_URL: 'http://localhost:3000',
+      },
+      // Logging
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      max_size: '10M',
+      error_file: './logs/ops-db-maintainer-error.log',
+      out_file: './logs/ops-db-maintainer-out.log',
+      merge_logs: true,
+    },
   ],
 
   // Deployment configuration (optional)
