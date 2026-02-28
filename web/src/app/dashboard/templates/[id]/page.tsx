@@ -420,19 +420,20 @@ export default function TemplateDetailPage() {
                 </button>
               </div>
 
-              <div className="relative bg-[var(--background)]" style={{ minHeight: '400px' }}>
+              <div className="relative bg-[var(--background)] p-4" style={{ minHeight: '400px' }}>
                 {previewLoading ? (
                   <div className="flex items-center justify-center h-96">
                     <LoadingSpinner size="lg" />
                   </div>
                 ) : previewHtml ? (
-                  <iframe
-                    srcDoc={previewHtml}
-                    sandbox="allow-scripts"
-                    className="w-full border-0"
-                    style={{ height: '500px' }}
-                    title={`Preview of ${template.name}`}
-                  />
+                  <div className="mx-auto" style={{ maxWidth: '100%', aspectRatio: '16/9' }}>
+                    <iframe
+                      srcDoc={previewHtml}
+                      sandbox="allow-scripts"
+                      className="w-full h-full border-0 rounded-lg"
+                      title={`Preview of ${template.name}`}
+                    />
+                  </div>
                 ) : template.thumbnailUrl ? (
                   <div className="flex items-center justify-center h-96">
                     <img

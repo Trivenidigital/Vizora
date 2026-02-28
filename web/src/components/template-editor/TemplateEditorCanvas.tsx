@@ -7,6 +7,7 @@ import {
   useImperativeHandle,
   useMemo,
   useRef,
+  useState,
 } from 'react';
 import type { SelectedElement } from './PropertyPanel';
 import { TEMPLATE_WIDTH, TEMPLATE_HEIGHT } from './useCanvasZoom';
@@ -395,6 +396,7 @@ const EDITOR_RUNTIME_CODE = `(function () {
 const TemplateEditorCanvas = forwardRef<CanvasHandle, TemplateEditorCanvasProps>(
   function TemplateEditorCanvas({ templateHtml, onElementSelected, onReady, scale = 1, isScrollable = false }, ref) {
     const iframeRef = useRef<HTMLIFrameElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
     const serializeResolverRef = useRef<((html: string) => void) | null>(null);
 
     // ── Inject editor runtime into template HTML ──────────────────────
@@ -530,6 +532,7 @@ const TemplateEditorCanvas = forwardRef<CanvasHandle, TemplateEditorCanvasProps>
 
     return (
       <div
+        ref={containerRef}
         className={`relative w-full h-full bg-gray-900 rounded-xl border border-gray-700 ${
           isScrollable ? 'overflow-auto' : 'overflow-hidden'
         }`}
