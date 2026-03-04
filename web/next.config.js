@@ -58,6 +58,11 @@ const nextConfig = {
         source: '/static/:path*',
         destination: `${backendUrl}/static/:path*`,
       },
+      // Proxy template seed thumbnails through Next.js
+      {
+        source: '/templates/seed/:path*',
+        destination: `${backendUrl}/templates/seed/:path*`,
+      },
       // Proxy uploaded content files through Next.js
       {
         source: '/uploads/:path*',

@@ -51,6 +51,12 @@ async function bootstrap() {
     maxAge: '7d',
   });
 
+  // Serve template seed thumbnails
+  app.useStaticAssets(join(process.cwd(), 'templates', 'seed'), {
+    prefix: '/templates/seed/',
+    maxAge: '30d',
+  });
+
   // NOTE: /uploads/ static route removed for security (H2).
   // Local files must be served through authenticated device-content endpoint.
   // MinIO-stored content (primary) is already served via DeviceContentController.

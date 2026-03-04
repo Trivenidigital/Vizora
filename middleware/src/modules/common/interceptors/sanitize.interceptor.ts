@@ -96,28 +96,29 @@ export class SanitizeInterceptor implements NestInterceptor {
       return next.handle();
     }
 
-    // Sanitize output
+    // Sanitize output — decode HTML entities since API returns JSON, not HTML.
+    // sanitize-html encodes & → &amp; etc., but React/JSON clients expect plain text.
     return next.handle().pipe(
       map((data) => {
         if (data && typeof data === 'object') {
-          return this.sanitizeObject(data);
+          return this.sanitizeObject(data, true);
         }
         return data;
       }),
     );
   }
 
-  private sanitizeObject(obj: any): any {
+  private sanitizeObject(obj: any, decodeEntities = false): any {
     if (obj === null || obj === undefined) {
       return obj;
     }
 
     if (typeof obj === 'string') {
-      return this.sanitizeString(obj);
+      return this.sanitizeString(obj, decodeEntities);
     }
 
     if (Array.isArray(obj)) {
-      return obj.map(item => this.sanitizeObject(item));
+      return obj.map(item => this.sanitizeObject(item, decodeEntities));
     }
 
     if (obj instanceof Date) {
@@ -137,7 +138,7 @@ export class SanitizeInterceptor implements NestInterceptor {
             ? this.sanitizeTemplateHtml(value)
             : value;
         } else {
-          sanitized[key] = this.sanitizeObject(value);
+          sanitized[key] = this.sanitizeObject(value, decodeEntities);
         }
       }
       return sanitized;
@@ -156,13 +157,30 @@ export class SanitizeInterceptor implements NestInterceptor {
   }
 
 
-  private sanitizeString(str: string): string {
+  private sanitizeString(str: string, decodeEntities = false): string {
     // First strip HTML tags
     let sanitized = sanitizeHtml(str, this.sanitizeOptions);
-    
+
     // Trim whitespace
     sanitized = sanitized.trim();
-    
+
+    // For OUTPUT only: decode HTML entities since our API returns JSON, not HTML.
+    // sanitize-html encodes & → &amp; etc., but JSON/React clients expect plain text.
+    // Only applied to response data (decodeEntities=true), never to request inputs.
+    if (decodeEntities) {
+      sanitized = this.decodeHtmlEntities(sanitized);
+    }
+
     return sanitized;
+  }
+
+  private decodeHtmlEntities(str: string): string {
+    return str
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#x27;/g, "'")
+      .replace(/&#x2F;/g, '/');
   }
 }

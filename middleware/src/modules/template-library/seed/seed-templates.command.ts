@@ -5,13 +5,43 @@
  *   npx ts-node middleware/src/modules/template-library/seed/seed-templates.command.ts
  *
  * Options:
- *   --clear      Remove all existing library templates before seeding
- *   --re-render  Update renderedHtml for existing templates without recreating them
+ *   --clear              Remove all existing library templates before seeding
+ *   --re-render          Update renderedHtml for existing templates without recreating them
+ *   --update-thumbnails  Assign previewImageUrl to existing templates from disk thumbnails
  */
 
 import { PrismaClient } from '@vizora/database';
 import * as Handlebars from 'handlebars';
+import * as fs from 'fs';
+import * as path from 'path';
 import { allTemplateSeeds, categorySummary } from './template-seeds';
+
+/**
+ * Build a map of category → sorted thumbnail filenames from disk.
+ * Thumbnails are assigned to templates by index within each category.
+ */
+function buildThumbnailMap(): Map<string, string[]> {
+  const seedDir = path.resolve(__dirname, '..', '..', '..', '..', '..', 'templates', 'seed');
+  const thumbMap = new Map<string, string[]>();
+
+  try {
+    const categories = fs.readdirSync(seedDir).filter((d) => {
+      const stat = fs.statSync(path.join(seedDir, d));
+      return stat.isDirectory() && d !== '{thumbnails}';
+    });
+
+    for (const category of categories) {
+      const thumbDir = path.join(seedDir, category, 'thumbnails');
+      if (!fs.existsSync(thumbDir)) continue;
+      const files = fs.readdirSync(thumbDir).filter((f) => f.endsWith('.png')).sort();
+      thumbMap.set(category, files);
+    }
+  } catch {
+    // Thumbnails dir not found — seed will work without thumbnails
+  }
+
+  return thumbMap;
+}
 
 /**
  * Compile a Handlebars template with sample data to produce renderedHtml
@@ -30,6 +60,7 @@ async function main() {
   const prisma = new PrismaClient();
   const clearFirst = process.argv.includes('--clear');
   const reRender = process.argv.includes('--re-render');
+  const updateThumbnails = process.argv.includes('--update-thumbnails');
 
   try {
     console.log('Template Library Seeder');
@@ -84,6 +115,43 @@ async function main() {
       return;
     }
 
+    // --update-thumbnails mode: assign previewImageUrl to existing templates
+    if (updateThumbnails) {
+      console.log('\nUpdating thumbnail URLs for existing templates...');
+      const thumbMap = buildThumbnailMap();
+      const catIndex: Record<string, number> = {};
+      let updated = 0;
+
+      for (const seed of allTemplateSeeds) {
+        catIndex[seed.category] = (catIndex[seed.category] || 0);
+        const thumbIdx = catIndex[seed.category];
+        catIndex[seed.category]++;
+
+        const thumbFiles = thumbMap.get(seed.category);
+        const thumbFile = thumbFiles?.[thumbIdx];
+        if (!thumbFile) continue;
+
+        const previewImageUrl = `/templates/seed/${seed.category}/thumbnails/${thumbFile}`;
+
+        const existing = await prisma.content.findFirst({
+          where: { name: seed.name, isGlobal: true, type: 'template' },
+          select: { id: true, metadata: true },
+        });
+        if (!existing) continue;
+
+        const meta = (existing.metadata as Record<string, any>) || {};
+        await prisma.content.update({
+          where: { id: existing.id },
+          data: { metadata: { ...meta, previewImageUrl } },
+        });
+        updated++;
+      }
+
+      console.log(`Updated ${updated} templates with thumbnail URLs.`);
+      console.log('Done!');
+      return;
+    }
+
     if (clearFirst) {
       console.log('\nClearing existing library templates...');
       const deleted = await prisma.content.deleteMany({
@@ -110,14 +178,32 @@ async function main() {
       })).map((t) => t.name),
     );
 
+    // Build thumbnail map from disk (category → sorted filenames)
+    const thumbMap = buildThumbnailMap();
+    const categoryIndex: Record<string, number> = {};
+
     let created = 0;
     let skipped = 0;
+    let thumbsAssigned = 0;
 
     for (const seed of allTemplateSeeds) {
+      // Track per-category index for thumbnail assignment
+      categoryIndex[seed.category] = (categoryIndex[seed.category] || 0);
+      const thumbIdx = categoryIndex[seed.category];
+      categoryIndex[seed.category]++;
+
       if (existingNames.has(seed.name)) {
         skipped++;
         continue;
       }
+
+      // Assign thumbnail URL if available
+      const thumbFiles = thumbMap.get(seed.category);
+      const thumbFile = thumbFiles?.[thumbIdx];
+      const previewImageUrl = thumbFile
+        ? `/templates/seed/${seed.category}/thumbnails/${thumbFile}`
+        : undefined;
+      if (previewImageUrl) thumbsAssigned++;
 
       // Render template with sample data
       const renderedHtml = renderWithSampleData(seed.templateHtml, seed.sampleData || {});
@@ -142,6 +228,7 @@ async function main() {
             libraryTags: seed.libraryTags,
             difficulty: seed.difficulty,
             isFeatured: seed.isFeatured || false,
+            ...(previewImageUrl && { previewImageUrl }),
             ...(seed.seasonalStart && { seasonalStart: seed.seasonalStart }),
             ...(seed.seasonalEnd && { seasonalEnd: seed.seasonalEnd }),
             dataSource: { type: 'manual', manualData: seed.sampleData || {} },
@@ -153,7 +240,7 @@ async function main() {
       created++;
     }
 
-    console.log(`\nDone! Created: ${created}, Skipped: ${skipped}`);
+    console.log(`\nDone! Created: ${created}, Skipped: ${skipped}, Thumbnails: ${thumbsAssigned}`);
     console.log('Template library is ready.');
   } catch (error) {
     console.error('Seeding failed:', error);

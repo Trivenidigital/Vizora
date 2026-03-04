@@ -518,6 +518,23 @@ describe('SanitizeInterceptor', () => {
       });
     });
 
+    it('should decode HTML entities in response output', (done) => {
+      // Simulates template names like "Before & After" that contain ampersands.
+      // sanitize-html encodes & → &amp; for HTML safety, but our API returns JSON.
+      mockCallHandler.handle = jest.fn().mockReturnValue(
+        of({ name: 'Before & After', category: 'Deals & Offers' }),
+      );
+
+      const result$ = interceptor.intercept(mockExecutionContext, mockCallHandler);
+
+      result$.subscribe((response) => {
+        // Output should have plain ampersands, not &amp; entities
+        expect(response.name).toBe('Before & After');
+        expect(response.category).toBe('Deals & Offers');
+        done();
+      });
+    });
+
     it('should sanitize arrays in response', (done) => {
       mockCallHandler.handle = jest.fn().mockReturnValue(
         of([{ name: '<script>evil()</script>Item' }]),
