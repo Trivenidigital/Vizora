@@ -151,8 +151,6 @@ class VizoraAndroidTV {
   // Pairing retry state
   private pairingRetryCount = 0;
 
-  // QR overlay and multi-zone layout state
-  private qrOverlayConfig: QrOverlayConfig | null = null;
   private zoneTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   private zoneIndices: Map<string, number> = new Map();
 
@@ -1188,12 +1186,9 @@ class VizoraAndroidTV {
 
     if (!config || !config.enabled) {
       overlay.classList.add('hidden');
-      overlay.innerHTML = '';
-      this.qrOverlayConfig = null;
+      while (overlay.firstChild) overlay.removeChild(overlay.firstChild);
       return;
     }
-
-    this.qrOverlayConfig = config;
     overlay.innerHTML = '';
     overlay.className = config.position || 'bottom-right';
     overlay.style.backgroundColor = config.backgroundColor || '#ffffff';
@@ -1263,7 +1258,7 @@ class VizoraAndroidTV {
       const zoneDiv = document.createElement('div');
       zoneDiv.style.cssText = 'position:relative;overflow:hidden;grid-area:' + zone.gridArea + ';';
 
-      if (zone.resolvedPlaylist?.items?.length > 0) {
+      if (zone.resolvedPlaylist?.items && zone.resolvedPlaylist.items.length > 0) {
         this.createZonePlayer(zone.id, zone.resolvedPlaylist, zoneDiv);
       } else if (zone.resolvedContent) {
         this.renderZoneContent(zone.resolvedContent, zoneDiv);

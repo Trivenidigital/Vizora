@@ -101,6 +101,8 @@ unusedInCode/
 
 # Nested git repos / worktrees
 vizora/
+# But allow com/vizora paths in Android native code
+!**/com/vizora/
 
 # Local Claude settings
 .claude/settings.local.json

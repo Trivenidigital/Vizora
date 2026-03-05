@@ -4,9 +4,20 @@ node_modules/
 # Build output
 dist/
 
-# Capacitor generated files
-android/
+# Capacitor generated files (track android/ since we have custom native code)
+# android/  -- DO NOT gitignore: contains BootReceiver, SecureStoragePlugin, CrashRecoveryHandler
 ios/
+
+# Android build artifacts (still ignore these)
+android/app/build/
+android/build/
+android/capacitor-cordova-android-plugins/build/
+android/.gradle/
+android/.idea/
+android/local.properties
+android/keystore.properties
+android/*.keystore
+android/*.jks
 
 # Environment files
 .env

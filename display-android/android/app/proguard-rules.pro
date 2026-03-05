@@ -20,6 +20,10 @@
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
 
+# Keep Capacitor plugin classes (reflection-based registration)
+-keep class com.vizora.display.** { *; }
+-keep class com.getcapacitor.** { *; }
+
 # AndroidX Security Crypto (EncryptedSharedPreferences) - suppress annotation warnings
 -dontwarn com.google.errorprone.annotations.CanIgnoreReturnValue
 -dontwarn com.google.errorprone.annotations.CheckReturnValue
