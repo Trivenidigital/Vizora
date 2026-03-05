@@ -122,7 +122,7 @@ e2e-tests/                 # 15 Playwright spec files (01-auth through 15-compre
 
 **Electron** (`display/`): Desktop app for Windows/macOS/Linux. Webpack + TypeScript. Packages via electron-builder.
 
-**Android TV** (`display-android/`): Capacitor 6 + Vite. Requires Android Studio + JDK 17 + SDK 34. Supports leanback launcher, D-pad nav, auto-start on boot.
+**Android TV**: Extracted to standalone repo (`vizora-tv`). Capacitor 6 + Vite + TypeScript. See [github.com/Trivenidigital/vizora-tv](https://github.com/Trivenidigital/vizora-tv).
 
 ## Production Deployment
 

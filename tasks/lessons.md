@@ -71,7 +71,7 @@
 - Middleware: builds via `npx nx build @vizora/middleware`
 - Realtime: builds via `npx nx build @vizora/realtime`
 - Web: builds via `npx nx build @vizora/web` (35 routes, Turbopack)
-- **Root cause of prior nx build failure**: `display-android` directory was not in `pnpm-workspace.yaml` but Nx auto-discovered it, breaking the project graph. Fix: add `display-android` to workspace packages
+- **Root cause of prior nx build failure**: `display-android` directory was not in `pnpm-workspace.yaml` but Nx auto-discovered it, breaking the project graph. NOTE: `display-android` was extracted to standalone repo `vizora-tv` on 2026-03-05 and removed from monorepo.
 
 ## Session: 2026-02-25 - Content Upload Fix & Deployment
 
@@ -100,3 +100,20 @@
 - Backend wraps all responses in `{ success, data, meta }` via ResponseEnvelopeInterceptor
 - Frontend multipart upload paths may not unwrap the envelope — check `createContent` and similar methods
 - Pattern: `const unwrapped = ('success' in result && 'data' in result) ? result.data : result;`
+
+## Session: 2026-02-27 - Support Agent System
+
+### Git Credential Helper on Windows
+- `credential.helper=manager` (system-level in `C:/Program Files/Git/etc/gitconfig`) opens GUI popup — hangs non-interactive Bash tool
+- `gh auth setup-git` adds gh helper at global level but system-level `manager` still fires first
+- System config requires admin to modify (`git config --system --unset`)
+- Workaround: push eventually completes (very slow due to stderr buffering), or use `gh api` for remote operations
+- **Lesson**: When `git push` hangs, don't retry 10 times — check `git config --list | grep credential` immediately
+
+### Claude Code Skill Architecture
+- Skills in `.claude/skills/<name>/SKILL.md` auto-register and appear in skill list
+- Slash commands in `.claude/commands/<name>.md` register as `/<name>` commands
+- Subagent definitions in `.claude/agents/<name>.md` define specialist agents
+- Frontmatter `description` should start with "Use when..." and ONLY describe triggering conditions (not workflow)
+- Level 3 reference files (not `@`-linked) avoid burning context — loaded only when needed
+- Config-only changes (`.claude/`, `CLAUDE.md`) don't need builds or PM2 reload on deploy
