@@ -124,6 +124,8 @@ e2e-tests/                 # 15 Playwright spec files (01-auth through 15-compre
 
 **Android TV**: Extracted to standalone repo (`vizora-tv`). Capacitor 6 + Vite + TypeScript. See [github.com/Trivenidigital/vizora-tv](https://github.com/Trivenidigital/vizora-tv).
 
+**Mobile Companion**: Extracted to standalone repo (`vizora-mobile`). Expo 54 + React Native 0.81 + TypeScript. Management app (NOT a display client). See [github.com/Trivenidigital/vizora-mobile](https://github.com/Trivenidigital/vizora-mobile).
+
 ## Production Deployment
 
 PM2 via `ecosystem.config.js`: middleware runs 2 instances in cluster mode, realtime runs single instance (WebSocket state consistency), web runs single instance. All have memory limits, exponential backoff restart, and graceful shutdown.
