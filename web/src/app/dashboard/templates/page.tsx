@@ -292,7 +292,7 @@ export default function TemplateLibraryPage() {
         <TemplateSidebar
           categories={categories}
           selectedCategory={selectedCategory}
-          onCategoryChange={(cat) => { setSelectedCategory(cat); setPage(1); }}
+          onCategoryChange={(cat) => { setSelectedCategory(cat); setSearchQuery(''); setPage(1); }}
           selectedOrientation={selectedOrientation}
           onOrientationChange={(o) => { setSelectedOrientation(o); setPage(1); }}
           selectedDifficulty={selectedDifficulty}
@@ -336,7 +336,7 @@ export default function TemplateLibraryPage() {
                 <>
                   <select
                     value={selectedCategory}
-                    onChange={(e) => { setSelectedCategory(e.target.value); setPage(1); }}
+                    onChange={(e) => { setSelectedCategory(e.target.value); setSearchQuery(''); setPage(1); }}
                     className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs bg-[var(--surface)] border border-[var(--border)] text-[var(--foreground-secondary)]"
                   >
                     <option value="">All Categories</option>

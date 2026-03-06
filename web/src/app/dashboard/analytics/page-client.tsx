@@ -99,6 +99,10 @@ export default function AnalyticsClient() {
  const bandwidthUsage = useBandwidthUsage(dateRange);
  const playlistPerformance = usePlaylistPerformance(dateRange);
 
+ const allMockData = deviceMetrics.isMockData && contentPerformance.isMockData &&
+   usageTrends.isMockData && deviceDistribution.isMockData &&
+   bandwidthUsage.isMockData && playlistPerformance.isMockData;
+
  // Real-time analytics updates
  useRealtimeEvents({
  enabled: true,
@@ -260,6 +264,16 @@ export default function AnalyticsClient() {
  icon="overview"
  />
  </div>
+
+ {/* Mock data notice */}
+ {allMockData && (
+   <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-4 py-3 flex items-center gap-3">
+     <span className="text-amber-400 text-sm font-medium">Demo Data</span>
+     <span className="text-sm text-[var(--foreground-secondary)]">
+       Connect devices and generate content to see real analytics.
+     </span>
+   </div>
+ )}
 
  {/* Charts Grid */}
  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

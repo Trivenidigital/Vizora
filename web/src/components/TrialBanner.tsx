@@ -41,9 +41,9 @@ export default function TrialBanner() {
         <div className="px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse shrink-0" />
-            <p className="text-sm text-red-100 truncate">
+            <p className="text-sm text-red-100 truncate sm:whitespace-normal sm:overflow-visible">
               <span className="font-semibold">Your free trial has ended.</span>
-              {' '}Your data is safe. Upgrade to pick up where you left off.
+              <span className="hidden sm:inline">{' '}Your data is safe. Upgrade to pick up where you left off.</span>
             </p>
           </div>
           <Link
@@ -63,9 +63,9 @@ export default function TrialBanner() {
         <div className="px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse shrink-0" />
-            <p className="text-sm text-amber-100 truncate">
+            <p className="text-sm text-amber-100 truncate sm:whitespace-normal sm:overflow-visible">
               <span className="font-semibold">Free Trial</span>
-              {' '}&mdash; {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'} remaining. Upgrade to keep your screens running.
+              {' '}&mdash; {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'} remaining.<span className="hidden sm:inline"> Upgrade to keep your screens running.</span>
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -96,7 +96,7 @@ export default function TrialBanner() {
       <div className="px-4 sm:px-6 lg:px-8 py-2 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-2 h-2 bg-[#00E5A0] rounded-full shrink-0" />
-          <p className="text-sm text-[#00E5A0]/90 truncate">
+          <p className="text-sm text-[#00E5A0]/90 truncate sm:whitespace-normal sm:overflow-visible">
             <span className="font-semibold">Free Trial</span>
             {' '}&mdash; {daysRemaining} days remaining
           </p>

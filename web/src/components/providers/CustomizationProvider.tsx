@@ -42,14 +42,14 @@ export function CustomizationProvider({ children }: { children: React.ReactNode 
     // Fetch branding from API
     const fetchBranding = async () => {
       try {
-        const orgRes = await fetch('/api/organizations/current', { credentials: 'include' });
+        const orgRes = await fetch('/api/v1/organizations/current', { credentials: 'include' });
         if (!orgRes.ok) return;
         const orgJson = await orgRes.json();
         const org = orgJson?.data ?? orgJson;
         if (!org?.id) return;
         setOrganizationId(org.id);
 
-        const brandingRes = await fetch(`/api/organizations/${org.id}/branding`, { credentials: 'include' });
+        const brandingRes = await fetch(`/api/v1/organizations/${org.id}/branding`, { credentials: 'include' });
         if (!brandingRes.ok) return;
         const brandingJson = await brandingRes.json();
         const branding = brandingJson?.data ?? brandingJson;
@@ -109,7 +109,7 @@ export function CustomizationProvider({ children }: { children: React.ReactNode 
     // Persist to API if we have an org ID
     if (organizationId) {
       try {
-        await fetch(`/api/organizations/${organizationId}/branding`, {
+        await fetch(`/api/v1/organizations/${organizationId}/branding`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',

@@ -12,7 +12,7 @@ interface UseNotificationsOptions {
 }
 
 export function useNotifications(options: UseNotificationsOptions = {}) {
-  const { pollInterval = 30000, autoFetch = true } = options;
+  const { pollInterval = 120000, autoFetch = true } = options;
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);

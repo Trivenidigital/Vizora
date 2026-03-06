@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { apiClient } from '@/lib/api';
 import { Content, Display, Playlist, ContentFolder } from '@/lib/types';
@@ -80,7 +80,17 @@ export default function ContentClient() {
  const [targetFolderId, setTargetFolderId] = useState<string | null>(null);
 
  // Real-time event handling
+ const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
+ useEffect(() => {
+   return () => {
+     if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+   };
+ }, []);
  const handleConnectionChange = useCallback((connected: boolean | null) => {
+ if (reconnectTimerRef.current) {
+ clearTimeout(reconnectTimerRef.current);
+ reconnectTimerRef.current = null;
+ }
  if (connected === true) {
  setRealtimeStatus('connected');
  toast.info('Real-time sync enabled');
@@ -89,6 +99,8 @@ export default function ContentClient() {
  } else {
  // null = reconnecting (WebSocket dropped but browser is online)
  setRealtimeStatus('reconnecting');
+ // After 15s of reconnecting, show offline to set proper expectations
+ reconnectTimerRef.current = setTimeout(() => setRealtimeStatus('offline'), 15000);
  }
  }, [toast]);
 
