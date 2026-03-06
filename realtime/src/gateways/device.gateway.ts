@@ -195,11 +195,14 @@ export class DeviceGateway
         return;
       }
 
-      // User/dashboard connections: just join org room, skip device setup
+      // User/dashboard connections: join org room and send current device statuses
       if (authResult.kind === 'user') {
         const orgId = authResult.payload.organizationId;
         await client.join(`org:${orgId}`);
         this.logger.log(`Dashboard client joined org:${orgId} (user: ${authResult.payload.sub}, socket: ${client.id})`);
+
+        // Send current device statuses so dashboard has accurate state on connect
+        await this.sendDeviceStatusCatchUp(client, orgId);
         return;
       }
 
@@ -553,6 +556,38 @@ export class DeviceGateway
       lastSeen: now,
       timestamp: now,
     });
+  }
+
+  /**
+   * Send current device statuses to a newly connected dashboard client.
+   * This ensures the dashboard has accurate online/offline state immediately,
+   * even if the devices connected before the dashboard did.
+   */
+  private async sendDeviceStatusCatchUp(client: Socket, orgId: string): Promise<void> {
+    try {
+      const devices = await this.databaseService.display.findMany({
+        where: { organizationId: orgId },
+        select: { id: true, status: true, lastHeartbeat: true },
+      });
+
+      const now = new Date().toISOString();
+      for (const device of devices) {
+        // Check in-memory cache first (most accurate for connected devices)
+        const cachedStatus = this.deviceStatusCache.get(device.id);
+        const status = cachedStatus || device.status || 'offline';
+        client.emit('device:status', {
+          deviceId: device.id,
+          status,
+          lastSeen: device.lastHeartbeat?.toISOString() || now,
+          timestamp: now,
+        });
+      }
+
+      this.logger.debug(`Sent status catch-up for ${devices.length} devices to dashboard (org: ${orgId})`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Failed to send device status catch-up: ${errorMessage}`);
+    }
   }
 
   async handleDisconnect(client: Socket) {

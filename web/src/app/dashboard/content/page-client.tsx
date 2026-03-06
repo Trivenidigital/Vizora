@@ -754,9 +754,9 @@ export default function ContentClient() {
  </span>
  )}
  {realtimeStatus === 'offline' && (
- <span className="ml-2 inline-flex items-center gap-1 text-xs text-red-500">
+ <span className="ml-2 inline-flex items-center gap-1 text-xs text-red-500" title="Live updates unavailable — content management still works">
  <span className="w-2 h-2 bg-red-500 rounded-full"></span>
- Offline
+ Live sync off
  </span>
  )}
  {getPendingCount() > 0 && (

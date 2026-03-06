@@ -9,6 +9,10 @@ import { DatabaseService } from '../../database/database.service';
 /**
  * Guards write operations (POST, PUT, PATCH, DELETE) behind active subscription.
  * GET/HEAD requests pass through to allow read-only dashboard access for expired users.
+ *
+ * Free tier: Users whose trial has expired retain limited write access for core
+ * operations (device pairing, content push, content upload within quota).
+ * The free tier is subject to quota limits enforced separately by QuotaGuard.
  */
 @Injectable()
 export class SubscriptionActiveGuard implements CanActivate {
@@ -33,6 +37,7 @@ export class SubscriptionActiveGuard implements CanActivate {
       where: { id: organizationId },
       select: {
         subscriptionStatus: true,
+        subscriptionTier: true,
         trialEndsAt: true,
       },
     });
@@ -51,6 +56,14 @@ export class SubscriptionActiveGuard implements CanActivate {
       if (new Date(org.trialEndsAt) > new Date()) {
         return true;
       }
+    }
+
+    // Free tier: allow core operations after trial expires.
+    // Users on the free tier (including expired trial) can still perform
+    // basic operations like pairing devices, pushing content, and uploading
+    // within their quota limits. Premium features are gated separately.
+    if (org.subscriptionTier === 'free') {
+      return true;
     }
 
     throw new ForbiddenException(
