@@ -9,6 +9,7 @@ export interface Display {
   location?: string;
   status: 'online' | 'offline';
   lastSeen?: Date | string;
+  lastHeartbeat?: Date | string;
   currentPlaylistId?: string;
   orientation?: DisplayOrientation;
   createdAt: Date | string;

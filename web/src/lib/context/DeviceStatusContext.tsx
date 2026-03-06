@@ -65,7 +65,7 @@ export function DeviceStatusProvider({ children, user }: DeviceStatusProviderPro
           metadata: {
             nickname: device.nickname,
             location: device.location,
-            lastSeen: device.lastSeen,
+            lastSeen: device.lastSeen || device.lastHeartbeat,
           },
         }));
 
@@ -135,6 +135,14 @@ export function DeviceStatusProvider({ children, user }: DeviceStatusProviderPro
 
     deviceStatusesRef.current = statusMap;
     setDeviceStatuses(statusMap);
+
+    // Notify existing subscribers so indicators mounted before init get the status
+    updates.forEach(update => {
+      const subs = subscribersRef.current[update.deviceId];
+      if (subs) {
+        subs.forEach(callback => callback(update));
+      }
+    });
   };
 
   const updateDeviceStatus = (deviceId: string, status: DeviceStatus) => {

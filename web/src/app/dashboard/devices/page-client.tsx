@@ -546,7 +546,7 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  <td className="px-6 py-4 whitespace-nowrap text-sm">
  <PlaylistQuickSelect device={device} playlists={playlists} onSuccess={() => toast.success('Playlist updated')} onError={(err) => toast.error(err.message || 'Failed to update playlist')} onUpdate={() => { loadDevices(); }} />
  </td>
- <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--foreground-tertiary)]">{device.lastSeen ? new Date(device.lastSeen).toLocaleString() : 'Never'}</td>
+ <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--foreground-tertiary)]">{(device.lastSeen || device.lastHeartbeat) ? new Date(String(device.lastSeen || device.lastHeartbeat)).toLocaleString() : 'Never'}</td>
  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
  <div className="flex justify-end gap-2">
  <button onClick={() => handlePreview(device)} className="text-green-600 hover:text-green-800 hover:bg-green-50 px-3 py-1 rounded transition font-medium" title="Preview device screen">Preview</button>
