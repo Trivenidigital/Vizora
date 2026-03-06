@@ -81,6 +81,11 @@ export default function ContentClient() {
 
  // Real-time event handling
  const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
+ useEffect(() => {
+   return () => {
+     if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+   };
+ }, []);
  const handleConnectionChange = useCallback((connected: boolean | null) => {
  if (reconnectTimerRef.current) {
  clearTimeout(reconnectTimerRef.current);

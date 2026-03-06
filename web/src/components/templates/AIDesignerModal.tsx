@@ -41,11 +41,11 @@ export default function AIDesignerModal({ onClose, onTemplateGenerated }: AIDesi
   // Close on Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && step !== 'generating') onClose();
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [onClose, step]);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
