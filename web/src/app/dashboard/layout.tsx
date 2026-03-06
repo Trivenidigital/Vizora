@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import ThemeToggle from '@/components/ThemeToggle';
@@ -37,8 +37,20 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
   const { user, loading: authLoading, logout: handleLogoutAuth } = useAuth();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    if (typeof window !== 'undefined') return window.innerWidth >= 1024;
+    return true;
+  });
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+
+  // Auto-close sidebar when resizing below lg breakpoint
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 1024) setSidebarOpen(false);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const isActive = (item: typeof navigation[0]) => {
     if (item.exactMatch) {

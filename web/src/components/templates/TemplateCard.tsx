@@ -62,7 +62,9 @@ export default function TemplateCard({
   variant = 'grid',
 }: TemplateCardProps) {
   const [imgError, setImgError] = useState(false);
-  const thumb = thumbnailUrl || previewImageUrl;
+  const rawThumb = thumbnailUrl || previewImageUrl;
+  // Skip img for relative seed thumbnail paths — those files aren't deployed
+  const thumb = rawThumb && /^\/templates\/seed\//.test(rawThumb) ? null : rawThumb;
   const catColor = CATEGORY_COLORS[category || 'general'] || CATEGORY_COLORS.general;
   const diffConfig = DIFFICULTY_CONFIG[difficulty || ''];
 
