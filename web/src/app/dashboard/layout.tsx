@@ -43,13 +43,20 @@ export default function DashboardLayout({
   });
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
-  // Auto-close sidebar when resizing below lg breakpoint
+  // Sync sidebar with viewport — close below lg, open above lg (debounced)
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
     const handleResize = () => {
-      if (window.innerWidth < 1024) setSidebarOpen(false);
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        setSidebarOpen(window.innerWidth >= 1024);
+      }, 150);
     };
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', handleResize);
+    };
   }, []);
 
   const isActive = (item: typeof navigation[0]) => {
