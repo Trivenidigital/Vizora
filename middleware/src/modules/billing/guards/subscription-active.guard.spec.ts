@@ -154,6 +154,35 @@ describe('SubscriptionActiveGuard', () => {
       });
     });
 
+    describe('when on free tier', () => {
+      it('should allow access for free tier with canceled status', async () => {
+        mockDatabaseService.organization.findUnique.mockResolvedValue({
+          subscriptionStatus: 'canceled',
+          subscriptionTier: 'free',
+          trialEndsAt: null,
+        } as any);
+
+        const result = await guard.canActivate(mockExecutionContext);
+
+        expect(result).toBe(true);
+      });
+
+      it('should allow access for free tier with expired trial', async () => {
+        const pastDate = new Date();
+        pastDate.setDate(pastDate.getDate() - 1);
+
+        mockDatabaseService.organization.findUnique.mockResolvedValue({
+          subscriptionStatus: 'trial',
+          subscriptionTier: 'free',
+          trialEndsAt: pastDate,
+        } as any);
+
+        const result = await guard.canActivate(mockExecutionContext);
+
+        expect(result).toBe(true);
+      });
+    });
+
     describe('when subscription is past_due', () => {
       it('should deny access', async () => {
         mockDatabaseService.organization.findUnique.mockResolvedValue({
@@ -201,6 +230,7 @@ describe('SubscriptionActiveGuard', () => {
           where: { id: 'org-123' },
           select: {
             subscriptionStatus: true,
+            subscriptionTier: true,
             trialEndsAt: true,
           },
         });

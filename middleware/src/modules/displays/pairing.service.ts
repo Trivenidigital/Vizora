@@ -261,6 +261,7 @@ export class PairingService implements OnModuleDestroy {
           organizationId,
           jwtToken: hashedToken, // Store hash, not plaintext
           pairedAt: new Date(),
+          lastHeartbeat: new Date(),
           status: 'pairing',
           location: completeDto.location || display.location,
         },
@@ -276,6 +277,7 @@ export class PairingService implements OnModuleDestroy {
           organizationId,
           jwtToken: hashedToken, // Store hash, not plaintext
           pairedAt: new Date(),
+          lastHeartbeat: new Date(),
           status: 'pairing',
           location: request.metadata?.hostname || null,
           metadata: request.metadata,
