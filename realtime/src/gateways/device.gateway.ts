@@ -8,7 +8,7 @@ import {
   MessageBody,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger, UsePipes } from '@nestjs/common';
+import { Logger, UseFilters, UsePipes } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { RedisService } from '../services/redis.service';
 import { HeartbeatService } from '../services/heartbeat.service';
@@ -36,6 +36,7 @@ import {
   BroadcastData,
 } from '../types';
 import * as Sentry from '@sentry/nestjs';
+import { WsAllExceptionsFilter } from './filters/ws-exception.filter';
 
 interface DevicePayload {
   sub: string; // device ID
@@ -67,6 +68,7 @@ type AuthPayload =
   pingTimeout: 20000,
   maxHttpBufferSize: 2 * 1024 * 1024,
 })
+@UseFilters(new WsAllExceptionsFilter())
 export class DeviceGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {
@@ -110,6 +112,8 @@ export class DeviceGateway
     this.cleanupIntervals.push(setInterval(() => this.cleanupRateLimitEntries(), 60000));
     // Periodically clean up expired message rate limit entries (every 60s)
     this.cleanupIntervals.push(setInterval(() => this.cleanupMessageRateLimits(), 60000));
+    // Periodically clean up stale deviceStatusCache entries (every 5 min)
+    this.cleanupIntervals.push(setInterval(() => this.cleanupStaleEntries(), 5 * 60 * 1000));
   }
 
   onModuleDestroy() {
@@ -179,6 +183,27 @@ export class DeviceGateway
       if (now > entry.resetAt) {
         this.connectionAttempts.delete(ip);
       }
+    }
+  }
+
+  /**
+   * Clean up stale deviceStatusCache entries that no longer have active sockets.
+   */
+  private cleanupStaleEntries(): void {
+    const activeDeviceIds = new Set<string>();
+    for (const [, deviceId] of this.deviceSockets) {
+      activeDeviceIds.add(deviceId);
+    }
+
+    let cleaned = 0;
+    for (const deviceId of this.deviceStatusCache.keys()) {
+      if (!activeDeviceIds.has(deviceId)) {
+        this.deviceStatusCache.delete(deviceId);
+        cleaned++;
+      }
+    }
+    if (cleaned > 0) {
+      this.logger.debug(`Cleaned ${cleaned} stale deviceStatusCache entries`);
     }
   }
 
@@ -842,7 +867,7 @@ export class DeviceGateway
   }
 
   // Admin methods (called from API)
-  async sendPlaylistUpdate(deviceId: string, playlist: Playlist): Promise<void> {
+  async sendPlaylistUpdate(deviceId: string, playlist: Playlist): Promise<{ delivered: boolean; reason?: string }> {
     // Resolve minio:// URLs to API-served URLs before sending to device
     // Devices authenticate content requests via Authorization header with their stored JWT
     const resolvedPlaylist = {
@@ -859,12 +884,36 @@ export class DeviceGateway
       }),
     };
 
-    this.server.to(`device:${deviceId}`).emit('playlist:update', {
-      playlist: resolvedPlaylist,
-      timestamp: new Date().toISOString(),
-    });
+    // Get all sockets in the device room
+    const roomName = `device:${deviceId}`;
+    const sockets = await this.server.in(roomName).fetchSockets();
 
-    this.logger.log(`Sent playlist update to device: ${deviceId}`);
+    if (sockets.length === 0) {
+      this.logger.warn(`pushPlaylist: no sockets in room ${roomName} for device ${deviceId}`);
+      return { delivered: false, reason: 'no_sockets' };
+    }
+
+    // Use Socket.IO acknowledgment with 10s timeout
+    for (const socket of sockets) {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('ack_timeout')), 10000);
+          socket.emit('playlist:update', {
+            playlist: resolvedPlaylist,
+            timestamp: new Date().toISOString(),
+          }, () => {
+            clearTimeout(timeout);
+            resolve();
+          });
+        });
+      } catch {
+        this.logger.warn(`pushPlaylist: ack timeout for device ${deviceId}`);
+        return { delivered: false, reason: 'ack_timeout' };
+      }
+    }
+
+    this.logger.log(`Sent playlist update to device: ${deviceId} (acknowledged)`);
+    return { delivered: true };
   }
 
   async sendCommand(deviceId: string, command: DeviceCommand): Promise<void> {

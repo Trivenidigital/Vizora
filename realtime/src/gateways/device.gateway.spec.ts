@@ -81,9 +81,19 @@ describe('DeviceGateway', () => {
     getPresignedUrl: jest.fn().mockResolvedValue('https://storage/test.png'),
   };
 
+  // Mock socket that auto-invokes ack callbacks on emit
+  const mockRemoteSocket = {
+    emit: jest.fn((_event: string, _data: any, ackCb?: () => void) => {
+      if (ackCb) ackCb();
+    }),
+  };
+
   const mockServer = {
     to: jest.fn().mockReturnValue({
       emit: jest.fn(),
+    }),
+    in: jest.fn().mockReturnValue({
+      fetchSockets: jest.fn().mockResolvedValue([mockRemoteSocket]),
     }),
     sockets: {
       sockets: new Map(),
@@ -558,6 +568,11 @@ describe('DeviceGateway', () => {
   });
 
   describe('sendPlaylistUpdate', () => {
+    beforeEach(() => {
+      mockRemoteSocket.emit.mockClear();
+      mockServer.in.mockClear();
+    });
+
     it('should resolve minio:// URLs before sending', async () => {
       const playlist = {
         id: 'p-1',
@@ -571,11 +586,11 @@ describe('DeviceGateway', () => {
         ],
       };
 
-      await gateway.sendPlaylistUpdate('device-1', playlist as any);
+      const result = await gateway.sendPlaylistUpdate('device-1', playlist as any);
 
-      expect(mockServer.to).toHaveBeenCalledWith('device:device-1');
-      const emitCall = mockServer.to('device:device-1').emit;
-      expect(emitCall).toHaveBeenCalledWith(
+      expect(result).toEqual({ delivered: true });
+      expect(mockServer.in).toHaveBeenCalledWith('device:device-1');
+      expect(mockRemoteSocket.emit).toHaveBeenCalledWith(
         'playlist:update',
         expect.objectContaining({
           playlist: expect.objectContaining({
@@ -588,36 +603,50 @@ describe('DeviceGateway', () => {
             ]),
           }),
         }),
+        expect.any(Function),
       );
     });
 
     it('should emit playlist:update to device room', async () => {
       const playlist = { id: 'p-1', name: 'Test', items: [] };
 
-      await gateway.sendPlaylistUpdate('device-2', playlist as any);
+      const result = await gateway.sendPlaylistUpdate('device-2', playlist as any);
 
-      expect(mockServer.to).toHaveBeenCalledWith('device:device-2');
-      const emitFn = mockServer.to('device:device-2').emit;
-      expect(emitFn).toHaveBeenCalledWith(
+      expect(result).toEqual({ delivered: true });
+      expect(mockServer.in).toHaveBeenCalledWith('device:device-2');
+      expect(mockRemoteSocket.emit).toHaveBeenCalledWith(
         'playlist:update',
         expect.objectContaining({
           playlist: expect.objectContaining({ id: 'p-1' }),
         }),
+        expect.any(Function),
       );
     });
 
     it('should include timestamp in the emitted event', async () => {
       const playlist = { id: 'p-1', name: 'Test', items: [] };
 
-      await gateway.sendPlaylistUpdate('device-1', playlist as any);
+      const result = await gateway.sendPlaylistUpdate('device-1', playlist as any);
 
-      const emitFn = mockServer.to('device:device-1').emit;
-      expect(emitFn).toHaveBeenCalledWith(
+      expect(result).toEqual({ delivered: true });
+      expect(mockRemoteSocket.emit).toHaveBeenCalledWith(
         'playlist:update',
         expect.objectContaining({
           timestamp: expect.any(String),
         }),
+        expect.any(Function),
       );
+    });
+
+    it('should return no_sockets when no devices connected', async () => {
+      mockServer.in.mockReturnValueOnce({
+        fetchSockets: jest.fn().mockResolvedValue([]),
+      });
+      const playlist = { id: 'p-1', name: 'Test', items: [] };
+
+      const result = await gateway.sendPlaylistUpdate('device-99', playlist as any);
+
+      expect(result).toEqual({ delivered: false, reason: 'no_sockets' });
     });
   });
 
