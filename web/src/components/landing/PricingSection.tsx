@@ -1,5 +1,6 @@
 'use client';
 
+import type { Dispatch, SetStateAction } from 'react';
 import Link from 'next/link';
 import { Check } from 'lucide-react';
 import { Reveal } from './shared';
@@ -17,7 +18,7 @@ interface PricingSectionProps {
   billingCycle: 'monthly' | 'annual';
   setBillingCycle: (cycle: 'monthly' | 'annual') => void;
   pricing: PricingData | null;
-  setPricing: (fn: (prev: PricingData | null) => PricingData | null) => void;
+  setPricing: Dispatch<SetStateAction<PricingData | null>>;
 }
 
 export default function PricingSection({ billingCycle, setBillingCycle, pricing, setPricing }: PricingSectionProps) {

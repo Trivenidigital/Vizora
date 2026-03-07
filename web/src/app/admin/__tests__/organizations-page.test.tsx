@@ -196,12 +196,11 @@ describe('AdminOrganizationsPage', () => {
     // Click the action menu button for Acme Corp (first row)
     const tableRows = document.querySelectorAll('tbody tr');
     const firstRowButton = tableRows[0].querySelector('button');
-    if (firstRowButton) {
-      fireEvent.click(firstRowButton);
-      await waitFor(() => {
-        expect(screen.getByText('Suspend')).toBeInTheDocument();
-      });
-    }
+    expect(firstRowButton).toBeTruthy();
+    fireEvent.click(firstRowButton!);
+    await waitFor(() => {
+      expect(screen.getByText('Suspend')).toBeInTheDocument();
+    });
   });
 
   it('shows extend trial option for trialing org', async () => {
@@ -214,12 +213,11 @@ describe('AdminOrganizationsPage', () => {
 
     const tableRows = document.querySelectorAll('tbody tr');
     const trialingRowButton = tableRows[1].querySelector('button');
-    if (trialingRowButton) {
-      fireEvent.click(trialingRowButton);
-      await waitFor(() => {
-        expect(screen.getByText('Extend Trial')).toBeInTheDocument();
-      });
-    }
+    expect(trialingRowButton).toBeTruthy();
+    fireEvent.click(trialingRowButton!);
+    await waitFor(() => {
+      expect(screen.getByText('Extend Trial')).toBeInTheDocument();
+    });
   });
 
   it('shows reactivate option for suspended org', async () => {
@@ -232,11 +230,10 @@ describe('AdminOrganizationsPage', () => {
 
     const tableRows = document.querySelectorAll('tbody tr');
     const suspendedRowButton = tableRows[2].querySelector('button');
-    if (suspendedRowButton) {
-      fireEvent.click(suspendedRowButton);
-      await waitFor(() => {
-        expect(screen.getByText('Reactivate')).toBeInTheDocument();
-      });
-    }
+    expect(suspendedRowButton).toBeTruthy();
+    fireEvent.click(suspendedRowButton!);
+    await waitFor(() => {
+      expect(screen.getByText('Reactivate')).toBeInTheDocument();
+    });
   });
 });

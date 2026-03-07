@@ -1,12 +1,12 @@
 'use client';
 
-import React from 'react';
+import type { RefObject } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Check, Play, Sparkles } from 'lucide-react';
 import { Reveal, scrollTo } from './shared';
 
 interface HeroSectionProps {
-  heroRef: React.RefObject<HTMLElement | null>;
+  heroRef: RefObject<HTMLElement | null>;
 }
 
 export default function HeroSection({ heroRef }: HeroSectionProps) {

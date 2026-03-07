@@ -35,7 +35,7 @@ declare module './client' {
     getPlatformHealth(): Promise<PlatformHealth>;
     // Admin - Config
     getSystemConfigs(): Promise<SystemConfig[]>;
-    updateSystemConfig(key: string, value: any): Promise<void>;
+    updateSystemConfig(key: string, value: string | number | boolean): Promise<void>;
     // Admin - Security
     getAdminAuditLogs(): Promise<AdminAuditLog[]>;
     getIpBlocklist(): Promise<IpBlocklistEntry[]>;
@@ -168,7 +168,7 @@ ApiClient.prototype.getSystemConfigs = async function (): Promise<SystemConfig[]
   return this.request<SystemConfig[]>('/admin/config');
 };
 
-ApiClient.prototype.updateSystemConfig = async function (key: string, value: any): Promise<void> {
+ApiClient.prototype.updateSystemConfig = async function (key: string, value: string | number | boolean): Promise<void> {
   await this.request<void>(`/admin/config/${encodeURIComponent(key)}`, {
     method: 'PATCH',
     body: JSON.stringify({ value }),

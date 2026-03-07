@@ -1,12 +1,12 @@
 'use client';
 
-import React from 'react';
+import type { RefObject } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Check } from 'lucide-react';
 import { Reveal } from './shared';
 
 interface FinalCTASectionProps {
-  finalCtaRef: React.RefObject<HTMLElement | null>;
+  finalCtaRef: RefObject<HTMLElement | null>;
 }
 
 export default function FinalCTASection({ finalCtaRef }: FinalCTASectionProps) {

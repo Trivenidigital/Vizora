@@ -99,7 +99,7 @@ export function FAQItem({ q, a }: { q: string; a: string }) {
 
   return (
     <div
-      className="border-b transition-colors"
+      className="relative border-b transition-colors"
       style={{ borderColor: '#1B3D47' }}
     >
       <button

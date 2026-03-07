@@ -1,12 +1,12 @@
 'use client';
 
-import React from 'react';
+import type { RefObject } from 'react';
 import Link from 'next/link';
 import { Monitor, ShieldCheck, Globe, Lock } from 'lucide-react';
 import { scrollTo } from './shared';
 
 interface FooterSectionProps {
-  footerRef: React.RefObject<HTMLElement | null>;
+  footerRef: RefObject<HTMLElement | null>;
 }
 
 export default function FooterSection({ footerRef }: FooterSectionProps) {

@@ -184,7 +184,8 @@ describe('InvoiceHistoryPage', () => {
     render(<InvoiceHistoryPage />);
 
     await waitFor(() => {
-      const backLink = screen.getByRole('link', { name: '' }); // The chevron link
+      // Back link uses a chevron icon with no visible text — accessible name is empty
+      const backLink = screen.getByRole('link', { name: '' });
       expect(backLink).toHaveAttribute('href', '/dashboard/settings/billing');
     });
   });

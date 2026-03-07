@@ -16,9 +16,9 @@ import './widgets';
 import './support';
 
 // Re-export client class, types, and singleton
-export { ApiClient, API_BASE_URL, getCsrfToken } from './client';
+import { ApiClient, API_BASE_URL, getCsrfToken } from './client';
+export { ApiClient, API_BASE_URL, getCsrfToken };
 export type { AuthUser, Organization, LoginResponse, RegisterResponse, ScheduleData } from './client';
 
 // Create and export the singleton instance
-import { ApiClient, API_BASE_URL } from './client';
 export const apiClient = new ApiClient(API_BASE_URL);

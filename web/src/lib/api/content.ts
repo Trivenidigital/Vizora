@@ -14,7 +14,7 @@ declare module './client' {
     archiveContent(id: string): Promise<Content>;
     getContentDownloadUrl(id: string, expirySeconds?: number): Promise<{ url: string; expiresIn: number }>;
     generateThumbnail(contentId: string): Promise<{ thumbnail: string }>;
-    uploadContentWithProgress(data: { title: string; type: string; file: any }, onProgress?: (percent: number) => void): Promise<Content>;
+    uploadContentWithProgress(data: { title: string; type: string; file: File | Blob }, onProgress?: (percent: number) => void): Promise<Content>;
     // Content Folders
     getFolders(params?: { format?: 'flat' | 'tree' }): Promise<ContentFolder[]>;
     getFolder(id: string): Promise<ContentFolder>;
@@ -170,7 +170,7 @@ ApiClient.prototype.generateThumbnail = async function (contentId: string): Prom
 
 ApiClient.prototype.uploadContentWithProgress = function (
   this: ApiClient,
-  data: { title: string; type: string; file: any },
+  data: { title: string; type: string; file: File | Blob },
   onProgress?: (percent: number) => void,
 ): Promise<Content> {
   return new Promise((resolve, reject) => {

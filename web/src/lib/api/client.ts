@@ -17,7 +17,7 @@ if (
   process.env.NODE_ENV === 'production' &&
   !process.env.NEXT_PUBLIC_API_URL
 ) {
-  devWarn(
+  console.warn(
     '[Vizora] WARNING: NEXT_PUBLIC_API_URL is not set in production. ' +
     'SSR requests will fall back to http://localhost:3000/api/v1. ' +
     'Set NEXT_PUBLIC_API_URL to your middleware API URL for production.',
@@ -174,7 +174,6 @@ export class ApiClient {
     if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
       await this.ensureCsrfToken();
     }
-
 
     // Include CSRF token for state-changing requests
     const csrfToken = getCsrfToken();
