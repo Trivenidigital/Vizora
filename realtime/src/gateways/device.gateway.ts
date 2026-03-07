@@ -279,7 +279,7 @@ export class DeviceGateway
     // Fall back to httpOnly cookie (dashboard clients)
     const cookies = client.handshake.headers?.cookie;
     if (cookies) {
-      const match = cookies.match(/vizora_token=([^;]+)/);
+      const match = cookies.match(/vizora_auth_token=([^;]+)/);
       if (match) return match[1];
     }
 
