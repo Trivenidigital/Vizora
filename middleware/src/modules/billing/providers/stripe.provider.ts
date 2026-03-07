@@ -57,7 +57,7 @@ export class StripeProvider implements PaymentProvider {
   async createCustomer(
     email: string,
     name: string,
-    metadata?: Record<string, any>,
+    metadata?: Record<string, unknown>,
   ): Promise<Customer> {
     this.ensureConfigured();
     const customer = await this.withCircuitBreaker(() =>

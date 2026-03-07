@@ -436,7 +436,7 @@ export class AuthService {
     await this.redisService.del(`user_auth:${userId}`);
   }
 
-  private generateToken(user: any, organization: any): string {
+  private generateToken(user: { id: string; email: string; role: string; isSuperAdmin?: boolean }, organization: { id: string }): string {
     const payload = {
       sub: user.id,
       email: user.email,
@@ -492,7 +492,7 @@ export class AuthService {
     }
   }
 
-  private sanitizeUser(user: any) {
+  private sanitizeUser(user: Record<string, unknown>) {
     const { passwordHash, ...sanitized } = user;
     return sanitized;
   }

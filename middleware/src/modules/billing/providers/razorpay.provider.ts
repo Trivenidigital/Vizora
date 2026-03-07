@@ -63,7 +63,7 @@ export class RazorpayProvider implements PaymentProvider {
   async createCustomer(
     email: string,
     name: string,
-    metadata?: Record<string, any>,
+    metadata?: Record<string, unknown>,
   ): Promise<Customer> {
     this.ensureConfigured();
     const customer = await this.withCircuitBreaker(() =>
@@ -161,7 +161,7 @@ export class RazorpayProvider implements PaymentProvider {
       }),
     );
 
-    return (invoices.items || []).map((inv: any) => ({
+    return (invoices.items || []).map((inv: { id: string; customer_id: string; subscription_id?: string; amount: number; currency: string; status: string; description?: string; short_url?: string; created_at: number }) => ({
       id: inv.id,
       customerId: inv.customer_id,
       subscriptionId: inv.subscription_id || null,
@@ -201,7 +201,7 @@ export class RazorpayProvider implements PaymentProvider {
     };
   }
 
-  private mapSubscription(sub: any): Subscription {
+  private mapSubscription(sub: { id: string; customer_id: string; status: string; current_start: number; current_end: number; ended_at?: number | null; plan_id: string; notes?: Record<string, unknown> }): Subscription {
     const statusMap: Record<string, Subscription['status']> = {
       created: 'incomplete',
       authenticated: 'incomplete',

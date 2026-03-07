@@ -18,6 +18,7 @@ import { CreateSupportRequestDto } from './dto/create-support-request.dto';
 import { UpdateSupportRequestDto } from './dto/update-support-request.dto';
 import { CreateSupportMessageDto } from './dto/create-support-message.dto';
 import { SupportQueryDto } from './dto/support-query.dto';
+import { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 
 @ApiTags('support')
 @Controller('support')
@@ -51,7 +52,7 @@ export class SupportController {
   @Get('requests')
   @ApiOperation({ summary: 'List support requests' })
   async findAll(
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
     @Query() query: SupportQueryDto,
   ) {
     return this.supportService.findAll(
@@ -87,7 +88,7 @@ export class SupportController {
   @ApiOperation({ summary: 'Get a support request with messages' })
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.supportService.findOne(id, {
       id: user.id,
@@ -124,7 +125,7 @@ export class SupportController {
   @ApiOperation({ summary: 'Add a message to a support request' })
   async addMessage(
     @Param('id', ParseUUIDPipe) requestId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateSupportMessageDto,
   ) {
     return this.supportService.addMessage(requestId, {

@@ -115,10 +115,10 @@ export class TemplateRenderingService {
     });
 
     // Conditional equals helper
-    Handlebars.registerHelper('eq', (a: any, b: any) => a === b);
+    Handlebars.registerHelper('eq', (a: unknown, b: unknown) => a === b);
 
     // Conditional not equals helper
-    Handlebars.registerHelper('ne', (a: any, b: any) => a !== b);
+    Handlebars.registerHelper('ne', (a: unknown, b: unknown) => a !== b);
 
     // Greater than helper
     Handlebars.registerHelper('gt', (a: number, b: number) => a > b);
@@ -127,7 +127,7 @@ export class TemplateRenderingService {
     Handlebars.registerHelper('lt', (a: number, b: number) => a < b);
 
     // JSON stringify helper for debugging
-    Handlebars.registerHelper('json', (context: any) => {
+    Handlebars.registerHelper('json', (context: unknown) => {
       try {
         return JSON.stringify(context, null, 2);
       } catch {
@@ -317,19 +317,19 @@ export class TemplateRenderingService {
    * Extract data from a JSON object using a simple path notation
    * Supports: $.data, $.items[0], $.nested.path
    */
-  private extractJsonPath(data: any, path: string): any {
+  private extractJsonPath(data: unknown, path: string): unknown {
     // Remove leading $. if present
     const cleanPath = path.replace(/^\$\.?/, '');
     if (!cleanPath) return data;
 
     const parts = cleanPath.split(/\.|\[|\]/).filter(Boolean);
-    let current = data;
+    let current: unknown = data;
 
     for (const part of parts) {
       if (current === null || current === undefined) {
         return {};
       }
-      current = current[part];
+      current = (current as Record<string, unknown>)[part];
     }
 
     return current ?? {};
