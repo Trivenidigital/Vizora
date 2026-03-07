@@ -502,7 +502,7 @@ export class ContentService {
     // Fetch items with file info for storage cleanup
     const items = await this.db.content.findMany({
       where: { id: { in: ids }, organizationId },
-      select: { id: true, fileSize: true, fileKey: true, url: true },
+      select: { id: true, fileSize: true, url: true },
     });
 
     if (items.length !== ids.length) {
@@ -511,7 +511,7 @@ export class ContentService {
 
     // Delete files from storage (fire-and-forget with logging)
     for (const item of items) {
-      const objectKey = (item as unknown as Record<string, unknown>).fileKey as string | undefined || (item.url?.startsWith('minio://') ? item.url.substring('minio://'.length) : null);
+      const objectKey = item.url?.startsWith('minio://') ? item.url.substring('minio://'.length) : null;
       if (objectKey) {
         this.storageService.deleteFile(objectKey).catch(error => {
           this.logger.error(`Failed to delete file ${objectKey} during bulk delete: ${error}`);

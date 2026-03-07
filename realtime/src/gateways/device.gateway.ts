@@ -363,6 +363,7 @@ export class DeviceGateway
         // Auto-rotate device token if it expires within 14 days.
         // NOTE: The old token remains valid until natural expiry (stateless JWT limitation).
         // TODO: For high-security deployments, consider a token blacklist in Redis.
+        // TODO: Rate-limit rotation to once per 24h per device via Redis key 'token_rotated:{deviceId}'
         if (payload.exp) {
           const daysUntilExpiry = (payload.exp - Math.floor(Date.now() / 1000)) / 86400;
           if (daysUntilExpiry < 14) {
@@ -915,7 +916,9 @@ export class DeviceGateway
       return { delivered: false, reason: 'no_sockets' };
     }
 
-    // Use Socket.IO acknowledgment with 10s timeout
+    // Use Socket.IO acknowledgment with 10s timeout — try all sockets,
+    // succeed if at least one acknowledges
+    let anyAcknowledged = false;
     for (const socket of sockets) {
       try {
         await new Promise<void>((resolve, reject) => {
@@ -928,10 +931,14 @@ export class DeviceGateway
             resolve();
           });
         });
+        anyAcknowledged = true;
       } catch {
-        this.logger.warn(`pushPlaylist: ack timeout for device ${deviceId}`);
-        return { delivered: false, reason: 'ack_timeout' };
+        this.logger.warn(`pushPlaylist: ack timeout for socket ${socket.id} on device ${deviceId}`);
       }
+    }
+
+    if (!anyAcknowledged) {
+      return { delivered: false, reason: 'ack_timeout' };
     }
 
     this.logger.log(`Sent playlist update to device: ${deviceId} (acknowledged)`);

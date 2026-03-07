@@ -33,7 +33,6 @@ import { MailService } from '../mail/mail.service';
 import { RedisService } from '../redis/redis.service';
 
 /** Webhook event data from Stripe/Razorpay — deeply nested untyped objects */
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
 interface WebhookData {
   [key: string]: WebhookData | string | number | boolean | null | undefined;
 }

@@ -52,7 +52,7 @@ export class AnnouncementsService {
    */
   async findAll(pagination?: { page?: number; limit?: number }) {
     const page = pagination?.page ?? 1;
-    const limit = pagination?.limit ?? 20;
+    const limit = pagination?.limit ?? 10;
     const skip = (page - 1) * limit;
 
     const [data, total] = await Promise.all([

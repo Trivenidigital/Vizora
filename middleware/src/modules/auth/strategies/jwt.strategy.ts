@@ -26,8 +26,6 @@ export interface AuthenticatedUser {
   role: string;
   isSuperAdmin?: boolean;
   organization?: Record<string, unknown> | null;
-  passwordHash?: string;
-  password?: string;
 }
 
 /**

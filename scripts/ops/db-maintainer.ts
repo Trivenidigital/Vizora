@@ -235,6 +235,12 @@ function runBackup(): void {
     return;
   }
 
+  // Validate bucket format to prevent injection via malformed values
+  if (!/^s3:\/\/[a-zA-Z0-9.\-_\/]+$|^[a-zA-Z0-9.\-_\/]+$/.test(bucket)) {
+    log(AGENT, `Backup skipped: BACKUP_S3_BUCKET has invalid format: ${bucket}`);
+    return;
+  }
+
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
     log(AGENT, 'Backup skipped: DATABASE_URL not set');

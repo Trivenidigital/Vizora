@@ -72,11 +72,11 @@ describe('SecurityAdminService', () => {
       mockDb.ipBlocklist.findMany.mockResolvedValue([mockIpBlocklistEntry]);
       mockDb.ipBlocklist.count.mockResolvedValue(1);
 
-      const result = await service.getIpBlocklist({ page: 1, limit: 20 });
+      const result = await service.getIpBlocklist({ page: 1, limit: 10 });
 
       expect(result.data).toHaveLength(1);
       expect(result.data[0].ipAddress).toBe('192.168.1.100');
-      expect(result.meta).toEqual({ page: 1, limit: 20, total: 1, totalPages: 1 });
+      expect(result.meta).toEqual({ page: 1, limit: 10, total: 1, totalPages: 1 });
     });
   });
 
@@ -171,12 +171,12 @@ describe('SecurityAdminService', () => {
       mockDb.apiKey.findMany.mockResolvedValue([mockApiKey]);
       mockDb.apiKey.count.mockResolvedValue(1);
 
-      const result = await service.getAllApiKeys({ page: 1, limit: 20 });
+      const result = await service.getAllApiKeys({ page: 1, limit: 10 });
 
       expect(result.data).toHaveLength(1);
       expect(result.data[0].name).toBe('Test API Key');
       expect(result.data[0].organization.name).toBe('Test Org');
-      expect(result.meta).toEqual({ page: 1, limit: 20, total: 1, totalPages: 1 });
+      expect(result.meta).toEqual({ page: 1, limit: 10, total: 1, totalPages: 1 });
     });
   });
 

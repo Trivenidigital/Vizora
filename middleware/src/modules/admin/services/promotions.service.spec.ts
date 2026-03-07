@@ -66,14 +66,14 @@ describe('PromotionsService', () => {
       mockDb.promotion.findMany.mockResolvedValue([mockPromotion]);
       mockDb.promotion.count.mockResolvedValue(1);
 
-      const result = await service.findAll({ page: 1, limit: 20 });
+      const result = await service.findAll({ page: 1, limit: 10 });
 
       expect(result.data).toHaveLength(1);
       expect(result.data[0]._count.redemptions).toBe(10);
-      expect(result.meta).toEqual({ page: 1, limit: 20, total: 1, totalPages: 1 });
+      expect(result.meta).toEqual({ page: 1, limit: 10, total: 1, totalPages: 1 });
       expect(mockDb.promotion.findMany).toHaveBeenCalledWith({
         skip: 0,
-        take: 20,
+        take: 10,
         orderBy: { createdAt: 'desc' },
         include: {
           applicablePlans: { include: { plan: true } },
@@ -406,14 +406,14 @@ describe('PromotionsService', () => {
       mockDb.promotionRedemption.findMany.mockResolvedValue(redemptions);
       mockDb.promotionRedemption.count.mockResolvedValue(2);
 
-      const result = await service.getRedemptions('promo-123', { page: 1, limit: 20 });
+      const result = await service.getRedemptions('promo-123', { page: 1, limit: 10 });
 
       expect(result.data).toHaveLength(2);
-      expect(result.meta).toEqual({ page: 1, limit: 20, total: 2, totalPages: 1 });
+      expect(result.meta).toEqual({ page: 1, limit: 10, total: 2, totalPages: 1 });
       expect(mockDb.promotionRedemption.findMany).toHaveBeenCalledWith({
         where: { promotionId: 'promo-123' },
         skip: 0,
-        take: 20,
+        take: 10,
         orderBy: { redeemedAt: 'desc' },
       });
     });

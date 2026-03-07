@@ -190,8 +190,12 @@ export class AuthService {
       throw new ForbiddenException('Account is inactive. Contact support.');
     }
 
-    // Clear lockout counter on successful login
-    await this.redisService.del(lockoutKey);
+    // Clear lockout counter on successful login (best-effort cleanup)
+    try {
+      await this.redisService.del(lockoutKey);
+    } catch (error) {
+      this.logger.error(`Failed to clear lockout counter (best-effort): ${error instanceof Error ? error.message : 'Unknown'}`);
+    }
 
     // Update last login timestamp
     await this.databaseService.user.update({
@@ -451,10 +455,14 @@ export class AuthService {
   }
 
   private async incrementLoginAttempts(lockoutKey: string): Promise<void> {
-    const count = await this.redisService.incr(lockoutKey);
-    // Set TTL only on the first attempt (when count becomes 1)
-    if (count === 1) {
-      await this.redisService.expire(lockoutKey, LOCKOUT_TTL_SECONDS);
+    try {
+      const count = await this.redisService.incr(lockoutKey);
+      // Set TTL only on the first attempt (when count becomes 1)
+      if (count === 1) {
+        await this.redisService.expire(lockoutKey, LOCKOUT_TTL_SECONDS);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to increment login attempts (best-effort): ${error instanceof Error ? error.message : 'Unknown'}`);
     }
   }
 
@@ -492,8 +500,8 @@ export class AuthService {
     }
   }
 
-  private sanitizeUser(user: Record<string, unknown>) {
-    const { passwordHash, ...sanitized } = user;
+  private sanitizeUser(user: { passwordHash?: string | null; [key: string]: unknown }) {
+    const { passwordHash: _, ...sanitized } = user;
     return sanitized;
   }
 

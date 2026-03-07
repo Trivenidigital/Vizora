@@ -5,7 +5,6 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { DataRetentionService } from '../modules/common/data-retention.service';
 import { ConfigModule } from '../modules/config/config.module';
 import { DatabaseModule } from '../modules/database/database.module';
 import { RedisModule } from '../modules/redis/redis.module';
@@ -106,7 +105,6 @@ import { SupportModule } from '../modules/support/support.module';
   controllers: [AppController],
   providers: [
     AppService,
-    DataRetentionService,
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,

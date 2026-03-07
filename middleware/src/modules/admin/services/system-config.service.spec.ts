@@ -43,13 +43,13 @@ describe('SystemConfigService', () => {
       mockDb.systemConfig.findMany.mockResolvedValue(configs);
       mockDb.systemConfig.count.mockResolvedValue(2);
 
-      const result = await service.findAll({ page: 1, limit: 20 });
+      const result = await service.findAll({ page: 1, limit: 10 });
 
       expect(result.data).toEqual(configs);
-      expect(result.meta).toEqual({ page: 1, limit: 20, total: 2, totalPages: 1 });
+      expect(result.meta).toEqual({ page: 1, limit: 10, total: 2, totalPages: 1 });
       expect(mockDb.systemConfig.findMany).toHaveBeenCalledWith({
         skip: 0,
-        take: 20,
+        take: 10,
         orderBy: [{ category: 'asc' }, { key: 'asc' }],
       });
     });

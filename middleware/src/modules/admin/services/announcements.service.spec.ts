@@ -48,11 +48,11 @@ describe('AnnouncementsService', () => {
       mockDb.systemAnnouncement.findMany.mockResolvedValue([mockAnnouncement]);
       mockDb.systemAnnouncement.count.mockResolvedValue(1);
 
-      const result = await service.findAll({ page: 1, limit: 20 });
+      const result = await service.findAll({ page: 1, limit: 10 });
 
       expect(result.data).toHaveLength(1);
       expect(result.data[0].title).toBe('Test Announcement');
-      expect(result.meta).toEqual({ page: 1, limit: 20, total: 1, totalPages: 1 });
+      expect(result.meta).toEqual({ page: 1, limit: 10, total: 1, totalPages: 1 });
     });
   });
 
