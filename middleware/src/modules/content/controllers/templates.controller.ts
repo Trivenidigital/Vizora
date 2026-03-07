@@ -8,6 +8,7 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -36,7 +37,7 @@ export class TemplatesController {
   @Roles('admin', 'manager')
   updateTemplate(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateTemplateDto,
   ) {
     return this.contentService.updateTemplate(organizationId, id, dto);
@@ -62,7 +63,7 @@ export class TemplatesController {
   @SkipOutputSanitize()
   getRenderedTemplate(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.contentService.getRenderedTemplate(organizationId, id);
   }
@@ -72,7 +73,7 @@ export class TemplatesController {
   @HttpCode(HttpStatus.OK)
   refreshTemplate(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.contentService.triggerTemplateRefresh(organizationId, id);
   }

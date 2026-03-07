@@ -9,6 +9,7 @@ import {
   ForbiddenException,
   UnauthorizedException,
   Logger,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { JwtService } from '@nestjs/jwt';
@@ -82,7 +83,7 @@ export class DeviceContentController {
   @SkipEnvelope()
   @SkipOutputSanitize()
   async serveFile(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {

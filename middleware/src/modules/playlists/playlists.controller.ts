@@ -8,6 +8,7 @@ import {
   Delete,
   Query,
   UseGuards,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -45,7 +46,7 @@ export class PlaylistsController {
   @Get(':id')
   findOne(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.playlistsService.findOne(organizationId, id);
   }
@@ -54,7 +55,7 @@ export class PlaylistsController {
   @Roles('admin', 'manager')
   update(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() updatePlaylistDto: UpdatePlaylistDto,
   ) {
     return this.playlistsService.update(organizationId, id, updatePlaylistDto);
@@ -64,7 +65,7 @@ export class PlaylistsController {
   @Roles('admin', 'manager')
   duplicate(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.playlistsService.duplicate(organizationId, id);
   }
@@ -73,7 +74,7 @@ export class PlaylistsController {
   @Roles('admin', 'manager')
   reorder(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() reorderDto: ReorderPlaylistDto,
   ) {
     return this.playlistsService.reorder(organizationId, id, reorderDto.itemIds);
@@ -83,7 +84,7 @@ export class PlaylistsController {
   @Roles('admin', 'manager')
   addItem(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id') playlistId: string,
+    @Param('id', ParseUUIDPipe) playlistId: string,
     @Body('contentId') contentId: string,
     @Body('duration') duration?: number,
   ) {
@@ -94,8 +95,8 @@ export class PlaylistsController {
   @Roles('admin')
   removeItem(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id') playlistId: string,
-    @Param('itemId') itemId: string,
+    @Param('id', ParseUUIDPipe) playlistId: string,
+    @Param('itemId', ParseUUIDPipe) itemId: string,
   ) {
     return this.playlistsService.removeItem(organizationId, playlistId, itemId);
   }
@@ -104,7 +105,7 @@ export class PlaylistsController {
   @Roles('admin')
   remove(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.playlistsService.remove(organizationId, id);
   }

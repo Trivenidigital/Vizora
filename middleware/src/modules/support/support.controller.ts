@@ -7,6 +7,7 @@ import {
   Body,
   Query,
   UseGuards,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -85,7 +86,7 @@ export class SupportController {
   @Get('requests/:id')
   @ApiOperation({ summary: 'Get a support request with messages' })
   async findOne(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: any,
   ) {
     return this.supportService.findOne(id, {
@@ -103,7 +104,7 @@ export class SupportController {
   @ApiOperation({ summary: 'Update a support request' })
   @Roles('admin')
   async update(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('organizationId') organizationId: string,
     @CurrentUser('isSuperAdmin') isSuperAdmin: boolean,
     @CurrentUser('id') userId: string,
@@ -122,7 +123,7 @@ export class SupportController {
   @Post('requests/:id/messages')
   @ApiOperation({ summary: 'Add a message to a support request' })
   async addMessage(
-    @Param('id') requestId: string,
+    @Param('id', ParseUUIDPipe) requestId: string,
     @CurrentUser() user: any,
     @Body() dto: CreateSupportMessageDto,
   ) {

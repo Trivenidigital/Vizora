@@ -6,6 +6,7 @@ import {
   Body,
   Param,
   UseGuards,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -37,7 +38,7 @@ export class ApiKeysController {
   @Delete(':id')
   @Roles('admin')
   async revoke(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('organizationId') organizationId: string,
   ) {
     await this.apiKeysService.revoke(organizationId, id);

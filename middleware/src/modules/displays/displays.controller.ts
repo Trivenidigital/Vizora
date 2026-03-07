@@ -10,6 +10,7 @@ import {
   Req,
   UseGuards,
   UnauthorizedException,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtService } from '@nestjs/jwt';
@@ -84,7 +85,7 @@ export class DisplaysController {
   @Get(':id')
   findOne(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.displaysService.findOne(organizationId, id);
   }
@@ -93,7 +94,7 @@ export class DisplaysController {
   @Roles('admin', 'manager')
   update(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() updateDisplayDto: UpdateDisplayDto,
   ) {
     return this.displaysService.update(organizationId, id, updateDisplayDto);
@@ -103,14 +104,14 @@ export class DisplaysController {
   @Roles('admin', 'manager')
   async generatePairingToken(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.displaysService.generatePairingToken(organizationId, id);
   }
 
   @Post(':deviceId/heartbeat')
   @Public() // Bypass user JWT guard -- device JWT verified manually below
-  heartbeat(@Param('deviceId') deviceId: string, @Req() req: Request) {
+  heartbeat(@Param('deviceId', ParseUUIDPipe) deviceId: string, @Req() req: Request) {
     // Verify device JWT to prevent unauthenticated heartbeat calls
     const token = (req.headers.authorization as string)?.replace('Bearer ', '');
     if (!token) {
@@ -138,7 +139,7 @@ export class DisplaysController {
   @Roles('admin')
   remove(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.displaysService.remove(organizationId, id);
   }
@@ -146,7 +147,7 @@ export class DisplaysController {
   @Get(':id/tags')
   getTags(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.displaysService.getTags(organizationId, id);
   }
@@ -155,7 +156,7 @@ export class DisplaysController {
   @Roles('admin', 'manager')
   addTags(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() body: { tagIds: string[] },
   ) {
     return this.displaysService.addTags(organizationId, id, body.tagIds);
@@ -165,7 +166,7 @@ export class DisplaysController {
   @Roles('admin')
   removeTags(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() body: { tagIds: string[] },
   ) {
     return this.displaysService.removeTags(organizationId, id, body.tagIds);
@@ -175,7 +176,7 @@ export class DisplaysController {
   @Roles('admin', 'manager')
   pushContent(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() body: { contentId: string; duration?: number },
   ) {
     return this.displaysService.pushContent(
@@ -189,7 +190,7 @@ export class DisplaysController {
   @Post(':id/screenshot')
   @Roles('admin', 'manager')
   async requestScreenshot(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('organizationId') organizationId: string,
   ): Promise<ScreenshotResponseDto> {
     const { requestId } = await this.displaysService.requestScreenshot(organizationId, id);
@@ -202,7 +203,7 @@ export class DisplaysController {
   @Get(':id/screenshot')
   @Roles('admin', 'manager', 'viewer')
   async getScreenshot(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('organizationId') organizationId: string,
   ): Promise<ScreenshotResultDto | null> {
     const screenshot = await this.displaysService.getLastScreenshot(organizationId, id);
@@ -223,7 +224,7 @@ export class DisplaysController {
   @Roles('admin', 'manager')
   async updateQrOverlay(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateQrOverlayDto,
   ) {
     return this.displaysService.updateQrOverlay(organizationId, id, dto);
@@ -233,7 +234,7 @@ export class DisplaysController {
   @Roles('admin', 'manager')
   async removeQrOverlay(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.displaysService.removeQrOverlay(organizationId, id);
   }

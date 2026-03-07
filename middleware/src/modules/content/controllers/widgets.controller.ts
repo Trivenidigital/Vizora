@@ -8,6 +8,7 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -39,7 +40,7 @@ export class WidgetsController {
   @Roles('admin', 'manager')
   updateWidget(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: Partial<CreateWidgetDto>,
   ) {
     return this.contentService.updateWidget(organizationId, id, dto);
@@ -50,7 +51,7 @@ export class WidgetsController {
   @HttpCode(HttpStatus.OK)
   refreshWidget(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.contentService.refreshWidget(organizationId, id);
   }
