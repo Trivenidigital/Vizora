@@ -34,7 +34,7 @@ import { AllExceptionsFilter } from './modules/common/filters/all-exceptions.fil
 async function bootstrap() {
   // Validate required production environment variables
   if (process.env.NODE_ENV === 'production') {
-    const required = ['API_BASE_URL', 'CORS_ORIGIN', 'DATABASE_URL', 'JWT_SECRET', 'DEVICE_JWT_SECRET'];
+    const required = ['API_BASE_URL', 'CORS_ORIGIN', 'DATABASE_URL', 'JWT_SECRET', 'DEVICE_JWT_SECRET', 'INTERNAL_API_SECRET'];
     const missing = required.filter(key => !process.env[key]);
     if (missing.length > 0) {
       Logger.error(`❌ Missing required production env vars: ${missing.join(', ')}`);
