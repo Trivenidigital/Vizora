@@ -8,6 +8,7 @@ import {
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { Request, Response } from 'express';
+import * as crypto from 'crypto';
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -111,6 +112,6 @@ export class LoggingInterceptor implements NestInterceptor {
   }
 
   private generateRequestId(): string {
-    return `${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 9)}`;
+    return crypto.randomUUID();
   }
 }
