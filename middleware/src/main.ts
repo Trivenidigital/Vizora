@@ -49,12 +49,14 @@ async function bootstrap() {
   app.useStaticAssets(join(process.cwd(), 'static'), {
     prefix: '/static/',
     maxAge: '7d',
+    etag: true,
   });
 
   // Serve template seed thumbnails
   app.useStaticAssets(join(process.cwd(), 'templates', 'seed'), {
     prefix: '/templates/seed/',
     maxAge: '30d',
+    etag: true,
   });
 
   // NOTE: /uploads/ static route removed for security (H2).
