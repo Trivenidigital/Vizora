@@ -172,6 +172,24 @@ export class DisplaysController {
     return this.displaysService.removeTags(organizationId, id, body.tagIds);
   }
 
+  @Post(':id/disable')
+  @Roles('admin')
+  async disableDevice(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('organizationId') organizationId: string,
+  ) {
+    return this.displaysService.disableDevice(id, organizationId);
+  }
+
+  @Post(':id/enable')
+  @Roles('admin')
+  async enableDevice(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('organizationId') organizationId: string,
+  ) {
+    return this.displaysService.enableDevice(id, organizationId);
+  }
+
   @Post(':id/push-content')
   @Roles('admin', 'manager')
   pushContent(

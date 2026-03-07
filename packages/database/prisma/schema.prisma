@@ -129,6 +129,7 @@ model Display {
   timezone              String   @default("UTC")
   lastScreenshot        String?  // URL to last captured screenshot
   lastScreenshotAt      DateTime? // When screenshot was taken
+  isDisabled            Boolean   @default(false)
   currentPlaylistId     String?  // Direct playlist assignment for simple cases
   currentPlaylist       Playlist? @relation("DisplayCurrentPlaylist", fields: [currentPlaylistId], references: [id], onDelete: SetNull)
   createdAt             DateTime @default(now())

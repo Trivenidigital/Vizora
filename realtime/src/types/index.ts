@@ -48,6 +48,8 @@ export enum DeviceCommandType {
   PAUSE = 'pause',
   RESUME = 'resume',
   PUSH_CONTENT = 'push_content',
+  DISABLE = 'disable',
+  ENABLE = 'enable',
 }
 
 /**

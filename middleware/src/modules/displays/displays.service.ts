@@ -590,6 +590,78 @@ export class DisplaysService {
     this.logger.log(`Screenshot saved for display ${displayId}: ${screenshotUrl}`);
   }
 
+  async disableDevice(id: string, organizationId: string) {
+    const display = await this.db.display.findFirst({
+      where: { id, organizationId },
+    });
+    if (!display) {
+      throw new NotFoundException('Display not found');
+    }
+
+    await this.db.display.update({
+      where: { id },
+      data: { isDisabled: true },
+    });
+
+    // Send disable command to device via realtime gateway (fire-and-forget)
+    this.sendDeviceCommand(id, 'disable').catch((error) => {
+      this.logger.warn(`Failed to send disable command to device ${id}: ${error.message}`);
+    });
+
+    this.emitDisplayEvent('disabled', id, organizationId);
+    return { message: 'Device disabled successfully' };
+  }
+
+  async enableDevice(id: string, organizationId: string) {
+    const display = await this.db.display.findFirst({
+      where: { id, organizationId },
+    });
+    if (!display) {
+      throw new NotFoundException('Display not found');
+    }
+
+    await this.db.display.update({
+      where: { id },
+      data: { isDisabled: false },
+    });
+
+    // Send enable command to device via realtime gateway (fire-and-forget)
+    this.sendDeviceCommand(id, 'enable').catch((error) => {
+      this.logger.warn(`Failed to send enable command to device ${id}: ${error.message}`);
+    });
+
+    this.emitDisplayEvent('enabled', id, organizationId);
+    return { message: 'Device enabled successfully' };
+  }
+
+  private async sendDeviceCommand(displayId: string, command: string, payload?: Record<string, unknown>): Promise<void> {
+    const url = `${this.realtimeUrl}/api/internal/command`;
+
+    await this.circuitBreaker.executeWithFallback(
+      'realtime-service',
+      async () => {
+        await firstValueFrom(
+          this.httpService.post(url, {
+            displayId,
+            command,
+            payload,
+          }, {
+            headers: { 'x-internal-api-key': process.env.INTERNAL_API_SECRET || '' },
+          }),
+        );
+        this.logger.log(`Command '${command}' sent to device ${displayId}`);
+      },
+      (error) => {
+        if (error) {
+          this.logger.warn(`Failed to send command '${command}' to device ${displayId}: ${error.message}`);
+        } else {
+          this.logger.warn(`Realtime service circuit is open, cannot send command '${command}' to device ${displayId}`);
+        }
+      },
+      REALTIME_CIRCUIT_CONFIG,
+    );
+  }
+
   async updateQrOverlay(organizationId: string, id: string, dto: UpdateQrOverlayDto) {
     const display = await this.findOne(organizationId, id);
     const metadata = (display.metadata as Record<string, any>) || {};
