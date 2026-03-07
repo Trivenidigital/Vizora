@@ -130,12 +130,25 @@ export class OrganizationsService {
   async remove(id: string, requestingUserId?: string) {
     const org = await this.findOne(id);
 
-    // 1. Delete all MinIO files for this org
+    // 1. Collect file URLs and user IDs before deletion
     const content = await this.db.content.findMany({
       where: { organizationId: id },
       select: { id: true, url: true },
     });
+    const users = await this.db.user.findMany({
+      where: { organizationId: id },
+      select: { id: true },
+    });
 
+    // 2. Cascade delete organization in a transaction (Prisma handles related records)
+    await this.db.$transaction(async (tx) => {
+      await tx.organization.delete({
+        where: { id },
+      });
+    });
+
+    // 3. Clean up MinIO files (after successful DB delete — orphaned files are
+    // safer than deleted files with live DB records)
     for (const item of content) {
       if (item.url?.startsWith('minio://')) {
         const objectKey = item.url.substring('minio://'.length);
@@ -147,21 +160,12 @@ export class OrganizationsService {
       }
     }
 
-    // 2. Clear Redis cache entries for this org's users
-    const users = await this.db.user.findMany({
-      where: { organizationId: id },
-      select: { id: true },
-    });
+    // 4. Clear Redis cache entries for this org's users
     for (const user of users) {
       await this.redisService.del(`user_auth:${user.id}`);
     }
 
-    // 3. Cascade delete organization (Prisma handles related records)
-    await this.db.organization.delete({
-      where: { id },
-    });
-
-    // 4. Log the deletion
+    // 5. Log the deletion
     this.logger.log(
       `Organization ${id} (${org.name}) deleted by user ${requestingUserId ?? 'unknown'}`,
     );

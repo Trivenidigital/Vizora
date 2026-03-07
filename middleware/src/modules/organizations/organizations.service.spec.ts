@@ -40,6 +40,11 @@ describe('OrganizationsService', () => {
       user: {
         findMany: jest.fn().mockResolvedValue([]),
       },
+      $transaction: jest.fn((fn) => fn({
+        organization: {
+          delete: jest.fn().mockResolvedValue(mockOrganization),
+        },
+      })),
     };
 
     mockStorageService = {
@@ -176,7 +181,7 @@ describe('OrganizationsService', () => {
   });
 
   describe('remove', () => {
-    it('should delete organization and clean up storage and cache', async () => {
+    it('should delete organization in transaction, then clean up storage and cache', async () => {
       mockDatabaseService.organization.findUnique.mockResolvedValue(mockOrganization);
       mockDatabaseService.content.findMany.mockResolvedValue([
         { id: 'c1', url: 'minio://org-123/file.png' },
@@ -186,11 +191,13 @@ describe('OrganizationsService', () => {
         { id: 'user-1' },
         { id: 'user-2' },
       ]);
-      mockDatabaseService.organization.delete.mockResolvedValue(mockOrganization);
 
       await service.remove('org-123', 'admin-user');
 
-      // Should delete MinIO files (only minio:// URLs)
+      // Should delete the organization inside a transaction
+      expect(mockDatabaseService.$transaction).toHaveBeenCalled();
+
+      // Should delete MinIO files AFTER successful DB delete (only minio:// URLs)
       expect(mockStorageService.deleteFile).toHaveBeenCalledTimes(1);
       expect(mockStorageService.deleteFile).toHaveBeenCalledWith('org-123/file.png');
 
@@ -198,25 +205,20 @@ describe('OrganizationsService', () => {
       expect(mockRedisService.del).toHaveBeenCalledTimes(2);
       expect(mockRedisService.del).toHaveBeenCalledWith('user_auth:user-1');
       expect(mockRedisService.del).toHaveBeenCalledWith('user_auth:user-2');
-
-      // Should delete the organization
-      expect(mockDatabaseService.organization.delete).toHaveBeenCalledWith({
-        where: { id: 'org-123' },
-      });
     });
 
-    it('should continue deletion even if MinIO delete fails', async () => {
+    it('should continue with cleanup even if MinIO delete fails', async () => {
       mockDatabaseService.organization.findUnique.mockResolvedValue(mockOrganization);
       mockDatabaseService.content.findMany.mockResolvedValue([
         { id: 'c1', url: 'minio://org-123/file.png' },
       ]);
       mockDatabaseService.user.findMany.mockResolvedValue([]);
-      mockDatabaseService.organization.delete.mockResolvedValue(mockOrganization);
       mockStorageService.deleteFile.mockRejectedValue(new Error('MinIO down'));
 
       await service.remove('org-123', 'admin-user');
 
-      expect(mockDatabaseService.organization.delete).toHaveBeenCalled();
+      // Transaction should still have been called (DB delete succeeded)
+      expect(mockDatabaseService.$transaction).toHaveBeenCalled();
     });
 
     it('should throw NotFoundException if organization not found', async () => {

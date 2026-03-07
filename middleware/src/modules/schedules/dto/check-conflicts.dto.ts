@@ -1,5 +1,5 @@
 import { IsString, IsOptional, IsArray, IsInt, Min, Max } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 
 export class CheckConflictsDto {
   @IsOptional()
@@ -14,7 +14,7 @@ export class CheckConflictsDto {
   @IsInt({ each: true })
   @Min(0, { each: true })
   @Max(6, { each: true })
-  @Type(() => Number)
+  @Transform(({ value }) => Array.isArray(value) ? value.map(Number) : value)
   daysOfWeek: number[];
 
   @IsOptional()

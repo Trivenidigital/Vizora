@@ -360,7 +360,9 @@ export class DeviceGateway
         client.data.organizationId = payload.organizationId;
         client.data.deviceIdentifier = payload.deviceIdentifier;
 
-        // Auto-rotate device token if it expires within 14 days
+        // Auto-rotate device token if it expires within 14 days.
+        // NOTE: The old token remains valid until natural expiry (stateless JWT limitation).
+        // TODO: For high-security deployments, consider a token blacklist in Redis.
         if (payload.exp) {
           const daysUntilExpiry = (payload.exp - Math.floor(Date.now() / 1000)) / 86400;
           if (daysUntilExpiry < 14) {

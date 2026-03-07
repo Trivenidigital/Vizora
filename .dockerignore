@@ -1,12 +1,15 @@
 node_modules
 .git
-*.md
+README.md
+CLAUDE.md
+SECURITY-NOTES.md
+SECURITY-EXCEPTIONS.md
+CONTRIBUTING.md
 screenshots/
 test-screenshots/
 logs/
 .env*
 .nx
-dist
 coverage
 .claude/
 docs/
@@ -14,3 +17,4 @@ e2e-tests/
 *.png
 *.jpg
 bug-reports/
+tasks/
