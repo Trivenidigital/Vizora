@@ -927,7 +927,7 @@ export class ContentService {
       throw new BadRequestException('Content is not a layout');
     }
 
-    const existingMetadata = (existing.metadata as Record<string, any>) || {};
+    const existingMetadata = (existing.metadata as Record<string, unknown>) || {};
 
     const metadata = {
       layoutType: dto.layoutType || existingMetadata.layoutType,
@@ -1051,8 +1051,8 @@ export class ContentService {
   getWidgetTypes() {
     const types: Array<{
       type: string;
-      configSchema: Record<string, any>;
-      sampleData: Record<string, any>;
+      configSchema: Record<string, unknown>;
+      sampleData: Record<string, unknown>;
       defaultTemplate: string;
     }> = [];
 
@@ -1084,7 +1084,7 @@ export class ContentService {
     const templateHtml = this.loadWidgetTemplate(templateName);
 
     // Fetch initial data from the data source (falls back to sample data on failure)
-    let data: Record<string, any>;
+    let data: Record<string, unknown>;
     try {
       data = await source.fetchData(dto.widgetConfig);
     } catch (error) {
@@ -1131,7 +1131,7 @@ export class ContentService {
   async updateWidget(organizationId: string, id: string, dto: Partial<CreateWidgetDto>) {
     const existing = await this.findOne(organizationId, id);
 
-    const existingMeta = (existing.metadata || {}) as Record<string, any>;
+    const existingMeta = (existing.metadata || {}) as Record<string, unknown>;
     if (!existingMeta.isWidget) {
       throw new BadRequestException('Content is not a widget');
     }
@@ -1155,7 +1155,7 @@ export class ContentService {
     }
 
     // Re-fetch data and re-render
-    let data: Record<string, any>;
+    let data: Record<string, unknown>;
     let renderedHtml = existingMeta.renderedHtml || '';
     let lastError: string | undefined;
 
@@ -1198,7 +1198,7 @@ export class ContentService {
   async refreshWidget(organizationId: string, id: string) {
     const existing = await this.findOne(organizationId, id);
 
-    const existingMeta = (existing.metadata || {}) as Record<string, any>;
+    const existingMeta = (existing.metadata || {}) as Record<string, unknown>;
     if (!existingMeta.isWidget) {
       throw new BadRequestException('Content is not a widget');
     }

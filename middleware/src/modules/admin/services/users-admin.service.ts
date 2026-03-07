@@ -39,7 +39,7 @@ export class UsersAdminService {
    * List all users across all organizations
    */
   async findAll(filters: UserFiltersDto): Promise<{
-    data: any[];
+    data: Record<string, unknown>[];
     total: number;
     skip: number;
     take: number;

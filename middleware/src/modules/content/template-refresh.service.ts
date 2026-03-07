@@ -79,7 +79,7 @@ export class TemplateRefreshService {
   /**
    * Refresh a single template by ID
    */
-  async refreshTemplate(contentId: string, prefetchedContent?: any): Promise<void> {
+  async refreshTemplate(contentId: string, prefetchedContent?: Record<string, unknown>): Promise<void> {
     const content = prefetchedContent ?? await this.db.content.findUnique({
       where: { id: contentId },
     });

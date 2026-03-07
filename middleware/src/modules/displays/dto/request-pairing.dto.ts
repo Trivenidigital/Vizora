@@ -10,5 +10,5 @@ export class RequestPairingDto {
 
   @IsObject()
   @IsOptional()
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }

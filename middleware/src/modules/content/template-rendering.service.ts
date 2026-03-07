@@ -195,7 +195,7 @@ export class TemplateRenderingService {
    * @param data - The data to render the template with
    * @returns Rendered HTML string
    */
-  renderTemplate(templateHtml: string, data: Record<string, any>): string {
+  renderTemplate(templateHtml: string, data: Record<string, unknown>): string {
     // Block triple-brace (unescaped) expressions for XSS prevention
     if (/\{\{\{[^}]+\}\}\}/.test(templateHtml)) {
       throw new BadRequestException(
@@ -228,7 +228,7 @@ export class TemplateRenderingService {
    * @param dataSource - The data source configuration
    * @returns Fetched data object
    */
-  async fetchDataFromSource(dataSource: DataSourceDto): Promise<Record<string, any>> {
+  async fetchDataFromSource(dataSource: DataSourceDto): Promise<Record<string, unknown>> {
     // Return manual data if type is manual
     if (dataSource.type === 'manual') {
       return dataSource.manualData || {};
@@ -485,7 +485,7 @@ export class TemplateRenderingService {
    * @param data - The data to render with
    * @returns Sanitized rendered HTML
    */
-  processTemplate(templateHtml: string, data: Record<string, any>): string {
+  processTemplate(templateHtml: string, data: Record<string, unknown>): string {
     // Validate template first
     const validation = this.validateTemplate(templateHtml);
     if (!validation.valid) {

@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
+import { Prisma } from '@vizora/database';
 import { DatabaseService } from '../database/database.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SupportClassifierService } from './support-classifier.service';
@@ -133,7 +134,7 @@ export class SupportService {
     const skip = (page - 1) * limit;
 
     // Build where clause with proper access control
-    const where: any = {};
+    const where: Prisma.SupportRequestWhereInput = {};
 
     if (user.isSuperAdmin) {
       // SuperAdmin sees all requests — no org filter unless we add one later
@@ -252,7 +253,7 @@ export class SupportService {
     }
 
     // Build update data
-    const updateData: any = {};
+    const updateData: Prisma.SupportRequestUpdateInput = {};
     if (data.status) updateData.status = data.status;
     if (data.priority) updateData.priority = data.priority;
     if (data.resolutionNotes !== undefined) updateData.resolutionNotes = data.resolutionNotes;
@@ -333,7 +334,7 @@ export class SupportService {
    * Get support statistics (admin/superadmin only)
    */
   async getStats(organizationId: string, isSuperAdmin: boolean) {
-    const where: any = {};
+    const where: Prisma.SupportRequestWhereInput = {};
     if (!isSuperAdmin) {
       where.organizationId = organizationId;
     }

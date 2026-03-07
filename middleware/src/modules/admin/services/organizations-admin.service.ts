@@ -47,7 +47,7 @@ export class OrganizationsAdminService {
    * List all organizations with search, pagination, and sorting
    */
   async findAll(filters: OrgFiltersDto): Promise<{
-    data: any[];
+    data: Record<string, unknown>[];
     total: number;
     skip: number;
     take: number;

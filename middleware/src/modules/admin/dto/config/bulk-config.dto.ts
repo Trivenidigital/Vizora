@@ -5,7 +5,7 @@ class ConfigItem {
   @IsString()
   key: string;
 
-  value: any;
+  value: string | number | boolean | Record<string, unknown>;
 
   @IsString()
   @IsOptional()

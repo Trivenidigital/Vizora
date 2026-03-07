@@ -3,7 +3,7 @@ import { Type } from 'class-transformer';
 
 export class UpdateConfigDto {
   @IsOptional()
-  value: any;
+  value: string | number | boolean | Record<string, unknown>;
 
   @IsString()
   @IsOptional()

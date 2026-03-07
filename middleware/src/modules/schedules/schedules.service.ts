@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { Prisma } from '@vizora/database';
 import { DatabaseService } from '../database/database.service';
 import { CreateScheduleDto } from './dto/create-schedule.dto';
 import { UpdateScheduleDto } from './dto/update-schedule.dto';
@@ -75,7 +76,7 @@ export class SchedulesService {
     const { page = 1, limit = 10 } = pagination;
     const skip = (page - 1) * limit;
 
-    const where: any = { organizationId };
+    const where: Prisma.ScheduleWhereInput = { organizationId };
     if (filters?.displayId) where.displayId = filters.displayId;
     if (filters?.displayGroupId) where.displayGroupId = filters.displayGroupId;
     if (filters?.isActive !== undefined) where.isActive = filters.isActive;
@@ -269,7 +270,7 @@ export class SchedulesService {
   }
 
   async checkConflicts(organizationId: string, dto: CheckConflictsDto) {
-    const where: any = {
+    const where: Prisma.ScheduleWhereInput = {
       organizationId,
       isActive: true,
     };

@@ -14,13 +14,13 @@ export interface WidgetDataSource {
    * @param config - Widget-specific configuration (API keys, URLs, etc.)
    * @returns The fetched data shaped for template rendering
    */
-  fetchData(config: Record<string, any>): Promise<Record<string, any>>;
+  fetchData(config: Record<string, unknown>): Promise<Record<string, unknown>>;
 
   /**
    * Return the JSON schema describing valid configuration options.
    * Used for UI form generation and validation.
    */
-  getConfigSchema(): Record<string, any>;
+  getConfigSchema(): Record<string, unknown>;
 
   /**
    * Return the default Handlebars template for this widget type.
@@ -32,5 +32,5 @@ export interface WidgetDataSource {
    * Return realistic sample data for previewing the widget
    * without making any external API calls.
    */
-  getSampleData(): Record<string, any>;
+  getSampleData(): Record<string, unknown>;
 }

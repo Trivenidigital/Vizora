@@ -2,6 +2,22 @@ import { Injectable, Logger } from '@nestjs/common';
 import { CircuitBreakerService } from '../../common/services/circuit-breaker.service';
 import { WidgetDataSource } from './widget-data-source.interface';
 
+/** OpenWeatherMap API response shape (partial) */
+interface WeatherApiResponse {
+  main?: { temp?: number; feels_like?: number; humidity?: number };
+  wind?: { speed?: number };
+  weather?: Array<{ description?: string; icon?: string; id?: number }>;
+  name?: string;
+  sys?: { country?: string };
+}
+
+/** OpenWeatherMap forecast list item */
+interface ForecastItem {
+  dt_txt?: string;
+  main?: { temp?: number; temp_max?: number; temp_min?: number };
+  weather?: Array<{ description?: string; icon?: string; id?: number }>;
+}
+
 const WEATHER_CIRCUIT_CONFIG = {
   failureThreshold: 3,
   resetTimeout: 30000, // 30 seconds
@@ -31,7 +47,7 @@ export class WeatherDataSource implements WidgetDataSource {
    * @param config - Must contain at least `location`; optionally `units`,
    *   `showForecast`, and `forecastDays`.
    */
-  async fetchData(config: Record<string, any>): Promise<Record<string, any>> {
+  async fetchData(config: Record<string, unknown>): Promise<Record<string, unknown>> {
     const apiKey = process.env.OPENWEATHER_API_KEY;
     if (!apiKey) {
       this.logger.warn('OPENWEATHER_API_KEY not set, returning sample data');
@@ -53,7 +69,7 @@ export class WeatherDataSource implements WidgetDataSource {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), this.REQUEST_TIMEOUT);
 
-        let currentData: any;
+        let currentData: WeatherApiResponse;
         try {
           const res = await fetch(currentUrl, {
             headers: { 'User-Agent': 'Vizora-Widget/1.0' },
@@ -68,7 +84,7 @@ export class WeatherDataSource implements WidgetDataSource {
           clearTimeout(timeoutId);
         }
 
-        const result: Record<string, any> = {
+        const result: Record<string, unknown> = {
           current: {
             temp: currentData.main?.temp,
             feelsLike: currentData.main?.feels_like,
@@ -102,8 +118,8 @@ export class WeatherDataSource implements WidgetDataSource {
               if (fRes.ok) {
                 const forecastData = await fRes.json();
                 // Group by day (take one entry per day at noon if available)
-                const dailyMap = new Map<string, any>();
-                for (const entry of forecastData.list || []) {
+                const dailyMap = new Map<string, Record<string, unknown>>();
+                for (const entry of (forecastData.list || []) as ForecastItem[]) {
                   const date = entry.dt_txt?.split(' ')[0];
                   if (date && !dailyMap.has(date)) {
                     dailyMap.set(date, {
@@ -138,7 +154,7 @@ export class WeatherDataSource implements WidgetDataSource {
     );
   }
 
-  getConfigSchema(): Record<string, any> {
+  getConfigSchema(): Record<string, unknown> {
     return {
       type: 'object',
       properties: {
@@ -174,7 +190,7 @@ export class WeatherDataSource implements WidgetDataSource {
     return 'weather';
   }
 
-  getSampleData(): Record<string, any> {
+  getSampleData(): Record<string, unknown> {
     return {
       current: {
         temp: 22,

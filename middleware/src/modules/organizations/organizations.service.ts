@@ -22,7 +22,7 @@ export class OrganizationsService {
    * PostgreSQL returns BigInt for storageUsedBytes/storageQuotaBytes,
    * but JSON.stringify cannot handle BigInt values.
    */
-  private sanitizeOrg(org: any) {
+  private sanitizeOrg(org: Record<string, unknown> | null) {
     if (!org) return org;
     return {
       ...org,

@@ -25,13 +25,13 @@ export interface LibraryTemplateMetadata {
   useCount?: number;
   dataSource: {
     type: 'manual';
-    manualData?: Record<string, any>;
+    manualData?: Record<string, unknown>;
   };
   refreshConfig: {
     enabled: boolean;
     intervalMinutes: number;
   };
-  sampleData?: Record<string, any>;
+  sampleData?: Record<string, unknown>;
   renderedHtml?: string;
   renderedAt?: string;
 }

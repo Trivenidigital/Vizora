@@ -185,7 +185,7 @@ export class AnnouncementsService {
       throw new BadRequestException('Expiration date must be after start date');
     }
 
-    const updateData: any = { ...dto };
+    const updateData: Record<string, unknown> = { ...dto };
 
     if (dto.startsAt) {
       updateData.startsAt = new Date(dto.startsAt);

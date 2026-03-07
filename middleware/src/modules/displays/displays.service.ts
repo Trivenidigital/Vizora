@@ -541,7 +541,7 @@ export class DisplaysService {
 
     // Parse metadata from lastScreenshot field if it's JSON
     // Format: { url: string, width?: number, height?: number }
-    let metadata: any = {};
+    let metadata: Record<string, unknown> = {};
     try {
       if (display.lastScreenshot.startsWith('{')) {
         metadata = JSON.parse(display.lastScreenshot);

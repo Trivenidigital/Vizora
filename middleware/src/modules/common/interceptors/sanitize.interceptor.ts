@@ -108,7 +108,7 @@ export class SanitizeInterceptor implements NestInterceptor {
     );
   }
 
-  private sanitizeObject(obj: any, decodeEntities = false): any {
+  private sanitizeObject(obj: unknown, decodeEntities = false): unknown {
     if (obj === null || obj === undefined) {
       return obj;
     }
@@ -126,7 +126,7 @@ export class SanitizeInterceptor implements NestInterceptor {
     }
 
     if (typeof obj === 'object') {
-      const sanitized: Record<string, any> = {};
+      const sanitized: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(obj)) {
         // Skip password fields - don't sanitize them
         if (key.toLowerCase().includes('password')) {
