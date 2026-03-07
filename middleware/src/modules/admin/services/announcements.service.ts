@@ -50,10 +50,24 @@ export class AnnouncementsService {
   /**
    * Get all announcements
    */
-  async findAll(): Promise<Announcement[]> {
-    return this.db.systemAnnouncement.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
+  async findAll(pagination?: { page?: number; limit?: number }) {
+    const page = pagination?.page ?? 1;
+    const limit = pagination?.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      this.db.systemAnnouncement.findMany({
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.db.systemAnnouncement.count(),
+    ]);
+
+    return {
+      data,
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
   }
 
   /**

@@ -47,11 +47,13 @@ describe('SecurityAdminService', () => {
         create: jest.fn(),
         update: jest.fn(),
         upsert: jest.fn(),
+        count: jest.fn(),
       },
       apiKey: {
         findMany: jest.fn(),
         findUnique: jest.fn(),
         update: jest.fn(),
+        count: jest.fn(),
       },
       auditLog: {
         findMany: jest.fn(),
@@ -66,13 +68,15 @@ describe('SecurityAdminService', () => {
   });
 
   describe('getIpBlocklist', () => {
-    it('should return all blocklist entries', async () => {
+    it('should return paginated blocklist entries', async () => {
       mockDb.ipBlocklist.findMany.mockResolvedValue([mockIpBlocklistEntry]);
+      mockDb.ipBlocklist.count.mockResolvedValue(1);
 
-      const result = await service.getIpBlocklist();
+      const result = await service.getIpBlocklist({ page: 1, limit: 20 });
 
-      expect(result).toHaveLength(1);
-      expect(result[0].ipAddress).toBe('192.168.1.100');
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].ipAddress).toBe('192.168.1.100');
+      expect(result.meta).toEqual({ page: 1, limit: 20, total: 1, totalPages: 1 });
     });
   });
 
@@ -163,14 +167,16 @@ describe('SecurityAdminService', () => {
   });
 
   describe('getAllApiKeys', () => {
-    it('should return all API keys across platform', async () => {
+    it('should return paginated API keys across platform', async () => {
       mockDb.apiKey.findMany.mockResolvedValue([mockApiKey]);
+      mockDb.apiKey.count.mockResolvedValue(1);
 
-      const result = await service.getAllApiKeys();
+      const result = await service.getAllApiKeys({ page: 1, limit: 20 });
 
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('Test API Key');
-      expect(result[0].organization.name).toBe('Test Org');
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].name).toBe('Test API Key');
+      expect(result.data[0].organization.name).toBe('Test Org');
+      expect(result.meta).toEqual({ page: 1, limit: 20, total: 1, totalPages: 1 });
     });
   });
 

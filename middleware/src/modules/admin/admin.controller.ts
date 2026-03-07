@@ -53,6 +53,7 @@ import {
   UpdateAnnouncementDto,
   BillingFiltersDto,
 } from './dto';
+import { PaginationDto } from '../common/dto/pagination.dto';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, SuperAdminGuard)
@@ -75,8 +76,8 @@ export class AdminController {
   // ============================================================================
 
   @Get('plans')
-  async getPlans() {
-    return this.plansService.findAll();
+  async getPlans(@Query() pagination: PaginationDto) {
+    return this.plansService.findAll(pagination);
   }
 
   @Get('plans/:id')
@@ -194,8 +195,8 @@ export class AdminController {
   // ============================================================================
 
   @Get('promotions')
-  async getPromotions() {
-    return this.promotionsService.findAll();
+  async getPromotions(@Query() pagination: PaginationDto) {
+    return this.promotionsService.findAll(pagination);
   }
 
   @Get('promotions/:id')
@@ -297,8 +298,11 @@ export class AdminController {
   }
 
   @Get('promotions/:id/redemptions')
-  async getPromotionRedemptions(@Param('id', ParseUUIDPipe) id: string) {
-    return this.promotionsService.getRedemptions(id);
+  async getPromotionRedemptions(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() pagination: PaginationDto,
+  ) {
+    return this.promotionsService.getRedemptions(id, pagination);
   }
 
   // ============================================================================
@@ -701,8 +705,8 @@ export class AdminController {
   // ============================================================================
 
   @Get('config')
-  async getAllConfig() {
-    return this.systemConfigService.findAll();
+  async getAllConfig(@Query() pagination: PaginationDto) {
+    return this.systemConfigService.findAll(pagination);
   }
 
   @Get('config/:key')
@@ -799,8 +803,8 @@ export class AdminController {
   }
 
   @Get('security/ip-blocklist')
-  async getIpBlocklist() {
-    return this.securityAdminService.getIpBlocklist();
+  async getIpBlocklist(@Query() pagination: PaginationDto) {
+    return this.securityAdminService.getIpBlocklist(pagination);
   }
 
   @Post('security/ip-blocklist')
@@ -854,8 +858,8 @@ export class AdminController {
   }
 
   @Get('security/api-keys')
-  async getAllApiKeys() {
-    return this.securityAdminService.getAllApiKeys();
+  async getAllApiKeys(@Query() pagination: PaginationDto) {
+    return this.securityAdminService.getAllApiKeys(pagination);
   }
 
   @Post('security/api-keys/:id/revoke')
@@ -884,8 +888,8 @@ export class AdminController {
   // ============================================================================
 
   @Get('announcements')
-  async getAnnouncements() {
-    return this.announcementsService.findAll();
+  async getAnnouncements(@Query() pagination: PaginationDto) {
+    return this.announcementsService.findAll(pagination);
   }
 
   @Get('announcements/:id')

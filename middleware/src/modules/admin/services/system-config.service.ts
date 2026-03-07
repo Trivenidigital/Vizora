@@ -23,10 +23,24 @@ export class SystemConfigService {
   /**
    * Get all system configurations
    */
-  async findAll() {
-    return this.db.systemConfig.findMany({
-      orderBy: [{ category: 'asc' }, { key: 'asc' }],
-    });
+  async findAll(pagination?: { page?: number; limit?: number }) {
+    const page = pagination?.page ?? 1;
+    const limit = pagination?.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      this.db.systemConfig.findMany({
+        skip,
+        take: limit,
+        orderBy: [{ category: 'asc' }, { key: 'asc' }],
+      }),
+      this.db.systemConfig.count(),
+    ]);
+
+    return {
+      data,
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
   }
 
   /**

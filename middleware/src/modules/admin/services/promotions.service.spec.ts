@@ -40,6 +40,7 @@ describe('PromotionsService', () => {
         update: jest.fn(),
         updateMany: jest.fn(),
         delete: jest.fn(),
+        count: jest.fn(),
       },
       planPromotion: {
         deleteMany: jest.fn(),
@@ -48,6 +49,7 @@ describe('PromotionsService', () => {
       promotionRedemption: {
         findMany: jest.fn(),
         create: jest.fn(),
+        count: jest.fn(),
       },
       $transaction: jest.fn((fn) => fn(mockDb)),
     };
@@ -60,14 +62,18 @@ describe('PromotionsService', () => {
   });
 
   describe('findAll', () => {
-    it('should return all promotions with redemption counts', async () => {
+    it('should return paginated promotions with redemption counts', async () => {
       mockDb.promotion.findMany.mockResolvedValue([mockPromotion]);
+      mockDb.promotion.count.mockResolvedValue(1);
 
-      const result = await service.findAll();
+      const result = await service.findAll({ page: 1, limit: 20 });
 
-      expect(result).toHaveLength(1);
-      expect(result[0]._count.redemptions).toBe(10);
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0]._count.redemptions).toBe(10);
+      expect(result.meta).toEqual({ page: 1, limit: 20, total: 1, totalPages: 1 });
       expect(mockDb.promotion.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 20,
         orderBy: { createdAt: 'desc' },
         include: {
           applicablePlans: { include: { plan: true } },
@@ -391,18 +397,23 @@ describe('PromotionsService', () => {
   });
 
   describe('getRedemptions', () => {
-    it('should return redemption history for a promotion', async () => {
+    it('should return paginated redemption history for a promotion', async () => {
       mockDb.promotion.findUnique.mockResolvedValue(mockPromotion);
-      mockDb.promotionRedemption.findMany.mockResolvedValue([
+      const redemptions = [
         { id: 'r-1', promotionId: 'promo-123', organizationId: 'org-1', discountApplied: 2499 },
         { id: 'r-2', promotionId: 'promo-123', organizationId: 'org-2', discountApplied: 2499 },
-      ]);
+      ];
+      mockDb.promotionRedemption.findMany.mockResolvedValue(redemptions);
+      mockDb.promotionRedemption.count.mockResolvedValue(2);
 
-      const result = await service.getRedemptions('promo-123');
+      const result = await service.getRedemptions('promo-123', { page: 1, limit: 20 });
 
-      expect(result).toHaveLength(2);
+      expect(result.data).toHaveLength(2);
+      expect(result.meta).toEqual({ page: 1, limit: 20, total: 2, totalPages: 1 });
       expect(mockDb.promotionRedemption.findMany).toHaveBeenCalledWith({
         where: { promotionId: 'promo-123' },
+        skip: 0,
+        take: 20,
         orderBy: { redeemedAt: 'desc' },
       });
     });

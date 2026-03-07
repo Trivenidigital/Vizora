@@ -62,10 +62,24 @@ export class SecurityAdminService {
   /**
    * Get all IP blocklist entries
    */
-  async getIpBlocklist(): Promise<IpBlocklistEntry[]> {
-    return this.db.ipBlocklist.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
+  async getIpBlocklist(pagination?: { page?: number; limit?: number }) {
+    const page = pagination?.page ?? 1;
+    const limit = pagination?.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      this.db.ipBlocklist.findMany({
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.db.ipBlocklist.count(),
+    ]);
+
+    return {
+      data,
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
   }
 
   /**
@@ -160,29 +174,38 @@ export class SecurityAdminService {
   /**
    * Get all API keys across the platform
    */
-  async getAllApiKeys(): Promise<ApiKeyInfo[]> {
-    const keys = await this.db.apiKey.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: {
-        organization: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-          },
-        },
-        createdBy: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-      },
-    });
+  async getAllApiKeys(pagination?: { page?: number; limit?: number }) {
+    const page = pagination?.page ?? 1;
+    const limit = pagination?.limit ?? 20;
+    const skip = (page - 1) * limit;
 
-    return keys.map((key) => ({
+    const [keys, total] = await Promise.all([
+      this.db.apiKey.findMany({
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          organization: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+            },
+          },
+          createdBy: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
+      }),
+      this.db.apiKey.count(),
+    ]);
+
+    const data = keys.map((key) => ({
       id: key.id,
       name: key.name,
       prefix: key.prefix,
@@ -194,6 +217,11 @@ export class SecurityAdminService {
       organization: key.organization,
       createdBy: key.createdBy,
     }));
+
+    return {
+      data,
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
   }
 
   /**
