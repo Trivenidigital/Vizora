@@ -4,6 +4,8 @@
  * Does nothing if DSN is not set — safe to import anywhere.
  */
 
+import { devLog } from './logger';
+
 let initialized = false;
 
 export function initSentry(): void {
@@ -36,5 +38,5 @@ export function captureMessage(message: string, level: 'info' | 'warning' | 'err
   // When @sentry/nextjs is installed:
   // import * as Sentry from '@sentry/nextjs';
   // Sentry.captureMessage(message, level);
-  console.log(`[Sentry stub] Would report (${level}):`, message);
+  devLog(`[Sentry stub] Would report (${level}):`, message);
 }

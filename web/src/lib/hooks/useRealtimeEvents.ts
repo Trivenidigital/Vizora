@@ -3,6 +3,7 @@
 
 import { useEffect, useCallback, useRef, useState } from 'react';
 import { useSocket } from './useSocket';
+import { devLog, devWarn } from '@/lib/logger';
 import type { Display, Content, Playlist, Schedule } from '../types';
 
 // Event types
@@ -109,7 +110,7 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
         }
 
         if (process.env.NODE_ENV === 'development') {
-          console.log('[RealtimeEvents] Event queued offline:', event, queueItem);
+          devLog('[RealtimeEvents] Event queued offline:', event, queueItem);
         }
       }
     },
@@ -145,13 +146,13 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
 
     const itemsToSync = [...offlineQueueRef.current];
     if (process.env.NODE_ENV === 'development') {
-      console.log('[RealtimeEvents] Syncing offline queue, items:', itemsToSync.length);
+      devLog('[RealtimeEvents] Syncing offline queue, items:', itemsToSync.length);
     }
 
     for (const item of itemsToSync) {
       if (item.retryCount >= retryAttempts) {
         if (process.env.NODE_ENV === 'development') {
-          console.warn('[RealtimeEvents] Max retries exceeded for:', item.event, item.id);
+          devWarn('[RealtimeEvents] Max retries exceeded for:', item.event, item.id);
         }
         // Move to conflicted changes for manual resolution
         setSyncState((prev) => ({
@@ -168,7 +169,7 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
         // Remove from queue after successful emit
         offlineQueueRef.current = offlineQueueRef.current.filter((qi) => qi.id !== item.id);
         if (process.env.NODE_ENV === 'development') {
-          console.log('[RealtimeEvents] Successfully synced:', item.event);
+          devLog('[RealtimeEvents] Successfully synced:', item.event);
         }
       } catch (error) {
         if (process.env.NODE_ENV === 'development') {
@@ -189,7 +190,7 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
   const handleDeviceStatusUpdate = useCallback(
     (update: DeviceStatusUpdate) => {
       if (process.env.NODE_ENV === 'development') {
-        console.log('[RealtimeEvents] Device status update:', update);
+        devLog('[RealtimeEvents] Device status update:', update);
       }
       onDeviceStatusChange?.(update);
 
@@ -208,7 +209,7 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
   const handlePlaylistUpdate = useCallback(
     (update: PlaylistUpdate) => {
       if (process.env.NODE_ENV === 'development') {
-        console.log('[RealtimeEvents] Playlist update:', update);
+        devLog('[RealtimeEvents] Playlist update:', update);
       }
       onPlaylistChange?.(update);
 
@@ -249,7 +250,7 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
       setIsOffline(false);
       onConnectionChange?.(true);
       if (process.env.NODE_ENV === 'development') {
-        console.log('[RealtimeEvents] Connected, syncing offline queue...');
+        devLog('[RealtimeEvents] Connected, syncing offline queue...');
       }
       syncOfflineQueue();
     });
@@ -259,7 +260,7 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
       // null = reconnecting (WS dropped but browser online), false = truly offline
       onConnectionChange?.(navigator.onLine ? null : false);
       if (process.env.NODE_ENV === 'development') {
-        console.log('[RealtimeEvents] Disconnected, browser online:', navigator.onLine);
+        devLog('[RealtimeEvents] Disconnected, browser online:', navigator.onLine);
       }
     });
 
@@ -289,7 +290,7 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
   useEffect(() => {
     const handleOnline = () => {
       if (process.env.NODE_ENV === 'development') {
-        console.log('[RealtimeEvents] Browser online, attempting to sync...');
+        devLog('[RealtimeEvents] Browser online, attempting to sync...');
       }
       setIsOffline(false);
       onConnectionChange?.(null); // Signal reconnecting (not offline, not yet connected)
@@ -300,7 +301,7 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
 
     const handleOffline = () => {
       if (process.env.NODE_ENV === 'development') {
-        console.log('[RealtimeEvents] Browser offline, queuing events...');
+        devLog('[RealtimeEvents] Browser offline, queuing events...');
       }
       setIsOffline(true);
     };
@@ -337,7 +338,7 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
     syncOfflineQueue,
     clearOfflineQueue: () => {
       if (process.env.NODE_ENV === 'development') {
-        console.log('[RealtimeEvents] Clearing offline queue');
+        devLog('[RealtimeEvents] Clearing offline queue');
       }
       offlineQueueRef.current = [];
     },

@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import io, { Socket } from 'socket.io-client';
+import { devLog, devWarn } from '@/lib/logger';
 
 interface UseSocketOptions {
   url?: string;
@@ -94,7 +95,7 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketReturn {
       // Clear exhaustion on successful connect
       reconnectExhaustedFor.delete(url);
       if (process.env.NODE_ENV === 'development') {
-        console.log('[Socket] Connected:', socket.id);
+        devLog('[Socket] Connected:', socket.id);
       }
 
       // Join organization room if organizationId is provided
@@ -106,7 +107,7 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketReturn {
     socket.on('disconnect', (reason) => {
       setIsConnected(false);
       if (process.env.NODE_ENV === 'development') {
-        console.log('[Socket] Disconnected:', reason);
+        devLog('[Socket] Disconnected:', reason);
       }
     });
 
@@ -116,7 +117,7 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketReturn {
       if (!hasLoggedErrorRef.current) {
         hasLoggedErrorRef.current = true;
         if (process.env.NODE_ENV === 'development') {
-          console.warn('[Socket] Connection error (retrying):', error.message);
+          devWarn('[Socket] Connection error (retrying):', error.message);
         }
       }
     });
@@ -135,7 +136,7 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketReturn {
     // Handle organization room join confirmation
     socket.on('joined:organization', (data) => {
       if (process.env.NODE_ENV === 'development') {
-        console.log('[Socket] Joined organization room:', data.organizationId);
+        devLog('[Socket] Joined organization room:', data.organizationId);
       }
     });
 
@@ -143,7 +144,7 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketReturn {
     socket.io.on('reconnect_failed', () => {
       markReconnectExhausted(url);
       if (process.env.NODE_ENV === 'development') {
-        console.warn('[Socket] Reconnection exhausted for', url, '— will retry after cooldown');
+        devWarn('[Socket] Reconnection exhausted for', url, '— will retry after cooldown');
       }
     });
 

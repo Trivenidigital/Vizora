@@ -2,6 +2,7 @@
 // Handles optimistic UI updates with automatic rollback on failure
 
 import { useState, useCallback, useRef } from 'react';
+import { devLog } from '@/lib/logger';
 
 export interface OptimisticUpdate<T> {
   id: string;
@@ -48,7 +49,7 @@ export function useOptimisticState<T>(
         updateQueueRef.current.push(update);
 
         if (enableLogging && process.env.NODE_ENV === 'development') {
-          console.log('[OptimisticState] Applied optimistic update:', id, {
+          devLog('[OptimisticState] Applied optimistic update:', id, {
             previous: prevState,
             optimistic: optimisticState,
           });
@@ -68,7 +69,7 @@ export function useOptimisticState<T>(
 
       if (update) {
         if (enableLogging && process.env.NODE_ENV === 'development') {
-          console.log('[OptimisticState] Committed update:', id);
+          devLog('[OptimisticState] Committed update:', id);
         }
         onCommit?.(update);
         updated.delete(id);
@@ -89,7 +90,7 @@ export function useOptimisticState<T>(
           setState(fallbackState ?? update.previousState);
 
           if (enableLogging && process.env.NODE_ENV === 'development') {
-            console.log('[OptimisticState] Rolled back update:', id, {
+            devLog('[OptimisticState] Rolled back update:', id, {
               previousState: update.previousState,
             });
           }
@@ -117,7 +118,7 @@ export function useOptimisticState<T>(
         setState(originalState);
 
         if (enableLogging && process.env.NODE_ENV === 'development') {
-          console.log('[OptimisticState] Rolled back all updates:', prev.size);
+          devLog('[OptimisticState] Rolled back all updates:', prev.size);
         }
 
         updates.forEach((update) => onRollback?.(update));
@@ -148,7 +149,7 @@ export function useOptimisticState<T>(
           updateQueueRef.current.push(update);
 
           if (enableLogging && process.env.NODE_ENV === 'development') {
-            console.log('[OptimisticState] Batched update:', id);
+            devLog('[OptimisticState] Batched update:', id);
           }
         });
 

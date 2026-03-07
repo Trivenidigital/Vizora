@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
+import { devLog } from '@/lib/logger';
 
 type DateRange = 'week' | 'month' | 'year';
 
@@ -42,7 +43,7 @@ export function useDeviceMetrics(dateRange: DateRange = 'month') {
         } catch (apiError) {
           // Fall through to mock data if API not available
           if (process.env.NODE_ENV === 'development') {
-            console.log('Analytics API not available, using mock data');
+            devLog('Analytics API not available, using mock data');
           }
         }
 
@@ -98,7 +99,7 @@ export function useContentPerformance(dateRange: DateRange = 'month') {
           }
         } catch (apiError) {
           if (process.env.NODE_ENV === 'development') {
-            console.log('Content performance API not available, using mock data');
+            devLog('Content performance API not available, using mock data');
           }
         }
 
@@ -160,7 +161,7 @@ export function useUsageTrends(dateRange: DateRange = 'month') {
           }
         } catch (apiError) {
           if (process.env.NODE_ENV === 'development') {
-            console.log('Usage trends API not available, using mock data');
+            devLog('Usage trends API not available, using mock data');
           }
         }
 
@@ -217,7 +218,7 @@ export function useDeviceDistribution() {
           }
         } catch (apiError) {
           if (process.env.NODE_ENV === 'development') {
-            console.log('Device distribution API not available, using mock data');
+            devLog('Device distribution API not available, using mock data');
           }
         }
 
@@ -278,7 +279,7 @@ export function useBandwidthUsage(dateRange: DateRange = 'month') {
           }
         } catch (apiError) {
           if (process.env.NODE_ENV === 'development') {
-            console.log('Bandwidth usage API not available, using mock data');
+            devLog('Bandwidth usage API not available, using mock data');
           }
         }
 
@@ -334,7 +335,7 @@ export function usePlaylistPerformance(dateRange: DateRange = 'month') {
           }
         } catch (apiError) {
           if (process.env.NODE_ENV === 'development') {
-            console.log('Playlist performance API not available, using mock data');
+            devLog('Playlist performance API not available, using mock data');
           }
         }
 

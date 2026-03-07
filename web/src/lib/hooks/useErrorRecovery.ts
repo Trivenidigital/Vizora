@@ -2,6 +2,7 @@
 // Handles exponential backoff, circuit breaker pattern, and intelligent retries
 
 import { useCallback, useRef, useState } from 'react';
+import { devLog } from '@/lib/logger';
 
 export type ErrorSeverity = 'critical' | 'warning' | 'info';
 
@@ -119,7 +120,7 @@ export function useErrorRecovery(options: UseErrorRecoveryOptions = {}) {
             newSuccessCount = 0;
 
             if (enableLogging && process.env.NODE_ENV === 'development') {
-              console.log('[ErrorRecovery] Circuit breaker CLOSED after successful recovery');
+              devLog('[ErrorRecovery] Circuit breaker CLOSED after successful recovery');
             }
             onCircuitBreakerChange?.(false);
           }
@@ -131,7 +132,7 @@ export function useErrorRecovery(options: UseErrorRecoveryOptions = {}) {
             newState = 'OPEN';
 
             if (enableLogging && process.env.NODE_ENV === 'development') {
-              console.log('[ErrorRecovery] Circuit breaker OPENED due to repeated failures');
+              devLog('[ErrorRecovery] Circuit breaker OPENED due to repeated failures');
             }
             onCircuitBreakerChange?.(true);
           }
@@ -157,7 +158,7 @@ export function useErrorRecovery(options: UseErrorRecoveryOptions = {}) {
         const timeSinceStateChange = Date.now() - prev.lastStateChangeTime;
         if (timeSinceStateChange >= circuitBreakerConfig.timeout) {
           if (enableLogging && process.env.NODE_ENV === 'development') {
-            console.log('[ErrorRecovery] Circuit breaker transitioning to HALF_OPEN');
+            devLog('[ErrorRecovery] Circuit breaker transitioning to HALF_OPEN');
           }
           return {
             ...prev,
@@ -240,7 +241,7 @@ export function useErrorRecovery(options: UseErrorRecoveryOptions = {}) {
             onSuccess?.(result);
 
             if (enableLogging && process.env.NODE_ENV === 'development') {
-              console.log('[ErrorRecovery] Operation succeeded:', { id, retryCount });
+              devLog('[ErrorRecovery] Operation succeeded:', { id, retryCount });
             }
 
             return result;
@@ -279,7 +280,7 @@ export function useErrorRecovery(options: UseErrorRecoveryOptions = {}) {
             });
 
             if (enableLogging && process.env.NODE_ENV === 'development') {
-              console.log('[ErrorRecovery] Retrying after', delay, 'ms:', {
+              devLog('[ErrorRecovery] Retrying after', delay, 'ms:', {
                 id,
                 attempt: retryCount + 1,
                 maxAttempts: retryConfig.maxAttempts,
@@ -347,7 +348,7 @@ export function useErrorRecovery(options: UseErrorRecoveryOptions = {}) {
     });
 
     if (enableLogging && process.env.NODE_ENV === 'development') {
-      console.log('[ErrorRecovery] Circuit breaker reset to CLOSED');
+      devLog('[ErrorRecovery] Circuit breaker reset to CLOSED');
     }
 
     onCircuitBreakerChange?.(false);

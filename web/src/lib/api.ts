@@ -1,6 +1,7 @@
 // API Client for Vizora Middleware
 // Uses httpOnly cookies for secure JWT token storage
 
+import { devLog, devWarn } from './logger';
 import type {
   Display, DisplayOrientation, Content, Playlist, PlaylistItem, Schedule,
   PaginatedResponse, ContentFolder, AppNotification, ApiKey, CreateApiKeyResponse,
@@ -30,7 +31,7 @@ if (
   process.env.NODE_ENV === 'production' &&
   !process.env.NEXT_PUBLIC_API_URL
 ) {
-  console.warn(
+  devWarn(
     '[Vizora] WARNING: NEXT_PUBLIC_API_URL is not set in production. ' +
     'SSR requests will fall back to http://localhost:3000/api/v1. ' +
     'Set NEXT_PUBLIC_API_URL to your middleware API URL for production.',
@@ -198,7 +199,7 @@ class ApiClient {
     };
 
     if (process.env.NODE_ENV === 'development') {
-      console.log(`[API] Request: ${options.method || 'GET'} ${this.baseUrl}${endpoint}`);
+      devLog(`[API] Request: ${options.method || 'GET'} ${this.baseUrl}${endpoint}`);
     }
 
     // Create abort controller for timeout
@@ -217,7 +218,7 @@ class ApiClient {
       clearTimeout(timeoutId);
 
       if (process.env.NODE_ENV === 'development') {
-        console.log(`[API] Response status: ${response.status} ${response.statusText}`);
+        devLog(`[API] Response status: ${response.status} ${response.statusText}`);
       }
 
       if (!response.ok) {
@@ -242,7 +243,7 @@ class ApiClient {
 
       const data = await response.json();
       if (process.env.NODE_ENV === 'development') {
-        console.log('[API] Response received');
+        devLog('[API] Response received');
       }
       // Auto-unwrap response envelope { success, data } from middleware
       if (data && typeof data === 'object' && 'success' in data && 'data' in data) {
@@ -256,7 +257,7 @@ class ApiClient {
       if (error instanceof Error && error.name === 'AbortError') {
         if (retries > 0 && (options.method === 'GET' || !options.method)) {
           if (process.env.NODE_ENV === 'development') {
-            console.warn(`[API] Request timeout, retrying... (${retries} attempts left)`);
+            devWarn(`[API] Request timeout, retrying... (${retries} attempts left)`);
           }
           return this.request<T>(endpoint, options, retries - 1);
         }
@@ -270,7 +271,7 @@ class ApiClient {
   // Auth - token is set as httpOnly cookie by server
   async login(email: string, password: string): Promise<LoginResponse> {
     if (process.env.NODE_ENV === 'development') {
-      console.log('[API] Login called');
+      devLog('[API] Login called');
     }
     const response = await this.request<LoginResponse>('/auth/login', {
       method: 'POST',
@@ -290,7 +291,7 @@ class ApiClient {
     lastName: string
   ): Promise<RegisterResponse> {
     if (process.env.NODE_ENV === 'development') {
-      console.log('[API] Register called');
+      devLog('[API] Register called');
     }
     const response = await this.request<RegisterResponse>('/auth/register', {
       method: 'POST',
@@ -451,7 +452,7 @@ class ApiClient {
       formData.append('type', data.type);
 
       if (process.env.NODE_ENV === 'development') {
-        console.log(`[API] Request: POST ${this.baseUrl}/content/upload (multipart/form-data)`);
+        devLog(`[API] Request: POST ${this.baseUrl}/content/upload (multipart/form-data)`);
       }
 
       const controller = new AbortController();
@@ -475,7 +476,7 @@ class ApiClient {
         clearTimeout(timeoutId);
 
         if (process.env.NODE_ENV === 'development') {
-          console.log(`[API] Response status: ${response.status} ${response.statusText}`);
+          devLog(`[API] Response status: ${response.status} ${response.statusText}`);
         }
 
         if (!response.ok) {
@@ -501,7 +502,7 @@ class ApiClient {
 
         const result = await response.json();
         if (process.env.NODE_ENV === 'development') {
-          console.log('[API] File upload successful');
+          devLog('[API] File upload successful');
         }
         // Unwrap response envelope { success, data: { content, fileHash } }
         const unwrapped = (result && typeof result === 'object' && 'success' in result && 'data' in result) ? result.data : result;
