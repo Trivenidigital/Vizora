@@ -401,4 +401,18 @@ describe('UsersService', () => {
       expect(result.email).toBe('alice@test.com');
     });
   });
+
+  describe('generateTempPassword', () => {
+    it('should generate a 16-character password', () => {
+      const password = (service as any).generateTempPassword();
+      expect(password).toHaveLength(16);
+    });
+
+    it('should use crypto.randomInt instead of Math.random', () => {
+      const spy = jest.spyOn(Math, 'random');
+      (service as any).generateTempPassword();
+      expect(spy).not.toHaveBeenCalled();
+      spy.mockRestore();
+    });
+  });
 });
