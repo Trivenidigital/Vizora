@@ -535,6 +535,23 @@ describe('SanitizeInterceptor', () => {
       });
     });
 
+    it('should NOT decode &lt; &gt; &quot; entities to prevent XSS re-introduction', (done) => {
+      // If someone managed to store "&lt;script&gt;" in the DB, decoding it back to
+      // "<script>" would re-introduce an XSS vector. Only &amp; should be decoded.
+      mockCallHandler.handle = jest.fn().mockReturnValue(
+        of({ name: '&lt;script&gt;alert(1)&lt;/script&gt;' }),
+      );
+
+      const result$ = interceptor.intercept(mockExecutionContext, mockCallHandler);
+
+      result$.subscribe((response) => {
+        // The dangerous entities should NOT be decoded back
+        expect(response.name).not.toContain('<script>');
+        expect(response.name).not.toContain('</script>');
+        done();
+      });
+    });
+
     it('should sanitize arrays in response', (done) => {
       mockCallHandler.handle = jest.fn().mockReturnValue(
         of([{ name: '<script>evil()</script>Item' }]),

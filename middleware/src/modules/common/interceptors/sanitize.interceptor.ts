@@ -175,12 +175,8 @@ export class SanitizeInterceptor implements NestInterceptor {
   }
 
   private decodeHtmlEntities(str: string): string {
-    return str
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#x27;/g, "'")
-      .replace(/&#x2F;/g, '/');
+    // Only decode &amp; — the only entity that is safe to decode.
+    // DO NOT decode &lt; &gt; &quot; as they could re-introduce XSS vectors.
+    return str.replace(/&amp;/g, '&');
   }
 }
