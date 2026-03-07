@@ -360,6 +360,26 @@ export class DeviceGateway
         client.data.organizationId = payload.organizationId;
         client.data.deviceIdentifier = payload.deviceIdentifier;
 
+        // Auto-rotate device token if it expires within 14 days
+        if (payload.exp) {
+          const daysUntilExpiry = (payload.exp - Math.floor(Date.now() / 1000)) / 86400;
+          if (daysUntilExpiry < 14) {
+            const newToken = this.jwtService.sign(
+              {
+                sub: payload.sub,
+                deviceIdentifier: payload.deviceIdentifier,
+                organizationId: payload.organizationId,
+                type: 'device',
+              },
+              { secret: process.env.DEVICE_JWT_SECRET, expiresIn: '90d' },
+            );
+            client.emit('token:refresh', { token: newToken });
+            this.logger.log(
+              `Rotated token for device ${payload.deviceIdentifier} (${Math.floor(daysUntilExpiry)} days remaining)`,
+            );
+          }
+        }
+
         return { kind: 'device', payload };
       }
     } catch {
