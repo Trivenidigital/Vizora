@@ -41,7 +41,7 @@ export class CreateContentDto {
 
   @IsOptional()
   @IsObject()
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 
   // Content expiration fields
   @IsOptional()

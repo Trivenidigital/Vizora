@@ -37,7 +37,7 @@ export class DataSourceDto {
 
   @IsOptional()
   @IsObject()
-  manualData?: Record<string, any>;
+  manualData?: Record<string, unknown>;
 }
 
 /**
@@ -78,7 +78,7 @@ export class CreateTemplateDto {
 
   @IsOptional()
   @IsObject()
-  sampleData?: Record<string, any>;
+  sampleData?: Record<string, unknown>;
 
   @IsOptional()
   @Type(() => Number)

@@ -114,7 +114,7 @@ export class OrganizationsService {
 
     // Merge settings with existing to avoid overwriting branding etc.
     const { settings: incomingSettings, ...rest } = updateOrganizationDto;
-    const data: Record<string, any> = { ...rest };
+    const data: Record<string, unknown> = { ...rest };
     if (incomingSettings) {
       const currentSettings = (org.settings as Record<string, unknown>) || {};
       data.settings = { ...currentSettings, ...incomingSettings };

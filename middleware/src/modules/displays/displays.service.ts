@@ -664,7 +664,7 @@ export class DisplaysService {
 
   async updateQrOverlay(organizationId: string, id: string, dto: UpdateQrOverlayDto) {
     const display = await this.findOne(organizationId, id);
-    const metadata = (display.metadata as Record<string, any>) || {};
+    const metadata = (display.metadata as Record<string, unknown>) || {};
     metadata.qrOverlay = {
       enabled: dto.enabled,
       url: dto.url,
@@ -684,7 +684,7 @@ export class DisplaysService {
 
   async removeQrOverlay(organizationId: string, id: string) {
     const display = await this.findOne(organizationId, id);
-    const metadata = (display.metadata as Record<string, any>) || {};
+    const metadata = (display.metadata as Record<string, unknown>) || {};
     delete metadata.qrOverlay;
 
     return this.db.display.update({

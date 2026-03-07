@@ -21,7 +21,7 @@ export class CreateWidgetDto {
   widgetType!: string;
 
   @IsObject()
-  widgetConfig!: Record<string, any>;
+  widgetConfig!: Record<string, unknown>;
 
   @IsOptional()
   @Type(() => Number)

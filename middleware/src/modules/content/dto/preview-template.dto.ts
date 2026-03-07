@@ -16,5 +16,5 @@ export class PreviewTemplateDto {
 
   @IsOptional()
   @IsObject()
-  sampleData?: Record<string, any>;
+  sampleData?: Record<string, unknown>;
 }

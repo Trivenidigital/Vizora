@@ -27,7 +27,7 @@ export const SkipEnvelope = () => SetMetadata(SKIP_ENVELOPE_KEY, true);
 export class ResponseEnvelopeInterceptor implements NestInterceptor {
   constructor(private readonly reflector: Reflector) {}
 
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const skip = this.reflector.getAllAndOverride<boolean>(SKIP_ENVELOPE_KEY, [
       context.getHandler(),
       context.getClass(),

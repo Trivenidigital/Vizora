@@ -16,7 +16,7 @@ export interface TemplateSeed {
   seasonalStart?: string;
   seasonalEnd?: string;
   templateHtml: string;
-  sampleData?: Record<string, any>;
+  sampleData?: Record<string, unknown>;
 }
 
 // Re-export all template arrays from category modules

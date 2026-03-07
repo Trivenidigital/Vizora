@@ -32,7 +32,7 @@ export class CreateTemplateDto {
 
   @IsOptional()
   @IsObject()
-  sampleData?: Record<string, any>;
+  sampleData?: Record<string, unknown>;
 
   @IsOptional()
   @IsString()

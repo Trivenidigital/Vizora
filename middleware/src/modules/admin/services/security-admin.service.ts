@@ -283,7 +283,7 @@ export class SecurityAdminService {
       if (log.ipAddress) {
         ipCounts.set(log.ipAddress, (ipCounts.get(log.ipAddress) || 0) + 1);
       }
-      const changes = log.changes as Record<string, any>;
+      const changes = log.changes as Record<string, unknown>;
       if (changes?.email) {
         emailCounts.set(changes.email, (emailCounts.get(changes.email) || 0) + 1);
       }

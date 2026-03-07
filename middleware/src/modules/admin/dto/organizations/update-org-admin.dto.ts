@@ -40,7 +40,7 @@ export class UpdateOrgAdminDto {
   isFeatureFlagged?: boolean;
 
   @IsOptional()
-  settings?: Record<string, any>;
+  settings?: Record<string, unknown>;
 
   @IsString()
   @IsOptional()

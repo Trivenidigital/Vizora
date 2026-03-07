@@ -71,7 +71,7 @@ export class CreatePlanDto {
   features?: string[];
 
   @IsOptional()
-  featureFlags?: Record<string, any>;
+  featureFlags?: Record<string, unknown>;
 
   @Type(() => Boolean)
   @IsBoolean()

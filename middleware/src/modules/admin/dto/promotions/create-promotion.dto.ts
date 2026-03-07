@@ -62,5 +62,5 @@ export class CreatePromotionDto {
   applicablePlanIds?: string[];
 
   @IsOptional()
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }

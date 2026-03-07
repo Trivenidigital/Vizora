@@ -511,7 +511,7 @@ export class ContentService {
 
     // Delete files from storage (fire-and-forget with logging)
     for (const item of items) {
-      const objectKey = (item as any).fileKey || (item.url?.startsWith('minio://') ? item.url.substring('minio://'.length) : null);
+      const objectKey = (item as unknown as Record<string, unknown>).fileKey as string | undefined || (item.url?.startsWith('minio://') ? item.url.substring('minio://'.length) : null);
       if (objectKey) {
         this.storageService.deleteFile(objectKey).catch(error => {
           this.logger.error(`Failed to delete file ${objectKey} during bulk delete: ${error}`);
