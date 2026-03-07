@@ -6,9 +6,11 @@ export class PlaylistItemDto {
   contentId!: string;
 
   @IsOptional()
+  @Type(() => Number)
   order?: number;
 
   @IsOptional()
+  @Type(() => Number)
   duration?: number;
 }
 
@@ -21,6 +23,7 @@ export class CreatePlaylistDto {
   description?: string;
 
   @IsOptional()
+  @Type(() => Boolean)
   @IsBoolean()
   isDefault?: boolean;
 

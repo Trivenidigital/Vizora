@@ -1,4 +1,5 @@
 import { IsString, IsOptional, IsArray, IsInt, Min, Max } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CheckConflictsDto {
   @IsOptional()
@@ -13,15 +14,18 @@ export class CheckConflictsDto {
   @IsInt({ each: true })
   @Min(0, { each: true })
   @Max(6, { each: true })
+  @Type(() => Number)
   daysOfWeek: number[];
 
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(0)
   @Max(1439)
   startTime?: number; // Minutes from midnight (0-1439)
 
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(0)
   @Max(1439)

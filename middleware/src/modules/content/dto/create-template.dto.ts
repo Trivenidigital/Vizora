@@ -44,9 +44,11 @@ export class DataSourceDto {
  * Refresh configuration for template
  */
 export class RefreshConfigDto {
+  @Type(() => Boolean)
   @IsBoolean()
   enabled!: boolean;
 
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   intervalMinutes!: number;
@@ -79,6 +81,7 @@ export class CreateTemplateDto {
   sampleData?: Record<string, any>;
 
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   duration?: number;

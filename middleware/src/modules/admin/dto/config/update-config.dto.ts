@@ -1,4 +1,5 @@
 import { IsString, IsOptional, IsBoolean, IsIn } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class UpdateConfigDto {
   @IsOptional()
@@ -18,6 +19,7 @@ export class UpdateConfigDto {
   @IsOptional()
   description?: string;
 
+  @Type(() => Boolean)
   @IsBoolean()
   @IsOptional()
   isSecret?: boolean;

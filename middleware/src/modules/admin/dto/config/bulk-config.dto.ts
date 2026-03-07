@@ -21,6 +21,7 @@ class ConfigItem {
   @IsOptional()
   description?: string;
 
+  @Type(() => Boolean)
   @IsBoolean()
   @IsOptional()
   isSecret?: boolean;

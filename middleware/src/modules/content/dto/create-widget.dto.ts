@@ -1,4 +1,5 @@
 import { IsString, IsOptional, IsEnum, IsInt, IsObject, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateWidgetDto {
   @IsString()
@@ -23,6 +24,7 @@ export class CreateWidgetDto {
   widgetConfig!: Record<string, any>;
 
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   duration?: number;

@@ -1,4 +1,5 @@
 import { IsString, IsOptional, IsEnum, IsInt, IsArray, IsObject, Min, Max, MinLength } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateTemplateDto {
   @IsString()
@@ -38,6 +39,7 @@ export class CreateTemplateDto {
   thumbnailUrl?: string;
 
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(300)

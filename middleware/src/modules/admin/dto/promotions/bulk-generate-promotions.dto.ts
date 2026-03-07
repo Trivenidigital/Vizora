@@ -1,9 +1,11 @@
 import { IsString, IsInt, IsOptional, IsBoolean, IsArray, IsDateString, Min, IsIn, Max } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class BulkGeneratePromotionsDto {
   @IsString()
   prefix: string;
 
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(1000)
@@ -20,6 +22,7 @@ export class BulkGeneratePromotionsDto {
   @IsIn(['percentage', 'fixed_amount', 'free_months'])
   discountType: string;
 
+  @Type(() => Number)
   @IsInt()
   @Min(0)
   discountValue: number;
@@ -29,11 +32,13 @@ export class BulkGeneratePromotionsDto {
   @IsIn(['usd', 'inr'])
   currency?: string;
 
+  @Type(() => Number)
   @IsInt()
   @IsOptional()
   @Min(1)
   maxRedemptions?: number;
 
+  @Type(() => Number)
   @IsInt()
   @IsOptional()
   @Min(1)

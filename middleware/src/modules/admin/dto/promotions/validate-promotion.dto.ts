@@ -1,4 +1,5 @@
 import { IsString, IsOptional, IsInt, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class ValidatePromotionDto {
   @IsString()
@@ -12,6 +13,7 @@ export class ValidatePromotionDto {
   @IsOptional()
   organizationId?: string;
 
+  @Type(() => Number)
   @IsInt()
   @IsOptional()
   @Min(0)

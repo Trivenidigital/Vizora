@@ -1,4 +1,5 @@
 import { IsOptional, IsString, IsIn, IsBoolean, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class UpdateUserDto {
   @IsOptional()
@@ -16,6 +17,7 @@ export class UpdateUserDto {
   role?: string;
 
   @IsOptional()
+  @Type(() => Boolean)
   @IsBoolean()
   isActive?: boolean;
 }
