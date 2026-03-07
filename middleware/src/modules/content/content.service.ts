@@ -340,10 +340,28 @@ export class ContentService {
     for (const content of expiredContent) {
       await this.db.$transaction(async (tx) => {
         if (content.replacementContentId) {
-          await tx.playlistItem.updateMany({
-            where: { contentId: content.id },
-            data: { contentId: content.replacementContentId },
+          // Validate replacement content belongs to same organization
+          const replacement = await tx.content.findFirst({
+            where: {
+              id: content.replacementContentId,
+              organizationId: content.organizationId,
+            },
           });
+
+          if (replacement) {
+            await tx.playlistItem.updateMany({
+              where: { contentId: content.id },
+              data: { contentId: content.replacementContentId },
+            });
+          } else {
+            // Cross-org or missing replacement -- remove playlist items
+            this.logger.warn(
+              `Expired content ${content.id} has invalid replacementContentId ${content.replacementContentId} (org mismatch or not found). Removing playlist items.`,
+            );
+            await tx.playlistItem.deleteMany({
+              where: { contentId: content.id },
+            });
+          }
         } else {
           await tx.playlistItem.deleteMany({
             where: { contentId: content.id },
