@@ -27,6 +27,7 @@ describe('LoggingInterceptor', () => {
 
     mockResponse = {
       statusCode: 200,
+      setHeader: jest.fn(),
     };
 
     mockExecutionContext = {
@@ -73,6 +74,27 @@ describe('LoggingInterceptor', () => {
 
       expect(mockRequest['requestId']).toBeDefined();
       expect(typeof mockRequest['requestId']).toBe('string');
+    });
+
+    it('should set X-Request-ID response header', () => {
+      interceptor.intercept(mockExecutionContext, mockCallHandler);
+
+      expect(mockResponse.setHeader).toHaveBeenCalledWith(
+        'X-Request-ID',
+        expect.any(String),
+      );
+    });
+
+    it('should use incoming X-Request-ID if provided', () => {
+      mockRequest.headers['x-request-id'] = 'incoming-request-id-123';
+
+      interceptor.intercept(mockExecutionContext, mockCallHandler);
+
+      expect(mockRequest['requestId']).toBe('incoming-request-id-123');
+      expect(mockResponse.setHeader).toHaveBeenCalledWith(
+        'X-Request-ID',
+        'incoming-request-id-123',
+      );
     });
 
     it('should log 4xx as warnings', (done) => {

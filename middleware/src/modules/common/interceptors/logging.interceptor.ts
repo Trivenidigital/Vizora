@@ -38,11 +38,14 @@ export class LoggingInterceptor implements NestInterceptor {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const response = context.switchToHttp().getResponse<Response>();
 
-    const requestId = this.generateRequestId();
+    // Use incoming X-Request-ID or generate a new one
+    const requestId =
+      (request.headers['x-request-id'] as string) || this.generateRequestId();
     const startTime = Date.now();
 
     // Attach request ID for tracing
     request['requestId'] = requestId;
+    response.setHeader('X-Request-ID', requestId);
 
     const metadata: LogMetadata = {
       requestId,
