@@ -89,7 +89,6 @@ jobs:
 
       - name: Run realtime unit tests
         working-directory: realtime
-        continue-on-error: true
         run: pnpm test --passWithNoTests
 
       - name: Upload coverage
@@ -144,11 +143,9 @@ jobs:
         run: pnpm --filter @vizora/database exec prisma db push --skip-generate
 
       - name: Run API E2E tests
-        continue-on-error: true
         run: npx nx run middleware-e2e:e2e --skip-nx-cache
 
       - name: Run WebSocket E2E tests
-        continue-on-error: true
         run: npx nx run realtime-e2e:e2e --skip-nx-cache
 
   build:
