@@ -245,27 +245,39 @@ function runBackup(): void {
   const filename = `vizora-backup-${timestamp}.sql.gz`;
   const tmpPath = `/tmp/${filename}`;
 
+  const tmpPathRaw = `/tmp/vizora-backup-${timestamp}.sql`;
+
   try {
-    // Use bash -c to pipe pg_dump through gzip. Arguments passed as array
-    // to execFileSync so the outer invocation is injection-safe.
-    execFileSync('bash', ['-c',
-      `pg_dump "${databaseUrl}" | gzip > "${tmpPath}"`,
-    ], {
+    // Two-step backup without shell interpolation to prevent command injection
+    // via DATABASE_URL containing shell metacharacters.
+    execFileSync('pg_dump', [databaseUrl, '-f', tmpPathRaw], {
       timeout: 300_000, // 5 minutes
+      stdio: 'pipe',
+    });
+    execFileSync('gzip', ['-f', tmpPathRaw], {
+      timeout: 60_000,
       stdio: 'pipe',
     });
     log(AGENT, `Backup created: ${filename}`);
 
     // Upload to S3 if aws CLI is available
+    const s3Dest = bucket.startsWith('s3://') ? bucket : `s3://${bucket}`;
     try {
-      execFileSync('aws', ['s3', 'cp', tmpPath, `${bucket}/${filename}`], {
+      execFileSync('aws', ['s3', 'cp', tmpPath, `${s3Dest}/${filename}`], {
         timeout: 300_000,
         stdio: 'pipe',
       });
-      log(AGENT, `Backup uploaded to ${bucket}/${filename}`);
+      log(AGENT, `Backup uploaded to ${s3Dest}/${filename}`);
     } catch (uploadErr) {
       const msg = uploadErr instanceof Error ? uploadErr.message : String(uploadErr);
       log(AGENT, `Backup upload to S3 failed (local backup retained): ${msg}`);
+    }
+
+    // Clean up local temp file after successful upload
+    try {
+      execFileSync('rm', ['-f', tmpPath], { stdio: 'pipe' });
+    } catch {
+      // Non-critical -- /tmp will be cleaned by OS
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

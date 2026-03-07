@@ -38,9 +38,12 @@ export class LoggingInterceptor implements NestInterceptor {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const response = context.switchToHttp().getResponse<Response>();
 
-    // Use incoming X-Request-ID or generate a new one
+    // Use incoming X-Request-ID if valid (alphanumeric/dashes, max 128 chars), else generate
+    const incomingId = request.headers['x-request-id'] as string;
     const requestId =
-      (request.headers['x-request-id'] as string) || this.generateRequestId();
+      incomingId && /^[\w\-]{1,128}$/.test(incomingId)
+        ? incomingId
+        : this.generateRequestId();
     const startTime = Date.now();
 
     // Attach request ID for tracing
