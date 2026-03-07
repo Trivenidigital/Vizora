@@ -742,9 +742,9 @@ model SupportRequest {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  organization     Organization @relation(fields: [organizationId], references: [id])
-  user             User         @relation("SupportRequestUser", fields: [userId], references: [id])
-  resolvedBy       User?        @relation("SupportRequestResolver", fields: [resolvedById], references: [id])
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user             User         @relation("SupportRequestUser", fields: [userId], references: [id], onDelete: Cascade)
+  resolvedBy       User?        @relation("SupportRequestResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
   messages         SupportMessage[]
 
   @@index([organizationId])
