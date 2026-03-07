@@ -1,0 +1,16 @@
+node_modules
+.git
+*.md
+screenshots/
+test-screenshots/
+logs/
+.env*
+.nx
+dist
+coverage
+.claude/
+docs/
+e2e-tests/
+*.png
+*.jpg
+bug-reports/
