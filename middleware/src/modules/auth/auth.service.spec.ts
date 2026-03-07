@@ -346,6 +346,14 @@ describe('AuthService', () => {
       expect(mockRedisService.del).toHaveBeenCalledWith(`login_attempts:${loginDto.email}`);
     });
 
+    it('should deny login when Redis is unreachable (fail-closed)', async () => {
+      mockRedisService.get.mockRejectedValue(new Error('ECONNREFUSED'));
+
+      await expect(service.login(loginDto)).rejects.toThrow(
+        'Authentication service temporarily unavailable',
+      );
+    });
+
     it('should throw ForbiddenException for inactive user', async () => {
       mockDatabaseService.user.findUnique.mockResolvedValue({
         ...mockUser,

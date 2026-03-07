@@ -144,10 +144,19 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    // Check account lockout
+    // Check account lockout — fail CLOSED if Redis is unreachable
     const lockoutKey = `login_attempts:${dto.email}`;
-    const attemptsStr = await this.redisService.get(lockoutKey);
-    const attempts = attemptsStr ? parseInt(attemptsStr, 10) : 0;
+    let attempts = 0;
+    try {
+      const attemptsStr = await this.redisService.get(lockoutKey);
+      attempts = attemptsStr ? parseInt(attemptsStr, 10) : 0;
+    } catch (error) {
+      this.logger.error(`Redis unavailable during login lockout check: ${error instanceof Error ? error.message : 'Unknown'}`);
+      throw new HttpException(
+        'Authentication service temporarily unavailable. Please try again shortly.',
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
 
     if (attempts >= MAX_LOGIN_ATTEMPTS) {
       throw new HttpException(
