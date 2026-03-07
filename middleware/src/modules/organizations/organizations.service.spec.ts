@@ -1,10 +1,14 @@
 import { NotFoundException, ConflictException } from '@nestjs/common';
 import { OrganizationsService } from './organizations.service';
 import { DatabaseService } from '../database/database.service';
+import { StorageService } from '../storage/storage.service';
+import { RedisService } from '../redis/redis.service';
 
 describe('OrganizationsService', () => {
   let service: OrganizationsService;
   let mockDatabaseService: any;
+  let mockStorageService: any;
+  let mockRedisService: any;
 
   const mockOrganization = {
     id: 'org-123',
@@ -30,9 +34,28 @@ describe('OrganizationsService', () => {
         delete: jest.fn(),
         count: jest.fn(),
       },
+      content: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      user: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
     };
 
-    service = new OrganizationsService(mockDatabaseService as DatabaseService);
+    mockStorageService = {
+      deleteFile: jest.fn().mockResolvedValue(undefined),
+      isMinioAvailable: jest.fn().mockReturnValue(false),
+    };
+
+    mockRedisService = {
+      del: jest.fn().mockResolvedValue(true),
+    };
+
+    service = new OrganizationsService(
+      mockDatabaseService as DatabaseService,
+      mockStorageService as StorageService,
+      mockRedisService as RedisService,
+    );
   });
 
   it('should be defined', () => {
@@ -153,13 +176,47 @@ describe('OrganizationsService', () => {
   });
 
   describe('remove', () => {
-    it('should delete organization', async () => {
+    it('should delete organization and clean up storage and cache', async () => {
       mockDatabaseService.organization.findUnique.mockResolvedValue(mockOrganization);
+      mockDatabaseService.content.findMany.mockResolvedValue([
+        { id: 'c1', url: 'minio://org-123/file.png' },
+        { id: 'c2', url: 'https://example.com/file.png' },
+      ]);
+      mockDatabaseService.user.findMany.mockResolvedValue([
+        { id: 'user-1' },
+        { id: 'user-2' },
+      ]);
       mockDatabaseService.organization.delete.mockResolvedValue(mockOrganization);
 
-      const result = await service.remove('org-123');
+      await service.remove('org-123', 'admin-user');
 
-      expect(result).toEqual(mockOrganization);
+      // Should delete MinIO files (only minio:// URLs)
+      expect(mockStorageService.deleteFile).toHaveBeenCalledTimes(1);
+      expect(mockStorageService.deleteFile).toHaveBeenCalledWith('org-123/file.png');
+
+      // Should clear Redis cache for all users
+      expect(mockRedisService.del).toHaveBeenCalledTimes(2);
+      expect(mockRedisService.del).toHaveBeenCalledWith('user_auth:user-1');
+      expect(mockRedisService.del).toHaveBeenCalledWith('user_auth:user-2');
+
+      // Should delete the organization
+      expect(mockDatabaseService.organization.delete).toHaveBeenCalledWith({
+        where: { id: 'org-123' },
+      });
+    });
+
+    it('should continue deletion even if MinIO delete fails', async () => {
+      mockDatabaseService.organization.findUnique.mockResolvedValue(mockOrganization);
+      mockDatabaseService.content.findMany.mockResolvedValue([
+        { id: 'c1', url: 'minio://org-123/file.png' },
+      ]);
+      mockDatabaseService.user.findMany.mockResolvedValue([]);
+      mockDatabaseService.organization.delete.mockResolvedValue(mockOrganization);
+      mockStorageService.deleteFile.mockRejectedValue(new Error('MinIO down'));
+
+      await service.remove('org-123', 'admin-user');
+
+      expect(mockDatabaseService.organization.delete).toHaveBeenCalled();
     });
 
     it('should throw NotFoundException if organization not found', async () => {

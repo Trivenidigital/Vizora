@@ -150,29 +150,33 @@ describe('OrganizationsController', () => {
   describe('remove', () => {
     it('should remove organization when user deletes own org', async () => {
       const userOrgId = 'org-123';
+      const userId = 'user-1';
       mockOrganizationsService.remove.mockResolvedValue(undefined);
 
-      await controller.remove(userOrgId, 'org-123');
+      const result = await controller.remove(userOrgId, userId, 'org-123');
 
-      expect(mockOrganizationsService.remove).toHaveBeenCalledWith('org-123');
+      expect(mockOrganizationsService.remove).toHaveBeenCalledWith('org-123', userId);
+      expect(result).toEqual({ message: 'Organization deleted successfully' });
     });
 
     it('should throw ForbiddenException when deleting another org', async () => {
       const userOrgId = 'org-123';
+      const userId = 'user-1';
       const otherOrgId = 'org-456';
 
-      await expect(controller.remove(userOrgId, otherOrgId)).rejects.toThrow(ForbiddenException);
-      await expect(controller.remove(userOrgId, otherOrgId)).rejects.toThrow(
+      await expect(controller.remove(userOrgId, userId, otherOrgId)).rejects.toThrow(ForbiddenException);
+      await expect(controller.remove(userOrgId, userId, otherOrgId)).rejects.toThrow(
         'You can only delete your own organization',
       );
     });
 
     it('should not call service when deleting another org', async () => {
       const userOrgId = 'org-123';
+      const userId = 'user-1';
       const otherOrgId = 'org-456';
 
       try {
-        await controller.remove(userOrgId, otherOrgId);
+        await controller.remove(userOrgId, userId, otherOrgId);
       } catch {
         // Expected
       }
