@@ -48,6 +48,16 @@ export class DisplaysService {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
+  /** Returns internal API secret headers, or null if secret is not configured */
+  private getInternalApiHeaders(): Record<string, string> | null {
+    const secret = process.env.INTERNAL_API_SECRET;
+    if (!secret) {
+      this.logger.warn('INTERNAL_API_SECRET is not set — skipping realtime service call');
+      return null;
+    }
+    return { 'x-internal-api-key': secret };
+  }
+
   async create(organizationId: string, createDisplayDto: CreateDisplayDto) {
     const { deviceId, name, ...rest } = createDisplayDto;
 
@@ -194,6 +204,9 @@ export class DisplaysService {
   }
 
   private async notifyPlaylistUpdate(displayId: string, playlist: unknown): Promise<void> {
+    const headers = this.getInternalApiHeaders();
+    if (!headers) return;
+
     const url = `${this.realtimeUrl}/api/push/playlist`;
 
     // Use circuit breaker with fallback - if circuit is open or call fails, just log
@@ -204,9 +217,7 @@ export class DisplaysService {
           this.httpService.post(url, {
             deviceId: displayId,
             playlist,
-          }, {
-            headers: { 'x-internal-api-key': process.env.INTERNAL_API_SECRET || '' },
-          }),
+          }, { headers }),
         );
         this.logger.log(`Notified realtime service of playlist update for display ${displayId}`);
       },
@@ -365,6 +376,11 @@ export class DisplaysService {
     // public API endpoints before forwarding to display clients.
     const contentUrl = content.url;
 
+    const headers = this.getInternalApiHeaders();
+    if (!headers) {
+      throw new Error('INTERNAL_API_SECRET is not configured — cannot push content to display');
+    }
+
     const url = `${this.realtimeUrl}/api/push/content`;
 
     // Use circuit breaker with fallback
@@ -384,9 +400,7 @@ export class DisplaysService {
               duration: content.duration,
             },
             duration,
-          }, {
-            headers: { 'x-internal-api-key': process.env.INTERNAL_API_SECRET || '' },
-          }),
+          }, { headers }),
         );
         this.logger.log(`Pushed content ${contentId} to display ${displayId} for ${duration} min`);
       },
@@ -491,6 +505,11 @@ export class DisplaysService {
     const requestId = crypto.randomUUID();
 
     // Send command to realtime service
+    const headers = this.getInternalApiHeaders();
+    if (!headers) {
+      throw new Error('INTERNAL_API_SECRET is not configured — cannot send commands to display');
+    }
+
     const url = `${this.realtimeUrl}/api/internal/command`;
 
     try {
@@ -502,9 +521,7 @@ export class DisplaysService {
               displayId,
               command: 'screenshot',
               payload: { requestId },
-            }, {
-              headers: { 'x-internal-api-key': process.env.INTERNAL_API_SECRET || '' },
-            }),
+            }, { headers }),
           );
           this.logger.log(`Screenshot requested for display ${displayId} (requestId: ${requestId})`);
         },
@@ -642,6 +659,9 @@ export class DisplaysService {
   }
 
   private async sendDeviceCommand(displayId: string, command: string, payload?: Record<string, unknown>): Promise<void> {
+    const headers = this.getInternalApiHeaders();
+    if (!headers) return;
+
     const url = `${this.realtimeUrl}/api/internal/command`;
 
     await this.circuitBreaker.executeWithFallback(
@@ -652,9 +672,7 @@ export class DisplaysService {
             displayId,
             command,
             payload,
-          }, {
-            headers: { 'x-internal-api-key': process.env.INTERNAL_API_SECRET || '' },
-          }),
+          }, { headers }),
         );
         this.logger.log(`Command '${command}' sent to device ${displayId}`);
       },

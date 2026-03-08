@@ -18,6 +18,16 @@ export class PlaylistsService {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
+  /** Returns internal API secret headers, or null if secret is not configured */
+  private getInternalApiHeaders(): Record<string, string> | null {
+    const secret = process.env.INTERNAL_API_SECRET;
+    if (!secret) {
+      this.logger.warn('INTERNAL_API_SECRET is not set — skipping realtime service notification');
+      return null;
+    }
+    return { 'x-internal-api-key': secret };
+  }
+
   async create(organizationId: string, createPlaylistDto: CreatePlaylistDto) {
     const { items, ...playlistData } = createPlaylistDto;
 
@@ -407,6 +417,9 @@ export class PlaylistsService {
    * Notify all displays using a playlist about the update
    */
   private async notifyDisplaysOfPlaylistUpdate(playlistId: string, playlist: unknown): Promise<void> {
+    const headers = this.getInternalApiHeaders();
+    if (!headers) return;
+
     // Find all displays currently using this playlist
     const displays = await this.db.display.findMany({
       where: { currentPlaylistId: playlistId },
@@ -429,9 +442,7 @@ export class PlaylistsService {
             this.httpService.post(url, {
               deviceId: display.id,
               playlist,
-            }, {
-              headers: { 'x-internal-api-key': process.env.INTERNAL_API_SECRET || '' },
-            }),
+            }, { headers }),
           );
           this.logger.log(`Notified display ${display.id} of playlist update`);
         } catch (error) {

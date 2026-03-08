@@ -36,6 +36,8 @@ describe('DisplaysService', () => {
   };
 
   beforeEach(async () => {
+    process.env.INTERNAL_API_SECRET = 'test-internal-secret';
+
     const mockDatabaseService = {
       display: {
         create: jest.fn(),
