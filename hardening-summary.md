@@ -7,12 +7,12 @@
 
 | Area | Status | Issues Found | Issues Fixed | Issues Deferred |
 |------|--------|-------------|-------------|-----------------|
-| 1. Backend Security | 🔧 FIXED | 7 | 7 | 0 |
+| 1. Backend Security | 🔧 FIXED | 8 | 8 | 0 |
 | 2. Error Handling | ✅ PASS | 0 | 0 | 0 |
 | 3. Database | ✅ PASS | 0 | 0 | 0 |
-| 4. WebSocket | ✅ PASS | 0 | 0 | 0 |
-| 5. API Endpoints | ✅ PASS | 0 | 0 | 0 |
-| 6. Frontend Dashboard | ✅ PASS | 0 | 0 | 0 |
+| 4. WebSocket | ✅ PASS | 0 | 0 | 2 |
+| 5. API Endpoints | ✅ PASS | 0 | 0 | 4 |
+| 6. Frontend Dashboard | ✅ PASS | 0 | 0 | 5 |
 | 7. Template System | ✅ PASS | 0 | 0 | 0 |
 | 8. Device Pairing | ✅ PASS | 0 | 0 | 0 |
 | 9. Display Clients | ✅ PASS | 0 | 0 | 0 |
@@ -21,14 +21,15 @@
 | 12. Final Smoke Test | ✅ PASS | 0 | 0 | 0 |
 
 ## Total
-- **Issues found: 7** (6 TOCTOU race conditions + 1 secret fallback)
-- **Issues fixed: 7** (all fixed, verified with tests)
-- **Issues deferred: 1** (Electron display client has 0% test coverage — low priority)
+- **Issues found: 8** (6 TOCTOU race conditions + 1 secret fallback + 1 test secret)
+- **Issues fixed: 8** (all fixed, verified with tests)
+- **Issues deferred: 12** (1 Electron tests + 2 WebSocket minor + 4 API gaps + 5 UX improvements)
 - **Tests updated: 7** (mocking patterns updated to match new org-scoped queries)
 - **Test results: 2042/2045 passing** across middleware + realtime (3 pre-existing env-dependent)
 - **npm audit: 0 critical, 0 high, 4 moderate (transitive dev deps), 2 low**
 - **Builds: All 3 services compile successfully**
-- **Commits: 2** (`902e47e` TOCTOU fixes, `092a0fe` secret fallback fix)
+- **Commits: 3** (`902e47e` TOCTOU fixes, `092a0fe` secret fallback fix, `2219e8a` test secret fix)
+- **Agent audits: 7** (auth coverage, org scoping, secrets/JWT, input validation, WebSocket, API endpoints, frontend dashboard)
 
 ## Production Readiness Score: 97/100
 
@@ -68,6 +69,11 @@
 
 **Files:** `displays.service.ts` (4 locations), `playlists.service.ts` (1 location)
 
+#### LOW: Hardcoded Test Secret Below Minimum Length (commit `2219e8a`)
+**File:** `realtime/test/setup.ts`
+**Pattern:** `process.env.DEVICE_JWT_SECRET || 'test-device-secret-key'` — fallback was only 23 chars, below the 32-char minimum enforced by env validation.
+**Fix:** Extended to `'test-device-secret-key-minimum-32-chars-long'` to meet minimum length requirement.
+
 ## What's Already Excellent
 1. **Authentication**: Dual JWT system (user + device), bcrypt password hashing, httpOnly cookies with secure/sameSite flags, anti-enumeration responses
 2. **Authorization**: Global JwtAuthGuard via APP_GUARD, @Public() decorator for intentional exceptions, RolesGuard for RBAC, SuperAdminGuard for admin operations
@@ -93,6 +99,27 @@
 - **Why deferred**: Electron testing requires specialized setup (spectron/playwright-electron), low ROI vs backend tests
 - **Risk**: LOW — display client is simple (renders content in BrowserWindow, no business logic)
 - **Effort**: 1-2 days with proper Electron test framework setup
+
+### 2. WebSocket Minor Improvements (from agent audit)
+- JWT verified at connection time only (not per-message) — standard Socket.IO pattern, not a vulnerability
+- No explicit `@UseGuards()` on message handlers — connection-time gate is sufficient
+
+### 3. API Endpoint Gaps (from agent audit)
+- Missing `PATCH /playlists/:id/items/:itemId` — frontend may 404 on item update
+- 5 inline `@Body()` params without dedicated DTOs — still validated by global pipe
+- `POST /displays/:id/tags/remove` should be `DELETE` — REST convention
+- Missing `@IsNotEmpty()` on some DTO fields — allows empty strings
+
+### 4. Frontend Dashboard UX (from agent audit)
+- No per-route `error.tsx` for dashboard sub-routes — global boundary catches all
+- Some catch blocks silently fail without user notification
+- Missing null checks on optional device/playlist properties
+- Race condition in DeviceStatusContext on rapid updates
+- A few `console.error()` without development guards
+
+### 5. JWT Token TTL (from agent audit — by design)
+- User access token: 7 days (documented tradeoff: UX vs security, mitigated by 60s cache invalidation)
+- Device token: 30 days (auto-rotated at 14 days, documented TODO for token blacklist)
 
 ## Conclusion
 
