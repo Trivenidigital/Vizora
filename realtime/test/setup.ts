@@ -5,7 +5,7 @@ import { config } from 'dotenv';
 config({ path: '.env.test' });
 
 // Set default test environment variables
-process.env.DEVICE_JWT_SECRET = process.env.DEVICE_JWT_SECRET || 'test-device-secret-key';
+process.env.DEVICE_JWT_SECRET = process.env.DEVICE_JWT_SECRET || 'test-device-secret-key-minimum-32-chars-long';
 process.env.REDIS_HOST = process.env.REDIS_HOST || 'localhost';
 process.env.REDIS_PORT = process.env.REDIS_PORT || '6379';
 process.env.CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
