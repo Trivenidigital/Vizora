@@ -52,6 +52,7 @@ import {
   CreateAnnouncementDto,
   UpdateAnnouncementDto,
   BillingFiltersDto,
+  SuspendOrgDto,
 } from './dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 
@@ -405,7 +406,7 @@ export class AdminController {
   @HttpCode(HttpStatus.OK)
   async suspendOrganization(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: { reason: string },
+    @Body() body: SuspendOrgDto,
     @CurrentUser('userId') adminId: string,
     @Req() req: Request,
   ) {

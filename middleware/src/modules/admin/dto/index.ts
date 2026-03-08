@@ -14,6 +14,7 @@ export * from './organizations/org-filters.dto';
 export * from './organizations/update-org-admin.dto';
 export * from './organizations/extend-trial.dto';
 export * from './organizations/org-notes.dto';
+export * from './organizations/suspend-org.dto';
 
 // Users
 export * from './users/user-filters.dto';

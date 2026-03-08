@@ -1,6 +1,7 @@
-import { IsString, IsOptional, IsObject } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsObject } from 'class-validator';
 
 export class RequestPairingDto {
+  @IsNotEmpty()
   @IsString()
   deviceIdentifier: string;
 

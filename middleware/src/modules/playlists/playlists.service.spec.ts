@@ -42,6 +42,7 @@ describe('PlaylistsService', () => {
         delete: jest.fn(),
         deleteMany: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
       },
       $transaction: jest.fn((fn) => fn(mockDatabaseService)),
       content: {
@@ -213,6 +214,31 @@ describe('PlaylistsService', () => {
           }),
         }),
       );
+    });
+  });
+
+  describe('updateItem', () => {
+    it('should update item duration', async () => {
+      mockDatabaseService.playlist.findFirst.mockResolvedValue(mockPlaylist);
+      mockDatabaseService.playlistItem.updateMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.playlistItem.findFirst.mockResolvedValue({ id: 'item-123', duration: 60, content: {} });
+
+      const result = await service.updateItem('org-123', 'playlist-123', 'item-123', { duration: 60 });
+
+      expect(result).toHaveProperty('id', 'item-123');
+      expect(mockDatabaseService.playlistItem.updateMany).toHaveBeenCalledWith({
+        where: { id: 'item-123', playlistId: 'playlist-123' },
+        data: { duration: 60 },
+      });
+    });
+
+    it('should throw NotFoundException if item not found', async () => {
+      mockDatabaseService.playlist.findFirst.mockResolvedValue(mockPlaylist);
+      mockDatabaseService.playlistItem.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(
+        service.updateItem('org-123', 'playlist-123', 'item-999', { duration: 60 }),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 

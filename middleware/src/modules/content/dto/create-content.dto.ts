@@ -1,7 +1,8 @@
-import { IsString, IsOptional, IsEnum, IsInt, IsObject, Min, IsDateString, IsIn } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsEnum, IsInt, IsObject, Min, IsDateString, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateContentDto {
+  @IsNotEmpty()
   @IsString()
   name!: string;
 
@@ -12,6 +13,7 @@ export class CreateContentDto {
   @IsEnum(['image', 'video', 'url', 'html', 'pdf', 'template'])
   type!: string;
 
+  @IsNotEmpty()
   @IsString()
   url!: string;
 

@@ -291,6 +291,28 @@ export class PlaylistsService {
     return newItem;
   }
 
+  async updateItem(organizationId: string, playlistId: string, itemId: string, data: { duration?: number }) {
+    await this.findOne(organizationId, playlistId);
+
+    const result = await this.db.playlistItem.updateMany({
+      where: { id: itemId, playlistId },
+      data,
+    });
+
+    if (result.count === 0) {
+      throw new NotFoundException('Playlist item not found');
+    }
+
+    const updatedItem = await this.db.playlistItem.findFirst({
+      where: { id: itemId },
+      include: { content: true },
+    });
+
+    this.notifyPlaylistChangeAfterItemUpdate(playlistId);
+
+    return updatedItem;
+  }
+
   async removeItem(organizationId: string, playlistId: string, itemId: string) {
     await this.findOne(organizationId, playlistId);
 

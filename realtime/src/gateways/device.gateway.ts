@@ -8,7 +8,7 @@ import {
   MessageBody,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger, UseFilters, UsePipes } from '@nestjs/common';
+import { Logger, UseFilters, UseGuards, UsePipes } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { RedisService } from '../services/redis.service';
 import { HeartbeatService } from '../services/heartbeat.service';
@@ -37,6 +37,7 @@ import {
 } from '../types';
 import * as Sentry from '@sentry/nestjs';
 import { WsAllExceptionsFilter } from './filters/ws-exception.filter';
+import { WsAuthGuard } from './guards/ws-auth.guard';
 
 interface DevicePayload {
   sub: string; // device ID
@@ -69,6 +70,7 @@ type AuthPayload =
   maxHttpBufferSize: 2 * 1024 * 1024,
 })
 @UseFilters(new WsAllExceptionsFilter())
+@UseGuards(WsAuthGuard)
 export class DeviceGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {

@@ -24,6 +24,8 @@ import { UpdateDisplayDto } from './dto/update-display.dto';
 import { UpdateQrOverlayDto } from './dto/update-qr-overlay.dto';
 import { BulkDisplayIdsDto, BulkAssignPlaylistDto, BulkAssignGroupDto } from './dto/bulk-operations.dto';
 import { ScreenshotResponseDto, ScreenshotResultDto } from './dto/screenshot.dto';
+import { AssignTagsDto, RemoveTagsDto } from './dto/tag-operations.dto';
+import { PushContentDto } from './dto/push-content.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
@@ -157,9 +159,9 @@ export class DisplaysController {
   addTags(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: { tagIds: string[] },
+    @Body() dto: AssignTagsDto,
   ) {
-    return this.displaysService.addTags(organizationId, id, body.tagIds);
+    return this.displaysService.addTags(organizationId, id, dto.tagIds);
   }
 
   @Post(':id/tags/remove')
@@ -167,9 +169,19 @@ export class DisplaysController {
   removeTags(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: { tagIds: string[] },
+    @Body() dto: RemoveTagsDto,
   ) {
-    return this.displaysService.removeTags(organizationId, id, body.tagIds);
+    return this.displaysService.removeTags(organizationId, id, dto.tagIds);
+  }
+
+  @Delete(':id/tags')
+  @Roles('admin')
+  deleteTagsFromDisplay(
+    @CurrentUser('organizationId') organizationId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RemoveTagsDto,
+  ) {
+    return this.displaysService.removeTags(organizationId, id, dto.tagIds);
   }
 
   @Post(':id/disable')
@@ -195,13 +207,13 @@ export class DisplaysController {
   pushContent(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: { contentId: string; duration?: number },
+    @Body() dto: PushContentDto,
   ) {
     return this.displaysService.pushContent(
       organizationId,
       id,
-      body.contentId,
-      body.duration,
+      dto.contentId,
+      dto.duration,
     );
   }
 

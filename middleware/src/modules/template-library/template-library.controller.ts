@@ -23,6 +23,7 @@ import { CloneTemplateDto } from './dto/clone-template.dto';
 import { CreateTemplateDto } from './dto/create-template.dto';
 import { UpdateTemplateDto } from './dto/update-template.dto';
 import { PublishTemplateDto } from './dto/publish-template.dto';
+import { AiGenerateDto } from './dto/ai-generate.dto';
 
 @UseGuards(RolesGuard)
 @Controller('template-library')
@@ -72,9 +73,9 @@ export class TemplateLibraryController {
   @Roles('admin', 'manager')
   @HttpCode(HttpStatus.OK)
   aiGenerate(
-    @Body() body: { prompt: string; category?: string; orientation?: string; style?: string },
+    @Body() dto: AiGenerateDto,
   ) {
-    return this.templateLibraryService.aiGenerate(body.prompt, body);
+    return this.templateLibraryService.aiGenerate(dto.prompt, dto);
   }
 
   @Post()

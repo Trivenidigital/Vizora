@@ -1,7 +1,8 @@
-import { IsString, IsOptional, IsBoolean, IsArray, ValidateNested } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsArray, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class PlaylistItemDto {
+  @IsNotEmpty()
   @IsString()
   contentId!: string;
 
@@ -15,6 +16,7 @@ export class PlaylistItemDto {
 }
 
 export class CreatePlaylistDto {
+  @IsNotEmpty()
   @IsString()
   name!: string;
 
