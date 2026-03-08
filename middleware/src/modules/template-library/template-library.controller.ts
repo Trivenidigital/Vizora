@@ -10,6 +10,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -89,14 +90,14 @@ export class TemplateLibraryController {
 
   @Get(':id')
   @Roles('admin', 'manager', 'viewer')
-  findOne(@Param('id') id: string) {
+  findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.templateLibraryService.findOne(id);
   }
 
   @Get(':id/preview')
   @Roles('admin', 'manager', 'viewer')
   @SkipOutputSanitize()
-  getPreview(@Param('id') id: string) {
+  getPreview(@Param('id', ParseUUIDPipe) id: string) {
     return this.templateLibraryService.getPreview(id);
   }
 
@@ -104,7 +105,7 @@ export class TemplateLibraryController {
   @Roles('admin', 'manager')
   @HttpCode(HttpStatus.CREATED)
   clone(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('organizationId') organizationId: string,
     @Body() dto: CloneTemplateDto,
   ) {
@@ -115,7 +116,7 @@ export class TemplateLibraryController {
   @Roles('admin', 'manager')
   @HttpCode(HttpStatus.CREATED)
   publish(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('organizationId') organizationId: string,
     @CurrentUser('id') userId: string,
     @Body() dto: PublishTemplateDto,
@@ -127,7 +128,7 @@ export class TemplateLibraryController {
   @Roles('admin', 'manager')
   @SkipOutputSanitize()
   saveUserTemplate(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('organizationId') organizationId: string,
     @Body() dto: UpdateTemplateDto,
   ) {
@@ -138,7 +139,7 @@ export class TemplateLibraryController {
   @Roles('admin')
   @UseGuards(SuperAdminGuard)
   setFeatured(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body('isFeatured') isFeatured: boolean,
   ) {
     return this.templateLibraryService.setFeatured(id, isFeatured);
@@ -148,7 +149,7 @@ export class TemplateLibraryController {
   @Roles('admin')
   @UseGuards(SuperAdminGuard)
   update(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateTemplateDto,
   ) {
     return this.templateLibraryService.updateTemplate(id, dto);
@@ -158,7 +159,7 @@ export class TemplateLibraryController {
   @Roles('admin')
   @UseGuards(SuperAdminGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param('id') id: string) {
+  remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.templateLibraryService.deleteTemplate(id);
   }
 }

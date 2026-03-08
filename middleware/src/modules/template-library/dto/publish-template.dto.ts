@@ -1,4 +1,5 @@
 import { IsString, IsArray, IsOptional, IsInt, Min, Max, MinLength, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class PublishTemplateDto {
   @IsString()
@@ -15,6 +16,7 @@ export class PublishTemplateDto {
   name!: string;
 
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(300)

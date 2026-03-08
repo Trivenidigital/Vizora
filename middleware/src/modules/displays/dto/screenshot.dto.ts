@@ -1,4 +1,5 @@
 import { IsNotEmpty, IsString, IsIn, IsOptional, IsNumber } from 'class-validator';
+import { Type } from 'class-transformer';
 
 /**
  * DTO for requesting a screenshot from a device
@@ -33,10 +34,12 @@ export class ScreenshotResultDto {
   capturedAt: string;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   width?: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   height?: number;
 }

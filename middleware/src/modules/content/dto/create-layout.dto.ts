@@ -45,6 +45,7 @@ export class CreateLayoutDto {
   gridTemplate?: { columns: string; rows: string };
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   gap?: number;

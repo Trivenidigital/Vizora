@@ -25,6 +25,7 @@ describe('SystemConfigService', () => {
         findUnique: jest.fn(),
         upsert: jest.fn(),
         delete: jest.fn(),
+        count: jest.fn(),
       },
       $transaction: jest.fn(),
     };
@@ -37,14 +38,18 @@ describe('SystemConfigService', () => {
   });
 
   describe('findAll', () => {
-    it('should return all configurations sorted by category and key', async () => {
+    it('should return paginated configurations sorted by category and key', async () => {
       const configs = [mockConfig, { ...mockConfig, key: 'app.debug', category: 'general' }];
       mockDb.systemConfig.findMany.mockResolvedValue(configs);
+      mockDb.systemConfig.count.mockResolvedValue(2);
 
-      const result = await service.findAll();
+      const result = await service.findAll({ page: 1, limit: 10 });
 
-      expect(result).toEqual(configs);
+      expect(result.data).toEqual(configs);
+      expect(result.meta).toEqual({ page: 1, limit: 10, total: 2, totalPages: 1 });
       expect(mockDb.systemConfig.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
         orderBy: [{ category: 'asc' }, { key: 'asc' }],
       });
     });

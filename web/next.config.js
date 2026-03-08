@@ -32,6 +32,16 @@ const nextConfig = {
         port: '3000',
         pathname: '/uploads/**',
       },
+      // Production: parse hostname from NEXT_PUBLIC_API_URL
+      ...(process.env.NEXT_PUBLIC_API_URL ? [{
+        protocol: new URL(process.env.NEXT_PUBLIC_API_URL).protocol.replace(':', ''),
+        hostname: new URL(process.env.NEXT_PUBLIC_API_URL).hostname,
+        pathname: '/static/**',
+      }, {
+        protocol: new URL(process.env.NEXT_PUBLIC_API_URL).protocol.replace(':', ''),
+        hostname: new URL(process.env.NEXT_PUBLIC_API_URL).hostname,
+        pathname: '/api/**',
+      }] : []),
     ],
   },
   webpack: (config) => {

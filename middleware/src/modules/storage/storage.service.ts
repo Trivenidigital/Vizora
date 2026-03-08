@@ -68,8 +68,12 @@ export class StorageService implements OnModuleInit {
     } catch (error) {
       this.available = false;
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.warn(`MinIO connection failed: ${errorMessage} - falling back to local storage`);
-      // Don't throw - graceful degradation to local storage
+
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error(`MinIO is required in production but unavailable: ${errorMessage}`);
+      }
+
+      this.logger.warn(`MinIO connection failed: ${errorMessage} - falling back to local storage (dev only)`);
     }
   }
 

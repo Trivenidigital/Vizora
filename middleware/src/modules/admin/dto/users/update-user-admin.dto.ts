@@ -1,4 +1,5 @@
 import { IsString, IsOptional, IsBoolean, IsIn, IsEmail } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class UpdateUserAdminDto {
   @IsEmail()
@@ -18,6 +19,7 @@ export class UpdateUserAdminDto {
   @IsIn(['admin', 'manager', 'viewer'])
   role?: string;
 
+  @Type(() => Boolean)
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;

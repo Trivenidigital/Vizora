@@ -1,4 +1,5 @@
 import { IsString, IsOptional, IsEnum, IsInt, IsObject, Min, IsDateString, IsIn } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateContentDto {
   @IsString()
@@ -19,11 +20,13 @@ export class CreateContentDto {
   thumbnail?: string;
 
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   duration?: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(0)
   fileSize?: number;
@@ -38,7 +41,7 @@ export class CreateContentDto {
 
   @IsOptional()
   @IsObject()
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 
   // Content expiration fields
   @IsOptional()

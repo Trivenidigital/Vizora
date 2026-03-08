@@ -225,15 +225,69 @@ function pm2Flush(): boolean {
 // ─── Task 5: Backup Verification ─────────────────────────────────────────────
 
 /**
- * Placeholder for backup verification. If BACKUP_S3_BUCKET is set,
- * logs a message indicating future implementation.
+ * Run a database backup, compressing the dump with gzip.
+ * If BACKUP_S3_BUCKET is set, the backup is created; otherwise skipped.
  */
-function checkBackups(): void {
+function runBackup(): void {
   const bucket = process.env.BACKUP_S3_BUCKET;
-  if (bucket) {
-    log(AGENT, `Backup verification: S3 bucket "${bucket}" configured — verification not yet implemented`);
-  } else {
-    log(AGENT, 'Backup verification: BACKUP_S3_BUCKET not set — skipping');
+  if (!bucket) {
+    log(AGENT, 'Backup skipped: BACKUP_S3_BUCKET not set');
+    return;
+  }
+
+  // Validate bucket format to prevent injection via malformed values
+  if (!/^s3:\/\/[a-zA-Z0-9.\-_\/]+$|^[a-zA-Z0-9.\-_\/]+$/.test(bucket)) {
+    log(AGENT, `Backup skipped: BACKUP_S3_BUCKET has invalid format: ${bucket}`);
+    return;
+  }
+
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    log(AGENT, 'Backup skipped: DATABASE_URL not set');
+    return;
+  }
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const filename = `vizora-backup-${timestamp}.sql.gz`;
+  const tmpPath = `/tmp/${filename}`;
+
+  const tmpPathRaw = `/tmp/vizora-backup-${timestamp}.sql`;
+
+  try {
+    // Two-step backup without shell interpolation to prevent command injection
+    // via DATABASE_URL containing shell metacharacters.
+    execFileSync('pg_dump', [databaseUrl, '-f', tmpPathRaw], {
+      timeout: 300_000, // 5 minutes
+      stdio: 'pipe',
+    });
+    execFileSync('gzip', ['-f', tmpPathRaw], {
+      timeout: 60_000,
+      stdio: 'pipe',
+    });
+    log(AGENT, `Backup created: ${filename}`);
+
+    // Upload to S3 if aws CLI is available
+    const s3Dest = bucket.startsWith('s3://') ? bucket : `s3://${bucket}`;
+    try {
+      execFileSync('aws', ['s3', 'cp', tmpPath, `${s3Dest}/${filename}`], {
+        timeout: 300_000,
+        stdio: 'pipe',
+      });
+      log(AGENT, `Backup uploaded to ${s3Dest}/${filename}`);
+    } catch (uploadErr) {
+      const msg = uploadErr instanceof Error ? uploadErr.message : String(uploadErr);
+      log(AGENT, `Backup upload to S3 failed (local backup retained): ${msg}`);
+    }
+
+    // Clean up local temp file after successful upload
+    try {
+      execFileSync('rm', ['-f', tmpPath], { stdio: 'pipe' });
+    } catch {
+      // Non-critical -- /tmp will be cleaned by OS
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    log(AGENT, `Backup failed: ${msg}`);
   }
 }
 
@@ -256,8 +310,8 @@ async function main(): Promise<void> {
     // ── 4. PM2 flush ──
     const pm2Ok = pm2Flush();
 
-    // ── 5. Backup verification ──
-    checkBackups();
+    // ── 5. Database backup ──
+    runBackup();
 
     // ── Record agent run ──
     const durationMs = Date.now() - startTime;

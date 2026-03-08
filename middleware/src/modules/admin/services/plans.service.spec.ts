@@ -42,6 +42,7 @@ describe('PlansService', () => {
         create: jest.fn(),
         update: jest.fn(),
         delete: jest.fn(),
+        count: jest.fn(),
       },
       $transaction: jest.fn(),
     };
@@ -54,14 +55,18 @@ describe('PlansService', () => {
   });
 
   describe('findAll', () => {
-    it('should return all plans sorted by sortOrder', async () => {
+    it('should return paginated plans sorted by sortOrder', async () => {
       const plans = [mockPlan, { ...mockPlan, id: 'plan-456', slug: 'basic', sortOrder: 0 }];
       mockDb.plan.findMany.mockResolvedValue(plans);
+      mockDb.plan.count.mockResolvedValue(2);
 
-      const result = await service.findAll();
+      const result = await service.findAll({ page: 1, limit: 10 });
 
-      expect(result).toEqual(plans);
+      expect(result.data).toEqual(plans);
+      expect(result.meta).toEqual({ page: 1, limit: 10, total: 2, totalPages: 1 });
       expect(mockDb.plan.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
         orderBy: { sortOrder: 'asc' },
         include: {
           promotions: {

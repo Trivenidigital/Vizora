@@ -37,16 +37,18 @@ export class DataSourceDto {
 
   @IsOptional()
   @IsObject()
-  manualData?: Record<string, any>;
+  manualData?: Record<string, unknown>;
 }
 
 /**
  * Refresh configuration for template
  */
 export class RefreshConfigDto {
+  @Type(() => Boolean)
   @IsBoolean()
   enabled!: boolean;
 
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   intervalMinutes!: number;
@@ -76,9 +78,10 @@ export class CreateTemplateDto {
 
   @IsOptional()
   @IsObject()
-  sampleData?: Record<string, any>;
+  sampleData?: Record<string, unknown>;
 
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   duration?: number;

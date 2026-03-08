@@ -9,6 +9,7 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -85,7 +86,7 @@ export class NotificationsController {
   @Patch(':id/read')
   markAsRead(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.notificationsService.markAsRead(organizationId, id);
   }
@@ -96,7 +97,7 @@ export class NotificationsController {
   @Patch(':id/dismiss')
   dismiss(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.notificationsService.dismiss(organizationId, id);
   }

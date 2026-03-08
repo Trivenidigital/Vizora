@@ -11,13 +11,13 @@ export class InstagramDataSource implements WidgetDataSource {
 
   readonly type = 'social_instagram';
 
-  async fetchData(config: Record<string, any>): Promise<Record<string, any>> {
+  async fetchData(config: Record<string, unknown>): Promise<Record<string, unknown>> {
     // Stub: real Instagram Graph API integration deferred
     this.logger.debug('Instagram fetchData called (stub), returning sample data');
     return this.getSampleData();
   }
 
-  getConfigSchema(): Record<string, any> {
+  getConfigSchema(): Record<string, unknown> {
     return {
       type: 'object',
       properties: {
@@ -58,7 +58,7 @@ export class InstagramDataSource implements WidgetDataSource {
     return 'social-grid';
   }
 
-  getSampleData(): Record<string, any> {
+  getSampleData(): Record<string, unknown> {
     return {
       platform: 'instagram',
       username: '@vizora_official',
@@ -133,12 +133,12 @@ export class TwitterDataSource implements WidgetDataSource {
 
   readonly type = 'social_twitter';
 
-  async fetchData(config: Record<string, any>): Promise<Record<string, any>> {
+  async fetchData(config: Record<string, unknown>): Promise<Record<string, unknown>> {
     this.logger.debug('Twitter fetchData called (stub), returning sample data');
     return this.getSampleData();
   }
 
-  getConfigSchema(): Record<string, any> {
+  getConfigSchema(): Record<string, unknown> {
     return {
       type: 'object',
       properties: {
@@ -179,7 +179,7 @@ export class TwitterDataSource implements WidgetDataSource {
     return 'social-wall';
   }
 
-  getSampleData(): Record<string, any> {
+  getSampleData(): Record<string, unknown> {
     return {
       platform: 'twitter',
       username: '@vizora',
@@ -240,12 +240,12 @@ export class FacebookDataSource implements WidgetDataSource {
 
   readonly type = 'social_facebook';
 
-  async fetchData(config: Record<string, any>): Promise<Record<string, any>> {
+  async fetchData(config: Record<string, unknown>): Promise<Record<string, unknown>> {
     this.logger.debug('Facebook fetchData called (stub), returning sample data');
     return this.getSampleData();
   }
 
-  getConfigSchema(): Record<string, any> {
+  getConfigSchema(): Record<string, unknown> {
     return {
       type: 'object',
       properties: {
@@ -286,7 +286,7 @@ export class FacebookDataSource implements WidgetDataSource {
     return 'social-carousel';
   }
 
-  getSampleData(): Record<string, any> {
+  getSampleData(): Record<string, unknown> {
     return {
       platform: 'facebook',
       pageName: 'Vizora Digital Signage',

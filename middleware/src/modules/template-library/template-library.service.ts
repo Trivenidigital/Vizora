@@ -25,13 +25,13 @@ export interface LibraryTemplateMetadata {
   useCount?: number;
   dataSource: {
     type: 'manual';
-    manualData?: Record<string, any>;
+    manualData?: Record<string, unknown>;
   };
   refreshConfig: {
     enabled: boolean;
     intervalMinutes: number;
   };
-  sampleData?: Record<string, any>;
+  sampleData?: Record<string, unknown>;
   renderedHtml?: string;
   renderedAt?: string;
 }
@@ -52,7 +52,7 @@ export class TemplateLibraryService {
     const { page = 1, limit = 20, search, category, tag, orientation, difficulty } = dto;
     const skip = (page - 1) * limit;
 
-    const where: any = {
+    const where: Prisma.ContentWhereInput = {
       isGlobal: true,
       type: 'template',
       status: 'active',
@@ -364,7 +364,7 @@ export class TemplateLibraryService {
     const { page = 1, limit = 20, search } = dto;
     const skip = (page - 1) * limit;
 
-    const where: any = {
+    const where: Prisma.ContentWhereInput = {
       organizationId,
       type: 'template',
       isGlobal: false,
@@ -548,7 +548,7 @@ export class TemplateLibraryService {
       updatedMetadata.templateHtml = dto.templateHtml;
     }
 
-    const updateData: any = {
+    const updateData: Prisma.ContentUpdateInput = {
       metadata: updatedMetadata as Prisma.InputJsonValue,
     };
     if (dto.name !== undefined) {
@@ -605,7 +605,7 @@ export class TemplateLibraryService {
     if (dto.templateHtml !== undefined || dto.sampleData !== undefined) {
       try {
         const html = (updatedMetadata.templateHtml as string) || '';
-        const sampleData = (updatedMetadata.sampleData as Record<string, any>) || {};
+        const sampleData = (updatedMetadata.sampleData as Record<string, unknown>) || {};
         const renderedHtml = this.templateRendering.processTemplate(html, sampleData);
         updatedMetadata.renderedHtml = renderedHtml;
         updatedMetadata.renderedAt = new Date().toISOString();
@@ -615,7 +615,7 @@ export class TemplateLibraryService {
     }
 
     // Build update data
-    const updateData: any = {
+    const updateData: Prisma.ContentUpdateInput = {
       metadata: updatedMetadata as Prisma.InputJsonValue,
     };
     if (dto.name !== undefined) {

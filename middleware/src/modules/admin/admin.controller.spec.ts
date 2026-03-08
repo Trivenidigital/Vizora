@@ -174,12 +174,13 @@ describe('AdminController', () => {
     };
 
     it('should get all plans', async () => {
-      mockPlansService.findAll.mockResolvedValue([mockPlan] as any);
+      const paginatedResult = { data: [mockPlan], meta: { page: 1, limit: 20, total: 1, totalPages: 1 } };
+      mockPlansService.findAll.mockResolvedValue(paginatedResult as any);
 
-      const result = await controller.getPlans();
+      const result = await controller.getPlans({ page: 1, limit: 20 });
 
-      expect(result).toEqual([mockPlan]);
-      expect(mockPlansService.findAll).toHaveBeenCalled();
+      expect(result).toEqual(paginatedResult);
+      expect(mockPlansService.findAll).toHaveBeenCalledWith({ page: 1, limit: 20 });
     });
 
     it('should get a plan by ID', async () => {
@@ -261,11 +262,12 @@ describe('AdminController', () => {
     };
 
     it('should get all promotions', async () => {
-      mockPromotionsService.findAll.mockResolvedValue([mockPromotion] as any);
+      const paginatedResult = { data: [mockPromotion], meta: { page: 1, limit: 20, total: 1, totalPages: 1 } };
+      mockPromotionsService.findAll.mockResolvedValue(paginatedResult as any);
 
-      const result = await controller.getPromotions();
+      const result = await controller.getPromotions({ page: 1, limit: 20 });
 
-      expect(result).toEqual([mockPromotion]);
+      expect(result).toEqual(paginatedResult);
     });
 
     it('should create a promotion', async () => {
@@ -513,13 +515,15 @@ describe('AdminController', () => {
 
   describe('Config', () => {
     it('should get all config', async () => {
-      mockSystemConfigService.findAll.mockResolvedValue([
-        { key: 'max_file_size', value: 100, dataType: 'number' },
-      ] as any);
+      const paginatedResult = {
+        data: [{ key: 'max_file_size', value: 100, dataType: 'number' }],
+        meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
+      };
+      mockSystemConfigService.findAll.mockResolvedValue(paginatedResult as any);
 
-      const result = await controller.getAllConfig();
+      const result = await controller.getAllConfig({ page: 1, limit: 20 });
 
-      expect(result).toHaveLength(1);
+      expect(result.data).toHaveLength(1);
     });
 
     it('should set config value', async () => {
@@ -545,13 +549,15 @@ describe('AdminController', () => {
 
   describe('Security', () => {
     it('should get IP blocklist', async () => {
-      mockSecurityAdminService.getIpBlocklist.mockResolvedValue([
-        { id: 'block-1', ipAddress: '192.168.1.1', isActive: true },
-      ] as any);
+      const paginatedResult = {
+        data: [{ id: 'block-1', ipAddress: '192.168.1.1', isActive: true }],
+        meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
+      };
+      mockSecurityAdminService.getIpBlocklist.mockResolvedValue(paginatedResult as any);
 
-      const result = await controller.getIpBlocklist();
+      const result = await controller.getIpBlocklist({ page: 1, limit: 20 });
 
-      expect(result).toHaveLength(1);
+      expect(result.data).toHaveLength(1);
     });
 
     it('should block an IP', async () => {
@@ -571,13 +577,15 @@ describe('AdminController', () => {
     });
 
     it('should get all API keys', async () => {
-      mockSecurityAdminService.getAllApiKeys.mockResolvedValue([
-        { id: 'key-1', name: 'Production Key', prefix: 'vz_live_' },
-      ] as any);
+      const paginatedResult = {
+        data: [{ id: 'key-1', name: 'Production Key', prefix: 'vz_live_' }],
+        meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
+      };
+      mockSecurityAdminService.getAllApiKeys.mockResolvedValue(paginatedResult as any);
 
-      const result = await controller.getAllApiKeys();
+      const result = await controller.getAllApiKeys({ page: 1, limit: 20 });
 
-      expect(result).toHaveLength(1);
+      expect(result.data).toHaveLength(1);
     });
 
     it('should revoke an API key', async () => {
@@ -603,11 +611,15 @@ describe('AdminController', () => {
     };
 
     it('should get all announcements', async () => {
-      mockAnnouncementsService.findAll.mockResolvedValue([mockAnnouncement] as any);
+      const paginatedResult = {
+        data: [mockAnnouncement],
+        meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
+      };
+      mockAnnouncementsService.findAll.mockResolvedValue(paginatedResult as any);
 
-      const result = await controller.getAnnouncements();
+      const result = await controller.getAnnouncements({ page: 1, limit: 20 });
 
-      expect(result).toHaveLength(1);
+      expect(result.data).toHaveLength(1);
     });
 
     it('should create an announcement', async () => {

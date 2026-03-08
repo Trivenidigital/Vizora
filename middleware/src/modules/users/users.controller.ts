@@ -8,6 +8,7 @@ import {
   Param,
   Query,
   UseGuards,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { InviteUserDto } from './dto/invite-user.dto';
@@ -35,7 +36,7 @@ export class UsersController {
   @Roles('admin', 'manager')
   findOne(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.usersService.findOne(organizationId, id);
   }
@@ -55,7 +56,7 @@ export class UsersController {
   update(
     @CurrentUser('organizationId') organizationId: string,
     @CurrentUser('id') userId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() updateUserDto: UpdateUserDto,
   ) {
     return this.usersService.update(organizationId, id, updateUserDto, userId);
@@ -66,7 +67,7 @@ export class UsersController {
   deactivate(
     @CurrentUser('organizationId') organizationId: string,
     @CurrentUser('id') userId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.usersService.deactivate(organizationId, id, userId);
   }

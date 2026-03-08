@@ -2,7 +2,7 @@ export interface Customer {
   id: string;
   email: string;
   name: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface CheckoutParams {
@@ -21,7 +21,7 @@ export interface Subscription {
   currentPeriodEnd: Date;
   cancelAtPeriodEnd: boolean;
   priceId: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface Invoice {
@@ -36,16 +36,21 @@ export interface Invoice {
   createdAt: Date;
 }
 
+/** Webhook event data from payment providers — deeply nested untyped objects */
+export interface WebhookEventData {
+  [key: string]: WebhookEventData | string | number | boolean | null | undefined;
+}
+
 export interface WebhookEvent {
   type: string;
-  data: any;
+  data: WebhookEventData;
 }
 
 export interface PaymentProvider {
   readonly name: 'stripe' | 'razorpay';
 
   // Customer management
-  createCustomer(email: string, name: string, metadata?: Record<string, any>): Promise<Customer>;
+  createCustomer(email: string, name: string, metadata?: Record<string, unknown>): Promise<Customer>;
   getCustomer(customerId: string): Promise<Customer | null>;
 
   // Subscription management

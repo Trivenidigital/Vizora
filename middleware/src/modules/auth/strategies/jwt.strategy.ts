@@ -16,6 +16,18 @@ export interface JwtPayload {
   jti?: string; // JWT ID for token revocation
 }
 
+/** Shape of request.user set by JwtStrategy.validate() */
+export interface AuthenticatedUser {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  organizationId: string;
+  role: string;
+  isSuperAdmin?: boolean;
+  organization?: Record<string, unknown> | null;
+}
+
 /**
  * Extract JWT from httpOnly cookie or Authorization header
  * Prioritizes cookie for security, falls back to header for API clients

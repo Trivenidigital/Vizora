@@ -32,7 +32,7 @@ export interface TemplateMetadata {
     method?: 'GET' | 'POST';
     headers?: Record<string, string>;
     jsonPath?: string;
-    manualData?: Record<string, any>;
+    manualData?: Record<string, unknown>;
   };
   refreshConfig: {
     enabled: boolean;
@@ -40,7 +40,7 @@ export interface TemplateMetadata {
     lastRefresh?: string;
     lastError?: string;
   };
-  sampleData?: Record<string, any>;
+  sampleData?: Record<string, unknown>;
   renderedHtml?: string;
   renderedAt?: string;
 }
@@ -51,7 +51,7 @@ export interface TemplateMetadata {
 export interface WidgetMetadata {
   isWidget: true;
   widgetType: string;
-  widgetConfig: Record<string, any>;
+  widgetConfig: Record<string, unknown>;
   templateName: string;
   templateHtml: string;
   renderedHtml?: string;
@@ -73,7 +73,7 @@ export class ContentService {
   ) {}
 
   // Map database content to API response format
-  private mapContentResponse(content: any) {
+  private mapContentResponse(content: Record<string, unknown> | null) {
     if (!content) return content;
     return {
       ...content,
@@ -106,7 +106,7 @@ export class ContentService {
     const validStatuses = ['active', 'archived', 'draft'];
     const validOrientations = ['landscape', 'portrait', 'both'];
 
-    const where: any = { organizationId };
+    const where: Prisma.ContentWhereInput = { organizationId };
     if (filters?.type && validTypes.includes(filters.type)) {
       where.type = filters.type;
     }
@@ -303,7 +303,7 @@ export class ContentService {
 
   async getVersionHistory(organizationId: string, id: string) {
     const content = await this.findOne(organizationId, id);
-    const versions: any[] = [content];
+    const versions: Record<string, unknown>[] = [content];
 
     let currentVersion = content;
     while (currentVersion.previousVersionId) {
@@ -340,10 +340,28 @@ export class ContentService {
     for (const content of expiredContent) {
       await this.db.$transaction(async (tx) => {
         if (content.replacementContentId) {
-          await tx.playlistItem.updateMany({
-            where: { contentId: content.id },
-            data: { contentId: content.replacementContentId },
+          // Validate replacement content belongs to same organization
+          const replacement = await tx.content.findFirst({
+            where: {
+              id: content.replacementContentId,
+              organizationId: content.organizationId,
+            },
           });
+
+          if (replacement) {
+            await tx.playlistItem.updateMany({
+              where: { contentId: content.id },
+              data: { contentId: content.replacementContentId },
+            });
+          } else {
+            // Cross-org or missing replacement -- remove playlist items
+            this.logger.warn(
+              `Expired content ${content.id} has invalid replacementContentId ${content.replacementContentId} (org mismatch or not found). Removing playlist items.`,
+            );
+            await tx.playlistItem.deleteMany({
+              where: { contentId: content.id },
+            });
+          }
         } else {
           await tx.playlistItem.deleteMany({
             where: { contentId: content.id },
@@ -359,6 +377,7 @@ export class ContentService {
 
     return { processed: expiredContent.length };
   }
+
 
   async setExpiration(
     organizationId: string,
@@ -483,7 +502,7 @@ export class ContentService {
     // Fetch items with file info for storage cleanup
     const items = await this.db.content.findMany({
       where: { id: { in: ids }, organizationId },
-      select: { id: true, fileSize: true, fileKey: true, url: true },
+      select: { id: true, fileSize: true, url: true },
     });
 
     if (items.length !== ids.length) {
@@ -492,7 +511,7 @@ export class ContentService {
 
     // Delete files from storage (fire-and-forget with logging)
     for (const item of items) {
-      const objectKey = (item as any).fileKey || (item.url?.startsWith('minio://') ? item.url.substring('minio://'.length) : null);
+      const objectKey = item.url?.startsWith('minio://') ? item.url.substring('minio://'.length) : null;
       if (objectKey) {
         this.storageService.deleteFile(objectKey).catch(error => {
           this.logger.error(`Failed to delete file ${objectKey} during bulk delete: ${error}`);
@@ -908,7 +927,7 @@ export class ContentService {
       throw new BadRequestException('Content is not a layout');
     }
 
-    const existingMetadata = (existing.metadata as Record<string, any>) || {};
+    const existingMetadata = (existing.metadata as Record<string, unknown>) || {};
 
     const metadata = {
       layoutType: dto.layoutType || existingMetadata.layoutType,
@@ -941,12 +960,12 @@ export class ContentService {
       throw new BadRequestException('Content is not a layout');
     }
 
-    const metadata = (layout.metadata as Record<string, any>) || {};
-    const zones = metadata.zones || [];
+    const metadata = (layout.metadata as Record<string, unknown>) || {};
+    const zones = (Array.isArray(metadata.zones) ? metadata.zones : []) as Record<string, unknown>[];
 
     // Batch-fetch all playlist and content IDs to avoid N+1 queries
-    const playlistIds = zones.filter((z: any) => z.playlistId).map((z: any) => z.playlistId);
-    const contentIds = zones.filter((z: any) => z.contentId).map((z: any) => z.contentId);
+    const playlistIds = zones.filter((z) => z.playlistId).map((z) => z.playlistId as string);
+    const contentIds = zones.filter((z) => z.contentId).map((z) => z.contentId as string);
 
     const [playlists, contents] = await Promise.all([
       playlistIds.length > 0
@@ -967,34 +986,34 @@ export class ContentService {
         : Promise.resolve([]),
     ]);
 
-    const playlistMap = new Map(playlists.map((p: any) => [p.id, p]));
-    const contentMap = new Map(contents.map((c: any) => [c.id, c]));
+    const playlistMap = new Map(playlists.map((p) => [p.id, p]));
+    const contentMap = new Map(contents.map((c) => [c.id, c]));
 
     // Resolve content for each zone using pre-fetched data
-    const resolvedZones = zones.map((zone: any) => {
-      const resolved: any = { ...zone };
+    const resolvedZones = zones.map((zone) => {
+      const resolved: Record<string, unknown> = { ...zone };
 
       if (zone.playlistId) {
-        const playlist = playlistMap.get(zone.playlistId);
+        const playlist = playlistMap.get(zone.playlistId as string);
         if (playlist) {
           resolved.playlist = {
             id: playlist.id,
             name: playlist.name,
-            items: playlist.items.map((item: any) => ({
+            items: playlist.items.map((item) => ({
               id: item.id,
               contentId: item.contentId,
               duration: item.duration || 10,
               order: item.order,
-              content: item.content ? this.mapContentResponse(item.content) : null,
+              content: item.content ? this.mapContentResponse(item.content as unknown as Record<string, unknown>) : null,
             })),
           };
         }
       }
 
       if (zone.contentId) {
-        const content = contentMap.get(zone.contentId);
+        const content = contentMap.get(zone.contentId as string);
         if (content) {
-          resolved.content = this.mapContentResponse(content);
+          resolved.content = this.mapContentResponse(content as unknown as Record<string, unknown>);
         }
       }
 
@@ -1032,8 +1051,8 @@ export class ContentService {
   getWidgetTypes() {
     const types: Array<{
       type: string;
-      configSchema: Record<string, any>;
-      sampleData: Record<string, any>;
+      configSchema: Record<string, unknown>;
+      sampleData: Record<string, unknown>;
       defaultTemplate: string;
     }> = [];
 
@@ -1065,7 +1084,7 @@ export class ContentService {
     const templateHtml = this.loadWidgetTemplate(templateName);
 
     // Fetch initial data from the data source (falls back to sample data on failure)
-    let data: Record<string, any>;
+    let data: Record<string, unknown>;
     try {
       data = await source.fetchData(dto.widgetConfig);
     } catch (error) {
@@ -1112,7 +1131,7 @@ export class ContentService {
   async updateWidget(organizationId: string, id: string, dto: Partial<CreateWidgetDto>) {
     const existing = await this.findOne(organizationId, id);
 
-    const existingMeta = (existing.metadata || {}) as Record<string, any>;
+    const existingMeta = (existing.metadata || {}) as Record<string, unknown>;
     if (!existingMeta.isWidget) {
       throw new BadRequestException('Content is not a widget');
     }
@@ -1136,7 +1155,7 @@ export class ContentService {
     }
 
     // Re-fetch data and re-render
-    let data: Record<string, any>;
+    let data: Record<string, unknown>;
     let renderedHtml = existingMeta.renderedHtml || '';
     let lastError: string | undefined;
 
@@ -1179,7 +1198,7 @@ export class ContentService {
   async refreshWidget(organizationId: string, id: string) {
     const existing = await this.findOne(organizationId, id);
 
-    const existingMeta = (existing.metadata || {}) as Record<string, any>;
+    const existingMeta = (existing.metadata || {}) as Record<string, unknown>;
     if (!existingMeta.isWidget) {
       throw new BadRequestException('Content is not a widget');
     }

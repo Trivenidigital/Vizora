@@ -32,6 +32,7 @@ describe('AnnouncementsService', () => {
         create: jest.fn(),
         update: jest.fn(),
         delete: jest.fn(),
+        count: jest.fn(),
       },
     };
 
@@ -43,13 +44,15 @@ describe('AnnouncementsService', () => {
   });
 
   describe('findAll', () => {
-    it('should return all announcements', async () => {
+    it('should return paginated announcements', async () => {
       mockDb.systemAnnouncement.findMany.mockResolvedValue([mockAnnouncement]);
+      mockDb.systemAnnouncement.count.mockResolvedValue(1);
 
-      const result = await service.findAll();
+      const result = await service.findAll({ page: 1, limit: 10 });
 
-      expect(result).toHaveLength(1);
-      expect(result[0].title).toBe('Test Announcement');
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].title).toBe('Test Announcement');
+      expect(result.meta).toEqual({ page: 1, limit: 10, total: 1, totalPages: 1 });
     });
   });
 

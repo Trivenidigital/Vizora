@@ -57,7 +57,7 @@ export class NotificationsService {
     const skip = (page - 1) * limit;
 
     // Build where clause with validated filters
-    const where: any = { organizationId };
+    const where: Prisma.NotificationWhereInput = { organizationId };
 
     if (filters?.read !== undefined) {
       where.read = filters.read;

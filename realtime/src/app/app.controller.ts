@@ -163,7 +163,13 @@ export class AppController {
   @Post('push/playlist')
   @UseGuards(InternalApiGuard)
   async pushPlaylist(@Body() data: PushPlaylistRequest): Promise<PushResponse> {
-    await this.deviceGateway.sendPlaylistUpdate(data.deviceId, data.playlist);
+    const result = await this.deviceGateway.sendPlaylistUpdate(data.deviceId, data.playlist);
+    if (!result.delivered) {
+      return {
+        success: false,
+        message: `Playlist delivery failed: ${result.reason ?? 'unknown'}`,
+      };
+    }
     return {
       success: true,
       message: 'Playlist update sent to device',

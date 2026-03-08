@@ -11,7 +11,7 @@ interface PairingRequest {
   code: string;
   deviceIdentifier: string;
   nickname: string;
-  metadata: any;
+  metadata: Record<string, unknown>;
   createdAt: string;   // ISO string for JSON serialization
   expiresAt: string;   // ISO string for JSON serialization
   qrCode?: string;
@@ -310,7 +310,7 @@ export class PairingService implements OnModuleDestroy {
     // Return active pairing requests filtered by organization
     // Only show requests that have been completed for this org,
     // or where the device already belongs to this org
-    const activePairings: any[] = [];
+    const activePairings: PairingRequest[] = [];
 
     // Use SCAN to find all pairing keys in Redis
     const keys = await this.scanPairingKeys();

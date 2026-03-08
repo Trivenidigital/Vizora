@@ -65,7 +65,7 @@ export class SanitizeInterceptor implements NestInterceptor {
   };
 
 
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const request = context.switchToHttp().getRequest();
 
     if (request.body && typeof request.body === 'object') {
@@ -108,7 +108,7 @@ export class SanitizeInterceptor implements NestInterceptor {
     );
   }
 
-  private sanitizeObject(obj: any, decodeEntities = false): any {
+  private sanitizeObject(obj: unknown, decodeEntities = false): unknown {
     if (obj === null || obj === undefined) {
       return obj;
     }
@@ -126,7 +126,7 @@ export class SanitizeInterceptor implements NestInterceptor {
     }
 
     if (typeof obj === 'object') {
-      const sanitized: Record<string, any> = {};
+      const sanitized: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(obj)) {
         // Skip password fields - don't sanitize them
         if (key.toLowerCase().includes('password')) {
@@ -175,12 +175,8 @@ export class SanitizeInterceptor implements NestInterceptor {
   }
 
   private decodeHtmlEntities(str: string): string {
-    return str
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#x27;/g, "'")
-      .replace(/&#x2F;/g, '/');
+    // Only decode &amp; — the only entity that is safe to decode.
+    // DO NOT decode &lt; &gt; &quot; as they could re-introduce XSS vectors.
+    return str.replace(/&amp;/g, '&');
   }
 }

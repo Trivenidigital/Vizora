@@ -144,10 +144,19 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    // Check account lockout
+    // Check account lockout — fail CLOSED if Redis is unreachable
     const lockoutKey = `login_attempts:${dto.email}`;
-    const attemptsStr = await this.redisService.get(lockoutKey);
-    const attempts = attemptsStr ? parseInt(attemptsStr, 10) : 0;
+    let attempts = 0;
+    try {
+      const attemptsStr = await this.redisService.get(lockoutKey);
+      attempts = attemptsStr ? parseInt(attemptsStr, 10) : 0;
+    } catch (error) {
+      this.logger.error(`Redis unavailable during login lockout check: ${error instanceof Error ? error.message : 'Unknown'}`);
+      throw new HttpException(
+        'Authentication service temporarily unavailable. Please try again shortly.',
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
 
     if (attempts >= MAX_LOGIN_ATTEMPTS) {
       throw new HttpException(
@@ -181,8 +190,12 @@ export class AuthService {
       throw new ForbiddenException('Account is inactive. Contact support.');
     }
 
-    // Clear lockout counter on successful login
-    await this.redisService.del(lockoutKey);
+    // Clear lockout counter on successful login (best-effort cleanup)
+    try {
+      await this.redisService.del(lockoutKey);
+    } catch (error) {
+      this.logger.error(`Failed to clear lockout counter (best-effort): ${error instanceof Error ? error.message : 'Unknown'}`);
+    }
 
     // Update last login timestamp
     await this.databaseService.user.update({
@@ -427,7 +440,7 @@ export class AuthService {
     await this.redisService.del(`user_auth:${userId}`);
   }
 
-  private generateToken(user: any, organization: any): string {
+  private generateToken(user: { id: string; email: string; role: string; isSuperAdmin?: boolean }, organization: { id: string }): string {
     const payload = {
       sub: user.id,
       email: user.email,
@@ -442,10 +455,14 @@ export class AuthService {
   }
 
   private async incrementLoginAttempts(lockoutKey: string): Promise<void> {
-    const count = await this.redisService.incr(lockoutKey);
-    // Set TTL only on the first attempt (when count becomes 1)
-    if (count === 1) {
-      await this.redisService.expire(lockoutKey, LOCKOUT_TTL_SECONDS);
+    try {
+      const count = await this.redisService.incr(lockoutKey);
+      // Set TTL only on the first attempt (when count becomes 1)
+      if (count === 1) {
+        await this.redisService.expire(lockoutKey, LOCKOUT_TTL_SECONDS);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to increment login attempts (best-effort): ${error instanceof Error ? error.message : 'Unknown'}`);
     }
   }
 
@@ -483,8 +500,8 @@ export class AuthService {
     }
   }
 
-  private sanitizeUser(user: any) {
-    const { passwordHash, ...sanitized } = user;
+  private sanitizeUser(user: { passwordHash?: string | null; [key: string]: unknown }) {
+    const { passwordHash: _, ...sanitized } = user;
     return sanitized;
   }
 

@@ -50,10 +50,24 @@ export class AnnouncementsService {
   /**
    * Get all announcements
    */
-  async findAll(): Promise<Announcement[]> {
-    return this.db.systemAnnouncement.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
+  async findAll(pagination?: { page?: number; limit?: number }) {
+    const page = pagination?.page ?? 1;
+    const limit = pagination?.limit ?? 10;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      this.db.systemAnnouncement.findMany({
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.db.systemAnnouncement.count(),
+    ]);
+
+    return {
+      data,
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
   }
 
   /**
@@ -171,7 +185,7 @@ export class AnnouncementsService {
       throw new BadRequestException('Expiration date must be after start date');
     }
 
-    const updateData: any = { ...dto };
+    const updateData: Record<string, unknown> = { ...dto };
 
     if (dto.startsAt) {
       updateData.startsAt = new Date(dto.startsAt);

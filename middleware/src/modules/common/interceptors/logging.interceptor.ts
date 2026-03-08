@@ -8,6 +8,7 @@ import {
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { Request, Response } from 'express';
+import * as crypto from 'crypto';
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -33,15 +34,21 @@ interface LogMetadata {
 export class LoggingInterceptor implements NestInterceptor {
   private readonly logger = new Logger('HTTP');
 
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const response = context.switchToHttp().getResponse<Response>();
 
-    const requestId = this.generateRequestId();
+    // Use incoming X-Request-ID if valid (alphanumeric/dashes, max 128 chars), else generate
+    const incomingId = request.headers['x-request-id'] as string;
+    const requestId =
+      incomingId && /^[\w\-]{1,128}$/.test(incomingId)
+        ? incomingId
+        : this.generateRequestId();
     const startTime = Date.now();
 
     // Attach request ID for tracing
     request['requestId'] = requestId;
+    response.setHeader('X-Request-ID', requestId);
 
     const metadata: LogMetadata = {
       requestId,
@@ -111,6 +118,6 @@ export class LoggingInterceptor implements NestInterceptor {
   }
 
   private generateRequestId(): string {
-    return `${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 9)}`;
+    return crypto.randomUUID();
   }
 }

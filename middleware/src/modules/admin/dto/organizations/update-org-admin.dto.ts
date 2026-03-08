@@ -1,4 +1,5 @@
 import { IsString, IsOptional, IsInt, Min, IsIn, IsBoolean, IsDateString } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class UpdateOrgAdminDto {
   @IsString()
@@ -10,6 +11,7 @@ export class UpdateOrgAdminDto {
   @IsIn(['free', 'basic', 'pro', 'enterprise'])
   subscriptionTier?: string;
 
+  @Type(() => Number)
   @IsInt()
   @IsOptional()
   @Min(-1)
@@ -32,12 +34,13 @@ export class UpdateOrgAdminDto {
   @IsOptional()
   trialEndsAt?: string;
 
+  @Type(() => Boolean)
   @IsBoolean()
   @IsOptional()
   isFeatureFlagged?: boolean;
 
   @IsOptional()
-  settings?: Record<string, any>;
+  settings?: Record<string, unknown>;
 
   @IsString()
   @IsOptional()

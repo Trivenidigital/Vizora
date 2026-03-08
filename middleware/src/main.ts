@@ -34,7 +34,7 @@ import { AllExceptionsFilter } from './modules/common/filters/all-exceptions.fil
 async function bootstrap() {
   // Validate required production environment variables
   if (process.env.NODE_ENV === 'production') {
-    const required = ['API_BASE_URL', 'CORS_ORIGIN', 'DATABASE_URL', 'JWT_SECRET', 'DEVICE_JWT_SECRET'];
+    const required = ['API_BASE_URL', 'CORS_ORIGIN', 'DATABASE_URL', 'JWT_SECRET', 'DEVICE_JWT_SECRET', 'INTERNAL_API_SECRET'];
     const missing = required.filter(key => !process.env[key]);
     if (missing.length > 0) {
       Logger.error(`❌ Missing required production env vars: ${missing.join(', ')}`);
@@ -49,12 +49,14 @@ async function bootstrap() {
   app.useStaticAssets(join(process.cwd(), 'static'), {
     prefix: '/static/',
     maxAge: '7d',
+    etag: true,
   });
 
   // Serve template seed thumbnails
   app.useStaticAssets(join(process.cwd(), 'templates', 'seed'), {
     prefix: '/templates/seed/',
     maxAge: '30d',
+    etag: true,
   });
 
   // NOTE: /uploads/ static route removed for security (H2).
@@ -103,7 +105,7 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
       transform: true,
       transformOptions: {
-        enableImplicitConversion: true,
+        enableImplicitConversion: false,
       },
       // Disable detailed errors in production
       disableErrorMessages: process.env.NODE_ENV === 'production',

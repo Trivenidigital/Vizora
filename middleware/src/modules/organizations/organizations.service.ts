@@ -1,16 +1,20 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ConflictException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { BrandingConfigDto } from './dto/branding-config.dto';
 import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
 import { StorageService } from '../storage/storage.service';
+import { RedisService } from '../redis/redis.service';
 
 @Injectable()
 export class OrganizationsService {
+  private readonly logger = new Logger(OrganizationsService.name);
+
   constructor(
     private readonly db: DatabaseService,
     private readonly storageService: StorageService,
+    private readonly redisService: RedisService,
   ) {}
 
   /**
@@ -18,7 +22,7 @@ export class OrganizationsService {
    * PostgreSQL returns BigInt for storageUsedBytes/storageQuotaBytes,
    * but JSON.stringify cannot handle BigInt values.
    */
-  private sanitizeOrg(org: any) {
+  private sanitizeOrg(org: Record<string, unknown> | null) {
     if (!org) return org;
     return {
       ...org,
@@ -110,7 +114,7 @@ export class OrganizationsService {
 
     // Merge settings with existing to avoid overwriting branding etc.
     const { settings: incomingSettings, ...rest } = updateOrganizationDto;
-    const data: Record<string, any> = { ...rest };
+    const data: Record<string, unknown> = { ...rest };
     if (incomingSettings) {
       const currentSettings = (org.settings as Record<string, unknown>) || {};
       data.settings = { ...currentSettings, ...incomingSettings };
@@ -123,12 +127,48 @@ export class OrganizationsService {
     return this.sanitizeOrg(updated);
   }
 
-  async remove(id: string) {
-    await this.findOne(id);
-    const deleted = await this.db.organization.delete({
-      where: { id },
+  async remove(id: string, requestingUserId?: string) {
+    const org = await this.findOne(id);
+
+    // 1. Collect file URLs and user IDs before deletion
+    const content = await this.db.content.findMany({
+      where: { organizationId: id },
+      select: { id: true, url: true },
     });
-    return this.sanitizeOrg(deleted);
+    const users = await this.db.user.findMany({
+      where: { organizationId: id },
+      select: { id: true },
+    });
+
+    // 2. Cascade delete organization in a transaction (Prisma handles related records)
+    await this.db.$transaction(async (tx) => {
+      await tx.organization.delete({
+        where: { id },
+      });
+    });
+
+    // 3. Clean up MinIO files (after successful DB delete — orphaned files are
+    // safer than deleted files with live DB records)
+    for (const item of content) {
+      if (item.url?.startsWith('minio://')) {
+        const objectKey = item.url.substring('minio://'.length);
+        try {
+          await this.storageService.deleteFile(objectKey);
+        } catch (err) {
+          this.logger.warn(`Failed to delete MinIO object ${objectKey}: ${err}`);
+        }
+      }
+    }
+
+    // 4. Clear Redis cache entries for this org's users
+    for (const user of users) {
+      await this.redisService.del(`user_auth:${user.id}`);
+    }
+
+    // 5. Log the deletion
+    this.logger.log(
+      `Organization ${id} (${org.name}) deleted by user ${requestingUserId ?? 'unknown'}`,
+    );
   }
 
   async getBranding(orgId: string) {

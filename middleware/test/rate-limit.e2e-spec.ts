@@ -49,7 +49,7 @@ describe('Rate Limiting (e2e)', () => {
       forbidNonWhitelisted: true,
       transform: true,
       transformOptions: {
-        enableImplicitConversion: true,
+        enableImplicitConversion: false,
       },
     }));
     app.useGlobalInterceptors(new SanitizeInterceptor());

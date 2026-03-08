@@ -1,4 +1,5 @@
 import { IsString, IsInt, IsOptional, IsBoolean, IsArray, IsDateString, Min, IsIn } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreatePromotionDto {
   @IsString()
@@ -15,6 +16,7 @@ export class CreatePromotionDto {
   @IsIn(['percentage', 'fixed_amount', 'free_months'])
   discountType: string;
 
+  @Type(() => Number)
   @IsInt()
   @Min(0)
   discountValue: number;
@@ -24,16 +26,19 @@ export class CreatePromotionDto {
   @IsIn(['usd', 'inr'])
   currency?: string;
 
+  @Type(() => Number)
   @IsInt()
   @IsOptional()
   @Min(1)
   maxRedemptions?: number;
 
+  @Type(() => Number)
   @IsInt()
   @IsOptional()
   @Min(1)
   maxPerCustomer?: number;
 
+  @Type(() => Number)
   @IsInt()
   @IsOptional()
   @Min(0)
@@ -46,6 +51,7 @@ export class CreatePromotionDto {
   @IsOptional()
   expiresAt?: string;
 
+  @Type(() => Boolean)
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;
@@ -56,5 +62,5 @@ export class CreatePromotionDto {
   applicablePlanIds?: string[];
 
   @IsOptional()
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }

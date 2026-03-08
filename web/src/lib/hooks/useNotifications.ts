@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiClient } from '../api';
+import { devLog } from '@/lib/logger';
 import { useSocket } from './useSocket';
 import { useAuth } from './useAuth';
 import type { AppNotification } from '../types';
@@ -131,7 +132,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
 
     const unsubscribe = on('notification:new', (data: any) => {
       if (process.env.NODE_ENV === 'development') {
-        console.log('[Notifications] Received new notification:', data);
+        devLog('[Notifications] Received new notification:', data);
       }
       // Increment unread count
       setUnreadCount((prev) => prev + 1);

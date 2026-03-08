@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@vizora/database';
 import { DatabaseService } from '../database/database.service';
 import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
 
@@ -18,7 +19,7 @@ export class AuditLogService {
     const { page = 1, limit = 10 } = pagination;
     const skip = (page - 1) * limit;
 
-    const where: any = { organizationId };
+    const where: Prisma.AuditLogWhereInput = { organizationId };
 
     if (filters.action) where.action = filters.action;
     if (filters.entityType) where.entityType = filters.entityType;

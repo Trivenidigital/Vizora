@@ -1,9 +1,3 @@
-/**
- * NOTE: These tests fail because the page component is async (server-component style)
- * but renders as a Client Component in jsdom, producing an empty <div />.
- * This is a known issue tied to the RSC migration deferral.
- * Tests will be fixed when the page is refactored to proper RSC architecture.
- */
 import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
@@ -25,14 +19,6 @@ jest.mock('@/lib/api', () => ({
     updatePlan: jest.fn(),
     deletePlan: jest.fn(),
   },
-}));
-
-// Mock useAuth hook
-jest.mock('@/lib/hooks/useAuth', () => ({
-  useAuth: () => ({
-    user: { id: '1', email: 'admin@test.com', isSuperAdmin: true },
-    loading: false,
-  }),
 }));
 
 // Mock useToast hook
@@ -58,7 +44,18 @@ jest.mock('@/components/ConfirmDialog', () => ({
     ) : null,
 }));
 
-import AdminPlansPage from '../plans/page';
+// Mock PlanForm
+jest.mock('../components/PlanForm', () => ({
+  PlanForm: ({ onSubmit, onCancel, plan, isLoading }: any) => (
+    <div data-testid="plan-form">
+      <button onClick={() => onSubmit({})}>Save Plan</button>
+      <button onClick={onCancel}>Cancel</button>
+    </div>
+  ),
+}));
+
+// Import the Client Component directly (not the async Server Component page)
+import AdminPlansClient from '../plans/page-client';
 import { apiClient } from '@/lib/api';
 
 const mockPlans = [
@@ -110,98 +107,81 @@ describe('AdminPlansPage', () => {
     (apiClient.getAdminPlans as jest.Mock).mockResolvedValue(mockPlans);
   });
 
-  it('renders loading state initially', () => {
-    render(<AdminPlansPage />);
-    expect(document.querySelector('.animate-spin')).toBeInTheDocument();
-  });
+  it('renders plans when provided as initialPlans', () => {
+    render(<AdminPlansClient initialPlans={mockPlans as any} />);
 
-  it('renders plans after loading', async () => {
-    render(<AdminPlansPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Plans')).toBeInTheDocument();
-    });
-
+    expect(screen.getByText('Plans')).toBeInTheDocument();
     expect(screen.getByText('Free')).toBeInTheDocument();
     expect(screen.getByText('Professional')).toBeInTheDocument();
     expect(screen.getByText('Most Popular')).toBeInTheDocument();
   });
 
-  it('displays plan pricing correctly', async () => {
-    render(<AdminPlansPage />);
+  it('displays plan pricing correctly', () => {
+    render(<AdminPlansClient initialPlans={mockPlans as any} />);
 
-    await waitFor(() => {
-      expect(screen.getByText('$29')).toBeInTheDocument();
-    });
-
+    expect(screen.getByText('$29')).toBeInTheDocument();
     expect(screen.getByText('$0')).toBeInTheDocument();
   });
 
-  it('shows create plan button', async () => {
-    render(<AdminPlansPage />);
+  it('shows create plan button', () => {
+    render(<AdminPlansClient initialPlans={mockPlans as any} />);
 
-    await waitFor(() => {
-      expect(screen.getByText('Create Plan')).toBeInTheDocument();
-    });
+    expect(screen.getByText('Create Plan')).toBeInTheDocument();
   });
 
   it('opens create plan form when button clicked', async () => {
-    render(<AdminPlansPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Create Plan')).toBeInTheDocument();
-    });
+    render(<AdminPlansClient initialPlans={mockPlans as any} />);
 
     fireEvent.click(screen.getByText('Create Plan'));
 
     await waitFor(() => {
-      // The form modal should appear
       expect(screen.getByText('Save Plan')).toBeInTheDocument();
     });
   });
 
-  it('displays plan features', async () => {
-    render(<AdminPlansPage />);
+  it('displays plan features', () => {
+    render(<AdminPlansClient initialPlans={mockPlans as any} />);
 
-    await waitFor(() => {
-      expect(screen.getByText('2 screens')).toBeInTheDocument();
-    });
-
+    expect(screen.getByText('2 screens')).toBeInTheDocument();
     expect(screen.getByText('10 screens')).toBeInTheDocument();
   });
 
-  it('shows edit button for each plan', async () => {
-    render(<AdminPlansPage />);
+  it('shows edit button for each plan', () => {
+    render(<AdminPlansClient initialPlans={mockPlans as any} />);
+
+    const editButtons = screen.getAllByText('Edit');
+    expect(editButtons).toHaveLength(2);
+  });
+
+  it('shows active/inactive status badges', () => {
+    render(<AdminPlansClient initialPlans={mockPlans as any} />);
+
+    const activeBadges = screen.getAllByText('Active');
+    expect(activeBadges.length).toBeGreaterThan(0);
+  });
+
+  it('handles empty plans list', () => {
+    render(<AdminPlansClient initialPlans={[]} />);
+
+    expect(screen.getByText('No plans yet')).toBeInTheDocument();
+  });
+
+  it('fetches plans from API when no initialPlans provided', async () => {
+    render(<AdminPlansClient />);
 
     await waitFor(() => {
-      const editButtons = screen.getAllByText('Edit');
-      expect(editButtons).toHaveLength(2);
+      expect(apiClient.getAdminPlans).toHaveBeenCalled();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Free')).toBeInTheDocument();
     });
   });
 
-  it('shows active/inactive status badges', async () => {
-    render(<AdminPlansPage />);
-
-    await waitFor(() => {
-      const activeBadges = screen.getAllByText('Active');
-      expect(activeBadges.length).toBeGreaterThan(0);
-    });
-  });
-
-  it('handles empty plans list', async () => {
-    (apiClient.getAdminPlans as jest.Mock).mockResolvedValue([]);
-
-    render(<AdminPlansPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText('No plans yet')).toBeInTheDocument();
-    });
-  });
-
-  it('handles API error', async () => {
+  it('handles API error when fetching plans', async () => {
     (apiClient.getAdminPlans as jest.Mock).mockRejectedValue(new Error('Failed to load'));
 
-    render(<AdminPlansPage />);
+    render(<AdminPlansClient />);
 
     await waitFor(() => {
       expect(mockToast.error).toHaveBeenCalledWith('Failed to load');

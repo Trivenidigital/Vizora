@@ -47,7 +47,7 @@ export class OrganizationsAdminService {
    * List all organizations with search, pagination, and sorting
    */
   async findAll(filters: OrgFiltersDto): Promise<{
-    data: any[];
+    data: Record<string, unknown>[];
     total: number;
     skip: number;
     take: number;
@@ -179,7 +179,7 @@ export class OrganizationsAdminService {
     }
 
     // Store suspension reason in settings
-    const currentSettings = (org.settings as Record<string, any>) || {};
+    const currentSettings = (org.settings as Record<string, unknown>) || {};
     const updatedSettings = {
       ...currentSettings,
       suspendedAt: new Date().toISOString(),
@@ -209,7 +209,7 @@ export class OrganizationsAdminService {
       throw new BadRequestException('Organization is not suspended');
     }
 
-    const currentSettings = (org.settings as Record<string, any>) || {};
+    const currentSettings = (org.settings as Record<string, unknown>) || {};
     const previousStatus = currentSettings.previousStatus || 'active';
 
     // Clean up suspension info from settings
@@ -290,7 +290,7 @@ export class OrganizationsAdminService {
   async addNote(id: string, note: string, adminUserId: string) {
     const org = await this.findOne(id);
 
-    const currentSettings = (org.settings as Record<string, any>) || {};
+    const currentSettings = (org.settings as Record<string, unknown>) || {};
     const adminNotes = currentSettings.adminNotes || [];
 
     const newNote = {

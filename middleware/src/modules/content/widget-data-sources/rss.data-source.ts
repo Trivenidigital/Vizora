@@ -25,7 +25,7 @@ export class RssDataSource implements WidgetDataSource {
 
   constructor(private readonly circuitBreaker: CircuitBreakerService) {}
 
-  async fetchData(config: Record<string, any>): Promise<Record<string, any>> {
+  async fetchData(config: Record<string, unknown>): Promise<Record<string, unknown>> {
     const feedUrl = config.feedUrl;
     if (!feedUrl) {
       this.logger.warn('No feedUrl provided, returning sample data');
@@ -87,7 +87,7 @@ export class RssDataSource implements WidgetDataSource {
   // Simple XML parsing (regex-based, no extra dependencies)
   // -----------------------------------------------------------------------
 
-  private parseXml(xml: string, maxItems: number): Record<string, any> {
+  private parseXml(xml: string, maxItems: number): Record<string, unknown> {
     // Detect Atom vs RSS
     const isAtom = /<feed[\s>]/i.test(xml);
 
@@ -97,12 +97,12 @@ export class RssDataSource implements WidgetDataSource {
     return this.parseRss(xml, maxItems);
   }
 
-  private parseRss(xml: string, maxItems: number): Record<string, any> {
+  private parseRss(xml: string, maxItems: number): Record<string, unknown> {
     const feedTitle = this.extractTag(xml, 'title') || '';
     const feedDescription = this.extractTag(xml, 'description') || '';
 
     const itemRegex = /<item[\s>]([\s\S]*?)<\/item>/gi;
-    const items: Record<string, any>[] = [];
+    const items: Record<string, unknown>[] = [];
     let match: RegExpExecArray | null;
 
     while ((match = itemRegex.exec(xml)) !== null && items.length < maxItems) {
@@ -129,12 +129,12 @@ export class RssDataSource implements WidgetDataSource {
     return { items, feedTitle, feedDescription };
   }
 
-  private parseAtom(xml: string, maxItems: number): Record<string, any> {
+  private parseAtom(xml: string, maxItems: number): Record<string, unknown> {
     const feedTitle = this.extractTag(xml, 'title') || '';
     const feedDescription = this.extractTag(xml, 'subtitle') || '';
 
     const entryRegex = /<entry[\s>]([\s\S]*?)<\/entry>/gi;
-    const items: Record<string, any>[] = [];
+    const items: Record<string, unknown>[] = [];
     let match: RegExpExecArray | null;
 
     while ((match = entryRegex.exec(xml)) !== null && items.length < maxItems) {
@@ -197,7 +197,7 @@ export class RssDataSource implements WidgetDataSource {
   // Interface methods
   // -----------------------------------------------------------------------
 
-  getConfigSchema(): Record<string, any> {
+  getConfigSchema(): Record<string, unknown> {
     return {
       type: 'object',
       properties: {
@@ -232,7 +232,7 @@ export class RssDataSource implements WidgetDataSource {
     return 'rss-list';
   }
 
-  getSampleData(): Record<string, any> {
+  getSampleData(): Record<string, unknown> {
     return {
       items: [
         {

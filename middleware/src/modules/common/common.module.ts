@@ -1,6 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { CircuitBreakerService } from './services/circuit-breaker.service';
 import { GeoService } from './services/geo.service';
+import { DataRetentionService } from './data-retention.service';
 
 /**
  * Common module providing shared services across the application.
@@ -8,7 +9,7 @@ import { GeoService } from './services/geo.service';
  */
 @Global()
 @Module({
-  providers: [CircuitBreakerService, GeoService],
+  providers: [CircuitBreakerService, GeoService, DataRetentionService],
   exports: [CircuitBreakerService, GeoService],
 })
 export class CommonModule {}

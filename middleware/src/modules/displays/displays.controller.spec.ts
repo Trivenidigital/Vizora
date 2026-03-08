@@ -27,6 +27,8 @@ describe('DisplaysController', () => {
       removeTags: jest.fn(),
       requestScreenshot: jest.fn(),
       getLastScreenshot: jest.fn(),
+      disableDevice: jest.fn(),
+      enableDevice: jest.fn(),
     } as any;
 
     // Mock DatabaseService for QuotaGuard

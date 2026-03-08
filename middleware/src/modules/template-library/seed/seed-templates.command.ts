@@ -46,7 +46,7 @@ function buildThumbnailMap(): Map<string, string[]> {
 /**
  * Compile a Handlebars template with sample data to produce renderedHtml
  */
-function renderWithSampleData(templateHtml: string, sampleData: Record<string, any>): string {
+function renderWithSampleData(templateHtml: string, sampleData: Record<string, unknown>): string {
   try {
     const template = Handlebars.compile(templateHtml, { strict: false, noEscape: true });
     return template(sampleData || {});
@@ -91,7 +91,7 @@ async function main() {
 
       let rendered = 0;
       for (const t of existingTemplates) {
-        const meta = t.metadata as Record<string, any> | null;
+        const meta = t.metadata as Record<string, unknown> | null;
         if (!meta?.templateHtml) continue;
 
         const sampleData = meta.sampleData || {};
@@ -139,7 +139,7 @@ async function main() {
         });
         if (!existing) continue;
 
-        const meta = (existing.metadata as Record<string, any>) || {};
+        const meta = (existing.metadata as Record<string, unknown>) || {};
         await prisma.content.update({
           where: { id: existing.id },
           data: { metadata: { ...meta, previewImageUrl } },

@@ -2,6 +2,8 @@
  * Retry utility for failed API requests
  */
 
+import { devWarn } from './logger';
+
 export interface RetryOptions {
   maxRetries?: number;
   retryDelay?: number;
@@ -45,7 +47,7 @@ export async function withRetry<T>(
         ? opts.retryDelay * Math.pow(2, attempt)
         : opts.retryDelay;
 
-      console.warn(
+      devWarn(
         `Request failed (attempt ${attempt + 1}/${opts.maxRetries + 1}), retrying in ${delay}ms...`,
         error.message
       );

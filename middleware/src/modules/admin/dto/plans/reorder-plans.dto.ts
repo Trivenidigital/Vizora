@@ -5,6 +5,7 @@ class PlanOrderItem {
   @IsString()
   id: string;
 
+  @Type(() => Number)
   @IsInt()
   @Min(0)
   sortOrder: number;

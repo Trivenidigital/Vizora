@@ -1,4 +1,5 @@
 import { IsString, IsOptional, IsBoolean, IsArray, IsDateString, IsIn, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateAnnouncementDto {
   @IsString()
@@ -31,10 +32,12 @@ export class CreateAnnouncementDto {
   @IsOptional()
   expiresAt?: string;
 
+  @Type(() => Boolean)
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;
 
+  @Type(() => Boolean)
   @IsBoolean()
   @IsOptional()
   isDismissible?: boolean;

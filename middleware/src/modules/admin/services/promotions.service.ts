@@ -43,20 +43,34 @@ export class PromotionsService {
   /**
    * Find all promotions
    */
-  async findAll() {
-    return this.db.promotion.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: {
-        applicablePlans: {
-          include: {
-            plan: true,
+  async findAll(pagination?: { page?: number; limit?: number }) {
+    const page = pagination?.page ?? 1;
+    const limit = pagination?.limit ?? 10;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      this.db.promotion.findMany({
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          applicablePlans: {
+            include: {
+              plan: true,
+            },
+          },
+          _count: {
+            select: { redemptions: true },
           },
         },
-        _count: {
-          select: { redemptions: true },
-        },
-      },
-    });
+      }),
+      this.db.promotion.count(),
+    ]);
+
+    return {
+      data,
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
   }
 
   /**
@@ -395,13 +409,28 @@ export class PromotionsService {
   /**
    * Get redemption history for a promotion
    */
-  async getRedemptions(promotionId: string) {
+  async getRedemptions(promotionId: string, pagination?: { page?: number; limit?: number }) {
     await this.findOne(promotionId);
 
-    return this.db.promotionRedemption.findMany({
-      where: { promotionId },
-      orderBy: { redeemedAt: 'desc' },
-    });
+    const page = pagination?.page ?? 1;
+    const limit = pagination?.limit ?? 10;
+    const skip = (page - 1) * limit;
+    const where = { promotionId };
+
+    const [data, total] = await Promise.all([
+      this.db.promotionRedemption.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { redeemedAt: 'desc' },
+      }),
+      this.db.promotionRedemption.count({ where }),
+    ]);
+
+    return {
+      data,
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
   }
 
   /**

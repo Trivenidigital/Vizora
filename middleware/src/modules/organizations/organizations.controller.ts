@@ -12,6 +12,7 @@ import {
   UseGuards,
   UploadedFile,
   UseInterceptors,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { OrganizationsService } from './organizations.service';
@@ -55,7 +56,7 @@ export class OrganizationsController {
   @Get(':id')
   async findOne(
     @CurrentUser('organizationId') userOrgId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     if (userOrgId !== id) {
       throw new ForbiddenException('You can only access your own organization');
@@ -69,7 +70,7 @@ export class OrganizationsController {
   @Roles('admin')
   async update(
     @CurrentUser('organizationId') userOrgId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() updateOrganizationDto: UpdateOrganizationDto,
   ) {
     if (userOrgId !== id) {
@@ -79,17 +80,20 @@ export class OrganizationsController {
   }
 
   // Delete - only allow deleting own organization (and must be admin)
+  // Performs full cleanup: MinIO storage, Redis cache, then cascade delete
   @Delete(':id')
   @UseGuards(RolesGuard)
   @Roles('admin')
   async remove(
     @CurrentUser('organizationId') userOrgId: string,
-    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     if (userOrgId !== id) {
       throw new ForbiddenException('You can only delete your own organization');
     }
-    return this.organizationsService.remove(id);
+    await this.organizationsService.remove(id, userId);
+    return { message: 'Organization deleted successfully' };
   }
 
   // Get branding config for organization
@@ -98,7 +102,7 @@ export class OrganizationsController {
   @Roles('admin', 'manager', 'viewer')
   async getBranding(
     @CurrentUser('organizationId') userOrgId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     if (userOrgId !== id) {
       throw new ForbiddenException('You can only access your own organization');
@@ -112,7 +116,7 @@ export class OrganizationsController {
   @Roles('admin')
   async updateBranding(
     @CurrentUser('organizationId') userOrgId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() brandingDto: BrandingConfigDto,
   ) {
     if (userOrgId !== id) {
@@ -128,7 +132,7 @@ export class OrganizationsController {
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 2 * 1024 * 1024 } }))
   async uploadLogo(
     @CurrentUser('organizationId') userOrgId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
     if (userOrgId !== id) {

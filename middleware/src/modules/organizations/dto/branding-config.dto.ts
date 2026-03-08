@@ -1,4 +1,5 @@
 import { IsString, IsOptional, IsBoolean, IsIn, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class BrandingConfigDto {
   @IsString()
@@ -23,6 +24,7 @@ export class BrandingConfigDto {
   @IsIn(['sans', 'serif', 'mono'])
   fontFamily?: string;
 
+  @Type(() => Boolean)
   @IsBoolean()
   showPoweredBy: boolean;
 

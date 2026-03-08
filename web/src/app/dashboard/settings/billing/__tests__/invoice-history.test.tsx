@@ -184,7 +184,8 @@ describe('InvoiceHistoryPage', () => {
     render(<InvoiceHistoryPage />);
 
     await waitFor(() => {
-      const backLink = screen.getByRole('link', { name: '' }); // The chevron link
+      // Back link uses a chevron icon with no visible text — accessible name is empty
+      const backLink = screen.getByRole('link', { name: '' });
       expect(backLink).toHaveAttribute('href', '/dashboard/settings/billing');
     });
   });
@@ -206,8 +207,8 @@ describe('InvoiceHistoryPage', () => {
       // Check that we have date cells rendered (3 rows)
       const table = screen.getByRole('table');
       expect(table).toBeInTheDocument();
-      // Check at least one date containing year is present
-      expect(screen.getByText(/2026/)).toBeInTheDocument();
+      // Check that dates containing year 2026 are present (multiple matches expected)
+      expect(screen.getAllByText(/2026/).length).toBeGreaterThan(0);
     });
   });
 });

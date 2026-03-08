@@ -6,6 +6,7 @@ import {
   Patch,
   Param,
   UseGuards,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -38,7 +39,7 @@ export class LayoutsController {
   @Roles('admin', 'manager')
   updateLayout(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateLayoutDto,
   ) {
     return this.contentService.updateLayout(organizationId, id, dto);
@@ -48,7 +49,7 @@ export class LayoutsController {
   @Roles('admin', 'manager', 'viewer')
   getResolvedLayout(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.contentService.getResolvedLayout(organizationId, id);
   }

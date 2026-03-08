@@ -32,6 +32,11 @@ import {
 import { MailService } from '../mail/mail.service';
 import { RedisService } from '../redis/redis.service';
 
+/** Webhook event data from Stripe/Razorpay — deeply nested untyped objects */
+interface WebhookData {
+  [key: string]: WebhookData | string | number | boolean | null | undefined;
+}
+
 @Injectable()
 export class BillingService {
   private readonly logger = new Logger(BillingService.name);
@@ -606,7 +611,7 @@ export class BillingService {
   /**
    * Handle subscription updated webhook
    */
-  private async handleSubscriptionUpdated(provider: string, data: any): Promise<void> {
+  private async handleSubscriptionUpdated(provider: string, data: WebhookData): Promise<void> {
     const customerId =
       provider === 'stripe'
         ? typeof data.customer === 'string'
@@ -647,7 +652,7 @@ export class BillingService {
   /**
    * Handle subscription canceled webhook
    */
-  private async handleSubscriptionCanceled(provider: string, data: any): Promise<void> {
+  private async handleSubscriptionCanceled(provider: string, data: WebhookData): Promise<void> {
     const customerId =
       provider === 'stripe'
         ? typeof data.customer === 'string'
@@ -684,7 +689,7 @@ export class BillingService {
   /**
    * Handle payment succeeded webhook
    */
-  private async handlePaymentSucceeded(provider: string, data: any): Promise<void> {
+  private async handlePaymentSucceeded(provider: string, data: WebhookData): Promise<void> {
     const invoiceId = provider === 'stripe' ? data.id : data.invoice?.id;
     const amount = provider === 'stripe' ? data.amount_paid : data.payment?.amount;
     const currency = provider === 'stripe' ? data.currency : data.payment?.currency;
@@ -759,7 +764,7 @@ export class BillingService {
   /**
    * Handle payment failed webhook
    */
-  private async handlePaymentFailed(provider: string, data: any): Promise<void> {
+  private async handlePaymentFailed(provider: string, data: WebhookData): Promise<void> {
     const customerId =
       provider === 'stripe'
         ? typeof data.customer === 'string'
@@ -809,7 +814,7 @@ export class BillingService {
   /**
    * Handle checkout session completed webhook (Stripe)
    */
-  private async handleCheckoutCompleted(provider: string, data: any): Promise<void> {
+  private async handleCheckoutCompleted(provider: string, data: WebhookData): Promise<void> {
     if (provider !== 'stripe') return;
 
     const metadata = data.metadata || {};
