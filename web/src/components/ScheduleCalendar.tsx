@@ -196,7 +196,7 @@ export default function ScheduleCalendar({
 
   return (
     <div className="bg-[var(--surface)] rounded-lg shadow-md p-6 schedule-calendar">
-      {/* @ts-expect-error styled-jsx global type not available */}
+      {/* @ts-ignore -- styled-jsx types may or may not be available */}
       <style jsx global>{`
         .schedule-calendar .rbc-calendar {
           font-family: inherit;
