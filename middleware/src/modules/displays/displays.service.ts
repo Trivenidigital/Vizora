@@ -227,13 +227,20 @@ export class DisplaysService {
   }
 
   async updateHeartbeat(deviceIdentifier: string) {
-    return this.db.display.update({
+    // deviceIdentifier is @unique, and device JWT identity is verified by the controller.
+    // Defense-in-depth: using updateMany with deviceIdentifier ensures no cross-tenant writes
+    // since deviceIdentifier is globally unique (tied to hardware MAC/ID).
+    const result = await this.db.display.updateMany({
       where: { deviceIdentifier },
       data: {
         lastHeartbeat: new Date(),
         status: 'online',
       },
     });
+    if (result.count === 0) {
+      throw new NotFoundException('Device not found');
+    }
+    return { success: true };
   }
 
   async generatePairingToken(organizationId: string, id: string) {

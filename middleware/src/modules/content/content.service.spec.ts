@@ -250,9 +250,10 @@ describe('ContentService', () => {
   describe('update', () => {
     const updateDto = { name: 'Updated Content' };
 
-    it('should update content', async () => {
+    it('should update content with org-scoped where clause', async () => {
       mockDatabaseService.content.findFirst.mockResolvedValue(mockContent);
-      mockDatabaseService.content.update.mockResolvedValue({
+      mockDatabaseService.content.updateMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.content.findUnique.mockResolvedValue({
         ...mockContent,
         ...updateDto,
       });
@@ -260,6 +261,10 @@ describe('ContentService', () => {
       const result = await service.update('org-123', 'content-123', updateDto);
 
       expect(result.name).toBe('Updated Content');
+      expect(mockDatabaseService.content.updateMany).toHaveBeenCalledWith({
+        where: { id: 'content-123', organizationId: 'org-123' },
+        data: updateDto,
+      });
     });
 
     it('should throw NotFoundException if content not found', async () => {
@@ -270,13 +275,16 @@ describe('ContentService', () => {
   });
 
   describe('remove', () => {
-    it('should delete content', async () => {
+    it('should delete content with org-scoped where clause', async () => {
       mockDatabaseService.content.findFirst.mockResolvedValue(mockContent);
-      mockDatabaseService.content.delete.mockResolvedValue(mockContent);
+      mockDatabaseService.content.deleteMany.mockResolvedValue({ count: 1 });
 
       const result = await service.remove('org-123', 'content-123');
 
-      expect(result).toEqual(mockContent);
+      expect(result).toEqual({ count: 1 });
+      expect(mockDatabaseService.content.deleteMany).toHaveBeenCalledWith({
+        where: { id: 'content-123', organizationId: 'org-123' },
+      });
     });
 
     it('should throw NotFoundException if content not found', async () => {
@@ -287,18 +295,19 @@ describe('ContentService', () => {
   });
 
   describe('archive', () => {
-    it('should archive content', async () => {
+    it('should archive content with org-scoped where clause', async () => {
       mockDatabaseService.content.findFirst.mockResolvedValue(mockContent);
-      mockDatabaseService.content.update.mockResolvedValue({
+      mockDatabaseService.content.updateMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.content.findUnique.mockResolvedValue({
         ...mockContent,
         status: 'archived',
       });
 
       const result = await service.archive('org-123', 'content-123');
 
-      expect(result.status).toBe('archived');
-      expect(mockDatabaseService.content.update).toHaveBeenCalledWith({
-        where: { id: 'content-123' },
+      expect(result!.status).toBe('archived');
+      expect(mockDatabaseService.content.updateMany).toHaveBeenCalledWith({
+        where: { id: 'content-123', organizationId: 'org-123' },
         data: { status: 'archived' },
       });
     });
@@ -764,7 +773,8 @@ describe('ContentService', () => {
 
     it('should replace file without backup', async () => {
       mockDatabaseService.content.findFirst.mockResolvedValue(existingContent);
-      mockDatabaseService.content.update.mockResolvedValue({
+      mockDatabaseService.content.updateMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.content.findUnique.mockResolvedValue({
         ...existingContent,
         url: 'https://example.com/new-image.jpg',
         versionNumber: 2,
@@ -777,8 +787,8 @@ describe('ContentService', () => {
       );
 
       expect(result.url).toBe('https://example.com/new-image.jpg');
-      expect(mockDatabaseService.content.update).toHaveBeenCalledWith({
-        where: { id: 'content-123' },
+      expect(mockDatabaseService.content.updateMany).toHaveBeenCalledWith({
+        where: { id: 'content-123', organizationId: 'org-123' },
         data: expect.objectContaining({
           url: 'https://example.com/new-image.jpg',
           versionNumber: 2,
@@ -816,7 +826,8 @@ describe('ContentService', () => {
 
     it('should update name when provided', async () => {
       mockDatabaseService.content.findFirst.mockResolvedValue(existingContent);
-      mockDatabaseService.content.update.mockResolvedValue({
+      mockDatabaseService.content.updateMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.content.findUnique.mockResolvedValue({
         ...existingContent,
         name: 'New Name',
         url: 'https://example.com/new-image.jpg',
@@ -829,8 +840,8 @@ describe('ContentService', () => {
         { name: 'New Name' },
       );
 
-      expect(mockDatabaseService.content.update).toHaveBeenCalledWith({
-        where: { id: 'content-123' },
+      expect(mockDatabaseService.content.updateMany).toHaveBeenCalledWith({
+        where: { id: 'content-123', organizationId: 'org-123' },
         data: expect.objectContaining({
           name: 'New Name',
         }),
@@ -839,7 +850,8 @@ describe('ContentService', () => {
 
     it('should update thumbnail for image files', async () => {
       mockDatabaseService.content.findFirst.mockResolvedValue(existingContent);
-      mockDatabaseService.content.update.mockResolvedValue({
+      mockDatabaseService.content.updateMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.content.findUnique.mockResolvedValue({
         ...existingContent,
         thumbnail: 'https://example.com/thumb.jpg',
       });
@@ -851,8 +863,8 @@ describe('ContentService', () => {
         { thumbnail: 'https://example.com/thumb.jpg' },
       );
 
-      expect(mockDatabaseService.content.update).toHaveBeenCalledWith({
-        where: { id: 'content-123' },
+      expect(mockDatabaseService.content.updateMany).toHaveBeenCalledWith({
+        where: { id: 'content-123', organizationId: 'org-123' },
         data: expect.objectContaining({
           thumbnail: 'https://example.com/thumb.jpg',
         }),
@@ -869,7 +881,8 @@ describe('ContentService', () => {
 
     it('should update file metadata', async () => {
       mockDatabaseService.content.findFirst.mockResolvedValue(existingContent);
-      mockDatabaseService.content.update.mockResolvedValue(existingContent);
+      mockDatabaseService.content.updateMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.content.findUnique.mockResolvedValue(existingContent);
 
       await service.replaceFile(
         'org-123',
@@ -878,8 +891,8 @@ describe('ContentService', () => {
         { fileSize: 2048, mimeType: 'image/png' },
       );
 
-      expect(mockDatabaseService.content.update).toHaveBeenCalledWith({
-        where: { id: 'content-123' },
+      expect(mockDatabaseService.content.updateMany).toHaveBeenCalledWith({
+        where: { id: 'content-123', organizationId: 'org-123' },
         data: expect.objectContaining({
           fileSize: 2048,
           mimeType: 'image/png',
@@ -934,19 +947,20 @@ describe('ContentService', () => {
   });
 
   describe('restore', () => {
-    it('should restore archived content to active', async () => {
+    it('should restore archived content with org-scoped where clause', async () => {
       const archivedContent = { ...mockContent, status: 'archived' };
       mockDatabaseService.content.findFirst.mockResolvedValue(archivedContent);
-      mockDatabaseService.content.update.mockResolvedValue({
+      mockDatabaseService.content.updateMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.content.findUnique.mockResolvedValue({
         ...archivedContent,
         status: 'active',
       });
 
       const result = await service.restore('org-123', 'content-123');
 
-      expect(result.status).toBe('active');
-      expect(mockDatabaseService.content.update).toHaveBeenCalledWith({
-        where: { id: 'content-123' },
+      expect(result!.status).toBe('active');
+      expect(mockDatabaseService.content.updateMany).toHaveBeenCalledWith({
+        where: { id: 'content-123', organizationId: 'org-123' },
         data: { status: 'active' },
       });
     });

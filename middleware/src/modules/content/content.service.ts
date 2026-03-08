@@ -176,12 +176,17 @@ export class ContentService {
   async update(organizationId: string, id: string, updateContentDto: UpdateContentDto) {
     await this.findOne(organizationId, id);
 
-    const content = await this.db.content.update({
-      where: { id },
+    // Defense-in-depth: include organizationId in where clause to prevent TOCTOU races
+    const result = await this.db.content.updateMany({
+      where: { id, organizationId },
       data: updateContentDto,
     });
+    if (result.count === 0) {
+      throw new NotFoundException('Content not found');
+    }
+    const content = await this.db.content.findUnique({ where: { id } });
     this.eventEmitter.emit('content.updated', { action: 'updated', entityType: 'content', entityId: id, organizationId });
-    return this.mapContentResponse(content);
+    return this.mapContentResponse(content!);
   }
 
   async remove(organizationId: string, id: string) {
@@ -204,8 +209,9 @@ export class ContentService {
       }
     }
 
-    const deleted = await this.db.content.delete({
-      where: { id },
+    // Defense-in-depth: include organizationId in where clause to prevent TOCTOU races
+    const deleted = await this.db.content.deleteMany({
+      where: { id, organizationId },
     });
 
     // Decrement storage usage if the content had a file size
@@ -219,18 +225,28 @@ export class ContentService {
 
   async archive(organizationId: string, id: string) {
     await this.findOne(organizationId, id);
-    return this.db.content.update({
-      where: { id },
+    // Defense-in-depth: include organizationId in where clause to prevent TOCTOU races
+    const result = await this.db.content.updateMany({
+      where: { id, organizationId },
       data: { status: 'archived' },
     });
+    if (result.count === 0) {
+      throw new NotFoundException('Content not found');
+    }
+    return this.db.content.findUnique({ where: { id } });
   }
 
   async restore(organizationId: string, id: string) {
     await this.findOne(organizationId, id);
-    return this.db.content.update({
-      where: { id },
+    // Defense-in-depth: include organizationId in where clause to prevent TOCTOU races
+    const result = await this.db.content.updateMany({
+      where: { id, organizationId },
       data: { status: 'active' },
     });
+    if (result.count === 0) {
+      throw new NotFoundException('Content not found');
+    }
+    return this.db.content.findUnique({ where: { id } });
   }
 
   // ============================================================================
@@ -266,6 +282,10 @@ export class ContentService {
           },
         });
 
+        // Defense-in-depth: verify org ownership inside transaction
+        const verified = await tx.content.findFirst({ where: { id, organizationId } });
+        if (!verified) throw new NotFoundException('Content not found');
+
         return tx.content.update({
           where: { id },
           data: {
@@ -284,9 +304,9 @@ export class ContentService {
       return this.mapContentResponse(updatedContent);
     }
 
-    // Simple replacement without backup
-    const updatedContent = await this.db.content.update({
-      where: { id },
+    // Simple replacement without backup — defense-in-depth org scoping
+    const result = await this.db.content.updateMany({
+      where: { id, organizationId },
       data: {
         url: newUrl,
         name: options.name || existingContent.name,
@@ -297,6 +317,10 @@ export class ContentService {
         updatedAt: new Date(),
       },
     });
+    if (result.count === 0) {
+      throw new NotFoundException('Content not found');
+    }
+    const updatedContent = await this.db.content.findUnique({ where: { id } });
 
     return this.mapContentResponse(updatedContent);
   }

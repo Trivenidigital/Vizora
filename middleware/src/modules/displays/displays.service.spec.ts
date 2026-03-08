@@ -44,6 +44,7 @@ describe('DisplaysService', () => {
         findFirst: jest.fn(),
         count: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
         delete: jest.fn(),
       },
     };
@@ -360,23 +361,26 @@ describe('DisplaysService', () => {
 
   describe('updateHeartbeat', () => {
     it('should update display heartbeat and status to online', async () => {
-      const updatedDisplay = {
-        ...mockDisplay,
-        lastHeartbeat: new Date(),
-        status: 'online',
-      };
-      databaseService.display.update.mockResolvedValue(updatedDisplay);
+      databaseService.display.updateMany.mockResolvedValue({ count: 1 });
 
       const result = await service.updateHeartbeat(mockDeviceIdentifier);
 
-      expect(databaseService.display.update).toHaveBeenCalledWith({
+      expect(databaseService.display.updateMany).toHaveBeenCalledWith({
         where: { deviceIdentifier: mockDeviceIdentifier },
         data: {
           lastHeartbeat: expect.any(Date),
           status: 'online',
         },
       });
-      expect(result.status).toBe('online');
+      expect(result.success).toBe(true);
+    });
+
+    it('should throw NotFoundException if device not found', async () => {
+      databaseService.display.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.updateHeartbeat('unknown-device')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
