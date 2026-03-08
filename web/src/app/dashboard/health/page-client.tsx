@@ -101,7 +101,7 @@ export default function HealthMonitoringClient() {
  // Filter devices
  const filteredDevices = devices.filter(d =>
  !debouncedSearch ||
- d.nickname.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+ (d.nickname || '').toLowerCase().includes(debouncedSearch.toLowerCase()) ||
  (d.location && d.location.toLowerCase().includes(debouncedSearch.toLowerCase()))
  );
 

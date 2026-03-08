@@ -103,7 +103,9 @@ export default function TemplateDetailPage() {
       const data = await apiClient.getTemplatePreview(templateId);
       setPreviewHtml(data.html || null);
     } catch (err: any) {
-      console.error('[TemplateDetail] Failed to load preview:', err);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[TemplateDetail] Failed to load preview:', err);
+      }
     } finally {
       setPreviewLoading(false);
     }

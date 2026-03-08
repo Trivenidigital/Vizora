@@ -27,7 +27,9 @@ export function SupportDashboardClient() {
       setStats(data);
     } catch (error: any) {
       // Stats are non-critical, don't show error toast
-      console.error('Failed to load support stats:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Failed to load support stats:', error);
+      }
     }
   }, []);
 

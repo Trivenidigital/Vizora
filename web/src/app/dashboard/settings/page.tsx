@@ -48,7 +48,9 @@ export default function SettingsPage() {
          notifications: orgSettings.notifications ?? prev.notifications,
        }));
      } catch (err) {
-       console.error('Failed to load settings:', err);
+       if (process.env.NODE_ENV === 'development') {
+         console.error('Failed to load settings:', err);
+       }
      }
    }
    loadSettings();

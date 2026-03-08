@@ -149,7 +149,7 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  const response = await apiClient.getPlaylists();
  setPlaylists(response.data || response || []);
  } catch (error) {
- // Silent fail
+ toast.error('Failed to load playlists');
  }
  };
 
@@ -164,7 +164,7 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  deviceIds: g.displays?.map((d: any) => d.displayId) || [],
  })));
  } catch (error) {
- // Silent fail
+ toast.error('Failed to load device groups');
  }
  };
 
@@ -366,7 +366,7 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  const filteredAndSortedDevices = devices
  .filter(d =>
  !debouncedSearch ||
- d.nickname.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+ (d.nickname || '').toLowerCase().includes(debouncedSearch.toLowerCase()) ||
  (d.location && d.location.toLowerCase().includes(debouncedSearch.toLowerCase()))
  )
  .sort((a, b) => {

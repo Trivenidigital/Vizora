@@ -148,7 +148,9 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  buildRecentActivity(content, playlists);
  setError(null);
  } catch (error) {
- console.error('Failed to load stats:', error);
+ if (process.env.NODE_ENV === 'development') {
+  console.error('Failed to load stats:', error);
+ }
  setError(error instanceof Error ? error.message : 'Failed to load dashboard data');
  } finally {
  setLoading(false);

@@ -213,7 +213,7 @@ export default function PlaylistsClient() {
  const response = await apiClient.getContent();
  setContent(response.data || response || []);
  } catch (error) {
- // Silent fail
+ toast.error('Failed to load content');
  }
  };
 
@@ -222,7 +222,7 @@ export default function PlaylistsClient() {
  const response = await apiClient.getDisplays();
  setDevices(response.data || response || []);
  } catch (error) {
- // Silent fail
+ toast.error('Failed to load devices');
  }
  };
 

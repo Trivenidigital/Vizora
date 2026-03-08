@@ -121,7 +121,9 @@ export default function TemplateLibraryPage() {
       const data = await apiClient.getTemplateCategories();
       setCategories(data || []);
     } catch (err: any) {
-      console.error('[Templates] Failed to load categories:', err);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[Templates] Failed to load categories:', err);
+      }
     }
   };
 
@@ -130,7 +132,9 @@ export default function TemplateLibraryPage() {
       const data = await apiClient.getFeaturedTemplates();
       setFeaturedTemplates(data || []);
     } catch (err: any) {
-      console.error('[Templates] Failed to load featured:', err);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[Templates] Failed to load featured:', err);
+      }
     }
   };
 
@@ -139,7 +143,9 @@ export default function TemplateLibraryPage() {
       const data = await apiClient.getPopularTemplates();
       setPopularTemplates((data || []).slice(0, 8));
     } catch (err: any) {
-      console.error('[Templates] Failed to load popular:', err);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[Templates] Failed to load popular:', err);
+      }
     }
   };
 

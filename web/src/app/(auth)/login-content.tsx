@@ -61,7 +61,9 @@ export default function LoginContent() {
       }
       window.location.href = redirectUrl;
     } catch (err: unknown) {
-      console.error('[LOGIN] Login error:', err);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[LOGIN] Login error:', err);
+      }
       const message = err instanceof Error ? err.message : 'Login failed';
       if (message.toLowerCase().includes('locked')) {
         setError('Account temporarily locked. Please try again in 15 minutes.');

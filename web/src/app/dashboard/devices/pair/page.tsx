@@ -57,7 +57,9 @@ export default function PairDevicePage() {
  }, 1500);
  
  } catch (error: any) {
- console.error('Pairing error:', error);
+ if (process.env.NODE_ENV === 'development') {
+  console.error('Pairing error:', error);
+ }
  toast.error(error.message || 'Failed to pair device. Please check the code and try again.');
  } finally {
  setLoading(false);

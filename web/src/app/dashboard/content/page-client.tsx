@@ -195,7 +195,9 @@ export default function ContentClient() {
  const folderList = await apiClient.getFolders({ format: 'tree' });
  setFolders(folderList || []);
  } catch (error: any) {
- console.error('[ContentPage] Failed to load folders:', error);
+ if (process.env.NODE_ENV === 'development') {
+  console.error('[ContentPage] Failed to load folders:', error);
+ }
  }
  };
 
@@ -247,7 +249,9 @@ export default function ContentClient() {
  const response = await apiClient.getDisplays();
  setDevices(response.data || response || []);
  } catch (error: any) {
- console.error('[ContentPage] Failed to load devices:', error);
+ if (process.env.NODE_ENV === 'development') {
+  console.error('[ContentPage] Failed to load devices:', error);
+ }
  // Non-critical: devices are optional for content listing
  if (process.env.NODE_ENV === 'development') {
  toast.warning('Could not load devices list');
@@ -260,7 +264,9 @@ export default function ContentClient() {
  const response = await apiClient.getPlaylists();
  setPlaylists(response.data || response || []);
  } catch (error: any) {
- console.error('[ContentPage] Failed to load playlists:', error);
+ if (process.env.NODE_ENV === 'development') {
+  console.error('[ContentPage] Failed to load playlists:', error);
+ }
  // Non-critical: playlists are optional for content listing
  if (process.env.NODE_ENV === 'development') {
  toast.warning('Could not load playlists list');

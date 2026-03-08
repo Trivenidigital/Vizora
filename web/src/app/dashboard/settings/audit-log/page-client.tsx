@@ -88,7 +88,9 @@ export default function AuditLogClient() {
  const response = await apiClient.getUsers({ limit: 100 });
  setFilterUsers(response.data || []);
  } catch (error: any) {
- console.error('Failed to load users for filter:', error);
+ if (process.env.NODE_ENV === 'development') {
+  console.error('Failed to load users for filter:', error);
+ }
  }
  };
 

@@ -90,8 +90,11 @@ export function DeviceStatusProvider({ children, user }: DeviceStatusProviderPro
     if (!isConnected) return;
 
     const unsubscribe = on('device:status', (data: DeviceStatusUpdate) => {
-      deviceStatusesRef.current = { ...deviceStatusesRef.current, [data.deviceId]: data };
-      setDeviceStatuses(deviceStatusesRef.current);
+      setDeviceStatuses(prev => {
+        const next = { ...prev, [data.deviceId]: data };
+        deviceStatusesRef.current = next;
+        return next;
+      });
 
       // Notify subscribers outside state setter to avoid side-effect anti-pattern
       const subs = subscribersRef.current[data.deviceId];
@@ -108,12 +111,14 @@ export function DeviceStatusProvider({ children, user }: DeviceStatusProviderPro
     if (!isConnected) return;
 
     const unsubscribe = on('device:status:batch', (data: DeviceStatusUpdate[]) => {
-      const updated = { ...deviceStatusesRef.current };
-      data.forEach(update => {
-        updated[update.deviceId] = update;
+      setDeviceStatuses(prev => {
+        const updated = { ...prev };
+        data.forEach(update => {
+          updated[update.deviceId] = update;
+        });
+        deviceStatusesRef.current = updated;
+        return updated;
       });
-      deviceStatusesRef.current = updated;
-      setDeviceStatuses(updated);
 
       // Notify subscribers outside state setter to avoid side-effect anti-pattern
       data.forEach(update => {
@@ -145,22 +150,25 @@ export function DeviceStatusProvider({ children, user }: DeviceStatusProviderPro
     });
   };
 
-  const updateDeviceStatus = (deviceId: string, status: DeviceStatus) => {
+  const updateDeviceStatus = useCallback((deviceId: string, status: DeviceStatus) => {
     const update: DeviceStatusUpdate = {
       deviceId,
       status,
       timestamp: Date.now(),
     };
 
-    deviceStatusesRef.current = { ...deviceStatusesRef.current, [deviceId]: update };
-    setDeviceStatuses(deviceStatusesRef.current);
+    setDeviceStatuses(prev => {
+      const next = { ...prev, [deviceId]: update };
+      deviceStatusesRef.current = next;
+      return next;
+    });
 
     // Notify subscribers
     const subs = subscribersRef.current[deviceId];
     if (subs) {
       subs.forEach(callback => callback(update));
     }
-  };
+  }, []);
 
   const getDeviceStatus = (deviceId: string) => {
     return deviceStatuses[deviceId];
