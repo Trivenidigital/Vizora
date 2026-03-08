@@ -304,7 +304,7 @@ export class PlaylistsService {
     }
 
     const updatedItem = await this.db.playlistItem.findFirst({
-      where: { id: itemId },
+      where: { id: itemId, playlistId },
       include: { content: true },
     });
 

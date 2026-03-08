@@ -980,15 +980,16 @@ describe('ContentService', () => {
     it('should set expiration date', async () => {
       const expiresAt = new Date('2025-12-31');
       mockDatabaseService.content.findFirst.mockResolvedValue(mockContent);
-      mockDatabaseService.content.update.mockResolvedValue({
+      mockDatabaseService.content.updateMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.content.findUnique.mockResolvedValue({
         ...mockContent,
         expiresAt,
       });
 
       const result = await service.setExpiration('org-123', 'content-123', expiresAt);
 
-      expect(mockDatabaseService.content.update).toHaveBeenCalledWith({
-        where: { id: 'content-123' },
+      expect(mockDatabaseService.content.updateMany).toHaveBeenCalledWith({
+        where: { id: 'content-123', organizationId: 'org-123' },
         data: {
           expiresAt,
           replacementContentId: undefined,
@@ -1002,7 +1003,8 @@ describe('ContentService', () => {
       mockDatabaseService.content.findFirst
         .mockResolvedValueOnce(mockContent) // findOne for main content
         .mockResolvedValueOnce(replacementContent); // findFirst for replacement
-      mockDatabaseService.content.update.mockResolvedValue({
+      mockDatabaseService.content.updateMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.content.findUnique.mockResolvedValue({
         ...mockContent,
         expiresAt,
         replacementContentId: 'replacement-123',
@@ -1015,8 +1017,8 @@ describe('ContentService', () => {
         'replacement-123',
       );
 
-      expect(mockDatabaseService.content.update).toHaveBeenCalledWith({
-        where: { id: 'content-123' },
+      expect(mockDatabaseService.content.updateMany).toHaveBeenCalledWith({
+        where: { id: 'content-123', organizationId: 'org-123' },
         data: {
           expiresAt,
           replacementContentId: 'replacement-123',
@@ -1052,7 +1054,8 @@ describe('ContentService', () => {
         replacementContentId: 'replacement-123',
       };
       mockDatabaseService.content.findFirst.mockResolvedValue(contentWithExpiration);
-      mockDatabaseService.content.update.mockResolvedValue({
+      mockDatabaseService.content.updateMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.content.findUnique.mockResolvedValue({
         ...mockContent,
         expiresAt: null,
         replacementContentId: null,
@@ -1060,8 +1063,8 @@ describe('ContentService', () => {
 
       const result = await service.clearExpiration('org-123', 'content-123');
 
-      expect(mockDatabaseService.content.update).toHaveBeenCalledWith({
-        where: { id: 'content-123' },
+      expect(mockDatabaseService.content.updateMany).toHaveBeenCalledWith({
+        where: { id: 'content-123', organizationId: 'org-123' },
         data: {
           expiresAt: null,
           replacementContentId: null,

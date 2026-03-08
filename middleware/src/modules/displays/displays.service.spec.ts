@@ -48,6 +48,7 @@ describe('DisplaysService', () => {
         update: jest.fn(),
         updateMany: jest.fn(),
         delete: jest.fn(),
+        deleteMany: jest.fn(),
       },
     };
 
@@ -290,7 +291,8 @@ describe('DisplaysService', () => {
       };
 
       databaseService.display.findFirst.mockResolvedValue(mockDisplayWithRelations);
-      databaseService.display.update.mockResolvedValue({
+      databaseService.display.updateMany.mockResolvedValue({ count: 1 });
+      databaseService.display.findUnique.mockResolvedValue({
         ...mockDisplay,
         nickname: 'Updated Display',
         orientation: 'portrait',
@@ -299,8 +301,8 @@ describe('DisplaysService', () => {
       const result = await service.update(mockOrganizationId, mockDisplayId, updateDto);
 
       expect(databaseService.display.findFirst).toHaveBeenCalled();
-      expect(databaseService.display.update).toHaveBeenCalledWith({
-        where: { id: mockDisplayId },
+      expect(databaseService.display.updateMany).toHaveBeenCalledWith({
+        where: { id: mockDisplayId, organizationId: mockOrganizationId },
         data: {
           orientation: 'portrait',
           nickname: 'Updated Display',
@@ -316,7 +318,7 @@ describe('DisplaysService', () => {
         service.update(mockOrganizationId, mockDisplayId, {})
       ).rejects.toThrow(NotFoundException);
 
-      expect(databaseService.display.update).not.toHaveBeenCalled();
+      expect(databaseService.display.updateMany).not.toHaveBeenCalled();
     });
 
     it('should throw ConflictException if new deviceId already exists', async () => {
@@ -332,7 +334,7 @@ describe('DisplaysService', () => {
         service.update(mockOrganizationId, mockDisplayId, updateDto)
       ).rejects.toThrow(ConflictException);
 
-      expect(databaseService.display.update).not.toHaveBeenCalled();
+      expect(databaseService.display.updateMany).not.toHaveBeenCalled();
     });
 
     it('should allow updating deviceId if not conflicting', async () => {
@@ -344,15 +346,16 @@ describe('DisplaysService', () => {
         .mockResolvedValueOnce(mockDisplayWithRelations) // For findOne check
         .mockResolvedValueOnce(null); // No conflict
 
-      databaseService.display.update.mockResolvedValue({
+      databaseService.display.updateMany.mockResolvedValue({ count: 1 });
+      databaseService.display.findUnique.mockResolvedValue({
         ...mockDisplay,
         deviceIdentifier: 'new-device-id',
       });
 
       const result = await service.update(mockOrganizationId, mockDisplayId, updateDto);
 
-      expect(databaseService.display.update).toHaveBeenCalledWith({
-        where: { id: mockDisplayId },
+      expect(databaseService.display.updateMany).toHaveBeenCalledWith({
+        where: { id: mockDisplayId, organizationId: mockOrganizationId },
         data: {
           deviceIdentifier: 'new-device-id',
         },
@@ -396,15 +399,15 @@ describe('DisplaysService', () => {
 
     it('should delete a display successfully', async () => {
       databaseService.display.findFirst.mockResolvedValue(mockDisplayWithRelations);
-      databaseService.display.delete.mockResolvedValue(mockDisplay);
+      databaseService.display.deleteMany.mockResolvedValue({ count: 1 });
 
       const result = await service.remove(mockOrganizationId, mockDisplayId);
 
       expect(databaseService.display.findFirst).toHaveBeenCalled();
-      expect(databaseService.display.delete).toHaveBeenCalledWith({
-        where: { id: mockDisplayId },
+      expect(databaseService.display.deleteMany).toHaveBeenCalledWith({
+        where: { id: mockDisplayId, organizationId: mockOrganizationId },
       });
-      expect(result).toEqual(mockDisplay);
+      expect(result).toEqual({ id: mockDisplayId });
     });
 
     it('should throw NotFoundException if display not found', async () => {
@@ -414,7 +417,7 @@ describe('DisplaysService', () => {
         service.remove(mockOrganizationId, mockDisplayId)
       ).rejects.toThrow(NotFoundException);
 
-      expect(databaseService.display.delete).not.toHaveBeenCalled();
+      expect(databaseService.display.deleteMany).not.toHaveBeenCalled();
     });
   });
 

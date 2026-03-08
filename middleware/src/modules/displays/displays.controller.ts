@@ -174,16 +174,6 @@ export class DisplaysController {
     return this.displaysService.removeTags(organizationId, id, dto.tagIds);
   }
 
-  @Delete(':id/tags')
-  @Roles('admin')
-  deleteTagsFromDisplay(
-    @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: RemoveTagsDto,
-  ) {
-    return this.displaysService.removeTags(organizationId, id, dto.tagIds);
-  }
-
   @Post(':id/disable')
   @Roles('admin')
   async disableDevice(

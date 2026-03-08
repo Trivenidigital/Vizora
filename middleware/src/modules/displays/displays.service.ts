@@ -181,15 +181,21 @@ export class DisplaysService {
       }
     }
 
-    const updatedDisplay = await this.db.display.update({
-      where: { id },
-      data: {
-        ...rest,
-        ...(deviceId && { deviceIdentifier: deviceId }),
-        ...(name && { nickname: name }),
-        ...(currentPlaylistId !== undefined && { currentPlaylistId }),
-      },
+    // Defense-in-depth: include organizationId in where clause to prevent TOCTOU races
+    const updateData = {
+      ...rest,
+      ...(deviceId && { deviceIdentifier: deviceId }),
+      ...(name && { nickname: name }),
+      ...(currentPlaylistId !== undefined && { currentPlaylistId }),
+    };
+    const updateResult = await this.db.display.updateMany({
+      where: { id, organizationId },
+      data: updateData,
     });
+    if (updateResult.count === 0) {
+      throw new NotFoundException('Display not found');
+    }
+    const updatedDisplay = await this.db.display.findUnique({ where: { id } });
 
     // If playlist was updated, notify the realtime service to push update to device
     // Fire-and-forget - don't block the response if realtime service is down
@@ -280,15 +286,18 @@ export class DisplaysService {
     // If database is compromised, attacker cannot use the hashed tokens
     const hashedToken = hashToken(pairingToken);
 
-    // Update display with hashed token
-    await this.db.display.update({
-      where: { id },
+    // Defense-in-depth: include organizationId in where clause to prevent TOCTOU races
+    const pairingResult = await this.db.display.updateMany({
+      where: { id, organizationId },
       data: {
         jwtToken: hashedToken, // Store hash, not plaintext
         pairedAt: new Date(),
         status: 'pairing',
       },
     });
+    if (pairingResult.count === 0) {
+      throw new NotFoundException('Display not found');
+    }
 
     // Return the actual token to the client (only time it's available)
     return {
@@ -301,11 +310,15 @@ export class DisplaysService {
 
   async remove(organizationId: string, id: string) {
     await this.findOne(organizationId, id);
-    const deleted = await this.db.display.delete({
-      where: { id },
+    // Defense-in-depth: include organizationId in where clause to prevent TOCTOU races
+    const result = await this.db.display.deleteMany({
+      where: { id, organizationId },
     });
+    if (result.count === 0) {
+      throw new NotFoundException('Display not found');
+    }
     this.emitDisplayEvent('deleted', id, organizationId);
-    return deleted;
+    return { id };
   }
 
   async getTags(organizationId: string, displayId: string) {
@@ -615,17 +628,14 @@ export class DisplaysService {
   }
 
   async disableDevice(id: string, organizationId: string) {
-    const display = await this.db.display.findFirst({
+    // Defense-in-depth: org-scoped write prevents TOCTOU races
+    const result = await this.db.display.updateMany({
       where: { id, organizationId },
-    });
-    if (!display) {
-      throw new NotFoundException('Display not found');
-    }
-
-    await this.db.display.update({
-      where: { id },
       data: { isDisabled: true },
     });
+    if (result.count === 0) {
+      throw new NotFoundException('Display not found');
+    }
 
     // Send disable command to device via realtime gateway (fire-and-forget)
     this.sendDeviceCommand(id, 'disable').catch((error) => {
@@ -637,17 +647,14 @@ export class DisplaysService {
   }
 
   async enableDevice(id: string, organizationId: string) {
-    const display = await this.db.display.findFirst({
+    // Defense-in-depth: org-scoped write prevents TOCTOU races
+    const result = await this.db.display.updateMany({
       where: { id, organizationId },
-    });
-    if (!display) {
-      throw new NotFoundException('Display not found');
-    }
-
-    await this.db.display.update({
-      where: { id },
       data: { isDisabled: false },
     });
+    if (result.count === 0) {
+      throw new NotFoundException('Display not found');
+    }
 
     // Send enable command to device via realtime gateway (fire-and-forget)
     this.sendDeviceCommand(id, 'enable').catch((error) => {
@@ -701,10 +708,15 @@ export class DisplaysService {
       label: dto.label,
     };
 
-    return this.db.display.update({
-      where: { id },
+    // Defense-in-depth: include organizationId to prevent TOCTOU races
+    const result = await this.db.display.updateMany({
+      where: { id, organizationId },
       data: { metadata: metadata as Prisma.InputJsonValue },
     });
+    if (result.count === 0) {
+      throw new NotFoundException('Display not found');
+    }
+    return this.db.display.findUnique({ where: { id } });
   }
 
   async removeQrOverlay(organizationId: string, id: string) {
@@ -712,9 +724,14 @@ export class DisplaysService {
     const metadata = (display.metadata as Record<string, unknown>) || {};
     delete metadata.qrOverlay;
 
-    return this.db.display.update({
-      where: { id },
+    // Defense-in-depth: include organizationId to prevent TOCTOU races
+    const result = await this.db.display.updateMany({
+      where: { id, organizationId },
       data: { metadata: metadata as Prisma.InputJsonValue },
     });
+    if (result.count === 0) {
+      throw new NotFoundException('Display not found');
+    }
+    return this.db.display.findUnique({ where: { id } });
   }
 }

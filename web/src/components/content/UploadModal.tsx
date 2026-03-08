@@ -76,8 +76,10 @@ export function UploadModal({ isOpen, onClose, onUpload }: UploadModalProps) {
       setUploadForm({ title: '', type: 'image', url: '' });
       setUploadQueue([]);
       onClose();
-    } catch (error) {
-      console.error('Upload failed:', error);
+    } catch (error: any) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Upload failed:', error);
+      }
     } finally {
       setActionLoading(false);
     }

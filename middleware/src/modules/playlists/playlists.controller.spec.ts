@@ -3,6 +3,7 @@ import { PlaylistsController } from './playlists.controller';
 import { PlaylistsService } from './playlists.service';
 import { SubscriptionActiveGuard } from '../billing/guards/subscription-active.guard';
 import { DatabaseService } from '../database/database.service';
+import { AddPlaylistItemDto } from './dto/add-playlist-item.dto';
 
 describe('PlaylistsController', () => {
   let controller: PlaylistsController;
@@ -128,8 +129,7 @@ describe('PlaylistsController', () => {
       const result = await controller.addItem(
         organizationId,
         'playlist-123',
-        'content-456',
-        10,
+        { contentId: 'content-456', duration: 10 } as AddPlaylistItemDto,
       );
 
       expect(result).toEqual(expectedResult);
@@ -144,7 +144,7 @@ describe('PlaylistsController', () => {
     it('should add item without duration', async () => {
       mockPlaylistsService.addItem.mockResolvedValue({ id: 'item-123' } as any);
 
-      await controller.addItem(organizationId, 'playlist-123', 'content-456', undefined);
+      await controller.addItem(organizationId, 'playlist-123', { contentId: 'content-456' } as AddPlaylistItemDto);
 
       expect(mockPlaylistsService.addItem).toHaveBeenCalledWith(
         organizationId,

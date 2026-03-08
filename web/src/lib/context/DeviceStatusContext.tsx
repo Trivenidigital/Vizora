@@ -132,7 +132,7 @@ export function DeviceStatusProvider({ children, user }: DeviceStatusProviderPro
     return unsubscribe;
   }, [isConnected, on]);
 
-  const initializeDeviceStatuses = (updates: DeviceStatusUpdate[]) => {
+  const initializeDeviceStatuses = useCallback((updates: DeviceStatusUpdate[]) => {
     const statusMap: Record<string, DeviceStatusUpdate> = {};
     updates.forEach(update => {
       statusMap[update.deviceId] = update;
@@ -148,7 +148,7 @@ export function DeviceStatusProvider({ children, user }: DeviceStatusProviderPro
         subs.forEach(callback => callback(update));
       }
     });
-  };
+  }, []);
 
   const updateDeviceStatus = useCallback((deviceId: string, status: DeviceStatus) => {
     const update: DeviceStatusUpdate = {

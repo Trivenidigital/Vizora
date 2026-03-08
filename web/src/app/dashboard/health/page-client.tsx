@@ -113,7 +113,7 @@ export default function HealthMonitoringClient() {
 
  switch (sortBy) {
  case 'name':
- compareValue = a.nickname.localeCompare(b.nickname);
+ compareValue = (a.nickname || '').localeCompare(b.nickname || '');
  break;
  case 'health':
  compareValue = (healthA?.score || 0) - (healthB?.score || 0);

@@ -87,7 +87,9 @@ export function CustomizationProvider({ children }: { children: React.ReactNode 
           setBrandConfig(newConfig);
           applyCSSVariables(newConfig);
         } catch (error) {
-          console.error('Failed to parse brand config from storage:', error);
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Failed to parse brand config from storage:', error);
+          }
         }
       }
     };

@@ -17,7 +17,7 @@ export default function Error({
   }, [error]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--background)]">
+    <div role="alert" className="min-h-screen flex items-center justify-center bg-[var(--background)]">
       <div className="max-w-md w-full bg-[var(--surface)] rounded-lg shadow-lg border border-[var(--border)] p-8 text-center">
         <Icon name="error" size="6xl" className="mx-auto mb-4 text-red-500" />
         <h2 className="text-2xl font-bold text-[var(--foreground)] mb-4">

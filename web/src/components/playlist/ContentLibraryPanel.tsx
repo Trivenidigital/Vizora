@@ -36,7 +36,9 @@ export default function ContentLibraryPanel({ organizationId }: ContentLibraryPa
         setTotalPages(response.meta.totalPages);
       }
     } catch (error) {
-      console.error('Failed to load content:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Failed to load content:', error);
+      }
     } finally {
       setLoading(false);
     }

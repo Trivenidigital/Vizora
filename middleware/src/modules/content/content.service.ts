@@ -421,13 +421,18 @@ export class ContentService {
       }
     }
 
-    const content = await this.db.content.update({
-      where: { id },
+    // Defense-in-depth: include organizationId in where clause to prevent TOCTOU races
+    const result = await this.db.content.updateMany({
+      where: { id, organizationId },
       data: {
         expiresAt,
         replacementContentId,
       },
     });
+    if (result.count === 0) {
+      throw new NotFoundException('Content not found');
+    }
+    const content = await this.db.content.findUnique({ where: { id } });
 
     return this.mapContentResponse(content);
   }
@@ -435,13 +440,18 @@ export class ContentService {
   async clearExpiration(organizationId: string, id: string) {
     await this.findOne(organizationId, id);
 
-    const content = await this.db.content.update({
-      where: { id },
+    // Defense-in-depth: include organizationId in where clause to prevent TOCTOU races
+    const result = await this.db.content.updateMany({
+      where: { id, organizationId },
       data: {
         expiresAt: null,
         replacementContentId: null,
       },
     });
+    if (result.count === 0) {
+      throw new NotFoundException('Content not found');
+    }
+    const content = await this.db.content.findUnique({ where: { id } });
 
     return this.mapContentResponse(content);
   }

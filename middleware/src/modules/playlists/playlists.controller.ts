@@ -18,6 +18,7 @@ import { CreatePlaylistDto } from './dto/create-playlist.dto';
 import { UpdatePlaylistDto } from './dto/update-playlist.dto';
 import { ReorderPlaylistDto } from './dto/reorder-playlist.dto';
 import { UpdatePlaylistItemDto } from './dto/update-playlist-item.dto';
+import { AddPlaylistItemDto } from './dto/add-playlist-item.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -86,10 +87,9 @@ export class PlaylistsController {
   addItem(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id', ParseUUIDPipe) playlistId: string,
-    @Body('contentId') contentId: string,
-    @Body('duration') duration?: number,
+    @Body() dto: AddPlaylistItemDto,
   ) {
-    return this.playlistsService.addItem(organizationId, playlistId, contentId, duration);
+    return this.playlistsService.addItem(organizationId, playlistId, dto.contentId, dto.duration);
   }
 
   @Patch(':id/items/:itemId')

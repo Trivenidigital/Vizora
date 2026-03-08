@@ -37,7 +37,7 @@ import {
 } from '../types';
 import * as Sentry from '@sentry/nestjs';
 import { WsAllExceptionsFilter } from './filters/ws-exception.filter';
-import { WsAuthGuard } from './guards/ws-auth.guard';
+import { WsAuthGuard, WsDeviceGuard } from './guards/ws-auth.guard';
 
 interface DevicePayload {
   sub: string; // device ID
@@ -662,7 +662,7 @@ export class DeviceGateway
           status: 'offline',
           lastHeartbeat: Date.now(),
           socketId: null,
-          organizationId: client.data.organizationId,
+          organizationId: client.data?.organizationId,
         });
 
         // 2.1: Update DB on disconnect (status transition) and clean up cache
@@ -683,33 +683,34 @@ export class DeviceGateway
           this.logger.warn(`Failed to update database for device ${deviceId}: ${errorMessage}`);
         }
 
-        // Schedule an offline notification (will fire after 2 minutes if device doesn't reconnect)
-        try {
-          await this.notificationService.scheduleOfflineNotification(
-            deviceId,
-            deviceName,
-            client.data.organizationId,
-          );
-        } catch (notifError) {
-          this.logger.warn(`Failed to schedule offline notification for device ${deviceId}`);
-        }
-
         this.logger.log(`Device disconnected: ${deviceId} (${client.id})`);
 
-        // Record metrics
-        this.metricsService.recordConnection(client.data.organizationId, 'disconnected');
-        this.metricsService.updateDeviceStatus(deviceId, client.data.organizationId, 'offline');
+        // Organization-scoped operations (notifications, metrics, dashboard broadcast)
+        const orgId = client.data?.organizationId;
+        if (orgId) {
+          try {
+            await this.notificationService.scheduleOfflineNotification(
+              deviceId,
+              deviceName,
+              orgId,
+            );
+          } catch (notifError) {
+            this.logger.warn(`Failed to schedule offline notification for device ${deviceId}`);
+          }
 
-        // Notify dashboard
-        const now = new Date().toISOString();
-        this.server
-          .to(`org:${client.data.organizationId}`)
-          .emit('device:status', {
-            deviceId,
-            status: 'offline',
-            lastSeen: now,
-            timestamp: now,
-          });
+          this.metricsService.recordConnection(orgId, 'disconnected');
+          this.metricsService.updateDeviceStatus(deviceId, orgId, 'offline');
+
+          const now = new Date().toISOString();
+          this.server
+            .to(`org:${orgId}`)
+            .emit('device:status', {
+              deviceId,
+              status: 'offline',
+              lastSeen: now,
+              timestamp: now,
+            });
+        }
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -718,6 +719,7 @@ export class DeviceGateway
   }
 
   @SubscribeMessage('heartbeat')
+  @UseGuards(WsDeviceGuard)
   @UsePipes(new WsValidationPipe())
   async handleHeartbeat(
     @ConnectedSocket() client: Socket,
@@ -797,6 +799,7 @@ export class DeviceGateway
   }
 
   @SubscribeMessage('content:impression')
+  @UseGuards(WsDeviceGuard)
   @UsePipes(new WsValidationPipe())
   async handleContentImpression(
     @ConnectedSocket() client: Socket,
@@ -824,6 +827,7 @@ export class DeviceGateway
   }
 
   @SubscribeMessage('content:error')
+  @UseGuards(WsDeviceGuard)
   @UsePipes(new WsValidationPipe())
   async handleContentError(
     @ConnectedSocket() client: Socket,
@@ -868,6 +872,7 @@ export class DeviceGateway
   }
 
   @SubscribeMessage('playlist:request')
+  @UseGuards(WsDeviceGuard)
   @UsePipes(new WsValidationPipe())
   async handlePlaylistRequest(
     @ConnectedSocket() client: Socket,

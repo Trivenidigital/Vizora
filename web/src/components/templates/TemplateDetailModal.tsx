@@ -58,7 +58,9 @@ export default function TemplateDetailModal({
         setSimilar(items.filter((t: any) => t.id !== templateId).slice(0, 4));
       }
     } catch (err) {
-      console.error('Failed to load template:', err);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Failed to load template:', err);
+      }
     } finally {
       setLoading(false);
     }

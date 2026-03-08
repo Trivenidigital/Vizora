@@ -8,6 +8,7 @@ export class AiGenerateDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   category?: string;
 
   @IsOptional()
@@ -17,5 +18,6 @@ export class AiGenerateDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   style?: string;
 }

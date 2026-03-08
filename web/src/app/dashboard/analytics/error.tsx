@@ -16,7 +16,7 @@ export default function AnalyticsError({
   }, [error]);
 
   return (
-    <div className="flex items-center justify-center min-h-[60vh]">
+    <div role="alert" className="flex items-center justify-center min-h-[60vh]">
       <div className="max-w-md w-full bg-[var(--surface)] rounded-lg border border-[var(--border)] p-8 text-center">
         <h2 className="text-xl font-bold text-[var(--foreground)] mb-2">
           Analytics Error

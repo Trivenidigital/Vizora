@@ -222,6 +222,8 @@ describe('PlaylistsService', () => {
       mockDatabaseService.playlist.findFirst.mockResolvedValue(mockPlaylist);
       mockDatabaseService.playlistItem.updateMany.mockResolvedValue({ count: 1 });
       mockDatabaseService.playlistItem.findFirst.mockResolvedValue({ id: 'item-123', duration: 60, content: {} });
+      // Mock findUnique used by notifyPlaylistChangeAfterItemUpdate
+      mockDatabaseService.playlist.findUnique.mockResolvedValue(mockPlaylist);
 
       const result = await service.updateItem('org-123', 'playlist-123', 'item-123', { duration: 60 });
 
