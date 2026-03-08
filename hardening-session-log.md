@@ -7,7 +7,7 @@
 
 ## Area 1: Backend Security Hardening
 **Started:** 2026-03-08T00:00
-**Status:** PASS — Backend already thoroughly hardened
+**Status:** PASS — 7 issues found and fixed
 
 ### Audit Checklist Results
 
@@ -38,13 +38,32 @@
 | Production env validation | ✅ PASS | Required vars checked at startup |
 | Static file security | ✅ PASS | `/uploads/` removed, content served through authenticated endpoint |
 | Error messages in prod | ✅ PASS | `disableErrorMessages: true` in production ValidationPipe |
+| TOCTOU race conditions | 🔧 FIXED | 6 write operations lacked org scoping in `where` clause |
+| Internal API secret handling | 🔧 FIXED | 5 locations used empty string fallback if secret unset |
 
-### Issues Found: 0
-No security issues found — the backend has already been comprehensively hardened.
+### Issues Found: 7 — ALL FIXED
 
-### Changes Made: None needed
-### Tests Added: 0
-### Tests Passing: Baseline maintained
+#### Issue 1-6: TOCTOU Race Conditions in Write Operations (CRITICAL)
+**Severity:** CRITICAL
+**Files:** `content.service.ts`, `displays.service.ts`
+**Pattern:** `findOne(orgId, id)` checks org ownership, then `update({where: {id}})` writes without org in `where` clause. A race between check and write could allow cross-tenant mutation.
+**Fix:** Changed 6 write operations from `update`/`delete` to `updateMany`/`deleteMany` with `{id, organizationId}` in the `where` clause (defense-in-depth). For transaction-based writes, added `findFirst({where: {id, organizationId}})` verification inside the transaction.
+**Affected methods:**
+- `content.service.ts`: `update()`, `remove()`, `archive()`, `restore()`, `replaceFile()` (2 paths)
+- `displays.service.ts`: `updateHeartbeat()`
+**Commit:** `902e47e`
+
+#### Issue 7: INTERNAL_API_SECRET Empty String Fallback
+**Severity:** MEDIUM
+**Files:** `displays.service.ts` (4 locations), `playlists.service.ts` (1 location)
+**Pattern:** `headers: { 'x-internal-api-key': process.env.INTERNAL_API_SECRET || '' }` — silently sends empty auth header if secret is unset. While the realtime service would reject the request, this masks configuration errors.
+**Fix:** Added `getInternalApiHeaders()` helper that returns `null` if secret is unset. Fire-and-forget calls (playlist updates, device commands) skip with a warning. User-initiated calls (push content, screenshot) throw a clear error.
+**Commit:** `092a0fe`
+
+### Tests Updated: 7
+- Updated 6 content service tests to use `updateMany`/`deleteMany` mocking pattern
+- Updated 1 displays service test to include `INTERNAL_API_SECRET` env setup
+### Tests Passing: 1836/1839 (3 pre-existing env-dependent failures)
 
 ---
 
