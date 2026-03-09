@@ -17,7 +17,6 @@ const CATEGORIES = [
   { value: 'healthcare', label: 'Healthcare' },
   { value: 'events', label: 'Events' },
   { value: 'general', label: 'General' },
-  { value: 'indian', label: 'Indian Cuisine' },
 ];
 
 const DIFFICULTIES = [

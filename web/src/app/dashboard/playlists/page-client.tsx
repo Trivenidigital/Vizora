@@ -97,7 +97,7 @@ function SortablePlaylistItem({ item, idx, onRemove, onDurationChange }: {
  onClick={onRemove}
  className="text-red-600 hover:text-red-800 text-sm"
  >
- <Icon name="delete" size="md" className="text-red-600" />
+ <Icon name="delete" size="md" className="text-red-600 dark:text-red-400" />
  </button>
  </div>
  );
@@ -515,7 +515,7 @@ export default function PlaylistsClient() {
  onClick={() => handlePublish(playlist)}
  className="flex-1 px-4 py-2 text-sm bg-green-500/10 text-green-600 dark:text-green-400 rounded-lg hover:bg-green-500/20 transition font-medium flex items-center justify-center gap-1"
  >
- <Icon name="power" size="sm" className="text-green-600" />
+ <Icon name="power" size="sm" className="text-green-600 dark:text-green-400" />
  Publish
  </button>
  <button
@@ -530,14 +530,14 @@ export default function PlaylistsClient() {
  }}
  className="flex-1 px-4 py-2 text-sm bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-500/20 transition font-medium flex items-center justify-center gap-1"
  >
- <Icon name="playlists" size="sm" className="text-purple-600" />
+ <Icon name="playlists" size="sm" className="text-purple-600 dark:text-purple-400" />
  Duplicate
  </button>
  <button
  onClick={() => handleDelete(playlist)}
  className="flex-1 px-4 py-2 text-sm bg-red-500/10 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-500/20 transition font-medium flex items-center justify-center gap-1"
  >
- <Icon name="delete" size="sm" className="text-red-600" />
+ <Icon name="delete" size="sm" className="text-red-600 dark:text-red-400" />
  Delete
  </button>
  </div>
