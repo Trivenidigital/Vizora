@@ -549,10 +549,10 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--foreground-tertiary)]">{(device.lastSeen || device.lastHeartbeat) ? new Date(String(device.lastSeen || device.lastHeartbeat)).toLocaleString() : 'Never'}</td>
  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
  <div className="flex justify-end gap-2">
- <button onClick={() => handlePreview(device)} className="text-green-600 hover:text-green-800 hover:bg-green-50 px-3 py-1 rounded transition font-medium" title="Preview device screen">Preview</button>
+ <button onClick={() => handlePreview(device)} className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-200 hover:bg-green-500/10 px-3 py-1 rounded transition font-medium" title="Preview device screen">Preview</button>
  <button onClick={() => handleEdit(device)} className="text-[#00E5A0] hover:text-[#00E5A0] hover:bg-[#00E5A0]/5 px-3 py-1 rounded transition font-medium">Edit</button>
- <button onClick={() => handleGeneratePairingCode(device)} className="text-purple-600 hover:text-purple-800 hover:bg-purple-50 px-3 py-1 rounded transition font-medium">Pair</button>
- <button onClick={() => handleDelete(device)} className="text-red-600 hover:text-red-800 hover:bg-red-50 px-3 py-1 rounded transition font-medium">Delete</button>
+ <button onClick={() => handleGeneratePairingCode(device)} className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-200 hover:bg-purple-500/10 px-3 py-1 rounded transition font-medium">Pair</button>
+ <button onClick={() => handleDelete(device)} className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200 hover:bg-red-500/10 px-3 py-1 rounded transition font-medium">Delete</button>
  </div>
  </td>
  </tr>

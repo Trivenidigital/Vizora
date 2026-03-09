@@ -166,23 +166,23 @@ export default function ApiKeysPage() {
 
  {/* New Key Alert */}
  {newKeyInfo && (
- <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+ <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
  <div className="flex items-start gap-3">
- <Icon name="warning" size="lg" className="text-yellow-600 flex-shrink-0 mt-0.5" />
+ <Icon name="warning" size="lg" className="text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
  <div className="flex-1">
- <h4 className="font-semibold text-yellow-800">
+ <h4 className="font-semibold text-yellow-800 dark:text-yellow-200">
  New API Key Created: {newKeyInfo.name}
  </h4>
- <p className="text-sm text-yellow-700 mt-1">
+ <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
  Copy this key now. You will not be able to see it again.
  </p>
  <div className="mt-3 flex items-center gap-2">
- <code className="bg-yellow-100 px-3 py-2 rounded text-sm font-mono text-yellow-900 break-all flex-1">
+ <code className="bg-yellow-500/15 px-3 py-2 rounded text-sm font-mono text-yellow-900 dark:text-yellow-100 break-all flex-1">
  {newKeyInfo.key}
  </code>
  <button
  onClick={() => copyToClipboard(newKeyInfo.key)}
- className="flex-shrink-0 p-2 text-yellow-700 hover:text-yellow-900 hover:bg-yellow-100 rounded transition"
+ className="flex-shrink-0 p-2 text-yellow-700 dark:text-yellow-300 hover:text-yellow-900 dark:hover:text-yellow-100 hover:bg-yellow-500/15 rounded transition"
  title="Copy to clipboard"
  >
  <Icon name="copy" size="md" />
@@ -190,7 +190,7 @@ export default function ApiKeysPage() {
  </div>
  <button
  onClick={() => setNewKeyInfo(null)}
- className="mt-3 text-sm text-yellow-600 hover:text-yellow-800"
+ className="mt-3 text-sm text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-200"
  >
  Dismiss
  </button>
@@ -285,7 +285,7 @@ export default function ApiKeysPage() {
  <td className="px-4 py-3 whitespace-nowrap">
  {key.expiresAt ? (
  <span
- className={`text-sm ${isExpired(key.expiresAt) ? 'text-red-600' : 'text-[var(--foreground-tertiary)]'}`}
+ className={`text-sm ${isExpired(key.expiresAt) ? 'text-red-600 dark:text-red-400' : 'text-[var(--foreground-tertiary)]'}`}
  >
  {isExpired(key.expiresAt) ? 'Expired' : formatDate(key.expiresAt)}
  </span>
@@ -296,7 +296,7 @@ export default function ApiKeysPage() {
  <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
  <button
  onClick={() => handleRevokeClick(key)}
- className="text-red-600 hover:text-red-800 hover:bg-red-50 px-3 py-1 rounded transition"
+ className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 hover:bg-red-500/10 px-3 py-1 rounded transition"
  >
  Revoke
  </button>

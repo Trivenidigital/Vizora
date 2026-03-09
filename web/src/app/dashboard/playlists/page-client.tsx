@@ -458,7 +458,7 @@ export default function PlaylistsClient() {
  </div>
  <div className="flex flex-col items-end gap-2">
  {playlist.isActive && (
- <span className="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+ <span className="px-3 py-1 text-xs font-semibold rounded-full bg-green-500/10 text-green-600 dark:text-green-400">
  Active
  </span>
  )}
@@ -513,7 +513,7 @@ export default function PlaylistsClient() {
  </button>
  <button
  onClick={() => handlePublish(playlist)}
- className="flex-1 px-4 py-2 text-sm bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition font-medium flex items-center justify-center gap-1"
+ className="flex-1 px-4 py-2 text-sm bg-green-500/10 text-green-600 dark:text-green-400 rounded-lg hover:bg-green-500/20 transition font-medium flex items-center justify-center gap-1"
  >
  <Icon name="power" size="sm" className="text-green-600" />
  Publish
@@ -528,14 +528,14 @@ export default function PlaylistsClient() {
  toast.error(error.message || 'Failed to duplicate playlist');
  }
  }}
- className="flex-1 px-4 py-2 text-sm bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 transition font-medium flex items-center justify-center gap-1"
+ className="flex-1 px-4 py-2 text-sm bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-500/20 transition font-medium flex items-center justify-center gap-1"
  >
  <Icon name="playlists" size="sm" className="text-purple-600" />
  Duplicate
  </button>
  <button
  onClick={() => handleDelete(playlist)}
- className="flex-1 px-4 py-2 text-sm bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition font-medium flex items-center justify-center gap-1"
+ className="flex-1 px-4 py-2 text-sm bg-red-500/10 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-500/20 transition font-medium flex items-center justify-center gap-1"
  >
  <Icon name="delete" size="sm" className="text-red-600" />
  Delete

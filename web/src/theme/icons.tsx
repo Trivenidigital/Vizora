@@ -41,6 +41,8 @@ import {
   Key,
   Copy,
   Shield,
+  LayoutGrid,
+  Component,
 } from 'lucide-react';
 
 export const ICON_SIZES = {
@@ -100,6 +102,8 @@ export const iconMap = {
   grid: Grid,
   list: Menu,
   storage: Folder,
+  widget: Component,
+  layout: LayoutGrid,
 
   // Chevrons & Navigation
   chevronDown: ChevronDown,

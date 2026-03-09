@@ -126,10 +126,10 @@ export default function AuditLogClient() {
  };
 
  const getActionBadgeColor = (action: string) => {
- if (action.includes('create') || action.includes('invited')) return 'bg-green-100 text-green-800';
+ if (action.includes('create') || action.includes('invited')) return 'bg-green-500/10 text-green-700 dark:text-green-300';
  if (action.includes('update')) return 'bg-[#00E5A0]/10 text-[#00E5A0]';
- if (action.includes('delete') || action.includes('deactivat')) return 'bg-red-100 text-red-800';
- if (action.includes('login') || action.includes('logout')) return 'bg-purple-100 text-purple-800';
+ if (action.includes('delete') || action.includes('deactivat')) return 'bg-red-500/10 text-red-700 dark:text-red-300';
+ if (action.includes('login') || action.includes('logout')) return 'bg-purple-500/10 text-purple-700 dark:text-purple-300';
  return 'bg-[var(--background-secondary)] text-[var(--foreground)]';
  };
 

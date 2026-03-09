@@ -748,20 +748,20 @@ export default function ContentClient() {
  <p className="mt-2 text-[var(--foreground-secondary)]">
  Manage your media assets ({content.length} items)
  {realtimeStatus === 'connected' && (
- <span className="ml-2 inline-flex items-center gap-1 text-xs text-green-600">
- <span className="w-2 h-2 bg-green-600 rounded-full animate-pulse"></span>
+ <span className="ml-2 inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+ <span className="w-2 h-2 bg-green-600 dark:bg-green-400 rounded-full animate-pulse"></span>
  Real-time enabled
  </span>
  )}
  {realtimeStatus === 'reconnecting' && (
- <span className="ml-2 inline-flex items-center gap-1 text-xs text-yellow-600">
- <span className="w-2 h-2 bg-yellow-600 rounded-full animate-pulse"></span>
+ <span className="ml-2 inline-flex items-center gap-1 text-xs text-yellow-600 dark:text-yellow-400">
+ <span className="w-2 h-2 bg-yellow-600 dark:bg-yellow-400 rounded-full animate-pulse"></span>
  Reconnecting...
  </span>
  )}
  {realtimeStatus === 'offline' && (
- <span className="ml-2 inline-flex items-center gap-1 text-xs text-red-500" title="Live updates unavailable — content management still works">
- <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+ <span className="ml-2 inline-flex items-center gap-1 text-xs text-red-500 dark:text-red-400" title="Live updates unavailable — content management still works">
+ <span className="w-2 h-2 bg-red-500 dark:bg-red-400 rounded-full"></span>
  Live sync off
  </span>
  )}
@@ -1235,7 +1235,7 @@ export default function ContentClient() {
  autoComplete="off"
  />
  {formErrors.title && (
- <p className="mt-1 text-sm text-red-600">{formErrors.title}</p>
+ <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.title}</p>
  )}
  </div>
  <div>
@@ -1311,7 +1311,7 @@ export default function ContentClient() {
  </p>
  <button
  onClick={() => setUploadQueue([])}
- className="text-xs text-red-600 hover:text-red-700"
+ className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
  >
  Clear All
  </button>
@@ -1338,14 +1338,14 @@ export default function ContentClient() {
  <LoadingSpinner size="sm" />
  )}
  {item.status === 'success' && (
- <span className="text-green-600">✓</span>
+ <span className="text-green-600 dark:text-green-400">✓</span>
  )}
  {item.status === 'error' && (
- <span className="text-red-600" title={item.error}>✗</span>
+ <span className="text-red-600 dark:text-red-400" title={item.error}>✗</span>
  )}
  <button
  onClick={() => setUploadQueue(prev => prev.filter((_, i) => i !== idx))}
- className="text-[var(--foreground-tertiary)] hover:text-red-600"
+ className="text-[var(--foreground-tertiary)] hover:text-red-600 dark:hover:text-red-400"
  >
  ×
  </button>
@@ -1386,7 +1386,7 @@ export default function ContentClient() {
  autoComplete="off"
  />
  {formErrors.url && (
- <p className="mt-1 text-sm text-red-600">{formErrors.url}</p>
+ <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.url}</p>
  )}
  </div>
  )}
@@ -1474,7 +1474,7 @@ export default function ContentClient() {
  autoComplete="off"
  />
  {formErrors.title && (
- <p className="mt-1 text-sm text-red-600">{formErrors.title}</p>
+ <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.title}</p>
  )}
  </div>
  

@@ -21,8 +21,8 @@ const navigation: Array<{ name: string; href: string; icon: IconName; exactMatch
   { name: 'Devices', href: '/dashboard/devices', icon: 'devices' },
   { name: 'Content', href: '/dashboard/content', icon: 'content' },
   { name: 'Templates', href: '/dashboard/templates', icon: 'grid' },
-  { name: 'Widgets', href: '/dashboard/widgets', icon: 'content' },
-  { name: 'Layouts', href: '/dashboard/layouts', icon: 'content' },
+  { name: 'Widgets', href: '/dashboard/widgets', icon: 'widget' },
+  { name: 'Layouts', href: '/dashboard/layouts', icon: 'layout' },
   { name: 'Playlists', href: '/dashboard/playlists', icon: 'playlists' },
   { name: 'Schedules', href: '/dashboard/schedules', icon: 'schedules' },
   { name: 'Analytics', href: '/dashboard/analytics', icon: 'analytics' },
@@ -257,7 +257,7 @@ export default function DashboardLayout({
         {/* Overlay for mobile */}
         {sidebarOpen && (
           <div
-            className="fixed inset-0 bg-black bg-opacity-50 z-10 lg:hidden"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-10 lg:hidden"
             onClick={() => setSidebarOpen(false)}
           />
         )}

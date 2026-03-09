@@ -278,12 +278,12 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
 
  <button
  onClick={() => router.push('/dashboard/content')}
- className="flex items-center gap-3 p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg hover:from-purple-100 hover:to-purple-200 transition-all transform hover:scale-105"
+ className="flex items-center gap-3 p-4 bg-gradient-to-br from-purple-500/5 to-purple-500/10 rounded-lg hover:from-purple-500/10 hover:to-purple-500/20 transition-all transform hover:scale-105"
  >
- <Icon name="upload" size="2xl" className="text-purple-600" />
+ <Icon name="upload" size="2xl" className="text-purple-500 dark:text-purple-400" />
  <div className="text-left">
- <div className="font-semibold text-purple-900">Upload Content</div>
- <div className="text-xs text-purple-700">Add new media</div>
+ <div className="font-semibold text-purple-700 dark:text-purple-300">Upload Content</div>
+ <div className="text-xs text-purple-600 dark:text-purple-400">Add new media</div>
  </div>
  </button>
 
@@ -300,12 +300,12 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
 
  <button
  onClick={() => router.push('/dashboard/schedules')}
- className="flex items-center gap-3 p-4 bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg hover:from-orange-100 hover:to-orange-200 transition-all transform hover:scale-105"
+ className="flex items-center gap-3 p-4 bg-gradient-to-br from-orange-500/5 to-orange-500/10 rounded-lg hover:from-orange-500/10 hover:to-orange-500/20 transition-all transform hover:scale-105"
  >
- <Icon name="schedules" size="2xl" className="text-orange-600" />
+ <Icon name="schedules" size="2xl" className="text-orange-500 dark:text-orange-400" />
  <div className="text-left">
- <div className="font-semibold text-orange-900">Schedule</div>
- <div className="text-xs text-orange-700">Set up timing</div>
+ <div className="font-semibold text-orange-700 dark:text-orange-300">Schedule</div>
+ <div className="text-xs text-orange-600 dark:text-orange-400">Set up timing</div>
  </div>
  </button>
  </div>
