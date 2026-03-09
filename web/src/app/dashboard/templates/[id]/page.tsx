@@ -9,7 +9,7 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import TemplateEditor from '@/components/TemplateEditor';
 import { Icon } from '@/theme/icons';
 
-const CATEGORIES = ['retail', 'restaurant', 'corporate', 'education', 'healthcare', 'events', 'general'];
+const CATEGORIES = ['retail', 'restaurant', 'corporate', 'education', 'healthcare', 'events', 'general', 'indian'];
 const DIFFICULTIES = ['beginner', 'intermediate', 'advanced'];
 const ORIENTATIONS = ['landscape', 'portrait', 'both'];
 

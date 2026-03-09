@@ -42,8 +42,11 @@ export default function ImageProperties({
     setUploading(true);
     try {
       const url = await onImageUpload(file);
+      if (!url) throw new Error('Upload returned no URL');
       setLocalSrc(url);
       onPropertyChange(elementId, 'src', src, url);
+    } catch {
+      // Upload failed — keep existing image, no state change needed
     } finally {
       setUploading(false);
       // Reset the input so the same file can be re-selected

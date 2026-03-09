@@ -402,6 +402,7 @@ const TemplateEditorCanvas = forwardRef<CanvasHandle, TemplateEditorCanvasProps>
     // ── Inject editor runtime into template HTML ──────────────────────
 
     const editorHtml = useMemo(() => {
+      if (!templateHtml) return '';
       const scriptTag = `<script data-editor-runtime>${EDITOR_RUNTIME_CODE}<\/script>`;
       if (templateHtml.includes('</body>')) {
         return templateHtml.replace('</body>', scriptTag + '\n</body>');

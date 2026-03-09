@@ -130,7 +130,7 @@ export default function EditPageClient({ templateId }: EditPageClientProps) {
     } finally {
       setSaving(false);
     }
-  }, [templateId, templateName, toast]);
+  }, [templateId, toast]);
 
   const handlePublish = useCallback(
     async (displayIds: string[]) => {
