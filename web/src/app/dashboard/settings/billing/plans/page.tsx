@@ -227,7 +227,7 @@ export default function PlansPage() {
  <div className="flex flex-col md:flex-row items-center justify-between gap-4">
  <div>
  <h3 className="text-xl font-bold">Need more than 100 screens?</h3>
- <p className="text-[#00E5A0]/50 mt-1">
+ <p className="text-white/80 mt-1">
  Contact our sales team for custom enterprise pricing and dedicated support.
  </p>
  </div>
