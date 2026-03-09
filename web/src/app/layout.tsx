@@ -4,6 +4,7 @@ import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { CustomizationProvider } from '@/components/providers/CustomizationProvider';
 import CommandPaletteWrapper from '@/components/CommandPaletteWrapper';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { CookieConsent } from '@/components/CookieConsent';
 
 import type { Viewport } from 'next';
 
@@ -48,6 +49,7 @@ export default function RootLayout({
             </CustomizationProvider>
           </ThemeProvider>
         </ErrorBoundary>
+        <CookieConsent />
       </body>
     </html>
   );
