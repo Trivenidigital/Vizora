@@ -17,10 +17,12 @@ describe('LayoutsController', () => {
 
   beforeEach(async () => {
     mockContentService = {
+      findAllLayouts: jest.fn(),
       getLayoutPresets: jest.fn(),
       createLayout: jest.fn(),
       updateLayout: jest.fn(),
       getResolvedLayout: jest.fn(),
+      remove: jest.fn(),
     } as any;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -35,6 +37,39 @@ describe('LayoutsController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  // ==========================================================================
+  // findAll
+  // ==========================================================================
+
+  describe('findAll', () => {
+    it('should return paginated layouts', async () => {
+      const expectedResult = {
+        data: [{ id: 'layout-1', name: 'Split View', type: 'layout' }],
+        meta: { page: 1, limit: 10, total: 1, totalPages: 1 },
+      };
+      mockContentService.findAllLayouts.mockResolvedValue(expectedResult as any);
+
+      const pagination = { page: 1, limit: 10 } as any;
+      const result = await controller.findAll(organizationId, pagination);
+
+      expect(result).toEqual(expectedResult);
+      expect(mockContentService.findAllLayouts).toHaveBeenCalledWith(organizationId, pagination);
+    });
+
+    it('should return empty results when no layouts exist', async () => {
+      const expectedResult = {
+        data: [],
+        meta: { page: 1, limit: 10, total: 0, totalPages: 0 },
+      };
+      mockContentService.findAllLayouts.mockResolvedValue(expectedResult as any);
+
+      const pagination = { page: 1, limit: 10 } as any;
+      const result = await controller.findAll(organizationId, pagination);
+
+      expect(result).toEqual(expectedResult);
+    });
   });
 
   // ==========================================================================
@@ -184,6 +219,29 @@ describe('LayoutsController', () => {
 
       await expect(
         controller.getResolvedLayout(organizationId, 'nonexistent'),
+      ).rejects.toThrow('Layout not found');
+    });
+  });
+
+  // ==========================================================================
+  // deleteLayout
+  // ==========================================================================
+
+  describe('deleteLayout', () => {
+    it('should delete a layout successfully', async () => {
+      mockContentService.remove.mockResolvedValue({ success: true } as any);
+
+      const result = await controller.deleteLayout(organizationId, 'layout-123');
+
+      expect(result).toEqual({ success: true });
+      expect(mockContentService.remove).toHaveBeenCalledWith(organizationId, 'layout-123');
+    });
+
+    it('should propagate not found errors', async () => {
+      mockContentService.remove.mockRejectedValue(new Error('Layout not found'));
+
+      await expect(
+        controller.deleteLayout(organizationId, 'nonexistent'),
       ).rejects.toThrow('Layout not found');
     });
   });

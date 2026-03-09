@@ -17,6 +17,7 @@ describe('WidgetsController', () => {
 
   beforeEach(async () => {
     mockContentService = {
+      findAllWidgets: jest.fn(),
       getWidgetTypes: jest.fn(),
       createWidget: jest.fn(),
       updateWidget: jest.fn(),
@@ -35,6 +36,39 @@ describe('WidgetsController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  // ==========================================================================
+  // findAll
+  // ==========================================================================
+
+  describe('findAll', () => {
+    it('should return paginated widgets', async () => {
+      const expectedResult = {
+        data: [{ id: 'widget-1', name: 'Clock', type: 'template' }],
+        meta: { page: 1, limit: 10, total: 1, totalPages: 1 },
+      };
+      mockContentService.findAllWidgets.mockResolvedValue(expectedResult as any);
+
+      const pagination = { page: 1, limit: 10 } as any;
+      const result = await controller.findAll(organizationId, pagination);
+
+      expect(result).toEqual(expectedResult);
+      expect(mockContentService.findAllWidgets).toHaveBeenCalledWith(organizationId, pagination);
+    });
+
+    it('should return empty results when no widgets exist', async () => {
+      const expectedResult = {
+        data: [],
+        meta: { page: 1, limit: 10, total: 0, totalPages: 0 },
+      };
+      mockContentService.findAllWidgets.mockResolvedValue(expectedResult as any);
+
+      const pagination = { page: 1, limit: 10 } as any;
+      const result = await controller.findAll(organizationId, pagination);
+
+      expect(result).toEqual(expectedResult);
+    });
   });
 
   // ==========================================================================

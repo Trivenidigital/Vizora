@@ -68,7 +68,7 @@ export default function ContentClient() {
  ]);
  const [selectedTags, setSelectedTags] = useState<string[]>([]);
  const [showTagFilter, setShowTagFilter] = useState(false);
- const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'reconnecting' | 'offline'>('reconnecting');
+ const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'reconnecting' | 'offline'>('offline');
 
  // Folder state
  const [folders, setFolders] = useState<ContentFolder[]>([]);

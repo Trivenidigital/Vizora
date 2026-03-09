@@ -5,6 +5,7 @@ import {
   Body,
   Patch,
   Param,
+  Query,
   HttpCode,
   HttpStatus,
   UseGuards,
@@ -14,12 +15,22 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { ContentService } from '../content.service';
 import { CreateWidgetDto } from '../dto/create-widget.dto';
+import { PaginationDto } from '../../common/dto/pagination.dto';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 
 @UseGuards(RolesGuard)
 @Controller('content/widgets')
 export class WidgetsController {
   constructor(private readonly contentService: ContentService) {}
+
+  @Get()
+  @Roles('admin', 'manager', 'viewer')
+  findAll(
+    @CurrentUser('organizationId') organizationId: string,
+    @Query() pagination: PaginationDto,
+  ) {
+    return this.contentService.findAllWidgets(organizationId, pagination);
+  }
 
   @Get('types')
   @Roles('admin', 'manager', 'viewer')

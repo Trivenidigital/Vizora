@@ -140,6 +140,59 @@ export class ContentService {
   }
 
   /**
+   * Find all widgets (content with type 'template' and metadata.isWidget = true)
+   */
+  async findAllWidgets(organizationId: string, pagination: PaginationDto) {
+    const { page = 1, limit = 10 } = pagination;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.ContentWhereInput = {
+      organizationId,
+      type: 'template',
+      metadata: { path: ['isWidget'], equals: true },
+    };
+
+    const [data, total] = await Promise.all([
+      this.db.content.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.db.content.count({ where }),
+    ]);
+
+    const mappedData = data.map(item => this.mapContentResponse(item));
+    return new PaginatedResponse(mappedData, total, page, limit);
+  }
+
+  /**
+   * Find all layouts (content with type 'layout')
+   */
+  async findAllLayouts(organizationId: string, pagination: PaginationDto) {
+    const { page = 1, limit = 10 } = pagination;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.ContentWhereInput = {
+      organizationId,
+      type: 'layout',
+    };
+
+    const [data, total] = await Promise.all([
+      this.db.content.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.db.content.count({ where }),
+    ]);
+
+    const mappedData = data.map(item => this.mapContentResponse(item));
+    return new PaginatedResponse(mappedData, total, page, limit);
+  }
+
+  /**
    * Find content by ID without org filter (for device content serving)
    */
   async findById(id: string) {

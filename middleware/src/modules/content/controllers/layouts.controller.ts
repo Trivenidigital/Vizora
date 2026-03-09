@@ -4,7 +4,9 @@ import {
   Post,
   Body,
   Patch,
+  Delete,
   Param,
+  Query,
   UseGuards,
   ParseUUIDPipe,
 } from '@nestjs/common';
@@ -13,12 +15,22 @@ import { Roles } from '../../auth/decorators/roles.decorator';
 import { ContentService } from '../content.service';
 import { CreateLayoutDto } from '../dto/create-layout.dto';
 import { UpdateLayoutDto } from '../dto/update-layout.dto';
+import { PaginationDto } from '../../common/dto/pagination.dto';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 
 @UseGuards(RolesGuard)
 @Controller('content/layouts')
 export class LayoutsController {
   constructor(private readonly contentService: ContentService) {}
+
+  @Get()
+  @Roles('admin', 'manager', 'viewer')
+  findAll(
+    @CurrentUser('organizationId') organizationId: string,
+    @Query() pagination: PaginationDto,
+  ) {
+    return this.contentService.findAllLayouts(organizationId, pagination);
+  }
 
   @Get('presets')
   @Roles('admin', 'manager', 'viewer')
@@ -52,5 +64,14 @@ export class LayoutsController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.contentService.getResolvedLayout(organizationId, id);
+  }
+
+  @Delete(':id')
+  @Roles('admin', 'manager')
+  deleteLayout(
+    @CurrentUser('organizationId') organizationId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.contentService.remove(organizationId, id);
   }
 }

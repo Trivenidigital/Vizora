@@ -16,7 +16,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { NotificationsService, NotificationFilters } from './notifications.service';
 import { CreateNotificationDto } from './dto/create-notification.dto';
-import { PaginationDto } from '../common/dto/pagination.dto';
+import { NotificationQueryDto } from './dto/notification-query.dto';
 
 @UseGuards(RolesGuard)
 @Controller('notifications')
@@ -44,22 +44,23 @@ export class NotificationsController {
   @Get()
   findAll(
     @CurrentUser('organizationId') organizationId: string,
-    @Query() pagination: PaginationDto,
-    @Query('read') read?: string,
-    @Query('severity') severity?: string,
+    @Query() query: NotificationQueryDto,
   ) {
     // Parse read filter
     const filters: NotificationFilters = {};
-    if (read === 'true') {
+    if (query.read === 'true') {
       filters.read = true;
-    } else if (read === 'false') {
+    } else if (query.read === 'false') {
       filters.read = false;
     }
-    if (severity) {
-      filters.severity = severity;
+    if (query.severity) {
+      filters.severity = query.severity;
     }
 
-    return this.notificationsService.findAll(organizationId, filters, pagination);
+    return this.notificationsService.findAll(organizationId, filters, {
+      page: query.page,
+      limit: query.limit,
+    });
   }
 
   /**

@@ -100,8 +100,6 @@ describe('NotificationsController', () => {
   });
 
   describe('findAll', () => {
-    const pagination = { page: 1, limit: 20 };
-
     it('should return paginated notifications', async () => {
       const expectedResult = {
         data: [mockNotification],
@@ -109,61 +107,66 @@ describe('NotificationsController', () => {
       };
       mockNotificationsService.findAll.mockResolvedValue(expectedResult as any);
 
-      const result = await controller.findAll(organizationId, pagination as any);
+      const query = { page: 1, limit: 20 } as any;
+      const result = await controller.findAll(organizationId, query);
 
       expect(result).toEqual(expectedResult);
       expect(mockNotificationsService.findAll).toHaveBeenCalledWith(
         organizationId,
         {},
-        pagination,
+        { page: 1, limit: 20 },
       );
     });
 
     it('should filter by read=true', async () => {
       mockNotificationsService.findAll.mockResolvedValue({ data: [], meta: {} } as any);
 
-      await controller.findAll(organizationId, pagination as any, 'true');
+      const query = { page: 1, limit: 20, read: 'true' } as any;
+      await controller.findAll(organizationId, query);
 
       expect(mockNotificationsService.findAll).toHaveBeenCalledWith(
         organizationId,
         { read: true },
-        pagination,
+        { page: 1, limit: 20 },
       );
     });
 
     it('should filter by read=false', async () => {
       mockNotificationsService.findAll.mockResolvedValue({ data: [], meta: {} } as any);
 
-      await controller.findAll(organizationId, pagination as any, 'false');
+      const query = { page: 1, limit: 20, read: 'false' } as any;
+      await controller.findAll(organizationId, query);
 
       expect(mockNotificationsService.findAll).toHaveBeenCalledWith(
         organizationId,
         { read: false },
-        pagination,
+        { page: 1, limit: 20 },
       );
     });
 
     it('should filter by severity', async () => {
       mockNotificationsService.findAll.mockResolvedValue({ data: [], meta: {} } as any);
 
-      await controller.findAll(organizationId, pagination as any, undefined, 'warning');
+      const query = { page: 1, limit: 20, severity: 'warning' } as any;
+      await controller.findAll(organizationId, query);
 
       expect(mockNotificationsService.findAll).toHaveBeenCalledWith(
         organizationId,
         { severity: 'warning' },
-        pagination,
+        { page: 1, limit: 20 },
       );
     });
 
     it('should combine read and severity filters', async () => {
       mockNotificationsService.findAll.mockResolvedValue({ data: [], meta: {} } as any);
 
-      await controller.findAll(organizationId, pagination as any, 'false', 'critical');
+      const query = { page: 1, limit: 20, read: 'false', severity: 'critical' } as any;
+      await controller.findAll(organizationId, query);
 
       expect(mockNotificationsService.findAll).toHaveBeenCalledWith(
         organizationId,
         { read: false, severity: 'critical' },
-        pagination,
+        { page: 1, limit: 20 },
       );
     });
 
@@ -174,7 +177,8 @@ describe('NotificationsController', () => {
       };
       mockNotificationsService.findAll.mockResolvedValue(expectedResult as any);
 
-      const result = await controller.findAll(organizationId, pagination as any);
+      const query = { page: 1, limit: 20 } as any;
+      const result = await controller.findAll(organizationId, query);
 
       expect(result).toEqual(expectedResult);
     });
