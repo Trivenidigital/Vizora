@@ -5,6 +5,18 @@ import Link from 'next/link';
 
 const STORAGE_KEY = 'vizora_cookie_consent';
 
+/**
+ * Check if the user has consented to a specific cookie category.
+ * Returns true if user accepted 'all', or if checking 'essential' (always allowed).
+ * Returns false if no consent has been given yet (for non-essential cookies).
+ */
+export function hasConsentFor(category: 'essential' | 'all'): boolean {
+  if (typeof window === 'undefined') return false;
+  if (category === 'essential') return true;
+  const consent = localStorage.getItem(STORAGE_KEY);
+  return consent === 'all';
+}
+
 export function CookieConsent() {
   const [visible, setVisible] = useState(false);
   const [mounted, setMounted] = useState(false);

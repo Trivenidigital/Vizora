@@ -1,4 +1,4 @@
-import { Controller, Post, Patch, Body, UseGuards, Get, Delete, Res, Req, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Patch, Body, UseGuards, Get, Delete, Res, Req, HttpCode, HttpStatus, BadRequestException } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import {
@@ -245,6 +245,9 @@ export class AuthController {
     @CurrentUser('id') userId: string,
     @Body() dto: UpdateProfileDto,
   ) {
+    if (!dto.firstName && !dto.lastName) {
+      throw new BadRequestException('At least one field (firstName or lastName) is required');
+    }
     const user = await this.authService.updateProfile(userId, dto);
     return { success: true, data: { user } };
   }
@@ -342,6 +345,12 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Delete('account')
   @HttpCode(HttpStatus.OK)
+  @Throttle({
+    default: {
+      limit: process.env.NODE_ENV === 'production' ? 3 : 1000,
+      ttl: 60000,
+    },
+  })
   async deleteAccount(
     @CurrentUser('id') userId: string,
     @Body() dto: DeleteAccountDto,

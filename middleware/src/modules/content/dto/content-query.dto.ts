@@ -9,11 +9,11 @@ export class ContentQueryDto extends PaginationDto {
 
   @IsOptional()
   @IsString()
-  @IsIn(['active', 'archived', 'expired', 'draft'])
+  @IsIn(['active', 'archived', 'draft'])
   status?: string;
 
   @IsOptional()
   @IsString()
-  @IsIn(['landscape', 'portrait', 'square'])
+  @IsIn(['landscape', 'portrait', 'both'])
   templateOrientation?: string;
 }

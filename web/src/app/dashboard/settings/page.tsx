@@ -84,6 +84,8 @@ export default function SettingsPage() {
        lastName: profileForm.lastName.trim(),
      });
      toast.success('Profile updated!');
+     // Force layout to re-fetch user data so header shows updated name
+     router.refresh();
    } catch (error: any) {
      toast.error(error.message || 'Failed to update profile');
    } finally {

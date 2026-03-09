@@ -17,6 +17,7 @@ import { RegisterDto, LoginDto } from './dto';
 import { AUTH_CONSTANTS } from './constants/auth.constants';
 import { GeoService } from '../common/services/geo.service';
 import { BillingService } from '../billing/billing.service';
+import { StorageService } from '../storage/storage.service';
 
 // Account lockout constants
 const MAX_LOGIN_ATTEMPTS = 10;
@@ -33,6 +34,7 @@ export class AuthService {
     private mailService: MailService,
     private geoService: GeoService,
     private billingService: BillingService,
+    private storageService: StorageService,
   ) {}
 
   async register(dto: RegisterDto, clientIp?: string) {
@@ -445,7 +447,10 @@ export class AuthService {
   async updateProfile(userId: string, data: { firstName?: string; lastName?: string }) {
     const updated = await this.databaseService.user.update({
       where: { id: userId },
-      data,
+      data: {
+        ...(data.firstName !== undefined && { firstName: data.firstName }),
+        ...(data.lastName !== undefined && { lastName: data.lastName }),
+      },
       select: {
         id: true,
         email: true,
@@ -494,6 +499,10 @@ export class AuthService {
 
     const isSoleAdmin = adminCount <= 1 && user.role === 'admin';
 
+    // Pre-compute bcrypt hash outside the transaction to avoid holding DB locks (~50-100ms)
+    const bcryptRounds = parseInt(process.env.BCRYPT_ROUNDS || '14', 10);
+    const randomHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), bcryptRounds);
+
     if (isSoleAdmin) {
       // 4a. Cancel active subscription (best-effort)
       try {
@@ -505,7 +514,15 @@ export class AuthService {
         this.logger.warn(`Failed to cancel subscription during account deletion for org ${orgId}: ${err instanceof Error ? err.message : 'Unknown'}`);
       }
 
-      // 4b-i. Delete all org data in a transaction, then delete the org
+      // 4b. Collect MinIO file keys before deleting DB records
+      const contentWithUrls = await this.databaseService.content.findMany({
+        where: { organizationId: orgId },
+        select: { url: true, thumbnail: true },
+      });
+
+      // 4c. Delete all org data in a transaction, then delete the org
+      // Note: org.delete cascades to users via FK onDelete, so we skip
+      // user anonymization here (it would be immediately deleted anyway).
       await this.databaseService.$transaction(async (tx) => {
         // Delete support messages (depends on support requests)
         await tx.supportMessage.deleteMany({ where: { organizationId: orgId } });
@@ -568,33 +585,21 @@ export class AuthService {
         if (userIds.length > 0) {
           await tx.passwordResetToken.deleteMany({ where: { userId: { in: userIds } } });
         }
-        // Delete all other users in org (except current user, handled below)
-        await tx.user.deleteMany({
-          where: { organizationId: orgId, id: { not: userId } },
-        });
-        // Anonymize the requesting user
-        const randomHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
-        await tx.user.update({
-          where: { id: userId },
-          data: {
-            firstName: 'Deleted',
-            lastName: 'User',
-            email: `deleted_${userId}@deleted.vizora.cloud`,
-            passwordHash: randomHash,
-            isActive: false,
-            avatar: null,
-          },
-        });
+        // Delete all users in org (cascade from org.delete would do this too,
+        // but explicit deletion ensures clean ordering)
+        await tx.user.deleteMany({ where: { organizationId: orgId } });
         // Delete the organization
         await tx.organization.delete({ where: { id: orgId } });
       });
+
+      // 4d. Delete files from MinIO after successful DB transaction (best-effort)
+      await this.deleteStorageFiles(contentWithUrls);
     } else {
       // 5. Not sole admin — just remove user from org
       await this.databaseService.$transaction(async (tx) => {
         // Delete user's password reset tokens
         await tx.passwordResetToken.deleteMany({ where: { userId } });
-        // Anonymize user record
-        const randomHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
+        // Anonymize user record (preserved for audit trail)
         await tx.user.update({
           where: { id: userId },
           data: {
@@ -635,7 +640,61 @@ export class AuthService {
       this.logger.warn(`Failed to invalidate tokens for deleted user ${userId}: ${err instanceof Error ? err.message : 'Unknown'}`);
     }
 
-    this.logger.log(`Account deleted for user ${userId} (email: ${originalEmail})`);
+    this.logger.log(`Account deleted for user ${userId}`);
+  }
+
+  /**
+   * Delete content files from MinIO storage (best-effort, non-blocking).
+   * Extracts MinIO object keys from content URLs and deletes them.
+   */
+  private async deleteStorageFiles(contentRecords: Array<{ url: string; thumbnail: string | null }>): Promise<void> {
+    const objectKeys: string[] = [];
+    for (const record of contentRecords) {
+      // Extract MinIO object key from URL (format: /content/orgId/filename or full URL)
+      const key = this.extractObjectKey(record.url);
+      if (key) objectKeys.push(key);
+      if (record.thumbnail) {
+        const thumbKey = this.extractObjectKey(record.thumbnail);
+        if (thumbKey) objectKeys.push(thumbKey);
+      }
+    }
+
+    for (const key of objectKeys) {
+      try {
+        await this.storageService.deleteFile(key);
+      } catch (err) {
+        this.logger.warn(`Failed to delete storage file ${key}: ${err instanceof Error ? err.message : 'Unknown'}`);
+      }
+    }
+
+    if (objectKeys.length > 0) {
+      this.logger.log(`Deleted ${objectKeys.length} storage files for account deletion`);
+    }
+  }
+
+  /**
+   * Extract MinIO object key from a content URL.
+   * Handles both relative paths (/content/...) and full URLs (https://minio.../bucket/...).
+   */
+  private extractObjectKey(url: string): string | null {
+    if (!url) return null;
+    // Skip external URLs (not stored in our MinIO)
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      try {
+        const parsed = new URL(url);
+        // Only process MinIO URLs (contain our bucket name in path)
+        const pathParts = parsed.pathname.split('/').filter(Boolean);
+        // MinIO URLs: /bucket-name/object-key — skip the bucket name
+        if (pathParts.length >= 2) {
+          return pathParts.slice(1).join('/');
+        }
+      } catch {
+        return null;
+      }
+      return null;
+    }
+    // Relative path — use as-is (strip leading slash)
+    return url.startsWith('/') ? url.substring(1) : url;
   }
 
   private generateToken(user: { id: string; email: string; role: string; isSuperAdmin?: boolean }, organization: { id: string }): string {
