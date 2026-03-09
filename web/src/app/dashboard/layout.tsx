@@ -72,12 +72,22 @@ export default function DashboardLayout({
 
   // Get user initials for avatar
   const getUserInitials = () => {
+    if (user?.firstName && user?.lastName) {
+      return (user.firstName[0] + user.lastName[0]).toUpperCase();
+    }
     if (!user?.email) return 'U';
     const parts = user.email.split('@')[0].split('.');
     if (parts.length >= 2) {
       return (parts[0][0] + parts[1][0]).toUpperCase();
     }
     return user.email.substring(0, 2).toUpperCase();
+  };
+
+  const getUserDisplayName = () => {
+    if (user?.firstName) {
+      return user.lastName ? `${user.firstName} ${user.lastName}` : user.firstName;
+    }
+    return user?.email?.split('@')[0] || '';
   };
 
   // Editor route gets full viewport — no header/sidebar
@@ -151,7 +161,7 @@ export default function DashboardLayout({
                       <span className="text-[#061A21] text-sm font-semibold">{getUserInitials()}</span>
                     </div>
                     <div className="hidden md:block text-left">
-                      <div className="text-sm font-medium text-[var(--foreground)]">{user.email.split('@')[0]}</div>
+                      <div className="text-sm font-medium text-[var(--foreground)]">{getUserDisplayName()}</div>
                       <div className="text-xs text-[var(--foreground-tertiary)]">{user.email}</div>
                     </div>
                     <svg className="w-4 h-4 text-[var(--foreground-tertiary)]" fill="currentColor" viewBox="0 0 20 20">
@@ -168,7 +178,7 @@ export default function DashboardLayout({
                       />
                       <div className="absolute right-0 mt-2 w-56 bg-[var(--surface)] rounded-lg shadow-lg border border-[var(--border)] z-20">
                         <div className="p-4 border-b border-[var(--border)]">
-                          <div className="text-sm font-medium text-[var(--foreground)]">{user.email.split('@')[0]}</div>
+                          <div className="text-sm font-medium text-[var(--foreground)]">{getUserDisplayName()}</div>
                           <div className="text-xs text-[var(--foreground-tertiary)]">{user.email}</div>
                         </div>
                         <div className="py-2">

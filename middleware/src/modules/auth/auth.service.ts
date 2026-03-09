@@ -442,6 +442,27 @@ export class AuthService {
     await this.redisService.del(`user_auth:${userId}`);
   }
 
+  async updateProfile(userId: string, data: { firstName?: string; lastName?: string }) {
+    const updated = await this.databaseService.user.update({
+      where: { id: userId },
+      data,
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        avatar: true,
+        organizationId: true,
+      },
+    });
+
+    // Invalidate user cache so next auth uses fresh data
+    await this.redisService.del(`user_auth:${userId}`);
+
+    return updated;
+  }
+
   async deleteAccount(userId: string, password: string): Promise<void> {
     // 1. Fetch user with organization
     const user = await this.databaseService.user.findUnique({

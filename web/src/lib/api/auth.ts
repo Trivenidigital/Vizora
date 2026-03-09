@@ -15,6 +15,7 @@ declare module './client' {
     validateResetToken(token: string): Promise<{ valid: boolean; email?: string }>;
     resetPassword(token: string, newPassword: string): Promise<{ message: string }>;
     deleteAccount(data: { password: string; confirmation: string }): Promise<{ message: string }>;
+    updateProfile(data: { firstName?: string; lastName?: string }): Promise<AuthUser>;
   }
 }
 
@@ -103,4 +104,12 @@ ApiClient.prototype.deleteAccount = async function (data: { password: string; co
     method: 'DELETE',
     body: JSON.stringify(data),
   });
+};
+
+ApiClient.prototype.updateProfile = async function (data: { firstName?: string; lastName?: string }): Promise<AuthUser> {
+  const response = await this.request<{ user: AuthUser }>('/auth/me', {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+  return response.user;
 };

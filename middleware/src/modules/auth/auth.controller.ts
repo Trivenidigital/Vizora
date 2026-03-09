@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, Get, Delete, Res, Req, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Patch, Body, UseGuards, Get, Delete, Res, Req, HttpCode, HttpStatus } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import {
@@ -10,7 +10,7 @@ import {
   ApiCookieAuth,
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto, ChangePasswordDto, DeleteAccountDto } from './dto';
+import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto, ChangePasswordDto, DeleteAccountDto, UpdateProfileDto } from './dto';
 import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -231,6 +231,22 @@ export class AuthController {
       success: true,
       data: { user: safeUser },
     };
+  }
+
+  @ApiOperation({ summary: 'Update profile (name) for authenticated user' })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth()
+  @ApiBody({ type: UpdateProfileDto })
+  @ApiResponse({ status: 200, description: 'Profile updated.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @UseGuards(JwtAuthGuard)
+  @Patch('me')
+  async updateMe(
+    @CurrentUser('id') userId: string,
+    @Body() dto: UpdateProfileDto,
+  ) {
+    const user = await this.authService.updateProfile(userId, dto);
+    return { success: true, data: { user } };
   }
 
   @ApiOperation({ summary: 'Change password for authenticated user' })

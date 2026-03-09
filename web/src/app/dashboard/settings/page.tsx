@@ -39,6 +39,10 @@ export default function SettingsPage() {
 
  const [saving, setSaving] = useState(false);
 
+ // Profile state
+ const [profileForm, setProfileForm] = useState({ firstName: '', lastName: '' });
+ const [profileSaving, setProfileSaving] = useState(false);
+
  // Fetch real settings on mount
  useEffect(() => {
    async function loadSettings() {
@@ -55,6 +59,10 @@ export default function SettingsPage() {
          timezone: orgSettings.timezone ?? prev.timezone,
          notifications: orgSettings.notifications ?? prev.notifications,
        }));
+       setProfileForm({
+         firstName: user.firstName || '',
+         lastName: user.lastName || '',
+       });
      } catch (err) {
        if (process.env.NODE_ENV === 'development') {
          console.error('Failed to load settings:', err);
@@ -63,6 +71,25 @@ export default function SettingsPage() {
    }
    loadSettings();
  }, []);
+
+ const handleSaveProfile = async () => {
+   if (!profileForm.firstName.trim()) {
+     toast.error('First name is required');
+     return;
+   }
+   setProfileSaving(true);
+   try {
+     await apiClient.updateProfile({
+       firstName: profileForm.firstName.trim(),
+       lastName: profileForm.lastName.trim(),
+     });
+     toast.success('Profile updated!');
+   } catch (error: any) {
+     toast.error(error.message || 'Failed to update profile');
+   } finally {
+     setProfileSaving(false);
+   }
+ };
 
  const handleChangePassword = async () => {
    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
@@ -122,6 +149,46 @@ export default function SettingsPage() {
  <p className="mt-2 text-[var(--foreground-secondary)]">
  Manage your account and preferences
  </p>
+ </div>
+
+ {/* Profile Settings */}
+ <div className="bg-[var(--surface)] rounded-lg shadow-md p-6">
+ <h3 className="text-lg font-semibold text-[var(--foreground)] mb-4">Profile</h3>
+ <div className="space-y-4">
+ <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+ <div>
+ <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
+ First Name
+ </label>
+ <input
+ type="text"
+ value={profileForm.firstName}
+ onChange={(e) => setProfileForm({ ...profileForm, firstName: e.target.value })}
+ className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ />
+ </div>
+ <div>
+ <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
+ Last Name
+ </label>
+ <input
+ type="text"
+ value={profileForm.lastName}
+ onChange={(e) => setProfileForm({ ...profileForm, lastName: e.target.value })}
+ className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ />
+ </div>
+ </div>
+ <div className="flex justify-end">
+ <button
+   onClick={handleSaveProfile}
+   disabled={profileSaving}
+   className="px-4 py-2 text-sm font-medium bg-[#00E5A0] text-[#061A21] hover:bg-[#00CC8E] rounded-lg transition disabled:opacity-50"
+ >
+   {profileSaving ? 'Saving...' : 'Update Profile'}
+ </button>
+ </div>
+ </div>
  </div>
 
  {/* Organization Settings */}
