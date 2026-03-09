@@ -30,7 +30,7 @@ import { CreateContentDto } from './dto/create-content.dto';
 import { UpdateContentDto } from './dto/update-content.dto';
 import { ReplaceFileDto } from './dto/replace-file.dto';
 import { SetContentExpirationDto } from './dto/set-content-expiration.dto';
-import { PaginationDto } from '../common/dto/pagination.dto';
+import { ContentQueryDto } from './dto/content-query.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -178,11 +178,9 @@ export class ContentController {
   @Get()
   findAll(
     @CurrentUser('organizationId') organizationId: string,
-    @Query() pagination: PaginationDto,
-    @Query('type') type?: string,
-    @Query('status') status?: string,
-    @Query('templateOrientation') templateOrientation?: string,
+    @Query() query: ContentQueryDto,
   ) {
+    const { type, status, templateOrientation, ...pagination } = query;
     return this.contentService.findAll(organizationId, pagination, { type, status, templateOrientation });
   }
 

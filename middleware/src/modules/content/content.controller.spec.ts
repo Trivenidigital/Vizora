@@ -309,7 +309,7 @@ describe('ContentController', () => {
     it('should pass type and status filters', async () => {
       mockContentService.findAll.mockResolvedValue({ data: [], total: 0 } as any);
 
-      await controller.findAll(organizationId, pagination as any, 'image', 'active');
+      await controller.findAll(organizationId, { ...pagination, type: 'image', status: 'active' } as any);
 
       expect(mockContentService.findAll).toHaveBeenCalledWith(
         organizationId,
