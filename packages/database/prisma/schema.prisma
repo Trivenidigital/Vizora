@@ -237,6 +237,7 @@ model Playlist {
   id          String   @id @default(cuid())
   name        String
   description String?
+  loop        Boolean  @default(true)
   isDefault   Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

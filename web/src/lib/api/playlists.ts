@@ -7,8 +7,8 @@ declare module './client' {
   interface ApiClient {
     getPlaylists(params?: { page?: number; limit?: number }): Promise<PaginatedResponse<Playlist>>;
     getPlaylist(id: string): Promise<Playlist>;
-    createPlaylist(data: { name: string; description?: string; items?: Array<{ contentId: string; duration?: number }> }): Promise<Playlist>;
-    updatePlaylist(id: string, data: Partial<{ name: string; description?: string }>): Promise<Playlist>;
+    createPlaylist(data: { name: string; description?: string; loop?: boolean; items?: Array<{ contentId: string; duration?: number }> }): Promise<Playlist>;
+    updatePlaylist(id: string, data: Partial<{ name: string; description?: string; loop?: boolean }>): Promise<Playlist>;
     deletePlaylist(id: string): Promise<void>;
     duplicatePlaylist(id: string): Promise<Playlist>;
     addPlaylistItem(playlistId: string, contentId: string, duration?: number): Promise<PlaylistItem>;
@@ -30,6 +30,7 @@ ApiClient.prototype.getPlaylist = async function (id: string): Promise<Playlist>
 ApiClient.prototype.createPlaylist = async function (data: {
   name: string;
   description?: string;
+  loop?: boolean;
   items?: Array<{ contentId: string; duration?: number }>;
 }): Promise<Playlist> {
   return this.request<Playlist>('/playlists', {
@@ -40,7 +41,7 @@ ApiClient.prototype.createPlaylist = async function (data: {
 
 ApiClient.prototype.updatePlaylist = async function (
   id: string,
-  data: Partial<{ name: string; description?: string }>
+  data: Partial<{ name: string; description?: string; loop?: boolean }>
 ): Promise<Playlist> {
   return this.request<Playlist>(`/playlists/${id}`, {
     method: 'PATCH',

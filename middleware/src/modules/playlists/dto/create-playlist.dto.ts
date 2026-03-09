@@ -27,6 +27,11 @@ export class CreatePlaylistDto {
   @IsOptional()
   @Type(() => Boolean)
   @IsBoolean()
+  loop?: boolean;
+
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
   isDefault?: boolean;
 
   @IsOptional()

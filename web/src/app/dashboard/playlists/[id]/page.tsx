@@ -298,9 +298,38 @@ export default function PlaylistBuilderPage() {
  </button>
  <div>
  <h1 className="text-2xl font-bold text-[var(--foreground)]">{playlist.name}</h1>
+ <div className="flex items-center gap-3 mt-1">
  {playlist.description && (
- <p className="text-sm text-[var(--foreground-secondary)] mt-1">{playlist.description}</p>
+ <p className="text-sm text-[var(--foreground-secondary)]">{playlist.description}</p>
  )}
+ <label className="flex items-center gap-2 cursor-pointer select-none">
+ <button
+   role="switch"
+   aria-checked={playlist.loop !== false}
+   onClick={async () => {
+     const newLoop = playlist.loop === false;
+     setPlaylist({ ...playlist, loop: newLoop });
+     try {
+       await apiClient.updatePlaylist(playlist.id, { loop: newLoop });
+       toast.success(newLoop ? 'Loop enabled' : 'Loop disabled');
+     } catch {
+       setPlaylist({ ...playlist, loop: !newLoop });
+       toast.error('Failed to update loop setting');
+     }
+   }}
+   className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+     playlist.loop !== false ? 'bg-[#00E5A0]' : 'bg-[var(--border)]'
+   }`}
+ >
+   <span
+     className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+       playlist.loop !== false ? 'translate-x-4' : 'translate-x-0.5'
+     }`}
+   />
+ </button>
+ <span className="text-xs text-[var(--foreground-tertiary)]">Loop</span>
+ </label>
+ </div>
  </div>
  </div>
  <div className="flex items-center gap-3">
