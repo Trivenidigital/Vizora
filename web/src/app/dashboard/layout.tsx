@@ -204,7 +204,7 @@ export default function DashboardLayout({
       </header>
 
       {/* Trial/Subscription Banner */}
-      <div className="fixed top-16 left-0 right-0 z-20">
+      <div className="fixed top-16 left-0 right-0 z-20 lg:left-56">
         <TrialBanner />
       </div>
 
