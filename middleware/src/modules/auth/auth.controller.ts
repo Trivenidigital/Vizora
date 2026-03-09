@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, Get, Res, Req } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Get, Delete, Res, Req, HttpCode, HttpStatus } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import {
@@ -10,7 +10,7 @@ import {
   ApiCookieAuth,
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto, ChangePasswordDto } from './dto';
+import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto, ChangePasswordDto, DeleteAccountDto } from './dto';
 import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -313,6 +313,33 @@ export class AuthController {
       success: true,
       data: {
         message: 'Password has been reset successfully.',
+      },
+    };
+  }
+
+  @ApiOperation({ summary: 'Delete account permanently' })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth()
+  @ApiBody({ type: DeleteAccountDto })
+  @ApiResponse({ status: 200, description: 'Account deleted successfully.' })
+  @ApiResponse({ status: 401, description: 'Incorrect password.' })
+  @UseGuards(JwtAuthGuard)
+  @Delete('account')
+  @HttpCode(HttpStatus.OK)
+  async deleteAccount(
+    @CurrentUser('id') userId: string,
+    @Body() dto: DeleteAccountDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    await this.authService.deleteAccount(userId, dto.password);
+
+    // Clear auth cookie
+    this.clearAuthCookie(res);
+
+    return {
+      success: true,
+      data: {
+        message: 'Account deleted successfully.',
       },
     };
   }

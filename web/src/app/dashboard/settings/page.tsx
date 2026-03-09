@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { Icon } from '@/theme/icons';
 import { useTheme } from '@/components/providers/ThemeProvider';
@@ -28,6 +29,13 @@ export default function SettingsPage() {
  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
  const [passwordLoading, setPasswordLoading] = useState(false);
+
+ // Delete account modal state
+ const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+ const [deleteForm, setDeleteForm] = useState({ password: '', confirmation: '' });
+ const [deleteLoading, setDeleteLoading] = useState(false);
+ const [deleteError, setDeleteError] = useState('');
+ const router = useRouter();
 
  const [saving, setSaving] = useState(false);
 
@@ -78,6 +86,32 @@ export default function SettingsPage() {
      toast.error(error.message || 'Failed to change password');
    } finally {
      setPasswordLoading(false);
+   }
+ };
+
+ const handleDeleteAccount = async () => {
+   setDeleteError('');
+   if (deleteForm.confirmation !== 'DELETE MY ACCOUNT') {
+     setDeleteError('Please type "DELETE MY ACCOUNT" exactly');
+     return;
+   }
+   if (!deleteForm.password) {
+     setDeleteError('Password is required');
+     return;
+   }
+   setDeleteLoading(true);
+   try {
+     await apiClient.deleteAccount({
+       password: deleteForm.password,
+       confirmation: deleteForm.confirmation,
+     });
+     // Clear auth state and redirect to login
+     apiClient.setAuthenticated(false);
+     router.push('/login?deleted=1');
+   } catch (error: any) {
+     setDeleteError(error.message || 'Failed to delete account. Please check your password.');
+   } finally {
+     setDeleteLoading(false);
    }
  };
 
@@ -315,7 +349,10 @@ export default function SettingsPage() {
  <Icon name="download" size="md" className="text-[var(--foreground-secondary)]" />
  Export Data
  </button>
- <button className="w-full px-4 py-3 text-sm bg-red-50 dark:bg-red-900 text-red-600 dark:text-red-300 rounded-lg hover:bg-red-100 dark:hover:bg-red-800 transition font-medium text-left flex items-center gap-2">
+ <button
+   onClick={() => setShowDeleteAccountModal(true)}
+   className="w-full px-4 py-3 text-sm bg-red-50 dark:bg-red-900 text-red-600 dark:text-red-300 rounded-lg hover:bg-red-100 dark:hover:bg-red-800 transition font-medium text-left flex items-center gap-2"
+ >
  <Icon name="warning" size="md" className="text-red-600 dark:text-red-300" />
  Delete Account
  </button>
@@ -408,6 +445,76 @@ export default function SettingsPage() {
          className="px-4 py-2 text-sm font-medium bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50"
        >
          {passwordLoading ? 'Changing...' : 'Change Password'}
+       </button>
+     </div>
+   </div>
+ </Modal>
+ {/* Delete Account Modal */}
+ <Modal
+   isOpen={showDeleteAccountModal}
+   onClose={() => {
+     setShowDeleteAccountModal(false);
+     setDeleteForm({ password: '', confirmation: '' });
+     setDeleteError('');
+   }}
+   title="Delete Account"
+ >
+   <div className="space-y-4">
+     <div className="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
+       <p className="text-sm text-red-700 dark:text-red-300 font-medium mb-2">
+         This action is permanent and cannot be undone.
+       </p>
+       <ul className="text-sm text-red-600 dark:text-red-400 list-disc list-inside space-y-1">
+         <li>All your content, playlists, and schedules will be deleted</li>
+         <li>All paired devices will be unpaired and removed</li>
+         <li>Your organization will be permanently deleted if you are the sole admin</li>
+         <li>Your account will be anonymized for audit purposes</li>
+       </ul>
+     </div>
+     {deleteError && (
+       <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+         <p className="text-sm text-red-600 dark:text-red-400">{deleteError}</p>
+       </div>
+     )}
+     <div>
+       <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-1">
+         Type <span className="font-mono font-bold text-red-600 dark:text-red-400">DELETE MY ACCOUNT</span> to confirm
+       </label>
+       <input
+         type="text"
+         value={deleteForm.confirmation}
+         onChange={(e) => setDeleteForm({ ...deleteForm, confirmation: e.target.value })}
+         placeholder="DELETE MY ACCOUNT"
+         className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+       />
+     </div>
+     <div>
+       <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-1">Password</label>
+       <input
+         type="password"
+         value={deleteForm.password}
+         onChange={(e) => setDeleteForm({ ...deleteForm, password: e.target.value })}
+         placeholder="Enter your password"
+         className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+       />
+     </div>
+     <div className="flex justify-end gap-3 pt-4">
+       <button
+         onClick={() => {
+           setShowDeleteAccountModal(false);
+           setDeleteForm({ password: '', confirmation: '' });
+           setDeleteError('');
+         }}
+         className="px-4 py-2 text-sm font-medium text-[var(--foreground-secondary)] bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition"
+       >
+         Cancel
+       </button>
+       <button
+         onClick={handleDeleteAccount}
+         disabled={deleteLoading || deleteForm.confirmation !== 'DELETE MY ACCOUNT' || !deleteForm.password}
+         className="px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+       >
+         {deleteLoading ? 'Deleting...' : 'Permanently Delete Account'}
        </button>
      </div>
    </div>

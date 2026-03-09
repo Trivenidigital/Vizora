@@ -97,6 +97,10 @@ describe('AuthService', () => {
       detect: jest.fn().mockReturnValue({ country: 'US', currency: 'USD', provider: 'stripe' }),
     };
 
+    const mockBillingService = {
+      cancelSubscription: jest.fn().mockResolvedValue(undefined),
+    };
+
     // Directly instantiate the service with mocked dependencies
     service = new AuthService(
       mockDatabaseService as DatabaseService,
@@ -104,6 +108,7 @@ describe('AuthService', () => {
       mockRedisService as RedisService,
       mockMailService as MailService,
       mockGeoService as GeoService,
+      mockBillingService as any,
     );
     
     // Reset bcrypt mocks

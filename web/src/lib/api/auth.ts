@@ -14,6 +14,7 @@ declare module './client' {
     forgotPassword(email: string): Promise<{ message: string }>;
     validateResetToken(token: string): Promise<{ valid: boolean; email?: string }>;
     resetPassword(token: string, newPassword: string): Promise<{ message: string }>;
+    deleteAccount(data: { password: string; confirmation: string }): Promise<{ message: string }>;
   }
 }
 
@@ -94,5 +95,12 @@ ApiClient.prototype.resetPassword = async function (token: string, newPassword: 
   return this.request<{ message: string }>('/auth/reset-password', {
     method: 'POST',
     body: JSON.stringify({ token, newPassword }),
+  });
+};
+
+ApiClient.prototype.deleteAccount = async function (data: { password: string; confirmation: string }): Promise<{ message: string }> {
+  return this.request<{ message: string }>('/auth/account', {
+    method: 'DELETE',
+    body: JSON.stringify(data),
   });
 };

@@ -16,6 +16,7 @@ import * as crypto from 'crypto';
 import { RegisterDto, LoginDto } from './dto';
 import { AUTH_CONSTANTS } from './constants/auth.constants';
 import { GeoService } from '../common/services/geo.service';
+import { BillingService } from '../billing/billing.service';
 
 // Account lockout constants
 const MAX_LOGIN_ATTEMPTS = 10;
@@ -31,6 +32,7 @@ export class AuthService {
     private redisService: RedisService,
     private mailService: MailService,
     private geoService: GeoService,
+    private billingService: BillingService,
   ) {}
 
   async register(dto: RegisterDto, clientIp?: string) {
@@ -438,6 +440,181 @@ export class AuthService {
 
     // Invalidate user cache so next auth uses fresh data
     await this.redisService.del(`user_auth:${userId}`);
+  }
+
+  async deleteAccount(userId: string, password: string): Promise<void> {
+    // 1. Fetch user with organization
+    const user = await this.databaseService.user.findUnique({
+      where: { id: userId },
+      include: { organization: true },
+    });
+
+    if (!user || !user.passwordHash) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    // 2. Verify password — MUST fail if wrong
+    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Incorrect password');
+    }
+
+    const originalEmail = user.email;
+    const orgId = user.organizationId;
+
+    // 3. Check if sole admin
+    const adminCount = await this.databaseService.user.count({
+      where: {
+        organizationId: orgId,
+        role: 'admin',
+        isActive: true,
+      },
+    });
+
+    const isSoleAdmin = adminCount <= 1 && user.role === 'admin';
+
+    if (isSoleAdmin) {
+      // 4a. Cancel active subscription (best-effort)
+      try {
+        const org = user.organization;
+        if (org.stripeSubscriptionId || org.razorpaySubscriptionId) {
+          await this.billingService.cancelSubscription(orgId, true);
+        }
+      } catch (err) {
+        this.logger.warn(`Failed to cancel subscription during account deletion for org ${orgId}: ${err instanceof Error ? err.message : 'Unknown'}`);
+      }
+
+      // 4b-i. Delete all org data in a transaction, then delete the org
+      await this.databaseService.$transaction(async (tx) => {
+        // Delete support messages (depends on support requests)
+        await tx.supportMessage.deleteMany({ where: { organizationId: orgId } });
+        // Delete support requests
+        await tx.supportRequest.deleteMany({ where: { organizationId: orgId } });
+        // Delete notifications
+        await tx.notification.deleteMany({ where: { organizationId: orgId } });
+        // Delete API keys
+        await tx.apiKey.deleteMany({ where: { organizationId: orgId } });
+        // Delete billing transactions
+        await tx.billingTransaction.deleteMany({ where: { organizationId: orgId } });
+        // Delete content impressions
+        await tx.contentImpression.deleteMany({ where: { organizationId: orgId } });
+        // Delete promotion redemptions
+        await tx.promotionRedemption.deleteMany({ where: { organizationId: orgId } });
+        // Delete schedules
+        await tx.schedule.deleteMany({ where: { organizationId: orgId } });
+        // Delete display group members (via display groups)
+        const groupIds = (await tx.displayGroup.findMany({ where: { organizationId: orgId }, select: { id: true } })).map(g => g.id);
+        if (groupIds.length > 0) {
+          await tx.displayGroupMember.deleteMany({ where: { displayGroupId: { in: groupIds } } });
+        }
+        // Delete display groups
+        await tx.displayGroup.deleteMany({ where: { organizationId: orgId } });
+        // Delete display tags
+        const displayIds = (await tx.display.findMany({ where: { organizationId: orgId }, select: { id: true } })).map(d => d.id);
+        if (displayIds.length > 0) {
+          await tx.displayTag.deleteMany({ where: { displayId: { in: displayIds } } });
+        }
+        // Delete displays
+        await tx.display.deleteMany({ where: { organizationId: orgId } });
+        // Delete playlist items (via playlists)
+        const playlistIds = (await tx.playlist.findMany({ where: { organizationId: orgId }, select: { id: true } })).map(p => p.id);
+        if (playlistIds.length > 0) {
+          await tx.playlistItem.deleteMany({ where: { playlistId: { in: playlistIds } } });
+        }
+        // Delete playlists
+        await tx.playlist.deleteMany({ where: { organizationId: orgId } });
+        // Delete content tags
+        const contentIds = (await tx.content.findMany({ where: { organizationId: orgId }, select: { id: true } })).map(c => c.id);
+        if (contentIds.length > 0) {
+          await tx.contentTag.deleteMany({ where: { contentId: { in: contentIds } } });
+        }
+        // Delete content (clear self-references first)
+        await tx.content.updateMany({
+          where: { organizationId: orgId },
+          data: { replacementContentId: null, previousVersionId: null },
+        });
+        await tx.content.deleteMany({ where: { organizationId: orgId } });
+        // Delete content folders
+        // Clear parent references first to avoid FK issues
+        await tx.contentFolder.updateMany({ where: { organizationId: orgId }, data: { parentId: null } });
+        await tx.contentFolder.deleteMany({ where: { organizationId: orgId } });
+        // Delete tags
+        await tx.tag.deleteMany({ where: { organizationId: orgId } });
+        // Delete audit logs
+        await tx.auditLog.deleteMany({ where: { organizationId: orgId } });
+        // Delete password reset tokens for all users in org
+        const userIds = (await tx.user.findMany({ where: { organizationId: orgId }, select: { id: true } })).map(u => u.id);
+        if (userIds.length > 0) {
+          await tx.passwordResetToken.deleteMany({ where: { userId: { in: userIds } } });
+        }
+        // Delete all other users in org (except current user, handled below)
+        await tx.user.deleteMany({
+          where: { organizationId: orgId, id: { not: userId } },
+        });
+        // Anonymize the requesting user
+        const randomHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
+        await tx.user.update({
+          where: { id: userId },
+          data: {
+            firstName: 'Deleted',
+            lastName: 'User',
+            email: `deleted_${userId}@deleted.vizora.cloud`,
+            passwordHash: randomHash,
+            isActive: false,
+            avatar: null,
+          },
+        });
+        // Delete the organization
+        await tx.organization.delete({ where: { id: orgId } });
+      });
+    } else {
+      // 5. Not sole admin — just remove user from org
+      await this.databaseService.$transaction(async (tx) => {
+        // Delete user's password reset tokens
+        await tx.passwordResetToken.deleteMany({ where: { userId } });
+        // Anonymize user record
+        const randomHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
+        await tx.user.update({
+          where: { id: userId },
+          data: {
+            firstName: 'Deleted',
+            lastName: 'User',
+            email: `deleted_${userId}@deleted.vizora.cloud`,
+            passwordHash: randomHash,
+            isActive: false,
+            avatar: null,
+          },
+        });
+        // Create audit log
+        await tx.auditLog.create({
+          data: {
+            organizationId: orgId,
+            userId,
+            action: 'account_deleted',
+            entityType: 'user',
+            entityId: userId,
+            changes: { reason: 'User requested account deletion' },
+          },
+        });
+      });
+    }
+
+    // 7. Send confirmation email (best-effort)
+    try {
+      await this.mailService.sendAccountDeletionEmail?.(originalEmail, user.firstName);
+    } catch (err) {
+      this.logger.warn(`Failed to send account deletion email to ${originalEmail}: ${err instanceof Error ? err.message : 'Unknown'}`);
+    }
+
+    // 9. Invalidate all JWT tokens for this user via Redis
+    try {
+      await this.redisService.set(`user_deleted:${userId}`, '1', AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS);
+      await this.redisService.del(`user_auth:${userId}`);
+    } catch (err) {
+      this.logger.warn(`Failed to invalidate tokens for deleted user ${userId}: ${err instanceof Error ? err.message : 'Unknown'}`);
+    }
+
+    this.logger.log(`Account deleted for user ${userId} (email: ${originalEmail})`);
   }
 
   private generateToken(user: { id: string; email: string; role: string; isSuperAdmin?: boolean }, organization: { id: string }): string {

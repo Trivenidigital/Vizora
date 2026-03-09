@@ -38,6 +38,8 @@ describe('AuthController', () => {
       forgotPassword: jest.fn(),
       validateResetToken: jest.fn(),
       resetPassword: jest.fn(),
+      changePassword: jest.fn(),
+      deleteAccount: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
