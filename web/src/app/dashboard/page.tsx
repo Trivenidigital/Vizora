@@ -1,5 +1,10 @@
+import type { Metadata } from 'next';
 import { serverFetch } from '@/lib/server-api';
 import DashboardClient from './page-client';
+
+export const metadata: Metadata = {
+  title: 'Dashboard',
+};
 
 export default async function DashboardPage() {
  let content: any[] = [];

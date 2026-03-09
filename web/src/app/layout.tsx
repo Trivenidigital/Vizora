@@ -12,7 +12,10 @@ const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-dm', display: 'sw
 const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono', display: 'swap' });
 
 export const metadata = {
-  title: 'Vizora — AI-Powered Digital Signage Platform',
+  title: {
+    default: 'Vizora — AI-Powered Digital Signage Platform',
+    template: '%s | Vizora',
+  },
   description: 'AI-driven digital signage that runs itself. Generate content, optimize schedules, predict device issues, and manage thousands of screens autonomously.',
   icons: {
     icon: '/favicon.ico',
