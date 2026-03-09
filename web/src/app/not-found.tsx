@@ -3,7 +3,7 @@ import Link from 'next/link';
 export default function NotFound() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--background)]">
-      <div className="text-center px-6 max-w-md">
+      <div className="text-center px-6 max-w-md animate-[fadeIn_0.3s_ease-out]">
         <h1 className="text-8xl font-bold eh-gradient mb-4">404</h1>
         <h2 className="text-2xl font-semibold text-[var(--foreground)] mb-4">
           Page Not Found
@@ -14,7 +14,7 @@ export default function NotFound() {
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link
             href="/dashboard"
-            className="inline-flex items-center justify-center px-6 py-3 bg-[#00E5A0] text-[#061A21] font-semibold rounded-lg hover:bg-[#00CC8E] transition"
+            className="inline-flex items-center justify-center px-6 py-3 eh-btn-neon rounded-lg"
           >
             Go to Dashboard
           </Link>

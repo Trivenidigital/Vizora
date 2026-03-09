@@ -159,8 +159,31 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
 
  if (loading) {
  return (
- <div className="flex items-center justify-center min-h-[60vh]">
- <LoadingSpinner size="lg" />
+ <div className="space-y-6">
+ <div>
+ <div className="h-8 w-48 bg-[var(--surface)] rounded-lg animate-pulse" />
+ <div className="h-4 w-72 bg-[var(--surface)] rounded mt-3 animate-pulse" />
+ </div>
+ <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+ {[...Array(4)].map((_, i) => (
+ <div key={i} className="bg-[var(--surface)] p-6 rounded-lg border border-[var(--border)] animate-pulse">
+ <div className="flex items-center justify-between mb-4">
+ <div className="h-4 w-24 bg-[var(--background-tertiary)] rounded" />
+ <div className="h-8 w-8 bg-[var(--background-tertiary)] rounded" />
+ </div>
+ <div className="h-10 w-16 bg-[var(--background-tertiary)] rounded mb-2" />
+ <div className="h-3 w-20 bg-[var(--background-tertiary)] rounded" />
+ </div>
+ ))}
+ </div>
+ <div className="bg-[var(--surface)] rounded-lg border border-[var(--border)] p-6 animate-pulse">
+ <div className="h-5 w-32 bg-[var(--background-tertiary)] rounded mb-4" />
+ <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+ {[...Array(4)].map((_, i) => (
+ <div key={i} className="h-16 bg-[var(--background-tertiary)] rounded-lg" />
+ ))}
+ </div>
+ </div>
  </div>
  );
  }
