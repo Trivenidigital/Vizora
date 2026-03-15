@@ -34,7 +34,7 @@ import {
   ],
   controllers: [
     // Sub-path controllers MUST be listed before ContentController to prevent
-    // ContentController's @Get(':id') (with ParseUUIDPipe) from matching
+    // ContentController's @Get(':id') (with ParseIdPipe) from matching
     // /content/widgets, /content/layouts, /content/templates, /content/bulk as :id params → 400
     WidgetsController,
     LayoutsController,

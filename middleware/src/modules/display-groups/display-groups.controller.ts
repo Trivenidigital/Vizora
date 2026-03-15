@@ -8,8 +8,8 @@ import {
   Delete,
   Query,
   UseGuards,
-  ParseUUIDPipe,
 } from '@nestjs/common';
+import { ParseIdPipe } from '../common/pipes/parse-id.pipe';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { DisplayGroupsService } from './display-groups.service';
@@ -44,7 +44,7 @@ export class DisplayGroupsController {
   @Get(':id')
   findOne(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
   ) {
     return this.displayGroupsService.findOne(organizationId, id);
   }
@@ -53,7 +53,7 @@ export class DisplayGroupsController {
   @Roles('admin', 'manager')
   update(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @Body() updateDisplayGroupDto: UpdateDisplayGroupDto,
   ) {
     return this.displayGroupsService.update(organizationId, id, updateDisplayGroupDto);
@@ -63,7 +63,7 @@ export class DisplayGroupsController {
   @Roles('admin')
   remove(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
   ) {
     return this.displayGroupsService.remove(organizationId, id);
   }
@@ -72,7 +72,7 @@ export class DisplayGroupsController {
   @Roles('admin', 'manager')
   addDisplays(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @Body() manageDisplaysDto: ManageDisplaysDto,
   ) {
     return this.displayGroupsService.addDisplays(organizationId, id, manageDisplaysDto);
@@ -82,7 +82,7 @@ export class DisplayGroupsController {
   @Roles('admin', 'manager')
   removeDisplays(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @Body() manageDisplaysDto: ManageDisplaysDto,
   ) {
     return this.displayGroupsService.removeDisplays(organizationId, id, manageDisplaysDto);

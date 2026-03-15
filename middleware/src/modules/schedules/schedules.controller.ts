@@ -10,8 +10,8 @@ import {
   Req,
   UseGuards,
   UnauthorizedException,
-  ParseUUIDPipe,
 } from '@nestjs/common';
+import { ParseIdPipe } from '../common/pipes/parse-id.pipe';
 import type { Request } from 'express';
 import { JwtService } from '@nestjs/jwt';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -69,7 +69,7 @@ export class SchedulesController {
 
   @Get('active/:displayId')
   @Public() // Bypass user JWT guard -- device JWT verified manually below
-  findActiveSchedules(@Param('displayId', ParseUUIDPipe) displayId: string, @Req() req: Request) {
+  findActiveSchedules(@Param('displayId', ParseIdPipe) displayId: string, @Req() req: Request) {
     // Verify device JWT to prevent unauthenticated schedule access
     const token = (req.headers.authorization as string)?.replace('Bearer ', '');
     if (!token) {
@@ -94,7 +94,7 @@ export class SchedulesController {
   @Get(':id')
   findOne(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
   ) {
     return this.schedulesService.findOne(organizationId, id);
   }
@@ -103,7 +103,7 @@ export class SchedulesController {
   @Roles('admin', 'manager')
   update(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @Body() updateScheduleDto: UpdateScheduleDto,
   ) {
     return this.schedulesService.update(organizationId, id, updateScheduleDto);
@@ -113,7 +113,7 @@ export class SchedulesController {
   @Roles('admin', 'manager')
   duplicate(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
   ) {
     return this.schedulesService.duplicate(organizationId, id);
   }
@@ -122,7 +122,7 @@ export class SchedulesController {
   @Roles('admin')
   remove(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
   ) {
     return this.schedulesService.remove(organizationId, id);
   }

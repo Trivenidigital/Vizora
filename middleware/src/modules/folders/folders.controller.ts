@@ -10,8 +10,8 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
-  ParseUUIDPipe,
 } from '@nestjs/common';
+import { ParseIdPipe } from '../common/pipes/parse-id.pipe';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { FoldersService } from './folders.service';
@@ -49,7 +49,7 @@ export class FoldersController {
   @Get(':id')
   findOne(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
   ) {
     return this.foldersService.findOne(organizationId, id);
   }
@@ -58,7 +58,7 @@ export class FoldersController {
   @Roles('admin', 'manager')
   update(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @Body() updateFolderDto: UpdateFolderDto,
   ) {
     return this.foldersService.update(organizationId, id, updateFolderDto);
@@ -68,7 +68,7 @@ export class FoldersController {
   @Roles('admin', 'manager')
   remove(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
   ) {
     return this.foldersService.remove(organizationId, id);
   }
@@ -78,7 +78,7 @@ export class FoldersController {
   @HttpCode(HttpStatus.OK)
   moveContent(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @Body() moveContentDto: MoveContentDto,
   ) {
     return this.foldersService.moveContent(organizationId, id, moveContentDto);
@@ -87,7 +87,7 @@ export class FoldersController {
   @Get(':id/content')
   getContents(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @Query() pagination: PaginationDto,
   ) {
     return this.foldersService.getContents(organizationId, id, pagination);
