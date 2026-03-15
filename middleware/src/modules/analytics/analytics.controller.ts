@@ -1,4 +1,5 @@
-import { Controller, Get, Query, Param, UseGuards, ParseUUIDPipe } from '@nestjs/common';
+import { Controller, Get, Query, Param, UseGuards } from '@nestjs/common';
+import { ParseIdPipe } from '../common/pipes/parse-id.pipe';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AnalyticsService } from './analytics.service';
@@ -83,7 +84,7 @@ export class AnalyticsController {
   @Roles('admin', 'manager')
   getContentMetrics(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('contentId', ParseUUIDPipe) contentId: string,
+    @Param('contentId', ParseIdPipe) contentId: string,
     @Query('range') range: string = 'month',
   ) {
     return this.analyticsService.getContentMetrics(organizationId, contentId, range);
@@ -92,7 +93,7 @@ export class AnalyticsController {
   @Get('device-uptime/:deviceId')
   @Roles('admin', 'manager', 'viewer')
   getDeviceUptime(
-    @Param('deviceId', ParseUUIDPipe) deviceId: string,
+    @Param('deviceId', ParseIdPipe) deviceId: string,
     @Query('days') days?: string,
     @CurrentUser('organizationId') organizationId: string,
   ) {

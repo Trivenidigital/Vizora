@@ -15,9 +15,9 @@ import {
   BadRequestException,
   NotFoundException,
   Logger,
-  ParseUUIDPipe,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { ParseIdPipe } from '../common/pipes/parse-id.pipe';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RequiresSubscription } from '../billing/decorators/requires-subscription.decorator';
@@ -187,7 +187,7 @@ export class ContentController {
   @Get(':id')
   findOne(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
   ) {
     return this.contentService.findOne(organizationId, id);
   }
@@ -200,7 +200,7 @@ export class ContentController {
   @Get(':id/download')
   async getDownloadUrl(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @Query('expirySeconds') expirySeconds?: string,
   ): Promise<{ url: string; expiresIn: number }> {
     const content = await this.contentService.findOne(organizationId, id);
@@ -241,7 +241,7 @@ export class ContentController {
   @Roles('admin', 'manager')
   update(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @Body() updateContentDto: UpdateContentDto,
   ) {
     return this.contentService.update(organizationId, id, updateContentDto);
@@ -252,7 +252,7 @@ export class ContentController {
   @HttpCode(HttpStatus.OK)
   async generateThumbnail(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
   ) {
     // Get content
     const content = await this.contentService.findOne(organizationId, id);
@@ -299,7 +299,7 @@ export class ContentController {
   @Roles('admin', 'manager')
   archive(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
   ) {
     return this.contentService.archive(organizationId, id);
   }
@@ -308,7 +308,7 @@ export class ContentController {
   @Roles('admin')
   remove(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
   ) {
     return this.contentService.remove(organizationId, id);
   }
@@ -323,7 +323,7 @@ export class ContentController {
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 100 * 1024 * 1024 } }))
   async replaceFile(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @UploadedFile() file: Express.Multer.File,
     @Body() replaceFileDto: ReplaceFileDto,
   ) {
@@ -422,7 +422,7 @@ export class ContentController {
   @Get(':id/versions')
   getVersionHistory(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
   ) {
     return this.contentService.getVersionHistory(organizationId, id);
   }
@@ -432,7 +432,7 @@ export class ContentController {
   @HttpCode(HttpStatus.OK)
   restore(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
   ) {
     return this.contentService.restore(organizationId, id);
   }
@@ -445,7 +445,7 @@ export class ContentController {
   @Roles('admin', 'manager')
   async setExpiration(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @Body() body: SetContentExpirationDto,
   ) {
     const expiresAtDate = new Date(body.expiresAt);
@@ -468,7 +468,7 @@ export class ContentController {
   @HttpCode(HttpStatus.OK)
   clearExpiration(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
   ) {
     return this.contentService.clearExpiration(organizationId, id);
   }

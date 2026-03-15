@@ -8,8 +8,8 @@ import {
   Param,
   Query,
   UseGuards,
-  ParseUUIDPipe,
 } from '@nestjs/common';
+import { ParseIdPipe } from '../../common/pipes/parse-id.pipe';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { ContentService } from '../content.service';
@@ -51,7 +51,7 @@ export class LayoutsController {
   @Roles('admin', 'manager')
   updateLayout(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @Body() dto: UpdateLayoutDto,
   ) {
     return this.contentService.updateLayout(organizationId, id, dto);
@@ -61,7 +61,7 @@ export class LayoutsController {
   @Roles('admin', 'manager', 'viewer')
   getResolvedLayout(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
   ) {
     return this.contentService.getResolvedLayout(organizationId, id);
   }
@@ -70,7 +70,7 @@ export class LayoutsController {
   @Roles('admin', 'manager')
   deleteLayout(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
   ) {
     return this.contentService.remove(organizationId, id);
   }

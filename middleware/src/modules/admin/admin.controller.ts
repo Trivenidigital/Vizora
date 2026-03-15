@@ -11,8 +11,8 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
-  ParseUUIDPipe,
 } from '@nestjs/common';
+import { ParseIdPipe } from '../common/pipes/parse-id.pipe';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -82,7 +82,7 @@ export class AdminController {
   }
 
   @Get('plans/:id')
-  async getPlan(@Param('id', ParseUUIDPipe) id: string) {
+  async getPlan(@Param('id', ParseIdPipe) id: string) {
     return this.plansService.findOne(id);
   }
 
@@ -109,7 +109,7 @@ export class AdminController {
 
   @Put('plans/:id')
   async updatePlan(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @Body() dto: UpdatePlanDto,
     @CurrentUser('userId') adminId: string,
     @Req() req: Request,
@@ -131,7 +131,7 @@ export class AdminController {
 
   @Delete('plans/:id')
   async deletePlan(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @CurrentUser('userId') adminId: string,
     @Req() req: Request,
   ) {
@@ -152,7 +152,7 @@ export class AdminController {
   @Post('plans/:id/duplicate')
   @HttpCode(HttpStatus.OK)
   async duplicatePlan(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @CurrentUser('userId') adminId: string,
     @Req() req: Request,
   ) {
@@ -201,7 +201,7 @@ export class AdminController {
   }
 
   @Get('promotions/:id')
-  async getPromotion(@Param('id', ParseUUIDPipe) id: string) {
+  async getPromotion(@Param('id', ParseIdPipe) id: string) {
     return this.promotionsService.findOne(id);
   }
 
@@ -232,7 +232,7 @@ export class AdminController {
 
   @Put('promotions/:id')
   async updatePromotion(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @Body() dto: UpdatePromotionDto,
     @CurrentUser('userId') adminId: string,
     @Req() req: Request,
@@ -254,7 +254,7 @@ export class AdminController {
 
   @Delete('promotions/:id')
   async deletePromotion(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @CurrentUser('userId') adminId: string,
     @Req() req: Request,
   ) {
@@ -300,7 +300,7 @@ export class AdminController {
 
   @Get('promotions/:id/redemptions')
   async getPromotionRedemptions(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @Query() pagination: PaginationDto,
   ) {
     return this.promotionsService.getRedemptions(id, pagination);
@@ -324,13 +324,13 @@ export class AdminController {
   }
 
   @Get('organizations/:id')
-  async getOrganization(@Param('id', ParseUUIDPipe) id: string) {
+  async getOrganization(@Param('id', ParseIdPipe) id: string) {
     return this.organizationsAdminService.findOne(id);
   }
 
   @Put('organizations/:id')
   async updateOrganization(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @Body() dto: UpdateOrgAdminDto,
     @CurrentUser('userId') adminId: string,
     @Req() req: Request,
@@ -360,7 +360,7 @@ export class AdminController {
 
   @Delete('organizations/:id')
   async deleteOrganization(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @CurrentUser('userId') adminId: string,
     @Req() req: Request,
   ) {
@@ -382,7 +382,7 @@ export class AdminController {
   @Post('organizations/:id/extend-trial')
   @HttpCode(HttpStatus.OK)
   async extendTrial(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @Body() dto: ExtendTrialDto,
     @CurrentUser('userId') adminId: string,
     @Req() req: Request,
@@ -405,7 +405,7 @@ export class AdminController {
   @Post('organizations/:id/suspend')
   @HttpCode(HttpStatus.OK)
   async suspendOrganization(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @Body() body: SuspendOrgDto,
     @CurrentUser('userId') adminId: string,
     @Req() req: Request,
@@ -428,7 +428,7 @@ export class AdminController {
   @Post('organizations/:id/unsuspend')
   @HttpCode(HttpStatus.OK)
   async unsuspendOrganization(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @CurrentUser('userId') adminId: string,
     @Req() req: Request,
   ) {
@@ -447,14 +447,14 @@ export class AdminController {
   }
 
   @Get('organizations/:id/stats')
-  async getOrganizationStats(@Param('id', ParseUUIDPipe) id: string) {
+  async getOrganizationStats(@Param('id', ParseIdPipe) id: string) {
     return this.organizationsAdminService.getStats(id);
   }
 
   @Post('organizations/:id/notes')
   @HttpCode(HttpStatus.OK)
   async addOrganizationNote(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @Body() dto: OrgNotesDto,
     @CurrentUser('userId') adminId: string,
   ) {
@@ -481,13 +481,13 @@ export class AdminController {
   }
 
   @Get('users/:id')
-  async getUser(@Param('id', ParseUUIDPipe) id: string) {
+  async getUser(@Param('id', ParseIdPipe) id: string) {
     return this.usersAdminService.findOne(id);
   }
 
   @Put('users/:id')
   async updateUser(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @Body() dto: UpdateUserAdminDto,
     @CurrentUser('userId') adminId: string,
     @Req() req: Request,
@@ -510,7 +510,7 @@ export class AdminController {
   @Post('users/:id/disable')
   @HttpCode(HttpStatus.OK)
   async disableUser(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @CurrentUser('userId') adminId: string,
     @Req() req: Request,
   ) {
@@ -532,7 +532,7 @@ export class AdminController {
   @Post('users/:id/enable')
   @HttpCode(HttpStatus.OK)
   async enableUser(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @CurrentUser('userId') adminId: string,
     @Req() req: Request,
   ) {
@@ -554,7 +554,7 @@ export class AdminController {
   @Post('users/:id/reset-password')
   @HttpCode(HttpStatus.OK)
   async resetUserPassword(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @CurrentUser('userId') adminId: string,
     @Req() req: Request,
   ) {
@@ -575,7 +575,7 @@ export class AdminController {
   @Post('users/:id/grant-super-admin')
   @HttpCode(HttpStatus.OK)
   async grantSuperAdmin(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @CurrentUser('userId') adminId: string,
     @Req() req: Request,
   ) {
@@ -597,7 +597,7 @@ export class AdminController {
   @Post('users/:id/revoke-super-admin')
   @HttpCode(HttpStatus.OK)
   async revokeSuperAdmin(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @CurrentUser('userId') adminId: string,
     @Req() req: Request,
   ) {
@@ -839,7 +839,7 @@ export class AdminController {
 
   @Delete('security/ip-blocklist/:id')
   async unblockIp(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @CurrentUser('userId') adminId: string,
     @Req() req: Request,
   ) {
@@ -866,7 +866,7 @@ export class AdminController {
   @Post('security/api-keys/:id/revoke')
   @HttpCode(HttpStatus.OK)
   async revokeApiKey(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @CurrentUser('userId') adminId: string,
     @Req() req: Request,
   ) {
@@ -894,7 +894,7 @@ export class AdminController {
   }
 
   @Get('announcements/:id')
-  async getAnnouncement(@Param('id', ParseUUIDPipe) id: string) {
+  async getAnnouncement(@Param('id', ParseIdPipe) id: string) {
     return this.announcementsService.findOne(id);
   }
 
@@ -935,7 +935,7 @@ export class AdminController {
 
   @Put('announcements/:id')
   async updateAnnouncement(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @Body() dto: UpdateAnnouncementDto,
     @CurrentUser('userId') adminId: string,
     @Req() req: Request,
@@ -957,7 +957,7 @@ export class AdminController {
 
   @Delete('announcements/:id')
   async deleteAnnouncement(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @CurrentUser('userId') adminId: string,
     @Req() req: Request,
   ) {
@@ -978,7 +978,7 @@ export class AdminController {
   @Post('announcements/:id/publish')
   @HttpCode(HttpStatus.OK)
   async publishAnnouncement(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @CurrentUser('userId') adminId: string,
     @Req() req: Request,
   ) {

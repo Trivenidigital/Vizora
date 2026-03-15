@@ -8,8 +8,8 @@ import {
   Delete,
   Query,
   UseGuards,
-  ParseUUIDPipe,
 } from '@nestjs/common';
+import { ParseIdPipe } from '../common/pipes/parse-id.pipe';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RequiresSubscription } from '../billing/decorators/requires-subscription.decorator';
@@ -48,7 +48,7 @@ export class PlaylistsController {
   @Get(':id')
   findOne(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
   ) {
     return this.playlistsService.findOne(organizationId, id);
   }
@@ -57,7 +57,7 @@ export class PlaylistsController {
   @Roles('admin', 'manager')
   update(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @Body() updatePlaylistDto: UpdatePlaylistDto,
   ) {
     return this.playlistsService.update(organizationId, id, updatePlaylistDto);
@@ -67,7 +67,7 @@ export class PlaylistsController {
   @Roles('admin', 'manager')
   duplicate(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
   ) {
     return this.playlistsService.duplicate(organizationId, id);
   }
@@ -76,7 +76,7 @@ export class PlaylistsController {
   @Roles('admin', 'manager')
   reorder(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
     @Body() reorderDto: ReorderPlaylistDto,
   ) {
     return this.playlistsService.reorder(organizationId, id, reorderDto.itemIds);
@@ -86,7 +86,7 @@ export class PlaylistsController {
   @Roles('admin', 'manager')
   addItem(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) playlistId: string,
+    @Param('id', ParseIdPipe) playlistId: string,
     @Body() dto: AddPlaylistItemDto,
   ) {
     return this.playlistsService.addItem(organizationId, playlistId, dto.contentId, dto.duration);
@@ -96,8 +96,8 @@ export class PlaylistsController {
   @Roles('admin', 'manager')
   updateItem(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) playlistId: string,
-    @Param('itemId', ParseUUIDPipe) itemId: string,
+    @Param('id', ParseIdPipe) playlistId: string,
+    @Param('itemId', ParseIdPipe) itemId: string,
     @Body() updateDto: UpdatePlaylistItemDto,
   ) {
     return this.playlistsService.updateItem(organizationId, playlistId, itemId, updateDto);
@@ -107,8 +107,8 @@ export class PlaylistsController {
   @Roles('admin')
   removeItem(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) playlistId: string,
-    @Param('itemId', ParseUUIDPipe) itemId: string,
+    @Param('id', ParseIdPipe) playlistId: string,
+    @Param('itemId', ParseIdPipe) itemId: string,
   ) {
     return this.playlistsService.removeItem(organizationId, playlistId, itemId);
   }
@@ -117,7 +117,7 @@ export class PlaylistsController {
   @Roles('admin')
   remove(
     @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseIdPipe) id: string,
   ) {
     return this.playlistsService.remove(organizationId, id);
   }
