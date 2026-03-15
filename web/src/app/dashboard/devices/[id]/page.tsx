@@ -37,8 +37,8 @@ export default function DeviceDetailPage() {
         setError(null);
         const data = await apiClient.getDisplay(deviceId);
         setDevice(data as DisplayDetail);
-      } catch (err: any) {
-        setError(err.message || 'Failed to load device');
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Failed to load device');
       } finally {
         setLoading(false);
       }

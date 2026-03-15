@@ -17,7 +17,8 @@ export class ParseIdPipe implements PipeTransform<string, string> {
   private static readonly UUID_RE =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-  // CUID pattern: starts with 'c', followed by lowercase alphanumeric, 20-30 chars total
+  // CUID pattern: starts with 'c', followed by lowercase alphanumeric, 20-30 chars total.
+  // Prisma's cuid() always generates lowercase, so no case-insensitive flag needed.
   private static readonly CUID_RE = /^c[a-z0-9]{19,29}$/;
 
   transform(value: string): string {
