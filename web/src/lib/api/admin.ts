@@ -33,6 +33,12 @@ declare module './client' {
     // Admin - Stats & Health
     getPlatformStats(): Promise<PlatformStats>;
     getPlatformHealth(): Promise<PlatformHealth>;
+    // Health Monitor
+    getHealthSelfTest(): Promise<Record<string, unknown>>;
+    triggerHealthSelfTest(): Promise<Record<string, unknown>>;
+    getHealthMonitorCurrent(): Promise<Record<string, unknown>>;
+    getHealthMonitorHistory(): Promise<Record<string, unknown>[]>;
+    getHealthMonitorMetrics(): Promise<Record<string, unknown>>;
     // Admin - Config
     getSystemConfigs(): Promise<SystemConfig[]>;
     updateSystemConfig(key: string, value: string | number | boolean): Promise<void>;
@@ -161,6 +167,23 @@ ApiClient.prototype.getPlatformStats = async function (): Promise<PlatformStats>
 
 ApiClient.prototype.getPlatformHealth = async function (): Promise<PlatformHealth> {
   return this.request<PlatformHealth>('/admin/health');
+};
+
+// Health Monitor endpoints
+ApiClient.prototype.getHealthSelfTest = async function (): Promise<Record<string, unknown>> {
+  return this.request<Record<string, unknown>>('/health/self-test');
+};
+ApiClient.prototype.triggerHealthSelfTest = async function (): Promise<Record<string, unknown>> {
+  return this.request<Record<string, unknown>>('/health/self-test', { method: 'POST' });
+};
+ApiClient.prototype.getHealthMonitorCurrent = async function (): Promise<Record<string, unknown>> {
+  return this.request<Record<string, unknown>>('/health/monitor/current');
+};
+ApiClient.prototype.getHealthMonitorHistory = async function (): Promise<Record<string, unknown>[]> {
+  return this.request<Record<string, unknown>[]>('/health/monitor/history');
+};
+ApiClient.prototype.getHealthMonitorMetrics = async function (): Promise<Record<string, unknown>> {
+  return this.request<Record<string, unknown>>('/health/monitor/metrics');
 };
 
 // Admin - Config
