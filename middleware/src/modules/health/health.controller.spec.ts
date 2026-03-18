@@ -3,6 +3,8 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 import { HealthController } from './health.controller';
 import { HealthService } from './health.service';
 import { ValidationMonitorService } from './validation-monitor.service';
+import { StartupSelfTestService } from './startup-self-test.service';
+import { ContinuousHealthMonitorService } from './continuous-health-monitor.service';
 
 describe('HealthController', () => {
   let controller: HealthController;
@@ -69,6 +71,14 @@ describe('HealthController', () => {
           provide: ValidationMonitorService,
           useValue: { getValidationState: jest.fn().mockResolvedValue(null) },
         },
+        {
+          provide: StartupSelfTestService,
+          useValue: { result: null, isRunning: false, runSelfTest: jest.fn() },
+        },
+        {
+          provide: ContinuousHealthMonitorService,
+          useValue: { latest: null, getHistory: jest.fn().mockReturnValue([]), getMetrics: jest.fn().mockReturnValue({ avg_latency_ms: 0, error_rate_5xx: 0, uptime_pct: 100, checks_count: 0 }) },
+        },
       ],
     }).compile();
 
@@ -97,8 +107,9 @@ describe('HealthController', () => {
 
       const result = await controller.ready();
 
-      expect(result).toEqual(mockHealthyResponse);
+      expect(result).toMatchObject(mockHealthyResponse);
       expect(result.status).toBe('ok');
+      expect(result).toHaveProperty('self_test', 'pending');
     });
 
     it('should return health response when degraded', async () => {
@@ -106,7 +117,7 @@ describe('HealthController', () => {
 
       const result = await controller.ready();
 
-      expect(result).toEqual(mockDegradedResponse);
+      expect(result).toMatchObject(mockDegradedResponse);
       expect(result.status).toBe('degraded');
     });
 
@@ -120,7 +131,7 @@ describe('HealthController', () => {
       } catch (error) {
         expect(error).toBeInstanceOf(HttpException);
         expect((error as HttpException).getStatus()).toBe(HttpStatus.SERVICE_UNAVAILABLE);
-        expect((error as HttpException).getResponse()).toEqual(mockUnhealthyResponse);
+        expect((error as HttpException).getResponse()).toMatchObject(mockUnhealthyResponse);
       }
     });
 
