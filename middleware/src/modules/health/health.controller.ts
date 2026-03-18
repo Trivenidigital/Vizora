@@ -1,8 +1,9 @@
-import { Controller, Get, Post, Body, HttpStatus, HttpException, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, HttpStatus, HttpException, Req, Query } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { HealthService } from './health.service';
 import { ValidationMonitorService } from './validation-monitor.service';
 import { StartupSelfTestService } from './startup-self-test.service';
+import { ContinuousHealthMonitorService } from './continuous-health-monitor.service';
 import { Public } from '../auth/decorators/public.decorator';
 
 @Controller('health')
@@ -12,6 +13,7 @@ export class HealthController {
     private readonly healthService: HealthService,
     private readonly validationMonitor: ValidationMonitorService,
     private readonly selfTest: StartupSelfTestService,
+    private readonly monitor: ContinuousHealthMonitorService,
   ) {}
 
   /**
@@ -111,6 +113,33 @@ export class HealthController {
     }
     const state = await this.validationMonitor.getValidationState(orgId);
     return state || { status: 'unknown', message: 'No validation data available' };
+  }
+
+  /**
+   * Latest continuous health check result.
+   * Auth-protected.
+   */
+  @Get('monitor/current')
+  async getMonitorCurrent() {
+    return this.monitor.latest || { status: 'pending', message: 'No health checks run yet' };
+  }
+
+  /**
+   * Health check history for dashboard sparklines (last 24h).
+   * Auth-protected.
+   */
+  @Get('monitor/history')
+  async getMonitorHistory() {
+    return this.monitor.getHistory();
+  }
+
+  /**
+   * Aggregated health metrics (avg latency, error rate, uptime %).
+   * Auth-protected.
+   */
+  @Get('monitor/metrics')
+  async getMonitorMetrics() {
+    return this.monitor.getMetrics();
   }
 
   /**
