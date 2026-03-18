@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, HttpStatus, HttpException, Req } from '@ne
 import { SkipThrottle } from '@nestjs/throttler';
 import { HealthService } from './health.service';
 import { ValidationMonitorService } from './validation-monitor.service';
+import { StartupSelfTestService } from './startup-self-test.service';
 import { Public } from '../auth/decorators/public.decorator';
 
 @Controller('health')
@@ -10,6 +11,7 @@ export class HealthController {
   constructor(
     private readonly healthService: HealthService,
     private readonly validationMonitor: ValidationMonitorService,
+    private readonly selfTest: StartupSelfTestService,
   ) {}
 
   /**
@@ -22,18 +24,40 @@ export class HealthController {
   }
 
   /**
-   * Detailed readiness probe - checks all dependencies
+   * Detailed readiness probe - checks all dependencies.
+   * Includes self-test status when available.
    */
   @Get('ready')
   @Public()
   async ready() {
     const result = await this.healthService.check();
-    
+
+    // Enrich with self-test status
+    const selfTestStatus = this.selfTest.isRunning
+      ? 'running'
+      : this.selfTest.result
+        ? this.selfTest.result.passed
+          ? 'passed'
+          : 'failed'
+        : 'pending';
+
+    const enriched = {
+      ...result,
+      self_test: selfTestStatus,
+      ...(this.selfTest.result && !this.selfTest.result.passed
+        ? {
+            self_test_failures: Object.entries(this.selfTest.result.results)
+              .filter(([, r]) => !r.passed)
+              .map(([name, r]) => `${name}: ${r.message}`),
+          }
+        : {}),
+    };
+
     if (result.status === 'unhealthy') {
-      throw new HttpException(result, HttpStatus.SERVICE_UNAVAILABLE);
+      throw new HttpException(enriched, HttpStatus.SERVICE_UNAVAILABLE);
     }
-    
-    return result;
+
+    return enriched;
   }
 
   /**
@@ -43,6 +67,36 @@ export class HealthController {
   @Public()
   async live() {
     return { status: 'ok', timestamp: new Date().toISOString() };
+  }
+
+  /**
+   * Full startup self-test results.
+   * Returns the latest self-test result, or triggers a new one if none exists.
+   * Auth-protected — admin visibility only.
+   */
+  @Get('self-test')
+  async getSelfTest() {
+    if (this.selfTest.isRunning) {
+      return { status: 'running', message: 'Self-test is currently in progress' };
+    }
+    if (!this.selfTest.result) {
+      return { status: 'pending', message: 'Self-test has not yet run' };
+    }
+    return this.selfTest.result;
+  }
+
+  /**
+   * Trigger a new self-test run on demand.
+   * Auth-protected — admin only.
+   */
+  @Post('self-test')
+  async runSelfTest() {
+    if (this.selfTest.isRunning) {
+      return { status: 'already_running', message: 'Self-test is already in progress' };
+    }
+    // Run async — don't block the response
+    this.selfTest.runSelfTest();
+    return { status: 'started', message: 'Self-test triggered' };
   }
 
   /**
