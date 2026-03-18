@@ -5,6 +5,8 @@ import { HealthService } from './health.service';
 import { ValidationMonitorService } from './validation-monitor.service';
 import { StartupSelfTestService } from './startup-self-test.service';
 import { ContinuousHealthMonitorService } from './continuous-health-monitor.service';
+import { SuperAdminGuard } from '../admin/guards/super-admin.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 describe('HealthController', () => {
   let controller: HealthController;
@@ -73,14 +75,17 @@ describe('HealthController', () => {
         },
         {
           provide: StartupSelfTestService,
-          useValue: { result: null, isRunning: false, runSelfTest: jest.fn() },
+          useValue: { result: null, isRunning: false, canRun: true, runSelfTest: jest.fn() },
         },
         {
           provide: ContinuousHealthMonitorService,
           useValue: { latest: null, getHistory: jest.fn().mockReturnValue([]), getMetrics: jest.fn().mockReturnValue({ avg_latency_ms: 0, error_rate_5xx: 0, uptime_pct: 100, checks_count: 0 }) },
         },
       ],
-    }).compile();
+    })
+      .overrideGuard(JwtAuthGuard).useValue({ canActivate: () => true })
+      .overrideGuard(SuperAdminGuard).useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<HealthController>(HealthController);
     healthService = module.get(HealthService);

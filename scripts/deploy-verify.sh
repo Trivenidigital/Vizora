@@ -24,7 +24,11 @@ fi
 ERRORS=0
 WARNINGS=0
 TOTAL=0
-CURL_OPTS="-s -o /dev/null -w %{http_code} --max-time 10 --connect-timeout 5"
+
+# Use a function to avoid quoting issues with curl options
+http_status() {
+  curl -s -o /dev/null -w '%{http_code}' --max-time 10 --connect-timeout 5 "$1" 2>/dev/null || echo "000"
+}
 
 # Colors (skip if not a terminal)
 if [[ -t 1 ]]; then
@@ -51,15 +55,15 @@ echo ""
 echo "--- Health Endpoints ---"
 
 check
-STATUS=$(curl $CURL_OPTS "$BASE_URL/api/v1/health" || echo "000")
+STATUS=$(http_status "$BASE_URL/api/v1/health")
 if [[ "$STATUS" == "200" ]]; then pass "GET /api/v1/health -> $STATUS"; else fail "GET /api/v1/health -> $STATUS (expected 200)"; fi
 
 check
-STATUS=$(curl $CURL_OPTS "$BASE_URL/api/v1/health/ready" || echo "000")
+STATUS=$(http_status "$BASE_URL/api/v1/health/ready")
 if [[ "$STATUS" == "200" ]]; then pass "GET /api/v1/health/ready -> $STATUS"; else fail "GET /api/v1/health/ready -> $STATUS (expected 200)"; fi
 
 check
-STATUS=$(curl $CURL_OPTS "$BASE_URL/api/v1/health/live" || echo "000")
+STATUS=$(http_status "$BASE_URL/api/v1/health/live")
 if [[ "$STATUS" == "200" ]]; then pass "GET /api/v1/health/live -> $STATUS"; else fail "GET /api/v1/health/live -> $STATUS (expected 200)"; fi
 
 echo ""
@@ -85,7 +89,7 @@ PROTECTED_ROUTES=(
 
 for ROUTE in "${PROTECTED_ROUTES[@]}"; do
   check
-  STATUS=$(curl $CURL_OPTS "$BASE_URL/api/v1/$ROUTE" || echo "000")
+  STATUS=$(http_status "$BASE_URL/api/v1/$ROUTE")
   if [[ "$STATUS" == "401" ]]; then
     pass "GET /api/v1/$ROUTE -> 401"
   elif [[ "$STATUS" == "400" ]]; then
@@ -107,11 +111,11 @@ echo ""
 echo "--- Public API Routes ---"
 
 check
-STATUS=$(curl $CURL_OPTS "$BASE_URL/api/v1/template-library" || echo "000")
+STATUS=$(http_status "$BASE_URL/api/v1/template-library")
 if [[ "$STATUS" == "200" ]]; then pass "GET /api/v1/template-library -> $STATUS"; else fail "GET /api/v1/template-library -> $STATUS (expected 200)"; fi
 
 check
-STATUS=$(curl $CURL_OPTS "$BASE_URL/api/v1/billing/plans" || echo "000")
+STATUS=$(http_status "$BASE_URL/api/v1/billing/plans")
 if [[ "$STATUS" == "200" ]]; then pass "GET /api/v1/billing/plans -> $STATUS"; else fail "GET /api/v1/billing/plans -> $STATUS (expected 200)"; fi
 
 echo ""
@@ -149,7 +153,7 @@ for PAGE in "${WEB_PAGES[@]}"; do
   check
   DISPLAY_PATH="/${PAGE}"
   [[ -z "$PAGE" ]] && DISPLAY_PATH="/"
-  STATUS=$(curl $CURL_OPTS "$WEB_URL/$PAGE" || echo "000")
+  STATUS=$(http_status "$WEB_URL/$PAGE")
   if [[ "$STATUS" == "200" ]]; then
     pass "GET $DISPLAY_PATH -> $STATUS"
   elif [[ "$STATUS" == "000" ]]; then

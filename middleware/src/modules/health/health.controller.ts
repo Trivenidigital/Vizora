@@ -1,10 +1,12 @@
-import { Controller, Get, Post, Body, HttpStatus, HttpException, Req, Query } from '@nestjs/common';
-import { SkipThrottle } from '@nestjs/throttler';
+import { Controller, Get, Post, Body, HttpStatus, HttpException, Req, UseGuards } from '@nestjs/common';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { HealthService } from './health.service';
 import { ValidationMonitorService } from './validation-monitor.service';
 import { StartupSelfTestService } from './startup-self-test.service';
 import { ContinuousHealthMonitorService } from './continuous-health-monitor.service';
 import { Public } from '../auth/decorators/public.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { SuperAdminGuard } from '../admin/guards/super-admin.guard';
 
 @Controller('health')
 @SkipThrottle() // Health checks should not be rate limited
@@ -27,14 +29,14 @@ export class HealthController {
 
   /**
    * Detailed readiness probe - checks all dependencies.
-   * Includes self-test status when available.
+   * Includes self-test status (pass/fail/pending) but NOT detailed results.
    */
   @Get('ready')
   @Public()
   async ready() {
     const result = await this.healthService.check();
 
-    // Enrich with self-test status
+    // Enrich with self-test status (status only — not detailed results)
     const selfTestStatus = this.selfTest.isRunning
       ? 'running'
       : this.selfTest.result
@@ -73,10 +75,10 @@ export class HealthController {
 
   /**
    * Full startup self-test results.
-   * Returns the latest self-test result, or triggers a new one if none exists.
-   * Auth-protected — admin visibility only.
+   * Admin-only — exposes infrastructure details (SMTP config, table existence, etc.).
    */
   @Get('self-test')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
   async getSelfTest() {
     if (this.selfTest.isRunning) {
       return { status: 'running', message: 'Self-test is currently in progress' };
@@ -89,12 +91,17 @@ export class HealthController {
 
   /**
    * Trigger a new self-test run on demand.
-   * Auth-protected — admin only.
+   * Admin-only. Rate-limited: 60s cooldown between runs.
    */
   @Post('self-test')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @SkipThrottle(false) // Re-enable throttling for this endpoint
   async runSelfTest() {
     if (this.selfTest.isRunning) {
       return { status: 'already_running', message: 'Self-test is already in progress' };
+    }
+    if (!this.selfTest.canRun) {
+      return { status: 'cooldown', message: 'Self-test was run recently. Wait 60 seconds between runs.' };
     }
     // Run async — don't block the response
     this.selfTest.runSelfTest();
@@ -117,27 +124,30 @@ export class HealthController {
 
   /**
    * Latest continuous health check result.
-   * Auth-protected.
+   * Admin-only — contains DB connection pool info, slow query counts, etc.
    */
   @Get('monitor/current')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
   async getMonitorCurrent() {
     return this.monitor.latest || { status: 'pending', message: 'No health checks run yet' };
   }
 
   /**
    * Health check history for dashboard sparklines (last 24h).
-   * Auth-protected.
+   * Admin-only.
    */
   @Get('monitor/history')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
   async getMonitorHistory() {
     return this.monitor.getHistory();
   }
 
   /**
    * Aggregated health metrics (avg latency, error rate, uptime %).
-   * Auth-protected.
+   * Admin-only.
    */
   @Get('monitor/metrics')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
   async getMonitorMetrics() {
     return this.monitor.getMetrics();
   }

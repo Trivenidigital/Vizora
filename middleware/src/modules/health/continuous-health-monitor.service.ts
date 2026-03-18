@@ -183,6 +183,7 @@ export class ContinuousHealthMonitorService {
   // -----------------------------------------------------------------------
 
   private async checkApiLatency(): Promise<MetricCheck & { slowest?: { endpoint: string; ms: number } }> {
+    const port = parseInt(process.env.MIDDLEWARE_PORT || process.env.PORT || '3000', 10);
     const endpoints = [
       { path: '/api/v1/health', label: 'health' },
       { path: '/api/v1/health/live', label: 'live' },
@@ -195,7 +196,7 @@ export class ContinuousHealthMonitorService {
     for (const ep of endpoints) {
       try {
         const start = Date.now();
-        await this.httpGet(3000, ep.path, 5000);
+        await this.httpGet(port, ep.path, 5000);
         const elapsed = Date.now() - start;
         totalMs += elapsed;
         if (elapsed > maxMs) {

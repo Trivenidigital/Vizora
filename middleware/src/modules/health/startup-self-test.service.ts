@@ -37,17 +37,32 @@ export interface SelfTestResult {
 // Service
 // ---------------------------------------------------------------------------
 
+// Strict allowlist for table existence checks — prevents any injection via $queryRawUnsafe
+const CRITICAL_TABLES = new Set([
+  'Organization', 'User', 'Display', 'Content',
+  'Playlist', 'Schedule', 'Notification', 'Plan',
+]);
+
+// Minimum cooldown between self-test runs (60 seconds)
+const SELF_TEST_COOLDOWN_MS = 60_000;
+
 @Injectable()
 export class StartupSelfTestService implements OnApplicationBootstrap {
   private readonly logger = new Logger(StartupSelfTestService.name);
   private _result: SelfTestResult | null = null;
   private _running = false;
+  private _lastRunAt = 0;
 
   constructor(
     private readonly db: DatabaseService,
     private readonly redis: RedisService,
     private readonly storage: StorageService,
   ) {}
+
+  /** Check if cooldown has elapsed since last run */
+  get canRun(): boolean {
+    return !this._running && (Date.now() - this._lastRunAt > SELF_TEST_COOLDOWN_MS);
+  }
 
   /** Access latest self-test result (null if not yet run) */
   get result(): SelfTestResult | null {
@@ -69,52 +84,55 @@ export class StartupSelfTestService implements OnApplicationBootstrap {
 
   async runSelfTest(): Promise<SelfTestResult> {
     this._running = true;
+    this._lastRunAt = Date.now();
     const start = Date.now();
     this.logger.log('Starting startup self-test...');
 
-    const [database, redis, minio, api_endpoints, templates, email, billing, id_consistency] =
-      await Promise.all([
-        this.checkDatabase(),
-        this.checkRedis(),
-        this.checkMinio(),
-        this.checkApiEndpoints(),
-        this.checkTemplates(),
-        this.checkEmail(),
-        this.checkBilling(),
-        this.checkIdConsistency(),
-      ]);
+    try {
+      const [database, redis, minio, api_endpoints, templates, email, billing, id_consistency] =
+        await Promise.all([
+          this.checkDatabase(),
+          this.checkRedis(),
+          this.checkMinio(),
+          this.checkApiEndpoints(),
+          this.checkTemplates(),
+          this.checkEmail(),
+          this.checkBilling(),
+          this.checkIdConsistency(),
+        ]);
 
-    const results = { database, redis, minio, api_endpoints, templates, email, billing, id_consistency };
-    const allPassed = Object.values(results).every((r) => r.passed);
+      const results = { database, redis, minio, api_endpoints, templates, email, billing, id_consistency };
+      const allPassed = Object.values(results).every((r) => r.passed);
 
-    this._result = {
-      passed: allPassed,
-      timestamp: new Date().toISOString(),
-      duration_ms: Date.now() - start,
-      results,
-    };
+      this._result = {
+        passed: allPassed,
+        timestamp: new Date().toISOString(),
+        duration_ms: Date.now() - start,
+        results,
+      };
 
-    this._running = false;
+      // Log structured result
+      const failedChecks = Object.entries(results)
+        .filter(([, r]) => !r.passed)
+        .map(([name]) => name);
 
-    // Log structured result
-    const failedChecks = Object.entries(results)
-      .filter(([, r]) => !r.passed)
-      .map(([name]) => name);
+      if (allPassed) {
+        this.logger.log(
+          `Self-test PASSED (${this._result.duration_ms}ms) — all ${Object.keys(results).length} checks passed`,
+        );
+      } else {
+        this.logger.warn(
+          `Self-test FAILED (${this._result.duration_ms}ms) — failed checks: ${failedChecks.join(', ')}`,
+        );
+      }
 
-    if (allPassed) {
-      this.logger.log(
-        `Self-test PASSED (${this._result.duration_ms}ms) — all ${Object.keys(results).length} checks passed`,
-      );
-    } else {
-      this.logger.warn(
-        `Self-test FAILED (${this._result.duration_ms}ms) — failed checks: ${failedChecks.join(', ')}`,
-      );
+      // Log full structured JSON for monitoring tools
+      this.logger.log(`Self-test result: ${JSON.stringify(this._result)}`);
+
+      return this._result;
+    } finally {
+      this._running = false;
     }
-
-    // Log full structured JSON for monitoring tools
-    this.logger.log(`Self-test result: ${JSON.stringify(this._result)}`);
-
-    return this._result;
   }
 
   // -------------------------------------------------------------------------
@@ -126,15 +144,12 @@ export class StartupSelfTestService implements OnApplicationBootstrap {
     try {
       await this.db.$queryRaw`SELECT 1`;
 
-      // Check critical tables exist by querying counts
-      const criticalTables = [
-        'Organization', 'User', 'Display', 'Content',
-        'Playlist', 'Schedule', 'Notification', 'Plan',
-      ];
+      // Check critical tables exist — only tables in CRITICAL_TABLES allowlist are queried
       const missing: string[] = [];
-      for (const table of criticalTables) {
+      for (const table of CRITICAL_TABLES) {
         try {
-          await this.db.$queryRawUnsafe(`SELECT COUNT(*) FROM "${table}" LIMIT 1`);
+          // Safe: table name comes from hardcoded allowlist, not user input
+          await this.db.$queryRawUnsafe(`SELECT 1 FROM "${table}" LIMIT 1`);
         } catch {
           missing.push(table);
         }
@@ -215,7 +230,7 @@ export class StartupSelfTestService implements OnApplicationBootstrap {
 
   private async checkApiEndpoints(): Promise<CheckResult & { failures: string[] }> {
     const start = Date.now();
-    const port = 3000;
+    const port = parseInt(process.env.MIDDLEWARE_PORT || process.env.PORT || '3000', 10);
     const failures: string[] = [];
 
     // Endpoints and their expected status codes
@@ -300,7 +315,8 @@ export class StartupSelfTestService implements OnApplicationBootstrap {
     const start = Date.now();
     const host = process.env.SMTP_HOST;
     const user = process.env.SMTP_USER;
-    const pass = process.env.SMTP_PASSWORD;
+    // Support both SMTP_PASSWORD (mail.service.ts) and SMTP_PASS (CLAUDE.md/env docs)
+    const pass = process.env.SMTP_PASSWORD || process.env.SMTP_PASS;
     const configured = !!(host && user && pass);
 
     if (!configured) {
@@ -417,6 +433,7 @@ export class StartupSelfTestService implements OnApplicationBootstrap {
       'admin/admin.controller': 'mixed', // skip — handles multiple model types
     };
 
+    let filesChecked = 0;
     for (const [controllerPath, model] of Object.entries(controllerModelMap)) {
       if (model === 'mixed') continue;
       if (uuidModels.has(model)) continue; // UUID models SHOULD use ParseUUIDPipe
@@ -424,19 +441,23 @@ export class StartupSelfTestService implements OnApplicationBootstrap {
       const fullPath = path.join(controllerDir, `${controllerPath}.ts`);
       try {
         const content = fs.readFileSync(fullPath, 'utf-8');
+        filesChecked++;
         if (content.includes('ParseUUIDPipe')) {
           mismatches.push(`${controllerPath} uses ParseUUIDPipe but ${model} uses CUID`);
         }
       } catch {
-        // File might not exist in built dist — skip gracefully
+        // Source files not available in production builds (compiled to dist/) — skip gracefully
       }
     }
 
+    const skipped = filesChecked === 0;
     return {
       passed: mismatches.length === 0,
-      message: mismatches.length === 0
-        ? 'All controllers use correct ID pipe for their model type'
-        : `${mismatches.length} controller(s) use wrong ID pipe`,
+      message: skipped
+        ? 'Skipped — source files not available (production build). Covered by regression guard tests.'
+        : mismatches.length === 0
+          ? `All ${filesChecked} controllers use correct ID pipe for their model type`
+          : `${mismatches.length} controller(s) use wrong ID pipe`,
       duration_ms: Date.now() - start,
       mismatches,
     };
