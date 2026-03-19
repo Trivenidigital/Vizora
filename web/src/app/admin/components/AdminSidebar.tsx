@@ -15,6 +15,7 @@ import {
   Shield,
   Megaphone,
   MessageSquare,
+  ClipboardList,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -38,6 +39,7 @@ const navigation: NavItem[] = [
   { name: 'Security', href: '/admin/security', icon: Shield },
   { name: 'Announcements', href: '/admin/announcements', icon: Megaphone },
   { name: 'Support', href: '/admin/support', icon: MessageSquare },
+  { name: 'Backlog', href: '/admin/backlog', icon: ClipboardList },
 ];
 
 interface AdminSidebarProps {
