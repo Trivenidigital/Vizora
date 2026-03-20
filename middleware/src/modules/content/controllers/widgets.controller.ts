@@ -9,6 +9,8 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { ParseIdPipe } from '../../common/pipes/parse-id.pipe';
 import { RolesGuard } from '../../auth/guards/roles.guard';
@@ -17,6 +19,7 @@ import { ContentService } from '../content.service';
 import { CreateWidgetDto } from '../dto/create-widget.dto';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
+import { parseRssFeed, extractFeedTitle } from '../rss-parser';
 
 @UseGuards(RolesGuard)
 @Controller('content/widgets')
@@ -51,6 +54,54 @@ export class WidgetsController {
     // Sanitize location to prevent URL injection
     const sanitizedLocation = encodeURIComponent(location || 'New York');
     return this.contentService.getWeatherPreview(decodeURIComponent(sanitizedLocation), units);
+  }
+
+  @Get('rss/preview')
+  @Roles('admin', 'manager', 'viewer')
+  async getRssFeed(
+    @Query('url') feedUrl: string,
+    @Query('limit') limit: string = '10',
+  ) {
+    if (!feedUrl) {
+      throw new BadRequestException('url parameter is required');
+    }
+
+    let parsed: URL;
+    try {
+      parsed = new URL(feedUrl);
+    } catch {
+      throw new BadRequestException('Invalid URL format');
+    }
+
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      throw new BadRequestException('Only http/https URLs are supported');
+    }
+
+    const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 50);
+
+    let response: Response;
+    try {
+      response = await fetch(feedUrl, {
+        signal: AbortSignal.timeout(10000),
+        headers: { 'User-Agent': 'Vizora/1.0 Digital Signage RSS Reader' },
+      });
+    } catch (err: any) {
+      throw new NotFoundException(`Failed to fetch RSS feed: ${err.message || 'timeout or network error'}`);
+    }
+
+    if (!response.ok) {
+      throw new NotFoundException(`Failed to fetch RSS feed: HTTP ${response.status}`);
+    }
+
+    const xml = await response.text();
+    const items = parseRssFeed(xml, parsedLimit);
+    const feedTitle = extractFeedTitle(xml);
+
+    return {
+      feedTitle,
+      items,
+      fetchedAt: new Date().toISOString(),
+    };
   }
 
   @Post()

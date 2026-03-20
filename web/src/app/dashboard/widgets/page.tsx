@@ -9,6 +9,7 @@ import { useToast } from '@/lib/hooks/useToast';
 import { Icon } from '@/theme/icons';
 import WeatherWidget from '@/components/widgets/WeatherWidget';
 import ClockWidget from '@/components/widgets/ClockWidget';
+import RssWidget from '@/components/widgets/RssWidget';
 
 // Default widget type definitions used as fallback when API is unavailable
 const DEFAULT_WIDGET_TYPES = [
@@ -27,13 +28,17 @@ const DEFAULT_WIDGET_TYPES = [
   },
   {
     type: 'rss',
-    name: 'RSS Feed',
-    description: 'Show live news or blog updates from any RSS feed source.',
+    name: 'News & RSS Feed',
+    description: 'Display headlines from any RSS or Atom feed source.',
     icon: 'list',
     configSchema: {
       feedUrl: { type: 'string', label: 'Feed URL', placeholder: 'https://example.com/rss', required: true },
-      maxItems: { type: 'number', label: 'Max Items', default: 5, min: 1, max: 20 },
+      maxItems: { type: 'number', label: 'Max Items', default: 10, min: 1, max: 50 },
       showImages: { type: 'boolean', label: 'Show Images', default: true },
+      showSummary: { type: 'boolean', label: 'Show Summary', default: true },
+      scrollSpeed: { type: 'select', label: 'Auto-Scroll', options: ['none', 'slow', 'medium', 'fast'], default: 'slow' },
+      refreshInterval: { type: 'select', label: 'Refresh (min)', options: ['5', '15', '30', '60'], default: '15' },
+      theme: { type: 'select', label: 'Theme', options: ['dark', 'light', 'auto'], default: 'dark' },
     },
   },
   {
@@ -594,6 +599,24 @@ export default function WidgetsPage() {
                   theme={(widgetConfig.theme as 'dark' | 'light' | 'auto') || 'dark'}
                   refreshInterval={0}
                   showForecast={widgetConfig.showForecast !== false}
+                  compact
+                />
+              </div>
+            ) : selectedType.type === 'rss' ? (
+              <div className="bg-[var(--background)] rounded-lg border border-[var(--border)] overflow-hidden p-4">
+                <h4 className="font-semibold text-[var(--foreground)] mb-1">{widgetName || 'Untitled Widget'}</h4>
+                <p className="text-xs text-[var(--foreground-tertiary)] uppercase mb-3">{selectedType.name}</p>
+                {widgetDescription && (
+                  <p className="text-sm text-[var(--foreground-secondary)] mb-3">{widgetDescription}</p>
+                )}
+                <RssWidget
+                  feedUrl={widgetConfig.feedUrl || ''}
+                  maxItems={parseInt(widgetConfig.maxItems) || 10}
+                  showImages={widgetConfig.showImages !== false}
+                  showSummary={widgetConfig.showSummary !== false}
+                  scrollSpeed={(widgetConfig.scrollSpeed as 'slow' | 'medium' | 'fast' | 'none') || 'none'}
+                  refreshInterval={0}
+                  theme={(widgetConfig.theme as 'dark' | 'light' | 'auto') || 'dark'}
                   compact
                 />
               </div>

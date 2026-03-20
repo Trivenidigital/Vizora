@@ -246,4 +246,92 @@ describe('WidgetsController', () => {
       ).rejects.toThrow('Refresh failed');
     });
   });
+
+  // ==========================================================================
+  // getRssFeed
+  // ==========================================================================
+
+  describe('getRssFeed', () => {
+    const mockFetchOriginal = global.fetch;
+
+    beforeEach(() => {
+      global.fetch = jest.fn();
+    });
+
+    afterEach(() => {
+      global.fetch = mockFetchOriginal;
+    });
+
+    it('should throw BadRequestException when url is missing', async () => {
+      await expect(
+        controller.getRssFeed(undefined as any, '10'),
+      ).rejects.toThrow('url parameter is required');
+    });
+
+    it('should throw BadRequestException for invalid URL', async () => {
+      await expect(
+        controller.getRssFeed('not-a-url', '10'),
+      ).rejects.toThrow('Invalid URL format');
+    });
+
+    it('should throw BadRequestException for non-http protocols', async () => {
+      await expect(
+        controller.getRssFeed('ftp://example.com/feed', '10'),
+      ).rejects.toThrow('Only http/https URLs are supported');
+    });
+
+    it('should fetch and parse an RSS feed successfully', async () => {
+      const rssXml = `<rss><channel>
+        <title>Test Feed</title>
+        <item><title>Article 1</title><description>Desc</description><link>https://example.com/1</link></item>
+      </channel></rss>`;
+
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        text: async () => rssXml,
+      });
+
+      const result = await controller.getRssFeed('https://example.com/rss', '10');
+
+      expect(result.feedTitle).toBe('Test Feed');
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].title).toBe('Article 1');
+      expect(result.fetchedAt).toBeDefined();
+    });
+
+    it('should respect the limit parameter', async () => {
+      const rssXml = `<rss><channel><title>Feed</title>
+        <item><title>A1</title><description>D1</description></item>
+        <item><title>A2</title><description>D2</description></item>
+        <item><title>A3</title><description>D3</description></item>
+      </channel></rss>`;
+
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        text: async () => rssXml,
+      });
+
+      const result = await controller.getRssFeed('https://example.com/rss', '2');
+      expect(result.items).toHaveLength(2);
+    });
+
+    it('should throw NotFoundException when fetch fails', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        status: 404,
+      });
+
+      await expect(
+        controller.getRssFeed('https://example.com/rss', '10'),
+      ).rejects.toThrow('Failed to fetch RSS feed: HTTP 404');
+    });
+
+    it('should throw NotFoundException on network error', async () => {
+      (global.fetch as jest.Mock).mockRejectedValue(new Error('Network timeout'));
+
+      await expect(
+        controller.getRssFeed('https://example.com/rss', '10'),
+      ).rejects.toThrow('Failed to fetch RSS feed: Network timeout');
+    });
+  });
 });
