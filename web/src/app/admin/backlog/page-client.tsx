@@ -64,6 +64,8 @@ const completed: BacklogItem[] = [
   { id: '20', title: 'Fleet Control: Device remote restart command (M6)', status: 'FIXED', notes: 'feat/fleet-control — 2026-03-20' },
   { id: '21', title: 'Fleet Control: Push-to-group endpoint (M7)', status: 'FIXED', notes: 'feat/fleet-control — 2026-03-20' },
   { id: '22', title: 'Fleet Control: Emergency content override with auto-revert (L6)', status: 'FIXED', notes: 'feat/fleet-control — 2026-03-20' },
+  { id: '23', title: 'Custom error pages — branded 404, error boundary, global-error (L3)', status: 'FIXED', notes: 'Already built — discovered during audit 2026-03-20' },
+  { id: '24', title: 'Proof-of-play — ContentImpression, analytics dashboard, CSV export (L5)', status: 'FIXED', notes: 'Already built — discovered during audit 2026-03-20' },
 ];
 
 const sections: Section[] = [
@@ -102,9 +104,9 @@ const sections: Section[] = [
     items: [
       { id: 'L1', title: 'Device offline email notification to customers', effort: '4h', status: 'TODO', notes: 'Ops agent detects offline but doesn\'t email customer' },
       { id: 'L2', title: 'Set up UptimeRobot monitoring for health endpoints', effort: '1h', status: 'TODO' },
-      { id: 'L3', title: 'Custom error pages (branded 404, 500)', effort: '4h', status: 'TODO' },
+      { id: 'L3', title: 'Custom error pages (branded 404, 500)', effort: '4h', status: 'FIXED', notes: 'Already built — branded 404, error boundary, global-error' },
       { id: 'L4', title: 'Basic knowledge base / help docs page', effort: '1d', status: 'TODO' },
-      { id: 'L5', title: 'Proof-of-play tracking (log content displayed per device)', effort: '1d', status: 'TODO', notes: 'Advertisers need this' },
+      { id: 'L5', title: 'Proof-of-play tracking (log content displayed per device)', effort: '1d', status: 'FIXED', notes: 'Already built — ContentImpression table, 7 analytics queries, 6 charts, CSV export' },
       { id: 'L6', title: 'Emergency content override (push urgent to all devices)', effort: '4h', status: 'FIXED', notes: 'feat/fleet-control' },
       { id: 'L7', title: 'Device remote reload command via WebSocket', effort: '2h', status: 'FIXED', notes: 'feat/fleet-control' },
       { id: 'L8', title: 'Wire real-time notification emission on creation', effort: '2h', status: 'TODO', notes: 'Currently polling, not real-time' },
