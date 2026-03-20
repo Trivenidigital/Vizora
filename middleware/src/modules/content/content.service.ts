@@ -1156,6 +1156,21 @@ export class ContentService {
   }
 
   /**
+   * Fetch live weather data for preview purposes.
+   * Uses the weather data source to get current conditions without creating a widget.
+   */
+  async getWeatherPreview(location: string, units: string = 'metric') {
+    let source: WidgetDataSource;
+    try {
+      source = this.dataSourceRegistry.get('weather');
+    } catch {
+      throw new BadRequestException('Weather widget type not available');
+    }
+
+    return source.fetchData({ location, units, showForecast: true, forecastDays: 5 });
+  }
+
+  /**
    * Create a widget as a Content record with type='template' and widget metadata.
    */
   async createWidget(organizationId: string, dto: CreateWidgetDto) {

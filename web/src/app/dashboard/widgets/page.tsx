@@ -7,6 +7,7 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import EmptyState from '@/components/EmptyState';
 import { useToast } from '@/lib/hooks/useToast';
 import { Icon } from '@/theme/icons';
+import WeatherWidget from '@/components/widgets/WeatherWidget';
 
 // Default widget type definitions used as fallback when API is unavailable
 const DEFAULT_WIDGET_TYPES = [
@@ -18,6 +19,8 @@ const DEFAULT_WIDGET_TYPES = [
     configSchema: {
       location: { type: 'string', label: 'Location', placeholder: 'e.g., New York, NY', required: true },
       units: { type: 'select', label: 'Units', options: ['imperial', 'metric'], default: 'imperial' },
+      refreshInterval: { type: 'select', label: 'Refresh Interval', options: ['15', '30', '60', '120'], default: '30' },
+      theme: { type: 'select', label: 'Theme', options: ['dark', 'light', 'auto'], default: 'dark' },
       showForecast: { type: 'boolean', label: 'Show Forecast', default: true },
     },
   },
@@ -324,8 +327,12 @@ export default function WidgetsPage() {
 
   const getConfigSummary = (type: string, config: Record<string, any>) => {
     switch (type) {
-      case 'weather':
-        return config.location ? `${config.location} (${config.units || 'imperial'})` : 'Not configured';
+      case 'weather': {
+        if (!config.location) return 'Not configured';
+        const unit = config.units === 'metric' ? '\u00B0C' : '\u00B0F';
+        const interval = config.refreshInterval ? `${config.refreshInterval}min` : '30min';
+        return `${config.location} (${unit}, ${interval})`;
+      }
       case 'rss':
         return config.feedUrl ? `${config.feedUrl.substring(0, 40)}...` : 'No feed URL';
       case 'social-media':
@@ -583,7 +590,25 @@ export default function WidgetsPage() {
 
         {wizardStep === 'preview' && selectedType && (
           <div className="space-y-4">
-            {/* Preview Card */}
+            {/* Live Preview for Weather widget */}
+            {selectedType.type === 'weather' ? (
+              <div className="bg-[var(--background)] rounded-lg border border-[var(--border)] overflow-hidden p-4">
+                <h4 className="font-semibold text-[var(--foreground)] mb-1">{widgetName || 'Untitled Widget'}</h4>
+                <p className="text-xs text-[var(--foreground-tertiary)] uppercase mb-3">{selectedType.name}</p>
+                {widgetDescription && (
+                  <p className="text-sm text-[var(--foreground-secondary)] mb-3">{widgetDescription}</p>
+                )}
+                <WeatherWidget
+                  location={widgetConfig.location || 'New York'}
+                  units={(widgetConfig.units as 'metric' | 'imperial') || 'imperial'}
+                  theme={(widgetConfig.theme as 'dark' | 'light' | 'auto') || 'dark'}
+                  refreshInterval={0}
+                  showForecast={widgetConfig.showForecast !== false}
+                  compact
+                />
+              </div>
+            ) : (
+            /* Generic Preview Card */
             <div className="bg-[var(--background)] rounded-lg border border-[var(--border)] overflow-hidden">
               <div className={`h-20 bg-gradient-to-br ${getColorForType(selectedType.type)} flex items-center justify-center`}>
                 <Icon name={getIconForType(selectedType.type)} size="3xl" className="text-white" />
@@ -609,6 +634,7 @@ export default function WidgetsPage() {
                 </div>
               </div>
             </div>
+            )}
 
             <div className="flex justify-between pt-4">
               <button

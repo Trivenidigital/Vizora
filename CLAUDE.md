@@ -103,6 +103,7 @@ BCRYPT_ROUNDS           # Password hashing rounds (10-15, default 12)
 GRAFANA_ADMIN_USER      # Required — Grafana admin username (no insecure default)
 GRAFANA_ADMIN_PASSWORD  # Required — Grafana admin password (no insecure default)
 BACKUP_S3_BUCKET        # Optional — S3 bucket for off-site DB backups
+OPENWEATHER_API_KEY     # Optional — OpenWeatherMap API key for weather widget
 ```
 
 ## Project Structure Highlights

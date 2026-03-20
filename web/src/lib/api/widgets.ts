@@ -5,12 +5,38 @@ import type {
 } from '../types';
 import { ApiClient } from './client';
 
+export interface WeatherData {
+  current: {
+    temp: number;
+    feelsLike: number;
+    humidity: number;
+    windSpeed: number;
+    description: string;
+    icon: string;
+    conditionCode: number;
+  };
+  location: {
+    name: string;
+    country: string;
+  };
+  forecast?: Array<{
+    date: string;
+    temp: number;
+    tempMin: number;
+    tempMax: number;
+    description: string;
+    icon: string;
+    conditionCode: number;
+  }>;
+}
+
 declare module './client' {
   interface ApiClient {
     getWidgetTypes(): Promise<WidgetType[]>;
     createWidget(data: { name: string; widgetType: string; widgetConfig?: Record<string, unknown>; description?: string }): Promise<Widget>;
     updateWidget(id: string, data: Partial<Widget>): Promise<Widget>;
     refreshWidget(id: string): Promise<Widget>;
+    getWeatherData(location: string, units?: string): Promise<WeatherData>;
     getLayoutPresets(): Promise<LayoutPreset[]>;
     createLayout(data: { name: string; layoutType: string; zones?: LayoutZone[]; description?: string }): Promise<Layout>;
     updateLayout(id: string, data: Partial<Layout>): Promise<Layout>;
@@ -40,6 +66,11 @@ ApiClient.prototype.refreshWidget = async function (id: string): Promise<Widget>
   return this.request<Widget>(`/content/widgets/${id}/refresh`, {
     method: 'POST',
   });
+};
+
+ApiClient.prototype.getWeatherData = async function (location: string, units: string = 'metric'): Promise<WeatherData> {
+  const params = new URLSearchParams({ location, units });
+  return this.request<WeatherData>(`/content/widgets/weather/preview?${params.toString()}`);
 };
 
 ApiClient.prototype.getLayoutPresets = async function (): Promise<LayoutPreset[]> {

@@ -38,6 +38,15 @@ export class WidgetsController {
     return this.contentService.getWidgetTypes();
   }
 
+  @Get('weather/preview')
+  @Roles('admin', 'manager', 'viewer')
+  getWeatherPreview(
+    @Query('location') location: string,
+    @Query('units') units: string = 'metric',
+  ) {
+    return this.contentService.getWeatherPreview(location || 'New York', units);
+  }
+
   @Post()
   @Roles('admin', 'manager')
   createWidget(
