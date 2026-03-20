@@ -59,6 +59,7 @@ const completed: BacklogItem[] = [
   { id: '15', title: 'Fix ParseUUIDPipe / CUID mismatch across codebase', status: 'FIXED', notes: '2026-03-10' },
   { id: '16', title: 'Night 1: Backend hardening (14 critical + 20 med/high fixed)', status: 'FIXED', notes: '2026-03-08' },
   { id: '17', title: 'Night 2: UI hardening (15 areas polished)', status: 'FIXED', notes: '2026-03-09' },
+  { id: '18', title: 'Dashboard UI standardization — EH design system across all pages (5 batches, 24 files, 332 CSS lines, 7 components)', status: 'FIXED', notes: 'feat/dashboard-ui — 2026-03-20' },
 ];
 
 const sections: Section[] = [
@@ -180,14 +181,14 @@ const knownIssues: BacklogItem[] = [
 ];
 
 const metrics: Array<{ label: string; start: string; current: string; target: string }> = [
-  { label: 'Test suites', start: '~89', current: '93', target: '95+' },
-  { label: 'Total tests', start: '1,734', current: '1,917', target: '2,000+' },
+  { label: 'Test suites', start: '~89', current: '168', target: '175+' },
+  { label: 'Total tests', start: '1,734', current: '1,917+', target: '2,000+' },
   { label: 'Test pass rate', start: '99.9%', current: '100%', target: '100%' },
   { label: 'P0 blockers', start: '8', current: '3*', target: '0' },
   { label: 'API 400 errors', start: '4', current: '0', target: '0' },
   { label: 'Template 404s', start: '100+', current: '0', target: '0' },
   { label: 'Health layers', start: '2', current: '5', target: '5' },
-  { label: 'Prod readiness', start: '78%', current: '~85%', target: '95%+' },
+  { label: 'Prod readiness', start: '78%', current: '~88%', target: '95%+' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -323,7 +324,7 @@ export default function BacklogClient() {
       <div>
         <h1 className="text-3xl font-bold text-[var(--foreground)]">Project Backlog</h1>
         <p className="mt-1 text-[var(--foreground-secondary)]">
-          Last updated: 2026-03-18 &middot; Production readiness: ~85%
+          Last updated: 2026-03-20 &middot; Production readiness: ~88%
         </p>
       </div>
 
