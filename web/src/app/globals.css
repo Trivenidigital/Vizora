@@ -420,3 +420,335 @@ body {
 .auth-field-enter-6 { animation-delay: 0.3s; }
 .auth-field-enter-7 { animation-delay: 0.35s; }
 .auth-field-enter-8 { animation-delay: 0.4s; }
+
+/* ── Dashboard Extensions to Electric Horizon ── */
+
+/* Dashboard card — extends .eh-card with subtler hover for app context */
+.eh-dash-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.eh-dash-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(0, 229, 160, 0.15);
+  box-shadow: 0 8px 24px rgba(0, 229, 160, 0.04);
+}
+.dark .eh-dash-card {
+  background: rgba(12, 34, 41, 0.7);
+}
+
+/* Interactive card variant — for clickable cards (stat cards, quick actions) */
+.eh-dash-card-interactive {
+  cursor: pointer;
+}
+.eh-dash-card-interactive:hover {
+  transform: translateY(-2px);
+  border-color: rgba(0, 229, 160, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 229, 160, 0.06);
+}
+.eh-dash-card-interactive:active {
+  transform: translateY(0);
+}
+
+/* Dashboard section heading — Sora font, proper hierarchy */
+.eh-dash-title {
+  font-family: var(--font-sora), sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+  color: var(--foreground);
+}
+
+/* Section subheading — Sora but lighter weight */
+.eh-dash-subtitle {
+  font-family: var(--font-sora), sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+  color: var(--foreground);
+}
+
+/* Standardized input styling */
+.eh-input {
+  width: 100%;
+  padding: 10px 16px;
+  background: var(--background-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--foreground);
+  font-size: 14px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.eh-input::placeholder {
+  color: var(--foreground-tertiary);
+}
+.eh-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(0, 229, 160, 0.15);
+}
+
+/* Standardized select styling */
+.eh-select {
+  width: 100%;
+  padding: 10px 16px;
+  background: var(--background-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--foreground);
+  font-size: 14px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%239A958E' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+.eh-select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(0, 229, 160, 0.15);
+}
+
+/* Neon button size variants */
+.eh-btn-neon.eh-btn-sm {
+  padding: 8px 16px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+.eh-btn-neon.eh-btn-lg {
+  padding: 14px 32px;
+  font-size: 16px;
+  border-radius: 12px;
+}
+
+/* Ghost button size variants */
+.eh-btn-ghost.eh-btn-sm {
+  padding: 7px 15px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+
+/* Danger button */
+.eh-btn-danger {
+  background: var(--error);
+  color: white;
+  font-weight: 600;
+  border-radius: 12px;
+  transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+.eh-btn-danger:hover {
+  background: var(--error-light);
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.25);
+  transform: translateY(-1px);
+}
+.eh-btn-danger:active {
+  transform: translateY(0);
+}
+
+/* Table header cell */
+.eh-th {
+  padding: 12px 24px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--foreground-tertiary);
+  text-align: left;
+}
+
+/* Table body cell */
+.eh-td {
+  padding: 16px 24px;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+/* Table row hover */
+.eh-tr-hover {
+  transition: background-color 0.15s ease;
+}
+.eh-tr-hover:hover {
+  background-color: var(--surface-hover);
+}
+
+/* Status badge — consistent pill style */
+.eh-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
+.eh-badge-success {
+  background: rgba(0, 229, 160, 0.1);
+  color: var(--primary);
+}
+.eh-badge-warning {
+  background: rgba(251, 191, 36, 0.1);
+  color: var(--warning);
+}
+.eh-badge-error {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--error);
+}
+.eh-badge-info {
+  background: rgba(0, 180, 216, 0.1);
+  color: var(--info);
+}
+.eh-badge-neutral {
+  background: var(--surface-hover);
+  color: var(--foreground-secondary);
+}
+
+/* Dashboard page entrance — subtler than homepage reveal */
+.eh-dash-enter {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.eh-dash-enter.eh-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Stagger delays for dashboard sections */
+.eh-stagger-1 { transition-delay: 0.05s; }
+.eh-stagger-2 { transition-delay: 0.1s; }
+.eh-stagger-3 { transition-delay: 0.15s; }
+.eh-stagger-4 { transition-delay: 0.2s; }
+.eh-stagger-5 { transition-delay: 0.25s; }
+
+/* Toolbar — unified filter bar */
+.eh-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  flex-wrap: wrap;
+}
+.dark .eh-toolbar {
+  background: rgba(12, 34, 41, 0.5);
+}
+
+/* Filter pill button — for type/status filters */
+.eh-filter-pill {
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--foreground-secondary);
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.eh-filter-pill:hover {
+  background: var(--surface-hover);
+  color: var(--foreground);
+}
+.eh-filter-pill-active {
+  background: var(--primary);
+  color: #061A21;
+  font-weight: 600;
+}
+.eh-filter-pill-active:hover {
+  background: #00CC8E;
+  color: #061A21;
+}
+
+/* Active filter chip — removable tag */
+.eh-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  background: rgba(0, 229, 160, 0.1);
+  color: var(--primary);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* Skeleton loading animation */
+@keyframes eh-skeleton {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.eh-skeleton {
+  background: linear-gradient(90deg,
+    var(--surface-hover) 25%,
+    var(--surface-secondary) 50%,
+    var(--surface-hover) 75%);
+  background-size: 200% 100%;
+  animation: eh-skeleton 1.5s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+/* Icon button — for table/toolbar actions */
+.eh-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 8px;
+  color: var(--foreground-secondary);
+  transition: all 0.15s ease;
+}
+.eh-icon-btn:hover {
+  background: var(--surface-hover);
+  color: var(--foreground);
+}
+.eh-icon-btn-danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--error);
+}
+
+/* Sticky bulk action bar */
+.eh-bulk-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 20px;
+  background: rgba(0, 229, 160, 0.06);
+  border: 1px solid rgba(0, 229, 160, 0.2);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+}
+
+/* Empty state container */
+.eh-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 24px;
+  text-align: center;
+}
+
+/* Progress bar */
+.eh-progress {
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--surface-hover);
+  overflow: hidden;
+}
+.eh-progress-bar {
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, var(--primary), var(--info));
+  transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
