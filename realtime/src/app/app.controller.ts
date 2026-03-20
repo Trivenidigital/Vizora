@@ -231,6 +231,21 @@ export class AppController {
     return { devicesOnline };
   }
 
+  @Post('notifications/broadcast')
+  @UseGuards(InternalApiGuard)
+  async broadcastNotification(
+    @Body() data: { organizationId: string; notification: any },
+  ): Promise<PushResponse> {
+    this.deviceGateway.server
+      .to(`org:${data.organizationId}`)
+      .emit('notification:new', data.notification);
+    this.logger.log(`Broadcasted notification to org:${data.organizationId}`);
+    return {
+      success: true,
+      message: 'Notification broadcasted to organization',
+    };
+  }
+
   @Post('internal/command')
   @UseGuards(InternalApiGuard)
   async sendCommand(
