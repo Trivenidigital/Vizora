@@ -16,6 +16,8 @@ declare module './client' {
     resetPassword(token: string, newPassword: string): Promise<{ message: string }>;
     deleteAccount(data: { password: string; confirmation: string }): Promise<{ message: string }>;
     updateProfile(data: { firstName?: string; lastName?: string }): Promise<AuthUser>;
+    uploadAvatar(file: File): Promise<{ avatarUrl: string }>;
+    deleteAvatar(): Promise<void>;
   }
 }
 
@@ -112,4 +114,16 @@ ApiClient.prototype.updateProfile = async function (data: { firstName?: string; 
     body: JSON.stringify(data),
   });
   return response.user;
+};
+
+ApiClient.prototype.uploadAvatar = async function (file: File): Promise<{ avatarUrl: string }> {
+  const formData = new FormData();
+  formData.append('file', file);
+  return this.requestFormData<{ avatarUrl: string }>('/auth/me/avatar', formData);
+};
+
+ApiClient.prototype.deleteAvatar = async function (): Promise<void> {
+  await this.request<void>('/auth/me/avatar', {
+    method: 'DELETE',
+  });
 };
