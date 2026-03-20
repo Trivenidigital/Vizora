@@ -28,6 +28,7 @@ describe('FleetService', () => {
       srem: jest.fn().mockResolvedValue(1),
       smembers: jest.fn().mockResolvedValue([]),
       scard: jest.fn().mockResolvedValue(0),
+      expire: jest.fn().mockResolvedValue(1),
     };
 
     const mockDb = {
@@ -214,6 +215,7 @@ describe('FleetService', () => {
       await service.createOverride(
         mockOrgId,
         'cmd-1',
+        'content-uuid-1',
         'Alert Content',
         'device',
         mockDeviceId,
@@ -227,6 +229,12 @@ describe('FleetService', () => {
       expect(mockRedisClient.sadd).toHaveBeenCalledWith(
         `overrides:index:${mockOrgId}`,
         'cmd-1',
+      );
+
+      // Should set sliding window expiry on index set
+      expect(mockRedisClient.expire).toHaveBeenCalledWith(
+        `overrides:index:${mockOrgId}`,
+        86400,
       );
 
       // Should store override details with TTL (60 minutes * 60 seconds)
@@ -354,8 +362,19 @@ describe('FleetService', () => {
       );
     });
 
-    it('should set TTL on first increment', async () => {
+    it('should always set TTL after increment', async () => {
       redis.incr.mockResolvedValue(1);
+
+      await service.checkRateLimit(mockOrgId);
+
+      expect(redis.expire).toHaveBeenCalledWith(
+        `fleet:ratelimit:${mockOrgId}`,
+        60,
+      );
+    });
+
+    it('should set TTL even on subsequent increments', async () => {
+      redis.incr.mockResolvedValue(5);
 
       await service.checkRateLimit(mockOrgId);
 

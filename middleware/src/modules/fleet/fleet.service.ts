@@ -70,19 +70,20 @@ export class FleetService {
     const devicesQueued = deviceIds.length - devicesOnline;
 
     // Handle emergency override with push_content
+    const duration = dto.payload?.duration ?? 60;
     if (
       dto.command === 'push_content' &&
-      dto.payload?.priority === 'emergency' &&
-      dto.payload?.duration
+      dto.payload?.priority === 'emergency'
     ) {
       await this.createOverride(
         orgId,
         commandId,
         dto.payload.contentId || 'unknown',
+        'Emergency content',
         dto.target.type,
         dto.target.id,
         targetName,
-        dto.payload.duration,
+        duration,
         userId,
         deviceIds,
       );
@@ -181,6 +182,7 @@ export class FleetService {
   async createOverride(
     orgId: string,
     commandId: string,
+    contentId: string,
     contentTitle: string,
     targetType: string,
     targetId: string,
@@ -192,6 +194,7 @@ export class FleetService {
     const ttl = duration * 60;
     const overrideData = JSON.stringify({
       commandId,
+      contentId,
       contentTitle,
       targetType,
       targetId,
@@ -210,6 +213,7 @@ export class FleetService {
 
     // Add commandId to org's override index set
     await client.sadd(`overrides:index:${orgId}`, commandId);
+    await client.expire(`overrides:index:${orgId}`, 86400); // 24h sliding window
 
     // Store override details with TTL
     await this.redis.set(`override:${orgId}:${commandId}`, overrideData, ttl);
@@ -292,11 +296,7 @@ export class FleetService {
   async checkRateLimit(orgId: string): Promise<void> {
     const key = `fleet:ratelimit:${orgId}`;
     const count = await this.redis.incr(key);
-
-    // Set TTL on first increment
-    if (count === 1) {
-      await this.redis.expire(key, 60);
-    }
+    await this.redis.expire(key, 60);
 
     if (count > 10) {
       throw new TooManyRequestsException(
