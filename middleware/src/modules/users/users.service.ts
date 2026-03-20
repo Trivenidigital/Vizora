@@ -209,6 +209,59 @@ export class UsersService {
     return deactivatedUser;
   }
 
+  async exportUserData(userId: string, organizationId: string) {
+    const [user, organization, content, displays, playlists, schedules, auditLogs, notifications] = await Promise.all([
+      this.db.user.findUnique({
+        where: { id: userId },
+        select: { email: true, firstName: true, lastName: true, role: true, createdAt: true, updatedAt: true },
+      }),
+      this.db.organization.findUnique({
+        where: { id: organizationId },
+        select: { name: true, slug: true, subscriptionTier: true, createdAt: true },
+      }),
+      this.db.content.findMany({
+        where: { organizationId },
+        select: { id: true, title: true, type: true, status: true, createdAt: true },
+      }),
+      this.db.display.findMany({
+        where: { organizationId },
+        select: { id: true, nickname: true, location: true, status: true, createdAt: true },
+      }),
+      this.db.playlist.findMany({
+        where: { organizationId },
+        select: { id: true, name: true, createdAt: true },
+      }),
+      this.db.schedule.findMany({
+        where: { organizationId },
+        select: { id: true, name: true, createdAt: true },
+      }),
+      this.db.auditLog.findMany({
+        where: { userId },
+        select: { action: true, entityType: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+        take: 1000,
+      }),
+      this.db.notification.findMany({
+        where: { userId },
+        select: { type: true, title: true, message: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+        take: 500,
+      }),
+    ]);
+
+    return {
+      exportDate: new Date().toISOString(),
+      user,
+      organization,
+      content: { count: content.length, items: content },
+      displays: { count: displays.length, items: displays },
+      playlists: { count: playlists.length, items: playlists },
+      schedules: { count: schedules.length, items: schedules },
+      auditLog: { count: auditLogs.length, entries: auditLogs },
+      notifications: { count: notifications.length, items: notifications },
+    };
+  }
+
   private generateTempPassword(): string {
     const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%';
     let password = '';

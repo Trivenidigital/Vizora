@@ -62,6 +62,15 @@ export class UsersController {
     return this.usersService.update(organizationId, id, updateUserDto, userId);
   }
 
+  @Post('me/data-export')
+  @Roles('admin', 'manager', 'viewer')
+  exportUserData(
+    @CurrentUser('id') userId: string,
+    @CurrentUser('organizationId') organizationId: string,
+  ) {
+    return this.usersService.exportUserData(userId, organizationId);
+  }
+
   @Delete(':id')
   @Roles('admin')
   deactivate(

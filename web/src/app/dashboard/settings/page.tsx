@@ -38,6 +38,7 @@ export default function SettingsPage() {
  const router = useRouter();
 
  const [saving, setSaving] = useState(false);
+ const [exporting, setExporting] = useState(false);
 
  // Profile state
  const [profileForm, setProfileForm] = useState({ firstName: '', lastName: '' });
@@ -174,6 +175,27 @@ export default function SettingsPage() {
      toast.error(error.message || 'Failed to change password');
    } finally {
      setPasswordLoading(false);
+   }
+ };
+
+ const handleExportData = async () => {
+   setExporting(true);
+   try {
+     const data = await apiClient.exportUserData();
+     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+     const url = URL.createObjectURL(blob);
+     const a = document.createElement('a');
+     a.href = url;
+     a.download = `vizora-data-export-${new Date().toISOString().slice(0, 10)}.json`;
+     document.body.appendChild(a);
+     a.click();
+     document.body.removeChild(a);
+     URL.revokeObjectURL(url);
+     toast.success('Data export downloaded');
+   } catch (error: any) {
+     toast.error(error.message || 'Failed to export data');
+   } finally {
+     setExporting(false);
    }
  };
 
@@ -524,9 +546,13 @@ export default function SettingsPage() {
  <Icon name="settings" size="md" className="text-[#00E5A0] dark:text-[#00E5A0]" />
  Change Password
  </button>
- <button className="w-full px-4 py-3 text-sm bg-[var(--background)] text-[var(--foreground-secondary)] rounded-lg hover:bg-[var(--surface-hover)] transition font-medium text-left flex items-center gap-2">
+ <button
+   onClick={handleExportData}
+   disabled={exporting}
+   className="w-full px-4 py-3 text-sm bg-[var(--background)] text-[var(--foreground-secondary)] rounded-lg hover:bg-[var(--surface-hover)] transition font-medium text-left flex items-center gap-2 disabled:opacity-50"
+ >
  <Icon name="download" size="md" className="text-[var(--foreground-secondary)]" />
- Export Data
+ {exporting ? 'Exporting...' : 'Export My Data'}
  </button>
  <button
    onClick={() => setShowDeleteAccountModal(true)}
