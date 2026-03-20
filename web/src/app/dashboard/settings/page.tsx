@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
@@ -38,10 +38,67 @@ export default function SettingsPage() {
  const router = useRouter();
 
  const [saving, setSaving] = useState(false);
+ const [exporting, setExporting] = useState(false);
 
  // Profile state
  const [profileForm, setProfileForm] = useState({ firstName: '', lastName: '' });
  const [profileSaving, setProfileSaving] = useState(false);
+
+ // Avatar state
+ const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+ const [avatarUploading, setAvatarUploading] = useState(false);
+ const fileInputRef = useRef<HTMLInputElement>(null);
+
+ const getUserInitials = () => {
+   if (profileForm.firstName && profileForm.lastName) {
+     return (profileForm.firstName[0] + profileForm.lastName[0]).toUpperCase();
+   }
+   if (profileForm.firstName) return profileForm.firstName[0].toUpperCase();
+   return 'U';
+ };
+
+ const handleAvatarSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+   const file = e.target.files?.[0];
+   if (!file) return;
+
+   const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+   if (!allowedTypes.includes(file.type)) {
+     toast.error('Only JPG, PNG, and WebP images are allowed');
+     return;
+   }
+
+   if (file.size > 2 * 1024 * 1024) {
+     toast.error('Image must be smaller than 2MB');
+     return;
+   }
+
+   setAvatarUploading(true);
+   try {
+     const result = await apiClient.uploadAvatar(file);
+     setAvatarUrl(result.avatarUrl);
+     toast.success('Avatar updated!');
+     router.refresh();
+   } catch (error: any) {
+     toast.error(error.message || 'Failed to upload avatar');
+   } finally {
+     setAvatarUploading(false);
+     if (fileInputRef.current) fileInputRef.current.value = '';
+   }
+ };
+
+ const handleRemoveAvatar = async () => {
+   setAvatarUploading(true);
+   try {
+     await apiClient.deleteAvatar();
+     setAvatarUrl(null);
+     toast.success('Avatar removed');
+     router.refresh();
+   } catch (error: any) {
+     toast.error(error.message || 'Failed to remove avatar');
+   } finally {
+     setAvatarUploading(false);
+   }
+ };
 
  // Fetch real settings on mount
  useEffect(() => {
@@ -63,6 +120,9 @@ export default function SettingsPage() {
          firstName: user.firstName || '',
          lastName: user.lastName || '',
        });
+       if (user.avatarUrl) {
+         setAvatarUrl(user.avatarUrl);
+       }
      } catch (err) {
        if (process.env.NODE_ENV === 'development') {
          console.error('Failed to load settings:', err);
@@ -115,6 +175,27 @@ export default function SettingsPage() {
      toast.error(error.message || 'Failed to change password');
    } finally {
      setPasswordLoading(false);
+   }
+ };
+
+ const handleExportData = async () => {
+   setExporting(true);
+   try {
+     const data = await apiClient.exportUserData();
+     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+     const url = URL.createObjectURL(blob);
+     const a = document.createElement('a');
+     a.href = url;
+     a.download = `vizora-data-export-${new Date().toISOString().slice(0, 10)}.json`;
+     document.body.appendChild(a);
+     a.click();
+     document.body.removeChild(a);
+     URL.revokeObjectURL(url);
+     toast.success('Data export downloaded');
+   } catch (error: any) {
+     toast.error(error.message || 'Failed to export data');
+   } finally {
+     setExporting(false);
    }
  };
 
@@ -414,9 +495,13 @@ export default function SettingsPage() {
  <Icon name="settings" size="md" className="text-[#00E5A0] dark:text-[#00E5A0]" />
  Change Password
  </button>
- <button className="w-full px-4 py-3 text-sm bg-[var(--background)] text-[var(--foreground-secondary)] rounded-lg hover:bg-[var(--surface-hover)] transition font-medium text-left flex items-center gap-2">
+ <button
+   onClick={handleExportData}
+   disabled={exporting}
+   className="w-full px-4 py-3 text-sm bg-[var(--background)] text-[var(--foreground-secondary)] rounded-lg hover:bg-[var(--surface-hover)] transition font-medium text-left flex items-center gap-2 disabled:opacity-50"
+ >
  <Icon name="download" size="md" className="text-[var(--foreground-secondary)]" />
- Export Data
+ {exporting ? 'Exporting...' : 'Export My Data'}
  </button>
  <button
    onClick={() => setShowDeleteAccountModal(true)}

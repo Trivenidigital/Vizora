@@ -10,6 +10,7 @@ declare module './client' {
     updateUser(id: string, data: { firstName?: string; lastName?: string; role?: string; isActive?: boolean }): Promise<User>;
     deactivateUser(id: string): Promise<User>;
     getAuditLogs(params?: { page?: number; limit?: number; action?: string; entityType?: string; userId?: string; startDate?: string; endDate?: string }): Promise<PaginatedResponse<AuditLog>>;
+    exportUserData(): Promise<any>;
   }
 }
 
@@ -35,6 +36,12 @@ ApiClient.prototype.updateUser = async function (id: string, data: { firstName?:
 ApiClient.prototype.deactivateUser = async function (id: string): Promise<User> {
   return this.request<User>(`/users/${id}`, {
     method: 'DELETE',
+  });
+};
+
+ApiClient.prototype.exportUserData = async function (): Promise<any> {
+  return this.request<any>('/users/me/data-export', {
+    method: 'POST',
   });
 };
 
