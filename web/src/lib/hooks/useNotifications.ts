@@ -13,7 +13,7 @@ interface UseNotificationsOptions {
 }
 
 export function useNotifications(options: UseNotificationsOptions = {}) {
-  const { pollInterval = 120000, autoFetch = true } = options;
+  const { pollInterval = 300000, autoFetch = true } = options;
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -132,12 +132,21 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
 
     const unsubscribe = on('notification:new', (data: any) => {
       if (process.env.NODE_ENV === 'development') {
-        devLog('[Notifications] Received new notification:', data);
+        devLog('[Notifications] Received new notification via WebSocket:', data);
       }
       // Increment unread count
       setUnreadCount((prev) => prev + 1);
-      // Fetch fresh notifications to get the full notification object
-      fetchNotifications();
+      // Prepend the full notification object if it has an id (came from broadcast)
+      if (data && data.id) {
+        setNotifications((prev) => {
+          // Avoid duplicates
+          if (prev.some((n) => n.id === data.id)) return prev;
+          return [data, ...prev].slice(0, 20);
+        });
+      } else {
+        // Fallback: fetch fresh notifications if payload is incomplete
+        fetchNotifications();
+      }
     });
 
     return unsubscribe;
