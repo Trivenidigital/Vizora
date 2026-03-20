@@ -1,4 +1,6 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
+import { firstValueFrom } from 'rxjs';
 import { Prisma } from '@vizora/database';
 import { DatabaseService } from '../database/database.service';
 import { CreateNotificationDto } from './dto/create-notification.dto';
@@ -13,7 +15,10 @@ export interface NotificationFilters {
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
 
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly httpService: HttpService,
+  ) {}
 
   /**
    * Create a new notification
@@ -42,6 +47,10 @@ export class NotificationsService {
     });
 
     this.logger.log(`Created notification: ${notification.id} (${notification.type})`);
+
+    // Broadcast to connected dashboard clients via realtime gateway
+    await this.broadcastNotification(data.organizationId, notification);
+
     return notification;
   }
 
@@ -223,6 +232,30 @@ export class NotificationsService {
       severity,
       organizationId,
     });
+  }
+
+  /**
+   * Broadcast a notification to connected dashboard clients via the realtime gateway.
+   * Non-critical — if it fails, the notification is still persisted and will appear on next poll.
+   */
+  private async broadcastNotification(organizationId: string, notification: any): Promise<void> {
+    try {
+      const secret = process.env.INTERNAL_API_SECRET;
+      const realtimeUrl = process.env.REALTIME_URL || 'http://localhost:3002';
+      if (secret) {
+        await firstValueFrom(
+          this.httpService.post(
+            `${realtimeUrl}/api/notifications/broadcast`,
+            { organizationId, notification },
+            { headers: { 'x-internal-api-key': secret }, timeout: 3000 },
+          ),
+        );
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Failed to broadcast notification via WebSocket: ${err instanceof Error ? err.message : 'unknown error'}`,
+      );
+    }
   }
 
   /**
