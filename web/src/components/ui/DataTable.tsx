@@ -97,13 +97,11 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps<any>>(
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
             <thead>
-              <tr className="border-b border-[var(--border)] bg-[var(--surface-hover)]">
+              <tr className="border-b border-[var(--border)] bg-[var(--background)]">
                 {columns.map((col) => (
                   <th
                     key={String(col.key)}
-                    className={`px-4 py-3 text-left text-sm font-semibold text-[var(--foreground)] ${
-                      col.width || ''
-                    }`}
+                    className={`eh-th ${col.width || ''}`}
                   >
                     {col.sortable ? (
                       <button
@@ -120,26 +118,26 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps<any>>(
                     )}
                   </th>
                 ))}
-                {rowActions && <th className="px-4 py-3 w-12" />}
+                {rowActions && <th className="eh-th w-12" />}
               </tr>
             </thead>
             <tbody>
               {paginatedData.map((row, idx) => (
                 <tr
                   key={String(row[keyField]) || idx}
-                  className="border-b border-[var(--border)] hover:bg-[var(--surface-hover)] transition-colors cursor-pointer"
+                  className="border-b border-[var(--border)] eh-tr-hover cursor-pointer"
                   onClick={() => onRowClick?.(row)}
                 >
                   {columns.map((col) => (
                     <td
                       key={String(col.key)}
-                      className="px-4 py-3 text-sm text-[var(--foreground-secondary)]"
+                      className="eh-td text-[var(--foreground-secondary)]"
                     >
                       {col.render ? col.render(row[col.key], row) : String(row[col.key])}
                     </td>
                   ))}
                   {rowActions && (
-                    <td className="px-4 py-3 text-center relative">
+                    <td className="eh-td text-center relative">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -175,7 +173,7 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps<any>>(
         </div>
 
         {pagination && totalPages > 1 && (
-          <div className="flex items-center justify-between mt-4 px-4 py-3">
+          <div className="flex items-center justify-between mt-4 px-6 py-3">
             <p className="text-sm text-[var(--foreground-secondary)]">
               Page {currentPage + 1} of {totalPages}
             </p>
@@ -183,14 +181,14 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps<any>>(
               <button
                 onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}
                 disabled={currentPage === 0}
-                className="px-3 py-1 text-sm border border-[var(--border)] rounded hover:bg-[var(--surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="eh-btn-ghost eh-btn-sm px-4 py-1.5 text-sm rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Previous
               </button>
               <button
                 onClick={() => setCurrentPage(Math.min(totalPages - 1, currentPage + 1))}
                 disabled={currentPage >= totalPages - 1}
-                className="px-3 py-1 text-sm border border-[var(--border)] rounded hover:bg-[var(--surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="eh-btn-ghost eh-btn-sm px-4 py-1.5 text-sm rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Next
               </button>
