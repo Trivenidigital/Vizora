@@ -38,12 +38,9 @@ export default function Button({
     lg: 'px-6 py-3 text-base',
   };
 
-  // eh-btn-neon/ghost/danger handle their own padding via CSS, but we add fallback padding
-  const needsPadding = variant === 'secondary';
-
   return (
     <button
-      className={`font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${variantClasses[variant]} ${sizeClasses[size]} ${needsPadding ? basePadding[size] : basePadding[size]} ${className}`}
+      className={`font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${variantClasses[variant]} ${sizeClasses[size]} ${basePadding[size]} ${className}`}
       disabled={disabled || loading}
       {...props}
     >

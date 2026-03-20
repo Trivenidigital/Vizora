@@ -7,6 +7,7 @@ import {
   Param,
   UseGuards,
   ForbiddenException,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -44,7 +45,7 @@ export class FleetController {
   @Delete('overrides/:commandId')
   @Roles('admin')
   async clearOverride(
-    @Param('commandId') commandId: string,
+    @Param('commandId', new ParseUUIDPipe()) commandId: string,
     @CurrentUser('organizationId') orgId: string,
   ) {
     return this.fleetService.clearOverride(orgId, commandId);

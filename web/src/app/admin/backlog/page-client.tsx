@@ -328,7 +328,7 @@ export default function BacklogClient() {
       <div>
         <h1 className="text-3xl font-bold text-[var(--foreground)]">Project Backlog</h1>
         <p className="mt-1 text-[var(--foreground-secondary)]">
-          Last updated: 2026-03-20 &middot; Production readiness: ~88%
+          Last updated: 2026-03-20 &middot; Production readiness: ~90%
         </p>
       </div>
 

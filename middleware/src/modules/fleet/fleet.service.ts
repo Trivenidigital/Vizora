@@ -4,6 +4,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
@@ -29,6 +30,20 @@ interface ResolvedTarget {
 
 interface GatewayBroadcastResult {
   devicesOnline: number;
+}
+
+interface OverrideRecord {
+  commandId: string;
+  contentId: string;
+  contentTitle: string;
+  targetType: string;
+  targetId: string;
+  targetName: string;
+  duration: number;
+  startedAt: string;
+  expiresAt: string;
+  startedBy: string;
+  deviceIds: string[];
 }
 
 @Injectable()
@@ -214,7 +229,11 @@ export class FleetService {
         );
         return response.data;
       },
-      () => ({ devicesOnline: 0 }),
+      () => {
+        throw new ServiceUnavailableException(
+          'Realtime gateway is temporarily unavailable. Commands were not sent.',
+        );
+      },
     );
 
     return { devicesOnline: result?.devicesOnline ?? 0 };
@@ -233,6 +252,7 @@ export class FleetService {
     deviceIds: string[],
   ): Promise<void> {
     const ttl = duration * 60;
+    const now = new Date();
     const overrideData = JSON.stringify({
       commandId,
       contentId,
@@ -241,9 +261,10 @@ export class FleetService {
       targetId,
       targetName,
       duration,
-      userId,
+      startedAt: now.toISOString(),
+      expiresAt: new Date(now.getTime() + duration * 60 * 1000).toISOString(),
+      startedBy: userId,
       deviceIds,
-      createdAt: new Date().toISOString(),
     });
 
     const client = this.redis.getClient();
@@ -252,7 +273,10 @@ export class FleetService {
       return;
     }
 
-    // Add commandId to org's override index set
+    // Add commandId to org's override index set.
+    // The 24h sliding TTL may leave stale commandIds in the set if no new overrides
+    // are created — this is harmless because getActiveOverrides() filters out expired
+    // entries by checking if the individual override key still exists.
     await client.sadd(`overrides:index:${orgId}`, commandId);
     await client.expire(`overrides:index:${orgId}`, 86400); // 24h sliding window
 
@@ -265,7 +289,7 @@ export class FleetService {
     }
   }
 
-  async getActiveOverrides(orgId: string): Promise<any[]> {
+  async getActiveOverrides(orgId: string): Promise<OverrideRecord[]> {
     const client = this.redis.getClient();
     if (!client) return [];
 
@@ -276,7 +300,7 @@ export class FleetService {
     // Get all command IDs in the index
     const commandIds = await client.smembers(`overrides:index:${orgId}`);
 
-    const overrides: any[] = [];
+    const overrides: OverrideRecord[] = [];
     const expiredIds: string[] = [];
 
     for (const id of commandIds) {
@@ -327,7 +351,7 @@ export class FleetService {
     // Notify devices to clear override
     await this.callGatewayBroadcast(deviceIds, {
       commandId,
-      command: 'CLEAR_OVERRIDE',
+      command: 'clear_override',
       payload: {},
     });
 
@@ -337,6 +361,11 @@ export class FleetService {
   async checkRateLimit(orgId: string): Promise<void> {
     const key = `fleet:ratelimit:${orgId}`;
     const count = await this.redis.incr(key);
+    // EXPIRE is called on every INCR, so even if the process crashes between
+    // INCR and EXPIRE on one call, the next successful call will set the TTL.
+    // The only edge case is a permanent crash after a single INCR — but then
+    // no more commands are being sent, and the key will be cleaned up by Redis
+    // once the TTL from a prior EXPIRE fires (or on next successful call).
     await this.redis.expire(key, 60);
 
     if (count > 10) {
