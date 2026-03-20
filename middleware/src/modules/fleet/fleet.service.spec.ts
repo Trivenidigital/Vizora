@@ -239,10 +239,10 @@ describe('FleetService', () => {
         where: { id: 'content-1', organizationId: mockOrgId },
       });
 
-      // Verify gateway was called with resolved content payload
+      // Verify gateway was called with correct command shape
       const postCall = httpService.post.mock.calls[0];
       const body = postCall[1];
-      expect(body.payload).toEqual(
+      expect(body.command).toEqual(
         expect.objectContaining({
           type: 'push_content',
           payload: expect.objectContaining({
@@ -321,7 +321,7 @@ describe('FleetService', () => {
 
       const postCall = httpService.post.mock.calls[0];
       const body = postCall[1];
-      expect(body.payload.payload.content.url).toBe(
+      expect(body.command.payload.content.url).toBe(
         'http://localhost:3000/api/v1/device-content/content-2/file',
       );
     });
@@ -360,6 +360,16 @@ describe('FleetService', () => {
         expect.any(String),
         3600,
       );
+
+      // Verify stored JSON contains startedAt and expiresAt (NEW-3 regression guard)
+      const storedJson = redis.set.mock.calls.find(
+        (c: any[]) => c[0] === `override:${mockOrgId}:cmd-1`,
+      )?.[1];
+      const parsed = JSON.parse(storedJson);
+      expect(parsed.startedAt).toBeDefined();
+      expect(parsed.expiresAt).toBeDefined();
+      expect(parsed.contentId).toBe('content-uuid-1');
+      expect(parsed.contentTitle).toBe('Alert Content');
 
       // Should set per-device override keys
       expect(redis.set).toHaveBeenCalledWith(
@@ -453,6 +463,11 @@ describe('FleetService', () => {
         `device:override:${mockDeviceId}`,
       );
       expect(redis.del).toHaveBeenCalledWith('device:override:dev-2');
+
+      // Should broadcast lowercase clear_override command (NEW-4 regression guard)
+      const postCall = httpService.post.mock.calls[0];
+      const body = postCall[1];
+      expect(body.command.type).toBe('clear_override');
     });
 
     it('should throw NotFoundException for nonexistent override', async () => {

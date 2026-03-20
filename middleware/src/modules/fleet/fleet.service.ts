@@ -101,23 +101,21 @@ export class FleetService {
       }
 
       gatewayPayload = {
-        type: 'push_content',
-        payload: {
-          content: {
-            id: resolvedContent.id,
-            title: resolvedContent.title,
-            type: resolvedContent.type,
-            url: resolvedUrl,
-            thumbnailUrl: resolvedContent.thumbnailUrl,
-          },
-          duration,
-          priority: dto.payload.priority || 'normal',
+        content: {
+          id: resolvedContent.id,
+          title: resolvedContent.title,
+          type: resolvedContent.type,
+          url: resolvedUrl,
+          thumbnailUrl: resolvedContent.thumbnailUrl,
         },
-        commandId,
+        duration,
+        priority: dto.payload.priority || 'normal',
       };
     }
 
-    // Call gateway broadcast
+    // Call gateway broadcast — command shape: { type, payload, commandId }
+    // For simple commands (reload, restart): payload is empty
+    // For push_content: payload contains { content, duration, priority }
     const { devicesOnline } = await this.callGatewayBroadcast(deviceIds, {
       commandId,
       command: dto.command,
@@ -209,7 +207,7 @@ export class FleetService {
 
   async callGatewayBroadcast(
     deviceIds: string[],
-    command: { commandId: string; command: string; payload: Record<string, any> },
+    commandData: { commandId: string; command: string; payload?: Record<string, any> },
   ): Promise<GatewayBroadcastResult> {
     const url = `${this.realtimeUrl}/api/commands/broadcast`;
     const headers: Record<string, string> = {};
@@ -217,13 +215,24 @@ export class FleetService {
       headers['x-internal-api-key'] = process.env.INTERNAL_API_SECRET;
     }
 
+    // Build the command object in the shape the gateway expects:
+    // { deviceIds, command: { type, payload, commandId } }
+    const gatewayBody = {
+      deviceIds,
+      command: {
+        type: commandData.command,
+        payload: commandData.payload || {},
+        commandId: commandData.commandId,
+      },
+    };
+
     const result = await this.circuitBreaker.executeWithFallback(
       'fleet-gateway',
       async () => {
         const response = await firstValueFrom(
           this.httpService.post(
             url,
-            { deviceIds, ...command },
+            gatewayBody,
             { headers },
           ),
         );
