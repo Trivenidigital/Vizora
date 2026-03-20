@@ -31,6 +31,8 @@ import { UpdateContentDto } from './dto/update-content.dto';
 import { ReplaceFileDto } from './dto/replace-file.dto';
 import { SetContentExpirationDto } from './dto/set-content-expiration.dto';
 import { ContentQueryDto } from './dto/content-query.dto';
+import { FlagContentDto } from './dto/flag-content.dto';
+import { ReviewContentDto } from './dto/review-content.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -293,6 +295,33 @@ export class ContentController {
     await this.contentService.update(organizationId, id, { thumbnail: thumbnailUrl });
 
     return { thumbnail: thumbnailUrl };
+  }
+
+  // ============================================================================
+  // CONTENT MODERATION
+  // ============================================================================
+
+  @Post(':id/flag')
+  @HttpCode(HttpStatus.OK)
+  flag(
+    @CurrentUser('organizationId') organizationId: string,
+    @CurrentUser('id') userId: string,
+    @Param('id', ParseIdPipe) id: string,
+    @Body() body: FlagContentDto,
+  ) {
+    return this.contentService.flagContent(organizationId, id, userId, body.reason);
+  }
+
+  @Post(':id/review')
+  @Roles('admin', 'manager')
+  @HttpCode(HttpStatus.OK)
+  review(
+    @CurrentUser('organizationId') organizationId: string,
+    @CurrentUser('id') userId: string,
+    @Param('id', ParseIdPipe) id: string,
+    @Body() body: ReviewContentDto,
+  ) {
+    return this.contentService.reviewContent(organizationId, id, userId, body.action, body.reason);
   }
 
   @Post(':id/archive')

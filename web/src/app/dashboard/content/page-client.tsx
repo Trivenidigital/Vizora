@@ -70,6 +70,12 @@ export default function ContentClient() {
  const [showTagFilter, setShowTagFilter] = useState(false);
  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'reconnecting' | 'offline'>('offline');
 
+ // Moderation state
+ const [isFlagModalOpen, setIsFlagModalOpen] = useState(false);
+ const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+ const [flagReason, setFlagReason] = useState('');
+ const [reviewReason, setReviewReason] = useState('');
+
  // Folder state
  const [folders, setFolders] = useState<ContentFolder[]>([]);
  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
@@ -567,6 +573,53 @@ export default function ContentClient() {
  }
  };
 
+ // Moderation handlers
+ const handleFlag = (item: Content) => {
+ setSelectedContent(item);
+ setFlagReason('');
+ setIsFlagModalOpen(true);
+ };
+
+ const confirmFlag = async () => {
+ if (!selectedContent) return;
+ try {
+ setActionLoading(true);
+ await apiClient.flagContent(selectedContent.id, flagReason || undefined);
+ toast.success('Content flagged for review');
+ setIsFlagModalOpen(false);
+ setSelectedContent(null);
+ setFlagReason('');
+ loadContent();
+ } catch (error: any) {
+ toast.error(error.message || 'Failed to flag content');
+ } finally {
+ setActionLoading(false);
+ }
+ };
+
+ const handleReview = (item: Content) => {
+ setSelectedContent(item);
+ setReviewReason('');
+ setIsReviewModalOpen(true);
+ };
+
+ const confirmReview = async (action: 'approve' | 'reject') => {
+ if (!selectedContent) return;
+ try {
+ setActionLoading(true);
+ await apiClient.reviewContent(selectedContent.id, action, reviewReason || undefined);
+ toast.success(action === 'approve' ? 'Content approved' : 'Content rejected and removed from playlists');
+ setIsReviewModalOpen(false);
+ setSelectedContent(null);
+ setReviewReason('');
+ loadContent();
+ } catch (error: any) {
+ toast.error(error.message || `Failed to ${action} content`);
+ } finally {
+ setActionLoading(false);
+ }
+ };
+
  // Bulk selection handlers
  const toggleSelectItem = (id: string) => {
  const newSelected = new Set(selectedItems);
@@ -631,6 +684,10 @@ export default function ContentClient() {
  return 'eh-badge-warning';
  case 'error':
  return 'eh-badge-danger';
+ case 'flagged':
+ return 'bg-amber-500/20 text-amber-400 border border-amber-500/30';
+ case 'rejected':
+ return 'bg-red-500/20 text-red-400 border border-red-500/30';
  case 'archived':
  return 'eh-badge-muted';
  default:
@@ -862,6 +919,7 @@ export default function ContentClient() {
  <option value="ready">Ready</option>
  <option value="processing">Processing</option>
  <option value="error">Error</option>
+ <option value="flagged">Flagged</option>
  </select>
  </div>
  <div>
@@ -1019,6 +1077,23 @@ export default function ContentClient() {
  </td>
  <td className="eh-td text-right text-sm font-medium">
  <div className="flex justify-end gap-2">
+ {item.status === 'flagged' ? (
+ <button
+ onClick={() => handleReview(item)}
+ className="eh-icon-btn text-amber-400"
+ title="Review flagged content"
+ >
+ <Icon name="shield" size="md" />
+ </button>
+ ) : item.status !== 'archived' && item.status !== 'rejected' ? (
+ <button
+ onClick={() => handleFlag(item)}
+ className="eh-icon-btn"
+ title="Flag for review"
+ >
+ <Icon name="warning" size="md" />
+ </button>
+ ) : null}
  <button
  onClick={() => handlePushToDevice(item)}
  className="eh-icon-btn"
@@ -1110,6 +1185,25 @@ export default function ContentClient() {
  </div>
  )}
  <div className="grid grid-cols-2 gap-3">
+ {item.status === 'flagged' ? (
+ <button
+ onClick={() => handleReview(item)}
+ className="eh-icon-btn text-sm py-2 rounded-lg font-medium flex items-center justify-center gap-1 text-amber-400 col-span-2"
+ >
+ <Icon name="shield" size="sm" />
+ Review
+ </button>
+ ) : item.status !== 'archived' && item.status !== 'rejected' ? (
+ <button
+ onClick={() => handleFlag(item)}
+ className="eh-icon-btn text-sm py-2 rounded-lg font-medium flex items-center justify-center gap-1"
+ >
+ <Icon name="warning" size="sm" />
+ Flag
+ </button>
+ ) : (
+ <div />
+ )}
  <button
  onClick={() => handlePushToDevice(item)}
  className="eh-icon-btn text-sm py-2 rounded-lg font-medium flex items-center justify-center gap-1"
@@ -1694,6 +1788,124 @@ export default function ContentClient() {
  >
  {actionLoading && <LoadingSpinner size="sm" />}
  Create Folder
+ </button>
+ </div>
+ </div>
+ </Modal>
+
+ {/* Flag Content Modal */}
+ <Modal
+ isOpen={isFlagModalOpen}
+ onClose={() => {
+ setIsFlagModalOpen(false);
+ setFlagReason('');
+ }}
+ title="Flag Content for Review"
+ >
+ <div className="space-y-4">
+ <p className="text-[var(--foreground-secondary)]">
+ Flag <strong>{selectedContent?.title}</strong> for review by an admin.
+ </p>
+ <div>
+ <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
+ Reason (optional)
+ </label>
+ <textarea
+ value={flagReason}
+ onChange={(e) => setFlagReason(e.target.value)}
+ className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
+ placeholder="Why are you flagging this content?"
+ rows={3}
+ maxLength={500}
+ />
+ </div>
+ <div className="flex justify-end gap-3 pt-4">
+ <button
+ onClick={() => {
+ setIsFlagModalOpen(false);
+ setFlagReason('');
+ }}
+ className="px-4 py-2 text-sm font-medium text-[var(--foreground-secondary)] bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition"
+ >
+ Cancel
+ </button>
+ <button
+ onClick={confirmFlag}
+ disabled={actionLoading}
+ className="px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 transition disabled:opacity-50 flex items-center gap-2"
+ >
+ {actionLoading && <LoadingSpinner size="sm" />}
+ <Icon name="warning" size="md" className="text-white" />
+ Flag for Review
+ </button>
+ </div>
+ </div>
+ </Modal>
+
+ {/* Review Flagged Content Modal */}
+ <Modal
+ isOpen={isReviewModalOpen}
+ onClose={() => {
+ setIsReviewModalOpen(false);
+ setReviewReason('');
+ }}
+ title="Review Flagged Content"
+ >
+ <div className="space-y-4">
+ <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+ <p className="text-amber-400 text-sm font-medium flex items-center gap-2">
+ <Icon name="warning" size="md" />
+ This content has been flagged for review
+ </p>
+ {selectedContent?.metadata?.moderation?.flagReason && (
+ <p className="text-sm text-[var(--foreground-secondary)] mt-2">
+ Reason: {selectedContent.metadata.moderation.flagReason}
+ </p>
+ )}
+ </div>
+ <p className="text-[var(--foreground-secondary)]">
+ Reviewing: <strong>{selectedContent?.title}</strong>
+ </p>
+ <div>
+ <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
+ Review note (optional)
+ </label>
+ <textarea
+ value={reviewReason}
+ onChange={(e) => setReviewReason(e.target.value)}
+ className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
+ placeholder="Add a note for the review decision..."
+ rows={3}
+ maxLength={500}
+ />
+ </div>
+ <div className="flex justify-end gap-3 pt-4">
+ <button
+ onClick={() => {
+ setIsReviewModalOpen(false);
+ setReviewReason('');
+ }}
+ className="px-4 py-2 text-sm font-medium text-[var(--foreground-secondary)] bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition"
+ >
+ Cancel
+ </button>
+ <button
+ onClick={() => confirmReview('reject')}
+ disabled={actionLoading}
+ className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition disabled:opacity-50 flex items-center gap-2"
+ >
+ {actionLoading && <LoadingSpinner size="sm" />}
+ <Icon name="close" size="md" className="text-white" />
+ Reject
+ </button>
+ <button
+ onClick={() => confirmReview('approve')}
+ disabled={actionLoading}
+ className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition disabled:opacity-50 flex items-center gap-2"
+ >
+ {actionLoading && <LoadingSpinner size="sm" />}
+ <Icon name="check" size="md" className="text-white" />
+ Approve
  </button>
  </div>
  </div>

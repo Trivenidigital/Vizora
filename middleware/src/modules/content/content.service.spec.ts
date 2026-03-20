@@ -129,6 +129,7 @@ describe('ContentService', () => {
     } as any;
 
     const mockEventEmitter = { emit: jest.fn() };
+    const mockNotificationsService = { create: jest.fn().mockResolvedValue({}) };
     service = new ContentService(
       mockDatabaseService as DatabaseService,
       mockTemplateRendering,
@@ -136,6 +137,7 @@ describe('ContentService', () => {
       mockStorageQuotaService,
       mockStorageService,
       mockEventEmitter as any,
+      mockNotificationsService as any,
     );
   });
 
