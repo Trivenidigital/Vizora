@@ -27,7 +27,23 @@ jest.mock('@/lib/api', () => ({
     getDisplayGroups: (...args: any[]) => mockGetDisplayGroups(...args),
     deleteDisplay: (...args: any[]) => mockDeleteDisplay(...args),
     updateDisplay: (...args: any[]) => mockUpdateDisplay(...args),
+    getCurrentUser: jest.fn().mockRejectedValue(new Error('401')),
+    setAuthenticated: jest.fn(),
+    getActiveOverrides: jest.fn().mockResolvedValue([]),
+    sendFleetCommand: jest.fn(),
+    clearOverride: jest.fn(),
   },
+}));
+
+jest.mock('@/lib/hooks/useAuth', () => ({
+  useAuth: () => ({
+    user: { id: 'u1', email: 'test@test.com', firstName: 'Test', lastName: 'User', organizationId: 'org-1', role: 'admin' },
+    loading: false,
+    error: null,
+    isAuthenticated: true,
+    logout: jest.fn(),
+    reload: jest.fn(),
+  }),
 }));
 
 const mockToast = {
@@ -104,6 +120,12 @@ jest.mock('@/components/DevicePreviewModal', () => {
 jest.mock('@/components/PlaylistQuickSelect', () => {
   return function MockPlaylistSelect() { return null; };
 });
+
+jest.mock('@/components/fleet', () => ({
+  FleetCommandDropdown: function MockFleetDropdown() { return <div data-testid="fleet-dropdown">Fleet Commands</div>; },
+  EmergencyOverrideModal: function MockOverrideModal({ isOpen }: any) { return isOpen ? <div data-testid="override-modal">Override Modal</div> : null; },
+  ActiveOverrideBanner: function MockBanner() { return null; },
+}));
 
 const sampleDevices = [
   {

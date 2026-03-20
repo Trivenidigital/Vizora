@@ -17,6 +17,8 @@ import { useToast } from '@/lib/hooks/useToast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { useRealtimeEvents, useOptimisticState, useErrorRecovery } from '@/lib/hooks';
 import { Icon } from '@/theme/icons';
+import { FleetCommandDropdown, EmergencyOverrideModal, ActiveOverrideBanner } from '@/components/fleet';
+import { useAuth } from '@/lib/hooks/useAuth';
 
 interface DevicesClientProps {
  initialDevices: Display[];
@@ -26,6 +28,8 @@ interface DevicesClientProps {
 export default function DevicesClient({ initialDevices, initialPlaylists }: DevicesClientProps) {
  const router = useRouter();
  const toast = useToast();
+ const { user } = useAuth();
+ const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false);
  const [devices, setDevices] = useState<Display[]>(initialDevices);
  const [playlists, setPlaylists] = useState<Playlist[]>(initialPlaylists);
  const [deviceGroups, setDeviceGroups] = useState<any[]>([]);
@@ -430,6 +434,17 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  {hasPendingUpdates() && ' \u2022 Syncing changes...'}
  </p>
  </div>
+ <div className="flex items-center gap-3">
+ {user?.organizationId && (
+ <FleetCommandDropdown organizationId={user.organizationId} />
+ )}
+ <button
+ onClick={() => setIsOverrideModalOpen(true)}
+ className="eh-btn-danger rounded-xl px-4 py-3 flex items-center gap-2 text-sm font-medium"
+ >
+ <Icon name="warning" size="lg" className="text-white" />
+ <span>Emergency Override</span>
+ </button>
  <button
  onClick={() => router.push('/dashboard/devices/pair')}
  className="eh-btn-neon rounded-xl px-6 py-3 flex items-center gap-2"
@@ -438,6 +453,9 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  <span>Pair New Device</span>
  </button>
  </div>
+ </div>
+
+ <ActiveOverrideBanner />
 
  <SearchFilter
  value={searchQuery}
@@ -659,6 +677,14 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
 
  {selectedDevice && (
  <DevicePreviewModal device={selectedDevice} isOpen={isPreviewModalOpen} onClose={() => setIsPreviewModalOpen(false)} />
+ )}
+
+ {user?.organizationId && (
+ <EmergencyOverrideModal
+ isOpen={isOverrideModalOpen}
+ onClose={() => setIsOverrideModalOpen(false)}
+ organizationId={user.organizationId}
+ />
  )}
  </div>
  );
