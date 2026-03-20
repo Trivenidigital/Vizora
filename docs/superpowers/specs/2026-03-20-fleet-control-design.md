@@ -117,8 +117,6 @@ Internal endpoint on realtime gateway (port 3002). Authenticated via `x-internal
 ```json
 {
   "deviceIds": ["dev_1", "dev_2"],
-  "orgId": "org_123",
-  "broadcastToOrg": false,
   "command": {
     "type": "push_content",
     "payload": { "content": {...}, "duration": 60, "priority": "emergency" },
@@ -127,10 +125,12 @@ Internal endpoint on realtime gateway (port 3002). Authenticated via `x-internal
 }
 ```
 
+**Architecture note:** All target resolution (device/group/org → deviceIds array) happens in the middleware `FleetService`. The gateway receives a flat `deviceIds[]` and iterates it. No `broadcastToOrg` flag — keeps the gateway stateless and simple.
+
 **Behavior:**
-- If `broadcastToOrg: true` → resolve all org device IDs from Redis (using existing `getOrganizationDevices()`), then emit to each `device:{id}` room individually. Do NOT broadcast to `org:{orgId}` room — that room contains dashboard browser clients too, which would receive unwanted command events and inflate the devicesOnline count.
-- If `broadcastToOrg: false` → iterate `deviceIds`, emit to each `device:{id}` room
-- For offline devices → queue command in Redis (`device:commands:{deviceId}`, 5-min TTL)
+- Iterate `deviceIds`, emit `command` event to each `device:{id}` room
+- Check room membership to determine if device is online
+- For offline devices → queue command in Redis (`device:commands:{deviceId}`, 5-min TTL via existing `addDeviceCommand`)
 - Returns `{ devicesOnline: number }` so middleware can calculate online vs queued
 
 ---
