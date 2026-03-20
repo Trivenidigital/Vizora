@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpService } from '@nestjs/axios';
 import { of } from 'rxjs';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { FleetService, TooManyRequestsException } from './fleet.service';
 import { DatabaseService } from '../database/database.service';
 import { RedisService } from '../redis/redis.service';
@@ -41,6 +41,9 @@ describe('FleetService', () => {
       },
       displayGroupMember: {
         findMany: jest.fn(),
+      },
+      content: {
+        findFirst: jest.fn(),
       },
       auditLog: {
         create: jest.fn().mockResolvedValue({}),
@@ -207,6 +210,120 @@ describe('FleetService', () => {
       expect(result.devicesQueued).toBe(0);
       expect(result.commandId).toBeDefined();
       expect(circuitBreaker.executeWithFallback).toHaveBeenCalled();
+    });
+
+    it('should resolve content from DB and include it in gateway payload for push_content', async () => {
+      db.display.findFirst.mockResolvedValue({
+        id: mockDeviceId,
+        nickname: 'Test',
+        organizationId: mockOrgId,
+      });
+      db.content.findFirst.mockResolvedValue({
+        id: 'content-1',
+        title: 'Promo Video',
+        type: 'video',
+        url: 'https://cdn.example.com/video.mp4',
+        thumbnailUrl: 'https://cdn.example.com/thumb.jpg',
+        organizationId: mockOrgId,
+      });
+
+      const dto = {
+        command: 'push_content' as const,
+        target: { type: 'device' as const, id: mockDeviceId },
+        payload: { contentId: 'content-1', duration: 30 },
+      };
+
+      await service.sendCommand(mockOrgId, mockUserId, 'admin', dto);
+
+      expect(db.content.findFirst).toHaveBeenCalledWith({
+        where: { id: 'content-1', organizationId: mockOrgId },
+      });
+
+      // Verify gateway was called with resolved content payload
+      const postCall = httpService.post.mock.calls[0];
+      const body = postCall[1];
+      expect(body.payload).toEqual(
+        expect.objectContaining({
+          type: 'push_content',
+          payload: expect.objectContaining({
+            content: expect.objectContaining({
+              id: 'content-1',
+              title: 'Promo Video',
+              type: 'video',
+              url: 'https://cdn.example.com/video.mp4',
+            }),
+            duration: 30,
+            priority: 'normal',
+          }),
+        }),
+      );
+    });
+
+    it('should throw BadRequestException for push_content without contentId', async () => {
+      db.display.findFirst.mockResolvedValue({
+        id: mockDeviceId,
+        nickname: 'Test',
+        organizationId: mockOrgId,
+      });
+
+      const dto = {
+        command: 'push_content' as const,
+        target: { type: 'device' as const, id: mockDeviceId },
+        payload: {},
+      };
+
+      await expect(
+        service.sendCommand(mockOrgId, mockUserId, 'admin', dto),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw NotFoundException for push_content with non-existent content', async () => {
+      db.display.findFirst.mockResolvedValue({
+        id: mockDeviceId,
+        nickname: 'Test',
+        organizationId: mockOrgId,
+      });
+      db.content.findFirst.mockResolvedValue(null);
+
+      const dto = {
+        command: 'push_content' as const,
+        target: { type: 'device' as const, id: mockDeviceId },
+        payload: { contentId: 'nonexistent' },
+      };
+
+      await expect(
+        service.sendCommand(mockOrgId, mockUserId, 'admin', dto),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should resolve minio:// URLs to public API paths', async () => {
+      db.display.findFirst.mockResolvedValue({
+        id: mockDeviceId,
+        nickname: 'Test',
+        organizationId: mockOrgId,
+      });
+      db.content.findFirst.mockResolvedValue({
+        id: 'content-2',
+        title: 'Uploaded Image',
+        type: 'image',
+        url: 'minio://vizora-content/images/photo.png',
+        thumbnailUrl: null,
+        organizationId: mockOrgId,
+      });
+
+      const dto = {
+        command: 'push_content' as const,
+        target: { type: 'device' as const, id: mockDeviceId },
+        payload: { contentId: 'content-2' },
+      };
+
+      await service.sendCommand(mockOrgId, mockUserId, 'admin', dto);
+
+      const postCall = httpService.post.mock.calls[0];
+      const body = postCall[1];
+      expect(body.payload.payload.content.url).toBe(
+        'http://localhost:3000/api/v1/device-content/content-2/file',
+      );
     });
   });
 

@@ -3,6 +3,7 @@ import {
   Logger,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
@@ -59,18 +60,58 @@ export class FleetService {
     );
 
     const commandId = crypto.randomUUID();
+    const duration = dto.payload?.duration ?? 60;
+
+    // Resolve content for push_content commands
+    let gatewayPayload: Record<string, any> = dto.payload || {};
+    let resolvedContent: any = null;
+    if (dto.command === 'push_content') {
+      if (!dto.payload?.contentId) {
+        throw new BadRequestException('contentId required for push_content');
+      }
+
+      resolvedContent = await this.db.content.findFirst({
+        where: { id: dto.payload.contentId, organizationId: orgId },
+      });
+      if (!resolvedContent) {
+        throw new NotFoundException('Content not found');
+      }
+
+      // Resolve MinIO URLs to public API paths
+      let resolvedUrl = resolvedContent.url;
+      if (resolvedUrl?.startsWith('minio://')) {
+        const apiBase =
+          process.env.API_BASE_URL || 'http://localhost:3000';
+        resolvedUrl = `${apiBase}/api/v1/device-content/${resolvedContent.id}/file`;
+      }
+
+      gatewayPayload = {
+        type: 'push_content',
+        payload: {
+          content: {
+            id: resolvedContent.id,
+            title: resolvedContent.title,
+            type: resolvedContent.type,
+            url: resolvedUrl,
+            thumbnailUrl: resolvedContent.thumbnailUrl,
+          },
+          duration,
+          priority: dto.payload.priority || 'normal',
+        },
+        commandId,
+      };
+    }
 
     // Call gateway broadcast
     const { devicesOnline } = await this.callGatewayBroadcast(deviceIds, {
       commandId,
       command: dto.command,
-      payload: dto.payload || {},
+      payload: gatewayPayload,
     });
 
     const devicesQueued = deviceIds.length - devicesOnline;
 
     // Handle emergency override with push_content
-    const duration = dto.payload?.duration ?? 60;
     if (
       dto.command === 'push_content' &&
       dto.payload?.priority === 'emergency'
@@ -78,8 +119,8 @@ export class FleetService {
       await this.createOverride(
         orgId,
         commandId,
-        dto.payload.contentId || 'unknown',
-        'Emergency content',
+        dto.payload.contentId,
+        resolvedContent?.title || 'Emergency content',
         dto.target.type,
         dto.target.id,
         targetName,
