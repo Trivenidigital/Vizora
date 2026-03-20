@@ -189,9 +189,9 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  }
 
  return (
- <div className="space-y-6">
+ <div className="space-y-8">
  <div>
- <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Dashboard Overview</h2>
+ <h2 className="eh-dash-title text-2xl text-[var(--foreground)]">Dashboard Overview</h2>
  <p className="mt-2 text-[var(--foreground-secondary)]">
  Welcome to your Vizora dashboard. Here's what's happening.
  </p>
@@ -222,7 +222,7 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  {/* Stats Grid */}
  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
  <div
- className="bg-[var(--surface)] p-6 rounded-lg border border-[var(--border)] hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300 cursor-pointer animate-[fadeIn_0.3s_ease-out]"
+ className="eh-dash-card p-6 hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300 cursor-pointer animate-[fadeIn_0.3s_ease-out]"
  onClick={() => router.push('/dashboard/devices')}
  >
  <div className="flex items-center justify-between mb-4">
@@ -239,7 +239,7 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  </div>
 
  <div
- className="bg-[var(--surface)] p-6 rounded-lg border border-[var(--border)] hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300 cursor-pointer animate-[fadeIn_0.4s_ease-out]"
+ className="eh-dash-card p-6 hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300 cursor-pointer animate-[fadeIn_0.4s_ease-out]"
  onClick={() => router.push('/dashboard/content')}
  >
  <div className="flex items-center justify-between mb-4">
@@ -255,7 +255,7 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  </div>
 
  <div
- className="bg-[var(--surface)] p-6 rounded-lg border border-[var(--border)] hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300 cursor-pointer animate-[fadeIn_0.5s_ease-out]"
+ className="eh-dash-card p-6 hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300 cursor-pointer animate-[fadeIn_0.5s_ease-out]"
  onClick={() => router.push('/dashboard/playlists')}
  >
  <div className="flex items-center justify-between mb-4">
@@ -268,7 +268,7 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  </p>
  </div>
 
- <div className="bg-gradient-to-br from-primary-500 to-purple-600 dark:from-primary-600 dark:to-purple-700 p-6 rounded-lg border border-[var(--border)] hover:-translate-y-[2px] hover:shadow-md transition-all duration-300 text-white animate-[fadeIn_0.6s_ease-out]">
+ <div className="bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] p-6 rounded-lg border border-[var(--border)] hover:-translate-y-[2px] hover:shadow-md transition-all duration-300 text-white animate-[fadeIn_0.6s_ease-out]">
  <div className="flex items-center justify-between mb-4">
  <p className="text-sm font-medium text-primary-100">System Status</p>
  <Icon name="power" size="2xl" className="text-primary-200" />
@@ -284,51 +284,51 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  {/* Quick Actions */}
  <div className="bg-[var(--surface)] rounded-lg border border-[var(--border)] p-6">
  <div className="flex items-center gap-2 mb-4">
- <h3 className="text-lg font-semibold text-[var(--foreground)] eh-heading">Quick Actions</h3>
+ <h3 className="eh-dash-subtitle text-lg text-[var(--foreground)]">Quick Actions</h3>
  <HelpIcon content="Common tasks to get started quickly" position="right" />
  </div>
  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
  <button
  onClick={() => router.push('/dashboard/devices/pair')}
- className="flex items-center gap-3 p-4 bg-gradient-to-br from-[#00E5A0]/5 to-[#00E5A0]/10 rounded-lg hover:from-[#00E5A0]/10 hover:to-[#00B4D8]/10 transition-all transform hover:scale-105"
+ className="eh-dash-card eh-dash-card-interactive p-5 flex items-center gap-3 transition-all transform hover:scale-105"
  >
  <Icon name="add" size="2xl" className="text-[#00E5A0]" />
  <div className="text-left">
- <div className="font-semibold text-[#00E5A0]">Pair Device</div>
- <div className="text-xs text-[#00E5A0]">Add new display</div>
+ <div className="font-semibold text-[var(--foreground)]">Pair Device</div>
+ <div className="text-xs text-[var(--foreground-secondary)]">Add new display</div>
  </div>
  </button>
 
  <button
  onClick={() => router.push('/dashboard/content')}
- className="flex items-center gap-3 p-4 bg-gradient-to-br from-purple-500/5 to-purple-500/10 rounded-lg hover:from-purple-500/10 hover:to-purple-500/20 transition-all transform hover:scale-105"
+ className="eh-dash-card eh-dash-card-interactive p-5 flex items-center gap-3 transition-all transform hover:scale-105"
  >
- <Icon name="upload" size="2xl" className="text-purple-500 dark:text-purple-400" />
+ <Icon name="upload" size="2xl" className="text-[#00E5A0]" />
  <div className="text-left">
- <div className="font-semibold text-purple-700 dark:text-purple-300">Upload Content</div>
- <div className="text-xs text-purple-600 dark:text-purple-400">Add new media</div>
+ <div className="font-semibold text-[var(--foreground)]">Upload Content</div>
+ <div className="text-xs text-[var(--foreground-secondary)]">Add new media</div>
  </div>
  </button>
 
  <button
  onClick={() => router.push('/dashboard/playlists')}
- className="flex items-center gap-3 p-4 bg-gradient-to-br from-success-50 dark:from-success-900 to-success-100 dark:to-success-800 rounded-lg hover:from-success-100 dark:hover:from-success-800 hover:to-success-200 dark:hover:to-success-700 transition-all transform hover:scale-105"
+ className="eh-dash-card eh-dash-card-interactive p-5 flex items-center gap-3 transition-all transform hover:scale-105"
  >
- <Icon name="playlists" size="2xl" className="text-success-600 dark:text-success-400" />
+ <Icon name="playlists" size="2xl" className="text-[#00E5A0]" />
  <div className="text-left">
- <div className="font-semibold text-success-900 dark:text-success-100">Create Playlist</div>
- <div className="text-xs text-success-700 dark:text-success-200">Organize content</div>
+ <div className="font-semibold text-[var(--foreground)]">Create Playlist</div>
+ <div className="text-xs text-[var(--foreground-secondary)]">Organize content</div>
  </div>
  </button>
 
  <button
  onClick={() => router.push('/dashboard/schedules')}
- className="flex items-center gap-3 p-4 bg-gradient-to-br from-orange-500/5 to-orange-500/10 rounded-lg hover:from-orange-500/10 hover:to-orange-500/20 transition-all transform hover:scale-105"
+ className="eh-dash-card eh-dash-card-interactive p-5 flex items-center gap-3 transition-all transform hover:scale-105"
  >
- <Icon name="schedules" size="2xl" className="text-orange-500 dark:text-orange-400" />
+ <Icon name="schedules" size="2xl" className="text-[#00E5A0]" />
  <div className="text-left">
- <div className="font-semibold text-orange-700 dark:text-orange-300">Schedule</div>
- <div className="text-xs text-orange-600 dark:text-orange-400">Set up timing</div>
+ <div className="font-semibold text-[var(--foreground)]">Schedule</div>
+ <div className="text-xs text-[var(--foreground-secondary)]">Set up timing</div>
  </div>
  </button>
  </div>
@@ -336,7 +336,7 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
 
  {/* Recent Activity */}
  <div className="bg-[var(--surface)] rounded-lg border border-[var(--border)] p-6">
- <h3 className="text-lg font-semibold text-[var(--foreground)] eh-heading mb-4">Recent Activity</h3>
+ <h3 className="eh-dash-subtitle text-lg text-[var(--foreground)] mb-4">Recent Activity</h3>
  {recentActivity.length > 0 ? (
  <div className="space-y-3">
  {recentActivity.map((item, idx) => (
@@ -374,7 +374,7 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  {/* Storage Usage */}
  <div className="bg-[var(--surface)] rounded-lg border border-[var(--border)] p-6">
  <div className="flex items-center justify-between mb-4">
- <h3 className="text-lg font-semibold text-[var(--foreground)] eh-heading">Storage Usage</h3>
+ <h3 className="eh-dash-subtitle text-lg text-[var(--foreground)]">Storage Usage</h3>
  <Icon name="storage" size="xl" className="text-[var(--foreground-secondary)]" />
  </div>
  <div className="space-y-3">
@@ -386,9 +386,9 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  : '0 MB'} / 5 GB
  </span>
  </div>
- <div className="w-full bg-[var(--background-tertiary)] rounded-full h-3 overflow-hidden">
+ <div className="eh-progress">
  <div
- className="bg-gradient-to-r from-primary-500 to-purple-600 dark:from-primary-600 dark:to-purple-700 h-3 rounded-full transition-all duration-500"
+ className="eh-progress-bar transition-all duration-500"
  style={{
  width: `${Math.min((stats.content.total * 2.5 / 5000) * 100, 100)}%`,
  }}
@@ -405,8 +405,8 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
 
  {/* Getting Started Guide */}
  {stats.devices.total === 0 && (
- <div className="bg-gradient-to-r from-primary-500 to-purple-600 dark:from-primary-600 dark:to-purple-700 rounded-lg shadow-lg p-8 text-white">
- <h3 className="text-2xl font-bold mb-4 flex items-center gap-2"><Icon name="power" size="xl" className="text-white" /> Getting Started</h3>
+ <div className="bg-gradient-to-r from-[#00E5A0] to-[#00B4D8] rounded-lg shadow-lg p-8 text-white">
+ <h3 className="eh-dash-subtitle text-2xl font-bold mb-4 flex items-center gap-2"><Icon name="power" size="xl" className="text-white" /> Getting Started</h3>
  <p className="mb-6 text-primary-100">
  Welcome to Vizora! Follow these steps to get your digital signage system up and running:
  </p>
@@ -458,7 +458,7 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  </div>
  <button
  onClick={() => router.push('/dashboard/devices/pair')}
- className="mt-6 bg-[var(--surface)] text-primary-600 px-6 py-3 rounded-lg font-semibold hover:bg-primary-50 dark:hover:bg-[var(--surface-hover)] transition shadow-md"
+ className="mt-6 eh-btn-neon rounded-xl px-6 py-3 font-semibold transition shadow-md"
  >
  Get Started - Pair Device
  </button>

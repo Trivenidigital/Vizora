@@ -14,6 +14,7 @@ import './admin';
 import './templates';
 import './widgets';
 import './support';
+import './fleet';
 
 // Re-export client class, types, and singleton
 import { ApiClient, API_BASE_URL, getCsrfToken } from './client';

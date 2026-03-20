@@ -145,39 +145,39 @@ export default function SettingsPage() {
  };
 
  return (
- <div className="space-y-6">
+ <div className="space-y-8">
  <div>
- <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Settings</h2>
+ <h2 className="eh-dash-title font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Settings</h2>
  <p className="mt-2 text-[var(--foreground-secondary)]">
  Manage your account and preferences
  </p>
  </div>
 
  {/* Profile Settings */}
- <div className="bg-[var(--surface)] rounded-lg shadow-md p-6">
- <h3 className="text-lg font-semibold text-[var(--foreground)] mb-4">Profile</h3>
+ <div className="eh-dash-card bg-[var(--surface)] rounded-lg shadow-md p-6">
+ <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)] mb-4">Profile</h3>
  <div className="space-y-4">
  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
  <div>
- <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
+ <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-2">
  First Name
  </label>
  <input
  type="text"
  value={profileForm.firstName}
  onChange={(e) => setProfileForm({ ...profileForm, firstName: e.target.value })}
- className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
  />
  </div>
  <div>
- <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
+ <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-2">
  Last Name
  </label>
  <input
  type="text"
  value={profileForm.lastName}
  onChange={(e) => setProfileForm({ ...profileForm, lastName: e.target.value })}
- className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
  />
  </div>
  </div>
@@ -185,7 +185,7 @@ export default function SettingsPage() {
  <button
    onClick={handleSaveProfile}
    disabled={profileSaving}
-   className="px-4 py-2 text-sm font-medium bg-[#00E5A0] text-[#061A21] hover:bg-[#00CC8E] rounded-lg transition disabled:opacity-50"
+   className="eh-btn-neon rounded-xl px-4 py-2 text-sm font-medium transition disabled:opacity-50"
  >
    {profileSaving ? 'Saving...' : 'Update Profile'}
  </button>
@@ -194,11 +194,11 @@ export default function SettingsPage() {
  </div>
 
  {/* Organization Settings */}
- <div className="bg-[var(--surface)] rounded-lg shadow-md p-6">
- <h3 className="text-lg font-semibold text-[var(--foreground)] mb-4">Organization</h3>
+ <div className="eh-dash-card bg-[var(--surface)] rounded-lg shadow-md p-6">
+ <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)] mb-4">Organization</h3>
  <div className="space-y-4">
  <div>
- <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
+ <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-2">
  Organization Name
  </label>
  <input
@@ -207,28 +207,28 @@ export default function SettingsPage() {
  onChange={(e) =>
  setSettings({ ...settings, organizationName: e.target.value })
  }
- className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
  />
  </div>
  <div>
- <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
+ <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-2">
  Admin Email
  </label>
  <input
  type="email"
  value={settings.email}
  onChange={(e) => setSettings({ ...settings, email: e.target.value })}
- className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
  />
  </div>
  <div>
-   <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
+   <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-2">
      Region
    </label>
    <select
      value={settings.country || 'US'}
      onChange={(e) => setSettings({ ...settings, country: e.target.value })}
-     className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+     className="eh-select w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
    >
      <option value="US">United States (USD)</option>
      <option value="IN">India (INR)</option>
@@ -241,14 +241,14 @@ export default function SettingsPage() {
  </div>
 
  {/* Theme Settings */}
- <div className="bg-[var(--surface)] rounded-lg shadow-md p-6">
- <h3 className="text-lg font-semibold text-[var(--foreground)] mb-4">Appearance</h3>
+ <div className="eh-dash-card bg-[var(--surface)] rounded-lg shadow-md p-6">
+ <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)] mb-4">Appearance</h3>
  <div className="space-y-4">
  <div>
- <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-3">
+ <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-3">
  Theme Preference
  </label>
- <div className="space-y-3">
+ <div className="space-y-2">
  {[
  { value: 'light', label: 'Light', icon: 'light_mode' },
  { value: 'dark', label: 'Dark', icon: 'dark_mode' },
@@ -256,7 +256,7 @@ export default function SettingsPage() {
  ].map(({ value, label, icon }) => (
  <label
  key={value}
- className="flex items-center p-3 border border-[var(--border)] rounded-lg cursor-pointer hover:bg-[var(--surface-hover)] transition"
+ className="flex items-center p-2.5 border border-[var(--border)] rounded-lg cursor-pointer hover:bg-[var(--surface-hover)] transition"
  >
  <input
  type="radio"
@@ -275,7 +275,7 @@ export default function SettingsPage() {
 
  {/* Color Preview */}
  <div>
- <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-3">
+ <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-3">
  Semantic Colors Preview
  </label>
  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -308,11 +308,11 @@ export default function SettingsPage() {
  </div>
 
  {/* Display Settings */}
- <div className="bg-[var(--surface)] rounded-lg shadow-md p-6">
- <h3 className="text-lg font-semibold text-[var(--foreground)] mb-4">Display Settings</h3>
+ <div className="eh-dash-card bg-[var(--surface)] rounded-lg shadow-md p-6">
+ <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)] mb-4">Display Settings</h3>
  <div className="space-y-4">
  <div>
- <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
+ <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-2">
  Default Content Duration (seconds)
  </label>
  <input
@@ -321,20 +321,20 @@ export default function SettingsPage() {
  onChange={(e) =>
  setSettings({ ...settings, defaultDuration: parseInt(e.target.value) })
  }
- className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
  />
  <p className="mt-2 text-xs text-[var(--foreground-tertiary)]">
  How long each piece of content displays by default
  </p>
  </div>
  <div>
- <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
+ <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-2">
  Timezone
  </label>
  <select
  value={settings.timezone}
  onChange={(e) => setSettings({ ...settings, timezone: e.target.value })}
- className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="eh-select w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
  >
  <option value="America/New_York">Eastern Time (US & Canada)</option>
  <option value="America/Chicago">Central Time (US & Canada)</option>
@@ -347,8 +347,8 @@ export default function SettingsPage() {
  </div>
 
  {/* Notification Settings */}
- <div className="bg-[var(--surface)] rounded-lg shadow-md p-6">
- <h3 className="text-lg font-semibold text-[var(--foreground)] mb-4">Notifications</h3>
+ <div className="eh-dash-card bg-[var(--surface)] rounded-lg shadow-md p-6">
+ <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)] mb-4">Notifications</h3>
  <div className="space-y-4">
  <label className="flex items-center justify-between p-4 bg-[var(--background)] rounded-lg cursor-pointer hover:bg-[var(--surface-hover)] transition">
  <div>
@@ -370,8 +370,8 @@ export default function SettingsPage() {
  </div>
 
  {/* Billing Settings */}
- <div className="bg-[var(--surface)] rounded-lg shadow-md p-6">
- <h3 className="text-lg font-semibold text-[var(--foreground)] mb-4">Billing</h3>
+ <div className="eh-dash-card bg-[var(--surface)] rounded-lg shadow-md p-6">
+ <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)] mb-4">Billing</h3>
  <div className="space-y-3">
  <Link
  href="/dashboard/settings/billing"
@@ -387,8 +387,8 @@ export default function SettingsPage() {
  </div>
 
  {/* Developer Settings */}
- <div className="bg-[var(--surface)] rounded-lg shadow-md p-6">
- <h3 className="text-lg font-semibold text-[var(--foreground)] mb-4">Developer</h3>
+ <div className="eh-dash-card bg-[var(--surface)] rounded-lg shadow-md p-6">
+ <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)] mb-4">Developer</h3>
  <div className="space-y-3">
  <Link
  href="/dashboard/settings/api-keys"
@@ -404,8 +404,8 @@ export default function SettingsPage() {
  </div>
 
  {/* Account Actions */}
- <div className="bg-[var(--surface)] rounded-lg shadow-md p-6">
- <h3 className="text-lg font-semibold text-[var(--foreground)] mb-4">Account</h3>
+ <div className="eh-dash-card bg-[var(--surface)] rounded-lg shadow-md p-6">
+ <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)] mb-4">Account</h3>
  <div className="space-y-3">
  <button
    onClick={() => setShowChangePasswordModal(true)}
@@ -455,7 +455,7 @@ export default function SettingsPage() {
      }
    }}
    disabled={saving}
-   className="px-6 py-3 text-sm font-medium bg-[#00E5A0] text-[#061A21] hover:bg-[#00CC8E] dark:bg-[#00E5A0] dark:hover:bg-[#00CC8E] rounded-lg transition shadow-md disabled:opacity-50"
+   className="eh-btn-neon rounded-xl px-6 py-3 text-sm font-medium transition shadow-md disabled:opacity-50"
  >
    {saving ? 'Saving...' : 'Save Changes'}
  </button>
@@ -472,30 +472,30 @@ export default function SettingsPage() {
  >
    <div className="space-y-4">
      <div>
-       <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-1">Current Password</label>
+       <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-1">Current Password</label>
        <input
          type="password"
          value={passwordForm.currentPassword}
          onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-         className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+         className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
        />
      </div>
      <div>
-       <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-1">New Password</label>
+       <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-1">New Password</label>
        <input
          type="password"
          value={passwordForm.newPassword}
          onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-         className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+         className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
        />
      </div>
      <div>
-       <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-1">Confirm New Password</label>
+       <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-1">Confirm New Password</label>
        <input
          type="password"
          value={passwordForm.confirmPassword}
          onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-         className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+         className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
        />
      </div>
      <div className="flex justify-end gap-3 pt-4">
@@ -511,7 +511,7 @@ export default function SettingsPage() {
        <button
          onClick={handleChangePassword}
          disabled={passwordLoading || !passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword}
-         className="px-4 py-2 text-sm font-medium bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50"
+         className="eh-btn-neon rounded-xl px-4 py-2 text-sm font-medium transition disabled:opacity-50"
        >
          {passwordLoading ? 'Changing...' : 'Change Password'}
        </button>
@@ -546,7 +546,7 @@ export default function SettingsPage() {
        </div>
      )}
      <div>
-       <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-1">
+       <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-1">
          Type <span className="font-mono font-bold text-red-600 dark:text-red-400">DELETE MY ACCOUNT</span> to confirm
        </label>
        <input
@@ -558,7 +558,7 @@ export default function SettingsPage() {
        />
      </div>
      <div>
-       <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-1">Password</label>
+       <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-1">Password</label>
        <input
          type="password"
          value={deleteForm.password}

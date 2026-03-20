@@ -4,7 +4,7 @@ import { ButtonHTMLAttributes } from 'react';
 import LoadingSpinner from './LoadingSpinner';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'danger' | 'success';
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
   loading?: boolean;
   children: React.ReactNode;
@@ -19,24 +19,28 @@ export default function Button({
   className = '',
   ...props
 }: ButtonProps) {
-  const baseClasses = 'font-semibold rounded-lg transition-all duration-200 focus:outline-2 focus:outline-offset-2 focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-95 hover:scale-105';
-
-  const variantClasses = {
-    primary: 'bg-[#00E5A0] text-[#061A21] hover:bg-[#00CC8E] focus:ring-[#00E5A0]',
-    secondary: 'bg-[var(--background-tertiary)] text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] focus:ring-[var(--border)]',
-    danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
-    success: 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500',
+  const sizeClasses = {
+    sm: 'eh-btn-sm',
+    md: '',
+    lg: 'eh-btn-lg',
   };
 
-  const sizeClasses = {
-    sm: 'px-3 py-1.5 text-sm',
-    md: 'px-4 py-2 text-sm',
+  const variantClasses = {
+    primary: 'eh-btn-neon',
+    secondary: 'bg-[var(--background-tertiary)] text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] border border-[var(--border)] rounded-xl transition-all duration-150',
+    danger: 'eh-btn-danger',
+    ghost: 'eh-btn-ghost',
+  };
+
+  const basePadding = {
+    sm: 'px-4 py-2 text-sm',
+    md: 'px-5 py-2.5 text-sm',
     lg: 'px-6 py-3 text-base',
   };
 
   return (
     <button
-      className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
+      className={`font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${variantClasses[variant]} ${sizeClasses[size]} ${basePadding[size]} ${className}`}
       disabled={disabled || loading}
       {...props}
     >

@@ -26,14 +26,14 @@ describe('ViewToggle', () => {
     const listButton = screen.getByLabelText('List view');
 
     // Grid should be active
-    expect(gridButton).toHaveClass('bg-[#00E5A0]', 'text-[#061A21]');
+    expect(gridButton).toHaveClass('bg-[var(--primary)]', 'text-[#061A21]');
     expect(listButton).toHaveClass('text-[var(--foreground-secondary)]');
 
     // Switch to list view
     rerender(<ViewToggle view="list" onChange={mockOnChange} />);
 
     // List should be active
-    expect(listButton).toHaveClass('bg-[#00E5A0]', 'text-[#061A21]');
+    expect(listButton).toHaveClass('bg-[var(--primary)]', 'text-[#061A21]');
     expect(gridButton).toHaveClass('text-[var(--foreground-secondary)]');
   });
 

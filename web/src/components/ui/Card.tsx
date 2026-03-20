@@ -24,9 +24,7 @@ interface CardFooterProps {
 
 const CardRoot: React.FC<CardProps> = ({ children, className }) => (
   <div
-    className={`bg-[var(--surface)] rounded-lg border border-[var(--border)] shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] ${
-      className || ''
-    }`}
+    className={`eh-dash-card p-0 ${className || ''}`}
   >
     {children}
   </div>
@@ -34,7 +32,7 @@ const CardRoot: React.FC<CardProps> = ({ children, className }) => (
 
 const CardHeader: React.FC<CardHeaderProps> = ({ children, className }) => (
   <div
-    className={`px-6 py-4 border-b border-[var(--border)] ${
+    className={`px-6 py-5 border-b border-[var(--border)] ${
       className || ''
     }`}
   >
@@ -43,12 +41,12 @@ const CardHeader: React.FC<CardHeaderProps> = ({ children, className }) => (
 );
 
 const CardBody: React.FC<CardBodyProps> = ({ children, className }) => (
-  <div className={`px-6 py-4 ${className || ''}`}>{children}</div>
+  <div className={`px-6 py-5 ${className || ''}`}>{children}</div>
 );
 
 const CardFooter: React.FC<CardFooterProps> = ({ children, className }) => (
   <div
-    className={`px-6 py-3 border-t border-[var(--border)] bg-[var(--background)] rounded-b-lg ${
+    className={`px-6 py-4 border-t border-[var(--border)] bg-[var(--background)] rounded-b-2xl ${
       className || ''
     }`}
   >

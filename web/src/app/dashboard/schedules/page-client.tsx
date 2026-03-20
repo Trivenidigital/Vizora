@@ -400,7 +400,7 @@ export default function SchedulesClient() {
  {/* Header */}
  <div className="flex justify-between items-center">
  <div>
- <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Schedules</h2>
+ <h2 className="eh-dash-title font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Schedules</h2>
  <p className="mt-2 text-[var(--foreground-secondary)]">
  Automate content playback with schedules ({schedules.length} total)
  </p>
@@ -435,7 +435,7 @@ export default function SchedulesClient() {
  resetForm();
  setIsCreateModalOpen(true);
  }}
- className="bg-[#00E5A0] text-[#061A21] px-6 py-3 rounded-lg hover:bg-[#00CC8E] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2 active:scale-95"
+ className="eh-btn-neon rounded-xl px-6 py-3 transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2 active:scale-95"
  >
  <Icon name="add" size="lg" className="text-white" />
  <span>Create Schedule</span>
@@ -480,7 +480,7 @@ export default function SchedulesClient() {
  {schedules.map(schedule => (
  <div
  key={schedule.id}
- className="bg-[var(--surface)] rounded-lg border border-[var(--border)] border-l-4 border-l-[#00E5A0] shadow-md p-6 hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:border-l-[#00E5A0] hover:shadow-md transition-all duration-300"
+ className="eh-dash-card border-l-4 border-l-[#00E5A0] p-6"
  >
  <div className="flex items-start justify-between">
  <div className="flex items-start gap-4 flex-1">
@@ -559,7 +559,7 @@ export default function SchedulesClient() {
  {/* Tips Section */}
  {schedules.length > 0 && (
  <div className="bg-[#00E5A0]/5 dark:bg-[#00E5A0]/10 border border-[#00E5A0]/30 dark:border-[#00E5A0] rounded-lg p-6">
- <h4 className="font-semibold text-[#00E5A0] dark:text-[#00E5A0] mb-3 flex items-center gap-2">
+ <h4 className="eh-dash-subtitle text-[#00E5A0] dark:text-[#00E5A0] mb-3 flex items-center gap-2">
  <Icon name="info" size="md" className="text-[#00E5A0] dark:text-[#00E5A0]" />
  Tips for Using Schedules
  </h4>
@@ -584,7 +584,7 @@ export default function SchedulesClient() {
  title={selectedSchedule ? 'Edit Schedule' : 'Create Schedule'}
  size="lg"
  >
- <div className="space-y-6 max-h-96 overflow-y-auto">
+ <div className="space-y-6 max-h-[75vh] overflow-y-auto">
  {/* Name */}
  <div>
  <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
@@ -598,7 +598,7 @@ export default function SchedulesClient() {
  if (formErrors.name) setFormErrors({ ...formErrors, name: '' });
  }}
  placeholder="e.g., Morning Content, Holiday Special"
- className={`w-full px-4 py-2 border rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] transition ${
+ className={`eh-input w-full px-4 py-2 border rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] transition ${
  formErrors.name ? 'border-red-500' : 'border-[var(--border)]'
  }`}
  />
@@ -632,7 +632,7 @@ export default function SchedulesClient() {
  }}
  min="1"
  max="1440"
- className={`w-full px-4 py-2 border rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] transition ${
+ className={`eh-input w-full px-4 py-2 border rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] transition ${
  formErrors.duration ? 'border-red-500' : 'border-[var(--border)]'
  }`}
  />
@@ -648,7 +648,7 @@ export default function SchedulesClient() {
  <select
  value={formData.timezone}
  onChange={e => setFormData({ ...formData, timezone: e.target.value })}
- className="w-full px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] transition"
+ className="eh-select w-full px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] transition"
  >
  <option value="America/New_York">Eastern (America/New_York)</option>
  <option value="America/Chicago">Central (America/Chicago)</option>
@@ -694,7 +694,7 @@ export default function SchedulesClient() {
  setFormData({ ...formData, playlistId: e.target.value });
  if (formErrors.playlistId) setFormErrors({ ...formErrors, playlistId: '' });
  }}
- className={`w-full px-4 py-2 border rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] transition ${
+ className={`eh-select w-full px-4 py-2 border rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] transition ${
  formErrors.playlistId ? 'border-red-500' : 'border-[var(--border)]'
  }`}
  >
@@ -751,7 +751,7 @@ export default function SchedulesClient() {
  setFormData({ ...formData, deviceIds: e.target.value ? [e.target.value] : [] });
  if (formErrors.deviceIds) setFormErrors({ ...formErrors, deviceIds: '' });
  }}
- className="w-full px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] transition"
+ className="eh-select w-full px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] transition"
  >
  <option value="">Select a group...</option>
  {displayGroups.map((g: any) => (
@@ -801,12 +801,12 @@ export default function SchedulesClient() {
 
  {/* Conflict Warnings */}
  {conflictWarnings.length > 0 && (
- <div className="bg-yellow-50 dark:bg-yellow-900 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
- <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-1">
- Schedule Conflicts Detected
+ <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 rounded-lg p-3">
+ <p className="text-sm font-semibold text-amber-800 dark:text-amber-200 mb-1 flex items-center gap-2">
+ <span className="text-amber-500">&#9888;</span> Schedule Conflicts Detected
  </p>
  {conflictWarnings.map((c: any, i: number) => (
- <p key={i} className="text-xs text-yellow-700 dark:text-yellow-300">
+ <p key={i} className="text-xs text-amber-700 dark:text-amber-300">
  Overlaps with &quot;{c.name}&quot; ({c.startTime} - {c.endTime})
  </p>
  ))}
@@ -830,7 +830,7 @@ export default function SchedulesClient() {
  type="button"
  onClick={selectedSchedule ? handleUpdate : handleCreate}
  disabled={actionLoading}
- className="px-4 py-2 bg-[#00E5A0] text-[#061A21] hover:bg-[#00CC8E] disabled:bg-[#00E5A0]/60 rounded-lg transition flex items-center gap-2"
+ className="eh-btn-neon rounded-xl px-4 py-2 disabled:opacity-60 transition flex items-center gap-2"
  >
  {actionLoading && (
  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

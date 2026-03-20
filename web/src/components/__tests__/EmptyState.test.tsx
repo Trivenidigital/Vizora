@@ -62,16 +62,17 @@ describe('EmptyState', () => {
   describe('variants', () => {
     it('renders default variant by default', () => {
       render(<EmptyState {...defaultProps} />);
-      // Default variant has gradient background - the title's container div has the gradient
-      const container = screen.getByText('No items found').closest('div.bg-gradient-to-br');
+      // Default variant uses eh-dash-card class
+      const container = screen.getByText('No items found').closest('div.eh-dash-card');
       expect(container).toBeInTheDocument();
     });
 
     it('renders minimal variant', () => {
       render(<EmptyState {...defaultProps} variant="minimal" />);
-      // Minimal variant does not have gradient background
-      const container = screen.getByText('No items found').closest('div');
-      expect(container?.className).not.toContain('bg-gradient-to-br');
+      // Minimal variant does not have eh-dash-card class
+      const container = screen.getByText('No items found').closest('div.eh-empty-state');
+      expect(container).toBeInTheDocument();
+      expect(container?.className).not.toContain('eh-dash-card');
     });
 
     it('minimal variant shows action button correctly', () => {

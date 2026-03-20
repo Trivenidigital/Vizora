@@ -626,15 +626,15 @@ export default function ContentClient() {
  switch (status) {
  case 'ready':
  case 'active':
- return 'bg-[rgba(0,229,160,0.1)] text-[#00E5A0]';
+ return 'eh-badge-success';
  case 'processing':
- return 'bg-[rgba(245,158,11,0.1)] text-[var(--accent-warm)]';
+ return 'eh-badge-warning';
  case 'error':
- return 'bg-[rgba(220,38,38,0.1)] text-[var(--error)]';
+ return 'eh-badge-danger';
  case 'archived':
- return 'bg-[var(--surface-secondary)] text-[var(--foreground-tertiary)]';
+ return 'eh-badge-muted';
  default:
- return 'bg-[var(--surface-secondary)] text-[var(--foreground)]';
+ return 'eh-badge-muted';
  }
  };
 
@@ -728,8 +728,8 @@ export default function ContentClient() {
 
  return (
  <div className="flex h-full">
- {/* Folder Sidebar */}
- <div className="w-64 flex-shrink-0 bg-[var(--surface)] border-r border-[var(--border)] pr-4">
+ {/* Folder Sidebar - hidden on mobile */}
+ <div className="hidden lg:block w-64 flex-shrink-0 bg-[var(--surface)] border-r border-[var(--border)] pr-4">
  <FolderTree
  folders={folders}
  selectedFolderId={selectedFolderId}
@@ -744,78 +744,97 @@ export default function ContentClient() {
 
  <div className="flex justify-between items-center">
  <div>
- <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Content Library</h2>
- <p className="mt-2 text-[var(--foreground-secondary)]">
- Manage your media assets ({content.length} items)
+ <h2 className="eh-dash-title text-2xl">Content Library</h2>
+ <p className="mt-1 text-sm text-[var(--foreground-secondary)] flex items-center gap-2">
+ {content.length} items
  {realtimeStatus === 'connected' && (
- <span className="ml-2 inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
- <span className="w-2 h-2 bg-green-600 dark:bg-green-400 rounded-full animate-pulse"></span>
- Real-time enabled
+ <span className="inline-flex items-center gap-1" title="Real-time sync enabled">
+ <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
  </span>
  )}
  {realtimeStatus === 'reconnecting' && (
- <span className="ml-2 inline-flex items-center gap-1 text-xs text-yellow-600 dark:text-yellow-400">
- <span className="w-2 h-2 bg-yellow-600 dark:bg-yellow-400 rounded-full animate-pulse"></span>
- Reconnecting...
+ <span className="inline-flex items-center gap-1" title="Reconnecting...">
+ <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></span>
  </span>
  )}
  {realtimeStatus === 'offline' && (
- <span className="ml-2 inline-flex items-center gap-1 text-xs text-red-500 dark:text-red-400" title="Live updates unavailable — content management still works">
- <span className="w-2 h-2 bg-red-500 dark:bg-red-400 rounded-full"></span>
- Live sync off
+ <span className="inline-flex items-center gap-1" title="Live updates unavailable">
+ <span className="w-2 h-2 bg-red-500 rounded-full"></span>
  </span>
  )}
  {getPendingCount() > 0 && (
- <span className="ml-2 inline-flex items-center gap-1 text-xs text-[#00E5A0]">
- <span className="w-2 h-2 bg-[#00E5A0] text-[#061A21] rounded-full animate-pulse"></span>
+ <span className="inline-flex items-center gap-1 text-xs text-[var(--primary)]">
  {getPendingCount()} pending
  </span>
  )}
  </p>
  </div>
- <div className="flex items-center gap-3">
- <ViewToggle view={viewMode} onChange={setViewMode} />
  <button
  onClick={() => setIsUploadModalOpen(true)}
- className="bg-[#00E5A0] text-[#061A21] px-6 py-3 rounded-lg hover:bg-[#00CC8E] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
+ className="eh-btn-neon px-6 py-3 rounded-xl flex items-center gap-2"
  >
  <Icon name="add" size="lg" className="text-[#061A21]" />
  <span>Upload Content</span>
  </button>
  </div>
- </div>
 
- {/* Search Filter */}
+ {/* Unified Toolbar */}
+ <div className="eh-toolbar flex-wrap gap-3">
+ {/* Search - takes available space */}
+ <div className="flex-1 min-w-[200px]">
  <SearchFilter
  value={searchQuery}
  onChange={setSearchQuery}
  placeholder="Search content by title..."
  />
- {debouncedSearch && (
- <p className="mt-2 text-sm text-[var(--foreground-secondary)]">
- {filteredContent.length} {filteredContent.length === 1 ? 'result' : 'results'} found
- </p>
- )}
+ </div>
 
- {/* Tag Filter */}
- <div className="bg-[var(--surface)] rounded-lg shadow p-5">
+ {/* Type filter pills - inline */}
+ <div className="flex gap-1.5">
+ {['all', 'image', 'video', 'pdf', 'url'].map((type) => (
+ <button
+ key={type}
+ onClick={() => setFilterType(type)}
+ className={filterType === type ? 'eh-filter-pill eh-filter-pill-active' : 'eh-filter-pill'}
+ >
+ {type.charAt(0).toUpperCase() + type.slice(1)}
+ </button>
+ ))}
+ </div>
+
+ {/* Tag filter dropdown button */}
  <button
  onClick={() => setShowTagFilter(!showTagFilter)}
- className="flex items-center gap-2 text-sm font-medium text-[var(--foreground-secondary)] mb-3"
+ className="eh-filter-pill flex items-center gap-1.5"
  >
- <Icon name="folder" size="md" />
- <span>Filter by Tags</span>
- <svg
- className={`w-4 h-4 transition-transform ${showTagFilter ? 'rotate-180' : ''}`}
- fill="currentColor"
- viewBox="0 0 20 20"
+ Tags {selectedTags.length > 0 && <span className="text-xs font-semibold">({selectedTags.length})</span>}
+ </button>
+
+ {/* Advanced filters toggle */}
+ <button
+ onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+ className="eh-filter-pill flex items-center gap-1.5"
  >
+ Filters
+ <svg className={`w-3.5 h-3.5 transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
  <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
  </svg>
  </button>
 
+ {/* View toggle */}
+ <ViewToggle view={viewMode} onChange={setViewMode} />
+
+ {/* Clear all link */}
+ {hasActiveFilters && (
+ <button onClick={clearAllFilters} className="text-sm text-[var(--primary)] hover:underline whitespace-nowrap">
+ Clear all
+ </button>
+ )}
+ </div>
+
+ {/* Tag filter panel - expands below toolbar */}
  {showTagFilter && (
- <div className="border-t border-[var(--border)] pt-3">
+ <div className="eh-dash-card p-4">
  <ContentTagger
  tags={tags}
  selectedTags={selectedTags}
@@ -824,72 +843,21 @@ export default function ContentClient() {
  {selectedTags.length > 0 && (
  <button
  onClick={() => setSelectedTags([])}
- className="mt-3 text-sm text-[#00E5A0] dark:text-[#00E5A0] hover:text-[#00E5A0] dark:hover:text-[#00CC8E] underline"
+ className="mt-3 text-sm text-[var(--primary)] hover:underline"
  >
  Clear tag filters
  </button>
  )}
  </div>
  )}
- </div>
 
- {/* Filter Tabs */}
- <div className="bg-[var(--surface)] rounded-lg shadow p-5 space-y-3">
- <div className="flex items-center justify-between">
- <div className="flex gap-2 flex-wrap">
- {['all', 'image', 'video', 'pdf', 'url'].map((type) => (
- <button
- key={type}
- onClick={() => setFilterType(type)}
- className={`px-4 py-2 rounded-md text-sm font-medium transition ${
- filterType === type
- ? 'bg-[#00E5A0] text-[#061A21]'
- : 'text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
- }`}
- >
- {type.charAt(0).toUpperCase() + type.slice(1)}
- {type !== 'all' && ` (${content.filter((c) => c.type === type).length})`}
- </button>
- ))}
- </div>
- <div className="flex items-center gap-2">
- {hasActiveFilters && (
- <button
- onClick={clearAllFilters}
- className="text-sm text-[#00E5A0] hover:text-[#00E5A0] underline"
- >
- Clear all
- </button>
- )}
- <button
- onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
- className="text-sm text-[var(--foreground-secondary)] hover:text-[var(--foreground)] flex items-center gap-1"
- >
- <Icon name="settings" size="md" className="text-[var(--foreground-secondary)]" />
- <span>Advanced</span>
- <svg 
- className={`w-4 h-4 transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`}
- fill="currentColor" 
- viewBox="0 0 20 20"
- >
- <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
- </svg>
- </button>
- </div>
- </div>
-
- {/* Advanced Filters Panel */}
- <div className={`overflow-hidden transition-all duration-300 ease-in-out ${showAdvancedFilters ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
- <div className="pt-3 border-t border-[var(--border)] grid grid-cols-1 md:grid-cols-2 gap-4">
+ {/* Advanced filters panel */}
+ {showAdvancedFilters && (
+ <div className="eh-dash-card p-4">
+ <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
  <div>
- <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
- Status
- </label>
- <select
- value={filterStatus}
- onChange={(e) => setFilterStatus(e.target.value)}
- className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-sm"
- >
+ <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">Status</label>
+ <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="eh-select">
  <option value="all">All Statuses</option>
  <option value="ready">Ready</option>
  <option value="processing">Processing</option>
@@ -897,14 +865,8 @@ export default function ContentClient() {
  </select>
  </div>
  <div>
- <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
- Upload Date
- </label>
- <select
- value={filterDateRange}
- onChange={(e) => setFilterDateRange(e.target.value as any)}
- className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-sm"
- >
+ <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">Upload Date</label>
+ <select value={filterDateRange} onChange={(e) => setFilterDateRange(e.target.value as any)} className="eh-select">
  <option value="all">All Time</option>
  <option value="7days">Last 7 days</option>
  <option value="30days">Last 30 days</option>
@@ -913,34 +875,25 @@ export default function ContentClient() {
  </div>
  </div>
  </div>
+ )}
 
- {/* Active Filters Indicator */}
+ {/* Active filters chips */}
  {hasActiveFilters && (
- <div className="pt-2 border-t border-[var(--border)] flex items-center gap-2 text-sm">
- <span className="text-[var(--foreground-secondary)]">Active filters:</span>
- {filterType !== 'all' && (
- <span className="px-2 py-1 bg-[#00E5A0]/10 text-[#00E5A0] rounded text-xs">
- Type: {filterType}
- </span>
- )}
- {filterStatus !== 'all' && (
- <span className="px-2 py-1 bg-[#00E5A0]/10 text-[#00E5A0] rounded text-xs">
- Status: {filterStatus}
- </span>
- )}
- {filterDateRange !== 'all' && (
- <span className="px-2 py-1 bg-[#00E5A0]/10 text-[#00E5A0] rounded text-xs">
- Date: {filterDateRange}
- </span>
- )}
- {searchQuery && (
- <span className="px-2 py-1 bg-[#00E5A0]/10 text-[#00E5A0] rounded text-xs">
- Search: "{searchQuery}"
- </span>
- )}
+ <div className="flex items-center gap-2 flex-wrap">
+ <span className="text-xs text-[var(--foreground-tertiary)]">Active:</span>
+ {filterType !== 'all' && <span className="eh-filter-chip">Type: {filterType}</span>}
+ {filterStatus !== 'all' && <span className="eh-filter-chip">Status: {filterStatus}</span>}
+ {filterDateRange !== 'all' && <span className="eh-filter-chip">Date: {filterDateRange}</span>}
+ {searchQuery && <span className="eh-filter-chip">Search: &quot;{searchQuery}&quot;</span>}
  </div>
  )}
- </div>
+
+ {/* Search results count */}
+ {debouncedSearch && (
+ <p className="text-sm text-[var(--foreground-secondary)]">
+ {filteredContent.length} {filteredContent.length === 1 ? 'result' : 'results'} found
+ </p>
+ )}
 
  {/* Folder Breadcrumb */}
  <FolderBreadcrumb
@@ -951,14 +904,14 @@ export default function ContentClient() {
 
  {/* Bulk Actions Toolbar */}
  {selectedItems.size > 0 && (
- <div className="bg-[#00E5A0]/5 border border-[#00E5A0]/30 rounded-lg p-4 flex items-center justify-between">
+ <div className="eh-bulk-bar">
  <div className="flex items-center gap-4">
- <span className="text-sm font-medium text-[#00E5A0]">
+ <span className="text-sm font-medium">
  {selectedItems.size} item{selectedItems.size > 1 ? 's' : ''} selected
  </span>
  <button
  onClick={() => setSelectedItems(new Set())}
- className="text-sm text-[#00E5A0] hover:text-[#00E5A0] underline"
+ className="text-sm text-[var(--primary)] hover:underline"
  >
  Clear selection
  </button>
@@ -967,18 +920,18 @@ export default function ContentClient() {
  <button
  onClick={() => setIsMoveToFolderModalOpen(true)}
  disabled={actionLoading}
- className="px-4 py-2 text-sm bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition font-medium disabled:opacity-50 flex items-center gap-2"
+ className="eh-btn-secondary px-4 py-2 text-sm font-medium disabled:opacity-50 flex items-center gap-2"
  >
- <Icon name="folder" size="md" className="text-white" />
+ <Icon name="folder" size="md" />
  Move to Folder
  </button>
  <button
  onClick={handleBulkDelete}
  disabled={actionLoading}
- className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium disabled:opacity-50 flex items-center gap-2"
+ className="eh-btn-danger px-4 py-2 text-sm font-medium disabled:opacity-50 flex items-center gap-2"
  >
  {actionLoading && <LoadingSpinner size="sm" />}
- <Icon name="delete" size="md" className="text-white" />
+ <Icon name="delete" size="md" />
  Delete Selected
  </button>
  </div>
@@ -987,7 +940,7 @@ export default function ContentClient() {
 
  {/* Content Grid */}
  {loading ? (
- <div className="bg-[var(--surface)] rounded-lg shadow p-12">
+ <div className="eh-dash-card p-12">
  <LoadingSpinner size="lg" />
  </div>
  ) : filteredContent.length === 0 ? (
@@ -1001,38 +954,38 @@ export default function ContentClient() {
  }}
  />
  ) : viewMode === 'list' ? (
- <div className="bg-[var(--surface)] rounded-lg shadow overflow-hidden">
+ <div className="eh-dash-card overflow-hidden">
  <table className="min-w-full divide-y divide-[var(--border)]">
- <thead className="bg-[var(--background)]">
+ <thead>
  <tr>
- <th className="px-6 py-3 text-left">
+ <th className="eh-th">
  <input
  type="checkbox"
  checked={selectedItems.size === filteredContent.length && filteredContent.length > 0}
  onChange={toggleSelectAll}
- className="rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]"
+ className="rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
  />
  </th>
- <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase">Content</th>
- <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase">Type</th>
- <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase">Status</th>
- <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase">Uploaded</th>
- <th className="px-6 py-3 text-right text-xs font-medium text-[var(--foreground-tertiary)] uppercase">Actions</th>
+ <th className="eh-th">Content</th>
+ <th className="eh-th">Type</th>
+ <th className="eh-th">Status</th>
+ <th className="eh-th">Uploaded</th>
+ <th className="eh-th text-right">Actions</th>
  </tr>
  </thead>
- <tbody className="bg-[var(--surface)] divide-y divide-[var(--border)]">
+ <tbody className="divide-y divide-[var(--border)]">
  {filteredContent.map((item) => (
- <tr key={item.id} className="hover:bg-[var(--surface-hover)] transition">
- <td className="px-6 py-4 whitespace-nowrap">
+ <tr key={item.id} className="eh-tr-hover">
+ <td className="eh-td">
  <input
  type="checkbox"
  checked={selectedItems.has(item.id)}
  onChange={() => toggleSelectItem(item.id)}
- className="rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]"
+ className="rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
  onClick={(e) => e.stopPropagation()}
  />
  </td>
- <td className="px-6 py-4 whitespace-nowrap">
+ <td className="eh-td">
  <div className="flex items-center gap-3 cursor-pointer" onClick={() => handlePreview(item)}>
  <div className="w-12 h-12 bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] rounded flex items-center justify-center flex-shrink-0 overflow-hidden">
  {item.thumbnailUrl ? (
@@ -1051,45 +1004,45 @@ export default function ContentClient() {
  </div>
  </div>
  </td>
- <td className="px-6 py-4 whitespace-nowrap">
+ <td className="eh-td">
  <span className="px-2 py-1 text-xs font-medium uppercase text-[var(--foreground-secondary)] bg-[var(--background-secondary)] rounded">
  {item.type}
  </span>
  </td>
- <td className="px-6 py-4 whitespace-nowrap">
+ <td className="eh-td">
  <span className={`px-2 py-1 text-xs font-semibold rounded ${getStatusColor(item.status)}`}>
  {item.status}
  </span>
  </td>
- <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--foreground-tertiary)]">
+ <td className="eh-td text-sm text-[var(--foreground-tertiary)]">
  {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '—'}
  </td>
- <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+ <td className="eh-td text-right text-sm font-medium">
  <div className="flex justify-end gap-2">
  <button
  onClick={() => handlePushToDevice(item)}
- className="text-success-600 dark:text-success-400 hover:bg-success-500/10 px-2 py-1 rounded-lg transition"
+ className="eh-icon-btn"
  title="Push to device"
  >
  <Icon name="push" size="md" />
  </button>
  <button
  onClick={() => handleAddToPlaylist(item)}
- className="text-purple-500 dark:text-purple-400 hover:bg-purple-500/10 px-2 py-1 rounded-lg transition"
+ className="eh-icon-btn"
  title="Add to playlist"
  >
  <Icon name="add" size="md" />
  </button>
  <button
  onClick={() => handleEdit(item)}
- className="text-[#00E5A0] hover:bg-[#00E5A0]/10 px-2 py-1 rounded-lg transition"
+ className="eh-icon-btn"
  title="Edit"
  >
  <Icon name="edit" size="md" />
  </button>
  <button
  onClick={() => handleDelete(item)}
- className="text-error-500 dark:text-error-400 hover:bg-error-500/10 px-2 py-1 rounded-lg transition"
+ className="eh-icon-btn-danger"
  title="Delete"
  >
  <Icon name="delete" size="md" />
@@ -1106,7 +1059,7 @@ export default function ContentClient() {
  {filteredContent.map((item) => (
  <div
  key={item.id}
- className="bg-[var(--surface)] rounded-lg shadow overflow-hidden border border-[var(--border)] hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300"
+ className="eh-dash-card overflow-hidden hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300"
  >
  <div
  className="aspect-video bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] flex items-center justify-center relative overflow-hidden cursor-pointer"
@@ -1132,7 +1085,7 @@ export default function ContentClient() {
  checked={selectedItems.has(item.id)}
  onChange={() => toggleSelectItem(item.id)}
  onClick={(e) => e.stopPropagation()}
- className="w-5 h-5 rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0] bg-[var(--surface)] shadow-sm"
+ className="w-5 h-5 rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)] bg-[var(--surface)] shadow-sm"
  />
  </div>
  <span
@@ -1159,28 +1112,28 @@ export default function ContentClient() {
  <div className="grid grid-cols-2 gap-3">
  <button
  onClick={() => handlePushToDevice(item)}
- className="text-sm bg-success-500/10 text-success-600 dark:text-success-400 py-2 rounded-lg hover:bg-success-500/20 transition font-medium flex items-center justify-center gap-1"
+ className="eh-icon-btn text-sm py-2 rounded-lg font-medium flex items-center justify-center gap-1"
  >
  <Icon name="push" size="sm" />
  Push
  </button>
  <button
  onClick={() => handleAddToPlaylist(item)}
- className="text-sm bg-purple-500/10 text-purple-600 dark:text-purple-400 py-2 rounded-lg hover:bg-purple-500/20 transition font-medium flex items-center justify-center gap-1"
+ className="eh-icon-btn text-sm py-2 rounded-lg font-medium flex items-center justify-center gap-1"
  >
  <Icon name="add" size="sm" />
  Playlist
  </button>
  <button
  onClick={() => handleEdit(item)}
- className="text-sm bg-[#00E5A0]/5 text-[#00E5A0] py-2 rounded-lg hover:bg-[#00E5A0]/10 transition font-medium flex items-center justify-center gap-1"
+ className="eh-icon-btn text-sm py-2 rounded-lg font-medium flex items-center justify-center gap-1"
  >
  <Icon name="edit" size="sm" />
  Edit
  </button>
  <button
  onClick={() => handleDelete(item)}
- className="text-sm bg-error-500/10 text-error-600 dark:text-error-400 py-2 rounded-lg hover:bg-error-500/20 transition font-medium flex items-center justify-center gap-1"
+ className="eh-icon-btn-danger text-sm py-2 rounded-lg font-medium flex items-center justify-center gap-1"
  >
  <Icon name="delete" size="sm" />
  Delete

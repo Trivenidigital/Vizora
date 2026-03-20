@@ -29,6 +29,7 @@ import { StorageModule } from '../modules/storage/storage.module';
 import { MetricsModule } from '../modules/metrics/metrics.module';
 import { MailModule } from '../modules/mail/mail.module';
 import { SupportModule } from '../modules/support/support.module';
+import { FleetModule } from '../modules/fleet/fleet.module';
 
 @Module({
   imports: [
@@ -101,6 +102,7 @@ import { SupportModule } from '../modules/support/support.module';
     TemplateLibraryModule,
     MetricsModule,
     SupportModule,
+    FleetModule,
   ],
   controllers: [AppController],
   providers: [

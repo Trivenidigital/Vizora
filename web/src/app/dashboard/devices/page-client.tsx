@@ -17,6 +17,8 @@ import { useToast } from '@/lib/hooks/useToast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { useRealtimeEvents, useOptimisticState, useErrorRecovery } from '@/lib/hooks';
 import { Icon } from '@/theme/icons';
+import { FleetCommandDropdown, EmergencyOverrideModal, ActiveOverrideBanner } from '@/components/fleet';
+import { useAuth } from '@/lib/hooks/useAuth';
 
 interface DevicesClientProps {
  initialDevices: Display[];
@@ -26,6 +28,8 @@ interface DevicesClientProps {
 export default function DevicesClient({ initialDevices, initialPlaylists }: DevicesClientProps) {
  const router = useRouter();
  const toast = useToast();
+ const { user } = useAuth();
+ const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false);
  const [devices, setDevices] = useState<Display[]>(initialDevices);
  const [playlists, setPlaylists] = useState<Playlist[]>(initialPlaylists);
  const [deviceGroups, setDeviceGroups] = useState<any[]>([]);
@@ -405,14 +409,14 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  <div className="flex justify-between items-center">
  <div>
  <div className="flex items-center gap-2">
- <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Devices</h2>
+ <h2 className="eh-dash-title text-2xl">Devices</h2>
  <div
- className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 ${
+ className={`eh-badge flex items-center gap-1 ${
  realtimeStatus === 'connected'
- ? 'bg-success-100 text-success-800 dark:bg-success-900 dark:text-success-200'
+ ? 'eh-badge-success'
  : realtimeStatus === 'offline'
- ? 'bg-warning-100 text-warning-800 dark:bg-warning-900 dark:text-warning-200'
- : 'bg-error-100 text-error-800 dark:bg-error-900 dark:text-error-200'
+ ? 'eh-badge-warning'
+ : 'eh-badge-error'
  }`}
  >
  <span className={`h-2 w-2 rounded-full ${
@@ -430,14 +434,28 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  {hasPendingUpdates() && ' \u2022 Syncing changes...'}
  </p>
  </div>
+ <div className="flex items-center gap-3">
+ {user?.organizationId && (
+ <FleetCommandDropdown organizationId={user.organizationId} />
+ )}
+ <button
+ onClick={() => setIsOverrideModalOpen(true)}
+ className="eh-btn-danger rounded-xl px-4 py-3 flex items-center gap-2 text-sm font-medium"
+ >
+ <Icon name="warning" size="lg" className="text-white" />
+ <span>Emergency Override</span>
+ </button>
  <button
  onClick={() => router.push('/dashboard/devices/pair')}
- className="bg-[#00E5A0] text-[#061A21] px-6 py-3 rounded-lg hover:bg-[#00CC8E] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
+ className="eh-btn-neon rounded-xl px-6 py-3 flex items-center gap-2"
  >
  <Icon name="add" size="lg" className="text-white" />
  <span>Pair New Device</span>
  </button>
  </div>
+ </div>
+
+ <ActiveOverrideBanner />
 
  <SearchFilter
  value={searchQuery}
@@ -445,10 +463,10 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  placeholder="Search devices by name or location..."
  />
 
- <div className="bg-[var(--surface)] rounded-lg shadow">
+ <div className="eh-dash-card">
  <button
  onClick={() => setShowGroupFilter(!showGroupFilter)}
- className="w-full px-6 py-3 flex items-center justify-between text-left hover:bg-[var(--surface-hover)] transition rounded-lg"
+ className="w-full p-4 flex items-center justify-between text-left hover:bg-[var(--surface-hover)] transition rounded-lg"
  >
  <span className="text-sm font-medium text-[var(--foreground-secondary)]">
  Device Groups ({deviceGroups.length})
@@ -477,7 +495,7 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  </div>
 
  {loading ? (
- <div className="bg-[var(--surface)] rounded-lg shadow p-12">
+ <div className="eh-dash-card p-12">
  <LoadingSpinner size="lg" />
  </div>
  ) : devices.length === 0 ? (
@@ -501,38 +519,38 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  </div>
  )}
  {selectedDeviceIds.size > 0 && (
- <div className="bg-[#00E5A0]/5 dark:bg-[#00E5A0]/10 border border-[#00E5A0]/30 dark:border-[#00E5A0] rounded-lg p-4 flex items-center justify-between">
+ <div className="eh-bulk-bar flex items-center justify-between">
  <span className="text-sm font-medium text-[#00E5A0] dark:text-[#00E5A0]">
  {selectedDeviceIds.size} device{selectedDeviceIds.size !== 1 ? 's' : ''} selected
  </span>
  <div className="flex gap-4 items-center">
- <button onClick={() => setIsBulkPlaylistModalOpen(true)} className="px-4 py-2 text-sm bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition font-medium">Assign Playlist</button>
+ <button onClick={() => setIsBulkPlaylistModalOpen(true)} className="eh-btn-neon rounded-xl px-4 py-2 text-sm font-medium">Assign Playlist</button>
  <button onClick={() => setIsBulkGroupModalOpen(true)} className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium">Add to Group</button>
  <button onClick={handleBulkDelete} disabled={actionLoading} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium disabled:opacity-50">Delete Selected</button>
  <button onClick={() => setSelectedDeviceIds(new Set())} className="px-4 py-2 text-sm text-[var(--foreground-secondary)] hover:text-[var(--foreground)] transition">Clear</button>
  </div>
  </div>
  )}
- <div className="bg-[var(--surface)] rounded-lg shadow overflow-hidden">
+ <div className="eh-dash-card overflow-hidden">
  <table className="min-w-full divide-y divide-[var(--border)]">
  <thead className="bg-[var(--background)]">
  <tr>
  <th className="px-4 py-3 text-left">
  <input type="checkbox" checked={selectedDeviceIds.size === displayDevices.length && displayDevices.length > 0} onChange={toggleSelectAll} className="rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]" />
  </th>
- <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider cursor-pointer hover:bg-[var(--surface-hover)] select-none" onClick={() => handleSort('nickname')}>Device{getSortIcon('nickname')}</th>
- <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider cursor-pointer hover:bg-[var(--surface-hover)] select-none" onClick={() => handleSort('status')}>Status{getSortIcon('status')}</th>
- <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider cursor-pointer hover:bg-[var(--surface-hover)] select-none" onClick={() => handleSort('location')}>Location{getSortIcon('location')}</th>
- <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">Currently Playing</th>
- <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider cursor-pointer hover:bg-[var(--surface-hover)] select-none" onClick={() => handleSort('lastSeen')}>Last Seen{getSortIcon('lastSeen')}</th>
- <th className="px-6 py-3 text-right text-xs font-medium text-[var(--foreground-tertiary)] uppercase tracking-wider">Actions</th>
+ <th className="eh-th cursor-pointer hover:bg-[var(--surface-hover)] select-none" onClick={() => handleSort('nickname')}>Device{getSortIcon('nickname')}</th>
+ <th className="eh-th cursor-pointer hover:bg-[var(--surface-hover)] select-none" onClick={() => handleSort('status')}>Status{getSortIcon('status')}</th>
+ <th className="eh-th cursor-pointer hover:bg-[var(--surface-hover)] select-none" onClick={() => handleSort('location')}>Location{getSortIcon('location')}</th>
+ <th className="eh-th">Currently Playing</th>
+ <th className="eh-th cursor-pointer hover:bg-[var(--surface-hover)] select-none" onClick={() => handleSort('lastSeen')}>Last Seen{getSortIcon('lastSeen')}</th>
+ <th className="eh-th text-right">Actions</th>
  </tr>
  </thead>
  <tbody className="bg-[var(--surface)] divide-y divide-[var(--border)]">
  {displayDevices.map((device) => (
- <tr key={device.id} className="hover:bg-[var(--surface-hover)] transition">
- <td className="px-4 py-4"><input type="checkbox" checked={selectedDeviceIds.has(device.id)} onChange={() => toggleDeviceSelection(device.id)} className="rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]" /></td>
- <td className="px-6 py-4 whitespace-nowrap">
+ <tr key={device.id} className="eh-tr-hover">
+ <td className="eh-td"><input type="checkbox" checked={selectedDeviceIds.has(device.id)} onChange={() => toggleDeviceSelection(device.id)} className="rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]" /></td>
+ <td className="eh-td">
  <div className="flex items-center">
  <Icon name="devices" size="xl" className="mr-3 text-[var(--foreground-secondary)]" />
  <div>
@@ -541,18 +559,18 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  </div>
  </div>
  </td>
- <td className="px-6 py-4 whitespace-nowrap"><DeviceStatusIndicator deviceId={device.id} showLabel showTime /></td>
- <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--foreground-secondary)]">{device.location || '\u2014'}</td>
- <td className="px-6 py-4 whitespace-nowrap text-sm">
+ <td className="eh-td"><DeviceStatusIndicator deviceId={device.id} showLabel showTime /></td>
+ <td className="eh-td text-sm text-[var(--foreground-secondary)]">{device.location || '\u2014'}</td>
+ <td className="eh-td text-sm">
  <PlaylistQuickSelect device={device} playlists={playlists} onSuccess={() => toast.success('Playlist updated')} onError={(err) => toast.error(err.message || 'Failed to update playlist')} onUpdate={() => { loadDevices(); }} />
  </td>
- <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--foreground-tertiary)]">{(device.lastSeen || device.lastHeartbeat) ? new Date(String(device.lastSeen || device.lastHeartbeat)).toLocaleString() : 'Never'}</td>
- <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+ <td className="eh-td text-sm text-[var(--foreground-tertiary)]">{(device.lastSeen || device.lastHeartbeat) ? new Date(String(device.lastSeen || device.lastHeartbeat)).toLocaleString() : 'Never'}</td>
+ <td className="eh-td text-right text-sm font-medium">
  <div className="flex justify-end gap-2">
- <button onClick={() => handlePreview(device)} className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-200 hover:bg-green-500/10 px-3 py-1 rounded transition font-medium" title="Preview device screen">Preview</button>
- <button onClick={() => handleEdit(device)} className="text-[#00E5A0] hover:text-[#00E5A0] hover:bg-[#00E5A0]/5 px-3 py-1 rounded transition font-medium">Edit</button>
- <button onClick={() => handleGeneratePairingCode(device)} className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-200 hover:bg-purple-500/10 px-3 py-1 rounded transition font-medium">Pair</button>
- <button onClick={() => handleDelete(device)} className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200 hover:bg-red-500/10 px-3 py-1 rounded transition font-medium">Delete</button>
+ <button onClick={() => handlePreview(device)} className="eh-icon-btn" title="Preview device screen">Preview</button>
+ <button onClick={() => handleEdit(device)} className="eh-icon-btn">Edit</button>
+ <button onClick={() => handleGeneratePairingCode(device)} className="eh-icon-btn">Pair</button>
+ <button onClick={() => handleDelete(device)} className="eh-icon-btn eh-icon-btn-danger">Delete</button>
  </div>
  </td>
  </tr>
@@ -562,7 +580,7 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  </div>
 
  {totalItems > 0 && (
- <div className="bg-[var(--surface)] px-4 py-3 flex items-center justify-between border-t border-[var(--border)] sm:px-6 rounded-b-lg">
+ <div className="eh-dash-card px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-[var(--border)] sm:px-6 rounded-b-lg">
  <div className="flex-1 flex justify-between sm:hidden">
  <button onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1} className="relative inline-flex items-center px-4 py-2 border border-[var(--border)] text-sm font-medium rounded-md text-[var(--foreground-secondary)] bg-[var(--surface)] hover:bg-[var(--surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
  <button onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages} className="ml-3 relative inline-flex items-center px-4 py-2 border border-[var(--border)] text-sm font-medium rounded-md text-[var(--foreground-secondary)] bg-[var(--surface)] hover:bg-[var(--surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
@@ -600,7 +618,7 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  )}
 
  <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Edit Device">
- <div className="space-y-4">
+ <div className="space-y-5">
  <div>
  <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">Device Nickname</label>
  <input type="text" value={editForm.nickname} onChange={(e) => setEditForm({ ...editForm, nickname: e.target.value })} className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent" placeholder="e.g., Store Front Display" />
@@ -611,26 +629,26 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  </div>
  <div className="flex justify-end gap-3 pt-4">
  <button onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 text-sm font-medium text-[var(--foreground-secondary)] bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition" disabled={actionLoading}>Cancel</button>
- <button onClick={handleSaveEdit} className="px-4 py-2 text-sm font-medium text-white bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2" disabled={actionLoading || !editForm.nickname.trim()}>{actionLoading && <LoadingSpinner size="sm" />}Save Changes</button>
+ <button onClick={handleSaveEdit} className="eh-btn-neon rounded-xl px-4 py-2 text-sm font-medium disabled:opacity-50 flex items-center gap-2" disabled={actionLoading || !editForm.nickname.trim()}>{actionLoading && <LoadingSpinner size="sm" />}Save Changes</button>
  </div>
  </div>
  </Modal>
 
  <Modal isOpen={isPairingModalOpen} onClose={() => setIsPairingModalOpen(false)} title="Pairing Code">
- <div className="text-center space-y-4">
+ <div className="text-center space-y-5">
  <p className="text-[var(--foreground-secondary)]">Enter this code on your display device to pair it:</p>
  <div className="bg-[var(--background-secondary)] rounded-lg p-6">
- <div className="text-4xl font-bold text-[#00E5A0] tracking-widest">{pairingCode}</div>
+ <div className="text-4xl font-bold font-mono text-[#00E5A0] tracking-widest">{pairingCode}</div>
  </div>
  <p className="text-sm text-[var(--foreground-tertiary)]">This code will expire in 5 minutes</p>
- <button onClick={() => setIsPairingModalOpen(false)} className="w-full px-4 py-2 text-sm font-medium text-white bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition">Done</button>
+ <button onClick={() => setIsPairingModalOpen(false)} className="eh-btn-neon rounded-xl w-full px-4 py-2 text-sm font-medium">Done</button>
  </div>
  </Modal>
 
  <ConfirmDialog isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} onConfirm={confirmDelete} title="Delete Device" message={`Are you sure you want to delete "${selectedDevice?.nickname}"? This action cannot be undone.`} confirmText="Delete" type="danger" />
 
  <Modal isOpen={isBulkPlaylistModalOpen} onClose={() => { setIsBulkPlaylistModalOpen(false); setBulkPlaylistId(''); }} title="Assign Playlist to Selected Devices">
- <div className="space-y-4">
+ <div className="space-y-5">
  <p className="text-sm text-[var(--foreground-secondary)]">Assign a playlist to {selectedDeviceIds.size} selected device{selectedDeviceIds.size !== 1 ? 's' : ''}.</p>
  <select value={bulkPlaylistId} onChange={(e) => setBulkPlaylistId(e.target.value)} className="w-full px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)]">
  <option value="">Select a playlist...</option>
@@ -638,13 +656,13 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  </select>
  <div className="flex justify-end gap-3">
  <button onClick={() => { setIsBulkPlaylistModalOpen(false); setBulkPlaylistId(''); }} className="px-4 py-2 text-[var(--foreground-secondary)] bg-[var(--background-secondary)] rounded-lg hover:bg-[var(--surface-hover)] transition">Cancel</button>
- <button onClick={handleBulkAssignPlaylist} disabled={!bulkPlaylistId || actionLoading} className="px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] disabled:opacity-50 transition">Assign</button>
+ <button onClick={handleBulkAssignPlaylist} disabled={!bulkPlaylistId || actionLoading} className="eh-btn-neon rounded-xl px-4 py-2 disabled:opacity-50">Assign</button>
  </div>
  </div>
  </Modal>
 
  <Modal isOpen={isBulkGroupModalOpen} onClose={() => { setIsBulkGroupModalOpen(false); setBulkGroupId(''); }} title="Add Selected Devices to Group">
- <div className="space-y-4">
+ <div className="space-y-5">
  <p className="text-sm text-[var(--foreground-secondary)]">Add {selectedDeviceIds.size} selected device{selectedDeviceIds.size !== 1 ? 's' : ''} to a group.</p>
  <select value={bulkGroupId} onChange={(e) => setBulkGroupId(e.target.value)} className="w-full px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)]">
  <option value="">Select a group...</option>
@@ -659,6 +677,14 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
 
  {selectedDevice && (
  <DevicePreviewModal device={selectedDevice} isOpen={isPreviewModalOpen} onClose={() => setIsPreviewModalOpen(false)} />
+ )}
+
+ {user?.organizationId && (
+ <EmergencyOverrideModal
+ isOpen={isOverrideModalOpen}
+ onClose={() => setIsOverrideModalOpen(false)}
+ organizationId={user.organizationId}
+ />
  )}
  </div>
  );

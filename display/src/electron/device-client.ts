@@ -16,13 +16,66 @@ export class DeviceClient {
   private readonly heartbeatIntervalMs = 15000; // 15 seconds
   private cachedDeviceIdentifier: string | null = null;
   private previousCpuTimes: { idle: number; total: number } | null = null;
+  private overrideState: { previousUrl?: string; revertTimer: any; commandId?: string } | null = null;
+
+  private mainWindow: any = null;
 
   constructor(
     private apiUrl: string,
     private realtimeUrl: string,
     private config: DeviceClientConfig,
     private store?: any, // electron-store instance
-  ) {}
+  ) {
+    // Check for crash-recovered override state
+    this.recoverOverrideState();
+  }
+
+  private recoverOverrideState(): void {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const { app } = require('electron');
+      const stateFile = path.join(app.getPath('userData'), 'override-state.json');
+      if (fs.existsSync(stateFile)) {
+        const state = JSON.parse(fs.readFileSync(stateFile, 'utf-8'));
+        const remaining = state.expiresAt - Date.now();
+        if (remaining > 0) {
+          // Override still active — set revert timer for remaining duration
+          this.overrideState = {
+            previousUrl: state.previousUrl,
+            commandId: state.commandId,
+            revertTimer: setTimeout(() => {
+              try {
+                const { BrowserWindow: BWRecover } = require('electron');
+                const win = BWRecover.getAllWindows()[0];
+                if (win && state.previousUrl) {
+                  win.loadURL(state.previousUrl);
+                }
+                this.overrideState = null;
+                try { fs.unlinkSync(stateFile); } catch {}
+              } catch (err) {
+                console.error('[DeviceClient] Failed to revert recovered override:', err);
+              }
+            }, remaining),
+          };
+          console.log(`[DeviceClient] Recovered override state, ${Math.round(remaining / 1000)}s remaining`);
+        } else {
+          // Override expired during crash — clean up
+          fs.unlinkSync(stateFile);
+        }
+      }
+    } catch (e) {
+      // Non-fatal — just log and continue
+      console.warn('[DeviceClient] Could not recover override state:', e);
+      try {
+        const fs = require('fs');
+        const path = require('path');
+        const { app } = require('electron');
+        const stateFile = path.join(app.getPath('userData'), 'override-state.json');
+        fs.unlinkSync(stateFile);
+      } catch {}
+    }
+  }
 
   async requestPairingCode(): Promise<any> {
     return new Promise((resolve, reject) => {
@@ -359,6 +412,140 @@ export class DeviceClient {
           });
         } catch (err) {
           console.error('[DeviceClient] clear_cache failed:', err);
+        }
+        break;
+      case 'restart':
+        console.log('[DeviceClient] Restart command received — relaunching app');
+        try {
+          const { app: appRestart } = require('electron');
+          appRestart.relaunch();
+          appRestart.exit(0);
+        } catch (err) {
+          console.error('[DeviceClient] Restart failed:', err);
+        }
+        break;
+      case 'reboot':
+        console.warn('[DeviceClient] Reboot command received — treating as restart (system reboot not supported)');
+        try {
+          const { app: appReboot } = require('electron');
+          appReboot.relaunch();
+          appReboot.exit(0);
+        } catch (err) {
+          console.error('[DeviceClient] Reboot/restart failed:', err);
+        }
+        break;
+      case 'push_content':
+        console.log('[DeviceClient] Executing push_content command');
+        try {
+          const { content, duration, commandId } = command.payload || {};
+          if (!content?.url) {
+            console.warn('[DeviceClient] push_content: no content URL provided');
+            break;
+          }
+
+          // Validate URL protocol — only allow http:, https:
+          try {
+            const urlObj = new URL(content.url);
+            if (!['http:', 'https:'].includes(urlObj.protocol)) {
+              console.error('[DeviceClient] push_content: rejected unsafe URL protocol:', urlObj.protocol);
+              break;
+            }
+          } catch (urlErr) {
+            console.error('[DeviceClient] push_content: invalid URL:', content.url);
+            break;
+          }
+
+          // Clear any existing override timer (last-writer-wins)
+          if (this.overrideState?.revertTimer) {
+            clearTimeout(this.overrideState.revertTimer);
+          }
+
+          const { BrowserWindow: BWPush } = require('electron');
+          const pushWindow = BWPush.getAllWindows()[0];
+          if (!pushWindow) {
+            console.warn('[DeviceClient] push_content: no window found');
+            break;
+          }
+
+          // Save current URL for revert (only if not already in an override)
+          const previousUrl = this.overrideState?.previousUrl || pushWindow.webContents.getURL();
+
+          // Load the pushed content
+          pushWindow.loadURL(content.url);
+          console.log(`[DeviceClient] Override active: loading ${content.url} (commandId: ${commandId})`);
+
+          // Set auto-revert timer (duration is in minutes)
+          const durationMs = (duration || 60) * 60 * 1000;
+
+          // Persist override state for crash recovery
+          const fs = require('fs');
+          const path = require('path');
+          const { app: appPush } = require('electron');
+          const stateFile = path.join(appPush.getPath('userData'), 'override-state.json');
+          try {
+            fs.writeFileSync(stateFile, JSON.stringify({
+              previousUrl,
+              commandId,
+              expiresAt: Date.now() + durationMs,
+            }));
+          } catch (writeErr) {
+            console.error('[DeviceClient] Failed to persist override state:', writeErr);
+          }
+
+          const revertTimer = setTimeout(() => {
+            try {
+              console.log(`[DeviceClient] Override expired — reverting to playlist`);
+              const { BrowserWindow: BWRevert } = require('electron');
+              const revertWindow = BWRevert.getAllWindows()[0];
+              if (revertWindow && previousUrl) {
+                revertWindow.loadURL(previousUrl);
+              }
+              this.overrideState = null;
+              // Clean up persisted state
+              try { fs.unlinkSync(stateFile); } catch {}
+            } catch (revertErr) {
+              console.error('[DeviceClient] Failed to revert override:', revertErr);
+            }
+          }, durationMs);
+
+          this.overrideState = { previousUrl, revertTimer, commandId };
+        } catch (err) {
+          console.error('[DeviceClient] push_content failed:', err);
+        }
+        break;
+      case 'clear_override':
+        console.log('[DeviceClient] Executing clear_override command');
+        try {
+          if (this.overrideState) {
+            // Clear the revert timer
+            if (this.overrideState.revertTimer) {
+              clearTimeout(this.overrideState.revertTimer);
+            }
+
+            // Restore the previous URL
+            if (this.overrideState.previousUrl) {
+              const { BrowserWindow: BWClear } = require('electron');
+              const clearWindow = BWClear.getAllWindows()[0];
+              if (clearWindow) {
+                clearWindow.loadURL(this.overrideState.previousUrl);
+                console.log(`[DeviceClient] Override cleared, restored ${this.overrideState.previousUrl}`);
+              }
+            }
+
+            this.overrideState = null;
+
+            // Clean up persisted override state
+            try {
+              const fsClear = require('fs');
+              const pathClear = require('path');
+              const { app: appClear } = require('electron');
+              fsClear.unlinkSync(pathClear.join(appClear.getPath('userData'), 'override-state.json'));
+            } catch {}
+          } else {
+            console.log('[DeviceClient] No active override to clear');
+          }
+        } catch (err) {
+          console.error('[DeviceClient] clear_override failed:', err);
         }
         break;
       case 'update':

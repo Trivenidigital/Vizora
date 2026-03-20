@@ -26,7 +26,7 @@ describe('Button', () => {
     it('applies primary variant styles by default', () => {
       render(<Button>Primary</Button>);
       const button = screen.getByRole('button');
-      expect(button.className).toContain('bg-[#00E5A0]');
+      expect(button.className).toContain('eh-btn-neon');
     });
 
     it('applies secondary variant styles', () => {
@@ -38,13 +38,13 @@ describe('Button', () => {
     it('applies danger variant styles', () => {
       render(<Button variant="danger">Danger</Button>);
       const button = screen.getByRole('button');
-      expect(button.className).toContain('bg-red-600');
+      expect(button.className).toContain('eh-btn-danger');
     });
 
-    it('applies success variant styles', () => {
-      render(<Button variant="success">Success</Button>);
+    it('applies ghost variant styles', () => {
+      render(<Button variant="ghost">Ghost</Button>);
       const button = screen.getByRole('button');
-      expect(button.className).toContain('bg-green-600');
+      expect(button.className).toContain('eh-btn-ghost');
     });
   });
 
@@ -52,13 +52,13 @@ describe('Button', () => {
     it('applies medium size by default', () => {
       render(<Button>Medium</Button>);
       const button = screen.getByRole('button');
-      expect(button.className).toContain('px-4 py-2');
+      expect(button.className).toContain('px-5 py-2.5');
     });
 
     it('applies small size', () => {
       render(<Button size="sm">Small</Button>);
       const button = screen.getByRole('button');
-      expect(button.className).toContain('px-3 py-1.5');
+      expect(button.className).toContain('eh-btn-sm');
     });
 
     it('applies large size', () => {

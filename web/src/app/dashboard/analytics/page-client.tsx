@@ -32,7 +32,7 @@ const KPICard: React.FC<KPICardProps> = ({
  changeType = 'neutral',
  icon,
 }) => (
- <Card>
+ <Card className="eh-dash-card">
  <Card.Body className="p-6">
  <div className="flex items-start justify-between">
  <div className="flex-1">
@@ -189,7 +189,7 @@ export default function AnalyticsClient() {
  {/* Header */}
  <div className="flex items-center justify-between">
  <div>
- <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">
+ <h2 className="eh-dash-title font-[var(--font-sora)] text-2xl text-[var(--foreground)]">
  Analytics
  </h2>
  <p className="mt-2 text-[var(--foreground-secondary)]">
@@ -215,7 +215,7 @@ export default function AnalyticsClient() {
  >
  {exporting ? 'Exporting...' : 'Export CSV'}
  </button>
- <div className="flex gap-2">
+ <div className="flex gap-3">
  {(['week', 'month', 'year'] as const).map((range) => (
  <button
  key={range}
@@ -234,7 +234,7 @@ export default function AnalyticsClient() {
  </div>
 
  {/* KPI Cards */}
- <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+ <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
  <KPICard
  label="Total Devices"
  value={summary ? String(summary.totalDevices) : '---'}
@@ -278,13 +278,13 @@ export default function AnalyticsClient() {
  {/* Charts Grid */}
  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
  {/* Device Uptime Timeline */}
- <Card className="lg:col-span-2">
+ <Card className="eh-dash-card lg:col-span-2">
  <Card.Header>
  <div className="flex items-center justify-between">
- <h3 className="text-lg font-semibold text-[var(--foreground)]">
+ <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)]">
  Device Uptime Timeline
  </h3>
- <Badge variant="info" size="sm">
+ <Badge variant="info" size="sm" className="eh-badge">
  Last 30 Days
  </Badge>
  </div>
@@ -313,9 +313,9 @@ export default function AnalyticsClient() {
  </Card>
 
  {/* Content Performance */}
- <Card>
+ <Card className="eh-dash-card">
  <Card.Header>
- <h3 className="text-lg font-semibold text-[var(--foreground)]">
+ <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)]">
  Content Performance
  </h3>
  </Card.Header>
@@ -339,9 +339,9 @@ export default function AnalyticsClient() {
  </Card>
 
  {/* Device Distribution */}
- <Card>
+ <Card className="eh-dash-card">
  <Card.Header>
- <h3 className="text-lg font-semibold text-[var(--foreground)]">
+ <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)]">
  Device Distribution
  </h3>
  </Card.Header>
@@ -365,9 +365,9 @@ export default function AnalyticsClient() {
  </Card>
 
  {/* Usage Trends */}
- <Card className="lg:col-span-2">
+ <Card className="eh-dash-card lg:col-span-2">
  <Card.Header>
- <h3 className="text-lg font-semibold text-[var(--foreground)]">
+ <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)]">
  Usage Trends by Content Type
  </h3>
  </Card.Header>
@@ -397,9 +397,9 @@ export default function AnalyticsClient() {
  </Card>
 
  {/* Bandwidth Usage */}
- <Card className="lg:col-span-2">
+ <Card className="eh-dash-card lg:col-span-2">
  <Card.Header>
- <h3 className="text-lg font-semibold text-[var(--foreground)]">
+ <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)]">
  Bandwidth Usage (24h)
  </h3>
  </Card.Header>
@@ -427,9 +427,9 @@ export default function AnalyticsClient() {
  </Card>
 
  {/* Playlist Performance */}
- <Card className="lg:col-span-2">
+ <Card className="eh-dash-card lg:col-span-2">
  <Card.Header>
- <h3 className="text-lg font-semibold text-[var(--foreground)]">
+ <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)]">
  Top Playlists by Engagement
  </h3>
  </Card.Header>

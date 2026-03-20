@@ -114,7 +114,7 @@ export default function DashboardLayout({
     <SupportChatProvider>
     <div className="min-h-screen bg-[var(--background)]">
       {/* Header */}
-      <header className="bg-[var(--surface)]/90 backdrop-blur-xl border-b border-[var(--border)] fixed top-0 left-0 right-0 z-30">
+      <header className="bg-[var(--surface)]/80 backdrop-blur-xl border-b border-[var(--border)] fixed top-0 left-0 right-0 z-30 transition-colors duration-200">
         <div className="px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-4">
@@ -176,7 +176,7 @@ export default function DashboardLayout({
                         className="fixed inset-0 z-10"
                         onClick={() => setUserMenuOpen(false)}
                       />
-                      <div className="absolute right-0 mt-2 w-56 bg-[var(--surface)] rounded-lg shadow-lg border border-[var(--border)] z-20">
+                      <div className="absolute right-0 mt-2 w-56 eh-dash-card shadow-xl z-20 animate-[fadeIn_0.15s_ease-out]">
                         <div className="p-4 border-b border-[var(--border)]">
                           <div className="text-sm font-medium text-[var(--foreground)]">{getUserDisplayName()}</div>
                           <div className="text-xs text-[var(--foreground-tertiary)]">{user.email}</div>
@@ -233,16 +233,16 @@ export default function DashboardLayout({
                   key={item.name}
                   href={item.href}
                   onClick={() => setSidebarOpen(false)}
-                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
                     active
-                      ? 'bg-[#00E5A0]/10 text-[#00E5A0] border-l-2 border-[#00E5A0]'
+                      ? 'bg-[var(--primary)]/10 text-[var(--primary)] border-l-2 border-[var(--primary)]'
                       : 'text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]'
                   }`}
                 >
-                  <Icon name={item.icon} size="md" className={active ? 'text-[#00E5A0]' : 'text-[var(--foreground-tertiary)]'} />
+                  <Icon name={item.icon} size="md" className={active ? 'text-[var(--primary)]' : 'text-[var(--foreground-tertiary)]'} />
                   <span className="flex-1">{item.name}</span>
                   {active && (
-                    <span className="w-2 h-2 bg-[#00E5A0] rounded-full shadow-neon-sm"></span>
+                    <span className="w-2 h-2 bg-[var(--primary)] rounded-full shadow-neon-sm"></span>
                   )}
                 </Link>
               );
@@ -283,7 +283,7 @@ export default function DashboardLayout({
               <main id="main-content" className="flex-1 p-6 sm:p-8 lg:p-10 min-h-[calc(100vh-4rem)] overflow-x-hidden">
                 <div className="max-w-7xl mx-auto">
                   <Breadcrumbs />
-                  <div className="animate-[fadeIn_0.2s_ease-out]">
+                  <div className="animate-[fadeIn_0.2s_ease-out] space-y-0">
                     {children}
                   </div>
                 </div>

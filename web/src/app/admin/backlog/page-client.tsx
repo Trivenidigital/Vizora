@@ -59,6 +59,11 @@ const completed: BacklogItem[] = [
   { id: '15', title: 'Fix ParseUUIDPipe / CUID mismatch across codebase', status: 'FIXED', notes: '2026-03-10' },
   { id: '16', title: 'Night 1: Backend hardening (14 critical + 20 med/high fixed)', status: 'FIXED', notes: '2026-03-08' },
   { id: '17', title: 'Night 2: UI hardening (15 areas polished)', status: 'FIXED', notes: '2026-03-09' },
+  { id: '18', title: 'Dashboard UI standardization — EH design system across all pages (5 batches, 24 files, 332 CSS lines, 7 components)', status: 'FIXED', notes: 'feat/dashboard-ui — 2026-03-20' },
+  { id: '19', title: 'Fleet Control: Remote reload command via WebSocket (L7)', status: 'FIXED', notes: 'feat/fleet-control — 2026-03-20' },
+  { id: '20', title: 'Fleet Control: Device remote restart command (M6)', status: 'FIXED', notes: 'feat/fleet-control — 2026-03-20' },
+  { id: '21', title: 'Fleet Control: Push-to-group endpoint (M7)', status: 'FIXED', notes: 'feat/fleet-control — 2026-03-20' },
+  { id: '22', title: 'Fleet Control: Emergency content override with auto-revert (L6)', status: 'FIXED', notes: 'feat/fleet-control — 2026-03-20' },
 ];
 
 const sections: Section[] = [
@@ -100,8 +105,8 @@ const sections: Section[] = [
       { id: 'L3', title: 'Custom error pages (branded 404, 500)', effort: '4h', status: 'TODO' },
       { id: 'L4', title: 'Basic knowledge base / help docs page', effort: '1d', status: 'TODO' },
       { id: 'L5', title: 'Proof-of-play tracking (log content displayed per device)', effort: '1d', status: 'TODO', notes: 'Advertisers need this' },
-      { id: 'L6', title: 'Emergency content override (push urgent to all devices)', effort: '4h', status: 'TODO', notes: 'Critical for corporate/healthcare' },
-      { id: 'L7', title: 'Device remote reload command via WebSocket', effort: '2h', status: 'TODO' },
+      { id: 'L6', title: 'Emergency content override (push urgent to all devices)', effort: '4h', status: 'FIXED', notes: 'feat/fleet-control' },
+      { id: 'L7', title: 'Device remote reload command via WebSocket', effort: '2h', status: 'FIXED', notes: 'feat/fleet-control' },
       { id: 'L8', title: 'Wire real-time notification emission on creation', effort: '2h', status: 'TODO', notes: 'Currently polling, not real-time' },
       { id: 'L9', title: 'Reduce notification polling (25s -> 60s or WebSocket)', effort: '1h', status: 'TODO' },
     ],
@@ -119,8 +124,8 @@ const sections: Section[] = [
       { id: 'M3', title: 'Google Sheets data source integration', effort: '3d', status: 'TODO', notes: 'Key for dynamic menu boards' },
       { id: 'M4', title: 'Content moderation workflow (flag -> review -> approve)', effort: '2d', status: 'TODO' },
       { id: 'M5', title: 'Expand template library to 150 templates', effort: '2d', status: 'TODO', notes: 'Currently 78' },
-      { id: 'M6', title: 'Device remote restart command', effort: '4h', status: 'TODO' },
-      { id: 'M7', title: 'Push-to-group endpoint (single API call)', effort: '4h', status: 'TODO' },
+      { id: 'M6', title: 'Device remote restart command', effort: '4h', status: 'FIXED', notes: 'feat/fleet-control' },
+      { id: 'M7', title: 'Push-to-group endpoint (single API call)', effort: '4h', status: 'FIXED', notes: 'feat/fleet-control' },
       { id: 'M8', title: 'Data retention policy (auto-purge audit logs > 90 days)', effort: '4h', status: 'TODO' },
       { id: 'M9', title: 'Profile editing: avatar upload', effort: '4h', status: 'TODO' },
       { id: 'M10', title: 'Fix Loki volume mount (logs lost on restart)', effort: '1h', status: 'TODO' },
@@ -180,14 +185,14 @@ const knownIssues: BacklogItem[] = [
 ];
 
 const metrics: Array<{ label: string; start: string; current: string; target: string }> = [
-  { label: 'Test suites', start: '~89', current: '93', target: '95+' },
-  { label: 'Total tests', start: '1,734', current: '1,917', target: '2,000+' },
+  { label: 'Test suites', start: '~89', current: '183', target: '175+' },
+  { label: 'Total tests', start: '1,734', current: '3,012', target: '2,000+' },
   { label: 'Test pass rate', start: '99.9%', current: '100%', target: '100%' },
   { label: 'P0 blockers', start: '8', current: '3*', target: '0' },
   { label: 'API 400 errors', start: '4', current: '0', target: '0' },
   { label: 'Template 404s', start: '100+', current: '0', target: '0' },
   { label: 'Health layers', start: '2', current: '5', target: '5' },
-  { label: 'Prod readiness', start: '78%', current: '~85%', target: '95%+' },
+  { label: 'Prod readiness', start: '78%', current: '~90%', target: '95%+' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -323,7 +328,7 @@ export default function BacklogClient() {
       <div>
         <h1 className="text-3xl font-bold text-[var(--foreground)]">Project Backlog</h1>
         <p className="mt-1 text-[var(--foreground-secondary)]">
-          Last updated: 2026-03-18 &middot; Production readiness: ~85%
+          Last updated: 2026-03-20 &middot; Production readiness: ~90%
         </p>
       </div>
 

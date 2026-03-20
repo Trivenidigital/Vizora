@@ -54,26 +54,26 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' }:
       <div className="flex min-h-screen items-center justify-center p-4">
         {/* Backdrop */}
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
           onClick={onClose}
           aria-hidden="true"
         />
 
         {/* Modal */}
         <div
-          className={`relative bg-[var(--surface)] rounded-lg shadow-xl ${sizeClasses[size]} w-full transform transition-all`}
+          className={`relative eh-dash-card ${sizeClasses[size]} w-full transform transition-all animate-[fadeIn_0.2s_ease-out] shadow-2xl`}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-[var(--border)]">
-            <h3 id="modal-title" className="text-xl font-semibold text-[var(--foreground)] eh-heading">{title}</h3>
+          <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border)]">
+            <h3 id="modal-title" className="eh-dash-title text-lg">{title}</h3>
             <button
               ref={closeButtonRef}
               onClick={onClose}
-              className="text-[var(--foreground-tertiary)] hover:text-[var(--foreground-secondary)] transition focus:outline-none focus:ring-2 focus:ring-[var(--primary)] rounded"
+              className="eh-icon-btn"
               aria-label="Close modal"
             >
               <svg
-                className="w-6 h-6"
+                className="w-5 h-5"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -90,7 +90,7 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' }:
           </div>
 
           {/* Body */}
-          <div className="p-6">{children}</div>
+          <div className="px-6 py-6 max-h-[75vh] overflow-y-auto">{children}</div>
         </div>
       </div>
     </div>
