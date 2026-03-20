@@ -469,6 +469,19 @@ export class DeviceGateway
    */
   private async sendInitialState(client: Socket, deviceId: string, orgId: string): Promise<void> {
     try {
+      // Check if device has an active content override — skip playlist update to prevent flicker
+      const overrideCommandId = await this.redisService.get(`device:override:${deviceId}`);
+      if (overrideCommandId) {
+        this.logger.log(`Device ${deviceId} has active override ${overrideCommandId} — skipping playlist update`);
+        // Still send config but skip playlist
+        client.emit('config', {
+          heartbeatInterval: 15000,
+          cacheSize: 524288000,
+          autoUpdate: true,
+        });
+        return;
+      }
+
       this.logger.debug(`Fetching playlist for device: ${deviceId}`);
       const display = await this.databaseService.display.findUnique({
         where: { id: deviceId },
