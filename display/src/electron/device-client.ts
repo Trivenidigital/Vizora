@@ -16,6 +16,7 @@ export class DeviceClient {
   private readonly heartbeatIntervalMs = 15000; // 15 seconds
   private cachedDeviceIdentifier: string | null = null;
   private previousCpuTimes: { idle: number; total: number } | null = null;
+  private overrideState: { previousUrl?: string; revertTimer: any; commandId?: string } | null = null;
 
   constructor(
     private apiUrl: string,
@@ -379,6 +380,78 @@ export class DeviceClient {
           appReboot.exit(0);
         } catch (err) {
           console.error('[DeviceClient] Reboot/restart failed:', err);
+        }
+        break;
+      case 'push_content':
+        console.log('[DeviceClient] Executing push_content command');
+        try {
+          const { content, duration, commandId } = command.payload || {};
+          if (!content?.url) {
+            console.warn('[DeviceClient] push_content: no content URL provided');
+            break;
+          }
+
+          // Clear any existing override timer (last-writer-wins)
+          if (this.overrideState?.revertTimer) {
+            clearTimeout(this.overrideState.revertTimer);
+          }
+
+          const { BrowserWindow: BWPush } = require('electron');
+          const pushWindow = BWPush.getAllWindows()[0];
+          if (!pushWindow) {
+            console.warn('[DeviceClient] push_content: no window found');
+            break;
+          }
+
+          // Save current URL for revert (only if not already in an override)
+          const previousUrl = this.overrideState?.previousUrl || pushWindow.webContents.getURL();
+
+          // Load the pushed content
+          pushWindow.loadURL(content.url);
+          console.log(`[DeviceClient] Override active: loading ${content.url} (commandId: ${commandId})`);
+
+          // Set auto-revert timer (duration is in minutes)
+          const durationMs = (duration || 60) * 60 * 1000;
+          const revertTimer = setTimeout(() => {
+            console.log(`[DeviceClient] Override expired, reverting to ${previousUrl}`);
+            const { BrowserWindow: BWRevert } = require('electron');
+            const revertWindow = BWRevert.getAllWindows()[0];
+            if (revertWindow && previousUrl) {
+              revertWindow.loadURL(previousUrl);
+            }
+            this.overrideState = null;
+          }, durationMs);
+
+          this.overrideState = { previousUrl, revertTimer, commandId };
+        } catch (err) {
+          console.error('[DeviceClient] push_content failed:', err);
+        }
+        break;
+      case 'clear_override':
+        console.log('[DeviceClient] Executing clear_override command');
+        try {
+          if (this.overrideState) {
+            // Clear the revert timer
+            if (this.overrideState.revertTimer) {
+              clearTimeout(this.overrideState.revertTimer);
+            }
+
+            // Restore the previous URL
+            if (this.overrideState.previousUrl) {
+              const { BrowserWindow: BWClear } = require('electron');
+              const clearWindow = BWClear.getAllWindows()[0];
+              if (clearWindow) {
+                clearWindow.loadURL(this.overrideState.previousUrl);
+                console.log(`[DeviceClient] Override cleared, restored ${this.overrideState.previousUrl}`);
+              }
+            }
+
+            this.overrideState = null;
+          } else {
+            console.log('[DeviceClient] No active override to clear');
+          }
+        } catch (err) {
+          console.error('[DeviceClient] clear_override failed:', err);
         }
         break;
       case 'update':
