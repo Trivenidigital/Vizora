@@ -361,6 +361,26 @@ export class DeviceClient {
           console.error('[DeviceClient] clear_cache failed:', err);
         }
         break;
+      case 'restart':
+        console.log('[DeviceClient] Restart command received — relaunching app');
+        try {
+          const { app: appRestart } = require('electron');
+          appRestart.relaunch();
+          appRestart.exit(0);
+        } catch (err) {
+          console.error('[DeviceClient] Restart failed:', err);
+        }
+        break;
+      case 'reboot':
+        console.warn('[DeviceClient] Reboot command received — treating as restart (system reboot not supported)');
+        try {
+          const { app: appReboot } = require('electron');
+          appReboot.relaunch();
+          appReboot.exit(0);
+        } catch (err) {
+          console.error('[DeviceClient] Reboot/restart failed:', err);
+        }
+        break;
       case 'update':
         console.log('[DeviceClient] Update command received');
         // Stub for autoUpdater integration
