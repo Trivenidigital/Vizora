@@ -8,6 +8,7 @@ import EmptyState from '@/components/EmptyState';
 import { useToast } from '@/lib/hooks/useToast';
 import { Icon } from '@/theme/icons';
 import WeatherWidget from '@/components/widgets/WeatherWidget';
+import ClockWidget from '@/components/widgets/ClockWidget';
 
 // Default widget type definitions used as fallback when API is unavailable
 const DEFAULT_WIDGET_TYPES = [
@@ -48,28 +49,18 @@ const DEFAULT_WIDGET_TYPES = [
   },
   {
     type: 'clock',
-    name: 'Clock',
-    description: 'Display a clock with customizable timezone and format options.',
+    name: 'Clock & Countdown',
+    description: 'Display current time or countdown to an event with customizable themes.',
     icon: 'clock',
     configSchema: {
-      timezone: { type: 'string', label: 'Timezone', placeholder: 'America/New_York', default: 'local' },
-      format: { type: 'select', label: 'Format', options: ['12h', '24h'], default: '12h' },
+      mode: { type: 'select', label: 'Mode', options: ['clock', 'countdown'], default: 'clock' },
+      format: { type: 'select', label: 'Time Format', options: ['12h', '24h'], default: '12h' },
       showDate: { type: 'boolean', label: 'Show Date', default: true },
-      showSeconds: { type: 'boolean', label: 'Show Seconds', default: false },
-    },
-  },
-  {
-    type: 'countdown',
-    name: 'Countdown',
-    description: 'Count down to a specific date and time for events or promotions.',
-    icon: 'clock',
-    configSchema: {
-      targetDate: { type: 'string', label: 'Target Date', placeholder: '2026-12-31T23:59:59', required: true },
-      title: { type: 'string', label: 'Event Title', placeholder: 'Grand Opening' },
-      showDays: { type: 'boolean', label: 'Show Days', default: true },
-      showHours: { type: 'boolean', label: 'Show Hours', default: true },
-      showMinutes: { type: 'boolean', label: 'Show Minutes', default: true },
       showSeconds: { type: 'boolean', label: 'Show Seconds', default: true },
+      timezone: { type: 'string', label: 'Timezone', placeholder: 'e.g. America/New_York or "local"', default: 'local' },
+      targetDate: { type: 'string', label: 'Countdown Target', placeholder: 'YYYY-MM-DD HH:MM (for countdown mode)' },
+      eventName: { type: 'string', label: 'Event Name', placeholder: 'e.g. Grand Opening' },
+      theme: { type: 'select', label: 'Theme', options: ['dark', 'light', 'auto'], default: 'dark' },
     },
   },
 ];
@@ -144,7 +135,6 @@ export default function WidgetsPage() {
       rss: 'list',
       'social-media': 'link',
       clock: 'clock',
-      countdown: 'clock',
     };
     return (mapping[type] || 'content') as any;
   };
@@ -155,7 +145,6 @@ export default function WidgetsPage() {
       rss: 'from-orange-400 to-orange-600',
       'social-media': 'from-pink-400 to-pink-600',
       clock: 'from-purple-400 to-purple-600',
-      countdown: 'from-red-400 to-red-600',
     };
     return mapping[type] || 'from-[#00E5A0] to-[#00B4D8]';
   };
@@ -338,9 +327,10 @@ export default function WidgetsPage() {
       case 'social-media':
         return config.handle ? `${config.platform || 'social'}: ${config.handle}` : 'Not configured';
       case 'clock':
+        if (config.mode === 'countdown') {
+          return config.eventName || config.targetDate || 'Countdown - not configured';
+        }
         return `${config.timezone || 'Local'} - ${config.format || '12h'}`;
-      case 'countdown':
-        return config.title || config.targetDate || 'Not configured';
       default:
         return 'Configured';
     }
@@ -604,6 +594,25 @@ export default function WidgetsPage() {
                   theme={(widgetConfig.theme as 'dark' | 'light' | 'auto') || 'dark'}
                   refreshInterval={0}
                   showForecast={widgetConfig.showForecast !== false}
+                  compact
+                />
+              </div>
+            ) : selectedType.type === 'clock' ? (
+              <div className="bg-[var(--background)] rounded-lg border border-[var(--border)] overflow-hidden p-4">
+                <h4 className="font-semibold text-[var(--foreground)] mb-1">{widgetName || 'Untitled Widget'}</h4>
+                <p className="text-xs text-[var(--foreground-tertiary)] uppercase mb-3">{selectedType.name}</p>
+                {widgetDescription && (
+                  <p className="text-sm text-[var(--foreground-secondary)] mb-3">{widgetDescription}</p>
+                )}
+                <ClockWidget
+                  mode={(widgetConfig.mode as 'clock' | 'countdown') || 'clock'}
+                  format={(widgetConfig.format as '12h' | '24h') || '12h'}
+                  showDate={widgetConfig.showDate !== false}
+                  showSeconds={widgetConfig.showSeconds !== false}
+                  timezone={widgetConfig.timezone || 'local'}
+                  targetDate={widgetConfig.targetDate || ''}
+                  eventName={widgetConfig.eventName || ''}
+                  theme={(widgetConfig.theme as 'dark' | 'light' | 'auto') || 'dark'}
                   compact
                 />
               </div>
