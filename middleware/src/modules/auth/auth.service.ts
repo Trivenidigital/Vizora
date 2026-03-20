@@ -4,6 +4,7 @@ import {
   UnauthorizedException,
   ConflictException,
   ForbiddenException,
+  BadRequestException,
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
@@ -466,6 +467,95 @@ export class AuthService {
     await this.redisService.del(`user_auth:${userId}`);
 
     return updated;
+  }
+
+  async uploadAvatar(userId: string, file: { buffer: Buffer; mimetype: string }): Promise<{ avatarUrl: string }> {
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedMimes.includes(file.mimetype)) {
+      throw new HttpException('Only JPEG, PNG, and WebP images are allowed', HttpStatus.BAD_REQUEST);
+    }
+
+    // Validate magic bytes — reject files that lie about their type
+    const magicBytes = file.buffer.slice(0, 12);
+    const isJpeg = magicBytes[0] === 0xFF && magicBytes[1] === 0xD8 && magicBytes[2] === 0xFF;
+    const isPng = magicBytes[0] === 0x89 && magicBytes[1] === 0x50 && magicBytes[2] === 0x4E && magicBytes[3] === 0x47;
+    const isWebp = magicBytes[0] === 0x52 && magicBytes[1] === 0x49 && magicBytes[2] === 0x46 && magicBytes[3] === 0x46
+      && magicBytes[8] === 0x57 && magicBytes[9] === 0x45 && magicBytes[10] === 0x42 && magicBytes[11] === 0x50;
+
+    if (!isJpeg && !isPng && !isWebp) {
+      throw new BadRequestException('Invalid file type. Only JPEG, PNG, and WebP images are accepted.');
+    }
+
+    // Delete existing avatar if any
+    const user = await this.databaseService.user.findUnique({
+      where: { id: userId },
+      select: { avatar: true },
+    });
+    if (user?.avatar) {
+      try {
+        await this.storageService.deleteFile(user.avatar);
+      } catch {
+        // Ignore delete errors for old avatar
+      }
+    }
+
+    // Determine extension from mimetype
+    const extMap: Record<string, string> = {
+      'image/jpeg': 'jpg',
+      'image/png': 'png',
+      'image/webp': 'webp',
+    };
+    const ext = extMap[file.mimetype] || 'jpg';
+    const objectKey = `avatars/${userId}.${ext}`;
+
+    await this.storageService.uploadFile(file.buffer, objectKey, file.mimetype);
+
+    // Store the object key in the user's avatar field
+    await this.databaseService.user.update({
+      where: { id: userId },
+      data: { avatar: objectKey },
+    });
+
+    // Invalidate user cache
+    await this.redisService.del(`user_auth:${userId}`);
+
+    // Generate a presigned URL for immediate use
+    const avatarUrl = await this.storageService.getPresignedUrl(objectKey, 86400); // 24h
+
+    return { avatarUrl };
+  }
+
+  async deleteAvatar(userId: string): Promise<void> {
+    const user = await this.databaseService.user.findUnique({
+      where: { id: userId },
+      select: { avatar: true },
+    });
+
+    if (user?.avatar) {
+      try {
+        await this.storageService.deleteFile(user.avatar);
+      } catch {
+        // Ignore storage errors
+      }
+
+      await this.databaseService.user.update({
+        where: { id: userId },
+        data: { avatar: null },
+      });
+
+      // Invalidate user cache
+      await this.redisService.del(`user_auth:${userId}`);
+    }
+  }
+
+  async getAvatarUrl(avatarKey: string | null): Promise<string | null> {
+    if (!avatarKey) return null;
+    if (!this.storageService.isMinioAvailable()) return null;
+    try {
+      return await this.storageService.getPresignedUrl(avatarKey, 86400); // 24h
+    } catch {
+      return null;
+    }
   }
 
   async deleteAccount(userId: string, password: string): Promise<void> {

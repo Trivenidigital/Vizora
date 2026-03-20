@@ -31,6 +31,7 @@ export interface AuthUser {
   firstName: string;
   lastName: string;
   role: string;
+  avatarUrl?: string | null;
   organizationId: string;
   organization?: {
     name: string;
@@ -249,6 +250,59 @@ export class ApiClient {
         throw new Error('Request timeout');
       }
 
+      throw error;
+    }
+  }
+
+  /**
+   * Send a request with FormData (for file uploads).
+   * Does NOT set Content-Type — the browser sets it with the boundary.
+   */
+  async requestFormData<T>(
+    endpoint: string,
+    formData: FormData,
+    method = 'POST',
+  ): Promise<T> {
+    await this.ensureCsrfToken();
+
+    const csrfToken = getCsrfToken();
+    const headers: HeadersInit = {
+      ...(csrfToken && { 'X-CSRF-Token': csrfToken }),
+    };
+
+    const controller = new AbortController();
+    const timeoutMs = 60000; // 60s for file uploads
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        method,
+        headers,
+        body: formData,
+        credentials: 'include',
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          this.isAuthenticated = false;
+        }
+        const error = await response.json().catch(() => ({ message: 'Upload failed' }));
+        throw new Error(error.message || `HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data && typeof data === 'object' && 'success' in data && 'data' in data) {
+        return data.data as T;
+      }
+      return data;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('Upload timeout');
+      }
       throw error;
     }
   }

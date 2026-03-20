@@ -59,7 +59,7 @@ const helpCategories: Category[] = [
       {
         question: 'How do I customize a template?',
         answer:
-          'Select a template and click "Customize" or "Edit." The visual editor lets you modify text, swap images, change colors, adjust fonts, and reposition elements. All changes are saved to your copy of the template — the original library template remains unchanged.',
+          'Select a template and click "Customize" or "Edit." The visual editor lets you modify text, swap images, change colors, adjust fonts, and reposition elements. All changes are saved to your copy of the template  &mdash; the original library template remains unchanged.',
       },
       {
         question: 'What file formats are supported for upload?',
@@ -93,7 +93,7 @@ const helpCategories: Category[] = [
           'Green (Online): The device has an active WebSocket connection and is receiving content. Yellow (Idle): The device is connected but has no active playlist or content assigned. Red (Offline): The device has lost its connection. Gray (Never Connected): The device was paired but has not connected yet.',
       },
       {
-        question: 'My device shows as offline — how do I troubleshoot?',
+        question: 'My device shows as offline  &mdash; how do I troubleshoot?',
         answer:
           'Check these in order: (1) Verify the device has internet connectivity, (2) Ensure the device is powered on and the Vizora app is running, (3) Check your network firewall allows WebSocket connections on port 3002, (4) Try restarting the Vizora app on the device, (5) If the issue persists, un-pair and re-pair the device from the dashboard.',
       },
@@ -131,7 +131,7 @@ const helpCategories: Category[] = [
       {
         question: 'Can I set different schedules for different days?',
         answer:
-          'Yes. When creating a schedule, select "Weekly" recurrence and choose specific days of the week. You can create multiple schedules for the same device with different playlists — for example, a lunch menu playlist on weekdays and a brunch menu on weekends. The system handles overlapping schedules by priority.',
+          'Yes. When creating a schedule, select "Weekly" recurrence and choose specific days of the week. You can create multiple schedules for the same device with different playlists  &mdash; for example, a lunch menu playlist on weekdays and a brunch menu on weekends. The system handles overlapping schedules by priority.',
       },
       {
         question: 'How does emergency content override work?',
@@ -152,7 +152,7 @@ const helpCategories: Category[] = [
       {
         question: 'How do I upgrade my subscription?',
         answer:
-          'Go to Settings > Billing and click "Upgrade Plan." Select your desired plan and enter your payment information. The upgrade takes effect immediately — you will have instant access to the new plan features. Your billing cycle resets on the upgrade date, and you will receive a prorated credit for the unused portion of your previous plan.',
+          'Go to Settings > Billing and click "Upgrade Plan." Select your desired plan and enter your payment information. The upgrade takes effect immediately  &mdash; you will have instant access to the new plan features. Your billing cycle resets on the upgrade date, and you will receive a prorated credit for the unused portion of your previous plan.',
       },
       {
         question: 'How do I cancel my subscription?',
@@ -198,7 +198,7 @@ const helpCategories: Category[] = [
       {
         question: 'What roles and permissions are available?',
         answer:
-          'Three roles are available: Admin (full access — manage team, billing, devices, and content), Editor (create and manage content, templates, playlists, and schedules — cannot manage team or billing), and Viewer (read-only access to dashboards and analytics — cannot modify content or devices). Organization owners can customize permissions further in Settings > Roles.',
+          'Three roles are available: Admin (full access  &mdash; manage team, billing, devices, and content), Editor (create and manage content, templates, playlists, and schedules  &mdash; cannot manage team or billing), and Viewer (read-only access to dashboards and analytics  &mdash; cannot modify content or devices). Organization owners can customize permissions further in Settings > Roles.',
       },
     ],
   },
@@ -385,6 +385,7 @@ export default function HelpPage() {
                         </div>
                       );
                     })}
+                  </div>
                   </div>
                 </div>
               </div>

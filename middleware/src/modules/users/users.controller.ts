@@ -10,6 +10,7 @@ import {
   UseGuards,
   ParseUUIDPipe,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { UsersService } from './users.service';
 import { InviteUserDto } from './dto/invite-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -60,6 +61,16 @@ export class UsersController {
     @Body() updateUserDto: UpdateUserDto,
   ) {
     return this.usersService.update(organizationId, id, updateUserDto, userId);
+  }
+
+  @Post('me/data-export')
+  @Roles('admin')
+  @Throttle({ default: { limit: 2, ttl: 60000 } })
+  async exportUserData(
+    @CurrentUser('id') userId: string,
+    @CurrentUser('organizationId') organizationId: string,
+  ) {
+    return await this.usersService.exportUserData(userId, organizationId);
   }
 
   @Delete(':id')

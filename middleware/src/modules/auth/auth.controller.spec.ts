@@ -15,6 +15,7 @@ describe('AuthController', () => {
     email: 'test@example.com',
     firstName: 'Test',
     lastName: 'User',
+    avatar: null,
     role: 'admin',
   };
 
@@ -40,6 +41,9 @@ describe('AuthController', () => {
       resetPassword: jest.fn(),
       changePassword: jest.fn(),
       deleteAccount: jest.fn(),
+      getAvatarUrl: jest.fn().mockResolvedValue(null),
+      uploadAvatar: jest.fn(),
+      deleteAvatar: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -273,7 +277,7 @@ describe('AuthController', () => {
       const result = await controller.getMe(mockUser);
 
       expect(result.success).toBe(true);
-      expect(result.data.user).toEqual(mockUser);
+      expect(result.data.user).toEqual({ ...mockUser, avatarUrl: null });
     });
   });
 

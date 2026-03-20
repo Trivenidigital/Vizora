@@ -1,4 +1,5 @@
-import { Controller, Post, Patch, Body, UseGuards, Get, Delete, Res, Req, HttpCode, HttpStatus, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Patch, Body, UseGuards, Get, Delete, Res, Req, HttpCode, HttpStatus, BadRequestException, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import {
@@ -8,6 +9,7 @@ import {
   ApiBody,
   ApiBearerAuth,
   ApiCookieAuth,
+  ApiConsumes,
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto, ChangePasswordDto, DeleteAccountDto, UpdateProfileDto } from './dto';
@@ -226,10 +228,12 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Get('me')
   async getMe(@CurrentUser() user: AuthenticatedUser) {
-    const { passwordHash, password, ...safeUser } = user || {};
+    const { passwordHash, password, ...safeUser } = user || {} as any;
+    // Resolve avatar storage key to a presigned URL
+    const avatarUrl = await this.authService.getAvatarUrl(safeUser.avatar || null);
     return {
       success: true,
-      data: { user: safeUser },
+      data: { user: { ...safeUser, avatarUrl } },
     };
   }
 
@@ -250,6 +254,45 @@ export class AuthController {
     }
     const user = await this.authService.updateProfile(userId, dto);
     return { success: true, data: { user } };
+  }
+
+  @ApiOperation({ summary: 'Upload avatar for authenticated user' })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth()
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({ status: 200, description: 'Avatar uploaded successfully.' })
+  @ApiResponse({ status: 400, description: 'Invalid file type or size.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @UseGuards(JwtAuthGuard)
+  @Post('me/avatar')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 2 * 1024 * 1024 } }))
+  async uploadAvatar(
+    @CurrentUser('id') userId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file provided');
+    }
+    const result = await this.authService.uploadAvatar(userId, {
+      buffer: file.buffer,
+      mimetype: file.mimetype,
+    });
+    return { success: true, data: result };
+  }
+
+  @ApiOperation({ summary: 'Delete avatar for authenticated user' })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth()
+  @ApiResponse({ status: 200, description: 'Avatar deleted successfully.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @UseGuards(JwtAuthGuard)
+  @Delete('me/avatar')
+  @HttpCode(HttpStatus.OK)
+  async deleteAvatar(
+    @CurrentUser('id') userId: string,
+  ) {
+    await this.authService.deleteAvatar(userId);
+    return { success: true, data: { message: 'Avatar deleted successfully.' } };
   }
 
   @ApiOperation({ summary: 'Change password for authenticated user' })

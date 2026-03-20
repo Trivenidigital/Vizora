@@ -17,6 +17,7 @@ describe('UsersController', () => {
       invite: jest.fn(),
       update: jest.fn(),
       deactivate: jest.fn(),
+      exportUserData: jest.fn(),
     } as any;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -122,6 +123,28 @@ describe('UsersController', () => {
 
       expect(result).toEqual(expectedUser);
       expect(mockUsersService.update).toHaveBeenCalledWith(organizationId, 'user-1', updateDto, userId);
+    });
+  });
+
+  describe('exportUserData', () => {
+    it('should call service exportUserData with correct params', async () => {
+      const mockExport = {
+        exportDate: '2026-03-20T00:00:00.000Z',
+        user: { email: 'alice@test.com' },
+        organization: { name: 'Test Org' },
+        content: { count: 0, items: [] },
+        displays: { count: 0, items: [] },
+        playlists: { count: 0, items: [] },
+        schedules: { count: 0, items: [] },
+        auditLog: { count: 0, entries: [] },
+        notifications: { count: 0, items: [] },
+      };
+      mockUsersService.exportUserData.mockResolvedValue(mockExport);
+
+      const result = await controller.exportUserData(userId, organizationId);
+
+      expect(result).toEqual(mockExport);
+      expect(mockUsersService.exportUserData).toHaveBeenCalledWith(userId, organizationId);
     });
   });
 

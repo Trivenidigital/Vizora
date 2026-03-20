@@ -39,6 +39,25 @@ describe('UsersService', () => {
       },
       auditLog: {
         create: jest.fn(),
+        findMany: jest.fn(),
+      },
+      organization: {
+        findUnique: jest.fn(),
+      },
+      content: {
+        findMany: jest.fn(),
+      },
+      display: {
+        findMany: jest.fn(),
+      },
+      playlist: {
+        findMany: jest.fn(),
+      },
+      schedule: {
+        findMany: jest.fn(),
+      },
+      notification: {
+        findMany: jest.fn(),
       },
     };
 
@@ -399,6 +418,71 @@ describe('UsersService', () => {
 
       expect(result.isActive).toBe(false);
       expect(result.email).toBe('alice@test.com');
+    });
+  });
+
+  describe('exportUserData', () => {
+    const mockUserProfile = { email: 'alice@test.com', firstName: 'Alice', lastName: 'Smith', role: 'viewer', createdAt: new Date(), updatedAt: new Date() };
+    const mockOrg = { name: 'Test Org', slug: 'test-org', subscriptionTier: 'pro', createdAt: new Date() };
+    const mockContent = [{ id: 'c-1', title: 'Content 1', type: 'image', status: 'active', createdAt: new Date() }];
+    const mockDisplays = [{ id: 'd-1', nickname: 'Lobby', location: 'Floor 1', status: 'online', createdAt: new Date() }];
+    const mockPlaylists = [{ id: 'p-1', name: 'Playlist 1', createdAt: new Date() }];
+    const mockSchedules = [{ id: 's-1', name: 'Schedule 1', createdAt: new Date() }];
+    const mockAuditLogs = [{ action: 'user_login', entityType: 'user', createdAt: new Date() }];
+    const mockNotifications = [{ type: 'system', title: 'Welcome', message: 'Hello', createdAt: new Date() }];
+
+    beforeEach(() => {
+      db.user.findUnique.mockResolvedValue(mockUserProfile);
+      db.organization.findUnique.mockResolvedValue(mockOrg);
+      db.content.findMany.mockResolvedValue(mockContent);
+      db.display.findMany.mockResolvedValue(mockDisplays);
+      db.playlist.findMany.mockResolvedValue(mockPlaylists);
+      db.schedule.findMany.mockResolvedValue(mockSchedules);
+      db.auditLog.findMany.mockResolvedValue(mockAuditLogs);
+      db.notification.findMany.mockResolvedValue(mockNotifications);
+    });
+
+    it('should query all 8 data sources with correct IDs', async () => {
+      await service.exportUserData('user-1', organizationId);
+
+      expect(db.user.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'user-1' } }));
+      expect(db.organization.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { id: organizationId } }));
+      expect(db.content.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { organizationId } }));
+      expect(db.display.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { organizationId } }));
+      expect(db.playlist.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { organizationId } }));
+      expect(db.schedule.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { organizationId } }));
+      expect(db.auditLog.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: 'user-1' } }));
+      expect(db.notification.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: 'user-1' } }));
+    });
+
+    it('should return export with all sections and correct counts', async () => {
+      const result = await service.exportUserData('user-1', organizationId);
+
+      expect(result.exportDate).toBeDefined();
+      expect(result.user).toEqual(mockUserProfile);
+      expect(result.organization).toEqual(mockOrg);
+      expect(result.content).toEqual({ count: 1, items: mockContent });
+      expect(result.displays).toEqual({ count: 1, items: mockDisplays });
+      expect(result.playlists).toEqual({ count: 1, items: mockPlaylists });
+      expect(result.schedules).toEqual({ count: 1, items: mockSchedules });
+      expect(result.auditLog).toEqual({ count: 1, entries: mockAuditLogs });
+      expect(result.notifications).toEqual({ count: 1, items: mockNotifications });
+    });
+
+    it('should limit audit logs to 1000 entries', async () => {
+      await service.exportUserData('user-1', organizationId);
+
+      expect(db.auditLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 1000 }),
+      );
+    });
+
+    it('should limit notifications to 500 entries', async () => {
+      await service.exportUserData('user-1', organizationId);
+
+      expect(db.notification.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 500 }),
+      );
     });
   });
 
