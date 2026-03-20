@@ -50,6 +50,7 @@ export enum DeviceCommandType {
   PUSH_CONTENT = 'push_content',
   DISABLE = 'disable',
   ENABLE = 'enable',
+  CLEAR_OVERRIDE = 'clear_override',
 }
 
 /**

@@ -201,6 +201,36 @@ export class AppController {
     };
   }
 
+  @Post('commands/broadcast')
+  @UseGuards(InternalApiGuard)
+  async broadcastCommand(
+    @Body() data: { deviceIds: string[]; command: { type: string; payload?: any; commandId?: string } },
+  ) {
+    let devicesOnline = 0;
+    const commandWithTimestamp = {
+      ...data.command,
+      timestamp: new Date().toISOString(),
+    };
+
+    for (const deviceId of data.deviceIds) {
+      // Check if device is connected by checking room membership
+      const room = this.deviceGateway.server.sockets.adapter.rooms.get(`device:${deviceId}`);
+      const isOnline = room && room.size > 0;
+
+      // Always emit to the room (no-op if empty)
+      this.deviceGateway.server.to(`device:${deviceId}`).emit('command', commandWithTimestamp);
+
+      if (isOnline) {
+        devicesOnline++;
+      } else {
+        // Queue for offline device
+        await this.redisService.addDeviceCommand(deviceId, commandWithTimestamp);
+      }
+    }
+
+    return { devicesOnline };
+  }
+
   @Post('internal/command')
   @UseGuards(InternalApiGuard)
   async sendCommand(
