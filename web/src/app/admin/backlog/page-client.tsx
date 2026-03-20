@@ -185,7 +185,7 @@ const knownIssues: BacklogItem[] = [
   { id: 'K4', title: 'Display client has 0 test coverage', status: 'TODO', notes: 'Android TV app untested' },
   { id: 'K5', title: '3 pre-existing RSC admin test failures', status: 'TODO', notes: 'React Server Component edge cases' },
   { id: 'K6', title: 'AI Designer returns "launching soon" stub', status: 'TODO', notes: 'Intentional — needs API budget' },
-  { id: 'K7', title: 'Push-to-group iterates client-side', status: 'TODO', notes: 'No server-side batch endpoint' },
+  { id: 'K7', title: 'Push-to-group iterates client-side', status: 'FIXED', notes: 'Fleet control — unified command endpoint' },
   { id: 'K8', title: 'Playlist loop UI not fully wired', status: 'FIXED' },
 ];
 
@@ -193,11 +193,11 @@ const metrics: Array<{ label: string; start: string; current: string; target: st
   { label: 'Test suites', start: '~89', current: '183', target: '175+' },
   { label: 'Total tests', start: '1,734', current: '3,016', target: '2,000+' },
   { label: 'Test pass rate', start: '99.9%', current: '100%', target: '100%' },
-  { label: 'P0 blockers', start: '8', current: '3*', target: '0' },
+  { label: 'P0 blockers', start: '8', current: '0*', target: '0' },
   { label: 'API 400 errors', start: '4', current: '0', target: '0' },
   { label: 'Template 404s', start: '100+', current: '0', target: '0' },
   { label: 'Health layers', start: '2', current: '5', target: '5' },
-  { label: 'Prod readiness', start: '78%', current: '~90%', target: '95%+' },
+  { label: 'Prod readiness', start: '78%', current: '~92%', target: '95%+' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -333,7 +333,7 @@ export default function BacklogClient() {
       <div>
         <h1 className="text-3xl font-bold text-[var(--foreground)]">Project Backlog</h1>
         <p className="mt-1 text-[var(--foreground-secondary)]">
-          Last updated: 2026-03-20 &middot; Production readiness: ~90%
+          Last updated: 2026-03-20 &middot; Production readiness: ~92%
         </p>
       </div>
 
