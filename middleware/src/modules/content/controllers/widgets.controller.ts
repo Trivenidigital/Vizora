@@ -44,7 +44,13 @@ export class WidgetsController {
     @Query('location') location: string,
     @Query('units') units: string = 'metric',
   ) {
-    return this.contentService.getWeatherPreview(location || 'New York', units);
+    // Whitelist units to prevent parameter injection (e.g., "metric&appid=STOLEN")
+    if (!['metric', 'imperial', 'standard'].includes(units)) {
+      units = 'metric';
+    }
+    // Sanitize location to prevent URL injection
+    const sanitizedLocation = encodeURIComponent(location || 'New York');
+    return this.contentService.getWeatherPreview(decodeURIComponent(sanitizedLocation), units);
   }
 
   @Post()

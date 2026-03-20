@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '@/lib/api';
+import type { WeatherData } from '@/lib/api/widgets';
 
 /** Weather condition code to emoji mapping */
 function getWeatherEmoji(conditionCode: number | undefined): string {
@@ -28,30 +29,8 @@ function formatDay(dateStr: string): string {
   }
 }
 
-export interface WeatherWidgetData {
-  current: {
-    temp: number;
-    feelsLike: number;
-    humidity: number;
-    windSpeed: number;
-    description: string;
-    icon: string;
-    conditionCode: number;
-  };
-  location: {
-    name: string;
-    country: string;
-  };
-  forecast?: Array<{
-    date: string;
-    temp: number;
-    tempMin: number;
-    tempMax: number;
-    description: string;
-    icon: string;
-    conditionCode: number;
-  }>;
-}
+/** Re-export the canonical WeatherData type from the API layer */
+export type WeatherWidgetData = WeatherData;
 
 export interface WeatherWidgetProps {
   /** City name (e.g., "New York" or "London,UK") */
@@ -89,7 +68,21 @@ export default function WeatherWidget({
   const [loading, setLoading] = useState(!externalData);
   const [error, setError] = useState<string | null>(null);
 
-  const isDark = theme === 'dark' || (theme === 'auto' && typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
+  // Track system dark mode preference reactively (for theme='auto')
+  const [systemDark, setSystemDark] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = (e: MediaQueryListEvent) => setSystemDark(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  const isDark = theme === 'dark' || (theme === 'auto' && systemDark);
 
   const unitSymbol = units === 'imperial' ? 'F' : 'C';
   const windUnit = units === 'imperial' ? 'mph' : 'm/s';

@@ -338,12 +338,13 @@ export default function HelpPage() {
 
                 {/* Questions Accordion */}
                 <div
-                  className={`transition-all duration-200 ${
+                  className={`grid transition-all duration-200 ${
                     isCategoryOpen
-                      ? 'max-h-[2000px] opacity-100'
-                      : 'max-h-0 opacity-0 overflow-hidden'
+                      ? 'grid-rows-[1fr] opacity-100'
+                      : 'grid-rows-[0fr] opacity-0'
                   }`}
                 >
+                  <div className="overflow-hidden">
                   <div className="border-t border-[var(--border)]">
                     {category.faqs.map((faq, idx) => {
                       const questionId = `${category.name}-${idx}`;
@@ -369,14 +370,16 @@ export default function HelpPage() {
                             />
                           </button>
                           <div
-                            className={`transition-all duration-200 ${
+                            className={`grid transition-all duration-200 ${
                               isOpen
-                                ? 'max-h-[500px] opacity-100'
-                                : 'max-h-0 opacity-0 overflow-hidden'
+                                ? 'grid-rows-[1fr] opacity-100'
+                                : 'grid-rows-[0fr] opacity-0'
                             }`}
                           >
-                            <div className="px-4 pb-4 text-sm text-[var(--foreground-secondary)] leading-relaxed">
-                              {faq.answer}
+                            <div className="overflow-hidden">
+                              <div className="px-4 pb-4 text-sm text-[var(--foreground-secondary)] leading-relaxed">
+                                {faq.answer}
+                              </div>
                             </div>
                           </div>
                         </div>
