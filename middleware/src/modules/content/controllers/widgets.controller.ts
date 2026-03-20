@@ -77,6 +77,25 @@ export class WidgetsController {
       throw new BadRequestException('Only http/https URLs are supported');
     }
 
+    // Block private/reserved IP ranges (SSRF prevention)
+    const { hostname } = parsed;
+    const blockedPatterns = [
+      /^localhost$/i,
+      /^127\./,
+      /^10\./,
+      /^172\.(1[6-9]|2\d|3[01])\./,
+      /^192\.168\./,
+      /^169\.254\./,
+      /^0\./,
+      /^\[::1\]/,
+      /^\[fc/i,
+      /^\[fd/i,
+      /^\[fe80/i,
+    ];
+    if (blockedPatterns.some(p => p.test(hostname))) {
+      throw new BadRequestException('Private or reserved IP addresses are not allowed');
+    }
+
     const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 50);
 
     let response: Response;
@@ -93,7 +112,17 @@ export class WidgetsController {
       throw new NotFoundException(`Failed to fetch RSS feed: HTTP ${response.status}`);
     }
 
+    // Read response with size limit (2MB max)
+    const maxSize = 2 * 1024 * 1024;
+    const contentLength = parseInt(response.headers.get('content-length') || '0');
+    if (contentLength > maxSize) {
+      throw new BadRequestException('Feed response too large (max 2MB)');
+    }
     const xml = await response.text();
+    if (xml.length > maxSize) {
+      throw new BadRequestException('Feed response too large (max 2MB)');
+    }
+
     const items = parseRssFeed(xml, parsedLimit);
     const feedTitle = extractFeedTitle(xml);
 

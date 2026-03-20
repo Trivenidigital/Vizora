@@ -831,7 +831,7 @@ export class ContentService {
     }
 
     // action === 'reject'
-    // Archive the content and remove from all playlists
+    // Reject the content and remove from org playlists
     const rejectedMetadata = {
       ...existingMetadata,
       moderation: {
@@ -845,16 +845,19 @@ export class ContentService {
     };
 
     await this.db.$transaction(async (tx) => {
-      // Remove from all playlists
+      // Remove from playlists within the same organization only
       await tx.playlistItem.deleteMany({
-        where: { contentId: id },
+        where: {
+          contentId: id,
+          playlist: { organizationId },
+        },
       });
 
-      // Set status to archived (rejected content is archived)
+      // Set status to rejected
       await tx.content.updateMany({
         where: { id, organizationId },
         data: {
-          status: 'archived',
+          status: 'rejected',
           metadata: rejectedMetadata as Prisma.InputJsonValue,
         },
       });

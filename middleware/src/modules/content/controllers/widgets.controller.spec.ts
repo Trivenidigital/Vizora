@@ -288,6 +288,7 @@ describe('WidgetsController', () => {
 
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
+        headers: new Map([['content-length', '0']]),
         text: async () => rssXml,
       });
 
@@ -308,6 +309,7 @@ describe('WidgetsController', () => {
 
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
+        headers: new Map([['content-length', '0']]),
         text: async () => rssXml,
       });
 

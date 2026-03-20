@@ -1,6 +1,8 @@
 /**
  * Lightweight RSS 2.0 and Atom feed parser using regex.
  * No external dependencies.
+ *
+ * Note: regex parsing is safe because input is size-limited to 2MB (enforced by controller)
  */
 
 export interface RssFeedItem {

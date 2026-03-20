@@ -16,6 +16,7 @@ import {
   NotFoundException,
   Logger,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ParseIdPipe } from '../common/pipes/parse-id.pipe';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -302,6 +303,8 @@ export class ContentController {
   // ============================================================================
 
   @Post(':id/flag')
+  @Roles('admin', 'manager', 'viewer')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   flag(
     @CurrentUser('organizationId') organizationId: string,

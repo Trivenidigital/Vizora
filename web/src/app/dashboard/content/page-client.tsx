@@ -21,6 +21,17 @@ import { contentUploadSchema, validateForm } from '@/lib/validation';
 import { Icon } from '@/theme/icons';
 import type { IconName } from '@/theme/icons';
 
+interface ModerationMetadata {
+  flaggedBy?: string;
+  flaggedAt?: string;
+  flagReason?: string;
+  previousStatus?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  reviewAction?: string;
+  reviewNote?: string;
+}
+
 export default function ContentClient() {
  const toast = useToast();
  const [content, setContent] = useState<Content[]>([]);
@@ -1564,7 +1575,7 @@ export default function ContentClient() {
  >
  <div className="space-y-4">
  <p className="text-[var(--foreground-secondary)]">
- Push "{selectedContent?.title}" directly to devices. The content will display for the specified duration, then the previous playlist will resume.
+ Push "{selectedContent?.title || 'Untitled'}" directly to devices. The content will display for the specified duration, then the previous playlist will resume.
  </p>
 
  {/* Duration Input */}
@@ -1679,7 +1690,7 @@ export default function ContentClient() {
  >
  <div className="space-y-4">
  <p className="text-[var(--foreground-secondary)]">
- Add "{selectedContent?.title}" to a playlist:
+ Add "{selectedContent?.title || 'Untitled'}" to a playlist:
  </p>
  <select
  value={selectedPlaylist}
@@ -1724,7 +1735,7 @@ export default function ContentClient() {
  onClose={() => setIsDeleteModalOpen(false)}
  onConfirm={confirmDelete}
  title="Delete Content"
- message={`Are you sure you want to delete "${selectedContent?.title}"? This action cannot be undone.`}
+ message={`Are you sure you want to delete "${selectedContent?.title || 'Untitled'}"? This action cannot be undone.`}
  confirmText="Delete"
  type="danger"
  />
@@ -1804,7 +1815,7 @@ export default function ContentClient() {
  >
  <div className="space-y-4">
  <p className="text-[var(--foreground-secondary)]">
- Flag <strong>{selectedContent?.title}</strong> for review by an admin.
+ Flag <strong>{selectedContent?.title || 'Untitled'}</strong> for review by an admin.
  </p>
  <div>
  <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
@@ -1857,14 +1868,17 @@ export default function ContentClient() {
  <Icon name="warning" size="md" />
  This content has been flagged for review
  </p>
- {selectedContent?.metadata?.moderation?.flagReason && (
- <p className="text-sm text-[var(--foreground-secondary)] mt-2">
- Reason: {selectedContent.metadata.moderation.flagReason}
- </p>
- )}
+ {(() => {
+   const moderation = (selectedContent?.metadata as { moderation?: ModerationMetadata })?.moderation;
+   return moderation?.flagReason ? (
+     <p className="text-sm text-[var(--foreground-secondary)] mt-2">
+       Reason: {moderation.flagReason}
+     </p>
+   ) : null;
+ })()}
  </div>
  <p className="text-[var(--foreground-secondary)]">
- Reviewing: <strong>{selectedContent?.title}</strong>
+ Reviewing: <strong>{selectedContent?.title || 'Untitled'}</strong>
  </p>
  <div>
  <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
