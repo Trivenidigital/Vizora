@@ -58,7 +58,7 @@ function SortablePlaylistItem({ item, idx, onRemove, onDurationChange }: {
  <div
  ref={setNodeRef}
  style={style}
- className="flex items-center justify-between p-3 bg-[var(--background)] rounded-lg hover:bg-[var(--surface-hover)] transition-all duration-300"
+ className="flex items-center justify-between p-3 bg-[var(--background)] rounded-lg hover:bg-[var(--surface-hover)] transition-all duration-300 min-h-[4rem]"
  >
  <div className="flex items-center gap-3 flex-1">
  <button
@@ -70,7 +70,7 @@ function SortablePlaylistItem({ item, idx, onRemove, onDurationChange }: {
  </button>
  <span className="text-[var(--foreground-tertiary)] font-medium">{idx + 1}</span>
  <div className="flex-1">
- <div className="text-sm font-medium text-[var(--foreground)]">
+ <div className="text-sm font-medium text-[var(--foreground)] truncate" title={item.content?.title || `Content ${item.contentId}`}>
  {item.content?.title || `Content ${item.contentId}`}
  </div>
  <div className="text-xs text-[var(--foreground-tertiary)] flex items-center gap-2">
@@ -87,7 +87,7 @@ function SortablePlaylistItem({ item, idx, onRemove, onDurationChange }: {
  }
  }}
  onClick={(e) => e.stopPropagation()}
- className="w-16 px-2 py-1 text-xs border border-[var(--border)] rounded focus:ring-1 focus:ring-[#00E5A0] focus:border-[#00E5A0]"
+ className="w-20 px-2 py-1 text-xs border border-[var(--border)] rounded focus:ring-1 focus:ring-[#00E5A0] focus:border-[#00E5A0]"
  />
  <span>s</span>
  </div>
@@ -348,14 +348,14 @@ export default function PlaylistsClient() {
 
  <div className="flex justify-between items-center">
  <div>
- <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Playlists</h2>
+ <h2 className="eh-dash-title font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Playlists</h2>
  <p className="mt-2 text-[var(--foreground-secondary)]">
  Create and manage content playlists ({playlists.length} total)
  </p>
  </div>
  <button
  onClick={() => setIsCreateModalOpen(true)}
- className="bg-[#00E5A0] text-[#061A21] px-6 py-3 rounded-lg hover:bg-[#00CC8E] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
+ className="eh-btn-neon rounded-xl px-6 py-3 transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
  >
  <span className="text-xl">+</span>
  <span>Create Playlist</span>
@@ -400,7 +400,7 @@ export default function PlaylistsClient() {
  .map((playlist) => (
  <div
  key={playlist.id}
- className="bg-[var(--surface)] rounded-lg border border-[var(--border)] shadow hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300 p-6"
+ className="eh-dash-card p-6"
  >
  <div className="flex items-start justify-between mb-4">
  <div className="flex items-start gap-4 flex-1">
@@ -481,7 +481,7 @@ export default function PlaylistsClient() {
  {playlist.items.slice(0, 3).map((item, idx) => (
  <div key={item.id} className="text-sm text-[var(--foreground-secondary)] flex items-center gap-2">
  <span className="text-[var(--foreground-tertiary)]">{idx + 1}.</span>
- <span className="flex-1 truncate">
+ <span className="flex-1 truncate" title={item.content?.title || `Content ${item.contentId}`}>
  {item.content?.title || `Content ${item.contentId}`}
  </span>
  <span className="text-xs text-[var(--foreground-tertiary)]">{item.duration || 30}s</span>
@@ -587,7 +587,7 @@ export default function PlaylistsClient() {
  </button>
  <button
  onClick={handleCreate}
- className="px-4 py-2 text-sm font-medium text-white bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
+ className="eh-btn-neon rounded-xl px-4 py-2 text-sm font-medium transition disabled:opacity-50 flex items-center gap-2"
  disabled={actionLoading || !createForm.name.trim()}
  >
  {actionLoading && <LoadingSpinner size="sm" />}
@@ -608,7 +608,7 @@ export default function PlaylistsClient() {
  <div className="grid grid-cols-2 gap-6">
  {/* Available Content */}
  <div>
- <h4 className="font-semibold text-[var(--foreground)] mb-3">Available Content</h4>
+ <h4 className="eh-dash-subtitle mb-3">Available Content</h4>
  <div className="border border-[var(--border)] rounded-lg p-4 max-h-96 overflow-y-auto space-y-2">
  {content.length === 0 ? (
  <p className="text-sm text-[var(--foreground-tertiary)] text-center py-8">
@@ -655,7 +655,7 @@ export default function PlaylistsClient() {
 
  {/* Playlist Items */}
  <div>
- <h4 className="font-semibold text-[var(--foreground)] mb-3">
+ <h4 className="eh-dash-subtitle mb-3">
  Playlist Items ({selectedPlaylist?.items?.length || 0})
  </h4>
  <DndContext
@@ -717,7 +717,7 @@ export default function PlaylistsClient() {
  setIsBuilderModalOpen(false);
  loadPlaylists();
  }}
- className="px-6 py-2 text-sm font-medium text-white bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition"
+ className="eh-btn-neon rounded-xl px-6 py-2 text-sm font-medium transition"
  >
  Done
  </button>

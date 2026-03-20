@@ -273,7 +273,7 @@ export default function WidgetsPage() {
           <select
             value={value || ''}
             onChange={(e) => onChange(key, e.target.value)}
-            className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
+            className="eh-select w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
           >
             <option value="">Select...</option>
             {(schema.options || []).map((opt: string) => (
@@ -298,7 +298,7 @@ export default function WidgetsPage() {
             min={schema.min}
             max={schema.max}
             onChange={(e) => onChange(key, parseInt(e.target.value) || 0)}
-            className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
+            className="eh-input w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
           />
         </div>
       );
@@ -316,7 +316,7 @@ export default function WidgetsPage() {
           value={value || ''}
           placeholder={schema.placeholder || ''}
           onChange={(e) => onChange(key, e.target.value)}
-          className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
+          className="eh-input w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
         />
       </div>
     );
@@ -346,7 +346,7 @@ export default function WidgetsPage() {
       {/* Page Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Widgets</h2>
+          <h2 className="eh-dash-title font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Widgets</h2>
           <p className="mt-2 text-[var(--foreground-secondary)]">
             Add dynamic data widgets like weather, RSS feeds, clocks, and more to your displays.
           </p>
@@ -357,7 +357,7 @@ export default function WidgetsPage() {
             setSelectedType(null);
             setIsWizardOpen(true);
           }}
-          className="bg-[#00E5A0] text-[#061A21] px-6 py-3 rounded-lg hover:bg-[#00CC8E] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
+          className="eh-btn-neon rounded-xl px-6 py-3 transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
         >
           <Icon name="add" size="lg" />
           <span>Create Widget</span>
@@ -373,12 +373,12 @@ export default function WidgetsPage() {
           {/* My Widgets Section */}
           {myWidgets.length > 0 && (
             <div>
-              <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">My Widgets</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <h3 className="eh-dash-subtitle text-xl font-semibold text-[var(--foreground)] mb-4">My Widgets</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
                 {myWidgets.map((widget) => (
                   <div
                     key={widget.id}
-                    className="bg-[var(--surface)] rounded-lg shadow border border-[var(--border)] overflow-hidden hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300"
+                    className="eh-dash-card rounded-lg shadow border border-[var(--border)] overflow-hidden hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300"
                   >
                     <div className={`h-2 bg-gradient-to-r ${getColorForType(widget.widgetType)}`} />
                     <div className="p-5">
@@ -426,14 +426,14 @@ export default function WidgetsPage() {
 
           {/* Widget Type Gallery */}
           <div>
-            <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">
+            <h3 className="eh-dash-subtitle text-xl font-semibold text-[var(--foreground)] mb-4">
               {myWidgets.length > 0 ? 'Available Widget Types' : 'Widget Gallery'}
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
               {widgetTypes.map((wType) => (
                 <div
                   key={wType.type}
-                  className="bg-[var(--surface)] rounded-lg shadow overflow-hidden hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300 border border-[var(--border)] cursor-pointer group"
+                  className="eh-dash-card rounded-lg shadow overflow-hidden hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300 border border-[var(--border)] cursor-pointer group"
                   onClick={() => openWizard(wType)}
                 >
                   <div className={`h-32 bg-gradient-to-br ${getColorForType(wType.type)} flex items-center justify-center relative`}>
@@ -448,7 +448,7 @@ export default function WidgetsPage() {
                         e.stopPropagation();
                         openWizard(wType);
                       }}
-                      className="w-full py-2 text-sm font-medium rounded-lg border-2 border-[#00E5A0] text-[#00E5A0] hover:bg-[#00E5A0] hover:text-[#061A21] transition flex items-center justify-center gap-2"
+                      className="w-full py-2 text-sm font-medium rounded-lg border border-[#00E5A0] text-[#00E5A0] hover:bg-[#00E5A0] hover:text-[#061A21] transition flex items-center justify-center gap-2"
                     >
                       <Icon name="add" size="sm" />
                       Create {wType.name} Widget
@@ -521,7 +521,7 @@ export default function WidgetsPage() {
                 value={widgetName}
                 onChange={(e) => setWidgetName(e.target.value)}
                 placeholder={`My ${selectedType.name} Widget`}
-                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
+                className="eh-input w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
               />
             </div>
 
@@ -535,7 +535,7 @@ export default function WidgetsPage() {
                 value={widgetDescription}
                 onChange={(e) => setWidgetDescription(e.target.value)}
                 placeholder="A brief description..."
-                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
+                className="eh-input w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
               />
             </div>
 
@@ -571,7 +571,7 @@ export default function WidgetsPage() {
                 <button
                   onClick={handleCreateWidget}
                   disabled={actionLoading || !widgetName.trim()}
-                  className="px-4 py-2 text-sm font-medium bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
+                  className="eh-btn-neon rounded-xl px-4 py-2 text-sm font-medium transition disabled:opacity-50 flex items-center gap-2"
                 >
                   {actionLoading && <LoadingSpinner size="sm" />}
                   Create Widget
@@ -620,7 +620,7 @@ export default function WidgetsPage() {
               <button
                 onClick={handleCreateWidget}
                 disabled={actionLoading || !widgetName.trim()}
-                className="px-4 py-2 text-sm font-medium bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
+                className="eh-btn-neon rounded-xl px-4 py-2 text-sm font-medium transition disabled:opacity-50 flex items-center gap-2"
               >
                 {actionLoading && <LoadingSpinner size="sm" />}
                 Create Widget
@@ -680,7 +680,7 @@ export default function WidgetsPage() {
               <button
                 onClick={handleUpdateWidget}
                 disabled={actionLoading}
-                className="px-4 py-2 text-sm font-medium bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
+                className="eh-btn-neon rounded-xl px-4 py-2 text-sm font-medium transition disabled:opacity-50 flex items-center gap-2"
               >
                 {actionLoading && <LoadingSpinner size="sm" />}
                 Save Changes

@@ -88,7 +88,7 @@ function LayoutPreviewGrid({ type }: { type: string }) {
 
   return (
     <div
-      className="w-full h-24 rounded-lg overflow-hidden border border-[var(--border)]"
+      className="w-full h-32 rounded-lg overflow-hidden border border-[var(--border)]"
       style={previewStyles[type] || { display: 'flex' }}
     >
       {zones.map((zone, idx) => (
@@ -262,7 +262,7 @@ export default function LayoutsPage() {
       {/* Page Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Layouts</h2>
+          <h2 className="eh-dash-title font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Layouts</h2>
           <p className="mt-2 text-[var(--foreground-secondary)]">
             Create multi-zone display layouts to show multiple content items simultaneously.
           </p>
@@ -274,7 +274,7 @@ export default function LayoutsPage() {
             setLayoutDescription('');
             setIsCreateModalOpen(true);
           }}
-          className="bg-[#00E5A0] text-[#061A21] px-6 py-3 rounded-lg hover:bg-[#00CC8E] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
+          className="eh-btn-neon rounded-xl px-6 py-3 transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
         >
           <Icon name="add" size="lg" />
           <span>Create Layout</span>
@@ -290,12 +290,12 @@ export default function LayoutsPage() {
           {/* Existing Layouts */}
           {layouts.length > 0 && (
             <div>
-              <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">My Layouts</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <h3 className="eh-dash-subtitle text-xl font-semibold text-[var(--foreground)] mb-4">My Layouts</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {layouts.map((layout) => (
                   <div
                     key={layout.id}
-                    className="bg-[var(--surface)] rounded-lg shadow border border-[var(--border)] overflow-hidden hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300"
+                    className="eh-dash-card rounded-lg shadow border border-[var(--border)] overflow-hidden hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300"
                   >
                     <div className="p-5">
                       <LayoutPreviewGrid type={layout.layoutType} />
@@ -340,15 +340,15 @@ export default function LayoutsPage() {
 
           {/* Preset Picker */}
           <div>
-            <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">Layout Presets</h3>
+            <h3 className="eh-dash-subtitle text-xl font-semibold text-[var(--foreground)] mb-4">Layout Presets</h3>
             <p className="text-[var(--foreground-secondary)] mb-4">
               Choose a preset to create a new layout. Each preset defines the zone structure for your display.
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
               {presets.map((preset) => (
                 <div
                   key={preset.type}
-                  className="bg-[var(--surface)] rounded-lg border border-[var(--border)] p-5 hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300 cursor-pointer group"
+                  className="eh-dash-card rounded-lg border border-[var(--border)] p-5 hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300 cursor-pointer group"
                   onClick={() => {
                     setSelectedPreset(preset);
                     setLayoutName('');
@@ -370,7 +370,7 @@ export default function LayoutsPage() {
                       setLayoutDescription('');
                       setIsCreateModalOpen(true);
                     }}
-                    className="mt-3 w-full py-1.5 text-xs font-medium rounded border border-[#00E5A0] text-[#00E5A0] group-hover:bg-[#00E5A0] group-hover:text-[#061A21] transition"
+                    className="eh-btn-neon rounded-xl mt-3 w-full py-1.5 text-xs font-medium transition"
                   >
                     Use Preset
                   </button>
@@ -450,7 +450,7 @@ export default function LayoutsPage() {
                   value={layoutName}
                   onChange={(e) => setLayoutName(e.target.value)}
                   placeholder="e.g., Lobby Main Display"
-                  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
+                  className="eh-input w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
                   autoFocus
                 />
               </div>
@@ -465,7 +465,7 @@ export default function LayoutsPage() {
                   value={layoutDescription}
                   onChange={(e) => setLayoutDescription(e.target.value)}
                   placeholder="A brief description of this layout..."
-                  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
+                  className="eh-input w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
                 />
               </div>
 
@@ -482,7 +482,7 @@ export default function LayoutsPage() {
                 <button
                   onClick={handleCreateLayout}
                   disabled={actionLoading || !layoutName.trim()}
-                  className="px-4 py-2 text-sm font-medium bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
+                  className="eh-btn-neon rounded-xl px-4 py-2 text-sm font-medium transition disabled:opacity-50 flex items-center gap-2"
                 >
                   {actionLoading && <LoadingSpinner size="sm" />}
                   Create Layout

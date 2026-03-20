@@ -406,8 +406,8 @@ export default function TemplateLibraryPage() {
               {featuredTemplates.length > 0 && (
                 <section>
                   <div className="flex items-center justify-between mb-3">
-                    <h2 className="font-[var(--font-sora)] text-base font-semibold text-[var(--foreground)] flex items-center gap-2">
-                      <span className="w-1 h-4 rounded-full bg-[#00E5A0]" />
+                    <h2 className="eh-dash-subtitle font-[var(--font-sora)] text-base font-semibold text-[var(--foreground)] flex items-center gap-2">
+                      <span className="w-1 h-4 rounded-full bg-[var(--primary)]" />
                       Featured
                     </h2>
                     <div className="flex gap-1.5">
@@ -443,8 +443,8 @@ export default function TemplateLibraryPage() {
               {popularTemplates.length > 0 && (
                 <section>
                   <div className="flex items-center justify-between mb-3">
-                    <h2 className="font-[var(--font-sora)] text-base font-semibold text-[var(--foreground)] flex items-center gap-2">
-                      <span className="w-1 h-4 rounded-full bg-[#00B4D8]" />
+                    <h2 className="eh-dash-subtitle font-[var(--font-sora)] text-base font-semibold text-[var(--foreground)] flex items-center gap-2">
+                      <span className="w-1 h-4 rounded-full bg-[var(--primary)]" />
                       Popular
                     </h2>
                   </div>
@@ -473,8 +473,8 @@ export default function TemplateLibraryPage() {
           <section>
             {viewMode === 'home' && (
               <div className="flex items-center justify-between mb-3">
-                <h2 className="font-[var(--font-sora)] text-base font-semibold text-[var(--foreground)] flex items-center gap-2">
-                  <span className="w-1 h-4 rounded-full bg-[var(--foreground-tertiary)]" />
+                <h2 className="eh-dash-subtitle font-[var(--font-sora)] text-base font-semibold text-[var(--foreground)] flex items-center gap-2">
+                  <span className="w-1 h-4 rounded-full bg-[var(--primary)]" />
                   {hasActiveFilters ? 'Search Results' : 'All Templates'}
                   {!loading && <span className="text-xs font-normal text-[var(--foreground-tertiary)] ml-1">({currentTotal})</span>}
                 </h2>
@@ -482,8 +482,8 @@ export default function TemplateLibraryPage() {
             )}
             {viewMode === 'your-templates' && (
               <div className="flex items-center justify-between mb-3">
-                <h2 className="font-[var(--font-sora)] text-base font-semibold text-[var(--foreground)] flex items-center gap-2">
-                  <span className="w-1 h-4 rounded-full bg-[#00E5A0]" />
+                <h2 className="eh-dash-subtitle font-[var(--font-sora)] text-base font-semibold text-[var(--foreground)] flex items-center gap-2">
+                  <span className="w-1 h-4 rounded-full bg-[var(--primary)]" />
                   Your Templates
                   {!loading && <span className="text-xs font-normal text-[var(--foreground-tertiary)] ml-1">({userTotalCount})</span>}
                 </h2>
@@ -497,7 +497,7 @@ export default function TemplateLibraryPage() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search your templates..."
-                    className="w-full pl-9 pr-3 py-1.5 rounded-lg text-sm bg-[var(--surface)] border border-[var(--border)] text-[var(--foreground)] placeholder-[var(--foreground-tertiary)] focus:outline-none focus:ring-1 focus:ring-[#00E5A0]/30"
+                    className="eh-input w-full pl-9 pr-3 py-1.5 rounded-lg text-sm"
                   />
                 </div>
               </div>
@@ -507,20 +507,20 @@ export default function TemplateLibraryPage() {
             {loading ? (
               <TemplateGridSkeleton count={8} />
             ) : error ? (
-              <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-12 text-center">
+              <div className="eh-dash-card p-12 text-center">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mx-auto mb-3 text-red-400">
                   <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
                 </svg>
                 <p className="text-sm text-[var(--foreground-secondary)] mb-4">{error}</p>
                 <button
                   onClick={viewMode === 'home' ? loadTemplates : loadUserTemplates}
-                  className="px-4 py-2 rounded-lg bg-[#00E5A0] text-[#061A21] font-semibold text-sm hover:bg-[#00CC8E] transition-all"
+                  className="eh-btn-neon rounded-xl px-4 py-2 text-sm"
                 >
                   Try Again
                 </button>
               </div>
             ) : currentTemplates.length === 0 ? (
-              <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-12 text-center">
+              <div className="eh-dash-card p-12 text-center">
                 <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="mx-auto mb-4 text-[var(--foreground-tertiary)] opacity-40">
                   <rect x="3" y="3" width="18" height="18" rx="2" />
                   <path d="M3 15l4-4a3 5 0 0 1 3 0l5 5" />
@@ -534,7 +534,7 @@ export default function TemplateLibraryPage() {
                     <div className="flex gap-2 justify-center">
                       <button
                         onClick={() => { setViewMode('home'); setPage(1); }}
-                        className="px-4 py-2 rounded-lg bg-[#00E5A0] text-[#061A21] font-semibold text-sm hover:bg-[#00CC8E] transition-all"
+                        className="eh-btn-neon rounded-xl px-4 py-2 text-sm"
                       >
                         Browse Library
                       </button>
@@ -582,7 +582,7 @@ export default function TemplateLibraryPage() {
 
                 {/* Pagination */}
                 {totalPages > 1 && (
-                  <div className="flex items-center justify-center gap-1.5 mt-8">
+                  <div className="flex items-center justify-center gap-1.5 mt-6">
                     <button
                       onClick={() => setPage(Math.max(1, page - 1))}
                       disabled={page <= 1}
@@ -608,7 +608,7 @@ export default function TemplateLibraryPage() {
                             onClick={() => setPage(item as number)}
                             className={`w-9 h-9 rounded-lg text-sm font-medium transition-all ${
                               page === item
-                                ? 'bg-[#00E5A0] text-[#061A21]'
+                                ? 'bg-[var(--primary)] text-[#061A21]'
                                 : 'text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]'
                             }`}
                           >
@@ -660,7 +660,7 @@ export default function TemplateLibraryPage() {
       {cloneModalId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !cloning && setCloneModalId(null)} />
-          <div className="relative bg-[var(--surface)] rounded-xl border border-[var(--border)] w-full max-w-sm mx-4 p-6 shadow-2xl animate-[fadeIn_0.15s_ease-out]">
+          <div className="relative eh-dash-card w-full max-w-sm mx-4 p-6 shadow-2xl animate-[fadeIn_0.15s_ease-out]">
             <h3 className="font-[var(--font-sora)] text-lg font-semibold text-[var(--foreground)] mb-2">Use This Template</h3>
             <p className="text-sm text-[var(--foreground-secondary)] mb-6">
               This will create a copy in your templates that you can customize and deploy to your displays.
@@ -676,7 +676,7 @@ export default function TemplateLibraryPage() {
               <button
                 onClick={handleCloneConfirm}
                 disabled={cloning}
-                className="px-5 py-2 text-sm font-semibold bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition-all disabled:opacity-50 flex items-center gap-2"
+                className="eh-btn-neon rounded-xl px-5 py-2 text-sm disabled:opacity-50 flex items-center gap-2"
               >
                 {cloning ? (
                   <>
@@ -696,7 +696,7 @@ export default function TemplateLibraryPage() {
       {deleteModalId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !deleting && setDeleteModalId(null)} />
-          <div className="relative bg-[var(--surface)] rounded-xl border border-[var(--border)] w-full max-w-sm mx-4 p-6 shadow-2xl animate-[fadeIn_0.15s_ease-out]">
+          <div className="relative eh-dash-card w-full max-w-sm mx-4 p-6 shadow-2xl animate-[fadeIn_0.15s_ease-out]">
             <h3 className="font-[var(--font-sora)] text-lg font-semibold text-[var(--foreground)] mb-2">Delete Template</h3>
             <p className="text-sm text-[var(--foreground-secondary)] mb-6">
               Are you sure? This template will be archived and hidden from the library.
