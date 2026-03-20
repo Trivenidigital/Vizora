@@ -22,6 +22,7 @@ describe('WidgetsController', () => {
       createWidget: jest.fn(),
       updateWidget: jest.fn(),
       refreshWidget: jest.fn(),
+      getWeatherPreview: jest.fn(),
     } as any;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -176,6 +177,49 @@ describe('WidgetsController', () => {
       await expect(
         controller.updateWidget(organizationId, 'nonexistent', updateDto as any),
       ).rejects.toThrow('Widget not found');
+    });
+  });
+
+  // ==========================================================================
+  // getWeatherPreview
+  // ==========================================================================
+
+  describe('getWeatherPreview', () => {
+    it('should return weather data for a location', async () => {
+      const weatherData = {
+        current: { temp: 22, description: 'partly cloudy' },
+        location: { name: 'New York', country: 'US' },
+      };
+      mockContentService.getWeatherPreview.mockResolvedValue(weatherData);
+
+      const result = await controller.getWeatherPreview('New York', 'metric');
+
+      expect(result).toEqual(weatherData);
+      expect(mockContentService.getWeatherPreview).toHaveBeenCalledWith('New York', 'metric');
+    });
+
+    it('should default to New York when no location provided', async () => {
+      mockContentService.getWeatherPreview.mockResolvedValue({});
+
+      await controller.getWeatherPreview(undefined as any, 'metric');
+
+      expect(mockContentService.getWeatherPreview).toHaveBeenCalledWith('New York', 'metric');
+    });
+
+    it('should default to metric units', async () => {
+      mockContentService.getWeatherPreview.mockResolvedValue({});
+
+      await controller.getWeatherPreview('London', undefined as any);
+
+      expect(mockContentService.getWeatherPreview).toHaveBeenCalledWith('London', 'metric');
+    });
+
+    it('should propagate service errors', async () => {
+      mockContentService.getWeatherPreview.mockRejectedValue(new Error('Weather API failed'));
+
+      await expect(
+        controller.getWeatherPreview('Invalid', 'metric'),
+      ).rejects.toThrow('Weather API failed');
     });
   });
 

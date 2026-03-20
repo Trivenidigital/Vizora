@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, HttpStatus, HttpException, UseGuards, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Body, HttpStatus, HttpException, UseGuards, Logger, BadRequestException } from '@nestjs/common';
 import { DeviceGateway } from '../gateways/device.gateway';
 import { RedisService } from '../services/redis.service';
 import { DatabaseService } from '../database/database.service';
@@ -229,6 +229,27 @@ export class AppController {
     }
 
     return { devicesOnline };
+  }
+
+  @Post('notifications/broadcast')
+  @UseGuards(InternalApiGuard)
+  async broadcastNotification(
+    @Body() data: { organizationId: string; notification: any },
+  ): Promise<PushResponse> {
+    if (!data.organizationId || typeof data.organizationId !== 'string') {
+      throw new BadRequestException('organizationId is required and must be a string');
+    }
+    if (!data.notification || typeof data.notification !== 'object') {
+      throw new BadRequestException('notification is required and must be an object');
+    }
+    this.deviceGateway.server
+      .to(`org:${data.organizationId}`)
+      .emit('notification:new', data.notification);
+    this.logger.log(`Broadcasted notification to org:${data.organizationId}`);
+    return {
+      success: true,
+      message: 'Notification broadcasted to organization',
+    };
   }
 
   @Post('internal/command')

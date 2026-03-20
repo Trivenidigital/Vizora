@@ -1,10 +1,12 @@
 import { NotFoundException } from '@nestjs/common';
+import { of } from 'rxjs';
 import { NotificationsService } from './notifications.service';
 import { DatabaseService } from '../database/database.service';
 
 describe('NotificationsService', () => {
   let service: NotificationsService;
   let db: any;
+  let mockHttpService: any;
 
   const organizationId = 'org-123';
 
@@ -38,7 +40,14 @@ describe('NotificationsService', () => {
       },
     };
 
-    service = new NotificationsService(db as unknown as DatabaseService);
+    mockHttpService = {
+      post: jest.fn().mockReturnValue(of({ data: { success: true } })),
+    };
+
+    service = new NotificationsService(
+      db as unknown as DatabaseService,
+      mockHttpService,
+    );
   });
 
   afterEach(() => {

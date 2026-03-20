@@ -38,6 +38,21 @@ export class WidgetsController {
     return this.contentService.getWidgetTypes();
   }
 
+  @Get('weather/preview')
+  @Roles('admin', 'manager', 'viewer')
+  getWeatherPreview(
+    @Query('location') location: string,
+    @Query('units') units: string = 'metric',
+  ) {
+    // Whitelist units to prevent parameter injection (e.g., "metric&appid=STOLEN")
+    if (!['metric', 'imperial', 'standard'].includes(units)) {
+      units = 'metric';
+    }
+    // Sanitize location to prevent URL injection
+    const sanitizedLocation = encodeURIComponent(location || 'New York');
+    return this.contentService.getWeatherPreview(decodeURIComponent(sanitizedLocation), units);
+  }
+
   @Post()
   @Roles('admin', 'manager')
   createWidget(
