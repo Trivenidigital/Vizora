@@ -10,8 +10,20 @@ declare module './client' {
     updateUser(id: string, data: { firstName?: string; lastName?: string; role?: string; isActive?: boolean }): Promise<User>;
     deactivateUser(id: string): Promise<User>;
     getAuditLogs(params?: { page?: number; limit?: number; action?: string; entityType?: string; userId?: string; startDate?: string; endDate?: string }): Promise<PaginatedResponse<AuditLog>>;
-    exportUserData(): Promise<any>;
+    exportUserData(): Promise<ExportedUserData>;
   }
+}
+
+export interface ExportedUserData {
+  exportDate: string;
+  user: { email: string; firstName: string | null; lastName: string | null; role: string; createdAt: string; updatedAt: string } | null;
+  organization: { name: string; slug: string; subscriptionTier: string | null; createdAt: string } | null;
+  content: { count: number; items: Array<{ id: string; title: string; type: string; status: string; createdAt: string }> };
+  displays: { count: number; items: Array<{ id: string; nickname: string | null; location: string | null; status: string; createdAt: string }> };
+  playlists: { count: number; items: Array<{ id: string; name: string; createdAt: string }> };
+  schedules: { count: number; items: Array<{ id: string; name: string; createdAt: string }> };
+  auditLog: { count: number; entries: Array<{ action: string; entityType: string | null; createdAt: string }> };
+  notifications: { count: number; items: Array<{ type: string; title: string; message: string | null; createdAt: string }> };
 }
 
 ApiClient.prototype.getUsers = async function (params?: { page?: number; limit?: number }): Promise<PaginatedResponse<User>> {
@@ -39,8 +51,8 @@ ApiClient.prototype.deactivateUser = async function (id: string): Promise<User> 
   });
 };
 
-ApiClient.prototype.exportUserData = async function (): Promise<any> {
-  return this.request<any>('/users/me/data-export', {
+ApiClient.prototype.exportUserData = async function (): Promise<ExportedUserData> {
+  return this.request<ExportedUserData>('/users/me/data-export', {
     method: 'POST',
   });
 };
