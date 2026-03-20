@@ -22,6 +22,7 @@ export interface AuthenticatedUser {
   email: string;
   firstName: string | null;
   lastName: string | null;
+  avatar: string | null;
   organizationId: string;
   role: string;
   isSuperAdmin?: boolean;
@@ -100,6 +101,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
           email: userData.email,
           firstName: userData.firstName,
           lastName: userData.lastName,
+          avatar: userData.avatar || null,
           organizationId: userData.organizationId,
           role: userData.role,
           organization: userData.organization,
@@ -134,6 +136,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
+      avatar: user.avatar,
       organizationId: user.organizationId,
       role: user.role,
       isActive: user.isActive,
@@ -146,6 +149,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
+      avatar: user.avatar,
       organizationId: user.organizationId,
       role: user.role,
       organization: safeOrganization,

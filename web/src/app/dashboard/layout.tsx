@@ -155,12 +155,20 @@ export default function DashboardLayout({
                     onClick={() => setUserMenuOpen(!userMenuOpen)}
                     className="hidden sm:flex items-center gap-2 px-3 py-2 bg-[var(--surface-hover)] rounded-lg hover:bg-[var(--border)] transition"
                   >
-                    <div
-                      className="w-8 h-8 bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] rounded-full flex items-center justify-center"
-                      aria-label={`${user.email} avatar`}
-                    >
-                      <span className="text-[#061A21] text-sm font-semibold">{getUserInitials()}</span>
-                    </div>
+                    {user.avatarUrl ? (
+                      <img
+                        src={user.avatarUrl}
+                        alt={`${user.email} avatar`}
+                        className="w-8 h-8 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div
+                        className="w-8 h-8 bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] rounded-full flex items-center justify-center"
+                        aria-label={`${user.email} avatar`}
+                      >
+                        <span className="text-[#061A21] text-sm font-semibold">{getUserInitials()}</span>
+                      </div>
+                    )}
                     <div className="hidden md:block text-left">
                       <div className="text-sm font-medium text-[var(--foreground)]">{getUserDisplayName()}</div>
                       <div className="text-xs text-[var(--foreground-tertiary)]">{user.email}</div>
