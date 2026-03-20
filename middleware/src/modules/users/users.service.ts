@@ -8,6 +8,18 @@ import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 
+interface ExportedUserData {
+  exportDate: string;
+  user: { email: string; firstName: string | null; lastName: string | null; role: string; createdAt: Date; updatedAt: Date } | null;
+  organization: { name: string; slug: string; subscriptionTier: string | null; createdAt: Date } | null;
+  content: { count: number; items: Array<{ id: string; title: string; type: string; status: string; createdAt: Date }> };
+  displays: { count: number; items: Array<{ id: string; nickname: string | null; location: string | null; status: string; createdAt: Date }> };
+  playlists: { count: number; items: Array<{ id: string; name: string; createdAt: Date }> };
+  schedules: { count: number; items: Array<{ id: string; name: string; createdAt: Date }> };
+  auditLog: { count: number; entries: Array<{ action: string; entityType: string | null; createdAt: Date }> };
+  notifications: { count: number; items: Array<{ type: string; title: string; message: string | null; createdAt: Date }> };
+}
+
 @Injectable()
 export class UsersService {
   constructor(
@@ -209,7 +221,7 @@ export class UsersService {
     return deactivatedUser;
   }
 
-  async exportUserData(userId: string, organizationId: string) {
+  async exportUserData(userId: string, organizationId: string): Promise<ExportedUserData> {
     const [user, organization, content, displays, playlists, schedules, auditLogs, notifications] = await Promise.all([
       this.db.user.findUnique({
         where: { id: userId },

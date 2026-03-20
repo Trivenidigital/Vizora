@@ -28,22 +28,36 @@ export class DataRetentionService {
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
 
+    let auditCount = 0;
+    let notifCount = 0;
+    let tokenCount = 0;
+
+    // 1. Purge audit logs older than 90 days
     try {
-      // 1. Purge audit logs older than 90 days
-      const deletedAuditLogs = await this.db.auditLog.deleteMany({
+      const result = await this.db.auditLog.deleteMany({
         where: { createdAt: { lt: ninetyDaysAgo } },
       });
-      this.logger.log(`Purged ${deletedAuditLogs.count} audit logs older than 90 days`);
+      auditCount = result.count;
+      this.logger.log(`Purged ${auditCount} audit logs older than 90 days`);
+    } catch (err) {
+      this.logger.error(`Failed to purge audit logs: ${err instanceof Error ? err.message : err}`);
+    }
 
-      // 2. Purge dismissed notifications older than 30 days
+    // 2. Purge dismissed notifications older than 30 days
+    try {
       const deletedDismissed = await this.db.notification.deleteMany({
         where: {
           dismissedAt: { not: null, lt: thirtyDaysAgo },
         },
       });
+      notifCount += deletedDismissed.count;
       this.logger.log(`Purged ${deletedDismissed.count} dismissed notifications older than 30 days`);
+    } catch (err) {
+      this.logger.error(`Failed to purge dismissed notifications: ${err instanceof Error ? err.message : err}`);
+    }
 
-      // 3. Purge read (non-dismissed) notifications older than 30 days
+    // 3. Purge read (non-dismissed) notifications older than 30 days
+    try {
       const deletedRead = await this.db.notification.deleteMany({
         where: {
           read: true,
@@ -51,20 +65,26 @@ export class DataRetentionService {
           createdAt: { lt: thirtyDaysAgo },
         },
       });
+      notifCount += deletedRead.count;
       this.logger.log(`Purged ${deletedRead.count} read notifications older than 30 days`);
+    } catch (err) {
+      this.logger.error(`Failed to purge read notifications: ${err instanceof Error ? err.message : err}`);
+    }
 
-      // 4. Delete expired password reset tokens
-      const deletedTokens = await this.db.passwordResetToken.deleteMany({
+    // 4. Delete expired password reset tokens
+    try {
+      const result = await this.db.passwordResetToken.deleteMany({
         where: { expiresAt: { lt: now } },
       });
-      this.logger.log(`Purged ${deletedTokens.count} expired password reset tokens`);
-
-      this.logger.log(
-        `Data retention cleanup complete: ${deletedAuditLogs.count} audit logs, ` +
-        `${deletedDismissed.count + deletedRead.count} notifications, ${deletedTokens.count} tokens`,
-      );
-    } catch (error) {
-      this.logger.error('Data retention cleanup failed:', error);
+      tokenCount = result.count;
+      this.logger.log(`Purged ${tokenCount} expired password reset tokens`);
+    } catch (err) {
+      this.logger.error(`Failed to purge expired tokens: ${err instanceof Error ? err.message : err}`);
     }
+
+    this.logger.log(
+      `Data retention cleanup complete: ${auditCount} audit logs, ` +
+      `${notifCount} notifications, ${tokenCount} tokens`,
+    );
   }
 }
