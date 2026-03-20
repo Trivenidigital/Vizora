@@ -27,6 +27,7 @@ const navigation: Array<{ name: string; href: string; icon: IconName; exactMatch
   { name: 'Schedules', href: '/dashboard/schedules', icon: 'schedules' },
   { name: 'Analytics', href: '/dashboard/analytics', icon: 'analytics' },
   { name: 'Settings', href: '/dashboard/settings', icon: 'settings' },
+  { name: 'Help', href: '/dashboard/help', icon: 'help' },
 ];
 
 export default function DashboardLayout({

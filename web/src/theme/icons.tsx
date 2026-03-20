@@ -43,6 +43,7 @@ import {
   Shield,
   LayoutGrid,
   Component,
+  HelpCircle,
 } from 'lucide-react';
 
 export const ICON_SIZES = {
@@ -124,6 +125,7 @@ export const iconMap = {
   key: Key,
   copy: Copy,
   shield: Shield,
+  help: HelpCircle,
 } as const;
 
 export type IconName = keyof typeof iconMap;
