@@ -15,6 +15,7 @@ import type { IconName } from '@/theme/icons';
 import TrialBanner from '@/components/TrialBanner';
 import { SupportChatProvider } from '@/components/support/SupportChatProvider';
 import { SupportChat } from '@/components/support/SupportChat';
+import { useCustomization } from '@/components/providers/CustomizationProvider';
 
 const navigation: Array<{ name: string; href: string; icon: IconName; exactMatch?: boolean }> = [
   { name: 'Overview', href: '/dashboard', icon: 'overview', exactMatch: true },
@@ -38,6 +39,10 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
   const { user, loading: authLoading, logout: handleLogoutAuth } = useAuth();
+  const { brandConfig } = useCustomization();
+  const brandName = brandConfig?.name || 'Vizora';
+  const brandLogo = brandConfig?.logo;
+  const brandInitial = brandName.charAt(0).toUpperCase();
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     if (typeof window !== 'undefined') return window.innerWidth >= 1024;
     return true;
@@ -138,11 +143,15 @@ export default function DashboardLayout({
                 </svg>
               </button>
               <Link href="/dashboard" className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] rounded-lg flex items-center justify-center">
-                  <span className="text-[#061A21] font-bold text-lg">V</span>
-                </div>
+                {brandLogo ? (
+                  <img src={brandLogo} alt={brandName} className="w-8 h-8 rounded-lg object-contain" />
+                ) : (
+                  <div className="w-8 h-8 bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] rounded-lg flex items-center justify-center">
+                    <span className="text-[#061A21] font-bold text-lg">{brandInitial}</span>
+                  </div>
+                )}
                 <h1 className="text-2xl font-bold eh-gradient eh-heading">
-                  Vizora
+                  {brandName}
                 </h1>
               </Link>
             </div>
@@ -267,7 +276,7 @@ export default function DashboardLayout({
               </div>
               <div className="flex justify-between">
                 <span>Platform</span>
-                <span className="font-semibold">Vizora</span>
+                <span className="font-semibold">{brandName}</span>
               </div>
             </div>
           </div>

@@ -59,9 +59,9 @@ export function CustomizationProvider({ children }: { children: React.ReactNode 
           id: org.id,
           name: branding.name || org.name,
           logo: branding.logoUrl,
-          primaryColor: branding.primaryColor || '#0284c7',
-          secondaryColor: branding.secondaryColor || '#38bdf8',
-          accentColor: branding.accentColor || '#0ea5e9',
+          primaryColor: branding.primaryColor || '#00E5A0',
+          secondaryColor: branding.secondaryColor || '#00B4D8',
+          accentColor: branding.accentColor || '#00CC8E',
           fontFamily: branding.fontFamily || 'sans',
           showPoweredBy: branding.showPoweredBy ?? true,
           customDomain: branding.customDomain || '',
@@ -151,10 +151,23 @@ export function CustomizationProvider({ children }: { children: React.ReactNode 
   );
 }
 
+// Default fallback when context is not yet available (pre-hydration)
+const defaultCustomizationContext: CustomizationContextType = {
+  brandConfig: {
+    id: 'default',
+    name: 'Vizora',
+    primaryColor: '#00E5A0',
+    secondaryColor: '#00B4D8',
+    accentColor: '#00CC8E',
+    fontFamily: 'sans',
+    showPoweredBy: true,
+  },
+  updateBrandConfig: () => {},
+  organizationId: null,
+};
+
 export function useCustomization() {
   const context = useContext(CustomizationContext);
-  if (!context) {
-    throw new Error('useCustomization must be used within CustomizationProvider');
-  }
-  return context;
+  // Return default context during SSR / pre-hydration instead of throwing
+  return context ?? defaultCustomizationContext;
 }
