@@ -72,7 +72,9 @@ export class WidgetsController {
       throw new BadRequestException('Invalid Google Sheets URL');
     }
 
-    // SSRF: only allow Google Sheets domain
+    // SSRF protection: hostname allowlist — only allow docs.google.com
+    // Private IP blocking is unnecessary since we validate hostname,
+    // and the fetch URL is server-constructed from the extracted sheet ID
     let parsedUrl: URL;
     try {
       parsedUrl = new URL(sheetUrl);
@@ -80,21 +82,11 @@ export class WidgetsController {
       throw new BadRequestException('Malformed URL');
     }
 
-    const hostname = parsedUrl.hostname.toLowerCase();
-    if (hostname !== 'docs.google.com') {
-      throw new BadRequestException('URL must be a Google Sheets URL (docs.google.com)');
+    if (parsedUrl.hostname !== 'docs.google.com') {
+      throw new BadRequestException('Only Google Sheets URLs are supported');
     }
     if (!['https:', 'http:'].includes(parsedUrl.protocol)) {
       throw new BadRequestException('URL must use HTTPS or HTTP');
-    }
-
-    // SSRF: block private / internal IP patterns (defense-in-depth)
-    const blockedPatterns = [
-      /^localhost$/i, /^127\./, /^10\./, /^172\.(1[6-9]|2\d|3[01])\./,
-      /^192\.168\./, /^0\./, /^169\.254\./, /^::1$/, /^fc00:/i, /^fe80:/i,
-    ];
-    if (blockedPatterns.some(p => p.test(hostname))) {
-      throw new BadRequestException('URL points to a blocked address');
     }
 
     // Extract sheet ID
@@ -122,15 +114,26 @@ export class WidgetsController {
       throw new NotFoundException('Could not fetch sheet data. Ensure the sheet is published to web.');
     }
 
-    const text = await response.text();
-
-    // Enforce 2 MB size limit
-    if (Buffer.byteLength(text, 'utf8') > MAX_SHEET_RESPONSE_BYTES) {
-      throw new BadRequestException('Sheet data exceeds the 2 MB size limit');
+    // Check content-length header first (fast reject)
+    const maxSize = MAX_SHEET_RESPONSE_BYTES;
+    const contentLength = parseInt(response.headers.get('content-length') || '0');
+    if (contentLength > maxSize) {
+      throw new BadRequestException('Sheet data too large (max 2MB)');
     }
 
+    // Read body with byte-level size cap
+    const arrayBuffer = await response.arrayBuffer();
+    if (arrayBuffer.byteLength > maxSize) {
+      throw new BadRequestException('Sheet data too large (max 2MB)');
+    }
+    const text = new TextDecoder().decode(arrayBuffer);
+
     // Google wraps JSON in: google.visualization.Query.setResponse({...})
-    const jsonStr = text.replace(/^[^(]*\(/, '').replace(/\);?\s*$/, '');
+    const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);?\s*$/);
+    if (!match) {
+      throw new BadRequestException('Invalid response format — ensure the sheet is published to web');
+    }
+    const jsonStr = match[1];
     let data: any;
     try {
       data = JSON.parse(jsonStr);

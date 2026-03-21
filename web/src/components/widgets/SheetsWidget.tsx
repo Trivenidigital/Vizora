@@ -2,15 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '@/lib/api';
+import type { SheetData } from '@/lib/api/widgets';
 
-export interface SheetData {
-  sheetId: string;
-  sheetName: string;
-  headers: string[];
-  rows: (string | number)[][];
-  rowCount: number;
-  fetchedAt: string;
-}
+export type { SheetData };
 
 export interface SheetsWidgetProps {
   /** Full Google Sheets URL (must be published to web) */

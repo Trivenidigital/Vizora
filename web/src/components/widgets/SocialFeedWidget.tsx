@@ -32,11 +32,16 @@ export interface SocialFeedWidgetProps {
 // ---------------------------------------------------------------------------
 
 export function detectPlatform(url: string): SocialPlatform {
-  if (url.includes('instagram.com')) return 'instagram';
-  if (url.includes('twitter.com') || url.includes('x.com')) return 'twitter';
-  if (url.includes('tiktok.com')) return 'tiktok';
-  if (url.includes('linkedin.com')) return 'linkedin';
-  return 'other';
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    if (hostname === 'instagram.com' || hostname.endsWith('.instagram.com')) return 'instagram';
+    if (hostname === 'twitter.com' || hostname.endsWith('.twitter.com') || hostname === 'x.com' || hostname.endsWith('.x.com')) return 'twitter';
+    if (hostname === 'tiktok.com' || hostname.endsWith('.tiktok.com')) return 'tiktok';
+    if (hostname === 'linkedin.com' || hostname.endsWith('.linkedin.com')) return 'linkedin';
+    return 'other';
+  } catch {
+    return 'other';
+  }
 }
 
 interface PlatformMeta {
@@ -111,6 +116,15 @@ export function parsePostUrls(text: string): SocialPost[] {
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line.length > 0)
+    .filter((line) => {
+      // Only allow http/https URLs — block javascript:, data:, etc.
+      try {
+        const url = new URL(line);
+        return ['http:', 'https:'].includes(url.protocol);
+      } catch {
+        return false;
+      }
+    })
     .map((url) => ({
       url,
       platform: detectPlatform(url),

@@ -241,7 +241,7 @@ describe('WidgetsController', () => {
     it('should reject a URL whose hostname is not docs.google.com', async () => {
       await expect(
         controller.getSheetData('https://notgoogle.com/docs.google.com/spreadsheets/d/abc123/edit', 'Sheet1'),
-      ).rejects.toThrow('URL must be a Google Sheets URL');
+      ).rejects.toThrow('Only Google Sheets URLs are supported');
     });
 
     it('should reject a URL with no extractable sheet ID', async () => {
@@ -262,9 +262,11 @@ describe('WidgetsController', () => {
       })});`;
 
       const originalFetch = global.fetch;
+      const responseBuffer = new TextEncoder().encode(mockGoogleResponse).buffer;
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
-        text: () => Promise.resolve(mockGoogleResponse),
+        headers: new Headers({ 'content-length': String(responseBuffer.byteLength) }),
+        arrayBuffer: () => Promise.resolve(responseBuffer),
       }) as any;
 
       try {
@@ -279,6 +281,78 @@ describe('WidgetsController', () => {
         expect(result.rows).toEqual([['Widget', 9.99], ['Gadget', 19.99]]);
         expect(result.rowCount).toBe(2);
         expect(result.fetchedAt).toBeDefined();
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+
+    it('should reject oversized responses via content-length header', async () => {
+      const originalFetch = global.fetch;
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        headers: new Headers({ 'content-length': String(3 * 1024 * 1024) }),
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(3 * 1024 * 1024)),
+      }) as any;
+
+      try {
+        await expect(
+          controller.getSheetData('https://docs.google.com/spreadsheets/d/abc123/edit', 'Sheet1'),
+        ).rejects.toThrow('Sheet data too large (max 2MB)');
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+
+    it('should reject oversized responses detected after download', async () => {
+      const originalFetch = global.fetch;
+      const oversized = new ArrayBuffer(2.5 * 1024 * 1024);
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        // No content-length header — size discovered after download
+        headers: new Headers({}),
+        arrayBuffer: () => Promise.resolve(oversized),
+      }) as any;
+
+      try {
+        await expect(
+          controller.getSheetData('https://docs.google.com/spreadsheets/d/abc123/edit', 'Sheet1'),
+        ).rejects.toThrow('Sheet data too large (max 2MB)');
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+
+    it('should reject malformed response that does not match Google wrapper format', async () => {
+      const originalFetch = global.fetch;
+      const badResponse = 'this is not a google visualization response';
+      const responseBuffer = new TextEncoder().encode(badResponse).buffer;
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        headers: new Headers({ 'content-length': String(responseBuffer.byteLength) }),
+        arrayBuffer: () => Promise.resolve(responseBuffer),
+      }) as any;
+
+      try {
+        await expect(
+          controller.getSheetData('https://docs.google.com/spreadsheets/d/abc123/edit', 'Sheet1'),
+        ).rejects.toThrow('Invalid response format');
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+
+    it('should throw NotFoundException when response is not ok', async () => {
+      const originalFetch = global.fetch;
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        headers: new Headers({}),
+      }) as any;
+
+      try {
+        await expect(
+          controller.getSheetData('https://docs.google.com/spreadsheets/d/abc123/edit', 'Sheet1'),
+        ).rejects.toThrow('Could not fetch sheet data');
       } finally {
         global.fetch = originalFetch;
       }
