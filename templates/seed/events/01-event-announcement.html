@@ -3,9 +3,31 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1920, height=1080">
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;700&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeLeft {
+      from { opacity: 0; transform: translateX(40px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes breathe {
+      0%, 100% { opacity: 0.6; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.05); }
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0) rotate(45deg); }
+      50% { transform: translateY(-12px) rotate(45deg); }
+    }
+    @keyframes scaleIn {
+      from { opacity: 0; transform: scale(0.8); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
     body {
       width: 1920px;
       height: 1080px;
@@ -13,134 +35,172 @@
       position: relative;
       font-family: 'Inter', sans-serif;
       background:
-        radial-gradient(ellipse at 20% 50%, rgba(255, 62, 85, 0.35) 0%, transparent 60%),
-        radial-gradient(ellipse at 80% 20%, rgba(255, 165, 0, 0.3) 0%, transparent 55%),
-        radial-gradient(ellipse at 60% 80%, rgba(138, 43, 226, 0.25) 0%, transparent 50%),
-        linear-gradient(135deg, #1a0a2e 0%, #16213e 40%, #0f3460 70%, #1a0a2e 100%);
-      color: #ffffff;
+        /* Diagonal line texture */
+        repeating-linear-gradient(
+          65deg,
+          transparent,
+          transparent 20px,
+          rgba(255,255,255,0.012) 20px,
+          rgba(255,255,255,0.012) 21px
+        ),
+        repeating-linear-gradient(
+          115deg,
+          transparent,
+          transparent 28px,
+          rgba(255,255,255,0.008) 28px,
+          rgba(255,255,255,0.008) 29px
+        ),
+        /* Deep teal gradient */
+        linear-gradient(155deg, #0a2e2e 0%, #0d3b3b 30%, #0a2929 60%, #071f1f 100%);
+      color: #f0f5f0;
     }
 
-    /* CSS dot grid pattern overlay */
+    /* Dot grid texture overlay */
     body::before {
       content: '';
       position: absolute;
       top: 0; left: 0; right: 0; bottom: 0;
-      background-image: radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px);
-      background-size: 30px 30px;
+      background-image: radial-gradient(circle, rgba(218,165,32,0.03) 1px, transparent 1px);
+      background-size: 32px 32px;
       z-index: 0;
     }
 
-    /* Decorative glowing orb top-right */
-    .glow-orb-1 {
+    /* Warm amber glow — top left */
+    body::after {
+      content: '';
       position: absolute;
-      top: -80px;
-      right: 120px;
-      width: 350px;
-      height: 350px;
+      top: -120px; left: -60px;
+      width: 700px; height: 700px;
+      background: radial-gradient(circle, rgba(218,165,32,0.12) 0%, rgba(218,165,32,0.04) 40%, transparent 70%);
       border-radius: 50%;
-      background: radial-gradient(circle, rgba(255, 62, 85, 0.5) 0%, transparent 70%);
-      filter: blur(40px);
-      z-index: 0;
+      z-index: 1;
+      pointer-events: none;
+      animation: breathe 6s ease-in-out infinite;
     }
 
-    /* Decorative glowing orb bottom-left */
-    .glow-orb-2 {
+    /* Secondary glow — bottom right */
+    .glow-br {
       position: absolute;
-      bottom: -60px;
-      left: 80px;
-      width: 280px;
-      height: 280px;
+      bottom: -100px; right: 80px;
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(218,165,32,0.07) 0%, transparent 60%);
       border-radius: 50%;
-      background: radial-gradient(circle, rgba(255, 165, 0, 0.45) 0%, transparent 70%);
-      filter: blur(35px);
-      z-index: 0;
+      z-index: 1;
+      pointer-events: none;
+      animation: breathe 8s ease-in-out 2s infinite;
     }
 
-    /* Decorative glowing orb center */
-    .glow-orb-3 {
+    /* Left sidebar — geometric accent border */
+    .sidebar {
       position: absolute;
-      top: 400px;
-      left: 900px;
-      width: 200px;
-      height: 200px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(138, 43, 226, 0.4) 0%, transparent 70%);
-      filter: blur(30px);
-      z-index: 0;
+      top: 0; left: 0;
+      width: 180px; height: 100%;
+      background:
+        linear-gradient(180deg, rgba(218,165,32,0.1) 0%, rgba(218,165,32,0.04) 50%, rgba(218,165,32,0.1) 100%);
+      border-right: 2px solid rgba(218,165,32,0.3);
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
     }
 
-    /* Ornamental horizontal line */
-    .ornamental-line {
+    /* Repeating diamond pattern in sidebar */
+    .sidebar::before {
+      content: '';
       position: absolute;
-      top: 60px;
-      left: 100px;
-      right: 100px;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, rgba(255, 165, 0, 0.6), rgba(255, 62, 85, 0.6), transparent);
+      top: 0; right: -1px;
+      width: 36px; height: 100%;
+      background:
+        repeating-linear-gradient(
+          180deg,
+          transparent 0px,
+          transparent 30px,
+          rgba(218,165,32,0.2) 30px,
+          rgba(218,165,32,0.2) 32px,
+          transparent 32px,
+          transparent 62px
+        );
+      pointer-events: none;
+    }
+
+    .sidebar::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background:
+        radial-gradient(circle, rgba(218,165,32,0.25) 2.5px, transparent 2.5px);
+      background-size: 28px 56px;
+      background-position: center 0;
+      pointer-events: none;
+    }
+
+    .sidebar-text {
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 20px;
+      letter-spacing: 10px;
+      color: rgba(218,165,32,0.5);
+      text-transform: uppercase;
       z-index: 1;
     }
 
-    .ornamental-line-bottom {
+    /* Vertical midrib line */
+    .midrib {
       position: absolute;
-      bottom: 60px;
-      left: 100px;
-      right: 100px;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, rgba(138, 43, 226, 0.6), rgba(255, 62, 85, 0.6), transparent);
-      z-index: 1;
+      top: 0; bottom: 0;
+      left: 176px;
+      width: 4px;
+      background: linear-gradient(180deg,
+        rgba(218,165,32,0.4) 0%,
+        rgba(218,165,32,0.2) 50%,
+        rgba(218,165,32,0.4) 100%
+      );
+      z-index: 0;
     }
 
-    /* Main grid layout */
-    .layout {
+    /* Main container */
+    .container {
       position: relative;
       z-index: 2;
-      display: grid;
-      grid-template-columns: 1fr 500px;
-      grid-template-rows: auto 1fr auto;
+      margin-left: 180px;
       height: 100%;
-      padding: 90px 120px;
+      display: grid;
+      grid-template-columns: 1fr 460px;
+      grid-template-rows: auto 1fr auto;
+      padding: 60px 80px 50px 70px;
       gap: 40px;
     }
 
-    /* SVG decoration container */
-    .svg-decor {
-      position: absolute;
-      z-index: 1;
-    }
-
-    .svg-top-left {
-      top: 20px;
-      left: 20px;
-    }
-
-    .svg-bottom-right {
-      bottom: 20px;
-      right: 20px;
-      transform: rotate(180deg);
-    }
-
-    /* Top bar: event type label */
+    /* Top bar */
     .top-bar {
       grid-column: 1 / -1;
       display: flex;
       align-items: center;
       justify-content: space-between;
+      padding-bottom: 25px;
+      border-bottom: 1px solid rgba(218,165,32,0.2);
+      animation: fadeUp 0.8s ease-out both;
     }
 
     .event-type {
       font-family: 'Inter', sans-serif;
       font-weight: 700;
-      font-size: 18px;
+      font-size: 16px;
       letter-spacing: 6px;
       text-transform: uppercase;
-      color: rgba(255, 165, 0, 0.9);
+      color: rgba(218,165,32,0.85);
     }
 
     .event-date-top {
       font-family: 'Inter', sans-serif;
       font-weight: 600;
-      font-size: 20px;
-      color: rgba(255, 255, 255, 0.7);
+      font-size: 18px;
+      color: rgba(240,245,240,0.6);
     }
 
     /* Main content area */
@@ -149,113 +209,97 @@
       display: flex;
       flex-direction: column;
       justify-content: center;
-      gap: 30px;
+      gap: 28px;
     }
 
     .event-name {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 120px;
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 96px;
       line-height: 1.0;
-      letter-spacing: 3px;
-      color: #ffffff;
-      text-shadow: 0 0 40px rgba(255, 62, 85, 0.4), 0 4px 20px rgba(0,0,0,0.5);
+      letter-spacing: 2px;
+      color: #f0f5f0;
+      text-shadow: 0 0 50px rgba(218,165,32,0.15), 0 4px 20px rgba(0,0,0,0.4);
+      animation: fadeUp 0.8s ease-out 0.2s both;
     }
 
     .event-tagline {
       font-family: 'Playfair Display', serif;
-      font-size: 36px;
+      font-size: 34px;
       font-weight: 700;
       font-style: italic;
-      color: rgba(255, 165, 0, 0.95);
-      text-shadow: 0 2px 10px rgba(0,0,0,0.4);
+      color: rgba(218,165,32,0.9);
+      text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+      animation: fadeUp 0.8s ease-out 0.4s both;
     }
 
     .event-description {
       font-family: 'Inter', sans-serif;
-      font-size: 24px;
+      font-size: 22px;
       font-weight: 400;
-      line-height: 1.7;
-      color: rgba(255, 255, 255, 0.8);
-      max-width: 750px;
+      line-height: 1.75;
+      color: rgba(240,245,240,0.7);
+      max-width: 720px;
+      animation: fadeUp 0.8s ease-out 0.6s both;
     }
 
-    /* Right sidebar: details card */
+    /* Right sidebar: details cards */
     .details-panel {
       grid-column: 2;
       display: flex;
       flex-direction: column;
       justify-content: center;
-      gap: 24px;
+      gap: 22px;
     }
 
     .detail-card {
-      background: rgba(255, 255, 255, 0.07);
+      background: rgba(218,165,32,0.04);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 20px;
-      padding: 32px 36px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255,255,255,0.1);
+      border: 1px solid rgba(218,165,32,0.15);
+      border-radius: 18px;
+      padding: 28px 32px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04);
+      position: relative;
+      overflow: hidden;
     }
+
+    .detail-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 4px; height: 100%;
+      background: linear-gradient(180deg, #DAA520, #B8860B);
+      border-radius: 4px 0 0 4px;
+    }
+
+    .detail-card:nth-child(1) { animation: fadeLeft 0.7s ease-out 0.3s both; }
+    .detail-card:nth-child(2) { animation: fadeLeft 0.7s ease-out 0.5s both; }
+    .detail-card:nth-child(3) { animation: fadeLeft 0.7s ease-out 0.7s both; }
 
     .detail-card-label {
       font-family: 'Inter', sans-serif;
       font-weight: 700;
-      font-size: 14px;
+      font-size: 13px;
       letter-spacing: 4px;
       text-transform: uppercase;
-      color: rgba(255, 165, 0, 0.8);
+      color: rgba(218,165,32,0.75);
       margin-bottom: 10px;
     }
 
     .detail-card-value {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 40px;
-      letter-spacing: 2px;
-      color: #ffffff;
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 36px;
+      letter-spacing: 1px;
+      color: #f0f5f0;
     }
 
     .detail-card-sub {
       font-family: 'Inter', sans-serif;
-      font-size: 18px;
-      color: rgba(255, 255, 255, 0.6);
+      font-size: 16px;
+      color: rgba(240,245,240,0.55);
       margin-top: 6px;
-    }
-
-    /* Emoji decoration */
-    .emoji-decor {
-      font-size: 160px;
-      filter: drop-shadow(0 0 30px rgba(255, 165, 0, 0.5)) drop-shadow(0 4px 15px rgba(0,0,0,0.4));
-      line-height: 1;
-      position: absolute;
-      bottom: 100px;
-      left: 130px;
-      z-index: 2;
-    }
-
-    /* Ticket accent shape */
-    .ticket-accent {
-      position: absolute;
-      top: 180px;
-      right: 80px;
-      width: 70px;
-      height: 70px;
-      border: 3px solid rgba(255, 62, 85, 0.5);
-      border-radius: 12px;
-      transform: rotate(45deg);
-      z-index: 1;
-    }
-
-    .ticket-accent-2 {
-      position: absolute;
-      top: 210px;
-      right: 110px;
-      width: 40px;
-      height: 40px;
-      border: 2px solid rgba(255, 165, 0, 0.4);
-      border-radius: 8px;
-      transform: rotate(45deg);
-      z-index: 1;
     }
 
     /* Bottom bar */
@@ -264,74 +308,106 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      padding-top: 20px;
+      border-top: 1px solid rgba(218,165,32,0.15);
+      animation: fadeUp 0.8s ease-out 0.9s both;
     }
 
     .cta-text {
       font-family: 'Inter', sans-serif;
       font-weight: 700;
-      font-size: 22px;
-      color: rgba(255, 255, 255, 0.85);
+      font-size: 20px;
+      color: rgba(240,245,240,0.8);
       letter-spacing: 1px;
     }
 
     .website-url {
       font-family: 'Inter', sans-serif;
       font-weight: 600;
-      font-size: 20px;
-      color: rgba(255, 165, 0, 0.9);
+      font-size: 18px;
+      color: rgba(218,165,32,0.85);
     }
 
-    /* Stripe pattern accent */
-    .stripe-accent {
+    /* Geometric floating shapes */
+    .geo-shape {
+      position: absolute;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .geo-diamond-1 {
+      top: 160px;
+      right: 70px;
+      width: 60px; height: 60px;
+      border: 2px solid rgba(218,165,32,0.25);
+      border-radius: 10px;
+      transform: rotate(45deg);
+      animation: float 5s ease-in-out infinite;
+    }
+
+    .geo-diamond-2 {
+      top: 195px;
+      right: 105px;
+      width: 35px; height: 35px;
+      border: 1.5px solid rgba(218,165,32,0.15);
+      border-radius: 6px;
+      transform: rotate(45deg);
+      animation: float 5s ease-in-out 1s infinite;
+    }
+
+    /* Teal accent stripe bottom */
+    .accent-stripe {
       position: absolute;
       bottom: 0;
       left: 0;
       width: 100%;
-      height: 8px;
-      background: repeating-linear-gradient(
-        90deg,
-        #ff3e55 0px,
-        #ff3e55 40px,
-        transparent 40px,
-        transparent 50px,
-        #ffa500 50px,
-        #ffa500 90px,
-        transparent 90px,
-        transparent 100px
-      );
+      height: 5px;
+      background: linear-gradient(90deg, #0d3b3b, #DAA520, #B8860B, #DAA520, #0d3b3b);
       z-index: 3;
+    }
+
+    /* Corner SVG decoration class */
+    .corner-svg {
+      position: absolute;
+      z-index: 3;
+      opacity: 0.25;
     }
   </style>
 </head>
 <body>
-  <!-- Decorative glowing orbs -->
-  <div class="glow-orb-1"></div>
-  <div class="glow-orb-2"></div>
-  <div class="glow-orb-3"></div>
+  <div class="glow-br"></div>
+  <div class="midrib"></div>
 
-  <!-- Ornamental lines -->
-  <div class="ornamental-line"></div>
-  <div class="ornamental-line-bottom"></div>
+  <!-- Geometric floating shapes -->
+  <div class="geo-shape geo-diamond-1"></div>
+  <div class="geo-shape geo-diamond-2"></div>
 
   <!-- SVG corner decorations -->
-  <svg class="svg-decor svg-top-left" width="80" height="80" viewBox="0 0 80 80" fill="none">
-    <path d="M0 40 L0 0 L40 0" stroke="rgba(255,165,0,0.5)" stroke-width="2" fill="none"/>
-    <circle cx="4" cy="4" r="3" fill="rgba(255,62,85,0.7)"/>
+  <svg class="corner-svg" style="top:18px;right:18px;" width="70" height="70" viewBox="0 0 70 70" fill="none">
+    <path d="M65 5 L65 35 Q65 5 35 5" stroke="#DAA520" stroke-width="2" fill="none"/>
+    <path d="M55 15 L55 28 Q55 15 42 15" stroke="#DAA520" stroke-width="1" fill="none"/>
+    <circle cx="62" cy="8" r="3" fill="#DAA520"/>
   </svg>
-  <svg class="svg-decor svg-bottom-right" width="80" height="80" viewBox="0 0 80 80" fill="none">
-    <path d="M0 40 L0 0 L40 0" stroke="rgba(255,165,0,0.5)" stroke-width="2" fill="none"/>
-    <circle cx="4" cy="4" r="3" fill="rgba(255,62,85,0.7)"/>
+  <svg class="corner-svg" style="bottom:18px;left:190px;" width="70" height="70" viewBox="0 0 70 70" fill="none">
+    <path d="M5 65 L5 35 Q5 65 35 65" stroke="#DAA520" stroke-width="2" fill="none"/>
+    <path d="M15 55 L15 42 Q15 55 28 55" stroke="#DAA520" stroke-width="1" fill="none"/>
+    <circle cx="8" cy="62" r="3" fill="#DAA520"/>
   </svg>
 
-  <!-- Ticket accent shapes -->
-  <div class="ticket-accent"></div>
-  <div class="ticket-accent-2"></div>
+  <!-- Inline SVG: geometric star burst replacing emoji -->
+  <svg style="position:absolute;bottom:90px;left:40px;z-index:3;opacity:0.3;" width="90" height="90" viewBox="0 0 90 90" fill="none">
+    <path d="M45 5 L49 36 L80 22 L55 45 L80 68 L49 54 L45 85 L41 54 L10 68 L35 45 L10 22 L41 36 Z" stroke="#DAA520" stroke-width="1.5" fill="none"/>
+    <circle cx="45" cy="45" r="6" fill="rgba(218,165,32,0.3)"/>
+    <circle cx="45" cy="45" r="16" stroke="rgba(218,165,32,0.15)" stroke-width="1" fill="none"/>
+  </svg>
 
-  <!-- Emoji decoration -->
-  <div class="emoji-decor">&#127881;</div>
+  <!-- Left sidebar -->
+  <div class="sidebar">
+    <span class="sidebar-text">EVENT</span>
+  </div>
 
   <!-- Main layout grid -->
-  <div class="layout">
+  <div class="container">
     <!-- Top bar -->
     <div class="top-bar">
       <span class="event-type" data-editable="true" data-field="eventType">Live Event</span>
@@ -371,7 +447,7 @@
     </div>
   </div>
 
-  <!-- Bottom stripe accent -->
-  <div class="stripe-accent"></div>
+  <!-- Bottom accent stripe -->
+  <div class="accent-stripe"></div>
 </body>
 </html>
