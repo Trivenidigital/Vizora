@@ -22,7 +22,7 @@ export interface Content {
   type: 'image' | 'video' | 'pdf' | 'url' | 'html' | 'template';
   url?: string;
   thumbnailUrl?: string;
-  status: 'ready' | 'processing' | 'error' | 'active' | 'archived';
+  status: 'ready' | 'processing' | 'error' | 'active' | 'archived' | 'flagged' | 'rejected';
   duration?: number;
   metadata?: Record<string, any>;
   folderId?: string;

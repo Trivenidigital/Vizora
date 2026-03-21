@@ -96,6 +96,8 @@ export default function FooterSection({ footerRef }: FooterSectionProps) {
               {[
                 { href: '/privacy', label: 'Privacy Policy' },
                 { href: '/terms', label: 'Terms of Service' },
+                { href: '/refund', label: 'Refund Policy' },
+                { href: '/sla', label: 'SLA' },
               ].map((l) => (
                 <li key={l.href}>
                   <Link href={l.href} className="text-sm transition-colors hover:text-[#F0ECE8]" style={{ color: '#6B655D' }}>

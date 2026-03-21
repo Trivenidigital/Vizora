@@ -15,6 +15,9 @@ declare module './client' {
     getContentDownloadUrl(id: string, expirySeconds?: number): Promise<{ url: string; expiresIn: number }>;
     generateThumbnail(contentId: string): Promise<{ thumbnail: string }>;
     uploadContentWithProgress(data: { title: string; type: string; file: File | Blob }, onProgress?: (percent: number) => void): Promise<Content>;
+    // Content Moderation
+    flagContent(id: string, reason?: string): Promise<Content>;
+    reviewContent(id: string, action: 'approve' | 'reject', reason?: string): Promise<Content>;
     // Content Folders
     getFolders(params?: { format?: 'flat' | 'tree' }): Promise<ContentFolder[]>;
     getFolder(id: string): Promise<ContentFolder>;
@@ -154,6 +157,20 @@ ApiClient.prototype.deleteContent = async function (id: string): Promise<void> {
 ApiClient.prototype.archiveContent = async function (id: string): Promise<Content> {
   return this.request<Content>(`/content/${id}/archive`, {
     method: 'POST',
+  });
+};
+
+ApiClient.prototype.flagContent = async function (id: string, reason?: string): Promise<Content> {
+  return this.request<Content>(`/content/${id}/flag`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+};
+
+ApiClient.prototype.reviewContent = async function (id: string, action: 'approve' | 'reject', reason?: string): Promise<Content> {
+  return this.request<Content>(`/content/${id}/review`, {
+    method: 'POST',
+    body: JSON.stringify({ action, reason }),
   });
 };
 

@@ -5,6 +5,20 @@ import type {
 } from '../types';
 import { ApiClient } from './client';
 
+export interface RssFeedItem {
+  title: string;
+  link: string;
+  description: string;
+  pubDate: string | null;
+  imageUrl: string | null;
+}
+
+export interface RssFeedData {
+  feedTitle: string;
+  items: RssFeedItem[];
+  fetchedAt: string;
+}
+
 export interface WeatherData {
   current: {
     temp: number;
@@ -37,6 +51,7 @@ declare module './client' {
     updateWidget(id: string, data: Partial<Widget>): Promise<Widget>;
     refreshWidget(id: string): Promise<Widget>;
     getWeatherData(location: string, units?: string): Promise<WeatherData>;
+    getRssFeed(url: string, limit?: number): Promise<RssFeedData>;
     getLayoutPresets(): Promise<LayoutPreset[]>;
     createLayout(data: { name: string; layoutType: string; zones?: LayoutZone[]; description?: string }): Promise<Layout>;
     updateLayout(id: string, data: Partial<Layout>): Promise<Layout>;
@@ -71,6 +86,11 @@ ApiClient.prototype.refreshWidget = async function (id: string): Promise<Widget>
 ApiClient.prototype.getWeatherData = async function (location: string, units: string = 'metric'): Promise<WeatherData> {
   const params = new URLSearchParams({ location, units });
   return this.request<WeatherData>(`/content/widgets/weather/preview?${params.toString()}`);
+};
+
+ApiClient.prototype.getRssFeed = async function (url: string, limit: number = 10): Promise<RssFeedData> {
+  const params = new URLSearchParams({ url, limit: String(limit) });
+  return this.request<RssFeedData>(`/content/widgets/rss/preview?${params.toString()}`);
 };
 
 ApiClient.prototype.getLayoutPresets = async function (): Promise<LayoutPreset[]> {

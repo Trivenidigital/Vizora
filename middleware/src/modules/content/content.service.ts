@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma } from '@vizora/database';
 import { DatabaseService } from '../database/database.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateContentDto } from './dto/create-content.dto';
 import { UpdateContentDto } from './dto/update-content.dto';
 import { CreateTemplateDto } from './dto/create-template.dto';
@@ -70,6 +71,7 @@ export class ContentService {
     private readonly storageQuotaService: StorageQuotaService,
     private readonly storageService: StorageService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   // Map database content to API response format
@@ -103,7 +105,7 @@ export class ContentService {
 
     // Validate filter values - only allow whitelisted values
     const validTypes = ['image', 'video', 'url', 'html', 'pdf', 'template', 'layout', 'widget'];
-    const validStatuses = ['active', 'archived', 'draft'];
+    const validStatuses = ['active', 'archived', 'draft', 'flagged', 'rejected'];
     const validOrientations = ['landscape', 'portrait', 'both'];
 
     const where: Prisma.ContentWhereInput = { organizationId };
@@ -693,6 +695,198 @@ export class ContentService {
     });
 
     return { updated: result.count };
+  }
+
+  // ============================================================================
+  // CONTENT MODERATION
+  // ============================================================================
+
+  /**
+   * Flag content for review. Any authenticated user in the org can flag content.
+   * Stores moderation metadata in the JSON metadata field and sets status to 'flagged'.
+   */
+  async flagContent(
+    organizationId: string,
+    id: string,
+    flaggedBy: string,
+    reason?: string,
+  ) {
+    const content = await this.findOne(organizationId, id);
+
+    if (content.status === 'flagged') {
+      throw new BadRequestException('Content is already flagged for review');
+    }
+    if (content.status === 'archived' || content.status === 'rejected') {
+      throw new BadRequestException('Cannot flag archived or rejected content');
+    }
+
+    const existingMetadata = (content.metadata || {}) as Record<string, unknown>;
+    const moderationMetadata = {
+      ...existingMetadata,
+      moderation: {
+        flagged: true,
+        flaggedBy,
+        flaggedAt: new Date().toISOString(),
+        flagReason: reason || null,
+        previousStatus: content.status,
+      },
+    };
+
+    const result = await this.db.content.updateMany({
+      where: { id, organizationId },
+      data: {
+        status: 'flagged',
+        metadata: moderationMetadata as Prisma.InputJsonValue,
+      },
+    });
+
+    if (result.count === 0) {
+      throw new NotFoundException('Content not found');
+    }
+
+    const updated = await this.db.content.findUnique({ where: { id } });
+
+    // Notify org admins about flagged content
+    try {
+      await this.notificationsService.create({
+        title: 'Content flagged for review',
+        message: `Content "${content.name}" has been flagged for review${reason ? `: ${reason}` : ''}`,
+        type: 'system',
+        severity: 'warning',
+        organizationId,
+        metadata: { contentId: id, flaggedBy, reason },
+      });
+    } catch (error) {
+      this.logger.warn(`Failed to create flag notification: ${error}`);
+    }
+
+    this.eventEmitter.emit('content.flagged', {
+      action: 'flagged',
+      entityType: 'content',
+      entityId: id,
+      organizationId,
+    });
+
+    return this.mapContentResponse(updated);
+  }
+
+  /**
+   * Review flagged content: approve (restore to previous status) or reject (archive + remove from playlists).
+   * Only admins and managers can review content.
+   */
+  async reviewContent(
+    organizationId: string,
+    id: string,
+    reviewedBy: string,
+    action: 'approve' | 'reject',
+    reason?: string,
+  ) {
+    const content = await this.findOne(organizationId, id);
+
+    if (content.status !== 'flagged') {
+      throw new BadRequestException('Only flagged content can be reviewed');
+    }
+
+    const existingMetadata = (content.metadata || {}) as Record<string, unknown>;
+    const moderation = (existingMetadata.moderation || {}) as Record<string, unknown>;
+
+    if (action === 'approve') {
+      // Restore to the status the content had before it was flagged
+      const previousStatus = (moderation.previousStatus as string) || 'active';
+
+      const approvedMetadata = {
+        ...existingMetadata,
+        moderation: {
+          ...moderation,
+          flagged: false,
+          reviewedBy,
+          reviewedAt: new Date().toISOString(),
+          reviewAction: 'approved',
+          reviewReason: reason || null,
+        },
+      };
+
+      const result = await this.db.content.updateMany({
+        where: { id, organizationId },
+        data: {
+          status: previousStatus,
+          metadata: approvedMetadata as Prisma.InputJsonValue,
+        },
+      });
+
+      if (result.count === 0) {
+        throw new NotFoundException('Content not found');
+      }
+
+      const updated = await this.db.content.findUnique({ where: { id } });
+
+      this.eventEmitter.emit('content.approved', {
+        action: 'approved',
+        entityType: 'content',
+        entityId: id,
+        organizationId,
+      });
+
+      return this.mapContentResponse(updated);
+    }
+
+    // action === 'reject'
+    // Reject the content and remove from org playlists
+    const rejectedMetadata = {
+      ...existingMetadata,
+      moderation: {
+        ...moderation,
+        flagged: false,
+        reviewedBy,
+        reviewedAt: new Date().toISOString(),
+        reviewAction: 'rejected',
+        reviewReason: reason || null,
+      },
+    };
+
+    await this.db.$transaction(async (tx) => {
+      // Remove from playlists within the same organization only
+      await tx.playlistItem.deleteMany({
+        where: {
+          contentId: id,
+          playlist: { organizationId },
+        },
+      });
+
+      // Set status to rejected
+      await tx.content.updateMany({
+        where: { id, organizationId },
+        data: {
+          status: 'rejected',
+          metadata: rejectedMetadata as Prisma.InputJsonValue,
+        },
+      });
+    });
+
+    const updated = await this.db.content.findUnique({ where: { id } });
+
+    // Notify that content was rejected
+    try {
+      await this.notificationsService.create({
+        title: 'Content rejected',
+        message: `Content "${content.name}" has been rejected and removed from playlists${reason ? `: ${reason}` : ''}`,
+        type: 'system',
+        severity: 'info',
+        organizationId,
+        metadata: { contentId: id, reviewedBy, reason },
+      });
+    } catch (error) {
+      this.logger.warn(`Failed to create rejection notification: ${error}`);
+    }
+
+    this.eventEmitter.emit('content.rejected', {
+      action: 'rejected',
+      entityType: 'content',
+      entityId: id,
+      organizationId,
+    });
+
+    return this.mapContentResponse(updated);
   }
 
   // ============================================================================
