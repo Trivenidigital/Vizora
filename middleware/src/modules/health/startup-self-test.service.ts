@@ -39,8 +39,8 @@ export interface SelfTestResult {
 
 // Strict allowlist for table existence checks — prevents any injection via $queryRawUnsafe
 const CRITICAL_TABLES = new Set([
-  'Organization', 'User', 'Display', 'Content',
-  'Playlist', 'Schedule', 'Notification', 'Plan',
+  'organizations', 'users', 'devices', 'content',
+  'playlists', 'schedules', 'notifications', 'plans',
 ]);
 
 // Minimum cooldown between self-test runs (60 seconds)
@@ -279,7 +279,7 @@ export class StartupSelfTestService implements OnApplicationBootstrap {
     const start = Date.now();
     try {
       const result = await this.db.$queryRaw<[{ count: bigint }]>`
-        SELECT COUNT(*) as count FROM "Template" WHERE "isSystem" = true
+        SELECT COUNT(*) as count FROM "Content" WHERE "isGlobal" = true AND "type" = 'template'
       `;
       const count = Number(result[0]?.count ?? 0);
 
