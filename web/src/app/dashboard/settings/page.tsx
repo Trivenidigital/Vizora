@@ -160,9 +160,9 @@ export default function SettingsPage() {
    const file = e.target.files?.[0];
    if (!file) return;
 
-   const allowedTypes = ['image/jpeg', 'image/png', 'image/svg+xml'];
+   const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
    if (!allowedTypes.includes(file.type)) {
-     toast.error('Only PNG, JPEG, and SVG logos are allowed');
+     toast.error('Only PNG, JPEG, and WebP logos are allowed');
      return;
    }
    if (file.size > 1024 * 1024) {
@@ -633,12 +633,12 @@ export default function SettingsPage() {
            )}
          </div>
          <p className="text-xs text-[var(--foreground-tertiary)]">
-           PNG, JPEG, or SVG. Max 1MB. Recommended: 256x256px.
+           PNG, JPEG, or WebP. Max 1MB. Recommended: 256x256px.
          </p>
          <input
            ref={logoInputRef}
            type="file"
-           accept="image/png,image/jpeg,image/svg+xml"
+           accept="image/png,image/jpeg,image/webp"
            onChange={handleLogoSelect}
            className="hidden"
          />

@@ -7,6 +7,7 @@ import {
   BadRequestException,
   HttpException,
   HttpStatus,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { DatabaseService } from '../database/database.service';
@@ -149,31 +150,46 @@ export class AuthService {
   }
 
   async googleLogin(credential: string) {
-    // Verify Google ID token via Google's tokeninfo endpoint
-    let payload: { email?: string; email_verified?: string; given_name?: string; family_name?: string; name?: string; aud?: string };
+    // C2: Validate audience — MANDATORY. Must be checked before any processing.
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      throw new ServiceUnavailableException('Google OAuth is not configured');
+    }
+
+    // C1: Decode Google ID token locally (standard JWT) instead of HTTP roundtrip to Google
+    let payload: { email?: string; email_verified?: boolean; given_name?: string; family_name?: string; name?: string; aud?: string; exp?: number; iss?: string };
     try {
-      const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
-      if (!response.ok) {
-        throw new UnauthorizedException('Invalid Google token');
+      const parts = credential.split('.');
+      if (parts.length !== 3) {
+        throw new UnauthorizedException('Invalid token format');
       }
-      payload = await response.json();
+
+      const header = JSON.parse(Buffer.from(parts[0], 'base64url').toString());
+      payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
     } catch (error) {
       if (error instanceof UnauthorizedException) throw error;
-      this.logger.error(`Google token verification failed: ${error instanceof Error ? error.message : 'Unknown'}`);
+      if (error instanceof ServiceUnavailableException) throw error;
+      this.logger.error(`Google token decode failed: ${error instanceof Error ? error.message : 'Unknown'}`);
       throw new UnauthorizedException('Failed to verify Google token');
     }
 
-    if (!payload.email) {
-      throw new UnauthorizedException('Google token missing email');
+    // Validate required fields
+    if (!payload.email || !payload.email_verified) {
+      throw new UnauthorizedException('Email not verified by Google');
     }
 
-    if (payload.email_verified !== 'true') {
-      throw new UnauthorizedException('Google email not verified');
+    // Validate expiry
+    if (payload.exp && payload.exp * 1000 < Date.now()) {
+      throw new UnauthorizedException('Google token has expired');
     }
 
-    // Optionally validate audience matches our client ID
-    const googleClientId = process.env.GOOGLE_CLIENT_ID;
-    if (googleClientId && payload.aud !== googleClientId) {
+    // Validate issuer
+    if (!['accounts.google.com', 'https://accounts.google.com'].includes(payload.iss || '')) {
+      throw new UnauthorizedException('Invalid token issuer');
+    }
+
+    // C2: Validate audience matches our client ID
+    if (payload.aud !== clientId) {
       throw new UnauthorizedException('Google token audience mismatch');
     }
 
@@ -185,6 +201,13 @@ export class AuthService {
 
     if (user && !user.isActive) {
       throw new ForbiddenException('Account is inactive. Contact support.');
+    }
+
+    // C3: Prevent account takeover — don't merge OAuth into password accounts
+    if (user && user.passwordHash && user.passwordHash !== '') {
+      throw new UnauthorizedException(
+        'This email is registered with a password. Please use email/password login, or reset your password first.',
+      );
     }
 
     let isNewUser = false;

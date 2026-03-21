@@ -1,4 +1,5 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ForbiddenException, CanActivate, ExecutionContext, SetMetadata } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { DatabaseService } from '../database/database.service';
 
 /**
@@ -93,5 +94,40 @@ export class FeatureFlagService {
 
     // Return the full merged flags
     return this.getFlags(orgId);
+  }
+}
+
+/**
+ * Decorator to mark a route as requiring a specific feature flag.
+ * Usage: @RequiresFeature('advancedAnalytics')
+ */
+export const FEATURE_KEY = 'requiredFeature';
+export const RequiresFeature = (feature: string) => SetMetadata(FEATURE_KEY, feature);
+
+/**
+ * Guard that checks if a feature flag is enabled for the requesting user's organization.
+ * If no @RequiresFeature() decorator is present, the guard passes through.
+ * If the user has no organizationId, the guard passes through (no org context).
+ */
+@Injectable()
+export class FeatureFlagGuard implements CanActivate {
+  constructor(
+    private reflector: Reflector,
+    private featureFlagService: FeatureFlagService,
+  ) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const feature = this.reflector.get<string>(FEATURE_KEY, context.getHandler());
+    if (!feature) return true; // No feature requirement
+
+    const request = context.switchToHttp().getRequest();
+    const orgId = request.user?.organizationId;
+    if (!orgId) return true; // No org context
+
+    const enabled = await this.featureFlagService.isEnabled(orgId, feature);
+    if (!enabled) {
+      throw new ForbiddenException(`Feature '${feature}' is not enabled for your organization`);
+    }
+    return true;
   }
 }

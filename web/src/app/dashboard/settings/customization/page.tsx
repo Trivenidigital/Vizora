@@ -40,9 +40,9 @@ export default function CustomizationPage() {
  const file = e.target.files?.[0];
  if (!file || !organizationId) return;
 
- const allowedTypes = ['image/png', 'image/jpeg', 'image/svg+xml'];
+ const allowedTypes = ['image/png', 'image/jpeg', 'image/webp'];
  if (!allowedTypes.includes(file.type)) {
-   setLogoUploadError('Only PNG, JPEG, and SVG files are allowed');
+   setLogoUploadError('Only PNG, JPEG, and WebP files are allowed');
    return;
  }
 
@@ -134,7 +134,7 @@ export default function CustomizationPage() {
  <input
  ref={fileInputRef}
  type="file"
- accept="image/png,image/jpeg,image/svg+xml"
+ accept="image/png,image/jpeg,image/webp"
  onChange={handleLogoUpload}
  className="flex-1 text-sm text-[var(--foreground)] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[var(--surface-hover)] file:text-[var(--foreground)] hover:file:bg-[var(--border)]"
  disabled={logoUploading || !organizationId}
@@ -147,7 +147,7 @@ export default function CustomizationPage() {
    <p className="text-xs text-red-500 mt-1">{logoUploadError}</p>
  )}
  <p className="text-xs text-[var(--foreground-secondary)] mt-1">
- PNG, JPEG, or SVG. Max 2MB.
+ PNG, JPEG, or WebP. Max 2MB.
  </p>
  </div>
 
