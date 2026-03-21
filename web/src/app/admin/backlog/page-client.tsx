@@ -81,6 +81,10 @@ const completed: BacklogItem[] = [
   { id: '37', title: 'Per-organization feature flags — 8 toggleable features (Q2)', status: 'FIXED', notes: '2026-03-21' },
   { id: '38', title: 'Google Sheets data source integration — published sheets proxy (M3)', status: 'FIXED', notes: '2026-03-21' },
   { id: '39', title: 'Social media feed widget — Instagram, Twitter, TikTok, LinkedIn (Q4)', status: 'FIXED', notes: '2026-03-21' },
+  { id: '40', title: 'SVG icon set for templates — 31 professional icons replacing emojis', status: 'FIXED', notes: '2026-03-21' },
+  { id: '41', title: 'CSS animation library — 18 signage animation classes (entrance, ambient, attention)', status: 'FIXED', notes: '2026-03-21' },
+  { id: '42', title: 'Template quality upgrade — Retail (3 templates: big-sale, flash-sale, bogo)', status: 'FIXED', notes: '2026-03-21' },
+  { id: '43', title: 'Template quality upgrade — Events (3 templates: announcement, conference, speaker)', status: 'FIXED', notes: '2026-03-21' },
 ];
 
 const sections: Section[] = [
@@ -342,7 +346,7 @@ export default function BacklogClient() {
       <div>
         <h1 className="text-3xl font-bold text-[var(--foreground)]">Project Backlog</h1>
         <p className="mt-1 text-[var(--foreground-secondary)]">
-          Last updated: 2026-03-21 &middot; Production readiness: ~95%
+          Last updated: 2026-03-21 &middot; Production readiness: ~96% &middot; Deployed
         </p>
       </div>
 
