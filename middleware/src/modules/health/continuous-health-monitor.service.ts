@@ -347,7 +347,7 @@ export class ContinuousHealthMonitorService {
     try {
       // Internal health proxy — just measure DB query time for notification counts
       const result = await this.db.$queryRaw<[{ count: bigint }]>`
-        SELECT COUNT(*) as count FROM "Notification" WHERE "read" = false LIMIT 1
+        SELECT COUNT(*) as count FROM "notifications" WHERE "read" = false LIMIT 1
       `;
       const ms = Date.now() - start;
       void result; // We don't care about the count, just the latency
