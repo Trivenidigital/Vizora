@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vizora — Agent Catalog</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --text: #1a1a2e;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --accent: #00E5A0;
+      --accent-dark: #00b37d;
+      --accent-light: #ecfdf5;
+      --surface: #f8fafc;
+      --card-bg: #ffffff;
+      --code-bg: #f1f5f9;
+      --header-bg: #061A21;
+      --header-text: #ffffff;
+      --support-color: #8b5cf6;
+      --support-bg: #f5f3ff;
+      --validator-color: #0ea5e9;
+      --validator-bg: #f0f9ff;
+      --tag-read: #16a34a;
+      --tag-bash: #ea580c;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--surface); color: var(--text); line-height: 1.6; }
+
+    .header { background: var(--header-bg); color: var(--header-text); padding: 2rem 0; border-bottom: 3px solid var(--accent); }
+    .header-inner { max-width: 1100px; margin: 0 auto; padding: 0 2rem; }
+    .header h1 { font-size: 2rem; font-weight: 700; }
+    .header h1 span { color: var(--accent); }
+    .header p { color: #94a3b8; margin-top: 0.5rem; font-size: 1rem; }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 2rem; }
+
+    .stats-bar { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 2rem; }
+    .stat { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.5rem; flex: 1; min-width: 150px; }
+    .stat-value { font-size: 1.75rem; font-weight: 700; color: var(--accent-dark); }
+    .stat-label { font-size: 0.85rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+    .section { margin-bottom: 2.5rem; }
+    .section-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 2px solid var(--border); }
+    .section-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; color: white; flex-shrink: 0; }
+    .section-icon.support { background: var(--support-color); }
+    .section-icon.validator { background: var(--validator-color); }
+    .section-title { font-size: 1.25rem; font-weight: 600; }
+    .section-desc { font-size: 0.9rem; color: var(--muted); }
+    .section-badge { font-size: 0.75rem; background: var(--code-bg); color: var(--muted); padding: 0.2rem 0.6rem; border-radius: 12px; font-weight: 500; }
+
+    .agent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem; }
+
+    .agent-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; transition: box-shadow 0.2s, border-color 0.2s; }
+    .agent-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-color: var(--accent); }
+    .agent-card.support { border-left: 3px solid var(--support-color); }
+    .agent-card.validator { border-left: 3px solid var(--validator-color); }
+
+    .agent-name { font-size: 1.05rem; font-weight: 600; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.5rem; }
+    .agent-name code { font-size: 0.8rem; font-family: 'SF Mono', 'Cascadia Code', monospace; background: var(--code-bg); padding: 0.15rem 0.5rem; border-radius: 4px; color: var(--muted); }
+    .agent-desc { font-size: 0.9rem; color: var(--muted); margin-bottom: 0.75rem; line-height: 1.5; }
+    .agent-meta { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    .tool-tag { font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 4px; font-weight: 500; font-family: 'SF Mono', 'Cascadia Code', monospace; }
+    .tool-tag.read { background: #f0fdf4; color: var(--tag-read); border: 1px solid #bbf7d0; }
+    .tool-tag.bash { background: #fff7ed; color: var(--tag-bash); border: 1px solid #fed7aa; }
+    .tool-tag.grep { background: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd; }
+    .tool-tag.glob { background: #faf5ff; color: #7c3aed; border: 1px solid #ddd6fe; }
+
+    .workflow-section { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; margin-bottom: 2rem; }
+    .workflow-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; }
+    .workflow-steps { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+    .workflow-step { background: var(--code-bg); padding: 0.4rem 0.8rem; border-radius: 6px; font-size: 0.85rem; font-weight: 500; white-space: nowrap; }
+    .workflow-step.highlight { background: var(--accent-light); color: var(--accent-dark); border: 1px solid var(--accent); }
+    .workflow-arrow { color: var(--muted); font-size: 0.9rem; }
+
+    .file-path { font-family: 'SF Mono', 'Cascadia Code', monospace; font-size: 0.8rem; color: var(--muted); background: var(--code-bg); padding: 0.15rem 0.5rem; border-radius: 4px; }
+
+    .info-box { background: var(--accent-light); border: 1px solid var(--accent); border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 2rem; font-size: 0.9rem; }
+    .info-box strong { color: var(--accent-dark); }
+
+    .footer { text-align: center; padding: 2rem; color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--border); margin-top: 2rem; }
+
+    @media (max-width: 768px) {
+      .agent-grid { grid-template-columns: 1fr; }
+      .stats-bar { flex-direction: column; }
+      .workflow-steps { flex-direction: column; align-items: flex-start; }
+      .workflow-arrow { transform: rotate(90deg); }
+      .two-col-grid { grid-template-columns: 1fr !important; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <h1><span>Vizora</span> Agent Catalog</h1>
+    <p>All Claude Code subagents available in the Vizora platform</p>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Stats -->
+  <div class="stats-bar">
+    <div class="stat">
+      <div class="stat-value">8</div>
+      <div class="stat-label">Total Agents</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">2</div>
+      <div class="stat-label">Agent Systems</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">2</div>
+      <div class="stat-label">Slash Commands</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">30</div>
+      <div class="stat-label">Validation Rules</div>
+    </div>
+  </div>
+
+  <div class="info-box">
+    <strong>Orchestrated via Claude Code skills.</strong> Agents are invoked through slash commands (<code>/support</code>, <code>/validate</code>). Validator agents are read-only (GET requests only). Support subagents are read-only during analysis; implementation only proceeds after explicit developer approval.
+  </div>
+
+  <!-- ─── Support Agent System ──────────────────────────────────── -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon support">S</div>
+      <div>
+        <div class="section-title">Support Agent System</div>
+        <div class="section-desc">Turns support requests into planned code changes &mdash; never auto-implements</div>
+      </div>
+      <span class="section-badge">3 agents &middot; 3 reference files</span>
+    </div>
+
+    <div class="workflow-section">
+      <div class="workflow-title">Workflow: <code>/support "description"</code></div>
+      <div class="workflow-steps">
+        <div class="workflow-step highlight">request-analyzer</div>
+        <div class="workflow-arrow">&rarr;</div>
+        <div class="workflow-step highlight">code-scout</div>
+        <div class="workflow-arrow">&rarr;</div>
+        <div class="workflow-step highlight">plan-writer</div>
+        <div class="workflow-arrow">&rarr;</div>
+        <div class="workflow-step" style="background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; font-weight: 600;">STOP: Approval</div>
+        <div class="workflow-arrow">&rarr;</div>
+        <div class="workflow-step">Implement + Commit</div>
+        <div class="workflow-arrow">&rarr;</div>
+        <div class="workflow-step">Verify Tests</div>
+      </div>
+      <div style="margin-top: 0.75rem; font-size: 0.85rem; color: var(--muted);">
+        Core principle: <strong style="color: #dc2626;">Every change requires explicit developer approval.</strong> If feedback is given, plan is revised and re-presented.
+      </div>
+    </div>
+
+    <!-- Support Reference Files -->
+    <div style="background: var(--support-bg); border: 1px solid #ddd6fe; border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1rem; font-size: 0.85rem;">
+      <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--support-color);">Skill &amp; Reference Files</div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem;">
+        <div><span class="file-path">.claude/skills/support-agent/SKILL.md</span> <span style="color: var(--muted);">&mdash; orchestration</span></div>
+        <div><span class="file-path">.claude/commands/support.md</span> <span style="color: var(--muted);">&mdash; slash command</span></div>
+        <div><span class="file-path">.claude/skills/support-agent/request-classifier.md</span> <span style="color: var(--muted);">&mdash; classification patterns</span></div>
+        <div><span class="file-path">.claude/skills/support-agent/codebase-navigator.md</span> <span style="color: var(--muted);">&mdash; search strategies</span></div>
+        <div><span class="file-path">.claude/skills/support-agent/plan-generator.md</span> <span style="color: var(--muted);">&mdash; plan template</span></div>
+      </div>
+    </div>
+
+    <div class="agent-grid">
+
+      <div class="agent-card support">
+        <div class="agent-name">
+          Request Analyzer
+          <code>request-analyzer</code>
+        </div>
+        <div class="agent-desc">Classifies raw support requests into structured JSON: <code>{ type, component, urgency, description }</code>. Supports 6 request types (bug-fix, feature-request, config-change, ui-tweak, content-update, unknown) across 10 domain components. Falls back to <code>unknown</code> if confidence &lt;60%.</div>
+        <div style="margin-bottom: 0.5rem;"><span class="file-path">.claude/agents/request-analyzer.md</span></div>
+        <div class="agent-meta">
+          <span class="tool-tag read">Read</span>
+          <span class="tool-tag grep">Grep</span>
+          <span class="tool-tag glob">Glob</span>
+        </div>
+      </div>
+
+      <div class="agent-card support">
+        <div class="agent-name">
+          Code Scout
+          <code>code-scout</code>
+        </div>
+        <div class="agent-desc">Receives classification JSON and searches domain-specific paths to find up to 15 relevant files with targeted line ranges. Follows imports 1 level deep and always includes associated test files. Prioritizes: entry points &gt; services &gt; hooks &gt; tests &gt; config.</div>
+        <div style="margin-bottom: 0.5rem;"><span class="file-path">.claude/agents/code-scout.md</span></div>
+        <div class="agent-meta">
+          <span class="tool-tag read">Read</span>
+          <span class="tool-tag grep">Grep</span>
+          <span class="tool-tag glob">Glob</span>
+        </div>
+      </div>
+
+      <div class="agent-card support">
+        <div class="agent-name">
+          Plan Writer
+          <code>plan-writer</code>
+        </div>
+        <div class="agent-desc">Takes classification + file list and generates a structured implementation plan: summary, files to modify (with line ranges), files to create, affected tests, risk assessment (Low/Medium/High), and estimated scope. Describes changes in prose &mdash; never writes code. Capped at 50&ndash;100 lines.</div>
+        <div style="margin-bottom: 0.5rem;"><span class="file-path">.claude/agents/plan-writer.md</span></div>
+        <div class="agent-meta">
+          <span class="tool-tag read">Read</span>
+          <span class="tool-tag grep">Grep</span>
+          <span class="tool-tag glob">Glob</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ─── Support Classification Reference ──────────────────────── -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">Support Classification Reference</div>
+      <span class="section-badge">6 types &middot; 10 domains</span>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+
+      <!-- Request Types Table -->
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; background: var(--card-bg); border-radius: 8px; overflow: hidden; border: 1px solid var(--border);">
+          <thead>
+            <tr style="background: var(--support-bg); text-align: left;">
+              <th style="padding: 0.6rem 0.8rem; font-weight: 600; color: var(--support-color);">Request Type</th>
+              <th style="padding: 0.6rem 0.8rem; font-weight: 600; color: var(--support-color);">Keywords</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-top: 1px solid var(--border);">
+              <td style="padding: 0.5rem 0.8rem;"><code>bug-fix</code></td>
+              <td style="padding: 0.5rem 0.8rem; color: var(--muted);">broken, error, fail, crash, not working, slow, timeout, 500, blank</td>
+            </tr>
+            <tr style="border-top: 1px solid var(--border); background: var(--surface);">
+              <td style="padding: 0.5rem 0.8rem;"><code>feature-request</code></td>
+              <td style="padding: 0.5rem 0.8rem; color: var(--muted);">add, new, want, need, support, enable, integrate</td>
+            </tr>
+            <tr style="border-top: 1px solid var(--border);">
+              <td style="padding: 0.5rem 0.8rem;"><code>config-change</code></td>
+              <td style="padding: 0.5rem 0.8rem; color: var(--muted);">env, config, port, url, docker, redis, database, deploy</td>
+            </tr>
+            <tr style="border-top: 1px solid var(--border); background: var(--surface);">
+              <td style="padding: 0.5rem 0.8rem;"><code>ui-tweak</code></td>
+              <td style="padding: 0.5rem 0.8rem; color: var(--muted);">align, color, font, spacing, layout, responsive, mobile, CSS</td>
+            </tr>
+            <tr style="border-top: 1px solid var(--border);">
+              <td style="padding: 0.5rem 0.8rem;"><code>content-update</code></td>
+              <td style="padding: 0.5rem 0.8rem; color: var(--muted);">template, playlist, schedule, content type, media, upload</td>
+            </tr>
+            <tr style="border-top: 1px solid var(--border); background: var(--surface);">
+              <td style="padding: 0.5rem 0.8rem;"><code>unknown</code></td>
+              <td style="padding: 0.5rem 0.8rem; color: var(--muted);">confidence &lt;60% &mdash; asks for clarification</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Domain Mapping Table -->
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; background: var(--card-bg); border-radius: 8px; overflow: hidden; border: 1px solid var(--border);">
+          <thead>
+            <tr style="background: var(--support-bg); text-align: left;">
+              <th style="padding: 0.6rem 0.8rem; font-weight: 600; color: var(--support-color);">Component</th>
+              <th style="padding: 0.6rem 0.8rem; font-weight: 600; color: var(--support-color);">Domain Keywords</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-top: 1px solid var(--border);">
+              <td style="padding: 0.5rem 0.8rem;"><code>displays</code></td>
+              <td style="padding: 0.5rem 0.8rem; color: var(--muted);">display, screen, device, preview, TV, kiosk</td>
+            </tr>
+            <tr style="border-top: 1px solid var(--border); background: var(--surface);">
+              <td style="padding: 0.5rem 0.8rem;"><code>playlists</code></td>
+              <td style="padding: 0.5rem 0.8rem; color: var(--muted);">playlist, queue, rotation, order</td>
+            </tr>
+            <tr style="border-top: 1px solid var(--border);">
+              <td style="padding: 0.5rem 0.8rem;"><code>templates</code></td>
+              <td style="padding: 0.5rem 0.8rem; color: var(--muted);">template, editor, design, layout, artboard</td>
+            </tr>
+            <tr style="border-top: 1px solid var(--border); background: var(--surface);">
+              <td style="padding: 0.5rem 0.8rem;"><code>schedules</code></td>
+              <td style="padding: 0.5rem 0.8rem; color: var(--muted);">schedule, timing, when, duration, expiration</td>
+            </tr>
+            <tr style="border-top: 1px solid var(--border);">
+              <td style="padding: 0.5rem 0.8rem;"><code>content</code></td>
+              <td style="padding: 0.5rem 0.8rem; color: var(--muted);">content, upload, image, video, media, file</td>
+            </tr>
+            <tr style="border-top: 1px solid var(--border); background: var(--surface);">
+              <td style="padding: 0.5rem 0.8rem;"><code>auth</code></td>
+              <td style="padding: 0.5rem 0.8rem; color: var(--muted);">login, auth, password, token, session, JWT</td>
+            </tr>
+            <tr style="border-top: 1px solid var(--border);">
+              <td style="padding: 0.5rem 0.8rem;"><code>dashboard</code></td>
+              <td style="padding: 0.5rem 0.8rem; color: var(--muted);">dashboard, overview, stats, home</td>
+            </tr>
+            <tr style="border-top: 1px solid var(--border); background: var(--surface);">
+              <td style="padding: 0.5rem 0.8rem;"><code>realtime</code></td>
+              <td style="padding: 0.5rem 0.8rem; color: var(--muted);">websocket, realtime, live, status, online</td>
+            </tr>
+            <tr style="border-top: 1px solid var(--border);">
+              <td style="padding: 0.5rem 0.8rem;"><code>organizations</code></td>
+              <td style="padding: 0.5rem 0.8rem; color: var(--muted);">organization, org, team, user, role</td>
+            </tr>
+            <tr style="border-top: 1px solid var(--border); background: var(--surface);">
+              <td style="padding: 0.5rem 0.8rem;"><code>support</code></td>
+              <td style="padding: 0.5rem 0.8rem; color: var(--muted);">support, help, chat, ticket</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+
+    <!-- Risk Assessment + Plan Output -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+      <div style="background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.25rem;">
+        <div style="font-weight: 600; margin-bottom: 0.5rem; font-size: 0.95rem;">Risk Assessment Criteria</div>
+        <div style="font-size: 0.85rem; line-height: 1.7;">
+          <div><span style="color: #16a34a; font-weight: 600;">Low</span> &mdash; single file, cosmetic/text, no logic change, existing tests cover it</div>
+          <div><span style="color: #d97706; font-weight: 600;">Medium</span> &mdash; 2&ndash;5 files, logic changes, may need new tests, no auth/data impact</div>
+          <div><span style="color: #dc2626; font-weight: 600;">High</span> &mdash; 6+ files, auth/security/data migration, infrastructure, breaking API</div>
+        </div>
+      </div>
+      <div style="background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.25rem;">
+        <div style="font-weight: 600; margin-bottom: 0.5rem; font-size: 0.95rem;">Plan Writer Output Structure</div>
+        <div style="font-size: 0.85rem; line-height: 1.7; color: var(--muted);">
+          <div>1. Summary &mdash; what changes and why</div>
+          <div>2. Classification &mdash; type, component, urgency</div>
+          <div>3. Files to Modify &mdash; with specific line ranges</div>
+          <div>4. Files to Create &mdash; if needed</div>
+          <div>5. Tests &mdash; existing + new tests required</div>
+          <div>6. Risk Assessment &mdash; level, justification, rollback</div>
+          <div>7. Estimated Scope &mdash; files, lines, complexity</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Red Flags -->
+    <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 1rem 1.25rem; margin-top: 1rem; font-size: 0.85rem;">
+      <div style="font-weight: 600; margin-bottom: 0.35rem; color: #dc2626;">Red Flags &mdash; Agent Stops and Asks</div>
+      <div style="color: #7f1d1d;">Request touches auth or data migrations &middot; Classification is <code>unknown</code> &middot; Plan affects 10+ files &middot; Verification fails after implementation</div>
+    </div>
+  </div>
+
+  <!-- ─── Content Validator System ──────────────────────────────── -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon validator">V</div>
+      <div>
+        <div class="section-title">Content Validator Agent System</div>
+        <div class="section-desc">Automated deployment readiness checker &mdash; 30 validation rules</div>
+      </div>
+      <span class="section-badge">5 agents</span>
+    </div>
+
+    <div class="workflow-section">
+      <div class="workflow-title">Workflow: <code>/validate [scope] [--token TOKEN]</code></div>
+      <div class="workflow-steps">
+        <div class="workflow-step highlight">infra-checker</div>
+        <div class="workflow-arrow">&rarr;</div>
+        <div class="workflow-step">Authenticate</div>
+        <div class="workflow-arrow">&rarr;</div>
+        <div class="workflow-step highlight">content-auditor</div>
+        <div class="workflow-step highlight">display-inspector</div>
+        <div class="workflow-step highlight">schedule-analyzer</div>
+        <div class="workflow-arrow">&rarr;</div>
+        <div class="workflow-step highlight">report-compiler</div>
+      </div>
+      <div style="margin-top: 0.75rem; font-size: 0.85rem; color: var(--muted);">
+        Steps 3&ndash;5 run in parallel. Output: <strong style="color: #16a34a;">READY</strong> | <strong style="color: #d97706;">DEGRADED</strong> | <strong style="color: #dc2626;">NOT READY</strong>
+      </div>
+    </div>
+
+    <div class="agent-grid">
+
+      <div class="agent-card validator">
+        <div class="agent-name">
+          Infra Checker
+          <code>infra-checker</code>
+        </div>
+        <div class="agent-desc">Checks Vizora infrastructure health &mdash; API reachability, database, Redis, and MinIO status. Runs before any other validation. No auth required.</div>
+        <div style="margin-bottom: 0.5rem;"><span class="file-path">.claude/agents/infra-checker.md</span></div>
+        <div class="agent-meta">
+          <span class="tool-tag bash">Bash</span>
+          <span class="tool-tag read">Read</span>
+          <span class="tool-tag grep">Grep</span>
+          <span class="tool-tag glob">Glob</span>
+        </div>
+      </div>
+
+      <div class="agent-card validator">
+        <div class="agent-name">
+          Content Auditor
+          <code>content-auditor</code>
+        </div>
+        <div class="agent-desc">Validates content integrity, layout zones, and storage quotas. Checks 12 rules: URL validity, expiry, orphans, thumbnails, MIME types, file sizes, zone assignments, and storage limits.</div>
+        <div style="margin-bottom: 0.5rem;"><span class="file-path">.claude/agents/content-auditor.md</span></div>
+        <div class="agent-meta">
+          <span class="tool-tag bash">Bash</span>
+          <span class="tool-tag read">Read</span>
+          <span class="tool-tag grep">Grep</span>
+          <span class="tool-tag glob">Glob</span>
+        </div>
+      </div>
+
+      <div class="agent-card validator">
+        <div class="agent-name">
+          Display Inspector
+          <code>display-inspector</code>
+        </div>
+        <div class="agent-desc">Validates display configurations, playlist assignments, and device health. Checks 9 rules: blank screens, stale heartbeats, empty playlists, error states, archived/expired content.</div>
+        <div style="margin-bottom: 0.5rem;"><span class="file-path">.claude/agents/display-inspector.md</span></div>
+        <div class="agent-meta">
+          <span class="tool-tag bash">Bash</span>
+          <span class="tool-tag read">Read</span>
+          <span class="tool-tag grep">Grep</span>
+          <span class="tool-tag glob">Glob</span>
+        </div>
+      </div>
+
+      <div class="agent-card validator">
+        <div class="agent-name">
+          Schedule Analyzer
+          <code>schedule-analyzer</code>
+        </div>
+        <div class="agent-desc">Validates schedule conflicts, coverage gaps, and integrity. Checks 8 rules: overlapping schedules, phantom targets, midnight-crossing, priority collisions, expired schedules.</div>
+        <div style="margin-bottom: 0.5rem;"><span class="file-path">.claude/agents/schedule-analyzer.md</span></div>
+        <div class="agent-meta">
+          <span class="tool-tag bash">Bash</span>
+          <span class="tool-tag read">Read</span>
+          <span class="tool-tag grep">Grep</span>
+          <span class="tool-tag glob">Glob</span>
+        </div>
+      </div>
+
+      <div class="agent-card validator">
+        <div class="agent-name">
+          Report Compiler
+          <code>report-compiler</code>
+        </div>
+        <div class="agent-desc">Aggregates validation results from all validators into a single deployment readiness report. Determines READY/DEGRADED/NOT READY status and generates actionable markdown output.</div>
+        <div style="margin-bottom: 0.5rem;"><span class="file-path">.claude/agents/report-compiler.md</span></div>
+        <div class="agent-meta">
+          <span class="tool-tag bash">Bash</span>
+          <span class="tool-tag read">Read</span>
+          <span class="tool-tag grep">Grep</span>
+          <span class="tool-tag glob">Glob</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ─── Validation Rules Summary ──────────────────────────────── -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">Validation Rules Summary</div>
+      <span class="section-badge">30 rules</span>
+    </div>
+
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem; background: var(--card-bg); border-radius: 8px; overflow: hidden; border: 1px solid var(--border);">
+        <thead>
+          <tr style="background: var(--code-bg); text-align: left;">
+            <th style="padding: 0.75rem 1rem; font-weight: 600;">Category</th>
+            <th style="padding: 0.75rem 1rem; font-weight: 600;">Rules</th>
+            <th style="padding: 0.75rem 1rem; font-weight: 600; color: #dc2626;">Critical</th>
+            <th style="padding: 0.75rem 1rem; font-weight: 600; color: #d97706;">Warning</th>
+            <th style="padding: 0.75rem 1rem; font-weight: 600; color: #3b82f6;">Info</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-top: 1px solid var(--border);">
+            <td style="padding: 0.6rem 1rem;">Content</td>
+            <td style="padding: 0.6rem 1rem; font-family: monospace;">C-001 &ndash; C-007</td>
+            <td style="padding: 0.6rem 1rem; font-weight: 600; color: #dc2626;">1</td>
+            <td style="padding: 0.6rem 1rem; font-weight: 600; color: #d97706;">4</td>
+            <td style="padding: 0.6rem 1rem; font-weight: 600; color: #3b82f6;">2</td>
+          </tr>
+          <tr style="border-top: 1px solid var(--border); background: var(--surface);">
+            <td style="padding: 0.6rem 1rem;">Layout</td>
+            <td style="padding: 0.6rem 1rem; font-family: monospace;">L-001 &ndash; L-003</td>
+            <td style="padding: 0.6rem 1rem; font-weight: 600; color: #dc2626;">3</td>
+            <td style="padding: 0.6rem 1rem;">0</td>
+            <td style="padding: 0.6rem 1rem;">0</td>
+          </tr>
+          <tr style="border-top: 1px solid var(--border);">
+            <td style="padding: 0.6rem 1rem;">Display</td>
+            <td style="padding: 0.6rem 1rem; font-family: monospace;">D-001 &ndash; D-006</td>
+            <td style="padding: 0.6rem 1rem; font-weight: 600; color: #dc2626;">3</td>
+            <td style="padding: 0.6rem 1rem; font-weight: 600; color: #d97706;">2</td>
+            <td style="padding: 0.6rem 1rem; font-weight: 600; color: #3b82f6;">1</td>
+          </tr>
+          <tr style="border-top: 1px solid var(--border); background: var(--surface);">
+            <td style="padding: 0.6rem 1rem;">Playlist</td>
+            <td style="padding: 0.6rem 1rem; font-family: monospace;">P-001 &ndash; P-003</td>
+            <td style="padding: 0.6rem 1rem;">0</td>
+            <td style="padding: 0.6rem 1rem; font-weight: 600; color: #d97706;">3</td>
+            <td style="padding: 0.6rem 1rem;">0</td>
+          </tr>
+          <tr style="border-top: 1px solid var(--border);">
+            <td style="padding: 0.6rem 1rem;">Schedule</td>
+            <td style="padding: 0.6rem 1rem; font-family: monospace;">S-001 &ndash; S-008</td>
+            <td style="padding: 0.6rem 1rem; font-weight: 600; color: #dc2626;">2</td>
+            <td style="padding: 0.6rem 1rem; font-weight: 600; color: #d97706;">4</td>
+            <td style="padding: 0.6rem 1rem; font-weight: 600; color: #3b82f6;">2</td>
+          </tr>
+          <tr style="border-top: 1px solid var(--border); background: var(--surface);">
+            <td style="padding: 0.6rem 1rem;">Storage</td>
+            <td style="padding: 0.6rem 1rem; font-family: monospace;">ST-001 &ndash; ST-002</td>
+            <td style="padding: 0.6rem 1rem; font-weight: 600; color: #dc2626;">1</td>
+            <td style="padding: 0.6rem 1rem; font-weight: 600; color: #d97706;">1</td>
+            <td style="padding: 0.6rem 1rem;">0</td>
+          </tr>
+          <tr style="border-top: 2px solid var(--border); font-weight: 700;">
+            <td style="padding: 0.75rem 1rem;">Total</td>
+            <td style="padding: 0.75rem 1rem;">30 rules</td>
+            <td style="padding: 0.75rem 1rem; color: #dc2626;">10</td>
+            <td style="padding: 0.75rem 1rem; color: #d97706;">14</td>
+            <td style="padding: 0.75rem 1rem; color: #3b82f6;">5</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  Vizora Agent Catalog &mdash; Updated 2026-02-28 &mdash; 8 agents across 2 systems &middot; 6 classification types &middot; 10 domain components &middot; 30 validation rules
+</div>
+
+</body>
+</html>

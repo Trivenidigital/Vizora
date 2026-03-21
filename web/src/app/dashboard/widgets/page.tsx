@@ -8,6 +8,8 @@ import EmptyState from '@/components/EmptyState';
 import { useToast } from '@/lib/hooks/useToast';
 import { Icon } from '@/theme/icons';
 import WeatherWidget from '@/components/widgets/WeatherWidget';
+import SheetsWidget from '@/components/widgets/SheetsWidget';
+import SocialFeedWidget, { parsePostUrls } from '@/components/widgets/SocialFeedWidget';
 import ClockWidget from '@/components/widgets/ClockWidget';
 import RssWidget from '@/components/widgets/RssWidget';
 
@@ -42,14 +44,15 @@ const DEFAULT_WIDGET_TYPES = [
     },
   },
   {
-    type: 'social-media',
-    name: 'Social Media',
-    description: 'Embed social media feeds from Twitter, Instagram, or Facebook.',
+    type: 'social-feed',
+    name: 'Social Media Feed',
+    description: 'Display curated social media posts from Instagram, Twitter/X, TikTok, and LinkedIn.',
     icon: 'link',
     configSchema: {
-      platform: { type: 'select', label: 'Platform', options: ['twitter', 'instagram', 'facebook'], required: true },
-      handle: { type: 'string', label: 'Handle / Page', placeholder: '@username', required: true },
-      postCount: { type: 'number', label: 'Number of Posts', default: 3, min: 1, max: 10 },
+      postUrls: { type: 'textarea', label: 'Post URLs (one per line)', placeholder: 'https://instagram.com/p/...\nhttps://twitter.com/...', default: '' },
+      rotateInterval: { type: 'select', label: 'Rotate Every (seconds)', options: ['5', '10', '15', '30'], default: '10' },
+      showPlatformIcon: { type: 'boolean', label: 'Show Platform Icon', default: true },
+      theme: { type: 'select', label: 'Theme', options: ['dark', 'light', 'auto'], default: 'dark' },
     },
   },
   {
@@ -65,6 +68,22 @@ const DEFAULT_WIDGET_TYPES = [
       timezone: { type: 'string', label: 'Timezone', placeholder: 'e.g. America/New_York or "local"', default: 'local' },
       targetDate: { type: 'string', label: 'Countdown Target', placeholder: 'YYYY-MM-DD HH:MM (for countdown mode)' },
       eventName: { type: 'string', label: 'Event Name', placeholder: 'e.g. Grand Opening' },
+      theme: { type: 'select', label: 'Theme', options: ['dark', 'light', 'auto'], default: 'dark' },
+    },
+  },
+  {
+    type: 'sheets',
+    name: 'Google Sheets',
+    description: 'Display live data from Google Sheets — menus, price lists, schedules, leaderboards.',
+    icon: 'content',
+    configSchema: {
+      sheetUrl: { type: 'string', label: 'Sheet URL', placeholder: 'https://docs.google.com/spreadsheets/d/...', required: true },
+      sheetName: { type: 'string', label: 'Sheet Name', placeholder: 'Sheet1', default: 'Sheet1' },
+      title: { type: 'string', label: 'Display Title', placeholder: "e.g. Today's Menu" },
+      showHeader: { type: 'boolean', label: 'Show Header Row', default: true },
+      stripedRows: { type: 'boolean', label: 'Striped Rows', default: true },
+      fontSize: { type: 'select', label: 'Font Size', options: ['small', 'medium', 'large'], default: 'medium' },
+      refreshInterval: { type: 'select', label: 'Refresh (min)', options: ['1', '5', '15', '30'], default: '5' },
       theme: { type: 'select', label: 'Theme', options: ['dark', 'light', 'auto'], default: 'dark' },
     },
   },
@@ -139,7 +158,10 @@ export default function WidgetsPage() {
       weather: 'sun',
       rss: 'list',
       'social-media': 'link',
+      'social-feed': 'link',
       clock: 'clock',
+      countdown: 'clock',
+      sheets: 'content',
     };
     return (mapping[type] || 'content') as any;
   };
@@ -149,7 +171,10 @@ export default function WidgetsPage() {
       weather: 'from-blue-400 to-blue-600',
       rss: 'from-orange-400 to-orange-600',
       'social-media': 'from-pink-400 to-pink-600',
+      'social-feed': 'from-pink-500 via-purple-500 to-orange-400',
       clock: 'from-purple-400 to-purple-600',
+      countdown: 'from-red-400 to-red-600',
+      sheets: 'from-green-400 to-emerald-600',
     };
     return mapping[type] || 'from-[#00E5A0] to-[#00B4D8]';
   };
@@ -246,6 +271,24 @@ export default function WidgetsPage() {
   ) => {
     const fieldType = schema.type || 'string';
 
+    if (fieldType === 'textarea') {
+      return (
+        <div key={key} className="space-y-1">
+          <label className="block text-sm font-medium text-[var(--foreground-secondary)]">
+            {schema.label || key}
+            {schema.required && <span className="text-red-500 ml-1">*</span>}
+          </label>
+          <textarea
+            value={value || ''}
+            placeholder={schema.placeholder || ''}
+            rows={4}
+            onChange={(e) => onChange(key, e.target.value)}
+            className="eh-input w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)] resize-y"
+          />
+        </div>
+      );
+    }
+
     if (fieldType === 'boolean') {
       return (
         <label key={key} className="flex items-center gap-3 py-2">
@@ -331,11 +374,19 @@ export default function WidgetsPage() {
         return config.feedUrl ? `${config.feedUrl.substring(0, 40)}...` : 'No feed URL';
       case 'social-media':
         return config.handle ? `${config.platform || 'social'}: ${config.handle}` : 'Not configured';
+      case 'social-feed': {
+        const urls = (config.postUrls || '').split('\n').filter((l: string) => l.trim());
+        return urls.length > 0 ? `${urls.length} post(s), ${config.rotateInterval || 10}s rotation` : 'No posts configured';
+      }
       case 'clock':
         if (config.mode === 'countdown') {
           return config.eventName || config.targetDate || 'Countdown - not configured';
         }
         return `${config.timezone || 'Local'} - ${config.format || '12h'}`;
+      case 'countdown':
+        return config.title || config.targetDate || 'Not configured';
+      case 'sheets':
+        return config.sheetUrl ? `${config.title || config.sheetName || 'Sheet1'} (${config.refreshInterval || 5}min)` : 'No Sheet URL';
       default:
         return 'Configured';
     }
@@ -599,6 +650,40 @@ export default function WidgetsPage() {
                   theme={(widgetConfig.theme as 'dark' | 'light' | 'auto') || 'dark'}
                   refreshInterval={0}
                   showForecast={widgetConfig.showForecast !== false}
+                  compact
+                />
+              </div>
+            ) : selectedType.type === 'sheets' ? (
+              <div className="bg-[var(--background)] rounded-lg border border-[var(--border)] overflow-hidden p-4">
+                <h4 className="font-semibold text-[var(--foreground)] mb-1">{widgetName || 'Untitled Widget'}</h4>
+                <p className="text-xs text-[var(--foreground-tertiary)] uppercase mb-3">{selectedType.name}</p>
+                {widgetDescription && (
+                  <p className="text-sm text-[var(--foreground-secondary)] mb-3">{widgetDescription}</p>
+                )}
+                <SheetsWidget
+                  sheetUrl={widgetConfig.sheetUrl || ''}
+                  sheetName={widgetConfig.sheetName || 'Sheet1'}
+                  title={widgetConfig.title || ''}
+                  showHeader={widgetConfig.showHeader !== false}
+                  stripedRows={widgetConfig.stripedRows !== false}
+                  fontSize={(widgetConfig.fontSize as 'small' | 'medium' | 'large') || 'medium'}
+                  theme={(widgetConfig.theme as 'dark' | 'light' | 'auto') || 'dark'}
+                  refreshInterval={0}
+                  compact
+                />
+              </div>
+            ) : selectedType.type === 'social-feed' ? (
+              <div className="bg-[var(--background)] rounded-lg border border-[var(--border)] overflow-hidden p-4">
+                <h4 className="font-semibold text-[var(--foreground)] mb-1">{widgetName || 'Untitled Widget'}</h4>
+                <p className="text-xs text-[var(--foreground-tertiary)] uppercase mb-3">{selectedType.name}</p>
+                {widgetDescription && (
+                  <p className="text-sm text-[var(--foreground-secondary)] mb-3">{widgetDescription}</p>
+                )}
+                <SocialFeedWidget
+                  posts={parsePostUrls(widgetConfig.postUrls || '')}
+                  rotateInterval={parseInt(widgetConfig.rotateInterval) || 10}
+                  showPlatformIcon={widgetConfig.showPlatformIcon !== false}
+                  theme={(widgetConfig.theme as 'dark' | 'light' | 'auto') || 'dark'}
                   compact
                 />
               </div>

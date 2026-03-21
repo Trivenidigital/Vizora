@@ -1,0 +1,25 @@
+     column_name      
+----------------------
+ id
+ name
+ description
+ type
+ url
+ thumbnail
+ duration
+ fileSize
+ mimeType
+ metadata
+ status
+ createdAt
+ updatedAt
+ organizationId
+ expiresAt
+ folderId
+ previousVersionId
+ replacementContentId
+ templateOrientation
+ versionNumber
+ isGlobal
+(21 rows)
+

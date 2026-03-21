@@ -1,0 +1,37 @@
+From https://github.com/Trivenidigital/Vizora
+ * [new branch]      feat/health-infrastructure -> origin/feat/health-infrastructure
+ * [new branch]      fix/parse-id-pipe-cuid-mismatch -> origin/fix/parse-id-pipe-cuid-mismatch
+   df7c779..471849e  main       -> origin/main
+Updating df7c779..471849e
+Fast-forward
+ .../src/__tests__/endpoint-smoke.e2e.spec.ts       | 152 +++++++
+ .../continuous-health-monitor.service.spec.ts      | 142 ++++++
+ .../health/continuous-health-monitor.service.ts    | 454 +++++++++++++++++++
+ .../src/modules/health/health.controller.spec.ts   |  24 +-
+ middleware/src/modules/health/health.controller.ts | 107 ++++-
+ middleware/src/modules/health/health.module.ts     |   6 +-
+ .../src/modules/health/regression-guards.spec.ts   | 225 ++++++++++
+ .../health/startup-self-test.service.spec.ts       | 155 +++++++
+ .../modules/health/startup-self-test.service.ts    | 487 +++++++++++++++++++++
+ scripts/deploy-verify.sh                           | 308 +++++++++++++
+ web/src/app/admin/backlog/page-client.tsx          | 438 ++++++++++++++++++
+ web/src/app/admin/backlog/page.tsx                 |   9 +
+ web/src/app/admin/components/AdminSidebar.tsx      |   4 +
+ web/src/app/admin/system-health/page-client.tsx    | 438 ++++++++++++++++++
+ web/src/app/admin/system-health/page.tsx           |   9 +
+ web/src/app/backlog/page.tsx                       |  16 +
+ web/src/lib/api/admin.ts                           |  23 +
+ web/src/middleware.ts                              |   2 +-
+ 18 files changed, 2985 insertions(+), 14 deletions(-)
+ create mode 100644 middleware/src/__tests__/endpoint-smoke.e2e.spec.ts
+ create mode 100644 middleware/src/modules/health/continuous-health-monitor.service.spec.ts
+ create mode 100644 middleware/src/modules/health/continuous-health-monitor.service.ts
+ create mode 100644 middleware/src/modules/health/regression-guards.spec.ts
+ create mode 100644 middleware/src/modules/health/startup-self-test.service.spec.ts
+ create mode 100644 middleware/src/modules/health/startup-self-test.service.ts
+ create mode 100644 scripts/deploy-verify.sh
+ create mode 100644 web/src/app/admin/backlog/page-client.tsx
+ create mode 100644 web/src/app/admin/backlog/page.tsx
+ create mode 100644 web/src/app/admin/system-health/page-client.tsx
+ create mode 100644 web/src/app/admin/system-health/page.tsx
+ create mode 100644 web/src/app/backlog/page.tsx
