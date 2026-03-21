@@ -239,8 +239,8 @@ export class StartupSelfTestService implements OnApplicationBootstrap {
       { path: '/api/v1/health/ready', expect: [200, 503], label: 'Ready' },
       { path: '/api/v1/health/live', expect: [200], label: 'Live' },
       // Protected endpoints should return 401 (not 400/500)
-      { path: '/api/v1/templates', expect: [401], label: 'Templates (auth)' },
-      { path: '/api/v1/devices', expect: [401], label: 'Devices (auth)' },
+      { path: '/api/v1/template-library', expect: [401], label: 'Templates (auth)' },
+      { path: '/api/v1/displays', expect: [401], label: 'Displays (auth)' },
       { path: '/api/v1/playlists', expect: [401], label: 'Playlists (auth)' },
       { path: '/api/v1/content', expect: [401], label: 'Content (auth)' },
       { path: '/api/v1/notifications', expect: [401], label: 'Notifications (auth)' },
