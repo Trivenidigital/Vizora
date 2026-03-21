@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1920, height=1080">
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -13,34 +13,36 @@
       position: relative;
       font-family: 'Inter', sans-serif;
       background:
+        /* Scanline texture */
+        repeating-linear-gradient(
+          0deg,
+          transparent,
+          transparent 3px,
+          rgba(0, 200, 255, 0.006) 3px,
+          rgba(0, 200, 255, 0.006) 4px
+        ),
+        /* Subtle grid texture */
+        repeating-linear-gradient(
+          90deg,
+          transparent,
+          transparent 39px,
+          rgba(0, 200, 255, 0.008) 39px,
+          rgba(0, 200, 255, 0.008) 40px
+        ),
+        /* Depth gradients */
         radial-gradient(ellipse at 50% 40%, rgba(0, 200, 255, 0.08) 0%, transparent 50%),
-        radial-gradient(ellipse at 20% 80%, rgba(255, 0, 200, 0.06) 0%, transparent 45%),
-        radial-gradient(ellipse at 80% 20%, rgba(0, 255, 150, 0.04) 0%, transparent 40%),
+        radial-gradient(ellipse at 20% 80%, rgba(180, 0, 220, 0.06) 0%, transparent 45%),
+        radial-gradient(ellipse at 80% 20%, rgba(0, 255, 150, 0.03) 0%, transparent 40%),
         linear-gradient(160deg, #050510 0%, #0a0a1a 30%, #080815 60%, #050508 100%);
       color: #e0e8ff;
     }
 
-    /* Scanline texture */
+    /* Dot grid overlay */
     body::before {
       content: '';
       position: absolute;
       top: 0; left: 0; right: 0; bottom: 0;
-      background: repeating-linear-gradient(
-        0deg,
-        transparent,
-        transparent 3px,
-        rgba(0, 200, 255, 0.008) 3px,
-        rgba(0, 200, 255, 0.008) 4px
-      );
-      z-index: 0;
-    }
-
-    /* Grid texture */
-    body::after {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background-image: radial-gradient(circle, rgba(0, 200, 255, 0.015) 1px, transparent 1px);
+      background-image: radial-gradient(circle, rgba(0, 200, 255, 0.012) 1px, transparent 1px);
       background-size: 40px 40px;
       z-index: 0;
     }
@@ -60,6 +62,7 @@
       height: 400px;
       background: radial-gradient(ellipse, rgba(0, 200, 255, 0.1) 0%, transparent 70%);
       filter: blur(80px);
+      animation: breathe 4s ease-in-out infinite;
     }
 
     .neon-magenta {
@@ -67,8 +70,10 @@
       left: 10%;
       width: 400px;
       height: 400px;
-      background: radial-gradient(circle, rgba(255, 0, 200, 0.08) 0%, transparent 70%);
+      background: radial-gradient(circle, rgba(180, 0, 220, 0.08) 0%, transparent 70%);
       filter: blur(60px);
+      animation: breathe 4s ease-in-out infinite;
+      animation-delay: 1.5s;
     }
 
     .neon-magenta-2 {
@@ -76,39 +81,37 @@
       right: 15%;
       width: 300px;
       height: 300px;
-      background: radial-gradient(circle, rgba(255, 0, 200, 0.06) 0%, transparent 70%);
+      background: radial-gradient(circle, rgba(180, 0, 220, 0.06) 0%, transparent 70%);
       filter: blur(50px);
     }
 
-    /* Lightning emoji */
-    .emoji-lightning {
+    /* CSS lightning bolt decorations (replacing emoji) */
+    .deco-bolt {
       position: absolute;
-      font-size: 160px;
       z-index: 2;
+      pointer-events: none;
     }
 
-    .emoji-lightning.l1 {
-      top: 60px;
-      left: 80px;
-      filter: drop-shadow(0 0 40px rgba(0, 200, 255, 0.6));
-      transform: rotate(-15deg);
+    .deco-bolt-1 {
+      top: 50px;
+      left: 70px;
+      animation: breathe 4s ease-in-out infinite;
     }
 
-    .emoji-lightning.l2 {
-      bottom: 60px;
-      right: 100px;
-      font-size: 120px;
-      filter: drop-shadow(0 0 35px rgba(255, 0, 200, 0.5));
-      transform: rotate(10deg);
-      opacity: 0.8;
+    .deco-bolt-2 {
+      bottom: 50px;
+      right: 90px;
+      opacity: 0.7;
+      animation: breathe 4s ease-in-out infinite;
+      animation-delay: 1s;
     }
 
-    .emoji-lightning.l3 {
-      top: 300px;
-      right: 200px;
-      font-size: 80px;
-      filter: drop-shadow(0 0 25px rgba(0, 200, 255, 0.4));
-      opacity: 0.5;
+    .deco-bolt-3 {
+      top: 280px;
+      right: 180px;
+      opacity: 0.4;
+      animation: breathe 4s ease-in-out infinite;
+      animation-delay: 2s;
     }
 
     /* Main layout */
@@ -127,6 +130,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      animation: fadeDown 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
 
     .store-name {
@@ -158,6 +162,7 @@
       border-radius: 50%;
       background: #00ff88;
       box-shadow: 0 0 10px rgba(0, 255, 136, 0.6);
+      animation: glowPulse 2s ease-in-out infinite;
     }
 
     /* Center content */
@@ -175,8 +180,10 @@
       font-size: 48px;
       letter-spacing: 20px;
       text-transform: uppercase;
-      color: #ff00c8;
-      text-shadow: 0 0 30px rgba(255, 0, 200, 0.5);
+      color: #c850ff;
+      text-shadow: 0 0 30px rgba(180, 0, 220, 0.5);
+      animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+      animation-delay: 0.1s;
     }
 
     .flash-title {
@@ -188,6 +195,8 @@
       text-shadow:
         0 0 40px rgba(0, 200, 255, 0.4),
         0 0 80px rgba(0, 200, 255, 0.2);
+      animation: scaleIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+      animation-delay: 0.2s;
     }
 
     .flash-title .neon-text {
@@ -204,6 +213,8 @@
       align-items: center;
       gap: 15px;
       margin-top: 10px;
+      animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+      animation-delay: 0.3s;
     }
 
     .countdown-label {
@@ -222,14 +233,14 @@
     }
 
     .countdown-block {
-      background: rgba(0, 200, 255, 0.08);
-      border: 1px solid rgba(0, 200, 255, 0.2);
+      background: rgba(0, 200, 255, 0.06);
+      border: 1px solid rgba(0, 200, 255, 0.15);
       border-radius: 12px;
       padding: 15px 22px;
       text-align: center;
       box-shadow:
-        0 0 20px rgba(0, 200, 255, 0.1),
-        inset 0 0 20px rgba(0, 200, 255, 0.03);
+        0 0 20px rgba(0, 200, 255, 0.08),
+        inset 0 0 20px rgba(0, 200, 255, 0.02);
     }
 
     .countdown-value {
@@ -269,17 +280,37 @@
       background: rgba(255, 255, 255, 0.03);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
-      border: 1px solid rgba(0, 200, 255, 0.1);
+      border: 1px solid rgba(0, 200, 255, 0.08);
       border-radius: 16px;
       padding: 24px 20px;
       text-align: center;
       box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+      position: relative;
+      overflow: hidden;
+      animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
 
-    .deal-emoji {
-      font-size: 44px;
-      margin-bottom: 10px;
-      filter: drop-shadow(0 2px 10px rgba(0,0,0,0.3));
+    .deal-card:nth-child(1) { animation-delay: 0.3s; }
+    .deal-card:nth-child(2) { animation-delay: 0.4s; }
+    .deal-card:nth-child(3) { animation-delay: 0.5s; }
+    .deal-card:nth-child(4) { animation-delay: 0.6s; }
+
+    /* Accent line on deal cards */
+    .deal-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #00c8ff, transparent);
+      opacity: 0.4;
+    }
+
+    /* SVG category icons replacing emoji */
+    .deal-icon {
+      width: 44px;
+      height: 44px;
+      margin: 0 auto 12px;
+      display: block;
     }
 
     .deal-name {
@@ -293,8 +324,8 @@
     .deal-discount {
       font-family: 'Bebas Neue', sans-serif;
       font-size: 36px;
-      color: #ff00c8;
-      text-shadow: 0 0 15px rgba(255, 0, 200, 0.4);
+      color: #c850ff;
+      text-shadow: 0 0 15px rgba(180, 0, 220, 0.4);
     }
 
     /* Footer */
@@ -304,6 +335,8 @@
       align-items: center;
       border-top: 1px solid rgba(0, 200, 255, 0.08);
       padding-top: 15px;
+      animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+      animation-delay: 0.7s;
     }
 
     .footer-terms {
@@ -317,8 +350,8 @@
       font-size: 18px;
       font-weight: 700;
       color: #00c8ff;
-      background: rgba(0, 200, 255, 0.08);
-      border: 1px solid rgba(0, 200, 255, 0.2);
+      background: rgba(0, 200, 255, 0.06);
+      border: 1px solid rgba(0, 200, 255, 0.15);
       padding: 8px 20px;
       border-radius: 4px;
       letter-spacing: 3px;
@@ -333,24 +366,44 @@
     /* Neon border bars */
     .neon-bar-top {
       position: absolute;
-      top: 0;
-      left: 0;
+      top: 0; left: 0;
       width: 100%;
       height: 2px;
-      background: linear-gradient(90deg, transparent 10%, #00c8ff 30%, #ff00c8 70%, transparent 90%);
+      background: linear-gradient(90deg, transparent 10%, #00c8ff 30%, #c850ff 70%, transparent 90%);
       opacity: 0.6;
       z-index: 5;
     }
 
     .neon-bar-bottom {
       position: absolute;
-      bottom: 0;
-      left: 0;
+      bottom: 0; left: 0;
       width: 100%;
       height: 2px;
-      background: linear-gradient(90deg, transparent 10%, #ff00c8 30%, #00c8ff 70%, transparent 90%);
+      background: linear-gradient(90deg, transparent 10%, #c850ff 30%, #00c8ff 70%, transparent 90%);
       opacity: 0.6;
       z-index: 5;
+    }
+
+    /* --- INLINE KEYFRAMES --- */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeDown {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes scaleIn {
+      from { opacity: 0; transform: scale(0.9); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    @keyframes glowPulse {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 1; }
+    }
+    @keyframes breathe {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 0.7; }
     }
   </style>
 </head>
@@ -367,7 +420,7 @@
   <!-- SVG hexagon pattern -->
   <svg class="svg-deco" style="top:80px;right:400px;opacity:0.06;" width="120" height="120" viewBox="0 0 120 120">
     <polygon points="60,5 110,30 110,90 60,115 10,90 10,30" fill="none" stroke="#00c8ff" stroke-width="1"/>
-    <polygon points="60,25 90,40 90,80 60,95 30,80 30,40" fill="none" stroke="#ff00c8" stroke-width="0.5"/>
+    <polygon points="60,25 90,40 90,80 60,95 30,80 30,40" fill="none" stroke="#c850ff" stroke-width="0.5"/>
   </svg>
 
   <svg class="svg-deco" style="bottom:100px;left:400px;opacity:0.05;" width="80" height="80" viewBox="0 0 80 80">
@@ -377,14 +430,24 @@
   <svg class="svg-deco" style="top:50%;left:40px;transform:translateY(-50%);opacity:0.04;" width="40" height="300" viewBox="0 0 40 300">
     <line x1="20" y1="0" x2="20" y2="300" stroke="#00c8ff" stroke-width="1"/>
     <circle cx="20" cy="50" r="3" fill="#00c8ff"/>
-    <circle cx="20" cy="150" r="3" fill="#ff00c8"/>
+    <circle cx="20" cy="150" r="3" fill="#c850ff"/>
     <circle cx="20" cy="250" r="3" fill="#00c8ff"/>
   </svg>
 
-  <!-- Lightning emojis -->
-  <div class="emoji-lightning l1">⚡</div>
-  <div class="emoji-lightning l2">⚡</div>
-  <div class="emoji-lightning l3">⚡</div>
+  <!-- SVG lightning bolts (replacing emoji) -->
+  <svg class="deco-bolt deco-bolt-1" width="80" height="140" viewBox="0 0 80 140">
+    <path d="M45 0 L20 55 L40 55 L15 140 L65 70 L42 70 L70 0 Z" fill="none" stroke="#00c8ff" stroke-width="2" opacity="0.6"/>
+    <path d="M45 0 L20 55 L40 55 L15 140 L65 70 L42 70 L70 0 Z" fill="rgba(0,200,255,0.08)"/>
+  </svg>
+
+  <svg class="deco-bolt deco-bolt-2" width="60" height="110" viewBox="0 0 80 140">
+    <path d="M45 0 L20 55 L40 55 L15 140 L65 70 L42 70 L70 0 Z" fill="none" stroke="#c850ff" stroke-width="2" opacity="0.5"/>
+    <path d="M45 0 L20 55 L40 55 L15 140 L65 70 L42 70 L70 0 Z" fill="rgba(180,0,220,0.06)"/>
+  </svg>
+
+  <svg class="deco-bolt deco-bolt-3" width="40" height="70" viewBox="0 0 80 140">
+    <path d="M45 0 L20 55 L40 55 L15 140 L65 70 L42 70 L70 0 Z" fill="none" stroke="#00c8ff" stroke-width="1.5" opacity="0.4"/>
+  </svg>
 
   <div class="layout">
     <div class="header">
@@ -422,22 +485,48 @@
 
     <div class="deals-row">
       <div class="deal-card">
-        <div class="deal-emoji">🎧</div>
+        <!-- SVG headphones icon -->
+        <svg class="deal-icon" viewBox="0 0 44 44" fill="none">
+          <path d="M8 24V22C8 14.3 14.3 8 22 8s14 6.3 14 14v2" stroke="#00c8ff" stroke-width="2" stroke-linecap="round"/>
+          <rect x="4" y="24" width="8" height="14" rx="3" stroke="#00c8ff" stroke-width="1.5" fill="rgba(0,200,255,0.1)"/>
+          <rect x="32" y="24" width="8" height="14" rx="3" stroke="#00c8ff" stroke-width="1.5" fill="rgba(0,200,255,0.1)"/>
+        </svg>
         <div class="deal-name" data-editable="true" data-field="deal1_name">Headphones</div>
         <div class="deal-discount" data-editable="true" data-field="deal1_discount">60% OFF</div>
       </div>
       <div class="deal-card">
-        <div class="deal-emoji">👟</div>
+        <!-- SVG sneaker icon -->
+        <svg class="deal-icon" viewBox="0 0 44 44" fill="none">
+          <path d="M6 30 L6 24 L14 18 L18 18 L20 22 L34 22 C38 22 40 24 40 28 L40 30 Z" stroke="#00c8ff" stroke-width="1.5" fill="rgba(0,200,255,0.08)"/>
+          <line x1="14" y1="22" x2="14" y2="18" stroke="#00c8ff" stroke-width="1" opacity="0.5"/>
+          <line x1="18" y1="22" x2="18" y2="18" stroke="#00c8ff" stroke-width="1" opacity="0.5"/>
+          <line x1="6" y1="30" x2="40" y2="30" stroke="#00c8ff" stroke-width="1.5"/>
+        </svg>
         <div class="deal-name" data-editable="true" data-field="deal2_name">Sneakers</div>
         <div class="deal-discount" data-editable="true" data-field="deal2_discount">45% OFF</div>
       </div>
       <div class="deal-card">
-        <div class="deal-emoji">⌚</div>
+        <!-- SVG watch icon -->
+        <svg class="deal-icon" viewBox="0 0 44 44" fill="none">
+          <circle cx="22" cy="22" r="12" stroke="#00c8ff" stroke-width="1.5" fill="rgba(0,200,255,0.08)"/>
+          <circle cx="22" cy="22" r="9" stroke="#00c8ff" stroke-width="0.5" opacity="0.4"/>
+          <line x1="22" y1="16" x2="22" y2="22" stroke="#00c8ff" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="22" y1="22" x2="27" y2="22" stroke="#c850ff" stroke-width="1.5" stroke-linecap="round"/>
+          <rect x="18" y="4" width="8" height="6" rx="2" stroke="#00c8ff" stroke-width="1" fill="none"/>
+          <rect x="18" y="34" width="8" height="6" rx="2" stroke="#00c8ff" stroke-width="1" fill="none"/>
+        </svg>
         <div class="deal-name" data-editable="true" data-field="deal3_name">Smartwatches</div>
         <div class="deal-discount" data-editable="true" data-field="deal3_discount">50% OFF</div>
       </div>
       <div class="deal-card">
-        <div class="deal-emoji">🎮</div>
+        <!-- SVG gamepad icon -->
+        <svg class="deal-icon" viewBox="0 0 44 44" fill="none">
+          <path d="M10 18 C10 14 14 12 18 12 L26 12 C30 12 34 14 34 18 L36 30 C36 34 33 36 30 34 L28 32 L16 32 L14 34 C11 36 8 34 8 30 Z" stroke="#00c8ff" stroke-width="1.5" fill="rgba(0,200,255,0.08)"/>
+          <line x1="15" y1="22" x2="21" y2="22" stroke="#00c8ff" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="18" y1="19" x2="18" y2="25" stroke="#00c8ff" stroke-width="1.5" stroke-linecap="round"/>
+          <circle cx="28" cy="20" r="2" fill="#c850ff" opacity="0.6"/>
+          <circle cx="32" cy="24" r="2" fill="#00c8ff" opacity="0.6"/>
+        </svg>
         <div class="deal-name" data-editable="true" data-field="deal4_name">Gaming</div>
         <div class="deal-discount" data-editable="true" data-field="deal4_discount">40% OFF</div>
       </div>

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1920, height=1080">
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800;900&family=Montserrat:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800;900&family=Montserrat:wght@400;600;700;800;900&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -13,9 +13,25 @@
       position: relative;
       font-family: 'Inter', sans-serif;
       background:
-        radial-gradient(ellipse at 40% 30%, rgba(34, 197, 94, 0.12) 0%, transparent 50%),
-        radial-gradient(ellipse at 70% 70%, rgba(251, 191, 36, 0.08) 0%, transparent 45%),
-        radial-gradient(ellipse at 10% 80%, rgba(16, 185, 129, 0.06) 0%, transparent 40%),
+        /* Diamond mesh texture */
+        repeating-linear-gradient(
+          60deg,
+          transparent,
+          transparent 40px,
+          rgba(34, 197, 94, 0.012) 40px,
+          rgba(34, 197, 94, 0.012) 42px
+        ),
+        repeating-linear-gradient(
+          -60deg,
+          transparent,
+          transparent 40px,
+          rgba(251, 191, 36, 0.008) 40px,
+          rgba(251, 191, 36, 0.008) 42px
+        ),
+        /* Depth gradients */
+        radial-gradient(ellipse at 40% 30%, rgba(34, 197, 94, 0.1) 0%, transparent 50%),
+        radial-gradient(ellipse at 70% 70%, rgba(251, 191, 36, 0.06) 0%, transparent 45%),
+        radial-gradient(ellipse at 10% 80%, rgba(16, 185, 129, 0.05) 0%, transparent 40%),
         linear-gradient(150deg, #071a0f 0%, #0a2615 25%, #081f10 50%, #051a0c 75%, #030f07 100%);
       color: #e8f5e9;
     }
@@ -25,69 +41,49 @@
       content: '';
       position: absolute;
       top: 0; left: 0; right: 0; bottom: 0;
-      background-image: radial-gradient(circle, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-image: radial-gradient(circle, rgba(255,255,255,0.015) 1px, transparent 1px);
       background-size: 32px 32px;
-      z-index: 0;
-    }
-
-    /* Diagonal stripe pattern */
-    body::after {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: repeating-linear-gradient(
-        -35deg,
-        transparent,
-        transparent 60px,
-        rgba(34, 197, 94, 0.02) 60px,
-        rgba(34, 197, 94, 0.02) 62px
-      );
       z-index: 0;
     }
 
     /* Glowing accents */
     .glow-green {
       position: absolute;
-      top: 20%;
-      left: 30%;
-      width: 600px;
-      height: 400px;
+      top: 20%; left: 30%;
+      width: 600px; height: 400px;
       background: radial-gradient(ellipse, rgba(34, 197, 94, 0.1) 0%, transparent 70%);
       filter: blur(60px);
       z-index: 0;
+      animation: breathe 4s ease-in-out infinite;
     }
 
     .glow-yellow {
       position: absolute;
-      bottom: 10%;
-      right: 20%;
-      width: 400px;
-      height: 400px;
+      bottom: 10%; right: 20%;
+      width: 400px; height: 400px;
       border-radius: 50%;
       background: radial-gradient(circle, rgba(251, 191, 36, 0.06) 0%, transparent 70%);
       filter: blur(50px);
       z-index: 0;
+      animation: breathe 4s ease-in-out infinite;
+      animation-delay: 2s;
     }
 
-    /* Diagonal accent shape */
+    /* Diagonal accent shapes */
     .diagonal-accent {
       position: absolute;
-      top: 0;
-      right: 0;
-      width: 600px;
-      height: 100%;
-      background: linear-gradient(135deg, transparent 40%, rgba(34, 197, 94, 0.04) 60%, rgba(34, 197, 94, 0.08) 100%);
+      top: 0; right: 0;
+      width: 600px; height: 100%;
+      background: linear-gradient(135deg, transparent 40%, rgba(34, 197, 94, 0.03) 60%, rgba(34, 197, 94, 0.06) 100%);
       clip-path: polygon(30% 0%, 100% 0%, 100% 100%, 0% 100%);
       z-index: 0;
     }
 
     .diagonal-accent-2 {
       position: absolute;
-      bottom: 0;
-      left: 0;
-      width: 500px;
-      height: 100%;
-      background: linear-gradient(315deg, transparent 40%, rgba(251, 191, 36, 0.02) 60%, rgba(251, 191, 36, 0.04) 100%);
+      bottom: 0; left: 0;
+      width: 500px; height: 100%;
+      background: linear-gradient(315deg, transparent 40%, rgba(251, 191, 36, 0.015) 60%, rgba(251, 191, 36, 0.03) 100%);
       clip-path: polygon(0% 0%, 100% 60%, 100% 100%, 0% 100%);
       z-index: 0;
     }
@@ -110,6 +106,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      animation: fadeDown 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
 
     .store-name {
@@ -126,8 +123,8 @@
       font-size: 16px;
       font-weight: 600;
       color: #22c55e;
-      background: rgba(34, 197, 94, 0.1);
-      border: 1px solid rgba(34, 197, 94, 0.2);
+      background: rgba(34, 197, 94, 0.08);
+      border: 1px solid rgba(34, 197, 94, 0.15);
       padding: 8px 20px;
       border-radius: 8px;
     }
@@ -138,6 +135,8 @@
       flex-direction: column;
       justify-content: center;
       gap: 10px;
+      animation: fadeLeft 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+      animation-delay: 0.1s;
     }
 
     .buy-text {
@@ -152,11 +151,13 @@
       font-family: 'Bebas Neue', sans-serif;
       font-size: 220px;
       line-height: 0.85;
-      background: linear-gradient(180deg, #22c55e 0%, #16a34a 50%, #15803d 100%);
+      background: linear-gradient(180deg, #4ade80 0%, #22c55e 40%, #16a34a 70%, #15803d 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
       filter: drop-shadow(0 6px 20px rgba(34, 197, 94, 0.3));
+      animation: scaleIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+      animation-delay: 0.2s;
     }
 
     .get-text {
@@ -171,11 +172,13 @@
       font-family: 'Bebas Neue', sans-serif;
       font-size: 180px;
       line-height: 0.85;
-      background: linear-gradient(180deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%);
+      background: linear-gradient(180deg, #fde68a 0%, #fbbf24 30%, #f59e0b 60%, #d97706 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
       filter: drop-shadow(0 6px 20px rgba(251, 191, 36, 0.3));
+      animation: scaleIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+      animation-delay: 0.3s;
     }
 
     /* Right - details */
@@ -193,6 +196,8 @@
       font-weight: 800;
       color: #ffffff;
       line-height: 1.3;
+      animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+      animation-delay: 0.2s;
     }
 
     .deal-desc {
@@ -201,6 +206,8 @@
       font-weight: 400;
       color: rgba(232, 245, 233, 0.6);
       line-height: 1.6;
+      animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+      animation-delay: 0.3s;
     }
 
     /* Category pills */
@@ -208,13 +215,15 @@
       display: flex;
       flex-wrap: wrap;
       gap: 12px;
+      animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+      animation-delay: 0.4s;
     }
 
     .pill {
-      background: rgba(34, 197, 94, 0.1);
+      background: rgba(34, 197, 94, 0.06);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
-      border: 1px solid rgba(34, 197, 94, 0.2);
+      border: 1px solid rgba(34, 197, 94, 0.15);
       border-radius: 50px;
       padding: 12px 24px;
       font-family: 'Inter', sans-serif;
@@ -226,19 +235,35 @@
       gap: 8px;
     }
 
-    .pill-emoji {
-      font-size: 22px;
+    /* SVG pill icons replacing emoji */
+    .pill-icon {
+      width: 22px;
+      height: 22px;
+      flex-shrink: 0;
     }
 
     /* Savings highlight */
     .savings-box {
-      background: rgba(255, 255, 255, 0.04);
+      background: rgba(255, 255, 255, 0.03);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.06);
       border-radius: 16px;
       padding: 24px 30px;
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+      position: relative;
+      overflow: hidden;
+      animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+      animation-delay: 0.5s;
+    }
+
+    .savings-box::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 4px; height: 100%;
+      background: linear-gradient(180deg, #22c55e, #fbbf24);
+      border-radius: 4px 0 0 4px;
     }
 
     .savings-label {
@@ -256,6 +281,7 @@
       font-size: 42px;
       font-weight: 900;
       color: #22c55e;
+      text-shadow: 0 0 30px rgba(34, 197, 94, 0.3);
     }
 
     .savings-detail {
@@ -271,8 +297,10 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-top: 1px solid rgba(34, 197, 94, 0.1);
+      border-top: 1px solid rgba(34, 197, 94, 0.08);
       padding-top: 18px;
+      animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+      animation-delay: 0.6s;
     }
 
     .footer-terms {
@@ -295,37 +323,65 @@
       z-index: 1;
     }
 
-    /* Emoji deco */
-    .emoji-tag {
+    /* CSS decorative elements replacing emoji tag and bag */
+    .deco-tag {
       position: absolute;
-      bottom: 120px;
-      left: 50px;
-      font-size: 100px;
-      filter: drop-shadow(0 4px 20px rgba(34, 197, 94, 0.3));
+      bottom: 110px; left: 45px;
       z-index: 2;
-      opacity: 0.7;
+      opacity: 0.5;
+      animation: breathe 4s ease-in-out infinite;
       transform: rotate(-12deg);
     }
 
-    .emoji-bag {
+    .deco-bag {
       position: absolute;
-      top: 100px;
-      right: 80px;
-      font-size: 110px;
-      filter: drop-shadow(0 4px 20px rgba(251, 191, 36, 0.3));
+      top: 90px; right: 70px;
       z-index: 2;
-      opacity: 0.6;
+      opacity: 0.4;
+      animation: breathe 4s ease-in-out infinite;
+      animation-delay: 1.5s;
     }
 
     /* Green accent bar */
     .accent-bar {
       position: absolute;
-      left: 0;
-      top: 0;
+      left: 0; top: 0;
       width: 100%;
       height: 4px;
-      background: linear-gradient(90deg, transparent 5%, #22c55e 25%, #fbbf24 75%, transparent 95%);
+      background: linear-gradient(90deg, transparent 5%, #15803d 20%, #22c55e 40%, #fbbf24 60%, #22c55e 80%, transparent 95%);
       z-index: 5;
+    }
+
+    /* Bottom accent bar */
+    .accent-bar-bottom {
+      position: absolute;
+      left: 0; bottom: 0;
+      width: 100%;
+      height: 3px;
+      background: linear-gradient(90deg, transparent 10%, rgba(34, 197, 94, 0.3) 30%, rgba(251, 191, 36, 0.3) 70%, transparent 90%);
+      z-index: 5;
+    }
+
+    /* --- INLINE KEYFRAMES --- */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeDown {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeLeft {
+      from { opacity: 0; transform: translateX(-20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes scaleIn {
+      from { opacity: 0; transform: scale(0.9); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    @keyframes breathe {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 0.7; }
     }
   </style>
 </head>
@@ -336,28 +392,41 @@
   <div class="diagonal-accent"></div>
   <div class="diagonal-accent-2"></div>
   <div class="accent-bar"></div>
+  <div class="accent-bar-bottom"></div>
 
   <!-- SVG decorations -->
-  <svg class="svg-deco" style="top:40px;left:40px;opacity:0.08;" width="100" height="100" viewBox="0 0 100 100">
+  <svg class="svg-deco" style="top:40px;left:40px;opacity:0.06;" width="100" height="100" viewBox="0 0 100 100">
     <path d="M10,50 Q10,10 50,10 Q90,10 90,50 Q90,90 50,90 Q10,90 10,50" fill="none" stroke="#22c55e" stroke-width="1"/>
     <circle cx="50" cy="50" r="20" fill="none" stroke="#fbbf24" stroke-width="0.5"/>
   </svg>
 
-  <svg class="svg-deco" style="bottom:50px;right:50px;opacity:0.06;" width="120" height="120" viewBox="0 0 120 120">
+  <svg class="svg-deco" style="bottom:50px;right:50px;opacity:0.05;" width="120" height="120" viewBox="0 0 120 120">
     <line x1="0" y1="0" x2="120" y2="120" stroke="#22c55e" stroke-width="0.5"/>
     <line x1="120" y1="0" x2="0" y2="120" stroke="#22c55e" stroke-width="0.5"/>
     <circle cx="60" cy="60" r="40" fill="none" stroke="#fbbf24" stroke-width="0.5"/>
     <circle cx="60" cy="60" r="55" fill="none" stroke="#22c55e" stroke-width="0.5"/>
   </svg>
 
-  <svg class="svg-deco" style="top:50%;left:48%;transform:translate(-50%,-50%);opacity:0.03;" width="300" height="300" viewBox="0 0 300 300">
+  <svg class="svg-deco" style="top:50%;left:48%;transform:translate(-50%,-50%);opacity:0.02;" width="300" height="300" viewBox="0 0 300 300">
     <circle cx="150" cy="150" r="140" fill="none" stroke="#22c55e" stroke-width="1"/>
     <circle cx="150" cy="150" r="120" fill="none" stroke="#fbbf24" stroke-width="0.5"/>
   </svg>
 
-  <!-- Emoji decorations -->
-  <div class="emoji-tag">🏷️</div>
-  <div class="emoji-bag">🛍️</div>
+  <!-- SVG price tag decoration (replacing emoji) -->
+  <svg class="deco-tag" width="90" height="90" viewBox="0 0 90 90">
+    <path d="M10 5 L55 5 L85 35 L50 70 L10 70 Q5 70 5 65 L5 10 Q5 5 10 5 Z" fill="none" stroke="#22c55e" stroke-width="2" opacity="0.6"/>
+    <circle cx="22" cy="22" r="5" fill="none" stroke="#22c55e" stroke-width="1.5" opacity="0.5"/>
+    <line x1="55" y1="35" x2="30" y2="55" stroke="#fbbf24" stroke-width="1" opacity="0.3"/>
+    <line x1="60" y1="40" x2="35" y2="60" stroke="#fbbf24" stroke-width="1" opacity="0.3"/>
+  </svg>
+
+  <!-- SVG shopping bag decoration (replacing emoji) -->
+  <svg class="deco-bag" width="80" height="100" viewBox="0 0 80 100">
+    <rect x="10" y="35" width="60" height="55" rx="6" fill="none" stroke="#fbbf24" stroke-width="2" opacity="0.5"/>
+    <path d="M25 35 L25 22 Q25 10 40 10 Q55 10 55 22 L55 35" fill="none" stroke="#fbbf24" stroke-width="2" opacity="0.4"/>
+    <line x1="30" y1="55" x2="50" y2="55" stroke="#22c55e" stroke-width="1" opacity="0.3"/>
+    <line x1="32" y1="62" x2="48" y2="62" stroke="#22c55e" stroke-width="1" opacity="0.2"/>
+  </svg>
 
   <div class="layout">
     <div class="header">
@@ -377,11 +446,26 @@
       <div class="deal-desc" data-editable="true" data-field="deal_description">Purchase any item at full price and get a second item of equal or lesser value absolutely free. No limits per transaction.</div>
 
       <div class="category-pills">
-        <div class="pill"><span class="pill-emoji">👕</span> <span data-editable="true" data-field="cat1">Apparel</span></div>
-        <div class="pill"><span class="pill-emoji">👟</span> <span data-editable="true" data-field="cat2">Footwear</span></div>
-        <div class="pill"><span class="pill-emoji">👜</span> <span data-editable="true" data-field="cat3">Accessories</span></div>
-        <div class="pill"><span class="pill-emoji">🧴</span> <span data-editable="true" data-field="cat4">Beauty</span></div>
-        <div class="pill"><span class="pill-emoji">🏠</span> <span data-editable="true" data-field="cat5">Home</span></div>
+        <div class="pill">
+          <svg class="pill-icon" viewBox="0 0 22 22" fill="none"><path d="M7 3 L7 1 L15 1 L15 3 M5 3 L17 3 L17 19 Q17 21 15 21 L7 21 Q5 21 5 19 Z" stroke="#4ade80" stroke-width="1.2" fill="none"/><line x1="8" y1="8" x2="14" y2="8" stroke="#4ade80" stroke-width="0.8" opacity="0.5"/></svg>
+          <span data-editable="true" data-field="cat1">Apparel</span>
+        </div>
+        <div class="pill">
+          <svg class="pill-icon" viewBox="0 0 22 22" fill="none"><path d="M3 16 L3 12 L7 8 L9 8 L10 11 L18 11 Q20 11 20 14 L20 16 Z" stroke="#4ade80" stroke-width="1.2" fill="none"/><line x1="3" y1="16" x2="20" y2="16" stroke="#4ade80" stroke-width="1.2"/></svg>
+          <span data-editable="true" data-field="cat2">Footwear</span>
+        </div>
+        <div class="pill">
+          <svg class="pill-icon" viewBox="0 0 22 22" fill="none"><rect x="4" y="6" width="14" height="12" rx="3" stroke="#4ade80" stroke-width="1.2" fill="none"/><path d="M8 6 L8 4 Q8 2 11 2 Q14 2 14 4 L14 6" stroke="#4ade80" stroke-width="1.2" fill="none"/></svg>
+          <span data-editable="true" data-field="cat3">Accessories</span>
+        </div>
+        <div class="pill">
+          <svg class="pill-icon" viewBox="0 0 22 22" fill="none"><path d="M8 20 L8 8 Q8 4 11 3 Q14 4 14 8 L14 20" stroke="#4ade80" stroke-width="1.2" fill="none"/><ellipse cx="11" cy="20" rx="5" ry="1" stroke="#4ade80" stroke-width="0.8" opacity="0.5"/></svg>
+          <span data-editable="true" data-field="cat4">Beauty</span>
+        </div>
+        <div class="pill">
+          <svg class="pill-icon" viewBox="0 0 22 22" fill="none"><path d="M3 20 L3 10 L11 4 L19 10 L19 20 Z" stroke="#4ade80" stroke-width="1.2" fill="none"/><rect x="9" y="14" width="4" height="6" stroke="#4ade80" stroke-width="0.8" fill="none"/></svg>
+          <span data-editable="true" data-field="cat5">Home</span>
+        </div>
       </div>
 
       <div class="savings-box">
