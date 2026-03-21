@@ -1,0 +1,372 @@
+/*
+ * Vizora Digital Signage — Animation Library
+ * ============================================
+ *
+ * Reusable CSS animation classes for signage templates.
+ * All animations use GPU-accelerated properties only (transform + opacity).
+ *
+ * Usage in templates:
+ *   <link rel="stylesheet" href="../shared/animations.css">
+ *
+ *   <h1 class="animate-fade-up">Title</h1>
+ *   <div class="animate-fade-up stagger-1">First item</div>
+ *   <div class="animate-fade-up stagger-2">Second item</div>
+ *   <span class="price animate-neon-pulse">$9.99</span>
+ *   <div class="glow-orb animate-breathe">decorative</div>
+ *
+ * Categories:
+ *   1. Entrance — run once on page load (0.5–1s)
+ *   2. Stagger — delays for sequential reveals
+ *   3. Ambient — infinite loops for atmosphere (2–4s)
+ *   4. Data Update — for content that changes
+ *   5. Attention — for CTAs, prices, badges
+ *   6. Background — slow environmental effects
+ *
+ * All entrance animations use fill-mode: both so elements
+ * stay invisible until their delay elapses, then hold final state.
+ */
+
+
+/* ==========================================================================
+   1. ENTRANCE ANIMATIONS (run once)
+   ========================================================================== */
+
+/* Fade in from bottom */
+.animate-fade-up {
+  animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Fade in from left */
+.animate-fade-left {
+  animation: fadeLeft 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Fade in from right */
+.animate-fade-right {
+  animation: fadeRight 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Scale up from center */
+.animate-scale-in {
+  animation: scaleIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Fade in only (no movement) */
+.animate-fade-in {
+  animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Fade in from top */
+.animate-fade-down {
+  animation: fadeDown 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+
+/* ==========================================================================
+   2. STAGGER DELAYS (combine with entrance animations)
+   ========================================================================== */
+
+.stagger-1  { animation-delay: 0.1s; }
+.stagger-2  { animation-delay: 0.2s; }
+.stagger-3  { animation-delay: 0.3s; }
+.stagger-4  { animation-delay: 0.4s; }
+.stagger-5  { animation-delay: 0.5s; }
+.stagger-6  { animation-delay: 0.6s; }
+.stagger-7  { animation-delay: 0.7s; }
+.stagger-8  { animation-delay: 0.8s; }
+.stagger-9  { animation-delay: 0.9s; }
+.stagger-10 { animation-delay: 1.0s; }
+
+
+/* ==========================================================================
+   3. AMBIENT LOOPS (run forever — subtle atmosphere)
+   ========================================================================== */
+
+/* Gentle glow pulse — for accent elements */
+.animate-glow {
+  animation: glowPulse 3s ease-in-out infinite;
+}
+
+/* Subtle float — for icons/decorative elements */
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+/* Breathing opacity — for background elements */
+.animate-breathe {
+  animation: breathe 4s ease-in-out infinite;
+}
+
+/* Shimmer — for highlight/accent bars */
+.animate-shimmer {
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+/* Soft rotation — for loading indicators or decorative elements */
+.animate-spin-slow {
+  animation: spinSlow 8s linear infinite;
+}
+
+
+/* ==========================================================================
+   4. DATA UPDATE ANIMATIONS (for content that changes)
+   ========================================================================== */
+
+/* Number/text update flash — briefly highlights then settles */
+.animate-update {
+  animation: updateFlash 1s ease-out;
+}
+
+/* Slide out to left — for carousel/rotating content */
+.animate-slide-out {
+  animation: slideOut 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Slide in from right — for carousel/rotating content */
+.animate-slide-in {
+  animation: slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+
+/* ==========================================================================
+   5. ATTENTION GRABBERS (for CTAs, sale prices, badges)
+   ========================================================================== */
+
+/* Gentle bounce — for prices, badges */
+.animate-bounce-subtle {
+  animation: bounceSoft 2s ease-in-out infinite;
+}
+
+/* Neon pulse — for accent text */
+.animate-neon-pulse {
+  animation: neonPulse 2s ease-in-out infinite;
+}
+
+
+/* ==========================================================================
+   6. BACKGROUND EFFECTS
+   ========================================================================== */
+
+/* Slow gradient shift — for backgrounds (requires background-size: 200% 200%) */
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradientShift 8s ease-in-out infinite;
+}
+
+/* Particle drift — for decorative dots/orbs */
+.animate-drift {
+  animation: drift 10s ease-in-out infinite;
+}
+
+
+/* ==========================================================================
+   KEYFRAMES
+   ========================================================================== */
+
+/* --- Entrance --- */
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* --- Ambient Loops --- */
+
+@keyframes glowPulse {
+  0%, 100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes breathe {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes shimmer {
+  0%, 100% {
+    opacity: 0.6;
+    transform: translateX(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateX(4px);
+  }
+}
+
+@keyframes spinSlow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* --- Data Update --- */
+
+@keyframes updateFlash {
+  0% {
+    opacity: 0.4;
+    transform: scale(1.05);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slideOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* --- Attention Grabbers --- */
+
+@keyframes bounceSoft {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes neonPulse {
+  0%, 100% {
+    opacity: 0.85;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+}
+
+/* --- Background Effects --- */
+
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes drift {
+  0% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(10px, -10px);
+  }
+  50% {
+    transform: translate(-5px, -15px);
+  }
+  75% {
+    transform: translate(-10px, -5px);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
