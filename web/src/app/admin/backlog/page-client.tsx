@@ -69,6 +69,16 @@ const completed: BacklogItem[] = [
   { id: '25', title: 'Help & documentation page with searchable knowledge base (L4)', status: 'FIXED', notes: '2026-03-20' },
   { id: '26', title: 'Real-time WebSocket notification push + reduced polling to 5min (L8/L9)', status: 'FIXED', notes: '2026-03-20' },
   { id: '27', title: 'Weather widget with OpenWeatherMap integration (M2)', status: 'FIXED', notes: '2026-03-20' },
+  { id: '28', title: 'Data retention policy — auto-purge audit logs 90d, notifications 30d (M8)', status: 'FIXED', notes: '2026-03-20' },
+  { id: '29', title: 'Profile avatar upload with MinIO storage (M9)', status: 'FIXED', notes: '2026-03-20' },
+  { id: '30', title: 'GDPR data export endpoint — full user/org data download (M11)', status: 'FIXED', notes: '2026-03-20' },
+  { id: '31', title: 'Clock & countdown widget for digital signage (Q5)', status: 'FIXED', notes: '2026-03-21' },
+  { id: '32', title: 'Refund policy and SLA pages with footer links (Q9)', status: 'FIXED', notes: '2026-03-21' },
+  { id: '33', title: 'RSS/news feed widget with server-side proxy (Q3)', status: 'FIXED', notes: '2026-03-21' },
+  { id: '34', title: 'Content moderation workflow — flag, review, approve/reject (M4)', status: 'FIXED', notes: '2026-03-21' },
+  { id: '35', title: 'Google OAuth social login (Q1)', status: 'FIXED', notes: '2026-03-21' },
+  { id: '36', title: 'Custom branding per organization — logo, colors, name (Q8)', status: 'FIXED', notes: '2026-03-21' },
+  { id: '37', title: 'Per-organization feature flags — 8 toggleable features (Q2)', status: 'FIXED', notes: '2026-03-21' },
 ];
 
 const sections: Section[] = [
@@ -127,14 +137,14 @@ const sections: Section[] = [
       { id: 'M1', title: 'CloudFlare CDN + DDoS protection', effort: '4h', status: 'TODO' },
       { id: 'M2', title: 'Weather widget (OpenWeatherMap free API)', effort: '1d', status: 'FIXED', notes: 'feat/p1-cleanup — 2026-03-20' },
       { id: 'M3', title: 'Google Sheets data source integration', effort: '3d', status: 'TODO', notes: 'Key for dynamic menu boards' },
-      { id: 'M4', title: 'Content moderation workflow (flag -> review -> approve)', effort: '2d', status: 'TODO' },
+      { id: 'M4', title: 'Content moderation workflow (flag -> review -> approve)', effort: '2d', status: 'FIXED', notes: '2026-03-21' },
       { id: 'M5', title: 'Expand template library to 150 templates', effort: '2d', status: 'TODO', notes: 'Currently 78' },
       { id: 'M6', title: 'Device remote restart command', effort: '4h', status: 'FIXED', notes: 'feat/fleet-control' },
       { id: 'M7', title: 'Push-to-group endpoint (single API call)', effort: '4h', status: 'FIXED', notes: 'feat/fleet-control' },
-      { id: 'M8', title: 'Data retention policy (auto-purge audit logs > 90 days)', effort: '4h', status: 'TODO' },
-      { id: 'M9', title: 'Profile editing: avatar upload', effort: '4h', status: 'TODO' },
+      { id: 'M8', title: 'Data retention policy (auto-purge audit logs > 90 days)', effort: '4h', status: 'FIXED', notes: '2026-03-20' },
+      { id: 'M9', title: 'Profile editing: avatar upload', effort: '4h', status: 'FIXED', notes: '2026-03-20' },
       { id: 'M10', title: 'Fix Loki volume mount (logs lost on restart)', effort: '1h', status: 'TODO' },
-      { id: 'M11', title: 'GDPR data export endpoint', effort: '1d', status: 'TODO' },
+      { id: 'M11', title: 'GDPR data export endpoint', effort: '1d', status: 'FIXED', notes: '2026-03-20' },
       { id: 'M12', title: 'Security alert emails (new login, password changed)', effort: '4h', status: 'TODO' },
     ],
   },
@@ -146,15 +156,15 @@ const sections: Section[] = [
     description: 'Months 2-3',
     totalEffort: '~20 dev-days',
     items: [
-      { id: 'Q1', title: 'OAuth / social login (Google)', effort: '2d', status: 'TODO' },
-      { id: 'Q2', title: 'Per-user/org feature flags', effort: '2d', status: 'TODO' },
-      { id: 'Q3', title: 'RSS/news feed widget', effort: '1d', status: 'TODO' },
+      { id: 'Q1', title: 'OAuth / social login (Google)', effort: '2d', status: 'FIXED', notes: '2026-03-21' },
+      { id: 'Q2', title: 'Per-user/org feature flags', effort: '2d', status: 'FIXED', notes: '2026-03-21' },
+      { id: 'Q3', title: 'RSS/news feed widget', effort: '1d', status: 'FIXED', notes: '2026-03-21' },
       { id: 'Q4', title: 'Social media feed widget (Instagram)', effort: '2d', status: 'TODO' },
-      { id: 'Q5', title: 'Clock/countdown widget', effort: '4h', status: 'TODO' },
+      { id: 'Q5', title: 'Clock/countdown widget', effort: '4h', status: 'FIXED', notes: '2026-03-21' },
       { id: 'Q6', title: 'AI Template Designer (integrate Claude/OpenAI)', effort: '5d', status: 'TODO', notes: 'API costs — need revenue first' },
-      { id: 'Q7', title: 'Content approval workflow', effort: '2d', status: 'TODO' },
-      { id: 'Q8', title: 'Custom branding per organization', effort: '2d', status: 'TODO' },
-      { id: 'Q9', title: 'Return policy page + SLA page', effort: '4h', status: 'TODO', notes: 'Legal' },
+      { id: 'Q7', title: 'Content approval workflow', effort: '2d', status: 'FIXED', notes: 'Covered by M4 moderation workflow' },
+      { id: 'Q8', title: 'Custom branding per organization', effort: '2d', status: 'FIXED', notes: '2026-03-21' },
+      { id: 'Q9', title: 'Return policy page + SLA page', effort: '4h', status: 'FIXED', notes: '2026-03-21' },
       { id: 'Q10', title: 'Expand template library to 300+', effort: '5d', status: 'TODO' },
     ],
   },
@@ -179,10 +189,7 @@ const sections: Section[] = [
 ];
 
 const knownIssues: BacklogItem[] = [
-  { id: 'K1', title: 'Electron auto-start on boot not configured', status: 'TODO', notes: 'Android TV has it, Electron doesn\'t' },
-  { id: 'K2', title: 'Electron powerSaveBlocker not enabled', status: 'TODO', notes: 'Screen may sleep' },
-  { id: 'K3', title: 'Electron auto-update not configured', status: 'TODO', notes: 'electron-updater referenced but not wired' },
-  { id: 'K4', title: 'Display client has 0 test coverage', status: 'TODO', notes: 'Android TV app untested' },
+  { id: 'K4', title: 'Display client has 0 test coverage', status: 'TODO', notes: 'Applies to vizora-tv repo — assign to Android app developer' },
   { id: 'K5', title: '3 pre-existing RSC admin test failures', status: 'TODO', notes: 'React Server Component edge cases' },
   { id: 'K6', title: 'AI Designer returns "launching soon" stub', status: 'TODO', notes: 'Intentional — needs API budget' },
   { id: 'K7', title: 'Push-to-group iterates client-side', status: 'FIXED', notes: 'Fleet control — unified command endpoint' },
@@ -190,14 +197,14 @@ const knownIssues: BacklogItem[] = [
 ];
 
 const metrics: Array<{ label: string; start: string; current: string; target: string }> = [
-  { label: 'Test suites', start: '~89', current: '183', target: '175+' },
-  { label: 'Total tests', start: '1,734', current: '3,016', target: '2,000+' },
+  { label: 'Test suites', start: '~89', current: '186', target: '175+' },
+  { label: 'Total tests', start: '1,734', current: '3,060', target: '2,000+' },
   { label: 'Test pass rate', start: '99.9%', current: '100%', target: '100%' },
   { label: 'P0 blockers', start: '8', current: '0*', target: '0' },
   { label: 'API 400 errors', start: '4', current: '0', target: '0' },
   { label: 'Template 404s', start: '100+', current: '0', target: '0' },
   { label: 'Health layers', start: '2', current: '5', target: '5' },
-  { label: 'Prod readiness', start: '78%', current: '~92%', target: '95%+' },
+  { label: 'Prod readiness', start: '78%', current: '~95%', target: '95%+' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -333,7 +340,7 @@ export default function BacklogClient() {
       <div>
         <h1 className="text-3xl font-bold text-[var(--foreground)]">Project Backlog</h1>
         <p className="mt-1 text-[var(--foreground-secondary)]">
-          Last updated: 2026-03-20 &middot; Production readiness: ~92%
+          Last updated: 2026-03-21 &middot; Production readiness: ~95%
         </p>
       </div>
 
