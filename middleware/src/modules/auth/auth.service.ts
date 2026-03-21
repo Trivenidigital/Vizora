@@ -7,6 +7,7 @@ import {
   BadRequestException,
   HttpException,
   HttpStatus,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { DatabaseService } from '../database/database.service';
@@ -145,6 +146,163 @@ export class AuthService {
       },
       token,
       expiresIn: 604800, // 7 days in seconds
+    };
+  }
+
+  async googleLogin(credential: string) {
+    // C2: Validate audience — MANDATORY. Must be checked before any processing.
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      throw new ServiceUnavailableException('Google OAuth is not configured');
+    }
+
+    // C1: Decode Google ID token locally (standard JWT) instead of HTTP roundtrip to Google
+    let payload: { email?: string; email_verified?: boolean; given_name?: string; family_name?: string; name?: string; aud?: string; exp?: number; iss?: string };
+    try {
+      const parts = credential.split('.');
+      if (parts.length !== 3) {
+        throw new UnauthorizedException('Invalid token format');
+      }
+
+      const header = JSON.parse(Buffer.from(parts[0], 'base64url').toString());
+      payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+    } catch (error) {
+      if (error instanceof UnauthorizedException) throw error;
+      if (error instanceof ServiceUnavailableException) throw error;
+      this.logger.error(`Google token decode failed: ${error instanceof Error ? error.message : 'Unknown'}`);
+      throw new UnauthorizedException('Failed to verify Google token');
+    }
+
+    // Validate required fields
+    if (!payload.email || !payload.email_verified) {
+      throw new UnauthorizedException('Email not verified by Google');
+    }
+
+    // Validate expiry
+    if (payload.exp && payload.exp * 1000 < Date.now()) {
+      throw new UnauthorizedException('Google token has expired');
+    }
+
+    // Validate issuer
+    if (!['accounts.google.com', 'https://accounts.google.com'].includes(payload.iss || '')) {
+      throw new UnauthorizedException('Invalid token issuer');
+    }
+
+    // C2: Validate audience matches our client ID
+    if (payload.aud !== clientId) {
+      throw new UnauthorizedException('Google token audience mismatch');
+    }
+
+    // Find existing user
+    let user = await this.databaseService.user.findUnique({
+      where: { email: payload.email },
+      include: { organization: true },
+    });
+
+    if (user && !user.isActive) {
+      throw new ForbiddenException('Account is inactive. Contact support.');
+    }
+
+    // C3: Prevent account takeover — don't merge OAuth into password accounts
+    if (user && user.passwordHash && user.passwordHash !== '') {
+      throw new UnauthorizedException(
+        'This email is registered with a password. Please use email/password login, or reset your password first.',
+      );
+    }
+
+    let isNewUser = false;
+
+    if (!user) {
+      // Auto-register: create org + user in a transaction
+      isNewUser = true;
+      const firstName = payload.given_name || payload.name?.split(' ')[0] || 'User';
+      const lastName = payload.family_name || payload.name?.split(' ').slice(1).join(' ') || '';
+      const orgName = `${firstName}'s Organization`;
+      const slug = this.generateSlug(orgName) + '-' + crypto.randomBytes(3).toString('hex');
+
+      const trialEndsAt = new Date();
+      trialEndsAt.setDate(trialEndsAt.getDate() + 30);
+
+      const result = await this.databaseService.$transaction(async (tx) => {
+        const organization = await tx.organization.create({
+          data: {
+            name: orgName,
+            slug,
+            subscriptionTier: 'free',
+            screenQuota: 5,
+            trialEndsAt,
+            subscriptionStatus: 'trial',
+          },
+        });
+
+        const newUser = await tx.user.create({
+          data: {
+            email: payload.email!,
+            passwordHash: '', // OAuth users have no password
+            firstName,
+            lastName,
+            role: 'admin',
+            organizationId: organization.id,
+            isActive: true,
+          },
+          include: { organization: true },
+        });
+
+        await tx.auditLog.create({
+          data: {
+            organizationId: organization.id,
+            userId: newUser.id,
+            action: 'user_registered',
+            entityType: 'user',
+            entityId: newUser.id,
+            changes: {
+              email: newUser.email,
+              organizationName: organization.name,
+              provider: 'google',
+            },
+          },
+        });
+
+        return newUser;
+      });
+
+      user = result;
+    }
+
+    // Update last login
+    await this.databaseService.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+
+    // Generate JWT token
+    const token = this.generateToken(user, user.organization);
+
+    // Log audit event for login
+    if (!isNewUser) {
+      await this.databaseService.auditLog.create({
+        data: {
+          organizationId: user.organizationId,
+          userId: user.id,
+          action: 'user_login',
+          entityType: 'user',
+          entityId: user.id,
+          changes: { provider: 'google' },
+        },
+      });
+    }
+
+    return {
+      user: {
+        ...this.sanitizeUser(user),
+        organization: {
+          name: user.organization.name,
+          subscriptionTier: user.organization.subscriptionTier,
+        },
+      },
+      token,
+      expiresIn: AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS,
+      isNewUser,
     };
   }
 

@@ -3,10 +3,15 @@
 import { devLog } from '../logger';
 import { ApiClient, LoginResponse, RegisterResponse, AuthUser } from './client';
 
+export interface GoogleLoginResponse extends LoginResponse {
+  isNewUser: boolean;
+}
+
 declare module './client' {
   interface ApiClient {
     login(email: string, password: string): Promise<LoginResponse>;
     register(email: string, password: string, organizationName: string, firstName: string, lastName: string): Promise<RegisterResponse>;
+    googleLogin(credential: string): Promise<GoogleLoginResponse>;
     logout(): Promise<void>;
     refreshToken(): Promise<{ expiresIn: number }>;
     getCurrentUser(): Promise<AuthUser>;
@@ -54,6 +59,20 @@ ApiClient.prototype.register = async function (
       firstName,
       lastName,
     }),
+  });
+
+  // Mark as authenticated - token is in httpOnly cookie
+  this.isAuthenticated = true;
+  return response;
+};
+
+ApiClient.prototype.googleLogin = async function (credential: string): Promise<GoogleLoginResponse> {
+  if (process.env.NODE_ENV === 'development') {
+    devLog('[API] Google login called');
+  }
+  const response = await this.request<GoogleLoginResponse>('/auth/google', {
+    method: 'POST',
+    body: JSON.stringify({ credential }),
   });
 
   // Mark as authenticated - token is in httpOnly cookie

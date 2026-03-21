@@ -104,6 +104,8 @@ GRAFANA_ADMIN_USER      # Required — Grafana admin username (no insecure defau
 GRAFANA_ADMIN_PASSWORD  # Required — Grafana admin password (no insecure default)
 BACKUP_S3_BUCKET        # Optional — S3 bucket for off-site DB backups
 OPENWEATHER_API_KEY     # Optional — OpenWeatherMap API key for weather widget
+GOOGLE_CLIENT_ID        # Optional — Google OAuth client ID (enables Google Sign-In)
+NEXT_PUBLIC_GOOGLE_CLIENT_ID  # Optional — Same value, exposed to frontend for GSI button
 ```
 
 ## Project Structure Highlights

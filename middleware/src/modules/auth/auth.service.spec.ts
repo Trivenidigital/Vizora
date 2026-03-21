@@ -1,11 +1,30 @@
 import { JwtService } from '@nestjs/jwt';
-import { ConflictException, UnauthorizedException, ForbiddenException, HttpException, HttpStatus } from '@nestjs/common';
+import { ConflictException, UnauthorizedException, ForbiddenException, HttpException, HttpStatus, ServiceUnavailableException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { DatabaseService } from '../database/database.service';
 import { RedisService } from '../redis/redis.service';
 import { MailService } from '../mail/mail.service';
 import { GeoService } from '../common/services/geo.service';
 import * as bcrypt from 'bcryptjs';
+
+/**
+ * Helper: build a fake Google ID token (3-part base64url JWT) for testing.
+ */
+function buildGoogleIdToken(payloadOverrides: Record<string, unknown> = {}): string {
+  const header = { alg: 'RS256', typ: 'JWT' };
+  const payload = {
+    iss: 'accounts.google.com',
+    aud: 'test-google-client-id',
+    email: 'googleuser@gmail.com',
+    email_verified: true,
+    given_name: 'Google',
+    family_name: 'User',
+    exp: Math.floor(Date.now() / 1000) + 3600,
+    ...payloadOverrides,
+  };
+  const enc = (obj: unknown) => Buffer.from(JSON.stringify(obj)).toString('base64url');
+  return `${enc(header)}.${enc(payload)}.fake-signature`;
+}
 
 // Mock bcryptjs
 jest.mock('bcryptjs', () => ({
@@ -101,6 +120,13 @@ describe('AuthService', () => {
       cancelSubscription: jest.fn().mockResolvedValue(undefined),
     };
 
+    const mockStorageService = {
+      uploadFile: jest.fn().mockResolvedValue(undefined),
+      deleteFile: jest.fn().mockResolvedValue(undefined),
+      getPresignedUrl: jest.fn().mockResolvedValue('https://minio/avatar.jpg'),
+      isMinioAvailable: jest.fn().mockReturnValue(true),
+    };
+
     // Directly instantiate the service with mocked dependencies
     service = new AuthService(
       mockDatabaseService as DatabaseService,
@@ -109,6 +135,7 @@ describe('AuthService', () => {
       mockMailService as MailService,
       mockGeoService as GeoService,
       mockBillingService as any,
+      mockStorageService as any,
     );
     
     // Reset bcrypt mocks
@@ -552,6 +579,126 @@ describe('AuthService', () => {
       });
 
       expect(result.user).not.toHaveProperty('passwordHash');
+    });
+  });
+
+  describe('googleLogin', () => {
+    const originalEnv = process.env;
+
+    beforeEach(() => {
+      process.env = { ...originalEnv, GOOGLE_CLIENT_ID: 'test-google-client-id' };
+    });
+
+    afterEach(() => {
+      process.env = originalEnv;
+    });
+
+    it('should return user and token for a valid Google token (existing OAuth user)', async () => {
+      const token = buildGoogleIdToken();
+      const oauthUser = {
+        ...mockUser,
+        passwordHash: '', // OAuth user has no password
+        organization: mockOrganization,
+      };
+      mockDatabaseService.user.findUnique.mockResolvedValue(oauthUser);
+      mockDatabaseService.user.update.mockResolvedValue(oauthUser);
+      mockDatabaseService.auditLog.create.mockResolvedValue({});
+
+      const result = await service.googleLogin(token);
+
+      expect(result).toHaveProperty('token', 'mock-jwt-token');
+      expect(result).toHaveProperty('user');
+      expect(result.isNewUser).toBe(false);
+    });
+
+    it('should throw UnauthorizedException for expired token', async () => {
+      const token = buildGoogleIdToken({ exp: Math.floor(Date.now() / 1000) - 3600 });
+
+      await expect(service.googleLogin(token)).rejects.toThrow(UnauthorizedException);
+      await expect(service.googleLogin(token)).rejects.toThrow('Google token has expired');
+    });
+
+    it('should throw UnauthorizedException when email is not verified', async () => {
+      const token = buildGoogleIdToken({ email_verified: false });
+
+      await expect(service.googleLogin(token)).rejects.toThrow(UnauthorizedException);
+      await expect(service.googleLogin(token)).rejects.toThrow('Email not verified by Google');
+    });
+
+    it('should throw UnauthorizedException for audience mismatch', async () => {
+      const token = buildGoogleIdToken({ aud: 'wrong-client-id' });
+
+      await expect(service.googleLogin(token)).rejects.toThrow(UnauthorizedException);
+      await expect(service.googleLogin(token)).rejects.toThrow('Google token audience mismatch');
+    });
+
+    it('should throw ServiceUnavailableException when GOOGLE_CLIENT_ID is not set', async () => {
+      delete process.env.GOOGLE_CLIENT_ID;
+      const token = buildGoogleIdToken();
+
+      await expect(service.googleLogin(token)).rejects.toThrow(ServiceUnavailableException);
+      await expect(service.googleLogin(token)).rejects.toThrow('Google OAuth is not configured');
+    });
+
+    it('should throw UnauthorizedException when existing user has a password (prevent account takeover)', async () => {
+      const token = buildGoogleIdToken();
+      const passwordUser = {
+        ...mockUser,
+        passwordHash: '$2a$14$somehash', // Has password
+        organization: mockOrganization,
+      };
+      mockDatabaseService.user.findUnique.mockResolvedValue(passwordUser);
+
+      await expect(service.googleLogin(token)).rejects.toThrow(UnauthorizedException);
+      await expect(service.googleLogin(token)).rejects.toThrow(
+        'This email is registered with a password',
+      );
+    });
+
+    it('should create new org + user for first-time Google login', async () => {
+      const token = buildGoogleIdToken();
+      mockDatabaseService.user.findUnique.mockResolvedValue(null);
+      // $transaction mock returns the callback result
+      const newUser = {
+        ...mockUser,
+        email: 'googleuser@gmail.com',
+        passwordHash: '',
+        firstName: 'Google',
+        lastName: 'User',
+        organization: mockOrganization,
+      };
+      mockDatabaseService.organization.create.mockResolvedValue(mockOrganization);
+      mockDatabaseService.user.create.mockResolvedValue(newUser);
+      mockDatabaseService.auditLog.create.mockResolvedValue({});
+      mockDatabaseService.user.update.mockResolvedValue(newUser);
+
+      const result = await service.googleLogin(token);
+
+      expect(result.isNewUser).toBe(true);
+      expect(result).toHaveProperty('token');
+      expect(mockDatabaseService.organization.create).toHaveBeenCalled();
+      expect(mockDatabaseService.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            email: 'googleuser@gmail.com',
+            passwordHash: '',
+          }),
+          include: { organization: true },
+        }),
+      );
+    });
+
+    it('should throw UnauthorizedException for invalid token format (not 3 parts)', async () => {
+      await expect(service.googleLogin('not.a.valid.jwt.token')).rejects.toThrow(
+        UnauthorizedException,
+      );
+    });
+
+    it('should throw UnauthorizedException for invalid issuer', async () => {
+      const token = buildGoogleIdToken({ iss: 'https://evil.example.com' });
+
+      await expect(service.googleLogin(token)).rejects.toThrow(UnauthorizedException);
+      await expect(service.googleLogin(token)).rejects.toThrow('Invalid token issuer');
     });
   });
 });

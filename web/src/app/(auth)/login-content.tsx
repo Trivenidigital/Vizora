@@ -9,6 +9,7 @@ import { z } from 'zod';
 import ValuePanel from '@/components/auth/ValuePanel';
 import FormField from '@/components/auth/FormField';
 import PasswordInput from '@/components/auth/PasswordInput';
+import GoogleSignInButton from '@/components/auth/GoogleSignInButton';
 
 function isValidRedirectUrl(url: string): boolean {
   return url.startsWith('/') && !url.startsWith('//') && !url.includes('://');
@@ -31,6 +32,26 @@ export default function LoginContent() {
 
   const clearFieldError = (field: string) => {
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: '' }));
+  };
+
+  const handleGoogleLogin = async (credential: string) => {
+    setLoading(true);
+    setError('');
+    try {
+      await apiClient.googleLogin(credential);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[LOGIN] Google login successful, redirecting to:', redirectUrl);
+      }
+      window.location.href = redirectUrl;
+    } catch (err: unknown) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[LOGIN] Google login error:', err);
+      }
+      const message = err instanceof Error ? err.message : 'Google login failed';
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -226,6 +247,21 @@ export default function LoginContent() {
             </button>
           </form>
 
+          {/* Divider */}
+          <div className="relative mt-5 lg:mt-4">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-[var(--border)]" />
+            </div>
+            <div className="relative flex justify-center text-xs">
+              <span className="bg-[var(--background)] px-3 text-[var(--foreground-tertiary)]">or</span>
+            </div>
+          </div>
+
+          {/* Google Sign-In */}
+          <div className="mt-4 lg:mt-3">
+            <GoogleSignInButton onSuccess={handleGoogleLogin} text="signin_with" />
+          </div>
+
           {/* Trust signals */}
           <div className="flex items-center justify-center gap-4 mt-4 lg:mt-3 text-[10px] text-[var(--foreground-tertiary)]">
             <span className="flex items-center gap-1">
@@ -239,16 +275,6 @@ export default function LoginContent() {
             <span>Free 30-day trial</span>
             <span className="text-[var(--border)]">|</span>
             <span>5 screens included</span>
-          </div>
-
-          {/* Divider + Register link */}
-          <div className="relative mt-6 lg:mt-4">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-[var(--border)]" />
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="bg-[var(--background)] px-3 text-[var(--foreground-tertiary)]">or</span>
-            </div>
           </div>
 
           <p className="text-center mt-4 lg:mt-3 text-sm text-[var(--foreground-secondary)]">

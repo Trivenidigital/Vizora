@@ -154,6 +154,6 @@ describe('CustomizationPage', () => {
   it('renders logo upload section', () => {
     render(<CustomizationPage />);
     expect(screen.getByText('Upload Logo')).toBeInTheDocument();
-    expect(screen.getByText(/PNG, JPEG, or SVG/)).toBeInTheDocument();
+    expect(screen.getByText(/PNG, JPEG, or WebP/)).toBeInTheDocument();
   });
 });

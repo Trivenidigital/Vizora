@@ -2,12 +2,14 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException } from '@nestjs/common';
 import { OrganizationsController } from './organizations.controller';
 import { OrganizationsService } from './organizations.service';
+import { FeatureFlagService } from './feature-flags.service';
 import { StorageQuotaService } from '../storage/storage-quota.service';
 import { Reflector } from '@nestjs/core';
 
 describe('OrganizationsController', () => {
   let controller: OrganizationsController;
   let mockOrganizationsService: jest.Mocked<OrganizationsService>;
+  let mockFeatureFlagService: jest.Mocked<FeatureFlagService>;
   let mockStorageQuotaService: jest.Mocked<StorageQuotaService>;
 
   beforeEach(async () => {
@@ -16,6 +18,12 @@ describe('OrganizationsController', () => {
       findOne: jest.fn(),
       update: jest.fn(),
       remove: jest.fn(),
+    } as any;
+
+    mockFeatureFlagService = {
+      isEnabled: jest.fn(),
+      getFlags: jest.fn(),
+      setFlags: jest.fn(),
     } as any;
 
     mockStorageQuotaService = {
@@ -30,6 +38,7 @@ describe('OrganizationsController', () => {
       controllers: [OrganizationsController],
       providers: [
         { provide: OrganizationsService, useValue: mockOrganizationsService },
+        { provide: FeatureFlagService, useValue: mockFeatureFlagService },
         { provide: StorageQuotaService, useValue: mockStorageQuotaService },
         { provide: Reflector, useValue: { getAllAndOverride: jest.fn() } },
       ],
@@ -182,6 +191,30 @@ describe('OrganizationsController', () => {
       }
 
       expect(mockOrganizationsService.remove).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getFeatureFlags', () => {
+    it('should return feature flags for the current org', async () => {
+      const flags = { weatherWidget: true, rssWidget: false };
+      mockFeatureFlagService.getFlags.mockResolvedValue(flags);
+
+      const result = await controller.getFeatureFlags('org-123');
+
+      expect(result).toEqual(flags);
+      expect(mockFeatureFlagService.getFlags).toHaveBeenCalledWith('org-123');
+    });
+  });
+
+  describe('updateFeatureFlags', () => {
+    it('should update feature flags for the current org', async () => {
+      const updatedFlags = { weatherWidget: true, rssWidget: false };
+      mockFeatureFlagService.setFlags.mockResolvedValue(updatedFlags);
+
+      const result = await controller.updateFeatureFlags('org-123', { rssWidget: false });
+
+      expect(result).toEqual(updatedFlags);
+      expect(mockFeatureFlagService.setFlags).toHaveBeenCalledWith('org-123', { rssWidget: false });
     });
   });
 });
