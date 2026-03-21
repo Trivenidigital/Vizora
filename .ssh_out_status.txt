@@ -1,0 +1,15 @@
+┌────┬──────────────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name                     │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼──────────────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 7  │ ops-content-lifecycle    │ default     │ N/A     │ fork    │ 0        │ 0      │ 1    │ stopped   │ 0%       │ 0b       │ root     │ disabled │
+│ 11 │ ops-db-maintainer        │ default     │ N/A     │ fork    │ 0        │ 0      │ 0    │ stopped   │ 0%       │ 0b       │ root     │ disabled │
+│ 8  │ ops-fleet-manager        │ default     │ N/A     │ fork    │ 0        │ 0      │ 2    │ stopped   │ 0%       │ 0b       │ root     │ disabled │
+│ 6  │ ops-health-guardian      │ default     │ N/A     │ fork    │ 0        │ 0      │ 3    │ stopped   │ 0%       │ 0b       │ root     │ disabled │
+│ 10 │ ops-reporter             │ default     │ N/A     │ fork    │ 0        │ 0      │ 1    │ stopped   │ 0%       │ 0b       │ root     │ disabled │
+│ 9  │ ops-schedule-doctor      │ default     │ N/A     │ fork    │ 0        │ 0      │ 3    │ stopped   │ 0%       │ 0b       │ root     │ disabled │
+│ 3  │ vizora-middleware        │ default     │ 0.0.1   │ cluster │ 2353474  │ 91m    │ 71   │ online    │ 0%       │ 298.4mb  │ root     │ disabled │
+│ 4  │ vizora-middleware        │ default     │ 0.0.1   │ cluster │ 2353651  │ 91m    │ 71   │ online    │ 0%       │ 298.4mb  │ root     │ disabled │
+│ 1  │ vizora-realtime          │ default     │ 0.0.1   │ fork    │ 2353490  │ 91m    │ 45   │ online    │ 0%       │ 270.6mb  │ root     │ disabled │
+│ 5  │ vizora-validator         │ default     │ N/A     │ fork    │ 0        │ 0      │ 1    │ stopped   │ 0%       │ 0b       │ root     │ disabled │
+│ 2  │ vizora-web               │ default     │ N/A     │ fork    │ 2353468  │ 91m    │ 80   │ online    │ 0%       │ 57.7mb   │ root     │ disabled │
+└────┴──────────────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘

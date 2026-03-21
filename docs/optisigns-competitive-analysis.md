@@ -1,0 +1,3 @@
+- Day 1-2: Email + SMTP + Verification — waiting on SendGrid
+  - Day 3-4: Billing config + checkout — waiting on Stripe/Razorpay
+  - Day 7-8: Final smoke test — after Day 1-2 + 3-4

@@ -12,7 +12,7 @@ import {
   ApiConsumes,
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto, ChangePasswordDto, DeleteAccountDto, UpdateProfileDto } from './dto';
+import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto, ChangePasswordDto, DeleteAccountDto, UpdateProfileDto, GoogleLoginDto } from './dto';
 import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -148,6 +148,41 @@ export class AuthController {
         access_token: result.token,
         user: result.user,
         expiresIn: result.expiresIn,
+      },
+    };
+  }
+
+  @ApiOperation({ summary: 'Login or register with Google OAuth' })
+  @ApiBody({ type: GoogleLoginDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Google login successful. Auth token set as httpOnly cookie.',
+  })
+  @ApiResponse({ status: 401, description: 'Invalid Google token' })
+  @Public()
+  @Post('google')
+  @Throttle({
+    default: {
+      limit: process.env.NODE_ENV === 'production' ? 3 : 1000,
+      ttl: 60000,
+    },
+  })
+  async googleLogin(
+    @Body() dto: GoogleLoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.googleLogin(dto.credential);
+
+    // Set httpOnly cookie with JWT token
+    this.setAuthCookie(res, result.token);
+
+    return {
+      success: true,
+      data: {
+        access_token: result.token,
+        user: result.user,
+        expiresIn: result.expiresIn,
+        isNewUser: result.isNewUser,
       },
     };
   }

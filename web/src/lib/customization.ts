@@ -17,13 +17,13 @@ export interface BrandConfig {
   customCSS?: string;
 }
 
-// Default brand configuration
+// Default brand configuration (matches Vizora's brand colors)
 const defaultBrandConfig: BrandConfig = {
   id: 'default',
   name: 'Vizora',
-  primaryColor: '#0284c7',
-  secondaryColor: '#38bdf8',
-  accentColor: '#0ea5e9',
+  primaryColor: '#00E5A0',
+  secondaryColor: '#00B4D8',
+  accentColor: '#00CC8E',
   fontFamily: 'sans',
   showPoweredBy: true,
 };
@@ -98,6 +98,12 @@ export function applyCSSVariables(config: BrandConfig = currentBrandConfig): voi
   root.style.setProperty('--brand-primary', config.primaryColor);
   root.style.setProperty('--brand-secondary', config.secondaryColor);
   root.style.setProperty('--brand-accent', config.accentColor || config.primaryColor);
+
+  // Also override the theme's --primary so the entire UI adapts (sidebar, focus rings, buttons)
+  // Only override if not using the default Vizora color to avoid flash
+  if (config.id !== 'default') {
+    root.style.setProperty('--primary', config.primaryColor);
+  }
 
   // Font family
   if (config.fontFamily) {

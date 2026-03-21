@@ -1,0 +1,14 @@
+                  id                  |               email               | firstName |  lastName  | isSuperAdmin 
+--------------------------------------+-----------------------------------+-----------+------------+--------------
+ 8f6e3741-ee16-47c0-a617-f4a24c136e38 | hisaku.digitalmarketing@gmail.com | Raghu     | Gadde      | f
+ c58f4ca5-0c08-4637-b8b4-06432e75cdc4 | advita.yalavarthi@gmail.com       | Advita    | Yalavarthi | f
+ 69b8abb3-175e-48af-b843-7b0fc0e9e733 | srini@vzora.com                   | Srini     | Yala       | f
+ 601a1832-8e7e-4909-ad6f-b261b11ba34c | lax@vizora.com                    | Srilu     | gadi       | f
+ 1717d65b-081d-4898-a2e3-4586cee37585 | Kusampudiashok@gmail.com          | Ashok     | Kusampudi  | f
+ ab857e89-b0f7-4bcd-b8d5-95537c4f2b33 | chanraj66@yahoo.com               | chan      | rao        | f
+ fa2050a3-1cfc-4813-889f-be6ebafe7746 | srinivas.yalavarthi@gmail.com     | Srini     | Yalavarthi | f
+ 23388638-f5af-4e2e-a655-e535371464b6 | e2etest@vizora.cloud              | E2E       | Tester     | f
+ 73aec8b2-0d0f-4a2a-a1ea-38e287d9970c | qa-test-0226@vizora.test          | Test      | Engineer   | f
+ 5e6da0c4-7b28-47eb-9306-8c4e44234c24 | mobiletest@vizora.cloud           | Mobile    | Test       | f
+(10 rows)
+

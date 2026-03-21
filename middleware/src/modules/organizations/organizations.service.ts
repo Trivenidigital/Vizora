@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
@@ -189,6 +189,18 @@ export class OrganizationsService {
   }
 
   async updateBranding(orgId: string, brandingDto: BrandingConfigDto) {
+    // Validate hex colors
+    const hexColorRegex = /^#[0-9A-Fa-f]{6}$/;
+    if (brandingDto.primaryColor && !hexColorRegex.test(brandingDto.primaryColor)) {
+      throw new BadRequestException('primaryColor must be a valid hex color (e.g., #00E5A0)');
+    }
+    if (brandingDto.secondaryColor && !hexColorRegex.test(brandingDto.secondaryColor)) {
+      throw new BadRequestException('secondaryColor must be a valid hex color (e.g., #38BDF8)');
+    }
+    if (brandingDto.accentColor && !hexColorRegex.test(brandingDto.accentColor)) {
+      throw new BadRequestException('accentColor must be a valid hex color (e.g., #0EA5E9)');
+    }
+
     const org = await this.findOne(orgId);
     if (brandingDto.customCSS) {
       brandingDto.customCSS = this.sanitizeCSS(brandingDto.customCSS);

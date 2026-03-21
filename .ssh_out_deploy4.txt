@@ -1,0 +1,10 @@
+└ ○ /terms
+ƒ Proxy (Middleware)
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+
+
+ NX   Successfully ran target build for project @vizora/web
+
+

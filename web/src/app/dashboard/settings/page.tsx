@@ -9,6 +9,7 @@ import { useTheme } from '@/components/providers/ThemeProvider';
 import { semanticColors } from '@/theme/colors';
 import Modal from '@/components/Modal';
 import { useToast } from '@/lib/hooks/useToast';
+import { useCustomization } from '@/components/providers/CustomizationProvider';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,6 +49,17 @@ export default function SettingsPage() {
  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
  const [avatarUploading, setAvatarUploading] = useState(false);
  const fileInputRef = useRef<HTMLInputElement>(null);
+
+ // Branding state
+ const { brandConfig, updateBrandConfig, organizationId: brandOrgId } = useCustomization();
+ const [brandingForm, setBrandingForm] = useState({
+   companyName: '',
+   primaryColor: '#00E5A0',
+   logoPreview: null as string | null,
+ });
+ const [brandingSaving, setBrandingSaving] = useState(false);
+ const [logoUploading, setLogoUploading] = useState(false);
+ const logoInputRef = useRef<HTMLInputElement>(null);
 
  const getUserInitials = () => {
    if (profileForm.firstName && profileForm.lastName) {
@@ -131,6 +143,80 @@ export default function SettingsPage() {
    }
    loadSettings();
  }, []);
+
+ // Sync branding form with context when brandConfig loads
+ useEffect(() => {
+   if (brandConfig) {
+     setBrandingForm(prev => ({
+       ...prev,
+       companyName: brandConfig.name || '',
+       primaryColor: brandConfig.primaryColor || '#00E5A0',
+       logoPreview: brandConfig.logo || null,
+     }));
+   }
+ }, [brandConfig]);
+
+ const handleLogoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+   const file = e.target.files?.[0];
+   if (!file) return;
+
+   const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+   if (!allowedTypes.includes(file.type)) {
+     toast.error('Only PNG, JPEG, and WebP logos are allowed');
+     return;
+   }
+   if (file.size > 1024 * 1024) {
+     toast.error('Logo must be smaller than 1MB');
+     return;
+   }
+
+   const orgId = brandOrgId || settings.organizationId;
+   if (!orgId) {
+     toast.error('Organization not loaded yet');
+     return;
+   }
+
+   setLogoUploading(true);
+   try {
+     const result = await apiClient.uploadBrandingLogo(orgId, file);
+     setBrandingForm(prev => ({ ...prev, logoPreview: result.logoUrl }));
+     toast.success('Logo uploaded');
+   } catch (error: any) {
+     toast.error(error.message || 'Failed to upload logo');
+   } finally {
+     setLogoUploading(false);
+     if (logoInputRef.current) logoInputRef.current.value = '';
+   }
+ };
+
+ const handleSaveBranding = async () => {
+   const orgId = brandOrgId || settings.organizationId;
+   if (!orgId) {
+     toast.error('Organization not loaded yet');
+     return;
+   }
+   setBrandingSaving(true);
+   try {
+     await apiClient.updateBranding(orgId, {
+       name: brandingForm.companyName.trim() || 'Vizora',
+       primaryColor: brandingForm.primaryColor,
+       secondaryColor: brandConfig?.secondaryColor || '#00B4D8',
+       showPoweredBy: brandConfig?.showPoweredBy ?? true,
+       logoUrl: brandingForm.logoPreview || undefined,
+     });
+     // Update the context so header/sidebar reflect changes immediately
+     updateBrandConfig({
+       name: brandingForm.companyName.trim() || 'Vizora',
+       primaryColor: brandingForm.primaryColor,
+       logo: brandingForm.logoPreview || undefined,
+     });
+     toast.success('Branding updated');
+   } catch (error: any) {
+     toast.error(error.message || 'Failed to save branding');
+   } finally {
+     setBrandingSaving(false);
+   }
+ };
 
  const handleSaveProfile = async () => {
    if (!profileForm.firstName.trim()) {
@@ -439,6 +525,168 @@ export default function SettingsPage() {
  </div>
  </div>
 
+ {/* Branding / Customization */}
+ <div className="eh-dash-card bg-[var(--surface)] rounded-lg shadow-md p-6">
+ <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)] mb-4">Customization</h3>
+ <p className="text-sm text-[var(--foreground-secondary)] mb-6">
+   Customize your dashboard with your organization&apos;s brand colors, logo, and name.
+ </p>
+ <div className="space-y-6">
+   {/* Company Name */}
+   <div>
+     <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-2">
+       Company Name
+     </label>
+     <input
+       type="text"
+       value={brandingForm.companyName}
+       onChange={(e) => setBrandingForm({ ...brandingForm, companyName: e.target.value })}
+       placeholder="Vizora"
+       maxLength={100}
+       className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+     />
+     <p className="mt-1 text-xs text-[var(--foreground-tertiary)]">
+       Replaces &quot;Vizora&quot; in the sidebar and header
+     </p>
+   </div>
+
+   {/* Primary Color */}
+   <div>
+     <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-2">
+       Primary Color
+     </label>
+     <div className="flex items-center gap-3">
+       <input
+         type="color"
+         value={brandingForm.primaryColor}
+         onChange={(e) => setBrandingForm({ ...brandingForm, primaryColor: e.target.value })}
+         className="w-10 h-10 rounded-lg border border-[var(--border)] cursor-pointer p-0.5"
+       />
+       <input
+         type="text"
+         value={brandingForm.primaryColor}
+         onChange={(e) => {
+           const v = e.target.value;
+           if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) {
+             setBrandingForm({ ...brandingForm, primaryColor: v });
+           }
+         }}
+         maxLength={7}
+         className="eh-input w-32 px-3 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent font-mono text-sm"
+       />
+       {/* Quick presets */}
+       <div className="flex gap-1.5">
+         {['#00E5A0', '#3B82F6', '#8B5CF6', '#EF4444', '#F59E0B', '#EC4899'].map(color => (
+           <button
+             key={color}
+             onClick={() => setBrandingForm({ ...brandingForm, primaryColor: color })}
+             className={`w-7 h-7 rounded-md border-2 transition ${brandingForm.primaryColor === color ? 'border-[var(--foreground)] scale-110' : 'border-[var(--border)] hover:scale-105'}`}
+             style={{ backgroundColor: color }}
+             title={color}
+           />
+         ))}
+       </div>
+     </div>
+     <p className="mt-1 text-xs text-[var(--foreground-tertiary)]">
+       Used as the accent color throughout the dashboard
+     </p>
+   </div>
+
+   {/* Logo Upload */}
+   <div>
+     <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-2">
+       Logo
+     </label>
+     <div className="flex items-center gap-4">
+       <div className="relative w-16 h-16 rounded-lg border-2 border-dashed border-[var(--border)] flex items-center justify-center overflow-hidden bg-[var(--background)]">
+         {brandingForm.logoPreview ? (
+           <img
+             src={brandingForm.logoPreview}
+             alt="Logo preview"
+             className="w-full h-full object-contain p-1"
+           />
+         ) : (
+           <Icon name="content" size="lg" className="text-[var(--foreground-tertiary)]" />
+         )}
+         {logoUploading && (
+           <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+             <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+           </div>
+         )}
+       </div>
+       <div className="space-y-2">
+         <div className="flex gap-2">
+           <button
+             onClick={() => logoInputRef.current?.click()}
+             disabled={logoUploading}
+             className="px-3 py-1.5 text-sm font-medium bg-[var(--background)] text-[var(--foreground-secondary)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition disabled:opacity-50"
+           >
+             {logoUploading ? 'Uploading...' : 'Upload Logo'}
+           </button>
+           {brandingForm.logoPreview && (
+             <button
+               onClick={() => setBrandingForm({ ...brandingForm, logoPreview: null })}
+               className="px-3 py-1.5 text-sm font-medium text-red-500 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition"
+             >
+               Remove
+             </button>
+           )}
+         </div>
+         <p className="text-xs text-[var(--foreground-tertiary)]">
+           PNG, JPEG, or WebP. Max 1MB. Recommended: 256x256px.
+         </p>
+         <input
+           ref={logoInputRef}
+           type="file"
+           accept="image/png,image/jpeg,image/webp"
+           onChange={handleLogoSelect}
+           className="hidden"
+         />
+       </div>
+     </div>
+   </div>
+
+   {/* Live Preview */}
+   <div>
+     <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-2">
+       Preview
+     </label>
+     <div className="p-4 rounded-lg border border-[var(--border)] bg-[var(--background)]">
+       <div className="flex items-center gap-2">
+         {brandingForm.logoPreview ? (
+           <img src={brandingForm.logoPreview} alt="Preview" className="w-8 h-8 rounded-lg object-contain" />
+         ) : (
+           <div
+             className="w-8 h-8 rounded-lg flex items-center justify-center"
+             style={{ background: `linear-gradient(135deg, ${brandingForm.primaryColor}, #00B4D8)` }}
+           >
+             <span className="text-white font-bold text-lg">
+               {(brandingForm.companyName || 'V').charAt(0).toUpperCase()}
+             </span>
+           </div>
+         )}
+         <span
+           className="text-2xl font-bold"
+           style={{ color: brandingForm.primaryColor }}
+         >
+           {brandingForm.companyName || 'Vizora'}
+         </span>
+       </div>
+     </div>
+   </div>
+
+   <div className="flex justify-end">
+     <button
+       onClick={handleSaveBranding}
+       disabled={brandingSaving}
+       className="eh-btn-neon rounded-xl px-4 py-2 text-sm font-medium transition disabled:opacity-50"
+     >
+       {brandingSaving ? 'Saving...' : 'Save Branding'}
+     </button>
+   </div>
+ </div>
+ </div>
+
  {/* Display Settings */}
  <div className="eh-dash-card bg-[var(--surface)] rounded-lg shadow-md p-6">
  <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)] mb-4">Display Settings</h3>
@@ -511,6 +759,23 @@ export default function SettingsPage() {
  >
  <Icon name="analytics" size="md" className="text-[var(--foreground-secondary)]" />
  Subscription & Billing
+ <span className="ml-auto text-[var(--foreground-tertiary)]">
+ <Icon name="chevronRight" size="md" />
+ </span>
+ </Link>
+ </div>
+ </div>
+
+ {/* Feature Flags */}
+ <div className="eh-dash-card bg-[var(--surface)] rounded-lg shadow-md p-6">
+ <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)] mb-4">Features</h3>
+ <div className="space-y-3">
+ <Link
+ href="/dashboard/settings/feature-flags"
+ className="w-full px-4 py-3 text-sm bg-[var(--background)] text-[var(--foreground-secondary)] rounded-lg hover:bg-[var(--surface-hover)] transition font-medium text-left flex items-center gap-2"
+ >
+ <Icon name="settings" size="md" className="text-[var(--foreground-secondary)]" />
+ Feature Flags
  <span className="ml-auto text-[var(--foreground-tertiary)]">
  <Icon name="chevronRight" size="md" />
  </span>
