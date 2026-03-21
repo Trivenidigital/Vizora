@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vizora Animation Library — Demo</title>
+  <link rel="stylesheet" href="animations.css">
+  <style>
+    /* Demo page styles only — not part of the animation library */
+    :root {
+      --bg: #0f0f14;
+      --surface: #1a1a24;
+      --border: #2a2a3a;
+      --text: #e4e4ef;
+      --text-muted: #8888a0;
+      --accent: #6366f1;
+      --accent-glow: #818cf8;
+      --success: #22c55e;
+      --warning: #f59e0b;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 40px;
+    }
+
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 8px;
+    }
+
+    h1 span {
+      color: var(--accent);
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      margin-bottom: 48px;
+      font-size: 1.1rem;
+    }
+
+    section {
+      margin-bottom: 56px;
+    }
+
+    h2 {
+      font-size: 1.2rem;
+      color: var(--accent-glow);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .section-desc {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 20px;
+    }
+
+    .demo-row {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .demo-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px 28px;
+      min-width: 180px;
+      text-align: center;
+    }
+
+    .demo-card .label {
+      margin-top: 12px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-family: 'SF Mono', 'Fira Code', monospace;
+    }
+
+    .demo-card .content {
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    /* Stagger demo list */
+    .stagger-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-width: 400px;
+    }
+
+    .stagger-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 20px;
+      font-size: 0.95rem;
+    }
+
+    /* Ambient demo */
+    .ambient-row {
+      display: flex;
+      gap: 32px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .ambient-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .orb {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    .bar {
+      width: 80px;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--accent-glow);
+    }
+
+    .icon-placeholder {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      background: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+    }
+
+    /* Data update demo */
+    .update-demo {
+      display: flex;
+      gap: 24px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 28px;
+      text-align: center;
+    }
+
+    .stat-card .value {
+      font-size: 2rem;
+      font-weight: 700;
+    }
+
+    .stat-card .stat-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* Attention demo */
+    .price-tag {
+      display: inline-block;
+      background: linear-gradient(135deg, #ef4444, #f97316);
+      color: white;
+      font-size: 2rem;
+      font-weight: 800;
+      padding: 12px 28px;
+      border-radius: 12px;
+    }
+
+    .badge {
+      display: inline-block;
+      background: var(--success);
+      color: #000;
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 6px 16px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .neon-text {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: var(--accent-glow);
+      text-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+    }
+
+    /* Background demo */
+    .gradient-box {
+      width: 300px;
+      height: 120px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #6366f1, #a855f7, #ec4899, #6366f1);
+    }
+
+    .drift-container {
+      position: relative;
+      width: 200px;
+      height: 120px;
+      overflow: hidden;
+      border-radius: 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    .drift-dot {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--accent);
+      opacity: 0.5;
+    }
+
+    .drift-dot:nth-child(1) { top: 30px; left: 40px; }
+    .drift-dot:nth-child(2) { top: 60px; left: 100px; animation-delay: -3s; }
+    .drift-dot:nth-child(3) { top: 80px; left: 60px; animation-delay: -6s; }
+
+    /* Carousel demo */
+    .carousel-track {
+      display: flex;
+      gap: 16px;
+    }
+
+    .carousel-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 28px;
+      min-width: 160px;
+      text-align: center;
+      font-weight: 600;
+    }
+
+    /* Replay button */
+    .replay-btn {
+      display: inline-block;
+      margin-top: 16px;
+      padding: 8px 20px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+
+    .replay-btn:hover {
+      border-color: var(--accent);
+      color: var(--text);
+    }
+
+    code {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.85rem;
+      background: rgba(99, 102, 241, 0.1);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--accent-glow);
+    }
+
+    .note {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      margin-top: 12px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1 class="animate-fade-up">Vizora <span>Animation Library</span></h1>
+  <p class="subtitle animate-fade-up stagger-1">
+    GPU-accelerated CSS animations for digital signage templates. Subtle, performant, loopable.
+  </p>
+
+  <!-- ============================================================ -->
+  <!-- 1. ENTRANCE ANIMATIONS -->
+  <!-- ============================================================ -->
+  <section>
+    <h2>1. Entrance Animations</h2>
+    <p class="section-desc">Run once on page load. Combine with stagger classes for sequential reveals.</p>
+
+    <div class="demo-row">
+      <div class="demo-card animate-fade-up">
+        <div class="content">Hello</div>
+        <div class="label">.animate-fade-up</div>
+      </div>
+
+      <div class="demo-card animate-fade-down">
+        <div class="content">Hello</div>
+        <div class="label">.animate-fade-down</div>
+      </div>
+
+      <div class="demo-card animate-fade-left">
+        <div class="content">Hello</div>
+        <div class="label">.animate-fade-left</div>
+      </div>
+
+      <div class="demo-card animate-fade-right">
+        <div class="content">Hello</div>
+        <div class="label">.animate-fade-right</div>
+      </div>
+
+      <div class="demo-card animate-scale-in">
+        <div class="content">Hello</div>
+        <div class="label">.animate-scale-in</div>
+      </div>
+
+      <div class="demo-card animate-fade-in">
+        <div class="content">Hello</div>
+        <div class="label">.animate-fade-in</div>
+      </div>
+    </div>
+
+    <button class="replay-btn" onclick="replaySection(this)">Replay</button>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- 2. STAGGER DELAYS -->
+  <!-- ============================================================ -->
+  <section>
+    <h2>2. Stagger Delays</h2>
+    <p class="section-desc">Add <code>.stagger-N</code> alongside any entrance animation to delay it by N * 100ms.</p>
+
+    <div class="stagger-list">
+      <div class="stagger-item animate-fade-up stagger-1">Menu Item 1 <code>.stagger-1</code></div>
+      <div class="stagger-item animate-fade-up stagger-2">Menu Item 2 <code>.stagger-2</code></div>
+      <div class="stagger-item animate-fade-up stagger-3">Menu Item 3 <code>.stagger-3</code></div>
+      <div class="stagger-item animate-fade-up stagger-4">Menu Item 4 <code>.stagger-4</code></div>
+      <div class="stagger-item animate-fade-up stagger-5">Menu Item 5 <code>.stagger-5</code></div>
+    </div>
+
+    <button class="replay-btn" onclick="replaySection(this)">Replay</button>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- 3. AMBIENT LOOPS -->
+  <!-- ============================================================ -->
+  <section>
+    <h2>3. Ambient Loops</h2>
+    <p class="section-desc">Run infinitely. Subtle atmosphere for always-on screens.</p>
+
+    <div class="ambient-row">
+      <div class="ambient-box">
+        <div class="orb animate-glow"></div>
+        <code>.animate-glow</code>
+      </div>
+
+      <div class="ambient-box">
+        <div class="icon-placeholder animate-float">&#9733;</div>
+        <code>.animate-float</code>
+      </div>
+
+      <div class="ambient-box">
+        <div class="orb animate-breathe"></div>
+        <code>.animate-breathe</code>
+      </div>
+
+      <div class="ambient-box">
+        <div class="bar animate-shimmer"></div>
+        <code>.animate-shimmer</code>
+      </div>
+
+      <div class="ambient-box">
+        <div class="icon-placeholder animate-spin-slow">&#10043;</div>
+        <code>.animate-spin-slow</code>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- 4. DATA UPDATE ANIMATIONS -->
+  <!-- ============================================================ -->
+  <section>
+    <h2>4. Data Update Animations</h2>
+    <p class="section-desc">For content that refreshes — stats, prices, carousel cards.</p>
+
+    <div class="update-demo">
+      <div class="stat-card">
+        <div class="value animate-update" id="stat-value">1,247</div>
+        <div class="stat-label">Visitors Today</div>
+      </div>
+
+      <div class="carousel-track">
+        <div class="carousel-card animate-slide-in">
+          Slide In
+          <div class="label" style="margin-top: 8px;"><code>.animate-slide-in</code></div>
+        </div>
+        <div class="carousel-card animate-slide-out">
+          Slide Out
+          <div class="label" style="margin-top: 8px;"><code>.animate-slide-out</code></div>
+        </div>
+      </div>
+    </div>
+
+    <button class="replay-btn" onclick="replayUpdate()">Simulate Update</button>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- 5. ATTENTION GRABBERS -->
+  <!-- ============================================================ -->
+  <section>
+    <h2>5. Attention Grabbers</h2>
+    <p class="section-desc">For CTAs, sale prices, and badges. Eye-catching but not annoying.</p>
+
+    <div class="demo-row" style="align-items: center;">
+      <div>
+        <span class="price-tag animate-bounce-subtle">$9.99</span>
+        <div class="note"><code>.animate-bounce-subtle</code></div>
+      </div>
+
+      <div>
+        <span class="badge animate-bounce-subtle">New</span>
+        <div class="note"><code>.animate-bounce-subtle</code></div>
+      </div>
+
+      <div>
+        <span class="neon-text animate-neon-pulse">SALE</span>
+        <div class="note"><code>.animate-neon-pulse</code></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- 6. BACKGROUND EFFECTS -->
+  <!-- ============================================================ -->
+  <section>
+    <h2>6. Background Effects</h2>
+    <p class="section-desc">Slow environmental effects for backgrounds and decorative elements.</p>
+
+    <div class="demo-row" style="align-items: flex-start;">
+      <div>
+        <div class="gradient-box animate-gradient"></div>
+        <div class="note"><code>.animate-gradient</code> — requires <code>background-size: 200% 200%</code></div>
+      </div>
+
+      <div>
+        <div class="drift-container">
+          <div class="drift-dot animate-drift"></div>
+          <div class="drift-dot animate-drift"></div>
+          <div class="drift-dot animate-drift"></div>
+        </div>
+        <div class="note"><code>.animate-drift</code> — for decorative orbs/particles</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- USAGE REFERENCE -->
+  <!-- ============================================================ -->
+  <section>
+    <h2>Quick Reference</h2>
+    <p class="section-desc">Copy-paste snippets for template developers.</p>
+
+    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.85rem; line-height: 1.8; max-width: 600px; color: var(--text-muted); white-space: pre; overflow-x: auto;">&lt;link rel="stylesheet" href="../shared/animations.css"&gt;
+
+&lt;!-- Staggered entrance --&gt;
+&lt;h1 class="animate-fade-up"&gt;Welcome&lt;/h1&gt;
+&lt;p class="animate-fade-up stagger-1"&gt;First line&lt;/p&gt;
+&lt;p class="animate-fade-up stagger-2"&gt;Second line&lt;/p&gt;
+
+&lt;!-- Ambient glow on a circle --&gt;
+&lt;div class="orb animate-glow"&gt;&lt;/div&gt;
+
+&lt;!-- Animated price --&gt;
+&lt;span class="animate-neon-pulse"&gt;$4.99&lt;/span&gt;
+
+&lt;!-- Moving gradient background --&gt;
+&lt;div class="animate-gradient"
+     style="background: linear-gradient(...);"&gt;
+&lt;/div&gt;</div>
+  </section>
+
+  <script>
+    /* Replay entrance animations by removing and re-adding classes */
+    function replaySection(btn) {
+      var section = btn.closest('section');
+      var animated = section.querySelectorAll('[class*="animate-"]');
+      animated.forEach(function(el) {
+        var classes = [];
+        el.classList.forEach(function(c) {
+          if (c.startsWith('animate-')) classes.push(c);
+        });
+        classes.forEach(function(c) { el.classList.remove(c); });
+        void el.offsetWidth; /* force reflow */
+        classes.forEach(function(c) { el.classList.add(c); });
+      });
+    }
+
+    /* Simulate a data update */
+    function replayUpdate() {
+      var el = document.getElementById('stat-value');
+      var num = Math.floor(Math.random() * 2000) + 500;
+      el.textContent = num.toLocaleString();
+      el.classList.remove('animate-update');
+      void el.offsetWidth;
+      el.classList.add('animate-update');
+    }
+  </script>
+
+</body>
+</html>
