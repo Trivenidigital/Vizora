@@ -30,6 +30,15 @@ export interface WeatherData {
   }>;
 }
 
+export interface SheetData {
+  sheetId: string;
+  sheetName: string;
+  headers: string[];
+  rows: (string | number)[][];
+  rowCount: number;
+  fetchedAt: string;
+}
+
 declare module './client' {
   interface ApiClient {
     getWidgetTypes(): Promise<WidgetType[]>;
@@ -37,6 +46,7 @@ declare module './client' {
     updateWidget(id: string, data: Partial<Widget>): Promise<Widget>;
     refreshWidget(id: string): Promise<Widget>;
     getWeatherData(location: string, units?: string): Promise<WeatherData>;
+    getSheetData(url: string, sheetName?: string): Promise<SheetData>;
     getLayoutPresets(): Promise<LayoutPreset[]>;
     createLayout(data: { name: string; layoutType: string; zones?: LayoutZone[]; description?: string }): Promise<Layout>;
     updateLayout(id: string, data: Partial<Layout>): Promise<Layout>;
@@ -71,6 +81,11 @@ ApiClient.prototype.refreshWidget = async function (id: string): Promise<Widget>
 ApiClient.prototype.getWeatherData = async function (location: string, units: string = 'metric'): Promise<WeatherData> {
   const params = new URLSearchParams({ location, units });
   return this.request<WeatherData>(`/content/widgets/weather/preview?${params.toString()}`);
+};
+
+ApiClient.prototype.getSheetData = async function (url: string, sheetName: string = 'Sheet1'): Promise<SheetData> {
+  const params = new URLSearchParams({ url, sheet: sheetName });
+  return this.request<SheetData>(`/content/widgets/sheets/preview?${params.toString()}`);
 };
 
 ApiClient.prototype.getLayoutPresets = async function (): Promise<LayoutPreset[]> {

@@ -224,6 +224,68 @@ describe('WidgetsController', () => {
   });
 
   // ==========================================================================
+  // getSheetData (sheets/preview)
+  // ==========================================================================
+
+  describe('getSheetData', () => {
+    it('should reject a missing URL', async () => {
+      await expect(controller.getSheetData('', 'Sheet1')).rejects.toThrow('Invalid Google Sheets URL');
+    });
+
+    it('should reject a non-Google-Sheets URL', async () => {
+      await expect(
+        controller.getSheetData('https://evil.com/spreadsheets/d/abc123', 'Sheet1'),
+      ).rejects.toThrow('Invalid Google Sheets URL');
+    });
+
+    it('should reject a URL whose hostname is not docs.google.com', async () => {
+      await expect(
+        controller.getSheetData('https://notgoogle.com/docs.google.com/spreadsheets/d/abc123/edit', 'Sheet1'),
+      ).rejects.toThrow('URL must be a Google Sheets URL');
+    });
+
+    it('should reject a URL with no extractable sheet ID', async () => {
+      await expect(
+        controller.getSheetData('https://docs.google.com/spreadsheets/', 'Sheet1'),
+      ).rejects.toThrow('Could not extract sheet ID from URL');
+    });
+
+    it('should fetch and return parsed sheet data', async () => {
+      const mockGoogleResponse = `/*O_o*/\ngoogle.visualization.Query.setResponse(${JSON.stringify({
+        table: {
+          cols: [{ id: 'A', label: 'Name' }, { id: 'B', label: 'Price' }],
+          rows: [
+            { c: [{ v: 'Widget' }, { v: 9.99 }] },
+            { c: [{ v: 'Gadget' }, { v: 19.99 }] },
+          ],
+        },
+      })});`;
+
+      const originalFetch = global.fetch;
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(mockGoogleResponse),
+      }) as any;
+
+      try {
+        const result = await controller.getSheetData(
+          'https://docs.google.com/spreadsheets/d/abc123xyz/edit',
+          'Sheet1',
+        );
+
+        expect(result.sheetId).toBe('abc123xyz');
+        expect(result.sheetName).toBe('Sheet1');
+        expect(result.headers).toEqual(['Name', 'Price']);
+        expect(result.rows).toEqual([['Widget', 9.99], ['Gadget', 19.99]]);
+        expect(result.rowCount).toBe(2);
+        expect(result.fetchedAt).toBeDefined();
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+  });
+
+  // ==========================================================================
   // refreshWidget
   // ==========================================================================
 
