@@ -79,6 +79,8 @@ const completed: BacklogItem[] = [
   { id: '35', title: 'Google OAuth social login (Q1)', status: 'FIXED', notes: '2026-03-21' },
   { id: '36', title: 'Custom branding per organization — logo, colors, name (Q8)', status: 'FIXED', notes: '2026-03-21' },
   { id: '37', title: 'Per-organization feature flags — 8 toggleable features (Q2)', status: 'FIXED', notes: '2026-03-21' },
+  { id: '38', title: 'Google Sheets data source integration — published sheets proxy (M3)', status: 'FIXED', notes: '2026-03-21' },
+  { id: '39', title: 'Social media feed widget — Instagram, Twitter, TikTok, LinkedIn (Q4)', status: 'FIXED', notes: '2026-03-21' },
 ];
 
 const sections: Section[] = [
@@ -136,9 +138,9 @@ const sections: Section[] = [
     items: [
       { id: 'M1', title: 'CloudFlare CDN + DDoS protection', effort: '4h', status: 'TODO' },
       { id: 'M2', title: 'Weather widget (OpenWeatherMap free API)', effort: '1d', status: 'FIXED', notes: 'feat/p1-cleanup — 2026-03-20' },
-      { id: 'M3', title: 'Google Sheets data source integration', effort: '3d', status: 'TODO', notes: 'Key for dynamic menu boards' },
+      { id: 'M3', title: 'Google Sheets data source integration', effort: '3d', status: 'FIXED', notes: '2026-03-21 — proxy for published sheets, no API key needed' },
       { id: 'M4', title: 'Content moderation workflow (flag -> review -> approve)', effort: '2d', status: 'FIXED', notes: '2026-03-21' },
-      { id: 'M5', title: 'Expand template library to 150 templates', effort: '2d', status: 'TODO', notes: 'Currently 78' },
+      { id: 'M5', title: 'Expand template library to 150 templates', effort: '2d', status: 'TODO', notes: 'Currently 87 across 8 categories. Plan: add 3 new categories (Hospitality, Fitness, Real Estate) + backfill existing. HTML+CSS templates seeded via seed script.' },
       { id: 'M6', title: 'Device remote restart command', effort: '4h', status: 'FIXED', notes: 'feat/fleet-control' },
       { id: 'M7', title: 'Push-to-group endpoint (single API call)', effort: '4h', status: 'FIXED', notes: 'feat/fleet-control' },
       { id: 'M8', title: 'Data retention policy (auto-purge audit logs > 90 days)', effort: '4h', status: 'FIXED', notes: '2026-03-20' },
@@ -159,13 +161,13 @@ const sections: Section[] = [
       { id: 'Q1', title: 'OAuth / social login (Google)', effort: '2d', status: 'FIXED', notes: '2026-03-21' },
       { id: 'Q2', title: 'Per-user/org feature flags', effort: '2d', status: 'FIXED', notes: '2026-03-21' },
       { id: 'Q3', title: 'RSS/news feed widget', effort: '1d', status: 'FIXED', notes: '2026-03-21' },
-      { id: 'Q4', title: 'Social media feed widget (Instagram)', effort: '2d', status: 'TODO' },
+      { id: 'Q4', title: 'Social media feed widget', effort: '2d', status: 'FIXED', notes: '2026-03-21 — curated URL carousel, Instagram/Twitter/TikTok/LinkedIn' },
       { id: 'Q5', title: 'Clock/countdown widget', effort: '4h', status: 'FIXED', notes: '2026-03-21' },
       { id: 'Q6', title: 'AI Template Designer (integrate Claude/OpenAI)', effort: '5d', status: 'TODO', notes: 'API costs — need revenue first' },
       { id: 'Q7', title: 'Content approval workflow', effort: '2d', status: 'FIXED', notes: 'Covered by M4 moderation workflow' },
       { id: 'Q8', title: 'Custom branding per organization', effort: '2d', status: 'FIXED', notes: '2026-03-21' },
       { id: 'Q9', title: 'Return policy page + SLA page', effort: '4h', status: 'FIXED', notes: '2026-03-21' },
-      { id: 'Q10', title: 'Expand template library to 300+', effort: '5d', status: 'TODO' },
+      { id: 'Q10', title: 'Expand template library to 300+', effort: '5d', status: 'TODO', notes: 'Phase 2 of template expansion. Currently 87, target 150 first (M5), then 300+' },
     ],
   },
   {
@@ -198,7 +200,7 @@ const knownIssues: BacklogItem[] = [
 
 const metrics: Array<{ label: string; start: string; current: string; target: string }> = [
   { label: 'Test suites', start: '~89', current: '186', target: '175+' },
-  { label: 'Total tests', start: '1,734', current: '3,060', target: '2,000+' },
+  { label: 'Total tests', start: '1,734', current: '3,060+', target: '2,000+' },
   { label: 'Test pass rate', start: '99.9%', current: '100%', target: '100%' },
   { label: 'P0 blockers', start: '8', current: '0*', target: '0' },
   { label: 'API 400 errors', start: '4', current: '0', target: '0' },
