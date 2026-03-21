@@ -148,6 +148,141 @@ export class AuthService {
     };
   }
 
+  async googleLogin(credential: string) {
+    // Verify Google ID token via Google's tokeninfo endpoint
+    let payload: { email?: string; email_verified?: string; given_name?: string; family_name?: string; name?: string; aud?: string };
+    try {
+      const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
+      if (!response.ok) {
+        throw new UnauthorizedException('Invalid Google token');
+      }
+      payload = await response.json();
+    } catch (error) {
+      if (error instanceof UnauthorizedException) throw error;
+      this.logger.error(`Google token verification failed: ${error instanceof Error ? error.message : 'Unknown'}`);
+      throw new UnauthorizedException('Failed to verify Google token');
+    }
+
+    if (!payload.email) {
+      throw new UnauthorizedException('Google token missing email');
+    }
+
+    if (payload.email_verified !== 'true') {
+      throw new UnauthorizedException('Google email not verified');
+    }
+
+    // Optionally validate audience matches our client ID
+    const googleClientId = process.env.GOOGLE_CLIENT_ID;
+    if (googleClientId && payload.aud !== googleClientId) {
+      throw new UnauthorizedException('Google token audience mismatch');
+    }
+
+    // Find existing user
+    let user = await this.databaseService.user.findUnique({
+      where: { email: payload.email },
+      include: { organization: true },
+    });
+
+    if (user && !user.isActive) {
+      throw new ForbiddenException('Account is inactive. Contact support.');
+    }
+
+    let isNewUser = false;
+
+    if (!user) {
+      // Auto-register: create org + user in a transaction
+      isNewUser = true;
+      const firstName = payload.given_name || payload.name?.split(' ')[0] || 'User';
+      const lastName = payload.family_name || payload.name?.split(' ').slice(1).join(' ') || '';
+      const orgName = `${firstName}'s Organization`;
+      const slug = this.generateSlug(orgName) + '-' + crypto.randomBytes(3).toString('hex');
+
+      const trialEndsAt = new Date();
+      trialEndsAt.setDate(trialEndsAt.getDate() + 30);
+
+      const result = await this.databaseService.$transaction(async (tx) => {
+        const organization = await tx.organization.create({
+          data: {
+            name: orgName,
+            slug,
+            subscriptionTier: 'free',
+            screenQuota: 5,
+            trialEndsAt,
+            subscriptionStatus: 'trial',
+          },
+        });
+
+        const newUser = await tx.user.create({
+          data: {
+            email: payload.email!,
+            passwordHash: '', // OAuth users have no password
+            firstName,
+            lastName,
+            role: 'admin',
+            organizationId: organization.id,
+            isActive: true,
+          },
+          include: { organization: true },
+        });
+
+        await tx.auditLog.create({
+          data: {
+            organizationId: organization.id,
+            userId: newUser.id,
+            action: 'user_registered',
+            entityType: 'user',
+            entityId: newUser.id,
+            changes: {
+              email: newUser.email,
+              organizationName: organization.name,
+              provider: 'google',
+            },
+          },
+        });
+
+        return newUser;
+      });
+
+      user = result;
+    }
+
+    // Update last login
+    await this.databaseService.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+
+    // Generate JWT token
+    const token = this.generateToken(user, user.organization);
+
+    // Log audit event for login
+    if (!isNewUser) {
+      await this.databaseService.auditLog.create({
+        data: {
+          organizationId: user.organizationId,
+          userId: user.id,
+          action: 'user_login',
+          entityType: 'user',
+          entityId: user.id,
+          changes: { provider: 'google' },
+        },
+      });
+    }
+
+    return {
+      user: {
+        ...this.sanitizeUser(user),
+        organization: {
+          name: user.organization.name,
+          subscriptionTier: user.organization.subscriptionTier,
+        },
+      },
+      token,
+      expiresIn: AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS,
+      isNewUser,
+    };
+  }
+
   async login(dto: LoginDto) {
     // Check account lockout — fail CLOSED if Redis is unreachable
     const lockoutKey = `login_attempts:${dto.email}`;

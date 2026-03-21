@@ -9,6 +9,7 @@ import ValuePanel from '@/components/auth/ValuePanel';
 import FormField from '@/components/auth/FormField';
 import PasswordInput from '@/components/auth/PasswordInput';
 import PasswordChecklist from '@/components/auth/PasswordChecklist';
+import GoogleSignInButton from '@/components/auth/GoogleSignInButton';
 
 export default function RegisterContent() {
   const commonDomains = ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'icloud.com', 'protonmail.com', 'mail.com', 'aol.com'];
@@ -72,6 +73,29 @@ export default function RegisterContent() {
     if (formData.confirmPassword.length < 3) return null;
     return formData.password === formData.confirmPassword;
   }, [formData.password, formData.confirmPassword]);
+
+  const handleGoogleSignUp = async (credential: string) => {
+    setLoading(true);
+    setError('');
+    try {
+      const result = await apiClient.googleLogin(credential);
+      setSuccess(true);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[REGISTER] Google sign-up successful, isNewUser:', result.isNewUser);
+      }
+      setTimeout(() => {
+        window.location.href = '/dashboard';
+      }, 800);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Google sign-up failed';
+      if (message.toLowerCase().includes('already exists') || message.toLowerCase().includes('duplicate')) {
+        setError('An account with this email already exists.');
+      } else {
+        setError(message);
+      }
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -422,6 +446,21 @@ export default function RegisterContent() {
             </button>
           </form>
 
+          {/* Divider */}
+          <div className="relative mt-5 lg:mt-4">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-[var(--border)]" />
+            </div>
+            <div className="relative flex justify-center text-xs">
+              <span className="bg-[var(--background)] px-3 text-[var(--foreground-tertiary)]">or</span>
+            </div>
+          </div>
+
+          {/* Google Sign-Up */}
+          <div className="mt-4 lg:mt-3">
+            <GoogleSignInButton onSuccess={handleGoogleSignUp} text="signup_with" />
+          </div>
+
           {/* Trust signals */}
           <div className="flex items-center justify-center gap-4 mt-4 lg:mt-3 text-[10px] text-[var(--foreground-tertiary)]">
             <span className="flex items-center gap-1">
@@ -435,16 +474,6 @@ export default function RegisterContent() {
             <span>Free 30-day trial</span>
             <span className="text-[var(--border)]">|</span>
             <span>5 screens included</span>
-          </div>
-
-          {/* Divider + Login link */}
-          <div className="relative mt-6 lg:mt-4">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-[var(--border)]" />
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="bg-[var(--background)] px-3 text-[var(--foreground-tertiary)]">or</span>
-            </div>
           </div>
 
           <p className="text-center mt-4 lg:mt-3 text-sm text-[var(--foreground-secondary)]">
