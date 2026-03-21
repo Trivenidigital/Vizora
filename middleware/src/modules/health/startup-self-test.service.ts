@@ -39,8 +39,8 @@ export interface SelfTestResult {
 
 // Strict allowlist for table existence checks — prevents any injection via $queryRawUnsafe
 const CRITICAL_TABLES = new Set([
-  'organizations', 'users', 'devices', 'content',
-  'playlists', 'schedules', 'notifications', 'plans',
+  'organizations', 'users', 'devices', 'Content',
+  'Playlist', 'Schedule', 'notifications', 'plans',
 ]);
 
 // Minimum cooldown between self-test runs (60 seconds)
