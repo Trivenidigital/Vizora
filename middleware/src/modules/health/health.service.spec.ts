@@ -8,8 +8,19 @@ describe('HealthService', () => {
   let mockDatabaseService: any;
   let mockRedisService: any;
   let mockStorageService: any;
+  let memoryUsageSpy: jest.SpyInstance;
+
+  // Mock memory usage to avoid flaky tests when heap is under pressure
+  const normalMemory = {
+    heapUsed: 50 * 1024 * 1024,   // 50 MB
+    heapTotal: 200 * 1024 * 1024, // 200 MB (25% usage)
+    rss: 300 * 1024 * 1024,
+    external: 10 * 1024 * 1024,
+    arrayBuffers: 5 * 1024 * 1024,
+  };
 
   beforeEach(() => {
+    memoryUsageSpy = jest.spyOn(process, 'memoryUsage').mockReturnValue(normalMemory as NodeJS.MemoryUsage);
     mockDatabaseService = {
       $queryRaw: jest.fn(),
     };
@@ -30,6 +41,10 @@ describe('HealthService', () => {
       mockRedisService as RedisService,
       mockStorageService as StorageService,
     );
+  });
+
+  afterEach(() => {
+    memoryUsageSpy.mockRestore();
   });
 
   it('should be defined', () => {
