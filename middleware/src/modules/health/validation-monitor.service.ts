@@ -90,7 +90,7 @@ export class ValidationMonitorService {
       // Get all orgs with active content
       const orgs = await this.db.organization.findMany({
         select: { id: true },
-        where: { isActive: true },
+        where: { subscriptionStatus: { not: 'canceled' } },
         take: 50,
       });
       for (const org of orgs) {
