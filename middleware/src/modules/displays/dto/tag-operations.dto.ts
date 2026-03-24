@@ -1,8 +1,8 @@
-import { IsArray, IsUUID, ArrayMinSize, ArrayMaxSize } from 'class-validator';
+import { IsArray, IsString, ArrayMinSize, ArrayMaxSize } from 'class-validator';
 
 export class AssignTagsDto {
   @IsArray()
-  @IsUUID('4', { each: true })
+  @IsString({ each: true })
   @ArrayMinSize(1)
   @ArrayMaxSize(50)
   tagIds!: string[];
@@ -10,7 +10,7 @@ export class AssignTagsDto {
 
 export class RemoveTagsDto {
   @IsArray()
-  @IsUUID('4', { each: true })
+  @IsString({ each: true })
   @ArrayMinSize(1)
   @ArrayMaxSize(50)
   tagIds!: string[];

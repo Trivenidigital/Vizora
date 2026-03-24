@@ -1,9 +1,8 @@
-import { IsArray, IsString, ArrayMinSize, IsUUID } from 'class-validator';
+import { IsArray, IsString, ArrayMinSize } from 'class-validator';
 
 export class MoveContentDto {
   @IsArray()
   @ArrayMinSize(1)
   @IsString({ each: true })
-  @IsUUID('all', { each: true })
   contentIds: string[];
 }

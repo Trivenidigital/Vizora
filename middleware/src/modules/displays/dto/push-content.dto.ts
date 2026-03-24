@@ -1,8 +1,8 @@
-import { IsNotEmpty, IsUUID, IsOptional, IsInt, Min, Max } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsInt, Min, Max } from 'class-validator';
 
 export class PushContentDto {
   @IsNotEmpty()
-  @IsUUID('4')
+  @IsString()
   contentId!: string;
 
   @IsOptional()

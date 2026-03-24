@@ -1,4 +1,4 @@
-import { IsString, IsOptional, MaxLength, MinLength, IsUUID } from 'class-validator';
+import { IsString, IsOptional, MaxLength, MinLength } from 'class-validator';
 
 export class CreateFolderDto {
   @IsString()
@@ -8,6 +8,5 @@ export class CreateFolderDto {
 
   @IsOptional()
   @IsString()
-  @IsUUID()
   parentId?: string;
 }
