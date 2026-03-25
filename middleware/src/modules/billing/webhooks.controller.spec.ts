@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { WebhooksController } from './webhooks.controller';
 import { BillingService } from './billing.service';
-import { RawBodyRequest } from '@nestjs/common';
+import { BadRequestException, UnauthorizedException, RawBodyRequest } from '@nestjs/common';
 import { Request } from 'express';
 
 describe('WebhooksController', () => {
@@ -44,19 +44,19 @@ describe('WebhooksController', () => {
       expect(result).toEqual({ received: true });
     });
 
-    it('should throw error when raw body is not available', async () => {
+    it('should throw BadRequestException when raw body is not available', async () => {
       const mockReq = {
         rawBody: undefined,
       } as RawBodyRequest<Request>;
       const signature = 'sig_test_123';
 
       await expect(controller.handleStripeWebhook(mockReq, signature)).rejects.toThrow(
-        'Raw body not available',
+        BadRequestException,
       );
       expect(mockBillingService.handleWebhookEvent).not.toHaveBeenCalled();
     });
 
-    it('should handle service errors', async () => {
+    it('should throw UnauthorizedException on invalid signature', async () => {
       const rawBody = Buffer.from('{"test": "data"}');
       const signature = 'invalid_sig';
       const mockReq = {
@@ -66,7 +66,7 @@ describe('WebhooksController', () => {
       mockBillingService.handleWebhookEvent.mockRejectedValue(new Error('Invalid signature'));
 
       await expect(controller.handleStripeWebhook(mockReq, signature)).rejects.toThrow(
-        'Invalid signature',
+        UnauthorizedException,
       );
     });
 
@@ -109,19 +109,19 @@ describe('WebhooksController', () => {
       expect(result).toEqual({ received: true });
     });
 
-    it('should throw error when raw body is not available', async () => {
+    it('should throw BadRequestException when raw body is not available', async () => {
       const mockReq = {
         rawBody: undefined,
       } as RawBodyRequest<Request>;
       const signature = 'razorpay_sig_123';
 
       await expect(controller.handleRazorpayWebhook(mockReq, signature)).rejects.toThrow(
-        'Raw body not available',
+        BadRequestException,
       );
       expect(mockBillingService.handleWebhookEvent).not.toHaveBeenCalled();
     });
 
-    it('should handle service errors', async () => {
+    it('should throw UnauthorizedException on invalid signature', async () => {
       const rawBody = Buffer.from('{"test": "data"}');
       const signature = 'invalid_sig';
       const mockReq = {
@@ -131,7 +131,7 @@ describe('WebhooksController', () => {
       mockBillingService.handleWebhookEvent.mockRejectedValue(new Error('Invalid signature'));
 
       await expect(controller.handleRazorpayWebhook(mockReq, signature)).rejects.toThrow(
-        'Invalid signature',
+        UnauthorizedException,
       );
     });
 

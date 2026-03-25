@@ -6,6 +6,9 @@ import {
   HttpCode,
   HttpStatus,
   RawBodyRequest,
+  BadRequestException,
+  ServiceUnavailableException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { BillingService } from './billing.service';
@@ -22,11 +25,22 @@ export class WebhooksController {
     @Req() req: RawBodyRequest<Request>,
     @Headers('stripe-signature') signature: string,
   ) {
+    if (!signature) {
+      throw new UnauthorizedException('Missing stripe-signature header');
+    }
     const rawBody = req.rawBody;
     if (!rawBody) {
-      throw new Error('Raw body not available');
+      throw new BadRequestException('Raw body not available');
     }
-    return this.billingService.handleWebhookEvent('stripe', { rawBody, signature });
+    try {
+      return await this.billingService.handleWebhookEvent('stripe', { rawBody, signature });
+    } catch (error) {
+      if (error instanceof ServiceUnavailableException) throw error;
+      if (error?.message?.includes('not configured')) {
+        throw new ServiceUnavailableException('Stripe webhook handler not configured');
+      }
+      throw new UnauthorizedException('Invalid webhook signature');
+    }
   }
 
   @Post('razorpay')
@@ -36,10 +50,21 @@ export class WebhooksController {
     @Req() req: RawBodyRequest<Request>,
     @Headers('x-razorpay-signature') signature: string,
   ) {
+    if (!signature) {
+      throw new UnauthorizedException('Missing x-razorpay-signature header');
+    }
     const rawBody = req.rawBody;
     if (!rawBody) {
-      throw new Error('Raw body not available');
+      throw new BadRequestException('Raw body not available');
     }
-    return this.billingService.handleWebhookEvent('razorpay', { rawBody, signature });
+    try {
+      return await this.billingService.handleWebhookEvent('razorpay', { rawBody, signature });
+    } catch (error) {
+      if (error instanceof ServiceUnavailableException) throw error;
+      if (error?.message?.includes('not configured')) {
+        throw new ServiceUnavailableException('Razorpay webhook handler not configured');
+      }
+      throw new UnauthorizedException('Invalid webhook signature');
+    }
   }
 }
