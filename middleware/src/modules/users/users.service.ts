@@ -90,7 +90,7 @@ export class UsersService {
 
     // Generate temp password and hash it
     const tempPassword = this.generateTempPassword();
-    const bcryptRounds = parseInt(process.env.BCRYPT_ROUNDS || '14', 10);
+    const bcryptRounds = parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
     const passwordHash = await bcrypt.hash(tempPassword, bcryptRounds);
 
     const user = await this.db.user.create({

@@ -249,7 +249,7 @@ export class UsersAdminService {
 
     // Generate secure random password
     const temporaryPassword = this.generateSecurePassword();
-    const bcryptRounds = parseInt(process.env.BCRYPT_ROUNDS || '14', 10);
+    const bcryptRounds = parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
     const passwordHash = await bcrypt.hash(temporaryPassword, bcryptRounds);
 
     await this.db.user.update({
