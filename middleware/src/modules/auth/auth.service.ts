@@ -62,7 +62,7 @@ export class AuthService {
     }
 
     // Hash password using secure bcrypt rounds (OWASP 2025+ recommendation: 13-14 rounds)
-    const bcryptRounds = parseInt(process.env.BCRYPT_ROUNDS || '14', 10);
+    const bcryptRounds = parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
     const passwordHash = await bcrypt.hash(dto.password, bcryptRounds);
 
     // Calculate trial end date (30 days from now)
@@ -524,7 +524,7 @@ export class AuthService {
     const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
 
     // Hash new password before transaction to minimize lock duration
-    const bcryptRounds = parseInt(process.env.BCRYPT_ROUNDS || '14', 10);
+    const bcryptRounds = parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
     const passwordHash = await bcrypt.hash(newPassword, bcryptRounds);
 
     // Lookup, validate, update user, and mark token used — all inside a
@@ -591,7 +591,7 @@ export class AuthService {
       throw new UnauthorizedException('Current password is incorrect');
     }
 
-    const bcryptRounds = parseInt(process.env.BCRYPT_ROUNDS || '14', 10);
+    const bcryptRounds = parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
     const passwordHash = await bcrypt.hash(newPassword, bcryptRounds);
 
     await this.databaseService.user.update({
@@ -748,7 +748,7 @@ export class AuthService {
     const isSoleAdmin = adminCount <= 1 && user.role === 'admin';
 
     // Pre-compute bcrypt hash outside the transaction to avoid holding DB locks (~50-100ms)
-    const bcryptRounds = parseInt(process.env.BCRYPT_ROUNDS || '14', 10);
+    const bcryptRounds = parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
     const randomHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), bcryptRounds);
 
     if (isSoleAdmin) {
