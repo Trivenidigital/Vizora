@@ -469,15 +469,64 @@ export class DeviceGateway
    */
   private async sendInitialState(client: Socket, deviceId: string, orgId: string): Promise<void> {
     try {
-      // Check if device has an active content override — skip playlist update to prevent flicker
+      // Check if device has an active content override
       const overrideCommandId = await this.redisService.get(`device:override:${deviceId}`);
       if (overrideCommandId) {
-        this.logger.log(`Device ${deviceId} has active override ${overrideCommandId} — skipping playlist update`);
-        // Still send config but skip playlist
+        // We still send the playlist even during an override. The TV app's
+        // updatePlaylist() persists it to Preferences but does NOT interrupt the
+        // active temporary content (guarded by the temporaryContent flag in main.ts).
+        // When the override expires, resumePlaylist() restores savedPlaylistState.
+        // On next restart, the device loads the newest playlist from Preferences.
+        this.logger.log(`Device ${deviceId} has active override ${overrideCommandId} — sending playlist alongside override so device has fallback content`);
+      }
+
+      // Check for a pending playlist queued while the device was offline.
+      // This takes priority over the DB query since it represents a more
+      // recent assignment that the device missed.
+      const pendingPlaylist = await this.redisService.getPendingPlaylist(deviceId);
+      if (pendingPlaylist) {
+        this.logger.log(`Delivering pending playlist to device ${deviceId} (queued while offline)`);
+
+        // Re-queue if the client disconnected between Redis read and now
+        if (!client.connected) {
+          this.logger.warn(`Device ${deviceId} disconnected before pending playlist delivery — re-queuing`);
+          await this.redisService.setPendingPlaylist(deviceId, pendingPlaylist);
+          return;
+        }
+
+        // Resolve layout content for any layout-type items (sendPlaylistUpdate
+        // only does shallow URL resolution, not layout zone expansion).
+        // Note: Zone content is resolved from the DB at reconnect time, so zone
+        // playlists reflect current state, not the queued snapshot. This is an
+        // acceptable trade-off — any zone changes would have been separate pushes.
+        const resolvedItems = await Promise.all(
+          (pendingPlaylist.items || []).map(async (item: any) => {
+            if (item.content?.type === 'layout') {
+              return { ...item, content: await this.resolveLayoutContent(item.content) };
+            }
+            return item;
+          }),
+        );
+
+        // Still need display record for config (qrOverlay etc.)
+        const displayForConfig = await this.databaseService.display.findUnique({
+          where: { id: deviceId },
+          select: { metadata: true },
+        });
+        const configMetadata = (displayForConfig?.metadata as Record<string, any>) || {};
         client.emit('config', {
           heartbeatInterval: 15000,
           cacheSize: 524288000,
           autoUpdate: true,
+          qrOverlay: configMetadata.qrOverlay || null,
+        });
+        // Note: Unlike sendPlaylistUpdate() which uses ack+timeout, this emit
+        // is fire-and-forget. If the socket drops between the connected check
+        // above and this emit, the playlist is lost. The device's next reconnect
+        // will fall through to the DB query path and pick up the current playlist.
+        client.emit('playlist:update', {
+          playlist: { ...pendingPlaylist, items: resolvedItems },
+          timestamp: new Date().toISOString(),
         });
         return;
       }
@@ -932,7 +981,8 @@ export class DeviceGateway
     const sockets = await this.server.in(roomName).fetchSockets();
 
     if (sockets.length === 0) {
-      this.logger.warn(`pushPlaylist: no sockets in room ${roomName} for device ${deviceId}`);
+      this.logger.warn(`pushPlaylist: no sockets in room ${roomName} for device ${deviceId} — queuing for reconnect`);
+      await this.redisService.setPendingPlaylist(deviceId, resolvedPlaylist);
       return { delivered: false, reason: 'no_sockets' };
     }
 
@@ -958,6 +1008,8 @@ export class DeviceGateway
     }
 
     if (!anyAcknowledged) {
+      this.logger.warn(`pushPlaylist: all sockets timed out for device ${deviceId} — queuing for reconnect`);
+      await this.redisService.setPendingPlaylist(deviceId, resolvedPlaylist);
       return { delivered: false, reason: 'ack_timeout' };
     }
 
