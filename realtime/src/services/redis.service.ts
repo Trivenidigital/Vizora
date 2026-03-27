@@ -209,6 +209,39 @@ export class RedisService implements OnModuleDestroy {
   }
 
   /**
+   * Store a pending playlist for an offline device.
+   * When the device reconnects, sendInitialState() delivers this
+   * instead of the DB query (it's fresher — represents a missed update).
+   */
+  async setPendingPlaylist(deviceId: string, playlist: any): Promise<void> {
+    const key = `device:pending-playlist:${deviceId}`;
+    await this.redis.setex(key, 1800, JSON.stringify(playlist)); // 30 minutes
+  }
+
+  /**
+   * Get and consume a pending playlist for a device (atomic read + delete).
+   * Returns null if no pending playlist exists.
+   *
+   * Note: Uses MULTI/EXEC which is atomic on single-node Redis. If migrating
+   * to Redis Cluster, consider replacing with a Lua script for guaranteed
+   * atomicity. On transient Redis errors, EXEC rolls back and the key
+   * survives — the next reconnect attempt will find it.
+   */
+  async getPendingPlaylist(deviceId: string): Promise<any | null> {
+    const key = `device:pending-playlist:${deviceId}`;
+    const multi = this.redis.multi();
+    multi.get(key);
+    multi.del(key);
+    const results = await multi.exec();
+    if (!results || !results[0] || !results[0][1]) return null;
+    try {
+      return JSON.parse(results[0][1] as string);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Publish event to channel
    */
   async publish<T = unknown>(channel: string, message: T): Promise<void> {

@@ -454,21 +454,29 @@ export class PlaylistsService {
 
     this.logger.log(`Notifying ${displays.length} display(s) of playlist update`);
 
-    // Notify each display via the realtime service
+    // Notify each display via the realtime service (1 retry with 2s delay on failure)
     const url = `${this.realtimeUrl}/api/push/playlist`;
 
     await Promise.allSettled(
       displays.map(async (display) => {
-        try {
-          await firstValueFrom(
-            this.httpService.post(url, {
-              deviceId: display.id,
-              playlist,
-            }, { headers }),
-          );
-          this.logger.log(`Notified display ${display.id} of playlist update`);
-        } catch (error) {
-          this.logger.warn(`Failed to notify display ${display.id}: ${error.message}`);
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            await firstValueFrom(
+              this.httpService.post(url, {
+                deviceId: display.id,
+                playlist,
+              }, { headers, timeout: 5000 }),
+            );
+            this.logger.log(`Notified display ${display.id} of playlist update`);
+            return;
+          } catch (error) {
+            if (attempt === 1) {
+              this.logger.warn(`Failed to notify display ${display.id} (attempt 1), retrying in 2s: ${error.message}`);
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+            } else {
+              this.logger.warn(`Failed to notify display ${display.id} after retry: ${error.message}`);
+            }
+          }
         }
       }),
     );
