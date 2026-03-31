@@ -46,6 +46,7 @@ export function UploadModal({ isOpen, onClose, onUpload }: UploadModalProps) {
     accept: getAcceptedFileTypes() as any,
     multiple: true,
     disabled: uploadForm.type === 'url',
+    useFsAccessApi: false,
     onDrop: (acceptedFiles) => {
       const newQueueItems = acceptedFiles.map((file) => ({
         file,
