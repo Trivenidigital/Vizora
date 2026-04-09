@@ -1,6 +1,0 @@
-   type   | count 
-----------+-------
- image    |    15
- template |    90
-(2 rows)
-

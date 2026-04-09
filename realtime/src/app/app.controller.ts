@@ -165,6 +165,9 @@ export class AppController {
   async pushPlaylist(@Body() data: PushPlaylistRequest): Promise<PushResponse> {
     const result = await this.deviceGateway.sendPlaylistUpdate(data.deviceId, data.playlist);
     if (!result.delivered) {
+      // Gateway already queues for 'no_sockets' and 'ack_timeout' internally,
+      // but if a future reason is added without queuing, this is a safety net.
+      this.logger.warn(`Playlist delivery failed for device ${data.deviceId}: ${result.reason ?? 'unknown'}`);
       return {
         success: false,
         message: `Playlist delivery failed: ${result.reason ?? 'unknown'}`,

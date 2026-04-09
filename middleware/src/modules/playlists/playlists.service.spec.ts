@@ -1,10 +1,14 @@
 import { NotFoundException } from '@nestjs/common';
+import { of, throwError } from 'rxjs';
 import { PlaylistsService } from './playlists.service';
 import { DatabaseService } from '../database/database.service';
 
 describe('PlaylistsService', () => {
   let service: PlaylistsService;
   let mockDatabaseService: any;
+  let mockHttpService: any;
+  let mockEventEmitter: any;
+  let mockCircuitBreaker: any;
 
   const mockPlaylist = {
     id: 'playlist-123',
@@ -50,10 +54,27 @@ describe('PlaylistsService', () => {
         findFirst: jest.fn(),
         count: jest.fn(),
       },
+      display: {
+        findMany: jest.fn(),
+      },
     };
 
-    const mockEventEmitter = { emit: jest.fn() };
-    service = new PlaylistsService(mockDatabaseService as DatabaseService, {} as any, mockEventEmitter as any);
+    mockHttpService = {
+      post: jest.fn(),
+    };
+
+    mockEventEmitter = { emit: jest.fn() };
+
+    mockCircuitBreaker = {
+      executeWithFallback: jest.fn(),
+    };
+
+    service = new PlaylistsService(
+      mockDatabaseService as DatabaseService,
+      mockHttpService as any,
+      mockEventEmitter as any,
+      mockCircuitBreaker as any,
+    );
   });
 
   it('should be defined', () => {
@@ -489,6 +510,84 @@ describe('PlaylistsService', () => {
       mockDatabaseService.playlist.findFirst.mockResolvedValue(null);
 
       await expect(service.remove('org-123', 'invalid-id')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('notifyDisplaysOfPlaylistUpdate (via update)', () => {
+    const updatedPlaylist = { ...mockPlaylist, name: 'Updated' };
+
+    beforeEach(() => {
+      // findOne succeeds
+      mockDatabaseService.playlist.findFirst.mockResolvedValue(mockPlaylist);
+      // update succeeds
+      mockDatabaseService.playlist.update.mockResolvedValue(updatedPlaylist);
+      // Set env so internal headers are returned
+      process.env.INTERNAL_API_SECRET = 'test-secret';
+    });
+
+    afterEach(() => {
+      delete process.env.INTERNAL_API_SECRET;
+    });
+
+    it('should notify displays via circuit breaker on playlist update', async () => {
+      mockDatabaseService.display.findMany.mockResolvedValue([
+        { id: 'display-1' },
+        { id: 'display-2' },
+      ]);
+      mockCircuitBreaker.executeWithFallback.mockResolvedValue(undefined);
+
+      await service.update('org-123', 'playlist-123', { name: 'Updated' });
+
+      // Allow fire-and-forget promise to settle
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(mockDatabaseService.display.findMany).toHaveBeenCalledWith({
+        where: { currentPlaylistId: 'playlist-123' },
+        select: { id: true },
+      });
+      expect(mockCircuitBreaker.executeWithFallback).toHaveBeenCalledTimes(2);
+      expect(mockCircuitBreaker.executeWithFallback).toHaveBeenCalledWith(
+        'realtime-service',
+        expect.any(Function),
+        expect.any(Function),
+        expect.objectContaining({ failureThreshold: 5 }),
+      );
+    });
+
+    it('should skip notification when no displays use the playlist', async () => {
+      mockDatabaseService.display.findMany.mockResolvedValue([]);
+
+      await service.update('org-123', 'playlist-123', { name: 'Updated' });
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(mockCircuitBreaker.executeWithFallback).not.toHaveBeenCalled();
+    });
+
+    it('should skip notification when INTERNAL_API_SECRET is not set', async () => {
+      delete process.env.INTERNAL_API_SECRET;
+      mockDatabaseService.display.findMany.mockResolvedValue([{ id: 'display-1' }]);
+
+      await service.update('org-123', 'playlist-123', { name: 'Updated' });
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(mockDatabaseService.display.findMany).not.toHaveBeenCalled();
+    });
+
+    it('should use circuit breaker fallback on failure without blocking update', async () => {
+      mockDatabaseService.display.findMany.mockResolvedValue([{ id: 'display-1' }]);
+      // Simulate circuit breaker calling fallback
+      mockCircuitBreaker.executeWithFallback.mockImplementation(
+        async (_name: string, _fn: () => Promise<void>, fallback: (err?: Error) => void) => {
+          fallback(new Error('connection refused'));
+        },
+      );
+
+      const result = await service.update('org-123', 'playlist-123', { name: 'Updated' });
+      await new Promise((r) => setTimeout(r, 50));
+
+      // Update still succeeds despite notification failure
+      expect(result).toEqual(updatedPlaylist);
+      expect(mockCircuitBreaker.executeWithFallback).toHaveBeenCalledTimes(1);
     });
   });
 });

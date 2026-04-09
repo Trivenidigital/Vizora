@@ -32,6 +32,7 @@ import {
 } from './dto';
 import {
   Playlist,
+  PlaylistContentItem,
   DeviceCommand,
   BroadcastData,
 } from '../types';
@@ -483,53 +484,8 @@ export class DeviceGateway
       // Check for a pending playlist queued while the device was offline.
       // This takes priority over the DB query since it represents a more
       // recent assignment that the device missed.
-      const pendingPlaylist = await this.redisService.getPendingPlaylist(deviceId);
-      if (pendingPlaylist) {
-        this.logger.log(`Delivering pending playlist to device ${deviceId} (queued while offline)`);
-
-        // Re-queue if the client disconnected between Redis read and now
-        if (!client.connected) {
-          this.logger.warn(`Device ${deviceId} disconnected before pending playlist delivery — re-queuing`);
-          await this.redisService.setPendingPlaylist(deviceId, pendingPlaylist);
-          return;
-        }
-
-        // Resolve layout content for any layout-type items (sendPlaylistUpdate
-        // only does shallow URL resolution, not layout zone expansion).
-        // Note: Zone content is resolved from the DB at reconnect time, so zone
-        // playlists reflect current state, not the queued snapshot. This is an
-        // acceptable trade-off — any zone changes would have been separate pushes.
-        const resolvedItems = await Promise.all(
-          (pendingPlaylist.items || []).map(async (item: any) => {
-            if (item.content?.type === 'layout') {
-              return { ...item, content: await this.resolveLayoutContent(item.content) };
-            }
-            return item;
-          }),
-        );
-
-        // Still need display record for config (qrOverlay etc.)
-        const displayForConfig = await this.databaseService.display.findUnique({
-          where: { id: deviceId },
-          select: { metadata: true },
-        });
-        const configMetadata = (displayForConfig?.metadata as Record<string, any>) || {};
-        client.emit('config', {
-          heartbeatInterval: 15000,
-          cacheSize: 524288000,
-          autoUpdate: true,
-          qrOverlay: configMetadata.qrOverlay || null,
-        });
-        // Note: Unlike sendPlaylistUpdate() which uses ack+timeout, this emit
-        // is fire-and-forget. If the socket drops between the connected check
-        // above and this emit, the playlist is lost. The device's next reconnect
-        // will fall through to the DB query path and pick up the current playlist.
-        client.emit('playlist:update', {
-          playlist: { ...pendingPlaylist, items: resolvedItems },
-          timestamp: new Date().toISOString(),
-        });
-        return;
-      }
+      const delivered = await this.deliverPendingPlaylist(client, deviceId);
+      if (delivered) return;
 
       this.logger.debug(`Fetching playlist for device: ${deviceId}`);
       const display = await this.databaseService.display.findUnique({
@@ -958,13 +914,54 @@ export class DeviceGateway
     }
   }
 
+  /**
+   * Deliver a pending playlist that was queued in Redis while the device was offline.
+   * The pending playlist has pre-resolved content URLs from sendPlaylistUpdate().
+   * Returns true if a pending playlist was found and delivered (or re-queued).
+   */
+  private async deliverPendingPlaylist(client: Socket, deviceId: string): Promise<boolean> {
+    const pendingPlaylist = await this.redisService.getPendingPlaylist(deviceId);
+    if (!pendingPlaylist) return false;
+
+    this.logger.log(`Delivering pending playlist to device ${deviceId} (queued while offline)`);
+
+    // Re-queue if the client disconnected between Redis read and now
+    if (!client.connected) {
+      this.logger.warn(`Device ${deviceId} disconnected before pending playlist delivery — re-queuing`);
+      await this.redisService.setPendingPlaylist(deviceId, pendingPlaylist);
+      return true;
+    }
+
+    // Fetch display metadata for config (qrOverlay etc.)
+    const displayForConfig = await this.databaseService.display.findUnique({
+      where: { id: deviceId },
+      select: { metadata: true },
+    });
+    const configMetadata = (displayForConfig?.metadata as Record<string, any>) || {};
+    client.emit('config', {
+      heartbeatInterval: 15000,
+      cacheSize: 524288000,
+      autoUpdate: true,
+      qrOverlay: configMetadata.qrOverlay || null,
+    });
+
+    // Fire-and-forget: if the socket drops between the connected check above
+    // and this emit, the playlist is lost. The device's next reconnect will
+    // fall through to the DB query path and pick up the current playlist.
+    client.emit('playlist:update', {
+      playlist: pendingPlaylist,
+      timestamp: new Date().toISOString(),
+    });
+    return true;
+  }
+
   // Admin methods (called from API)
   async sendPlaylistUpdate(deviceId: string, playlist: Playlist): Promise<{ delivered: boolean; reason?: string }> {
     // Resolve minio:// URLs to API-served URLs before sending to device
     // Devices authenticate content requests via Authorization header with their stored JWT
     const resolvedPlaylist = {
       ...playlist,
-      items: (playlist.items || []).map((item: any) => {
+      items: (playlist.items || []).map((item: PlaylistContentItem) => {
         const resolvedUrl = this.resolveContentUrl(item);
         return {
           ...item,
