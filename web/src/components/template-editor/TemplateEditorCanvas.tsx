@@ -366,6 +366,9 @@ const EDITOR_RUNTIME_CODE = `(function () {
   // ── Message Listener ───────────────────────────────────────────────
 
   function handleMessage(e) {
+    // Only accept messages from the parent window's origin
+    if (e.origin !== window.parent.location.origin) return;
+
     var data = e.data;
     if (!data || !data.type) return;
 

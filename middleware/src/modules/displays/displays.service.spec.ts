@@ -631,4 +631,44 @@ describe('DisplaysService', () => {
       });
     });
   });
+
+  describe('detectOfflineDevices', () => {
+    it('should mark stale devices offline and emit device.offline events', async () => {
+      const staleDevices = [
+        { id: 'device-1', nickname: 'Lobby TV', deviceIdentifier: 'dev-1', organizationId: 'org-1' },
+        { id: 'device-2', nickname: null, deviceIdentifier: 'dev-2', organizationId: 'org-1' },
+      ];
+      databaseService.display.findMany.mockResolvedValue(staleDevices as any);
+      databaseService.display.updateMany.mockResolvedValue({ count: 2 });
+
+      await service.detectOfflineDevices();
+
+      expect(databaseService.display.findMany).toHaveBeenCalledWith({
+        where: {
+          status: 'online',
+          lastHeartbeat: { lt: expect.any(Date) },
+        },
+        select: { id: true, nickname: true, deviceIdentifier: true, organizationId: true },
+      });
+      expect(databaseService.display.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ['device-1', 'device-2'] } },
+        data: { status: 'offline' },
+      });
+      const eventEmitter = (service as any).eventEmitter;
+      expect(eventEmitter.emit).toHaveBeenCalledWith('device.offline', {
+        deviceId: 'device-1', deviceName: 'Lobby TV', organizationId: 'org-1',
+      });
+      expect(eventEmitter.emit).toHaveBeenCalledWith('device.offline', {
+        deviceId: 'device-2', deviceName: 'dev-2', organizationId: 'org-1',
+      });
+    });
+
+    it('should not update when no stale devices found', async () => {
+      databaseService.display.findMany.mockResolvedValue([]);
+
+      await service.detectOfflineDevices();
+
+      expect(databaseService.display.updateMany).not.toHaveBeenCalled();
+    });
+  });
 });
