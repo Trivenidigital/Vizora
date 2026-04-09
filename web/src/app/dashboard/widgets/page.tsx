@@ -141,7 +141,7 @@ export default function WidgetsPage() {
           const fallback = DEFAULT_WIDGET_TYPES.find(d => d.type === t.type);
           return {
             ...t,
-            name: t.name || fallback?.name || t.type,
+            name: t.name || fallback?.name || t.type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
             description: t.description || fallback?.description || '',
           };
         });
