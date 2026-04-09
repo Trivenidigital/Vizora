@@ -135,11 +135,21 @@ export default function WidgetsPage() {
     setLoading(true);
     try {
       const types = await apiClient.getWidgetTypes();
-      if (types && types.length > 0) {
-        setWidgetTypes(types);
+      if (types && Array.isArray(types) && types.length > 0) {
+        // Merge API types with defaults to ensure name/description are never empty
+        const merged = types.map((t: WidgetType) => {
+          const fallback = DEFAULT_WIDGET_TYPES.find(d => d.type === t.type);
+          return {
+            ...t,
+            name: t.name || fallback?.name || t.type,
+            description: t.description || fallback?.description || '',
+          };
+        });
+        setWidgetTypes(merged);
       }
     } catch {
-      // Use default widget types as fallback
+      // Use default widget types as fallback — already set as initial state
+      setWidgetTypes(DEFAULT_WIDGET_TYPES);
     }
 
     try {

@@ -52,8 +52,8 @@ async function bootstrap() {
     etag: true,
   });
 
-  // Serve template seed thumbnails
-  app.useStaticAssets(join(process.cwd(), 'templates', 'seed'), {
+  // Serve template seed thumbnails (templates/ is at repo root, one level up from middleware cwd)
+  app.useStaticAssets(join(process.cwd(), '..', 'templates', 'seed'), {
     prefix: '/templates/seed/',
     maxAge: '30d',
     etag: true,
