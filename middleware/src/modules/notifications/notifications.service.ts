@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
+import { OnEvent } from '@nestjs/event-emitter';
 import { firstValueFrom } from 'rxjs';
 import { Prisma } from '@vizora/database';
 import { DatabaseService } from '../database/database.service';
@@ -255,6 +256,30 @@ export class NotificationsService {
       this.logger.warn(
         `Failed to broadcast notification via WebSocket: ${err instanceof Error ? err.message : 'unknown error'}`,
       );
+    }
+  }
+
+  /**
+   * Event listener: device came online (status transition only, not every heartbeat)
+   */
+  @OnEvent('device.online')
+  async handleDeviceOnline(payload: { deviceId: string; deviceName: string; organizationId: string }) {
+    try {
+      await this.createDeviceOnlineNotification(payload.deviceId, payload.deviceName, payload.organizationId);
+    } catch (error) {
+      this.logger.warn(`Failed to create device online notification: ${error instanceof Error ? error.message : 'unknown'}`);
+    }
+  }
+
+  /**
+   * Event listener: device went offline
+   */
+  @OnEvent('device.offline')
+  async handleDeviceOffline(payload: { deviceId: string; deviceName: string; organizationId: string }) {
+    try {
+      await this.createDeviceOfflineNotification(payload.deviceId, payload.deviceName, payload.organizationId);
+    } catch (error) {
+      this.logger.warn(`Failed to create device offline notification: ${error instanceof Error ? error.message : 'unknown'}`);
     }
   }
 

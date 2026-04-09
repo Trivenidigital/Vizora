@@ -34,7 +34,7 @@
 
   function sendToParent(data) {
     if (window.parent && window.parent !== window) {
-      window.parent.postMessage(data, '*');
+      window.parent.postMessage(data, window.parent.location.origin);
     }
   }
 

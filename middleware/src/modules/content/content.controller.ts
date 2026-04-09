@@ -57,6 +57,7 @@ export class ContentController {
 
   @Post()
   @Roles('admin', 'manager')
+  @HttpCode(HttpStatus.CREATED)
   async create(
     @CurrentUser('organizationId') organizationId: string,
     @Body() createContentDto: CreateContentDto,
@@ -68,8 +69,10 @@ export class ContentController {
     return this.contentService.create(organizationId, createContentDto);
   }
 
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('upload')
   @Roles('admin', 'manager')
+  @HttpCode(HttpStatus.CREATED)
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 100 * 1024 * 1024 } }))
   async uploadFile(
     @CurrentUser('organizationId') organizationId: string,

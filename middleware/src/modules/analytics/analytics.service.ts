@@ -128,41 +128,32 @@ export class AnalyticsService {
     const { startDate } = this.getDateRange(range);
     const days = this.getRangeDays(range);
 
-    const impressionGroups = await this.db.contentImpression.groupBy({
-      by: ['date'],
-      where: {
-        organizationId,
-        timestamp: { gte: startDate },
-      },
-      _count: { id: true },
-    });
+    // Aggregate type breakdown per date in the database instead of fetching all rows
+    const typeBreakdown = await this.db.$queryRaw<
+      Array<{ date: Date; type: string | null; count: bigint }>
+    >`
+      SELECT ci.date, c.type, COUNT(*)::bigint as count
+      FROM content_impressions ci
+      LEFT JOIN "Content" c ON ci."contentId" = c.id
+      WHERE ci."organizationId" = ${organizationId}
+        AND ci.timestamp >= ${startDate}
+      GROUP BY ci.date, c.type
+    `;
 
-    // Also get type breakdown per date using a bounded query
-    const impressions = await this.db.contentImpression.findMany({
-      where: {
-        organizationId,
-        timestamp: { gte: startDate },
-      },
-      select: {
-        date: true,
-        content: { select: { type: true } },
-      },
-      take: 50000,
-    });
-
-    // Group by date and type
+    // Build lookup map: dateStr -> { video, image, text, interactive }
     const dailyData = new Map<string, Record<string, number>>();
-    for (const imp of impressions) {
-      const dateStr = imp.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    for (const row of typeBreakdown) {
+      const dateStr = new Date(row.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       if (!dailyData.has(dateStr)) {
         dailyData.set(dateStr, { video: 0, image: 0, text: 0, interactive: 0 });
       }
       const dayData = dailyData.get(dateStr)!;
-      const type = imp.content?.type;
-      if (type === 'video') dayData.video++;
-      else if (type === 'image') dayData.image++;
-      else if (type === 'html') dayData.text++;
-      else if (type === 'url') dayData.interactive++;
+      const count = Number(row.count);
+      const type = row.type;
+      if (type === 'video') dayData.video += count;
+      else if (type === 'image') dayData.image += count;
+      else if (type === 'html') dayData.text += count;
+      else if (type === 'url') dayData.interactive += count;
     }
 
     // Generate data points for all days in range

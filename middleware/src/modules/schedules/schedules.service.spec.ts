@@ -342,6 +342,7 @@ describe('SchedulesService', () => {
         },
       ];
 
+      databaseService.display.findFirst.mockResolvedValue({ timezone: 'UTC' } as any);
       databaseService.schedule.findMany.mockResolvedValue(mockActiveSchedules);
 
       const result = await service.findActiveSchedules(mockDisplayId, mockOrganizationId);
@@ -351,6 +352,7 @@ describe('SchedulesService', () => {
     });
 
     it('should filter by current date, time, day of week, and organizationId', async () => {
+      databaseService.display.findFirst.mockResolvedValue({ timezone: 'UTC' } as any);
       databaseService.schedule.findMany.mockResolvedValue([]);
 
       await service.findActiveSchedules(mockDisplayId, mockOrganizationId);

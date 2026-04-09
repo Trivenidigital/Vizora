@@ -142,9 +142,19 @@ export class SchedulesService {
   }
 
   async findActiveSchedules(displayId: string, organizationId: string) {
+    // Fetch the display's timezone to compute "now" in local time
+    const display = await this.db.display.findFirst({
+      where: { id: displayId, organizationId },
+      select: { timezone: true },
+    });
+    const timezone = display?.timezone || 'UTC';
+
+    // Compute current day/time in the display's timezone
     const now = new Date();
-    const dayOfWeek = now.getDay();
-    const currentTime = now.getHours() * 60 + now.getMinutes();
+    const localStr = now.toLocaleString('en-US', { timeZone: timezone });
+    const localNow = new Date(localStr);
+    const dayOfWeek = localNow.getDay();
+    const currentTime = localNow.getHours() * 60 + localNow.getMinutes();
 
     return this.db.schedule.findMany({
       where: {

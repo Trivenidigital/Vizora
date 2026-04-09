@@ -39,9 +39,6 @@ export default function LoginContent() {
     setError('');
     try {
       await apiClient.googleLogin(credential);
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[LOGIN] Google login successful, redirecting to:', redirectUrl);
-      }
       window.location.href = redirectUrl;
     } catch (err: unknown) {
       if (process.env.NODE_ENV === 'development') {
@@ -77,9 +74,6 @@ export default function LoginContent() {
 
     try {
       await apiClient.login(formData.email, formData.password);
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[LOGIN] Login successful, redirecting to:', redirectUrl);
-      }
       window.location.href = redirectUrl;
     } catch (err: unknown) {
       if (process.env.NODE_ENV === 'development') {

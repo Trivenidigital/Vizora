@@ -44,6 +44,7 @@ export class PairingController {
   /**
    * User completes pairing from web dashboard (Authenticated)
    */
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('complete')
   async completePairing(
     @CurrentUser('organizationId') organizationId: string,

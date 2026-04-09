@@ -119,11 +119,28 @@ export class DeviceGateway
     this.cleanupIntervals.push(setInterval(() => this.cleanupStaleEntries(), 5 * 60 * 1000));
   }
 
-  onModuleDestroy() {
+  async onModuleDestroy() {
+    // Stop all periodic cleanup intervals
     for (const interval of this.cleanupIntervals) {
       clearInterval(interval);
     }
     this.cleanupIntervals = [];
+
+    // Notify all connected clients to reconnect to another instance
+    if (this.server) {
+      this.logger.log('Graceful shutdown: notifying clients to reconnect...');
+      this.server.emit('server:shutdown', { reconnect: true });
+
+      // Give clients 2 seconds to process the shutdown notice
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Disconnect all sockets
+      const sockets = await this.server.fetchSockets();
+      for (const socket of sockets) {
+        socket.disconnect(true);
+      }
+      this.logger.log(`Graceful shutdown: disconnected ${sockets.length} client(s)`);
+    }
   }
 
   /**
@@ -577,6 +594,20 @@ export class DeviceGateway
       this.logger.error(`Failed to fetch playlist for device ${deviceId}: ${playlistErrorMsg}`);
       // Don't fail the connection if playlist fetch fails
     }
+
+    // Deliver any commands that were queued while the device was offline
+    try {
+      const pendingCommands = await this.redisService.getDeviceCommands(deviceId);
+      if (pendingCommands.length > 0) {
+        this.logger.log(`Delivering ${pendingCommands.length} pending command(s) to device ${deviceId}`);
+        for (const cmd of pendingCommands) {
+          client.emit('command', cmd);
+        }
+      }
+    } catch (cmdError: unknown) {
+      const cmdErrorMsg = cmdError instanceof Error ? cmdError.message : 'Unknown error';
+      this.logger.error(`Failed to deliver pending commands to device ${deviceId}: ${cmdErrorMsg}`);
+    }
   }
 
   /**
@@ -945,13 +976,22 @@ export class DeviceGateway
       qrOverlay: configMetadata.qrOverlay || null,
     });
 
-    // Fire-and-forget: if the socket drops between the connected check above
-    // and this emit, the playlist is lost. The device's next reconnect will
-    // fall through to the DB query path and pick up the current playlist.
-    client.emit('playlist:update', {
-      playlist: pendingPlaylist,
-      timestamp: new Date().toISOString(),
-    });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('ack_timeout')), 10000);
+        client.emit('playlist:update', {
+          playlist: pendingPlaylist,
+          timestamp: new Date().toISOString(),
+        }, () => {
+          clearTimeout(timeout);
+          resolve();
+        });
+      });
+      this.logger.log(`Pending playlist delivered to device ${deviceId} (acknowledged)`);
+    } catch {
+      this.logger.warn(`Pending playlist ack timeout for device ${deviceId} — re-queuing`);
+      await this.redisService.setPendingPlaylist(deviceId, pendingPlaylist);
+    }
     return true;
   }
 
@@ -1014,13 +1054,41 @@ export class DeviceGateway
     return { delivered: true };
   }
 
-  async sendCommand(deviceId: string, command: DeviceCommand): Promise<void> {
-    this.server.to(`device:${deviceId}`).emit('command', {
-      ...command,
-      timestamp: new Date().toISOString(),
-    });
+  async sendCommand(deviceId: string, command: DeviceCommand): Promise<{ delivered: boolean; reason?: string }> {
+    const commandWithTimestamp = { ...command, timestamp: new Date().toISOString() };
+    const roomName = `device:${deviceId}`;
+    const sockets = await this.server.in(roomName).fetchSockets();
 
-    this.logger.log(`Sent command ${command.type} to device: ${deviceId}`);
+    if (sockets.length === 0) {
+      this.logger.warn(`sendCommand: no sockets for device ${deviceId} — queuing`);
+      await this.redisService.addDeviceCommand(deviceId, commandWithTimestamp);
+      return { delivered: false, reason: 'no_sockets' };
+    }
+
+    let anyAcknowledged = false;
+    for (const socket of sockets) {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('ack_timeout')), 10000);
+          socket.emit('command', commandWithTimestamp, () => {
+            clearTimeout(timeout);
+            resolve();
+          });
+        });
+        anyAcknowledged = true;
+      } catch {
+        this.logger.warn(`sendCommand: ack timeout for socket ${socket.id} on device ${deviceId}`);
+      }
+    }
+
+    if (!anyAcknowledged) {
+      this.logger.warn(`sendCommand: all sockets timed out for device ${deviceId} — queuing`);
+      await this.redisService.addDeviceCommand(deviceId, commandWithTimestamp);
+      return { delivered: false, reason: 'ack_timeout' };
+    }
+
+    this.logger.log(`Sent command ${command.type} to device: ${deviceId} (acknowledged)`);
+    return { delivered: true };
   }
 
   async broadcastToOrganization(organizationId: string, event: string, data: BroadcastData): Promise<void> {

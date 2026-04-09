@@ -42,7 +42,7 @@ export function useEditorHistory(
       if (!iframe?.contentWindow) return;
       iframe.contentWindow.postMessage(
         { type: 'update-property', elementId, property, value },
-        '*',
+        window.location.origin,
       );
     },
     [iframeRef],

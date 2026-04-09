@@ -29,6 +29,7 @@ services:
     networks:
       - vizora-network
 
+  # Optional analytics services — start with: docker compose --profile analytics up -d
   mongodb:
     profiles: ["analytics"]
     image: mongo:7
@@ -99,6 +100,7 @@ services:
     networks:
       - vizora-network
 
+  # Optional analytics service — included in the "analytics" profile (see mongodb above)
   clickhouse:
     profiles: ["analytics"]
     image: clickhouse/clickhouse-server:24
@@ -213,6 +215,8 @@ services:
       dockerfile: Dockerfile
     # container_name omitted — required for deploy.replicas > 1
     restart: unless-stopped
+    environment:
+      VIZORA_DOMAIN: ${VIZORA_DOMAIN:-vizora.cloud}
     ports:
       - "80:80"
       - "443:443"
@@ -231,7 +235,7 @@ services:
     # below is for local development; with replicas > 1 Docker Compose will
     # warn in non-swarm mode but a single-node dev setup still works.
     deploy:
-      replicas: 2
+      replicas: 1
       resources:
         limits:
           memory: 256M

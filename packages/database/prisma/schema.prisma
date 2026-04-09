@@ -52,6 +52,7 @@ model Organization {
   impressions         ContentImpression[]
   promotionRedemptions PromotionRedemption[]
   supportRequests      SupportRequest[]
+  supportMessages      SupportMessage[] @relation("OrgSupportMessages")
 
   @@index([slug])
   @@index([stripeCustomerId])
@@ -336,6 +337,7 @@ model Schedule {
   @@index([isActive])
   @@index([displayId, startDate, endDate])
   @@index([displayGroupId, startDate, endDate])
+  @@index([organizationId, isActive])
 }
 
 // ============================================================================
@@ -770,6 +772,7 @@ model SupportMessage {
   createdAt        DateTime  @default(now())
 
   request          SupportRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  organization     Organization   @relation("OrgSupportMessages", fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([requestId])
   @@index([organizationId])

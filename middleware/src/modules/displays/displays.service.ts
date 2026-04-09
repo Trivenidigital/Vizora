@@ -247,6 +247,18 @@ export class DisplaysService {
     // deviceIdentifier is @unique, and device JWT identity is verified by the controller.
     // Defense-in-depth: using updateMany with deviceIdentifier ensures no cross-tenant writes
     // since deviceIdentifier is globally unique (tied to hardware MAC/ID).
+
+    // Check previous status to detect online transition (avoid notification spam on every heartbeat)
+    const display = await this.db.display.findFirst({
+      where: { deviceIdentifier },
+      select: { id: true, status: true, nickname: true, organizationId: true },
+    });
+    if (!display) {
+      throw new NotFoundException('Device not found');
+    }
+
+    const wasOffline = display.status !== 'online';
+
     const result = await this.db.display.updateMany({
       where: { deviceIdentifier },
       data: {
@@ -257,6 +269,16 @@ export class DisplaysService {
     if (result.count === 0) {
       throw new NotFoundException('Device not found');
     }
+
+    // Emit device.online only on status transition (not every heartbeat)
+    if (wasOffline) {
+      this.eventEmitter.emit('device.online', {
+        deviceId: display.id,
+        deviceName: display.nickname || deviceIdentifier,
+        organizationId: display.organizationId,
+      });
+    }
+
     return { success: true };
   }
 

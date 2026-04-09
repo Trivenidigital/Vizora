@@ -598,14 +598,18 @@ export class ContentService {
       throw new BadRequestException('Some content items not found or not accessible');
     }
 
-    // Delete files from storage (fire-and-forget with logging)
-    for (const item of items) {
-      const objectKey = item.url?.startsWith('minio://') ? item.url.substring('minio://'.length) : null;
-      if (objectKey) {
-        this.storageService.deleteFile(objectKey).catch(error => {
-          this.logger.error(`Failed to delete file ${objectKey} during bulk delete: ${error}`);
-        });
-      }
+    // Delete files from storage with error collection
+    const deletionResults = await Promise.allSettled(
+      items.map(async (item) => {
+        const objectKey = item.url?.startsWith('minio://') ? item.url.substring('minio://'.length) : null;
+        if (objectKey) {
+          await this.storageService.deleteFile(objectKey);
+        }
+      }),
+    );
+    const failures = deletionResults.filter(r => r.status === 'rejected');
+    if (failures.length > 0) {
+      this.logger.warn(`Bulk delete: ${failures.length}/${items.length} storage file(s) failed to delete`);
     }
 
     const result = await this.db.content.deleteMany({

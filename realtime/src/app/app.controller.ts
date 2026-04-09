@@ -4,6 +4,7 @@ import { RedisService } from '../services/redis.service';
 import { DatabaseService } from '../database/database.service';
 import { InternalApiGuard } from '../guards/internal-api.guard';
 import { PushPlaylistRequest, PushContentRequest, DeviceCommandType } from '../types';
+import { PushPlaylistDto, PushContentDto, BroadcastCommandDto, InternalCommandDto } from '../dto/internal-api.dto';
 
 interface DependencyHealth {
   status: 'healthy' | 'unhealthy' | 'degraded';
@@ -162,7 +163,7 @@ export class AppController {
 
   @Post('push/playlist')
   @UseGuards(InternalApiGuard)
-  async pushPlaylist(@Body() data: PushPlaylistRequest): Promise<PushResponse> {
+  async pushPlaylist(@Body() data: PushPlaylistDto): Promise<PushResponse> {
     const result = await this.deviceGateway.sendPlaylistUpdate(data.deviceId, data.playlist);
     if (!result.delivered) {
       // Gateway already queues for 'no_sockets' and 'ack_timeout' internally,
@@ -181,23 +182,30 @@ export class AppController {
 
   @Post('push/content')
   @UseGuards(InternalApiGuard)
-  async pushContent(@Body() data: PushContentRequest): Promise<PushResponse> {
+  async pushContent(@Body() data: PushContentDto): Promise<PushResponse> {
     // Resolve minio:// URLs to public API endpoints before sending to device
-    const content = { ...data.content };
-    this.logger.log(`Push content received - original URL: ${content.url?.substring(0, 80)}`);
-    if (content.url && content.url.startsWith('minio://')) {
+    const content = { ...data.content } as Record<string, any>;
+    this.logger.log(`Push content received - original URL: ${String(content.url ?? '').substring(0, 80)}`);
+    if (content.url && typeof content.url === 'string' && content.url.startsWith('minio://')) {
       const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:3000';
       content.url = `${apiBaseUrl}/api/v1/device-content/${content.id}/file`;
       this.logger.log(`Resolved to: ${content.url}`);
     }
 
-    await this.deviceGateway.sendCommand(data.deviceId, {
+    const result = await this.deviceGateway.sendCommand(data.deviceId, {
       type: DeviceCommandType.PUSH_CONTENT,
       payload: {
         content,
         duration: data.duration || 5,
       },
     });
+    if (!result.delivered) {
+      this.logger.warn(`Content push failed for device ${data.deviceId}: ${result.reason ?? 'unknown'}`);
+      return {
+        success: false,
+        message: `Content push failed: ${result.reason ?? 'unknown'}`,
+      };
+    }
     return {
       success: true,
       message: 'Content pushed to device',
@@ -207,29 +215,25 @@ export class AppController {
   @Post('commands/broadcast')
   @UseGuards(InternalApiGuard)
   async broadcastCommand(
-    @Body() data: { deviceIds: string[]; command: { type: string; payload?: any; commandId?: string } },
+    @Body() data: BroadcastCommandDto,
   ) {
-    let devicesOnline = 0;
     const commandWithTimestamp = {
       ...data.command,
       timestamp: new Date().toISOString(),
     };
 
-    for (const deviceId of data.deviceIds) {
-      // Check if device is connected by checking room membership
-      const room = this.deviceGateway.server.sockets.adapter.rooms.get(`device:${deviceId}`);
-      const isOnline = room && room.size > 0;
-
-      // Always emit to the room (no-op if empty)
-      this.deviceGateway.server.to(`device:${deviceId}`).emit('command', commandWithTimestamp);
-
-      if (isOnline) {
-        devicesOnline++;
-      } else {
-        // Queue for offline device
-        await this.redisService.addDeviceCommand(deviceId, commandWithTimestamp);
-      }
-    }
+    const results = await Promise.allSettled(
+      data.deviceIds.map(async (deviceId) => {
+        const room = this.deviceGateway.server.sockets.adapter.rooms.get(`device:${deviceId}`);
+        const isOnline = room && room.size > 0;
+        this.deviceGateway.server.to(`device:${deviceId}`).emit('command', commandWithTimestamp);
+        if (!isOnline) {
+          await this.redisService.addDeviceCommand(deviceId, commandWithTimestamp);
+        }
+        return isOnline;
+      }),
+    );
+    const devicesOnline = results.filter(r => r.status === 'fulfilled' && r.value).length;
 
     return { devicesOnline };
   }
@@ -258,15 +262,19 @@ export class AppController {
   @Post('internal/command')
   @UseGuards(InternalApiGuard)
   async sendCommand(
-    @Body() data: { displayId: string; command: string; payload?: Record<string, unknown> },
+    @Body() data: InternalCommandDto,
   ): Promise<PushResponse> {
-    await this.deviceGateway.sendCommand(data.displayId, {
-      type: data.command as DeviceCommandType,
-      payload: data.payload,
-    });
+    const result = await this.deviceGateway.sendCommand(data.deviceId, data.command);
+    if (!result.delivered) {
+      this.logger.warn(`Command delivery failed for device ${data.deviceId}: ${result.reason ?? 'unknown'}`);
+      return {
+        success: false,
+        message: `Command delivery failed: ${result.reason ?? 'unknown'}`,
+      };
+    }
     return {
       success: true,
-      message: `Command ${data.command} sent to device`,
+      message: `Command ${data.command.type} sent to device`,
     };
   }
 }

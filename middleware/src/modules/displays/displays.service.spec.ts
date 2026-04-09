@@ -366,10 +366,20 @@ describe('DisplaysService', () => {
 
   describe('updateHeartbeat', () => {
     it('should update display heartbeat and status to online', async () => {
+      databaseService.display.findFirst.mockResolvedValue({
+        id: mockDisplayId,
+        status: 'online',
+        nickname: 'Test Display',
+        organizationId: mockOrganizationId,
+      } as any);
       databaseService.display.updateMany.mockResolvedValue({ count: 1 });
 
       const result = await service.updateHeartbeat(mockDeviceIdentifier);
 
+      expect(databaseService.display.findFirst).toHaveBeenCalledWith({
+        where: { deviceIdentifier: mockDeviceIdentifier },
+        select: { id: true, status: true, nickname: true, organizationId: true },
+      });
       expect(databaseService.display.updateMany).toHaveBeenCalledWith({
         where: { deviceIdentifier: mockDeviceIdentifier },
         data: {
@@ -380,8 +390,42 @@ describe('DisplaysService', () => {
       expect(result.success).toBe(true);
     });
 
+    it('should emit device.online event on status transition from offline', async () => {
+      databaseService.display.findFirst.mockResolvedValue({
+        id: mockDisplayId,
+        status: 'offline',
+        nickname: 'Test Display',
+        organizationId: mockOrganizationId,
+      } as any);
+      databaseService.display.updateMany.mockResolvedValue({ count: 1 });
+
+      await service.updateHeartbeat(mockDeviceIdentifier);
+
+      const eventEmitter = (service as any).eventEmitter;
+      expect(eventEmitter.emit).toHaveBeenCalledWith('device.online', {
+        deviceId: mockDisplayId,
+        deviceName: 'Test Display',
+        organizationId: mockOrganizationId,
+      });
+    });
+
+    it('should not emit device.online event when already online', async () => {
+      databaseService.display.findFirst.mockResolvedValue({
+        id: mockDisplayId,
+        status: 'online',
+        nickname: 'Test Display',
+        organizationId: mockOrganizationId,
+      } as any);
+      databaseService.display.updateMany.mockResolvedValue({ count: 1 });
+
+      await service.updateHeartbeat(mockDeviceIdentifier);
+
+      const eventEmitter = (service as any).eventEmitter;
+      expect(eventEmitter.emit).not.toHaveBeenCalledWith('device.online', expect.anything());
+    });
+
     it('should throw NotFoundException if device not found', async () => {
-      databaseService.display.updateMany.mockResolvedValue({ count: 0 });
+      databaseService.display.findFirst.mockResolvedValue(null);
 
       await expect(service.updateHeartbeat('unknown-device')).rejects.toThrow(
         NotFoundException,
