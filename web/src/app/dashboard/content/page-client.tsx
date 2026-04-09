@@ -718,6 +718,7 @@ export default function ContentClient() {
  accept: getAcceptedFileTypes() as any,
  multiple: true, // Enable multiple file selection
  disabled: uploadForm.type === 'url',
+ useFsAccessApi: false,
  onDrop: (acceptedFiles) => {
  // Add files to upload queue
  const newQueueItems = acceptedFiles.map(file => ({

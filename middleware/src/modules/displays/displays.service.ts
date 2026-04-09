@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma } from '@vizora/database';
 import { JwtService } from '@nestjs/jwt';
@@ -247,6 +248,18 @@ export class DisplaysService {
     // deviceIdentifier is @unique, and device JWT identity is verified by the controller.
     // Defense-in-depth: using updateMany with deviceIdentifier ensures no cross-tenant writes
     // since deviceIdentifier is globally unique (tied to hardware MAC/ID).
+
+    // Check previous status to detect online transition (avoid notification spam on every heartbeat)
+    const display = await this.db.display.findFirst({
+      where: { deviceIdentifier },
+      select: { id: true, status: true, nickname: true, organizationId: true },
+    });
+    if (!display) {
+      throw new NotFoundException('Device not found');
+    }
+
+    const wasOffline = display.status !== 'online';
+
     const result = await this.db.display.updateMany({
       where: { deviceIdentifier },
       data: {
@@ -257,7 +270,51 @@ export class DisplaysService {
     if (result.count === 0) {
       throw new NotFoundException('Device not found');
     }
+
+    // Emit device.online only on status transition (not every heartbeat)
+    if (wasOffline) {
+      this.eventEmitter.emit('device.online', {
+        deviceId: display.id,
+        deviceName: display.nickname || deviceIdentifier,
+        organizationId: display.organizationId,
+      });
+    }
+
     return { success: true };
+  }
+
+  /**
+   * Detect devices that stopped sending heartbeats and mark them offline.
+   * Runs every 2 minutes. A device is considered offline if its last
+   * heartbeat was >2 minutes ago and status is still 'online'.
+   */
+  @Cron(CronExpression.EVERY_MINUTE)
+  async detectOfflineDevices(): Promise<void> {
+    const threshold = new Date(Date.now() - 2 * 60 * 1000); // 2 minutes ago
+    const staleDevices = await this.db.display.findMany({
+      where: {
+        status: 'online',
+        lastHeartbeat: { lt: threshold },
+      },
+      select: { id: true, nickname: true, deviceIdentifier: true, organizationId: true },
+    });
+
+    if (staleDevices.length === 0) return;
+
+    await this.db.display.updateMany({
+      where: { id: { in: staleDevices.map(d => d.id) } },
+      data: { status: 'offline' },
+    });
+
+    for (const device of staleDevices) {
+      this.eventEmitter.emit('device.offline', {
+        deviceId: device.id,
+        deviceName: device.nickname || device.deviceIdentifier,
+        organizationId: device.organizationId,
+      });
+    }
+
+    this.logger.log(`Marked ${staleDevices.length} device(s) as offline (stale heartbeat)`);
   }
 
   async generatePairingToken(organizationId: string, id: string) {

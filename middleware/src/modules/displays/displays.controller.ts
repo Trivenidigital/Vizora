@@ -11,6 +11,8 @@ import {
   UseGuards,
   UnauthorizedException,
   ParseUUIDPipe,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtService } from '@nestjs/jwt';
@@ -42,6 +44,7 @@ export class DisplaysController {
   @Post()
   @Roles('admin', 'manager')
   @CheckQuota('screen')
+  @HttpCode(HttpStatus.CREATED)
   create(
     @CurrentUser('organizationId') organizationId: string,
     @Body() createDisplayDto: CreateDisplayDto,

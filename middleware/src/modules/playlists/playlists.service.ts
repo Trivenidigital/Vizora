@@ -3,9 +3,18 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { DatabaseService } from '../database/database.service';
+import { CircuitBreakerService } from '../common/services/circuit-breaker.service';
 import { CreatePlaylistDto } from './dto/create-playlist.dto';
 import { UpdatePlaylistDto } from './dto/update-playlist.dto';
 import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
+
+/** Circuit breaker configuration for realtime service — shared with displays.service */
+const REALTIME_CIRCUIT_CONFIG = {
+  failureThreshold: 5,
+  resetTimeout: 30000, // 30 seconds
+  successThreshold: 2,
+  failureWindow: 60000, // 1 minute
+};
 
 @Injectable()
 export class PlaylistsService {
@@ -16,6 +25,7 @@ export class PlaylistsService {
     private readonly db: DatabaseService,
     private readonly httpService: HttpService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly circuitBreaker: CircuitBreakerService,
   ) {}
 
   /** Returns internal API secret headers, or null if secret is not configured */
@@ -454,13 +464,13 @@ export class PlaylistsService {
 
     this.logger.log(`Notifying ${displays.length} display(s) of playlist update`);
 
-    // Notify each display via the realtime service (1 retry with 2s delay on failure)
     const url = `${this.realtimeUrl}/api/push/playlist`;
 
     await Promise.allSettled(
       displays.map(async (display) => {
-        for (let attempt = 1; attempt <= 2; attempt++) {
-          try {
+        await this.circuitBreaker.executeWithFallback(
+          'realtime-service',
+          async () => {
             await firstValueFrom(
               this.httpService.post(url, {
                 deviceId: display.id,
@@ -468,16 +478,20 @@ export class PlaylistsService {
               }, { headers, timeout: 5000 }),
             );
             this.logger.log(`Notified display ${display.id} of playlist update`);
-            return;
-          } catch (error) {
-            if (attempt === 1) {
-              this.logger.warn(`Failed to notify display ${display.id} (attempt 1), retrying in 2s: ${error.message}`);
-              await new Promise((resolve) => setTimeout(resolve, 2000));
+          },
+          (error) => {
+            if (error) {
+              this.logger.warn(
+                `Failed to notify realtime service for display ${display.id}: ${error.message}`,
+              );
             } else {
-              this.logger.warn(`Failed to notify display ${display.id} after retry: ${error.message}`);
+              this.logger.warn(
+                `Realtime service circuit is open, skipping notification for display ${display.id}`,
+              );
             }
-          }
-        }
+          },
+          REALTIME_CIRCUIT_CONFIG,
+        );
       }),
     );
   }

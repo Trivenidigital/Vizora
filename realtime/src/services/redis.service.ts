@@ -213,7 +213,7 @@ export class RedisService implements OnModuleDestroy {
    * When the device reconnects, sendInitialState() delivers this
    * instead of the DB query (it's fresher — represents a missed update).
    */
-  async setPendingPlaylist(deviceId: string, playlist: any): Promise<void> {
+  async setPendingPlaylist(deviceId: string, playlist: Playlist): Promise<void> {
     const key = `device:pending-playlist:${deviceId}`;
     await this.redis.setex(key, 1800, JSON.stringify(playlist)); // 30 minutes
   }
@@ -227,7 +227,7 @@ export class RedisService implements OnModuleDestroy {
    * atomicity. On transient Redis errors, EXEC rolls back and the key
    * survives — the next reconnect attempt will find it.
    */
-  async getPendingPlaylist(deviceId: string): Promise<any | null> {
+  async getPendingPlaylist(deviceId: string): Promise<Playlist | null> {
     const key = `device:pending-playlist:${deviceId}`;
     const multi = this.redis.multi();
     multi.get(key);

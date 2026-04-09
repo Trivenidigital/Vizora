@@ -78,11 +78,8 @@ export default function RegisterContent() {
     setLoading(true);
     setError('');
     try {
-      const result = await apiClient.googleLogin(credential);
+      await apiClient.googleLogin(credential);
       setSuccess(true);
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[REGISTER] Google sign-up successful, isNewUser:', result.isNewUser);
-      }
       setTimeout(() => {
         window.location.href = '/dashboard';
       }, 800);

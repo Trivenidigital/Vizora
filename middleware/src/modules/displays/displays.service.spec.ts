@@ -366,10 +366,20 @@ describe('DisplaysService', () => {
 
   describe('updateHeartbeat', () => {
     it('should update display heartbeat and status to online', async () => {
+      databaseService.display.findFirst.mockResolvedValue({
+        id: mockDisplayId,
+        status: 'online',
+        nickname: 'Test Display',
+        organizationId: mockOrganizationId,
+      } as any);
       databaseService.display.updateMany.mockResolvedValue({ count: 1 });
 
       const result = await service.updateHeartbeat(mockDeviceIdentifier);
 
+      expect(databaseService.display.findFirst).toHaveBeenCalledWith({
+        where: { deviceIdentifier: mockDeviceIdentifier },
+        select: { id: true, status: true, nickname: true, organizationId: true },
+      });
       expect(databaseService.display.updateMany).toHaveBeenCalledWith({
         where: { deviceIdentifier: mockDeviceIdentifier },
         data: {
@@ -380,8 +390,42 @@ describe('DisplaysService', () => {
       expect(result.success).toBe(true);
     });
 
+    it('should emit device.online event on status transition from offline', async () => {
+      databaseService.display.findFirst.mockResolvedValue({
+        id: mockDisplayId,
+        status: 'offline',
+        nickname: 'Test Display',
+        organizationId: mockOrganizationId,
+      } as any);
+      databaseService.display.updateMany.mockResolvedValue({ count: 1 });
+
+      await service.updateHeartbeat(mockDeviceIdentifier);
+
+      const eventEmitter = (service as any).eventEmitter;
+      expect(eventEmitter.emit).toHaveBeenCalledWith('device.online', {
+        deviceId: mockDisplayId,
+        deviceName: 'Test Display',
+        organizationId: mockOrganizationId,
+      });
+    });
+
+    it('should not emit device.online event when already online', async () => {
+      databaseService.display.findFirst.mockResolvedValue({
+        id: mockDisplayId,
+        status: 'online',
+        nickname: 'Test Display',
+        organizationId: mockOrganizationId,
+      } as any);
+      databaseService.display.updateMany.mockResolvedValue({ count: 1 });
+
+      await service.updateHeartbeat(mockDeviceIdentifier);
+
+      const eventEmitter = (service as any).eventEmitter;
+      expect(eventEmitter.emit).not.toHaveBeenCalledWith('device.online', expect.anything());
+    });
+
     it('should throw NotFoundException if device not found', async () => {
-      databaseService.display.updateMany.mockResolvedValue({ count: 0 });
+      databaseService.display.findFirst.mockResolvedValue(null);
 
       await expect(service.updateHeartbeat('unknown-device')).rejects.toThrow(
         NotFoundException,
@@ -585,6 +629,46 @@ describe('DisplaysService', () => {
           lastScreenshotAt: expect.any(Date),
         },
       });
+    });
+  });
+
+  describe('detectOfflineDevices', () => {
+    it('should mark stale devices offline and emit device.offline events', async () => {
+      const staleDevices = [
+        { id: 'device-1', nickname: 'Lobby TV', deviceIdentifier: 'dev-1', organizationId: 'org-1' },
+        { id: 'device-2', nickname: null, deviceIdentifier: 'dev-2', organizationId: 'org-1' },
+      ];
+      databaseService.display.findMany.mockResolvedValue(staleDevices as any);
+      databaseService.display.updateMany.mockResolvedValue({ count: 2 });
+
+      await service.detectOfflineDevices();
+
+      expect(databaseService.display.findMany).toHaveBeenCalledWith({
+        where: {
+          status: 'online',
+          lastHeartbeat: { lt: expect.any(Date) },
+        },
+        select: { id: true, nickname: true, deviceIdentifier: true, organizationId: true },
+      });
+      expect(databaseService.display.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ['device-1', 'device-2'] } },
+        data: { status: 'offline' },
+      });
+      const eventEmitter = (service as any).eventEmitter;
+      expect(eventEmitter.emit).toHaveBeenCalledWith('device.offline', {
+        deviceId: 'device-1', deviceName: 'Lobby TV', organizationId: 'org-1',
+      });
+      expect(eventEmitter.emit).toHaveBeenCalledWith('device.offline', {
+        deviceId: 'device-2', deviceName: 'dev-2', organizationId: 'org-1',
+      });
+    });
+
+    it('should not update when no stale devices found', async () => {
+      databaseService.display.findMany.mockResolvedValue([]);
+
+      await service.detectOfflineDevices();
+
+      expect(databaseService.display.updateMany).not.toHaveBeenCalled();
     });
   });
 });

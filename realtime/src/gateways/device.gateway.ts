@@ -32,6 +32,7 @@ import {
 } from './dto';
 import {
   Playlist,
+  PlaylistContentItem,
   DeviceCommand,
   BroadcastData,
 } from '../types';
@@ -118,11 +119,28 @@ export class DeviceGateway
     this.cleanupIntervals.push(setInterval(() => this.cleanupStaleEntries(), 5 * 60 * 1000));
   }
 
-  onModuleDestroy() {
+  async onModuleDestroy() {
+    // Stop all periodic cleanup intervals
     for (const interval of this.cleanupIntervals) {
       clearInterval(interval);
     }
     this.cleanupIntervals = [];
+
+    // Notify all connected clients to reconnect to another instance
+    if (this.server) {
+      this.logger.log('Graceful shutdown: notifying clients to reconnect...');
+      this.server.emit('server:shutdown', { reconnect: true });
+
+      // Give clients 2 seconds to process the shutdown notice
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Disconnect all sockets
+      const sockets = await this.server.fetchSockets();
+      for (const socket of sockets) {
+        socket.disconnect(true);
+      }
+      this.logger.log(`Graceful shutdown: disconnected ${sockets.length} client(s)`);
+    }
   }
 
   /**
@@ -483,53 +501,8 @@ export class DeviceGateway
       // Check for a pending playlist queued while the device was offline.
       // This takes priority over the DB query since it represents a more
       // recent assignment that the device missed.
-      const pendingPlaylist = await this.redisService.getPendingPlaylist(deviceId);
-      if (pendingPlaylist) {
-        this.logger.log(`Delivering pending playlist to device ${deviceId} (queued while offline)`);
-
-        // Re-queue if the client disconnected between Redis read and now
-        if (!client.connected) {
-          this.logger.warn(`Device ${deviceId} disconnected before pending playlist delivery — re-queuing`);
-          await this.redisService.setPendingPlaylist(deviceId, pendingPlaylist);
-          return;
-        }
-
-        // Resolve layout content for any layout-type items (sendPlaylistUpdate
-        // only does shallow URL resolution, not layout zone expansion).
-        // Note: Zone content is resolved from the DB at reconnect time, so zone
-        // playlists reflect current state, not the queued snapshot. This is an
-        // acceptable trade-off — any zone changes would have been separate pushes.
-        const resolvedItems = await Promise.all(
-          (pendingPlaylist.items || []).map(async (item: any) => {
-            if (item.content?.type === 'layout') {
-              return { ...item, content: await this.resolveLayoutContent(item.content) };
-            }
-            return item;
-          }),
-        );
-
-        // Still need display record for config (qrOverlay etc.)
-        const displayForConfig = await this.databaseService.display.findUnique({
-          where: { id: deviceId },
-          select: { metadata: true },
-        });
-        const configMetadata = (displayForConfig?.metadata as Record<string, any>) || {};
-        client.emit('config', {
-          heartbeatInterval: 15000,
-          cacheSize: 524288000,
-          autoUpdate: true,
-          qrOverlay: configMetadata.qrOverlay || null,
-        });
-        // Note: Unlike sendPlaylistUpdate() which uses ack+timeout, this emit
-        // is fire-and-forget. If the socket drops between the connected check
-        // above and this emit, the playlist is lost. The device's next reconnect
-        // will fall through to the DB query path and pick up the current playlist.
-        client.emit('playlist:update', {
-          playlist: { ...pendingPlaylist, items: resolvedItems },
-          timestamp: new Date().toISOString(),
-        });
-        return;
-      }
+      const delivered = await this.deliverPendingPlaylist(client, deviceId);
+      if (delivered) return;
 
       this.logger.debug(`Fetching playlist for device: ${deviceId}`);
       const display = await this.databaseService.display.findUnique({
@@ -620,6 +593,20 @@ export class DeviceGateway
       const playlistErrorMsg = playlistError instanceof Error ? playlistError.stack || playlistError.message : 'Unknown error';
       this.logger.error(`Failed to fetch playlist for device ${deviceId}: ${playlistErrorMsg}`);
       // Don't fail the connection if playlist fetch fails
+    }
+
+    // Deliver any commands that were queued while the device was offline
+    try {
+      const pendingCommands = await this.redisService.getDeviceCommands(deviceId);
+      if (pendingCommands.length > 0) {
+        this.logger.log(`Delivering ${pendingCommands.length} pending command(s) to device ${deviceId}`);
+        for (const cmd of pendingCommands) {
+          client.emit('command', cmd);
+        }
+      }
+    } catch (cmdError: unknown) {
+      const cmdErrorMsg = cmdError instanceof Error ? cmdError.message : 'Unknown error';
+      this.logger.error(`Failed to deliver pending commands to device ${deviceId}: ${cmdErrorMsg}`);
     }
   }
 
@@ -958,13 +945,63 @@ export class DeviceGateway
     }
   }
 
+  /**
+   * Deliver a pending playlist that was queued in Redis while the device was offline.
+   * The pending playlist has pre-resolved content URLs from sendPlaylistUpdate().
+   * Returns true if a pending playlist was found and delivered (or re-queued).
+   */
+  private async deliverPendingPlaylist(client: Socket, deviceId: string): Promise<boolean> {
+    const pendingPlaylist = await this.redisService.getPendingPlaylist(deviceId);
+    if (!pendingPlaylist) return false;
+
+    this.logger.log(`Delivering pending playlist to device ${deviceId} (queued while offline)`);
+
+    // Re-queue if the client disconnected between Redis read and now
+    if (!client.connected) {
+      this.logger.warn(`Device ${deviceId} disconnected before pending playlist delivery — re-queuing`);
+      await this.redisService.setPendingPlaylist(deviceId, pendingPlaylist);
+      return true;
+    }
+
+    // Fetch display metadata for config (qrOverlay etc.)
+    const displayForConfig = await this.databaseService.display.findUnique({
+      where: { id: deviceId },
+      select: { metadata: true },
+    });
+    const configMetadata = (displayForConfig?.metadata as Record<string, any>) || {};
+    client.emit('config', {
+      heartbeatInterval: 15000,
+      cacheSize: 524288000,
+      autoUpdate: true,
+      qrOverlay: configMetadata.qrOverlay || null,
+    });
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('ack_timeout')), 10000);
+        client.emit('playlist:update', {
+          playlist: pendingPlaylist,
+          timestamp: new Date().toISOString(),
+        }, () => {
+          clearTimeout(timeout);
+          resolve();
+        });
+      });
+      this.logger.log(`Pending playlist delivered to device ${deviceId} (acknowledged)`);
+    } catch {
+      this.logger.warn(`Pending playlist ack timeout for device ${deviceId} — re-queuing`);
+      await this.redisService.setPendingPlaylist(deviceId, pendingPlaylist);
+    }
+    return true;
+  }
+
   // Admin methods (called from API)
   async sendPlaylistUpdate(deviceId: string, playlist: Playlist): Promise<{ delivered: boolean; reason?: string }> {
     // Resolve minio:// URLs to API-served URLs before sending to device
     // Devices authenticate content requests via Authorization header with their stored JWT
     const resolvedPlaylist = {
       ...playlist,
-      items: (playlist.items || []).map((item: any) => {
+      items: (playlist.items || []).map((item: PlaylistContentItem) => {
         const resolvedUrl = this.resolveContentUrl(item);
         return {
           ...item,
@@ -1017,13 +1054,41 @@ export class DeviceGateway
     return { delivered: true };
   }
 
-  async sendCommand(deviceId: string, command: DeviceCommand): Promise<void> {
-    this.server.to(`device:${deviceId}`).emit('command', {
-      ...command,
-      timestamp: new Date().toISOString(),
-    });
+  async sendCommand(deviceId: string, command: DeviceCommand): Promise<{ delivered: boolean; reason?: string }> {
+    const commandWithTimestamp = { ...command, timestamp: new Date().toISOString() };
+    const roomName = `device:${deviceId}`;
+    const sockets = await this.server.in(roomName).fetchSockets();
 
-    this.logger.log(`Sent command ${command.type} to device: ${deviceId}`);
+    if (sockets.length === 0) {
+      this.logger.warn(`sendCommand: no sockets for device ${deviceId} — queuing`);
+      await this.redisService.addDeviceCommand(deviceId, commandWithTimestamp);
+      return { delivered: false, reason: 'no_sockets' };
+    }
+
+    let anyAcknowledged = false;
+    for (const socket of sockets) {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('ack_timeout')), 10000);
+          socket.emit('command', commandWithTimestamp, () => {
+            clearTimeout(timeout);
+            resolve();
+          });
+        });
+        anyAcknowledged = true;
+      } catch {
+        this.logger.warn(`sendCommand: ack timeout for socket ${socket.id} on device ${deviceId}`);
+      }
+    }
+
+    if (!anyAcknowledged) {
+      this.logger.warn(`sendCommand: all sockets timed out for device ${deviceId} — queuing`);
+      await this.redisService.addDeviceCommand(deviceId, commandWithTimestamp);
+      return { delivered: false, reason: 'ack_timeout' };
+    }
+
+    this.logger.log(`Sent command ${command.type} to device: ${deviceId} (acknowledged)`);
+    return { delivered: true };
   }
 
   async broadcastToOrganization(organizationId: string, event: string, data: BroadcastData): Promise<void> {

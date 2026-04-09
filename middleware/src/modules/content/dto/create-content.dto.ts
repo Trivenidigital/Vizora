@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsEnum, IsInt, IsObject, Min, IsDateString, IsIn } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsEnum, IsInt, IsObject, Min, IsDateString, IsIn, Matches } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateContentDto {
@@ -14,6 +14,7 @@ export class CreateContentDto {
   type!: string;
 
   @IsNotEmpty()
+  @Matches(/^(https?:\/\/.+|minio:\/\/.+)$/)
   @IsString()
   url!: string;
 

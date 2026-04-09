@@ -30,6 +30,7 @@ describe('AnalyticsService', () => {
         aggregate: jest.fn().mockResolvedValue({ _avg: { duration: 0, completionPercentage: 0 } }),
         deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
+      $queryRaw: jest.fn().mockResolvedValue([]),
     };
 
     service = new AnalyticsService(mockDb as DatabaseService);
@@ -97,12 +98,11 @@ describe('AnalyticsService', () => {
 
   describe('getUsageTrends', () => {
     it('should return trend data points', async () => {
-      // getUsageTrends now uses contentImpression.findMany with content relation
+      // getUsageTrends now uses $queryRaw for DB-level aggregation
       const today = new Date();
-      mockDb.contentImpression.findMany.mockResolvedValue([
-        { date: today, content: { type: 'video' } },
-        { date: today, content: { type: 'video' } },
-        { date: today, content: { type: 'image' } },
+      mockDb.$queryRaw.mockResolvedValue([
+        { date: today, type: 'video', count: BigInt(2) },
+        { date: today, type: 'image', count: BigInt(1) },
       ]);
 
       const result = await service.getUsageTrends('org-123', 'week');
@@ -247,9 +247,9 @@ describe('AnalyticsService', () => {
 
     it('getUsageTrends should return same values on repeated calls', async () => {
       const today = new Date();
-      mockDb.contentImpression.findMany.mockResolvedValue([
-        { date: today, content: { type: 'video' } },
-        { date: today, content: { type: 'image' } },
+      mockDb.$queryRaw.mockResolvedValue([
+        { date: today, type: 'video', count: BigInt(1) },
+        { date: today, type: 'image', count: BigInt(1) },
       ]);
 
       const result1 = await service.getUsageTrends('org-123', 'week');
@@ -271,8 +271,8 @@ describe('AnalyticsService', () => {
     it('getUsageTrends should count real impressions by type', async () => {
       const today = new Date();
       const todayStr = today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      mockDb.contentImpression.findMany.mockResolvedValue([
-        { date: today, content: { type: 'video' } },
+      mockDb.$queryRaw.mockResolvedValue([
+        { date: today, type: 'video', count: BigInt(1) },
       ]);
 
       const result = await service.getUsageTrends('org-123', 'week');

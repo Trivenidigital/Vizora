@@ -30,6 +30,9 @@ describe('DeviceGateway', () => {
   const mockRedisService = {
     setDeviceStatus: jest.fn().mockResolvedValue(undefined),
     getDeviceCommands: jest.fn().mockResolvedValue([]),
+    addDeviceCommand: jest.fn().mockResolvedValue(undefined),
+    setPendingPlaylist: jest.fn().mockResolvedValue(undefined),
+    getPendingPlaylist: jest.fn().mockResolvedValue(null),
     exists: jest.fn().mockResolvedValue(false),
     getCachedPlaylist: jest.fn().mockResolvedValue(null),
     cachePlaylist: jest.fn().mockResolvedValue(undefined),
@@ -651,30 +654,32 @@ describe('DeviceGateway', () => {
   });
 
   describe('sendCommand', () => {
-    it('should emit command to device room', async () => {
+    it('should emit command with ack to connected device', async () => {
       const command = { type: 'reload' as any };
 
-      await gateway.sendCommand('device-1', command);
+      const result = await gateway.sendCommand('device-1', command);
 
-      expect(mockServer.to).toHaveBeenCalledWith('device:device-1');
-      const emitFn = mockServer.to('device:device-1').emit;
-      expect(emitFn).toHaveBeenCalledWith(
+      expect(result).toEqual({ delivered: true });
+      expect(mockServer.in).toHaveBeenCalledWith('device:device-1');
+      expect(mockRemoteSocket.emit).toHaveBeenCalledWith(
         'command',
-        expect.objectContaining({ type: 'reload' }),
+        expect.objectContaining({ type: 'reload', timestamp: expect.any(String) }),
+        expect.any(Function),
       );
     });
 
-    it('should include timestamp in the command', async () => {
+    it('should queue command when no sockets connected', async () => {
+      mockServer.in.mockReturnValueOnce({
+        fetchSockets: jest.fn().mockResolvedValue([]),
+      });
       const command = { type: 'clear_cache' as any, payload: {} };
 
-      await gateway.sendCommand('device-1', command);
+      const result = await gateway.sendCommand('device-99', command);
 
-      const emitFn = mockServer.to('device:device-1').emit;
-      expect(emitFn).toHaveBeenCalledWith(
-        'command',
-        expect.objectContaining({
-          timestamp: expect.any(String),
-        }),
+      expect(result).toEqual({ delivered: false, reason: 'no_sockets' });
+      expect(mockRedisService.addDeviceCommand).toHaveBeenCalledWith(
+        'device-99',
+        expect.objectContaining({ type: 'clear_cache', timestamp: expect.any(String) }),
       );
     });
   });

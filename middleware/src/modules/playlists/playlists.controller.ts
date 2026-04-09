@@ -8,6 +8,8 @@ import {
   Delete,
   Query,
   UseGuards,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { ParseIdPipe } from '../common/pipes/parse-id.pipe';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -30,6 +32,7 @@ export class PlaylistsController {
 
   @Post()
   @Roles('admin', 'manager')
+  @HttpCode(HttpStatus.CREATED)
   create(
     @CurrentUser('organizationId') organizationId: string,
     @Body() createPlaylistDto: CreatePlaylistDto,

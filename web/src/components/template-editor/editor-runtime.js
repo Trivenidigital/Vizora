@@ -34,7 +34,7 @@
 
   function sendToParent(data) {
     if (window.parent && window.parent !== window) {
-      window.parent.postMessage(data, '*');
+      window.parent.postMessage(data, window.parent.location.origin);
     }
   }
 
@@ -231,6 +231,9 @@
   // ── Message Listener ───────────────────────────────────────────────
 
   function handleMessage(e) {
+    // Only accept messages from the parent window's origin
+    if (e.origin !== window.parent.location.origin) return;
+
     var data = e.data;
     if (!data || !data.type) return;
 

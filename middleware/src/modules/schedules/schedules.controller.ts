@@ -10,6 +10,8 @@ import {
   Req,
   UseGuards,
   UnauthorizedException,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { ParseIdPipe } from '../common/pipes/parse-id.pipe';
 import type { Request } from 'express';
@@ -36,6 +38,7 @@ export class SchedulesController {
 
   @Post()
   @Roles('admin', 'manager')
+  @HttpCode(HttpStatus.CREATED)
   create(
     @CurrentUser('organizationId') organizationId: string,
     @Body() createScheduleDto: CreateScheduleDto,

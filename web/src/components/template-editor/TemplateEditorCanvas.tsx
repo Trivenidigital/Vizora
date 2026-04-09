@@ -63,7 +63,7 @@ const EDITOR_RUNTIME_CODE = `(function () {
 
   function sendToParent(data) {
     if (window.parent && window.parent !== window) {
-      window.parent.postMessage(data, '*');
+      window.parent.postMessage(data, window.parent.location.origin);
     }
   }
 
@@ -366,6 +366,9 @@ const EDITOR_RUNTIME_CODE = `(function () {
   // ── Message Listener ───────────────────────────────────────────────
 
   function handleMessage(e) {
+    // Only accept messages from the parent window's origin
+    if (e.origin !== window.parent.location.origin) return;
+
     var data = e.data;
     if (!data || !data.type) return;
 
@@ -492,7 +495,7 @@ const TemplateEditorCanvas = forwardRef<CanvasHandle, TemplateEditorCanvasProps>
           if (!iframe?.contentWindow) return;
           iframe.contentWindow.postMessage(
             { type: 'update-property', elementId, property, value },
-            '*',
+            window.location.origin,
           );
         },
 
@@ -519,7 +522,7 @@ const TemplateEditorCanvas = forwardRef<CanvasHandle, TemplateEditorCanvasProps>
               resolve(html);
             };
 
-            iframe.contentWindow.postMessage({ type: 'serialize' }, '*');
+            iframe.contentWindow.postMessage({ type: 'serialize' }, window.location.origin);
           });
         },
       }),

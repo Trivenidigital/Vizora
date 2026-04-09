@@ -304,17 +304,28 @@ export class BillingService {
       await provider.updateSubscription(subscriptionId, priceId);
 
       // Update organization with new tier, screen quota, and storage quota
+      // Wrapped in $transaction to ensure atomicity of local DB changes
       const tierConfig = PLAN_TIERS[dto.planId];
-      await this.db.organization.update({
-        where: { id: organizationId },
-        data: {
-          subscriptionTier: dto.planId,
-          screenQuota: getScreenQuotaForTier(dto.planId),
-          ...(tierConfig?.storageQuotaMb
-            ? { storageQuotaBytes: BigInt(tierConfig.storageQuotaMb * 1024 * 1024) }
-            : {}),
-        },
-      });
+      try {
+        await this.db.$transaction(async (tx) => {
+          await tx.organization.update({
+            where: { id: organizationId },
+            data: {
+              subscriptionTier: dto.planId,
+              screenQuota: getScreenQuotaForTier(dto.planId),
+              ...(tierConfig?.storageQuotaMb
+                ? { storageQuotaBytes: BigInt(tierConfig.storageQuotaMb * 1024 * 1024) }
+                : {}),
+            },
+          });
+        });
+      } catch (dbError) {
+        this.logger.error(
+          `DB update failed after Stripe subscription change (org: ${organizationId}, stripe sub: ${subscriptionId}). Manual reconciliation needed.`,
+          dbError,
+        );
+        throw dbError;
+      }
     }
 
     // Handle cancel at period end (Stripe-specific)
