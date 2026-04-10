@@ -3,83 +3,86 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1920, height=1080">
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Yatra+One&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Cormorant+SC:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Yatra+One&display=swap" rel="stylesheet">
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     body {
       width:1920px; height:1080px; overflow:hidden; position:relative;
       font-family:'Lora', serif; color:#2C1810;
-      background: #F5EDE0;
+      background: #D9C4A0;
     }
-    /* Warm vignette */
+    /* Toasted parchment gradient — Mylapore heritage */
     body::before {
       content:''; position:absolute; inset:0; z-index:0; pointer-events:none;
-      background: radial-gradient(ellipse at 50% 40%, #FBF7F0 0%, #F5EDE0 55%, #EBDDC4 100%);
+      background: radial-gradient(ellipse at 50% 38%, #E2D0B0 0%, #D9C4A0 55%, #C4AE82 100%);
     }
 
-    /* Thin copper border frame */
     .frame {
       position:absolute; inset:50px;
-      border: 1px solid rgba(184,115,51,0.5);
+      border: 1px solid rgba(139,111,46,0.55);
       z-index: 1;
     }
     .frame::before {
       content:''; position:absolute; inset:8px;
-      border: 1px solid rgba(184,115,51,0.22);
+      border: 1px solid rgba(139,111,46,0.25);
     }
 
-    /* Subtle coffee bean scatter */
+    /* Coffee bean scatter */
     .beans {
       position:absolute; inset:0; z-index:1;
-      pointer-events:none; opacity: 0.06;
+      pointer-events:none; opacity: 0.08;
     }
 
-    /* Header */
+    /* Cardamom pod decorations */
+    .pods {
+      position:absolute; inset:0; z-index:1;
+      pointer-events:none; opacity: 0.2;
+    }
+
     .header {
       position:relative; z-index:3; text-align:center; padding-top:110px;
     }
     .eyebrow {
-      font-family:'Yatra One', cursive;
-      font-size: 20px;
-      color: #8B5A2B;
+      font-family:'Cormorant SC', serif;
+      font-weight: 500;
+      font-size: 19px;
+      color: #7A4A28;
       letter-spacing: 10px;
-      margin-bottom: 18px;
-      opacity: 0.8;
+      margin-bottom: 20px;
     }
     .restaurant-name {
-      font-family:'Cormorant Garamond', serif;
-      font-weight: 500;
-      font-size: 88px;
+      font-family:'DM Serif Display', serif;
+      font-weight: 400;
+      font-size: 98px;
       line-height: 1;
       color: #2C1810;
-      letter-spacing: 3px;
-      margin-bottom: 14px;
+      letter-spacing: 2px;
+      margin-bottom: 16px;
     }
     .title-rule {
       display:flex; align-items:center; justify-content:center;
-      gap: 24px; margin: 14px auto 0;
+      gap: 24px; margin: 16px auto 0;
     }
     .title-rule .line {
-      width: 180px; height: 1px;
-      background: linear-gradient(90deg, transparent, #B87333, transparent);
+      width: 200px; height: 1px;
+      background: linear-gradient(90deg, transparent, #8B6F2E, transparent);
     }
     .title-rule .ornament {
-      color: #B87333; font-size: 22px;
-      font-family:'Cormorant Garamond', serif;
+      color: #8B6F2E; font-size: 22px;
+      font-family:'DM Serif Display', serif;
     }
 
-    /* Central hero dabara tumbler SVG */
+    /* Prominent dabara-tumbler in copper tones */
     .coffee-hero {
       position:absolute;
-      top: 380px; left: 50%;
+      top: 360px; left: 50%;
       transform: translateX(-50%);
-      width: 280px; height: 280px;
+      width: 340px; height: 340px;
       z-index: 2;
-      opacity: 0.12;
+      opacity: 0.18;
       pointer-events:none;
     }
 
-    /* Two panels */
     .panels {
       position:absolute;
       top: 360px;
@@ -97,23 +100,23 @@
     }
 
     .panel-title {
-      font-family:'Cormorant Garamond', serif;
-      font-weight: 600;
-      font-size: 42px;
+      font-family:'DM Serif Display', serif;
+      font-weight: 400;
+      font-size: 44px;
       color: #2C1810;
       text-align: center;
-      letter-spacing: 3px;
-      margin-bottom: 4px;
+      letter-spacing: 2px;
+      margin-bottom: 6px;
     }
     .panel-subtitle {
-      font-family:'Cormorant Garamond', serif;
-      font-style: italic;
-      font-size: 18px;
-      color: #8B5A2B;
+      font-family:'Cormorant SC', serif;
+      font-weight: 500;
+      font-size: 16px;
+      color: #7A4A28;
       text-align: center;
-      letter-spacing: 2px;
+      letter-spacing: 4px;
       padding-bottom: 16px;
-      border-bottom: 1px solid rgba(184,115,51,0.3);
+      border-bottom: 1px solid rgba(139,111,46,0.4);
       margin-bottom: 18px;
     }
 
@@ -124,49 +127,48 @@
       gap: 0 14px;
     }
     .item-name {
-      font-family:'Cormorant Garamond', serif;
+      font-family:'Lora', serif;
       font-weight: 600;
-      font-size: 22px;
+      font-size: 21px;
       color: #2C1810;
       grid-column: 1;
     }
     .item-price {
-      font-family:'Cormorant Garamond', serif;
+      font-family:'Lora', serif;
       font-weight: 600;
-      font-size: 22px;
-      color: #B87333;
+      font-size: 21px;
+      color: #8B6F2E;
       grid-column: 2;
     }
     .item-desc {
-      font-family:'Cormorant Garamond', serif;
+      font-family:'Lora', serif;
       font-style: italic;
       font-size: 15px;
-      color: #6B4423;
+      color: #7A4A28;
       grid-column: 1 / -1;
       margin-top: 2px;
     }
 
     .section-subheader {
-      font-family:'Cormorant Garamond', serif;
+      font-family:'Cormorant SC', serif;
       font-weight: 600;
-      font-size: 20px;
-      color: #B87333;
+      font-size: 18px;
+      color: #8B6F2E;
       text-align: center;
-      letter-spacing: 5px;
-      text-transform: uppercase;
+      letter-spacing: 6px;
       margin: 22px 0 14px;
-      padding: 8px 0;
-      border-top: 1px solid rgba(184,115,51,0.25);
-      border-bottom: 1px solid rgba(184,115,51,0.25);
+      padding: 9px 0;
+      border-top: 1px solid rgba(139,111,46,0.3);
+      border-bottom: 1px solid rgba(139,111,46,0.3);
     }
   </style>
 </head>
 <body>
   <div class="frame"></div>
 
-  <!-- Coffee bean scatter -->
+  <!-- Coffee bean scatter (3% opacity) -->
   <svg class="beans" viewBox="0 0 1920 1080" preserveAspectRatio="none">
-    <g fill="#8B5A2B">
+    <g fill="#4A2D18">
       <ellipse cx="150" cy="200" rx="9" ry="6" transform="rotate(20 150 200)"/>
       <ellipse cx="1750" cy="180" rx="10" ry="6" transform="rotate(-15 1750 180)"/>
       <ellipse cx="280" cy="420" rx="8" ry="5" transform="rotate(35 280 420)"/>
@@ -177,12 +179,24 @@
       <ellipse cx="1790" cy="940" rx="9" ry="6" transform="rotate(-10 1790 940)"/>
       <ellipse cx="340" cy="880" rx="8" ry="5" transform="rotate(40 340 880)"/>
       <ellipse cx="1540" cy="890" rx="9" ry="6" transform="rotate(-25 1540 890)"/>
+      <ellipse cx="960" cy="150" rx="8" ry="5" transform="rotate(15 960 150)"/>
+      <ellipse cx="960" cy="980" rx="8" ry="5" transform="rotate(-20 960 980)"/>
     </g>
   </svg>
 
-  <!-- Filter coffee dabara tumbler SVG -->
+  <!-- Small cardamom pods -->
+  <svg class="pods" viewBox="0 0 1920 1080" preserveAspectRatio="none">
+    <g fill="none" stroke="#2F5233" stroke-width="1.2">
+      <g transform="translate(220 300) rotate(25)"><ellipse cx="0" cy="0" rx="6" ry="10"/><line x1="0" y1="-10" x2="0" y2="-16"/></g>
+      <g transform="translate(1680 340) rotate(-15)"><ellipse cx="0" cy="0" rx="6" ry="10"/><line x1="0" y1="-10" x2="0" y2="-16"/></g>
+      <g transform="translate(250 800) rotate(35)"><ellipse cx="0" cy="0" rx="6" ry="10"/><line x1="0" y1="-10" x2="0" y2="-16"/></g>
+      <g transform="translate(1660 820) rotate(-30)"><ellipse cx="0" cy="0" rx="6" ry="10"/><line x1="0" y1="-10" x2="0" y2="-16"/></g>
+    </g>
+  </svg>
+
+  <!-- Filter coffee dabara tumbler SVG — copper/brass -->
   <svg class="coffee-hero" viewBox="0 0 340 340">
-    <g fill="none" stroke="#8B5A2B" stroke-width="2">
+    <g fill="none" stroke="#8B6F2E" stroke-width="2">
       <!-- Davara (saucer bowl) -->
       <ellipse cx="170" cy="290" rx="135" ry="20"/>
       <path d="M35 290 Q35 242 82 232 L258 232 Q305 242 305 290"/>
@@ -192,14 +206,14 @@
       <path d="M98 92 L108 214 Q112 224 170 224 Q228 224 232 214 L242 92"/>
       <ellipse cx="170" cy="214" rx="62" ry="10"/>
       <!-- Rim shadow -->
-      <ellipse cx="170" cy="92" rx="62" ry="10" fill="#B87333" fill-opacity="0.35"/>
+      <ellipse cx="170" cy="92" rx="62" ry="10" fill="#A85A3E" fill-opacity="0.4"/>
       <!-- Steam wisps -->
       <path d="M145 65 Q138 45 150 25 Q162 5 148 -15" stroke-width="1.5"/>
       <path d="M170 62 Q165 42 177 22 Q189 2 173 -18" stroke-width="1.5"/>
       <path d="M195 65 Q188 45 200 25 Q212 5 198 -15" stroke-width="1.5"/>
-      <!-- Decorative bands -->
-      <ellipse cx="170" cy="125" rx="66" ry="3" stroke-width="1"/>
-      <ellipse cx="170" cy="185" rx="60" ry="3" stroke-width="1"/>
+      <!-- Decorative brass bands -->
+      <ellipse cx="170" cy="125" rx="66" ry="3" stroke-width="1.2"/>
+      <ellipse cx="170" cy="185" rx="60" ry="3" stroke-width="1.2"/>
     </g>
   </svg>
 

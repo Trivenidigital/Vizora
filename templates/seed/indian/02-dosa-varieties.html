@@ -3,68 +3,59 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1920, height=1080">
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Yatra+One&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Cormorant+SC:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Yatra+One&display=swap" rel="stylesheet">
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     body {
       width:1920px; height:1080px; overflow:hidden; position:relative;
       font-family:'Lora', serif; color:#2C1810;
-      background: #FBF7F0;
+      background: #D9C4A0;
     }
-    /* Subtle rangoli watermark */
+    /* Warm gradient — aged parchment, candlelit */
     body::before {
-      content:''; position:absolute; inset:0; z-index:0;
-      background-image:
-        radial-gradient(circle at 50% 50%, rgba(139,90,43,0.04) 1px, transparent 1.5px);
-      background-size: 48px 48px;
-      opacity: 0.9;
+      content:''; position:absolute; inset:0; z-index:0; pointer-events:none;
+      background: radial-gradient(ellipse at 50% 42%, #E2D0B0 0%, #D9C4A0 55%, #C9B084 100%);
     }
-    /* Soft warm vignette */
+    /* Tawa concentric circles watermark */
     body::after {
       content:''; position:absolute; inset:0; z-index:0; pointer-events:none;
-      background: radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(139,90,43,0.06) 100%);
+      background-image:
+        radial-gradient(circle at 50% 45%, rgba(60,30,15,0.05) 1px, transparent 1.5px),
+        radial-gradient(circle at 50% 45%, transparent 150px, rgba(60,30,15,0.035) 151px, transparent 152px),
+        radial-gradient(circle at 50% 45%, transparent 260px, rgba(60,30,15,0.035) 261px, transparent 262px),
+        radial-gradient(circle at 50% 45%, transparent 380px, rgba(60,30,15,0.03) 381px, transparent 382px),
+        radial-gradient(circle at 50% 45%, transparent 500px, rgba(60,30,15,0.025) 501px, transparent 502px);
+      background-size: 60px 60px, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
     }
 
-    /* Thin gold border frame */
     .frame {
       position:absolute; inset:50px;
-      border: 1px solid rgba(184,115,51,0.45);
+      border: 1px solid rgba(139,111,46,0.55);
       z-index: 1;
     }
     .frame::before {
       content:''; position:absolute; inset:8px;
-      border: 1px solid rgba(184,115,51,0.2);
+      border: 1px solid rgba(139,111,46,0.25);
     }
 
-    /* Large central watermark rangoli */
-    .rangoli-wm {
-      position:absolute; top:50%; left:50%;
-      transform: translate(-50%, -50%);
-      width: 900px; height: 900px;
-      z-index: 1;
-      opacity: 0.05;
-      pointer-events:none;
-    }
-
-    /* Header */
     .header {
-      position:relative; z-index:3; text-align:center; padding-top:110px;
+      position:relative; z-index:3; text-align:center; padding-top:100px;
     }
     .devanagari {
-      font-family:'Yatra One', cursive;
-      font-size: 22px;
-      color: #8B5A2B;
+      font-family:'Cormorant SC', serif;
+      font-weight: 500;
+      font-size: 20px;
+      color: #7A4A28;
       letter-spacing: 8px;
-      margin-bottom: 18px;
-      opacity: 0.75;
+      margin-bottom: 20px;
     }
     .title {
-      font-family:'Cormorant Garamond', serif;
-      font-weight: 500;
-      font-size: 96px;
+      font-family:'DM Serif Display', serif;
+      font-weight: 400;
+      font-size: 104px;
       line-height: 1;
       color: #2C1810;
-      letter-spacing: 4px;
+      letter-spacing: 2px;
       margin-bottom: 18px;
     }
     .title-rule {
@@ -72,110 +63,107 @@
       gap: 24px; margin: 0 auto 18px;
     }
     .title-rule .line {
-      width: 140px; height: 1px;
-      background: linear-gradient(90deg, transparent, #B87333, transparent);
+      width: 160px; height: 1px;
+      background: linear-gradient(90deg, transparent, #8B6F2E, transparent);
     }
     .title-rule .ornament {
-      color: #B87333; font-size: 18px;
-      font-family:'Cormorant Garamond', serif;
+      color: #A85A3E; font-size: 18px;
+      font-family:'DM Serif Display', serif;
     }
     .tagline {
-      font-family:'Cormorant Garamond', serif;
-      font-style: italic;
-      font-weight: 400;
-      font-size: 28px;
-      color: #6B4423;
-      letter-spacing: 3px;
+      font-family:'Cormorant SC', serif;
+      font-weight: 500;
+      font-size: 26px;
+      color: #4A2D18;
+      letter-spacing: 4px;
     }
     .chutney-note {
-      display:inline-block; margin-top: 22px;
-      font-family:'Cormorant Garamond', serif;
+      display:inline-block; margin-top: 24px;
+      font-family:'Lora', serif;
       font-style: italic;
       font-size: 19px;
-      color: #8B5A2B;
-      letter-spacing: 1px;
+      color: #7A4A28;
+      letter-spacing: 0.8px;
       padding: 10px 40px;
-      border-top: 1px solid rgba(184,115,51,0.3);
-      border-bottom: 1px solid rgba(184,115,51,0.3);
+      border-top: 1px solid rgba(139,111,46,0.35);
+      border-bottom: 1px solid rgba(139,111,46,0.35);
     }
 
-    /* Hero dosa SVG */
+    /* Hero dosa SVG centerpiece */
     .dosa-hero {
       position:absolute;
-      top: 390px; left: 50%;
+      top: 400px; left: 50%;
       transform: translateX(-50%);
-      width: 720px; height: 180px;
+      width: 760px; height: 190px;
       z-index: 2;
-      opacity: 0.55;
+      opacity: 0.85;
       pointer-events:none;
     }
 
-    /* Panels grid */
     .panels {
-      position:absolute; top: 600px; left: 120px; right: 120px;
+      position:absolute; top: 630px; left: 120px; right: 120px;
       z-index: 3;
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
       gap: 40px;
     }
     .panel {
-      background: rgba(255,255,255,0.35);
-      border: 1px solid rgba(184,115,51,0.3);
-      padding: 28px 30px 26px;
+      background: rgba(255,248,232,0.28);
+      border: 1px solid rgba(139,111,46,0.4);
+      padding: 26px 30px 24px;
       position: relative;
     }
     .panel::before {
       content:''; position:absolute;
       top: -1px; left: 20px; right: 20px;
       height: 1px;
-      background: linear-gradient(90deg, transparent, #B87333, transparent);
+      background: linear-gradient(90deg, transparent, #A85A3E, transparent);
     }
     .col-header {
-      font-family:'Cormorant Garamond', serif;
+      font-family:'Cormorant SC', serif;
       font-weight: 600;
-      font-size: 28px;
+      font-size: 24px;
       text-align: center;
       letter-spacing: 5px;
       color: #2C1810;
-      text-transform: uppercase;
       margin-bottom: 4px;
     }
     .col-sub {
       text-align: center;
-      font-family:'Cormorant Garamond', serif;
+      font-family:'Lora', serif;
       font-style: italic;
       font-size: 15px;
-      color: #8B5A2B;
-      padding-bottom: 16px;
-      margin-bottom: 16px;
-      border-bottom: 1px solid rgba(184,115,51,0.25);
-      letter-spacing: 1px;
+      color: #7A4A28;
+      padding-bottom: 14px;
+      margin-bottom: 14px;
+      border-bottom: 1px solid rgba(139,111,46,0.3);
+      letter-spacing: 0.5px;
     }
-    .dosa-list { display:flex; flex-direction:column; gap: 12px; }
+    .dosa-list { display:flex; flex-direction:column; gap: 11px; }
     .dosa-row {
       display:flex; align-items: baseline;
       justify-content: space-between;
       gap: 12px;
-      padding: 4px 2px;
+      padding: 3px 2px;
     }
     .dosa-row .dots {
       flex: 1;
-      border-bottom: 1px dotted rgba(139,90,43,0.35);
+      border-bottom: 1px dotted rgba(122,74,40,0.45);
       margin: 0 6px 6px;
       min-width: 10px;
     }
     .dosa-name {
-      font-family:'Cormorant Garamond', serif;
+      font-family:'Lora', serif;
       font-weight: 500;
-      font-size: 21px;
+      font-size: 20px;
       color: #2C1810;
       white-space: nowrap;
     }
     .dosa-price {
-      font-family:'Cormorant Garamond', serif;
+      font-family:'Lora', serif;
       font-weight: 600;
-      font-size: 21px;
-      color: #B87333;
+      font-size: 20px;
+      color: #A85A3E;
       white-space: nowrap;
     }
 
@@ -184,70 +172,47 @@
       text-align: center; z-index: 3;
     }
     .footer-text {
-      font-family:'Cormorant Garamond', serif;
+      font-family:'Lora', serif;
       font-style: italic;
       font-size: 19px;
-      color: #6B4423;
-      letter-spacing: 1.5px;
+      color: #4A2D18;
+      letter-spacing: 1px;
     }
   </style>
 </head>
 <body>
   <div class="frame"></div>
 
-  <!-- Subtle rangoli watermark -->
-  <svg class="rangoli-wm" viewBox="0 0 400 400">
-    <g fill="none" stroke="#8B5A2B" stroke-width="0.8">
-      <circle cx="200" cy="200" r="60"/>
-      <circle cx="200" cy="200" r="100"/>
-      <circle cx="200" cy="200" r="140"/>
-      <circle cx="200" cy="200" r="180"/>
-      <g>
-        <path d="M200 40 Q230 120 200 200 Q170 120 200 40Z"/>
-        <path d="M200 360 Q230 280 200 200 Q170 280 200 360Z"/>
-        <path d="M40 200 Q120 230 200 200 Q120 170 40 200Z"/>
-        <path d="M360 200 Q280 230 200 200 Q280 170 360 200Z"/>
-      </g>
-      <g transform="rotate(45 200 200)">
-        <path d="M200 40 Q230 120 200 200 Q170 120 200 40Z"/>
-        <path d="M200 360 Q230 280 200 200 Q170 280 200 360Z"/>
-        <path d="M40 200 Q120 230 200 200 Q120 170 40 200Z"/>
-        <path d="M360 200 Q280 230 200 200 Q280 170 360 200Z"/>
-      </g>
-      <circle cx="200" cy="200" r="20" fill="#B87333" fill-opacity="0.15"/>
-    </g>
-  </svg>
-
-  <!-- Hero dosa illustration: crescent dosa with two chutney bowls -->
-  <svg class="dosa-hero" viewBox="0 0 720 180">
+  <!-- Hero dosa illustration: crescent dosa with two chutney bowls — terracotta tones -->
+  <svg class="dosa-hero" viewBox="0 0 760 190">
     <defs>
       <linearGradient id="dosaWash" x1="0" x2="0" y1="0" y2="1">
-        <stop offset="0%" stop-color="#E8B931" stop-opacity="0.55"/>
-        <stop offset="60%" stop-color="#D4A05A" stop-opacity="0.35"/>
-        <stop offset="100%" stop-color="#8B5A2B" stop-opacity="0.2"/>
+        <stop offset="0%" stop-color="#C08848" stop-opacity="0.55"/>
+        <stop offset="60%" stop-color="#A85A3E" stop-opacity="0.35"/>
+        <stop offset="100%" stop-color="#5C2A18" stop-opacity="0.2"/>
       </linearGradient>
     </defs>
-    <!-- Left chutney bowl (coconut white) -->
-    <g transform="translate(60 120)">
-      <ellipse cx="0" cy="30" rx="60" ry="6" fill="none" stroke="#8B5A2B" stroke-width="1.2" opacity="0.5"/>
-      <path d="M-55 10 Q-55 40 0 40 Q55 40 55 10 Z" fill="none" stroke="#8B5A2B" stroke-width="1.5"/>
-      <ellipse cx="0" cy="10" rx="55" ry="8" fill="#FFFAF0" stroke="#8B5A2B" stroke-width="1.2"/>
-      <ellipse cx="0" cy="8" rx="48" ry="5" fill="#F5EDE0"/>
+    <!-- Left chutney bowl (coconut — parchment white) -->
+    <g transform="translate(65 130)">
+      <ellipse cx="0" cy="32" rx="62" ry="6" fill="none" stroke="#5C2A18" stroke-width="1.2" opacity="0.5"/>
+      <path d="M-56 12 Q-56 42 0 42 Q56 42 56 12 Z" fill="none" stroke="#5C2A18" stroke-width="1.6"/>
+      <ellipse cx="0" cy="12" rx="56" ry="8" fill="#F0E2C4" stroke="#5C2A18" stroke-width="1.2"/>
+      <ellipse cx="0" cy="10" rx="48" ry="5" fill="#E6D4B0"/>
     </g>
-    <!-- Right chutney bowl (tomato ochre) -->
-    <g transform="translate(660 120)">
-      <ellipse cx="0" cy="30" rx="60" ry="6" fill="none" stroke="#8B5A2B" stroke-width="1.2" opacity="0.5"/>
-      <path d="M-55 10 Q-55 40 0 40 Q55 40 55 10 Z" fill="none" stroke="#8B5A2B" stroke-width="1.5"/>
-      <ellipse cx="0" cy="10" rx="55" ry="8" fill="#E89662" stroke="#8B5A2B" stroke-width="1.2"/>
-      <ellipse cx="0" cy="8" rx="48" ry="5" fill="#D97706" opacity="0.7"/>
+    <!-- Right chutney bowl (tomato — terracotta) -->
+    <g transform="translate(695 130)">
+      <ellipse cx="0" cy="32" rx="62" ry="6" fill="none" stroke="#5C2A18" stroke-width="1.2" opacity="0.5"/>
+      <path d="M-56 12 Q-56 42 0 42 Q56 42 56 12 Z" fill="none" stroke="#5C2A18" stroke-width="1.6"/>
+      <ellipse cx="0" cy="12" rx="56" ry="8" fill="#A85A3E" stroke="#5C2A18" stroke-width="1.2"/>
+      <ellipse cx="0" cy="10" rx="48" ry="5" fill="#8B3A28" opacity="0.85"/>
     </g>
     <!-- Crescent dosa -->
     <g>
-      <path d="M150 150 Q180 30 420 30 Q570 40 570 100 Q520 160 320 165 Q180 165 150 150 Z"
-            fill="url(#dosaWash)" stroke="#8B5A2B" stroke-width="1.8"/>
-      <path d="M180 140 Q220 60 410 55" fill="none" stroke="#8B5A2B" stroke-width="0.8" opacity="0.45"/>
-      <path d="M200 150 Q260 80 440 75" fill="none" stroke="#8B5A2B" stroke-width="0.8" opacity="0.35"/>
-      <path d="M230 158 Q300 95 470 90" fill="none" stroke="#8B5A2B" stroke-width="0.8" opacity="0.3"/>
+      <path d="M160 158 Q190 32 445 32 Q600 42 600 105 Q550 168 335 172 Q190 172 160 158 Z"
+            fill="url(#dosaWash)" stroke="#5C2A18" stroke-width="1.8"/>
+      <path d="M190 148 Q230 62 430 57" fill="none" stroke="#5C2A18" stroke-width="0.8" opacity="0.45"/>
+      <path d="M210 158 Q275 82 465 77" fill="none" stroke="#5C2A18" stroke-width="0.8" opacity="0.35"/>
+      <path d="M240 165 Q315 98 495 92" fill="none" stroke="#5C2A18" stroke-width="0.8" opacity="0.3"/>
     </g>
   </svg>
 

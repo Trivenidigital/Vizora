@@ -3,100 +3,92 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1920, height=1080">
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Yatra+One&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Cormorant+SC:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Yatra+One&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     :root {
-      --cream: #FBF6EC;
-      --cream-deep: #F3E9D2;
+      --bg-a: #E2D0B0;
+      --bg-b: #D4BC8E;
       --ink: #2C1810;
-      --ink-soft: #5B4636;
-      --accent: #7A1F2B;
-      --accent-soft: #A94C59;
-      --gold: #B08A3E;
-      --gold-soft: #D4B572;
-      --rule: rgba(176,138,62,0.35);
+      --ink-body: #4A2D18;
+      --ink-muted: #7A4A28;
+      --accent: #A85A3E;
+      --brass: #8B6F2E;
+      --rule: rgba(139,111,46,0.4);
     }
     body {
       width: 1920px; height: 1080px; overflow: hidden; position: relative;
-      font-family: 'Lora', serif; color: var(--ink);
+      font-family: 'Lora', serif; color: var(--ink-body);
       background:
-        radial-gradient(ellipse at 50% 0%, rgba(176,138,62,0.08), transparent 60%),
-        radial-gradient(ellipse at 50% 100%, rgba(122,31,43,0.05), transparent 55%),
-        linear-gradient(180deg, #FBF6EC 0%, #F6EEDD 100%);
+        radial-gradient(ellipse at 50% 0%, rgba(139,111,46,0.06), transparent 60%),
+        radial-gradient(ellipse at 50% 100%, rgba(168,90,62,0.05), transparent 55%),
+        linear-gradient(168deg, #E2D0B0 0%, #D4BC8E 100%);
     }
-    /* subtle paper grain */
     body::before {
       content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
       background-image:
-        radial-gradient(circle at 20% 30%, rgba(44,24,16,0.025) 0.5px, transparent 1px),
-        radial-gradient(circle at 70% 60%, rgba(44,24,16,0.02) 0.5px, transparent 1px);
-      background-size: 40px 40px, 55px 55px;
+        radial-gradient(circle at 18% 26%, rgba(44,24,16,0.035) 0.6px, transparent 1.1px),
+        radial-gradient(circle at 72% 63%, rgba(44,24,16,0.028) 0.5px, transparent 1px),
+        radial-gradient(circle at 86% 36%, rgba(44,24,16,0.022) 0.5px, transparent 1px);
+      background-size: 38px 38px, 54px 54px, 70px 70px;
+    }
+    /* hand-drawn paper feel — pencil scratch lines */
+    body::after {
+      content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+      background:
+        repeating-linear-gradient(115deg, transparent 0 8px, rgba(44,24,16,0.012) 8px 9px),
+        repeating-linear-gradient(63deg, transparent 0 14px, rgba(44,24,16,0.01) 14px 15px);
     }
 
-    /* refined single-line frame */
     .frame {
-      position: absolute; inset: 70px;
-      border: 1px solid var(--rule);
-      z-index: 1;
+      position: absolute; inset: 72px;
+      border: 1px solid var(--brass); z-index: 1;
     }
     .frame::before {
-      content: ''; position: absolute; inset: 8px;
-      border: 1px solid rgba(176,138,62,0.18);
+      content: ''; position: absolute; inset: 10px;
+      border: 1px solid rgba(139,111,46,0.22);
     }
 
-    /* subtle rangoli corner ornaments — small, restrained */
-    .corner-ornament { position: absolute; z-index: 3; opacity: 0.55; }
-    .co-tl { top: 82px; left: 82px; }
-    .co-tr { top: 82px; right: 82px; transform: scaleX(-1); }
-    .co-bl { bottom: 82px; left: 82px; transform: scaleY(-1); }
-    .co-br { bottom: 82px; right: 82px; transform: scale(-1,-1); }
-
-    /* Header */
     .header {
-      position: absolute; top: 130px; left: 0; right: 0;
+      position: absolute; top: 140px; left: 0; right: 0;
       text-align: center; z-index: 5;
     }
     .eyebrow {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 16px; letter-spacing: 10px;
-      color: var(--gold); text-transform: uppercase; font-weight: 500;
+      font-family: 'Cormorant SC', serif;
+      font-size: 22px; letter-spacing: 8px;
+      color: var(--accent); text-transform: uppercase; font-weight: 500;
+      display: inline-block; margin-bottom: 18px;
     }
-    .eyebrow-rule {
-      display: inline-flex; align-items: center; gap: 22px;
-      margin-bottom: 18px;
-    }
-    .eyebrow-rule::before, .eyebrow-rule::after {
-      content: ''; display: inline-block; width: 60px; height: 1px;
-      background: var(--gold);
+    .eyebrow::before, .eyebrow::after {
+      content: ''; display: inline-block;
+      width: 56px; height: 1px; background: var(--brass);
+      vertical-align: middle; margin: 0 22px;
     }
     .title {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 104px; font-weight: 500;
-      color: var(--accent); letter-spacing: 2px; line-height: 0.9;
+      font-family: 'DM Serif Display', serif;
+      font-size: 116px; font-weight: 400;
+      color: var(--ink); letter-spacing: -0.5px; line-height: 0.95;
     }
     .title-devanagari {
       font-family: 'Yatra One', cursive;
-      font-size: 22px; color: var(--gold);
-      letter-spacing: 4px; margin-top: 10px; opacity: 0.75;
+      font-size: 22px; color: var(--brass);
+      letter-spacing: 4px; margin-top: 12px; opacity: 0.7;
     }
     .subtitle {
-      font-family: 'Cormorant Garamond', serif; font-style: italic;
-      font-size: 26px; color: var(--ink-soft);
-      letter-spacing: 3px; margin-top: 14px;
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 26px; color: var(--ink-muted);
+      letter-spacing: 1px; margin-top: 14px;
     }
 
-    /* Central hero — small SVG illustration */
     .hero-svg {
-      position: absolute; top: 330px; left: 50%;
+      position: absolute; top: 360px; left: 50%;
       transform: translateX(-50%);
-      width: 180px; height: 110px; z-index: 4; opacity: 0.85;
+      width: 200px; height: 130px; z-index: 4; opacity: 0.85;
     }
 
-    /* Two-column menu */
     .columns {
       position: absolute;
-      top: 490px; bottom: 150px;
+      top: 530px; bottom: 150px;
       left: 160px; right: 160px;
       z-index: 5;
       display: grid;
@@ -107,132 +99,112 @@
     .col-divider {
       background: linear-gradient(180deg, transparent, var(--rule) 15%, var(--rule) 85%, transparent);
     }
+    .menu-card {
+      padding: 22px 30px;
+      background: rgba(255,248,232,0.22);
+      border: 1px solid var(--brass);
+      position: relative;
+    }
+    .menu-card::before {
+      content: ''; position: absolute; inset: 6px;
+      border: 1px solid rgba(139,111,46,0.22);
+      pointer-events: none;
+    }
     .section-header {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 28px; font-weight: 600;
-      color: var(--accent); letter-spacing: 6px;
+      font-family: 'Cormorant SC', serif;
+      font-size: 24px; font-weight: 600;
+      color: var(--ink); letter-spacing: 6px;
       text-transform: uppercase; text-align: center;
-      padding-bottom: 10px; margin-bottom: 22px;
+      padding-bottom: 12px; margin-bottom: 18px;
       position: relative;
     }
     .section-header::after {
       content: ''; position: absolute;
       bottom: 0; left: 50%; transform: translateX(-50%);
-      width: 40px; height: 1px; background: var(--gold);
+      width: 42px; height: 1px; background: var(--brass);
     }
     .item {
       display: grid; grid-template-columns: 1fr auto;
       align-items: baseline; gap: 0 16px;
-      padding: 10px 0;
-      border-bottom: 1px dotted rgba(176,138,62,0.25);
+      padding: 9px 0;
+      border-bottom: 1px dotted rgba(139,111,46,0.32);
     }
     .item:last-child { border-bottom: none; }
     .item-name {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 23px; font-weight: 600; color: var(--ink);
+      font-family: 'DM Serif Display', serif;
+      font-size: 22px; font-weight: 400; color: var(--ink);
     }
     .item-price {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 23px; font-weight: 600; color: var(--accent);
+      font-family: 'DM Serif Display', serif;
+      font-size: 22px; font-weight: 400; color: var(--accent);
     }
     .item-desc {
       grid-column: 1 / -1;
       font-family: 'Lora', serif; font-style: italic;
-      font-size: 13px; color: var(--ink-soft);
+      font-size: 13px; color: var(--ink-muted);
       margin-top: 2px;
     }
 
-    /* Drinks mini-panel */
     .drinks {
-      margin-top: 20px;
-      padding-top: 18px;
+      margin-top: 18px;
+      padding-top: 16px;
       border-top: 1px solid var(--rule);
     }
 
-    /* Footer */
     .footer {
-      position: absolute; bottom: 80px; left: 0; right: 0;
+      position: absolute; bottom: 90px; left: 0; right: 0;
       text-align: center; z-index: 5;
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 14px; color: var(--ink-soft);
+      font-family: 'Cormorant SC', serif;
+      font-size: 14px; color: var(--ink-muted);
       letter-spacing: 5px; text-transform: uppercase;
     }
     .footer-inner {
       display: inline-flex; align-items: center; gap: 18px;
       padding: 0 30px;
     }
-    .footer-inner .sep { color: var(--gold); }
+    .footer-inner .sep { color: var(--brass); }
   </style>
 </head>
 <body>
   <div class="frame"></div>
 
-  <!-- Refined corner ornaments -->
-  <svg class="corner-ornament co-tl" width="70" height="70" viewBox="0 0 70 70">
-    <g fill="none" stroke="#B08A3E" stroke-width="1" stroke-linecap="round">
-      <path d="M5 5 Q30 5 35 30 Q5 30 5 5 Z"/>
-      <path d="M5 5 Q5 30 30 35"/>
-      <circle cx="22" cy="22" r="2" fill="#B08A3E"/>
-      <path d="M12 40 Q20 42 22 50 M20 50 Q25 48 30 52"/>
-    </g>
-  </svg>
-  <svg class="corner-ornament co-tr" width="70" height="70" viewBox="0 0 70 70">
-    <g fill="none" stroke="#B08A3E" stroke-width="1" stroke-linecap="round">
-      <path d="M5 5 Q30 5 35 30 Q5 30 5 5 Z"/>
-      <path d="M5 5 Q5 30 30 35"/>
-      <circle cx="22" cy="22" r="2" fill="#B08A3E"/>
-      <path d="M12 40 Q20 42 22 50 M20 50 Q25 48 30 52"/>
-    </g>
-  </svg>
-  <svg class="corner-ornament co-bl" width="70" height="70" viewBox="0 0 70 70">
-    <g fill="none" stroke="#B08A3E" stroke-width="1" stroke-linecap="round">
-      <path d="M5 5 Q30 5 35 30 Q5 30 5 5 Z"/>
-      <path d="M5 5 Q5 30 30 35"/>
-      <circle cx="22" cy="22" r="2" fill="#B08A3E"/>
-      <path d="M12 40 Q20 42 22 50 M20 50 Q25 48 30 52"/>
-    </g>
-  </svg>
-  <svg class="corner-ornament co-br" width="70" height="70" viewBox="0 0 70 70">
-    <g fill="none" stroke="#B08A3E" stroke-width="1" stroke-linecap="round">
-      <path d="M5 5 Q30 5 35 30 Q5 30 5 5 Z"/>
-      <path d="M5 5 Q5 30 30 35"/>
-      <circle cx="22" cy="22" r="2" fill="#B08A3E"/>
-      <path d="M12 40 Q20 42 22 50 M20 50 Q25 48 30 52"/>
-    </g>
-  </svg>
-
   <div class="header">
-    <div class="eyebrow-rule">
-      <span class="eyebrow">Est. Tradition</span>
-    </div>
+    <div class="eyebrow">Est. Tradition</div>
     <h1 class="title" data-editable="true" data-field="title">Chaat Corner</h1>
     <div class="title-devanagari">&#2330;&#2366;&#2335;</div>
     <p class="subtitle" data-editable="true" data-field="subtitle">Street Food &bull; Bold Flavors &bull; Fun Eats</p>
   </div>
 
-  <!-- Small hero SVG: chaat bowl -->
-  <svg class="hero-svg" viewBox="0 0 180 110">
-    <g fill="none" stroke="#7A1F2B" stroke-width="1.5">
-      <!-- bowl -->
-      <ellipse cx="90" cy="70" rx="58" ry="8" fill="#F3E9D2"/>
-      <path d="M32 70 Q35 100 90 100 Q145 100 148 70 Z" fill="#F3E9D2"/>
-      <ellipse cx="90" cy="70" rx="58" ry="8"/>
-      <!-- pani puri spheres on top -->
-      <circle cx="65" cy="60" r="10" fill="#FBF6EC"/>
-      <circle cx="90" cy="56" r="11" fill="#FBF6EC"/>
-      <circle cx="115" cy="60" r="10" fill="#FBF6EC"/>
-      <!-- little garnish dots -->
-      <circle cx="65" cy="60" r="2" fill="#B08A3E" stroke="none"/>
-      <circle cx="90" cy="56" r="2" fill="#B08A3E" stroke="none"/>
-      <circle cx="115" cy="60" r="2" fill="#B08A3E" stroke="none"/>
-      <!-- steam -->
-      <path d="M75 40 Q72 30 78 22 M90 38 Q87 26 93 18 M105 40 Q102 30 108 22" stroke="#B08A3E" stroke-width="1" opacity="0.6"/>
+  <!-- Single hand-drawn chaat illustration: pani puri bowl -->
+  <svg class="hero-svg" viewBox="0 0 200 130">
+    <g fill="none" stroke="#7A4A28" stroke-width="1.4" stroke-linecap="round">
+      <!-- bowl with hand-drawn wobble -->
+      <path d="M40 78 Q42 110 100 110 Q158 110 160 78"/>
+      <ellipse cx="100" cy="78" rx="60" ry="9" fill="#E2D0B0"/>
+      <!-- pani puri spheres -->
+      <circle cx="72" cy="66" r="11" fill="#F0E4C2"/>
+      <circle cx="100" cy="60" r="12" fill="#F0E4C2"/>
+      <circle cx="128" cy="66" r="11" fill="#F0E4C2"/>
+      <!-- imperfect line marks (hand-drawn feel) -->
+      <path d="M65 64 Q72 60 78 64" stroke-width="0.8"/>
+      <path d="M93 58 Q100 54 107 58" stroke-width="0.8"/>
+      <path d="M121 64 Q128 60 134 64" stroke-width="0.8"/>
+      <!-- garnish dots -->
+      <circle cx="72" cy="66" r="2" fill="#A85A3E" stroke="none"/>
+      <circle cx="100" cy="60" r="2" fill="#A85A3E" stroke="none"/>
+      <circle cx="128" cy="66" r="2" fill="#A85A3E" stroke="none"/>
+      <!-- coriander sprigs -->
+      <path d="M82 50 Q86 44 90 48" stroke="#5A7A3A"/>
+      <path d="M110 48 Q114 42 118 46" stroke="#5A7A3A"/>
+      <!-- steam wisps -->
+      <path d="M82 38 Q78 28 84 18" stroke="#8B6F2E" stroke-width="0.9" opacity="0.6"/>
+      <path d="M100 34 Q96 22 102 12" stroke="#8B6F2E" stroke-width="0.9" opacity="0.6"/>
+      <path d="M118 38 Q114 28 120 18" stroke="#8B6F2E" stroke-width="0.9" opacity="0.6"/>
     </g>
   </svg>
 
   <div class="columns">
-    <!-- Left column: Chaat Favorites -->
-    <div>
+    <div class="menu-card">
       <div class="section-header" data-editable="true" data-field="leftSectionTitle">Chaat Favorites</div>
       <div class="item">
         <span class="item-name" data-editable="true" data-field="item1Name">Pani Puri (6 pcs)</span>
@@ -278,8 +250,7 @@
 
     <div class="col-divider"></div>
 
-    <!-- Right column: Fried Goodness + Drinks -->
-    <div>
+    <div class="menu-card">
       <div class="section-header" data-editable="true" data-field="rightSectionTitle">Fried Goodness</div>
       <div class="item">
         <span class="item-name" data-editable="true" data-field="fried1Name">Samosa (2 pcs)</span>

@@ -3,96 +3,93 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1920, height=1080">
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Yatra+One&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Cormorant+SC:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Yatra+One&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       width: 1920px; height: 1080px; overflow: hidden; position: relative;
       font-family: 'Lora', serif;
       color: #2C1810;
-      background: #FFFAF0;
+      background: #E2D0B0;
     }
-    /* Warm vignette */
+    /* Warm stone gradient */
     body::before {
       content:''; position:absolute; inset:0; z-index:0; pointer-events:none;
-      background: radial-gradient(ellipse at 50% 40%, #FFFAF0 0%, #F5EDE0 70%, #EBDDC4 100%);
+      background: radial-gradient(ellipse at 50% 40%, #E8D7B8 0%, #E2D0B0 55%, #CBB58A 100%);
     }
 
-    /* Thin gold border frame */
     .frame {
       position:absolute; inset:50px;
-      border: 1px solid rgba(184,115,51,0.45);
+      border: 1px solid rgba(47,82,51,0.5);
       z-index: 1;
     }
     .frame::before {
       content:''; position:absolute; inset:8px;
-      border: 1px solid rgba(184,115,51,0.22);
+      border: 1px solid rgba(47,82,51,0.22);
     }
 
-    /* Banana leaf watermark — single large subtle leaf */
+    /* Banana leaf rib watermark - single large subtle leaf */
     .leaf-wm {
       position:absolute;
       top: 50%; left: 50%;
       transform: translate(-50%, -48%);
       width: 1600px;
       z-index: 1;
-      opacity: 0.06;
+      opacity: 0.05;
       pointer-events:none;
     }
 
-    /* Header */
     .header {
       position: relative;
       z-index: 5;
       text-align: center;
-      padding-top: 95px;
+      padding-top: 90px;
     }
     .eyebrow {
-      font-family: 'Yatra One', cursive;
-      font-size: 20px;
-      color: #8B5A2B;
+      font-family: 'Cormorant SC', serif;
+      font-weight: 500;
+      font-size: 19px;
+      color: #2F5233;
       letter-spacing: 10px;
-      margin-bottom: 16px;
-      opacity: 0.75;
+      margin-bottom: 18px;
     }
     .main-title {
-      font-family: 'Cormorant Garamond', serif;
-      font-weight: 500;
-      font-size: 82px;
+      font-family: 'DM Serif Display', serif;
+      font-weight: 400;
+      font-size: 96px;
       line-height: 1;
       color: #2C1810;
-      letter-spacing: 3px;
+      letter-spacing: 2px;
       margin-bottom: 14px;
     }
     .main-subtitle {
-      font-family: 'Cormorant Garamond', serif;
+      font-family: 'Lora', serif;
       font-style: italic;
       font-size: 24px;
-      color: #6B4423;
-      letter-spacing: 2px;
+      color: #4A2D18;
+      letter-spacing: 1.5px;
     }
     .header-divider {
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 20px;
-      margin-top: 14px;
+      margin-top: 16px;
     }
     .hd-line {
-      width: 160px;
+      width: 170px;
       height: 1px;
-      background: linear-gradient(90deg, transparent, #B87333, transparent);
+      background: linear-gradient(90deg, transparent, #2F5233, transparent);
     }
     .hd-ornament {
-      color: #B87333;
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 20px;
+      color: #2F5233;
+      font-family: 'DM Serif Display', serif;
+      font-size: 22px;
     }
 
-    /* Weekly grid */
     .container {
       position: absolute;
-      top: 330px;
+      top: 340px;
       left: 90px; right: 90px;
       bottom: 140px;
       z-index: 4;
@@ -102,7 +99,7 @@
       gap: 22px;
     }
 
-    /* Consistent day card — cream with thin gold border */
+    /* Consistent day card — parchment + emerald border */
     .day-card {
       position: relative;
       padding: 22px 20px 20px;
@@ -110,38 +107,45 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      background: rgba(255,255,255,0.4);
-      border: 1px solid rgba(184,115,51,0.4);
+      background: rgba(255,248,232,0.3);
+      border: 1px solid rgba(47,82,51,0.45);
     }
     .day-card::before {
       content:''; position: absolute;
       inset: 5px;
-      border: 1px solid rgba(184,115,51,0.2);
+      border: 1px solid rgba(47,82,51,0.18);
       pointer-events:none;
     }
 
     .day-label {
-      font-family: 'Cormorant Garamond', serif;
+      font-family: 'Cormorant SC', serif;
       font-weight: 600;
-      font-size: 16px;
-      color: #B87333;
+      font-size: 15px;
+      color: #2F5233;
       letter-spacing: 5px;
-      text-transform: uppercase;
       padding-bottom: 10px;
-      margin-bottom: 12px;
-      border-bottom: 1px solid rgba(184,115,51,0.3);
+      margin-bottom: 10px;
+      border-bottom: 1px solid rgba(47,82,51,0.35);
       width: 80%;
       position: relative;
       z-index: 1;
     }
 
+    .meal-icon {
+      width: 44px; height: 44px;
+      margin-bottom: 8px;
+      position: relative;
+      z-index: 1;
+      opacity: 0.8;
+    }
+
     .dish-name {
-      font-family: 'Cormorant Garamond', serif;
-      font-weight: 600;
+      font-family: 'DM Serif Display', serif;
+      font-weight: 400;
       font-size: 26px;
       color: #2C1810;
       line-height: 1.15;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
       min-height: 56px;
       display: flex;
       align-items: center;
@@ -151,33 +155,32 @@
     }
 
     .dish-desc {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 15px;
+      font-family: 'Lora', serif;
+      font-size: 14px;
       font-style: italic;
-      color: #6B4423;
+      color: #7A4A28;
       line-height: 1.35;
-      margin-bottom: 14px;
+      margin-bottom: 12px;
       flex: 1;
       position: relative;
       z-index: 1;
     }
 
     .dish-price {
-      font-family: 'Cormorant Garamond', serif;
+      font-family: 'Lora', serif;
       font-weight: 600;
-      font-size: 26px;
-      color: #B87333;
+      font-size: 24px;
+      color: #2F5233;
       position: relative;
       z-index: 1;
     }
 
-    /* Sunday chef's special ribbon - restrained */
     .sunday-ribbon {
       position: absolute;
       top: -1px; right: -1px;
-      background: #8B5A2B;
-      color: #FBF7F0;
-      font-family: 'Cormorant Garamond', serif;
+      background: #2F5233;
+      color: #F0E2C4;
+      font-family: 'Cormorant SC', serif;
       font-weight: 600;
       font-size: 11px;
       letter-spacing: 2px;
@@ -185,7 +188,6 @@
       z-index: 2;
     }
 
-    /* 8th slot - banana leaf ornament */
     .ornament-card {
       display: flex;
       flex-direction: column;
@@ -200,46 +202,45 @@
       z-index: 1;
     }
     .ornament-card .label {
-      font-family: 'Cormorant Garamond', serif;
+      font-family: 'Lora', serif;
       font-style: italic;
-      font-size: 20px;
-      color: #6B4423;
+      font-size: 19px;
+      color: #4A2D18;
       text-align: center;
       line-height: 1.3;
-      letter-spacing: 1px;
+      letter-spacing: 0.8px;
       position: relative;
       z-index: 1;
     }
 
-    /* Footer */
     .footer {
       position: absolute;
       bottom: 75px; left: 90px; right: 90px;
       z-index: 5;
       text-align: center;
       padding: 12px 30px;
-      border-top: 1px solid rgba(184,115,51,0.3);
-      border-bottom: 1px solid rgba(184,115,51,0.3);
+      border-top: 1px solid rgba(47,82,51,0.35);
+      border-bottom: 1px solid rgba(47,82,51,0.35);
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 50px;
     }
     .footer-text {
-      font-family: 'Cormorant Garamond', serif;
+      font-family: 'Lora', serif;
       font-style: italic;
       font-size: 19px;
-      color: #6B4423;
-      letter-spacing: 1px;
+      color: #4A2D18;
+      letter-spacing: 0.8px;
     }
     .footer-text strong {
       font-weight: 600;
-      color: #8B5A2B;
+      color: #2F5233;
       font-style: normal;
     }
     .footer-dot {
       width: 6px; height: 6px;
-      background: #B87333;
+      background: #2F5233;
       transform: rotate(45deg);
     }
   </style>
@@ -247,7 +248,7 @@
 <body>
   <div class="frame"></div>
 
-  <!-- Single large banana leaf watermark -->
+  <!-- Single large banana leaf rib watermark -->
   <svg class="leaf-wm" viewBox="0 0 1600 800">
     <g fill="none" stroke="#2C1810" stroke-width="1.5">
       <path d="M50 400 Q400 100 800 100 Q1200 100 1550 400 Q1200 700 800 700 Q400 700 50 400 Z" stroke-width="2"/>
@@ -269,7 +270,6 @@
     </g>
   </svg>
 
-  <!-- Header -->
   <div class="header">
     <div class="eyebrow">SHUBH BHOJANAM</div>
     <h1 class="main-title" data-editable="true" data-field="mainTitle">Weekly Lunch Specials</h1>
@@ -281,10 +281,10 @@
     </div>
   </div>
 
-  <!-- Weekly grid -->
   <div class="container">
     <div class="day-card">
       <div class="day-label" data-editable="true" data-field="day1Label">Monday</div>
+      <svg class="meal-icon" viewBox="0 0 44 44"><g fill="none" stroke="#2F5233" stroke-width="1.5"><ellipse cx="22" cy="28" rx="16" ry="5"/><path d="M6 28 Q6 15 22 15 Q38 15 38 28"/><circle cx="22" cy="18" r="3" fill="#2F5233" fill-opacity="0.3"/></g></svg>
       <div class="dish-name" data-editable="true" data-field="day1Dish">Ven Pongal</div>
       <div class="dish-desc" data-editable="true" data-field="day1Desc">Coconut chutney &amp; sambar, tempered with ghee &amp; cashews</div>
       <div class="dish-price" data-editable="true" data-field="day1Price">$8.99</div>
@@ -292,6 +292,7 @@
 
     <div class="day-card">
       <div class="day-label" data-editable="true" data-field="day2Label">Tuesday</div>
+      <svg class="meal-icon" viewBox="0 0 44 44"><g fill="none" stroke="#2F5233" stroke-width="1.5"><circle cx="22" cy="22" r="15"/><circle cx="22" cy="22" r="9"/><circle cx="22" cy="22" r="3" fill="#2F5233" fill-opacity="0.3"/></g></svg>
       <div class="dish-name" data-editable="true" data-field="day2Dish">Bisibelebath</div>
       <div class="dish-desc" data-editable="true" data-field="day2Desc">Karnataka sambar rice with ghee, crispy boondi on top</div>
       <div class="dish-price" data-editable="true" data-field="day2Price">$8.99</div>
@@ -299,6 +300,7 @@
 
     <div class="day-card">
       <div class="day-label" data-editable="true" data-field="day3Label">Wednesday</div>
+      <svg class="meal-icon" viewBox="0 0 44 44"><g fill="none" stroke="#2F5233" stroke-width="1.5"><circle cx="22" cy="22" r="15"/><path d="M12 22 Q22 15 32 22 Q22 29 12 22"/></g></svg>
       <div class="dish-name" data-editable="true" data-field="day3Dish">Tomato Rice</div>
       <div class="dish-desc" data-editable="true" data-field="day3Desc">Tangy tomato gravy rice with raita &amp; papad</div>
       <div class="dish-price" data-editable="true" data-field="day3Price">$8.99</div>
@@ -306,6 +308,7 @@
 
     <div class="day-card">
       <div class="day-label" data-editable="true" data-field="day4Label">Thursday</div>
+      <svg class="meal-icon" viewBox="0 0 44 44"><g fill="none" stroke="#2F5233" stroke-width="1.5"><circle cx="22" cy="22" r="14"/><path d="M14 22 L30 22 M22 14 L22 30"/></g></svg>
       <div class="dish-name" data-editable="true" data-field="day4Dish">Lemon Rice</div>
       <div class="dish-desc" data-editable="true" data-field="day4Desc">Zesty lemon turmeric rice with cashews &amp; peanuts</div>
       <div class="dish-price" data-editable="true" data-field="day4Price">$8.99</div>
@@ -313,6 +316,7 @@
 
     <div class="day-card">
       <div class="day-label" data-editable="true" data-field="day5Label">Friday</div>
+      <svg class="meal-icon" viewBox="0 0 44 44"><g fill="none" stroke="#2F5233" stroke-width="1.5"><circle cx="22" cy="22" r="15"/><circle cx="18" cy="19" r="2"/><circle cx="26" cy="19" r="2"/><circle cx="22" cy="26" r="2"/></g></svg>
       <div class="dish-name" data-editable="true" data-field="day5Dish">Tamarind Rice</div>
       <div class="dish-desc" data-editable="true" data-field="day5Desc">Puliyodharai, temple-style tangy &amp; spiced rice</div>
       <div class="dish-price" data-editable="true" data-field="day5Price">$8.99</div>
@@ -320,6 +324,7 @@
 
     <div class="day-card">
       <div class="day-label" data-editable="true" data-field="day6Label">Saturday</div>
+      <svg class="meal-icon" viewBox="0 0 44 44"><g fill="none" stroke="#2F5233" stroke-width="1.5"><ellipse cx="22" cy="24" rx="15" ry="10"/><ellipse cx="22" cy="21" rx="12" ry="7"/></g></svg>
       <div class="dish-name" data-editable="true" data-field="day6Dish">Curd Rice &amp; Vada</div>
       <div class="dish-desc" data-editable="true" data-field="day6Desc">Cool curd rice with crispy vada &amp; pomegranate</div>
       <div class="dish-price" data-editable="true" data-field="day6Price">$7.99</div>
@@ -328,6 +333,7 @@
     <div class="day-card">
       <div class="sunday-ribbon">CHEF'S SPECIAL</div>
       <div class="day-label" data-editable="true" data-field="day7Label">Sunday</div>
+      <svg class="meal-icon" viewBox="0 0 44 44"><g fill="none" stroke="#2F5233" stroke-width="1.5"><path d="M8 26 Q8 14 22 14 Q36 14 36 26 L34 32 L10 32 Z"/><line x1="14" y1="20" x2="30" y2="20"/></g></svg>
       <div class="dish-name" data-editable="true" data-field="day7Dish">Special Biryani</div>
       <div class="dish-desc" data-editable="true" data-field="day7Desc">Veg or Chicken dum-cooked with raita &amp; salan</div>
       <div class="dish-price" data-editable="true" data-field="day7Price">$11.99</div>
@@ -335,7 +341,7 @@
 
     <div class="day-card ornament-card">
       <svg class="leaf-icon" viewBox="0 0 120 120">
-        <g fill="none" stroke="#B87333" stroke-width="1.5">
+        <g fill="none" stroke="#2F5233" stroke-width="1.5">
           <path d="M20 60 Q40 20 60 15 Q80 20 100 60 Q80 100 60 105 Q40 100 20 60 Z"/>
           <line x1="20" y1="60" x2="100" y2="60"/>
           <path d="M35 60 Q45 35 58 30 M35 60 Q45 85 58 90"/>
@@ -347,7 +353,6 @@
     </div>
   </div>
 
-  <!-- Footer -->
   <div class="footer">
     <span class="footer-text" data-editable="true" data-field="footerNote1">All specials include <strong>papad, condiments &amp; buttermilk</strong></span>
     <span class="footer-dot"></span>
