@@ -3,601 +3,185 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1920, height=1080">
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Poiret+One&family=Cormorant+Garamond:wght@300;400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Cormorant+SC:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --ink: #2C1810;
+      --ink-body: #4A2D18;
+      --ink-muted: #7A4A28;
+      --accent: #6B2737;
+      --brass: #8B6F2E;
+      --rule: rgba(107,39,55,0.35);
+    }
     body {
-      width: 1920px;
-      height: 1080px;
-      overflow: hidden;
-      position: relative;
-      font-family: 'Inter', sans-serif;
+      width: 1920px; height: 1080px; overflow: hidden; position: relative;
+      font-family: 'Lora', serif; color: var(--ink-body);
       background:
-        radial-gradient(ellipse at 20% 30%, rgba(255,40,120,0.12) 0%, transparent 45%),
-        radial-gradient(ellipse at 80% 70%, rgba(90,40,180,0.14) 0%, transparent 50%),
-        radial-gradient(ellipse at 50% 100%, rgba(0,220,255,0.08) 0%, transparent 55%),
-        linear-gradient(160deg, #0a0618 0%, #130a28 30%, #1a0b36 55%, #120724 80%, #080414 100%);
-      color: #f4eefb;
+        radial-gradient(ellipse at 50% 0%, rgba(107,39,55,0.06), transparent 60%),
+        linear-gradient(168deg, #D9C4A0 0%, #C9B082 100%);
     }
-
-    /* Art Deco diagonal rays pattern */
     body::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background:
-        repeating-linear-gradient(
-          45deg,
-          transparent,
-          transparent 80px,
-          rgba(255,80,160,0.025) 80px,
-          rgba(255,80,160,0.025) 81px
-        ),
-        repeating-linear-gradient(
-          -45deg,
-          transparent,
-          transparent 80px,
-          rgba(120,60,220,0.025) 80px,
-          rgba(120,60,220,0.025) 81px
-        );
-      pointer-events: none;
-      z-index: 0;
+      content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+      background-image:
+        radial-gradient(circle at 19% 27%, rgba(44,24,16,0.035) 0.6px, transparent 1.1px),
+        radial-gradient(circle at 71% 64%, rgba(44,24,16,0.028) 0.5px, transparent 1px);
+      background-size: 40px 40px, 58px 58px;
     }
-
-    /* Film grain overlay */
     body::after {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background:
-        radial-gradient(circle at 30% 40%, rgba(255,255,255,0.015) 0%, transparent 60%),
-        radial-gradient(circle at 70% 60%, rgba(255,255,255,0.01) 0%, transparent 60%);
-      pointer-events: none;
-      z-index: 0;
+      content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+      background: repeating-linear-gradient(42deg, transparent 0 90px, rgba(107,39,55,0.02) 90px 91px);
     }
 
-    /* Neon glow orbs */
-    .neon-pink {
-      position: absolute;
-      top: -180px; left: 150px;
-      width: 720px; height: 720px;
-      background: radial-gradient(circle, rgba(255,40,130,0.18) 0%, transparent 60%);
-      border-radius: 50%;
-      z-index: 1;
-      animation: pulse-pink 6s ease-in-out infinite;
+    .frame {
+      position: absolute; inset: 60px;
+      border: 1px solid var(--brass); z-index: 1;
     }
-    .neon-purple {
-      position: absolute;
-      bottom: -220px; right: 180px;
-      width: 780px; height: 780px;
-      background: radial-gradient(circle, rgba(120,50,220,0.16) 0%, transparent 60%);
-      border-radius: 50%;
-      z-index: 1;
-      animation: pulse-purple 7s ease-in-out infinite;
-    }
-    .neon-cyan {
-      position: absolute;
-      top: 200px; right: -120px;
-      width: 540px; height: 540px;
-      background: radial-gradient(circle, rgba(0,220,255,0.10) 0%, transparent 65%);
-      border-radius: 50%;
-      z-index: 1;
-      animation: pulse-cyan 8s ease-in-out infinite;
+    .frame::before {
+      content: ''; position: absolute; inset: 10px;
+      border: 1px solid rgba(139,111,46,0.22);
     }
 
-    @keyframes pulse-pink {
-      0%, 100% { opacity: 0.8; transform: scale(1); }
-      50% { opacity: 1; transform: scale(1.05); }
+    .header {
+      position: absolute; top: 110px; left: 0; right: 0;
+      text-align: center; z-index: 5;
     }
-    @keyframes pulse-purple {
-      0%, 100% { opacity: 0.75; transform: scale(1); }
-      50% { opacity: 1; transform: scale(1.06); }
+    .eyebrow {
+      font-family: 'Cormorant SC', serif;
+      font-size: 20px; letter-spacing: 8px;
+      color: var(--accent); text-transform: uppercase; font-weight: 500;
+      margin-bottom: 14px;
     }
-    @keyframes pulse-cyan {
-      0%, 100% { opacity: 0.7; transform: scale(1); }
-      50% { opacity: 0.95; transform: scale(1.04); }
-    }
-
-    .container {
-      position: relative;
-      z-index: 2;
-      display: grid;
-      grid-template-columns: 780px 1fr;
-      grid-template-rows: 1fr;
-      height: 100%;
-      padding: 70px 80px;
-      gap: 70px;
-    }
-
-    /* ===== LEFT HERO ===== */
-    .hero-side {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      position: relative;
-      padding-right: 40px;
-      border-right: 1px solid rgba(255,80,180,0.15);
-    }
-
-    .cocktail-icons {
-      display: flex;
-      gap: 32px;
-      margin-bottom: 40px;
-      align-items: flex-end;
-    }
-
-    .deco-header {
-      font-family: 'Poiret One', sans-serif;
-      font-size: 22px;
-      letter-spacing: 14px;
-      color: #00dcff;
-      text-transform: uppercase;
-      text-shadow: 0 0 18px rgba(0,220,255,0.6);
-      margin-bottom: 24px;
-      opacity: 0.9;
-    }
-
     .happy-title {
-      font-family: 'Playfair Display', serif;
-      font-weight: 900;
-      font-size: 168px;
-      line-height: 0.82;
-      letter-spacing: -2px;
-      text-transform: uppercase;
-      background: linear-gradient(135deg, #ff2880 0%, #ff5aa8 25%, #c048ff 55%, #7c3aff 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      filter: drop-shadow(0 0 50px rgba(255,50,140,0.35)) drop-shadow(0 0 90px rgba(180,60,255,0.2));
-      margin-bottom: 32px;
+      font-family: 'DM Serif Display', serif;
+      font-size: 118px; font-weight: 400;
+      color: var(--ink); letter-spacing: -0.5px; line-height: 0.92;
     }
-
-    .happy-title .word-1 { display: block; }
-    .happy-title .word-2 { display: block; }
-
+    .happy-title .word-1 { display: inline; }
+    .happy-title .word-2 { display: inline; margin-left: 28px; font-style: italic; color: var(--accent); }
     .time-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 22px;
-      padding: 22px 44px;
-      background: linear-gradient(135deg, rgba(255,40,130,0.1), rgba(120,50,220,0.1));
-      border: 1px solid rgba(0,220,255,0.35);
-      border-radius: 4px;
-      backdrop-filter: blur(14px);
-      box-shadow:
-        0 0 40px rgba(0,220,255,0.2),
-        inset 0 0 20px rgba(0,220,255,0.08);
-      margin-bottom: 28px;
-      width: fit-content;
-      position: relative;
-    }
-    .time-badge::before,
-    .time-badge::after {
-      content: '';
-      position: absolute;
-      width: 12px;
-      height: 12px;
-      border: 1px solid #00dcff;
-    }
-    .time-badge::before { top: -1px; left: -1px; border-right: none; border-bottom: none; }
-    .time-badge::after { bottom: -1px; right: -1px; border-left: none; border-top: none; }
-
-    .time-label {
-      font-family: 'Poiret One', sans-serif;
-      font-size: 16px;
-      letter-spacing: 6px;
-      color: rgba(244,238,251,0.55);
-      text-transform: uppercase;
+      display: inline-block;
+      margin-top: 22px;
+      padding: 12px 40px;
+      border: 1px solid var(--brass);
     }
     .time-display {
-      font-family: 'Playfair Display', serif;
-      font-weight: 700;
-      font-size: 56px;
-      color: #00dcff;
-      letter-spacing: 3px;
-      line-height: 1;
-      text-shadow:
-        0 0 15px rgba(0,220,255,0.7),
-        0 0 35px rgba(0,220,255,0.4);
+      font-family: 'Cormorant SC', serif;
+      font-size: 22px; letter-spacing: 6px;
+      color: var(--accent); text-transform: uppercase; font-weight: 600;
     }
-
     .subtitle {
-      font-family: 'Cormorant Garamond', serif;
-      font-weight: 300;
-      font-style: italic;
-      font-size: 32px;
-      color: rgba(244,238,251,0.6);
-      letter-spacing: 2px;
-      margin-top: 6px;
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 22px; color: var(--ink-muted);
+      letter-spacing: 1px; margin-top: 20px;
+    }
+    .subtitle::before, .subtitle::after {
+      content: '\2014'; color: var(--brass); margin: 0 14px;
     }
 
-    /* ===== RIGHT DRINKS ===== */
-    .drinks-side {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      gap: 18px;
-    }
-
-    .drinks-header {
-      font-family: 'Poiret One', sans-serif;
-      font-size: 24px;
-      letter-spacing: 10px;
-      color: #ff5aa8;
-      text-transform: uppercase;
-      margin-bottom: 12px;
-      text-shadow: 0 0 20px rgba(255,90,168,0.5);
-      display: flex;
-      align-items: center;
-      gap: 20px;
-    }
-    .drinks-header::before,
-    .drinks-header::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(255,90,168,0.5), transparent);
-    }
-
-    .drink-card {
-      background: linear-gradient(135deg, rgba(255,40,130,0.05), rgba(120,50,220,0.04));
-      border: 1px solid rgba(255,90,180,0.18);
-      border-radius: 2px;
-      padding: 26px 34px 26px 48px;
-      backdrop-filter: blur(18px);
+    .drinks {
+      position: absolute;
+      top: 500px; bottom: 90px;
+      left: 180px; right: 180px;
+      z-index: 5;
       display: grid;
-      grid-template-columns: auto 1fr auto;
-      align-items: center;
-      gap: 26px;
-      box-shadow:
-        0 8px 40px rgba(0,0,0,0.3),
-        inset 0 1px 0 rgba(255,255,255,0.06);
-      position: relative;
-      overflow: hidden;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px 50px;
     }
-    .drink-card::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0;
-      width: 6px; height: 100%;
-      background: linear-gradient(180deg, #ff2880 0%, #c048ff 50%, #00dcff 100%);
-      box-shadow: 0 0 20px rgba(255,50,140,0.6);
+    .drink-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: baseline;
+      gap: 0 20px;
+      padding: 14px 0;
+      border-bottom: 1px dotted rgba(139,111,46,0.35);
     }
-    .drink-card::after {
-      content: '';
-      position: absolute;
-      top: 8px; right: 8px; bottom: 8px;
-      width: 1px;
-      background: linear-gradient(180deg, transparent, rgba(0,220,255,0.25), transparent);
-    }
-
-    .drink-glyph {
-      width: 52px;
-      height: 52px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      opacity: 0.9;
-      filter: drop-shadow(0 0 12px rgba(0,220,255,0.4));
-    }
-
-    .drink-info {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      min-width: 0;
-    }
-
+    .drink-info {}
     .drink-name {
-      font-family: 'Playfair Display', serif;
-      font-weight: 700;
-      font-size: 30px;
-      color: #f4eefb;
-      letter-spacing: 0.5px;
-      line-height: 1.1;
+      font-family: 'DM Serif Display', serif;
+      font-size: 26px; color: var(--ink); margin-bottom: 4px;
     }
     .drink-desc {
-      font-family: 'Cormorant Garamond', serif;
-      font-style: italic;
-      font-weight: 400;
-      font-size: 18px;
-      color: rgba(244,238,251,0.5);
-      letter-spacing: 0.3px;
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 14px; color: var(--ink-muted);
     }
-
-    .drink-pricing {
-      text-align: right;
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 2px;
-      min-width: 120px;
-    }
+    .drink-pricing { text-align: right; }
     .old-price {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 22px;
-      color: rgba(244,238,251,0.3);
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 18px; color: var(--ink-muted);
       text-decoration: line-through;
-      text-decoration-color: rgba(255,90,168,0.5);
+      display: block; line-height: 1.1;
     }
     .new-price {
-      font-family: 'Playfair Display', serif;
-      font-weight: 900;
-      font-size: 48px;
-      color: #00dcff;
-      line-height: 0.9;
-      text-shadow:
-        0 0 18px rgba(0,220,255,0.6),
-        0 0 40px rgba(0,220,255,0.3);
-    }
-    .save-badge {
-      font-family: 'Poiret One', sans-serif;
-      font-size: 12px;
-      font-weight: 400;
-      color: #ff5aa8;
-      text-transform: uppercase;
-      letter-spacing: 2.5px;
-      margin-top: 4px;
-      text-shadow: 0 0 10px rgba(255,90,168,0.4);
-    }
-
-    /* Art Deco corner frames */
-    .deco-corner {
-      position: absolute;
-      z-index: 3;
-      width: 120px;
-      height: 120px;
-      pointer-events: none;
-    }
-    .deco-tl { top: 30px; left: 30px; }
-    .deco-tr { top: 30px; right: 30px; transform: scaleX(-1); }
-    .deco-bl { bottom: 30px; left: 30px; transform: scaleY(-1); }
-    .deco-br { bottom: 30px; right: 30px; transform: scale(-1,-1); }
-
-    /* Bottom neon strip */
-    .bottom-strip {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 3px;
-      background: linear-gradient(90deg, transparent 0%, #ff2880 20%, #c048ff 50%, #00dcff 80%, transparent 100%);
-      box-shadow: 0 0 30px rgba(200,80,255,0.5);
-      z-index: 3;
-    }
-    .top-strip {
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(0,220,255,0.6), transparent);
-      z-index: 3;
+      font-family: 'DM Serif Display', serif;
+      font-size: 30px; color: var(--accent);
+      display: block; line-height: 1.1;
     }
   </style>
 </head>
 <body>
-  <div class="neon-pink"></div>
-  <div class="neon-purple"></div>
-  <div class="neon-cyan"></div>
+  <div class="frame"></div>
 
-  <div class="top-strip"></div>
-
-  <!-- Art Deco corner ornaments -->
-  <svg class="deco-corner deco-tl" viewBox="0 0 120 120" fill="none">
-    <path d="M10 10 L10 70 M10 10 L70 10" stroke="#00dcff" stroke-width="2" opacity="0.7"/>
-    <path d="M10 10 L50 50" stroke="#ff5aa8" stroke-width="1" opacity="0.6"/>
-    <path d="M20 10 L20 45 M10 20 L45 20" stroke="#c048ff" stroke-width="1" opacity="0.5"/>
-    <path d="M30 10 L30 35 M10 30 L35 30" stroke="#c048ff" stroke-width="1" opacity="0.4"/>
-    <circle cx="10" cy="10" r="4" fill="#00dcff" opacity="0.8"/>
-    <circle cx="55" cy="10" r="2" fill="#ff5aa8"/>
-    <circle cx="10" cy="55" r="2" fill="#ff5aa8"/>
-  </svg>
-  <svg class="deco-corner deco-tr" viewBox="0 0 120 120" fill="none">
-    <path d="M10 10 L10 70 M10 10 L70 10" stroke="#00dcff" stroke-width="2" opacity="0.7"/>
-    <path d="M10 10 L50 50" stroke="#ff5aa8" stroke-width="1" opacity="0.6"/>
-    <path d="M20 10 L20 45 M10 20 L45 20" stroke="#c048ff" stroke-width="1" opacity="0.5"/>
-    <path d="M30 10 L30 35 M10 30 L35 30" stroke="#c048ff" stroke-width="1" opacity="0.4"/>
-    <circle cx="10" cy="10" r="4" fill="#00dcff" opacity="0.8"/>
-    <circle cx="55" cy="10" r="2" fill="#ff5aa8"/>
-    <circle cx="10" cy="55" r="2" fill="#ff5aa8"/>
-  </svg>
-  <svg class="deco-corner deco-bl" viewBox="0 0 120 120" fill="none">
-    <path d="M10 10 L10 70 M10 10 L70 10" stroke="#00dcff" stroke-width="2" opacity="0.7"/>
-    <path d="M10 10 L50 50" stroke="#ff5aa8" stroke-width="1" opacity="0.6"/>
-    <path d="M20 10 L20 45 M10 20 L45 20" stroke="#c048ff" stroke-width="1" opacity="0.5"/>
-    <circle cx="10" cy="10" r="4" fill="#00dcff" opacity="0.8"/>
-  </svg>
-  <svg class="deco-corner deco-br" viewBox="0 0 120 120" fill="none">
-    <path d="M10 10 L10 70 M10 10 L70 10" stroke="#00dcff" stroke-width="2" opacity="0.7"/>
-    <path d="M10 10 L50 50" stroke="#ff5aa8" stroke-width="1" opacity="0.6"/>
-    <path d="M20 10 L20 45 M10 20 L45 20" stroke="#c048ff" stroke-width="1" opacity="0.5"/>
-    <circle cx="10" cy="10" r="4" fill="#00dcff" opacity="0.8"/>
-  </svg>
-
-  <div class="container">
-    <div class="hero-side">
-      <!-- SVG Cocktail glass icons -->
-      <div class="cocktail-icons">
-        <!-- Martini glass -->
-        <svg width="130" height="170" viewBox="0 0 130 170" fill="none">
-          <defs>
-            <linearGradient id="martiniFill" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stop-color="#ff2880" stop-opacity="0.9"/>
-              <stop offset="100%" stop-color="#c048ff" stop-opacity="0.6"/>
-            </linearGradient>
-            <linearGradient id="martiniGlass" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stop-color="#00dcff" stop-opacity="1"/>
-              <stop offset="100%" stop-color="#00dcff" stop-opacity="0.3"/>
-            </linearGradient>
-          </defs>
-          <!-- Liquid -->
-          <path d="M20 25 L110 25 L68 85 L62 85 Z" fill="url(#martiniFill)" opacity="0.85"/>
-          <!-- Glass outline -->
-          <path d="M15 20 L115 20 L68 90 L65 90 L65 150 L90 155 L90 160 L40 160 L40 155 L65 150" stroke="url(#martiniGlass)" stroke-width="2.5" fill="none" stroke-linejoin="round" stroke-linecap="round" filter="drop-shadow(0 0 8px rgba(0,220,255,0.6))"/>
-          <!-- Olive -->
-          <circle cx="68" cy="55" r="6" fill="#7c3aff" stroke="#00dcff" stroke-width="1"/>
-          <line x1="68" y1="50" x2="95" y2="15" stroke="#00dcff" stroke-width="1.5"/>
-          <!-- Rim highlight -->
-          <ellipse cx="65" cy="20" rx="50" ry="3" stroke="#00dcff" stroke-width="1" fill="none" opacity="0.6"/>
-        </svg>
-
-        <!-- Highball glass -->
-        <svg width="90" height="170" viewBox="0 0 90 170" fill="none">
-          <defs>
-            <linearGradient id="highballFill" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stop-color="#00dcff" stop-opacity="0.2"/>
-              <stop offset="50%" stop-color="#c048ff" stop-opacity="0.7"/>
-              <stop offset="100%" stop-color="#ff2880" stop-opacity="0.8"/>
-            </linearGradient>
-          </defs>
-          <!-- Liquid -->
-          <rect x="18" y="45" width="54" height="105" fill="url(#highballFill)" opacity="0.85"/>
-          <!-- Glass -->
-          <path d="M15 20 L15 155 Q15 160 20 160 L70 160 Q75 160 75 155 L75 20" stroke="#00dcff" stroke-width="2.5" fill="none" stroke-linejoin="round" filter="drop-shadow(0 0 8px rgba(0,220,255,0.6))"/>
-          <ellipse cx="45" cy="20" rx="30" ry="4" stroke="#00dcff" stroke-width="2" fill="none" opacity="0.8"/>
-          <!-- Ice cubes -->
-          <rect x="25" y="55" width="14" height="14" stroke="#f4eefb" stroke-width="1" fill="rgba(244,238,251,0.15)" opacity="0.7"/>
-          <rect x="45" y="68" width="14" height="14" stroke="#f4eefb" stroke-width="1" fill="rgba(244,238,251,0.15)" opacity="0.7"/>
-          <!-- Straw -->
-          <line x1="55" y1="10" x2="48" y2="100" stroke="#ff5aa8" stroke-width="2.5" stroke-linecap="round"/>
-        </svg>
-
-        <!-- Coupe glass -->
-        <svg width="120" height="170" viewBox="0 0 120 170" fill="none">
-          <defs>
-            <linearGradient id="coupeFill" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stop-color="#ff5aa8" stop-opacity="0.9"/>
-              <stop offset="100%" stop-color="#ff2880" stop-opacity="0.6"/>
-            </linearGradient>
-          </defs>
-          <!-- Liquid -->
-          <path d="M15 30 Q60 70 105 30 L105 42 Q60 82 15 42 Z" fill="url(#coupeFill)"/>
-          <!-- Glass bowl -->
-          <path d="M10 25 Q60 85 110 25" stroke="#00dcff" stroke-width="2.5" fill="none" stroke-linecap="round" filter="drop-shadow(0 0 8px rgba(0,220,255,0.6))"/>
-          <line x1="10" y1="25" x2="110" y2="25" stroke="#00dcff" stroke-width="2"/>
-          <!-- Stem -->
-          <line x1="60" y1="85" x2="60" y2="150" stroke="#00dcff" stroke-width="2.5"/>
-          <!-- Base -->
-          <ellipse cx="60" cy="155" rx="28" ry="5" stroke="#00dcff" stroke-width="2.5" fill="none"/>
-          <!-- Cherry garnish -->
-          <circle cx="78" cy="45" r="5" fill="#ff2880" stroke="#00dcff" stroke-width="1"/>
-        </svg>
-      </div>
-
-      <div class="deco-header">Cocktail Lounge</div>
-      <h1 class="happy-title" data-editable="true" data-field="title"><span class="word-1">Happy</span><span class="word-2">Hour</span></h1>
-
-      <div class="time-badge">
-        <div>
-          <div class="time-label">Served Daily</div>
-          <div class="time-display" data-editable="true" data-field="timeRange">4PM &ndash; 7PM</div>
-        </div>
-      </div>
-
-      <p class="subtitle" data-editable="true" data-field="subtitle">Monday through Friday &mdash; an affair to remember</p>
+  <div class="header">
+    <div class="eyebrow">An Affair To Remember</div>
+    <h1 class="happy-title" data-editable="true" data-field="title"><span class="word-1">Happy</span><span class="word-2">Hour</span></h1>
+    <div class="time-badge">
+      <div class="time-display" data-editable="true" data-field="timeRange">4PM &ndash; 7PM</div>
     </div>
+    <p class="subtitle" data-editable="true" data-field="subtitle">Monday through Friday &mdash; an affair to remember</p>
+  </div>
 
-    <div class="drinks-side">
-      <div class="drinks-header">Signature Pours</div>
-
-      <div class="drink-card">
-        <div class="drink-glyph">
-          <svg width="46" height="52" viewBox="0 0 46 52" fill="none">
-            <path d="M4 6 L42 6 L24 30 L22 30 Z" fill="rgba(255,40,130,0.3)" stroke="#00dcff" stroke-width="1.5"/>
-            <line x1="23" y1="30" x2="23" y2="46" stroke="#00dcff" stroke-width="1.5"/>
-            <line x1="13" y1="46" x2="33" y2="46" stroke="#00dcff" stroke-width="1.5"/>
-            <circle cx="23" cy="18" r="2" fill="#ff5aa8"/>
-          </svg>
-        </div>
-        <div class="drink-info">
-          <div class="drink-name" data-editable="true" data-field="drink1Name">Classic Margarita</div>
-          <div class="drink-desc" data-editable="true" data-field="drink1Desc">Silver tequila, fresh lime, Cointreau, salted rim</div>
-        </div>
-        <div class="drink-pricing">
-          <span class="old-price" data-editable="true" data-field="drink1OldPrice">$16</span>
-          <span class="new-price" data-editable="true" data-field="drink1NewPrice">$9</span>
-          <span class="save-badge">Save 44%</span>
-        </div>
+  <div class="drinks">
+    <div class="drink-item">
+      <div class="drink-info">
+        <div class="drink-name" data-editable="true" data-field="drink1Name">Classic Margarita</div>
+        <div class="drink-desc" data-editable="true" data-field="drink1Desc">Silver tequila, fresh lime, Cointreau, salted rim</div>
       </div>
-
-      <div class="drink-card">
-        <div class="drink-glyph">
-          <svg width="46" height="52" viewBox="0 0 46 52" fill="none">
-            <path d="M6 6 Q23 28 40 6" stroke="#00dcff" stroke-width="1.5" fill="rgba(120,50,220,0.25)"/>
-            <line x1="6" y1="6" x2="40" y2="6" stroke="#00dcff" stroke-width="1.5"/>
-            <line x1="23" y1="28" x2="23" y2="44" stroke="#00dcff" stroke-width="1.5"/>
-            <ellipse cx="23" cy="46" rx="10" ry="2" stroke="#00dcff" stroke-width="1.5" fill="none"/>
-            <circle cx="29" cy="14" r="2" fill="#c048ff"/>
-          </svg>
-        </div>
-        <div class="drink-info">
-          <div class="drink-name" data-editable="true" data-field="drink2Name">Espresso Martini</div>
-          <div class="drink-desc" data-editable="true" data-field="drink2Desc">Vodka, Kahlua, freshly pulled espresso, vanilla</div>
-        </div>
-        <div class="drink-pricing">
-          <span class="old-price" data-editable="true" data-field="drink2OldPrice">$18</span>
-          <span class="new-price" data-editable="true" data-field="drink2NewPrice">$10</span>
-          <span class="save-badge">Save 44%</span>
-        </div>
+      <div class="drink-pricing">
+        <span class="old-price" data-editable="true" data-field="drink1OldPrice">$16</span>
+        <span class="new-price" data-editable="true" data-field="drink1NewPrice">$9</span>
       </div>
-
-      <div class="drink-card">
-        <div class="drink-glyph">
-          <svg width="46" height="52" viewBox="0 0 46 52" fill="none">
-            <path d="M10 8 L10 44 Q10 48 14 48 L32 48 Q36 48 36 44 L36 8" stroke="#00dcff" stroke-width="1.5" fill="rgba(255,150,40,0.25)"/>
-            <ellipse cx="23" cy="8" rx="13" ry="2" stroke="#00dcff" stroke-width="1.5" fill="none"/>
-            <path d="M14 12 Q18 6 22 12 Q26 6 30 12" stroke="#ff5aa8" stroke-width="1" fill="none" opacity="0.8"/>
-          </svg>
-        </div>
-        <div class="drink-info">
-          <div class="drink-name" data-editable="true" data-field="drink3Name">Craft Beer Flight</div>
-          <div class="drink-desc" data-editable="true" data-field="drink3Desc">Four rotating local craft selections &mdash; tasting pour</div>
-        </div>
-        <div class="drink-pricing">
-          <span class="old-price" data-editable="true" data-field="drink3OldPrice">$20</span>
-          <span class="new-price" data-editable="true" data-field="drink3NewPrice">$12</span>
-          <span class="save-badge">Save 40%</span>
-        </div>
+    </div>
+    <div class="drink-item">
+      <div class="drink-info">
+        <div class="drink-name" data-editable="true" data-field="drink2Name">Espresso Martini</div>
+        <div class="drink-desc" data-editable="true" data-field="drink2Desc">Vodka, Kahlua, freshly pulled espresso, vanilla</div>
       </div>
-
-      <div class="drink-card">
-        <div class="drink-glyph">
-          <svg width="46" height="52" viewBox="0 0 46 52" fill="none">
-            <path d="M12 6 Q12 22 20 28 L20 42 L14 44 L14 48 L32 48 L32 44 L26 42 L26 28 Q34 22 34 6 Z" stroke="#00dcff" stroke-width="1.5" fill="rgba(200,60,120,0.3)"/>
-            <line x1="12" y1="6" x2="34" y2="6" stroke="#00dcff" stroke-width="1.5"/>
-          </svg>
-        </div>
-        <div class="drink-info">
-          <div class="drink-name" data-editable="true" data-field="drink4Name">House Wine</div>
-          <div class="drink-desc" data-editable="true" data-field="drink4Desc">Red, white, or ros&eacute; &mdash; curated by the glass</div>
-        </div>
-        <div class="drink-pricing">
-          <span class="old-price" data-editable="true" data-field="drink4OldPrice">$14</span>
-          <span class="new-price" data-editable="true" data-field="drink4NewPrice">$7</span>
-          <span class="save-badge">Save 50%</span>
-        </div>
+      <div class="drink-pricing">
+        <span class="old-price" data-editable="true" data-field="drink2OldPrice">$18</span>
+        <span class="new-price" data-editable="true" data-field="drink2NewPrice">$10</span>
       </div>
-
-      <div class="drink-card">
-        <div class="drink-glyph">
-          <svg width="46" height="52" viewBox="0 0 46 52" fill="none">
-            <path d="M8 12 L38 12 L35 46 Q35 48 33 48 L13 48 Q11 48 11 46 Z" stroke="#00dcff" stroke-width="1.5" fill="rgba(0,220,180,0.25)"/>
-            <path d="M6 12 L40 12" stroke="#00dcff" stroke-width="2"/>
-            <path d="M16 4 L20 12 M24 4 L28 12" stroke="#7cff88" stroke-width="1.2"/>
-            <circle cx="20" cy="24" r="1.5" fill="#7cff88"/>
-            <circle cx="28" cy="30" r="1.5" fill="#7cff88"/>
-          </svg>
-        </div>
-        <div class="drink-info">
-          <div class="drink-name" data-editable="true" data-field="drink5Name">Mojito Pitcher</div>
-          <div class="drink-desc" data-editable="true" data-field="drink5Desc">White rum, fresh mint, lime, soda &mdash; serves four</div>
-        </div>
-        <div class="drink-pricing">
-          <span class="old-price" data-editable="true" data-field="drink5OldPrice">$48</span>
-          <span class="new-price" data-editable="true" data-field="drink5NewPrice">$28</span>
-          <span class="save-badge">Save 42%</span>
-        </div>
+    </div>
+    <div class="drink-item">
+      <div class="drink-info">
+        <div class="drink-name" data-editable="true" data-field="drink3Name">Craft Beer Flight</div>
+        <div class="drink-desc" data-editable="true" data-field="drink3Desc">Four rotating local craft selections &mdash; tasting pour</div>
+      </div>
+      <div class="drink-pricing">
+        <span class="old-price" data-editable="true" data-field="drink3OldPrice">$20</span>
+        <span class="new-price" data-editable="true" data-field="drink3NewPrice">$12</span>
+      </div>
+    </div>
+    <div class="drink-item">
+      <div class="drink-info">
+        <div class="drink-name" data-editable="true" data-field="drink4Name">House Wine</div>
+        <div class="drink-desc" data-editable="true" data-field="drink4Desc">Red, white, or ros&eacute; &mdash; curated by the glass</div>
+      </div>
+      <div class="drink-pricing">
+        <span class="old-price" data-editable="true" data-field="drink4OldPrice">$14</span>
+        <span class="new-price" data-editable="true" data-field="drink4NewPrice">$7</span>
+      </div>
+    </div>
+    <div class="drink-item" style="grid-column: 1 / -1;">
+      <div class="drink-info">
+        <div class="drink-name" data-editable="true" data-field="drink5Name">Mojito Pitcher</div>
+        <div class="drink-desc" data-editable="true" data-field="drink5Desc">White rum, fresh mint, lime, soda &mdash; serves four</div>
+      </div>
+      <div class="drink-pricing">
+        <span class="old-price" data-editable="true" data-field="drink5OldPrice">$48</span>
+        <span class="new-price" data-editable="true" data-field="drink5NewPrice">$28</span>
       </div>
     </div>
   </div>
-
-  <div class="bottom-strip"></div>
 </body>
 </html>

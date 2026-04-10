@@ -1,723 +1,275 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=1920, height=1080">
-    <title>Company Metrics - Executive Dashboard</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <title>Company Metrics</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Cormorant+SC:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --ink: #2C1810; --ink-body: #4A2D18; --ink-muted: #7A4A28;
+      --brass: #8B6F2E; --royal: #3D1F14;
+      --rule: rgba(139,111,46,0.4);
+    }
+    body {
+      width: 1920px; height: 1080px; overflow: hidden; position: relative;
+      font-family: 'Lora', serif; color: var(--ink-body);
+      background: linear-gradient(168deg, #EADDBE 0%, #E2D0B0 100%);
+    }
+    body::before {
+      content: ''; position: absolute; inset: 0; pointer-events: none;
+      background-image: radial-gradient(circle, rgba(44,24,16,0.03) 0.6px, transparent 1.1px);
+      background-size: 44px 44px;
+    }
+    .frame { position: absolute; inset: 40px; border: 1px solid var(--brass); z-index: 1; }
+    .frame::before { content: ''; position: absolute; inset: 10px; border: 1px solid rgba(139,111,46,0.22); }
 
-        :root {
-            --navy-900: #061C22;
-            --navy-800: #0A2E36;
-            --navy-700: #0F3B45;
-            --navy-600: #14525E;
-            --gold-500: #D4AF55;
-            --gold-400: #E6C877;
-            --gold-300: #F0D99A;
-            --ivory: #F5EFE0;
-        }
+    .container {
+      position: absolute; inset: 40px; z-index: 2;
+      padding: 44px 60px;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 28px;
+    }
+    .header {
+      display: flex; justify-content: space-between; align-items: flex-end;
+      padding-bottom: 20px; border-bottom: 1px solid var(--rule);
+    }
+    .eyebrow {
+      font-family: 'Cormorant SC', serif;
+      font-size: 14px; letter-spacing: 5px; font-weight: 600;
+      color: var(--brass); text-transform: uppercase; margin-bottom: 6px;
+    }
+    .header-title {
+      font-family: 'DM Serif Display', serif;
+      font-size: 52px; color: var(--royal); line-height: 1;
+    }
+    .header-subtitle {
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 17px; color: var(--ink-muted); margin-top: 6px;
+    }
+    .header-right { display: flex; align-items: center; gap: 20px; }
+    .quarter-badge {
+      padding: 10px 24px; border: 1px solid var(--brass);
+      background: rgba(255,248,232,0.4);
+      font-family: 'DM Serif Display', serif;
+      font-size: 20px; color: var(--royal);
+    }
+    .update-info {
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 14px; color: var(--ink-muted);
+    }
 
-        body {
-            width: 1920px;
-            height: 1080px;
-            overflow: hidden;
-            font-family: 'Inter', sans-serif;
-            background:
-                radial-gradient(ellipse at 20% 50%, rgba(20, 82, 94, 0.5) 0%, transparent 55%),
-                radial-gradient(ellipse at 85% 20%, rgba(212, 175, 85, 0.10) 0%, transparent 45%),
-                linear-gradient(150deg, #050f13 0%, #0A2E36 45%, #061C22 100%);
-            color: var(--ivory);
-            position: relative;
-        }
+    .hero-row {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;
+    }
+    .hero-card {
+      background: rgba(255,248,232,0.32);
+      border: 1px solid var(--brass);
+      padding: 28px 32px; position: relative;
+    }
+    .hero-card::before {
+      content: ''; position: absolute; inset: 6px;
+      border: 1px solid rgba(139,111,46,0.22); pointer-events: none;
+    }
+    .hero-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 14px; position: relative; z-index: 1;
+    }
+    .hero-label {
+      font-family: 'Cormorant SC', serif;
+      font-size: 12px; letter-spacing: 3px; font-weight: 600;
+      color: var(--brass); text-transform: uppercase;
+    }
+    .hero-icon { width: 28px; height: 28px; color: var(--brass); }
+    .hero-value {
+      font-family: 'DM Serif Display', serif;
+      font-size: 54px; color: var(--royal); line-height: 1;
+      margin-bottom: 10px; position: relative; z-index: 1;
+    }
+    .hero-trend {
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 16px; color: var(--brass); font-weight: 600;
+      position: relative; z-index: 1;
+    }
+    .hero-comparison {
+      font-family: 'Lora', serif; font-size: 13px;
+      color: var(--ink-muted); margin-top: 4px;
+      position: relative; z-index: 1;
+    }
 
-        /* Fine grid texture */
-        body::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background-image:
-                linear-gradient(rgba(212, 175, 85, 0.05) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(212, 175, 85, 0.05) 1px, transparent 1px);
-            background-size: 40px 40px;
-            z-index: 0;
-        }
+    .panels-row {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+    }
+    .panel {
+      background: rgba(255,248,232,0.28);
+      border: 1px solid var(--brass);
+      padding: 28px 34px; position: relative;
+    }
+    .panel::before {
+      content: ''; position: absolute; inset: 6px;
+      border: 1px solid rgba(139,111,46,0.22); pointer-events: none;
+    }
+    .panel-title {
+      font-family: 'Cormorant SC', serif;
+      font-size: 16px; letter-spacing: 5px; font-weight: 600;
+      color: var(--brass); text-transform: uppercase;
+      padding-bottom: 14px; border-bottom: 1px solid var(--rule);
+      margin-bottom: 14px; position: relative; z-index: 1;
+    }
+    .revenue-row {
+      display: flex; justify-content: space-between; align-items: baseline;
+      padding: 10px 0; border-bottom: 1px dotted rgba(139,111,46,0.3);
+      position: relative; z-index: 1;
+    }
+    .revenue-name { font-family: 'Lora', serif; font-size: 18px; color: var(--ink); }
+    .revenue-val { font-family: 'DM Serif Display', serif; font-size: 22px; color: var(--brass); }
 
-        body::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: repeating-linear-gradient(
-                0deg,
-                transparent,
-                transparent 2px,
-                rgba(0, 0, 0, 0.04) 2px,
-                rgba(0, 0, 0, 0.04) 4px
-            );
-            pointer-events: none;
-            z-index: 0;
-        }
+    .target-row {
+      display: grid; grid-template-columns: 1fr auto;
+      align-items: center; gap: 20px;
+      padding: 12px 0; border-bottom: 1px dotted rgba(139,111,46,0.3);
+      position: relative; z-index: 1;
+    }
+    .target-name { font-family: 'Lora', serif; font-size: 17px; color: var(--ink); }
+    .target-value { font-family: 'DM Serif Display', serif; font-size: 26px; color: var(--royal); text-align: right; }
+    .target-label { font-family: 'Lora', serif; font-style: italic; font-size: 12px; color: var(--ink-muted); text-align: right; }
 
-        /* Glow orbs */
-        .glow-1 {
-            position: absolute;
-            top: -80px;
-            left: 25%;
-            width: 560px;
-            height: 260px;
-            background: radial-gradient(ellipse, rgba(212, 175, 85, 0.16) 0%, transparent 70%);
-            filter: blur(60px);
-            z-index: 0;
-            animation: pulse 12s ease-in-out infinite;
-        }
-
-        .glow-2 {
-            position: absolute;
-            bottom: -60px;
-            right: 15%;
-            width: 460px;
-            height: 220px;
-            background: radial-gradient(ellipse, rgba(20, 82, 94, 0.6) 0%, transparent 70%);
-            filter: blur(50px);
-            z-index: 0;
-            animation: pulse 14s ease-in-out infinite reverse;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 0.85; }
-            50% { opacity: 1; }
-        }
-
-        .accent-line {
-            position: absolute;
-            top: 108px;
-            left: 0;
-            width: 100%;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, rgba(212, 175, 85, 0.4) 30%, rgba(212, 175, 85, 0.4) 70%, transparent);
-            z-index: 0;
-        }
-
-        .container {
-            position: relative;
-            z-index: 1;
-            width: 100%;
-            height: 100%;
-            display: grid;
-            grid-template-rows: auto auto 1fr auto;
-            padding: 36px 64px;
-            gap: 26px;
-        }
-
-        /* Header */
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding-bottom: 18px;
-        }
-
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 24px;
-        }
-
-        .header-icon-wrap {
-            width: 68px;
-            height: 68px;
-            border-radius: 16px;
-            background: linear-gradient(145deg, rgba(212, 175, 85, 0.2), rgba(212, 175, 85, 0.05));
-            border: 1px solid rgba(212, 175, 85, 0.4);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 6px 20px rgba(212, 175, 85, 0.2);
-        }
-
-        .header-icon {
-            width: 38px;
-            height: 38px;
-            color: var(--gold-400);
-        }
-
-        .header-title {
-            font-family: 'Playfair Display', serif;
-            font-size: 38px;
-            font-weight: 700;
-            color: #fbf7ec;
-            line-height: 1;
-        }
-
-        .header-subtitle {
-            font-family: 'Inter', sans-serif;
-            font-size: 15px;
-            color: rgba(212, 175, 85, 0.65);
-            margin-top: 8px;
-            letter-spacing: 0.5px;
-        }
-
-        .header-right {
-            display: flex;
-            align-items: center;
-            gap: 24px;
-        }
-
-        .quarter-badge {
-            padding: 11px 26px;
-            background: linear-gradient(135deg, rgba(212, 175, 85, 0.2), rgba(212, 175, 85, 0.08));
-            border: 1px solid rgba(212, 175, 85, 0.45);
-            border-radius: 12px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 15px;
-            font-weight: 600;
-            color: var(--gold-300);
-            letter-spacing: 1px;
-            box-shadow: inset 0 1px 0 rgba(240, 217, 154, 0.15);
-        }
-
-        .live-indicator {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
-            color: rgba(245, 239, 224, 0.5);
-        }
-
-        .live-dot {
-            width: 9px;
-            height: 9px;
-            border-radius: 50%;
-            background: var(--gold-500);
-            box-shadow: 0 0 12px rgba(212, 175, 85, 0.9);
-            animation: blink 2s ease-in-out infinite;
-        }
-
-        @keyframes blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.4; }
-        }
-
-        /* Hero metrics row */
-        .hero-row {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 22px;
-        }
-
-        .hero-card {
-            background: linear-gradient(160deg, rgba(15, 59, 69, 0.75) 0%, rgba(10, 46, 54, 0.6) 100%);
-            border: 1px solid rgba(212, 175, 85, 0.2);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border-radius: 20px;
-            padding: 30px 32px;
-            box-shadow:
-                0 12px 40px rgba(0, 0, 0, 0.4),
-                inset 0 1px 0 rgba(212, 175, 85, 0.12);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .hero-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, var(--gold-500), var(--gold-300), var(--gold-500));
-            box-shadow: 0 0 14px rgba(212, 175, 85, 0.5);
-        }
-
-        .hero-card::after {
-            content: '';
-            position: absolute;
-            top: 20px;
-            right: -40px;
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(212, 175, 85, 0.08), transparent 70%);
-        }
-
-        .hero-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 18px;
-            position: relative;
-            z-index: 1;
-        }
-
-        .hero-label {
-            font-family: 'Inter', sans-serif;
-            font-size: 13px;
-            font-weight: 600;
-            color: rgba(212, 175, 85, 0.75);
-            text-transform: uppercase;
-            letter-spacing: 2px;
-        }
-
-        .hero-icon-wrap {
-            width: 42px;
-            height: 42px;
-            border-radius: 10px;
-            background: rgba(212, 175, 85, 0.12);
-            border: 1px solid rgba(212, 175, 85, 0.25);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .hero-icon {
-            width: 22px;
-            height: 22px;
-            color: var(--gold-400);
-        }
-
-        .hero-value {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 54px;
-            font-weight: 700;
-            color: #fbf7ec;
-            line-height: 1;
-            margin-bottom: 14px;
-            letter-spacing: -1px;
-            position: relative;
-            z-index: 1;
-        }
-
-        .hero-trend {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 15px;
-            font-weight: 600;
-            position: relative;
-            z-index: 1;
-            margin-bottom: 4px;
-        }
-
-        .trend-up { color: var(--gold-300); }
-        .trend-down { color: #E88B7D; }
-
-        .trend-arrow {
-            width: 14px;
-            height: 14px;
-        }
-
-        .hero-comparison {
-            font-family: 'Inter', sans-serif;
-            font-size: 12px;
-            color: rgba(245, 239, 224, 0.45);
-            position: relative;
-            z-index: 1;
-        }
-
-        /* Main content area */
-        .main-content {
-            display: grid;
-            grid-template-columns: 1.2fr 1fr;
-            gap: 22px;
-        }
-
-        .revenue-panel,
-        .targets-panel {
-            background: linear-gradient(160deg, rgba(15, 59, 69, 0.7) 0%, rgba(10, 46, 54, 0.55) 100%);
-            border: 1px solid rgba(212, 175, 85, 0.18);
-            backdrop-filter: blur(18px);
-            -webkit-backdrop-filter: blur(18px);
-            border-radius: 20px;
-            padding: 32px 36px;
-            box-shadow: 0 10px 35px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(212, 175, 85, 0.08);
-            position: relative;
-        }
-
-        .revenue-panel::before,
-        .targets-panel::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 32px;
-            right: 32px;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, rgba(212, 175, 85, 0.5), transparent);
-        }
-
-        .panel-title {
-            font-family: 'Playfair Display', serif;
-            font-size: 24px;
-            font-weight: 600;
-            color: #fbf7ec;
-            margin-bottom: 26px;
-            display: flex;
-            align-items: center;
-            gap: 14px;
-        }
-
-        .panel-title::before {
-            content: '';
-            width: 4px;
-            height: 22px;
-            background: linear-gradient(180deg, var(--gold-500), var(--gold-300));
-            border-radius: 2px;
-            box-shadow: 0 0 10px rgba(212, 175, 85, 0.5);
-        }
-
-        .revenue-bar-group {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .revenue-item {
-            display: grid;
-            grid-template-columns: 170px 1fr 110px;
-            align-items: center;
-            gap: 22px;
-        }
-
-        .revenue-name {
-            font-family: 'Inter', sans-serif;
-            font-size: 15px;
-            font-weight: 500;
-            color: rgba(245, 239, 224, 0.75);
-        }
-
-        .bar-track {
-            height: 28px;
-            background: rgba(6, 28, 34, 0.7);
-            border: 1px solid rgba(212, 175, 85, 0.12);
-            border-radius: 8px;
-            overflow: hidden;
-            position: relative;
-        }
-
-        .bar-fill {
-            height: 100%;
-            border-radius: 7px;
-            position: relative;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
-        }
-
-        .bar-fill::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 50%);
-        }
-
-        .bar-gold-1 { background: linear-gradient(90deg, #D4AF55, #F0D99A); }
-        .bar-gold-2 { background: linear-gradient(90deg, #B89645, #D4AF55); }
-        .bar-gold-3 { background: linear-gradient(90deg, #14525E, #1C6B79); }
-        .bar-gold-4 { background: linear-gradient(90deg, #0F3B45, #14525E); }
-        .bar-gold-5 { background: linear-gradient(90deg, #8a7030, #B89645); }
-
-        .revenue-val {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 17px;
-            font-weight: 700;
-            color: var(--gold-300);
-            text-align: right;
-        }
-
-        /* Targets panel */
-        .targets-panel {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .target-item {
-            display: grid;
-            grid-template-columns: 1fr auto;
-            gap: 16px;
-            align-items: center;
-            padding: 18px 0;
-            border-bottom: 1px solid rgba(212, 175, 85, 0.12);
-        }
-
-        .target-item:last-child {
-            border-bottom: none;
-        }
-
-        .target-name {
-            font-family: 'Inter', sans-serif;
-            font-size: 16px;
-            font-weight: 500;
-            color: rgba(245, 239, 224, 0.8);
-        }
-
-        .target-progress {
-            width: 100%;
-            height: 6px;
-            background: rgba(6, 28, 34, 0.8);
-            border-radius: 3px;
-            overflow: hidden;
-            margin-top: 10px;
-        }
-
-        .target-fill {
-            height: 100%;
-            border-radius: 3px;
-            box-shadow: 0 0 8px rgba(212, 175, 85, 0.4);
-        }
-
-        .target-right {
-            text-align: right;
-        }
-
-        .target-value {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 24px;
-            font-weight: 700;
-            color: #fbf7ec;
-        }
-
-        .target-label {
-            font-family: 'Inter', sans-serif;
-            font-size: 12px;
-            color: rgba(212, 175, 85, 0.6);
-            margin-top: 4px;
-            letter-spacing: 0.5px;
-        }
-
-        /* Footer */
-        .footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding-top: 14px;
-            border-top: 1px solid rgba(212, 175, 85, 0.18);
-        }
-
-        .footer-left {
-            font-family: 'Playfair Display', serif;
-            font-size: 16px;
-            font-style: italic;
-            color: rgba(212, 175, 85, 0.55);
-        }
-
-        .footer-right {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
-            color: rgba(245, 239, 224, 0.35);
-        }
-
-        /* SVG decorations */
-        .deco-svg { position: absolute; z-index: 0; }
-    </style>
+    .footer {
+      display: flex; justify-content: space-between; align-items: center;
+      padding-top: 16px; border-top: 1px solid var(--rule);
+    }
+    .footer-left {
+      font-family: 'Cormorant SC', serif;
+      font-size: 13px; letter-spacing: 4px; font-weight: 600;
+      color: var(--brass); text-transform: uppercase;
+    }
+    .footer-right {
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 13px; color: var(--ink-muted);
+    }
+  </style>
 </head>
 <body>
-    <div class="glow-1"></div>
-    <div class="glow-2"></div>
-    <div class="accent-line"></div>
-
-    <!-- Decorative SVG chart icon -->
-    <svg class="deco-svg" style="bottom:40px;left:40px;opacity:0.07;" width="220" height="220" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect x="20" y="100" width="30" height="80" rx="4" stroke="#D4AF55" stroke-width="1.5" fill="none"/>
-        <rect x="65" y="60" width="30" height="120" rx="4" stroke="#D4AF55" stroke-width="1.5" fill="none"/>
-        <rect x="110" y="80" width="30" height="100" rx="4" stroke="#D4AF55" stroke-width="1.5" fill="none"/>
-        <rect x="155" y="30" width="30" height="150" rx="4" stroke="#D4AF55" stroke-width="1.5" fill="none"/>
-        <line x1="10" y1="185" x2="195" y2="185" stroke="#D4AF55" stroke-width="1"/>
-        <path d="M20 140 L65 100 L110 120 L155 60" stroke="rgba(212,175,85,0.6)" stroke-width="2" fill="none" stroke-dasharray="4 4"/>
-    </svg>
-
-    <!-- Decorative trending arrow -->
-    <svg class="deco-svg" style="top:40px;right:40px;opacity:0.08;" width="140" height="90" viewBox="0 0 120 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M10 60 L40 30 L70 45 L110 10" stroke="#D4AF55" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-        <path d="M90 10 L110 10 L110 30" stroke="#D4AF55" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-    </svg>
-
-    <div class="container">
-        <div class="header">
-            <div class="header-left">
-                <div class="header-icon-wrap">
-                    <svg class="header-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M3 3v18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                        <path d="M7 14l4-4 4 4 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        <path d="M17 8h4v4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </div>
-                <div>
-                    <div class="header-title" data-editable="true" data-field="dashboard-title">Executive Performance</div>
-                    <div class="header-subtitle" data-editable="true" data-field="dashboard-subtitle">Company-wide metrics and financial performance</div>
-                </div>
-            </div>
-            <div class="header-right">
-                <div class="quarter-badge" data-editable="true" data-field="quarter">Q1 FY2026</div>
-                <div class="live-indicator">
-                    <span class="live-dot"></span>
-                    <span data-editable="true" data-field="update-time">Updated 09:30 AM</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="hero-row">
-            <div class="hero-card">
-                <div class="hero-header">
-                    <div class="hero-label" data-editable="true" data-field="hero-1-label">Annual Revenue</div>
-                    <div class="hero-icon-wrap">
-                        <svg class="hero-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
-                            <path d="M12 7v10M9 10h4.5a1.5 1.5 0 010 3H9m0 0h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                        </svg>
-                    </div>
-                </div>
-                <div class="hero-value" data-editable="true" data-field="hero-1-value">$18.4M</div>
-                <div class="hero-trend trend-up">
-                    <svg class="trend-arrow" viewBox="0 0 14 14" fill="none"><path d="M2 10L7 4L12 10" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    <span data-editable="true" data-field="hero-1-trend">24.6% YoY</span>
-                </div>
-                <div class="hero-comparison" data-editable="true" data-field="hero-1-comparison">vs $14.8M last year</div>
-            </div>
-
-            <div class="hero-card">
-                <div class="hero-header">
-                    <div class="hero-label" data-editable="true" data-field="hero-2-label">Gross Margin</div>
-                    <div class="hero-icon-wrap">
-                        <svg class="hero-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <rect x="3" y="12" width="4" height="9" rx="1" stroke="currentColor" stroke-width="2"/>
-                            <rect x="10" y="7" width="4" height="14" rx="1" stroke="currentColor" stroke-width="2"/>
-                            <rect x="17" y="3" width="4" height="18" rx="1" stroke="currentColor" stroke-width="2"/>
-                        </svg>
-                    </div>
-                </div>
-                <div class="hero-value" data-editable="true" data-field="hero-2-value">72.3%</div>
-                <div class="hero-trend trend-up">
-                    <svg class="trend-arrow" viewBox="0 0 14 14" fill="none"><path d="M2 10L7 4L12 10" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    <span data-editable="true" data-field="hero-2-trend">3.1% QoQ</span>
-                </div>
-                <div class="hero-comparison" data-editable="true" data-field="hero-2-comparison">Target: 70%</div>
-            </div>
-
-            <div class="hero-card">
-                <div class="hero-header">
-                    <div class="hero-label" data-editable="true" data-field="hero-3-label">Customer Count</div>
-                    <div class="hero-icon-wrap">
-                        <svg class="hero-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M4 21V8l8-5 8 5v13" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-                            <path d="M9 21v-7h6v7" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-                            <path d="M4 13h16" stroke="currentColor" stroke-width="2"/>
-                        </svg>
-                    </div>
-                </div>
-                <div class="hero-value" data-editable="true" data-field="hero-3-value">2,847</div>
-                <div class="hero-trend trend-up">
-                    <svg class="trend-arrow" viewBox="0 0 14 14" fill="none"><path d="M2 10L7 4L12 10" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    <span data-editable="true" data-field="hero-3-trend">312 new</span>
-                </div>
-                <div class="hero-comparison" data-editable="true" data-field="hero-3-comparison">Churn: 2.1% (down)</div>
-            </div>
-
-            <div class="hero-card">
-                <div class="hero-header">
-                    <div class="hero-label" data-editable="true" data-field="hero-4-label">Headcount</div>
-                    <div class="hero-icon-wrap">
-                        <svg class="hero-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <circle cx="9" cy="8" r="3.5" stroke="currentColor" stroke-width="2"/>
-                            <circle cx="17" cy="9" r="2.5" stroke="currentColor" stroke-width="2"/>
-                            <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                            <path d="M15 20c0-2.2 1.8-4 4-4s2 1.5 2 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                        </svg>
-                    </div>
-                </div>
-                <div class="hero-value" data-editable="true" data-field="hero-4-value">428</div>
-                <div class="hero-trend trend-up">
-                    <svg class="trend-arrow" viewBox="0 0 14 14" fill="none"><path d="M2 10L7 4L12 10" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    <span data-editable="true" data-field="hero-4-trend">38 hires Q1</span>
-                </div>
-                <div class="hero-comparison" data-editable="true" data-field="hero-4-comparison">Revenue/head: $43K</div>
-            </div>
-        </div>
-
-        <div class="main-content">
-            <div class="revenue-panel">
-                <div class="panel-title" data-editable="true" data-field="revenue-panel-title">Revenue by Segment</div>
-                <div class="revenue-bar-group">
-                    <div class="revenue-item">
-                        <div class="revenue-name" data-editable="true" data-field="segment-1-name">Enterprise SaaS</div>
-                        <div class="bar-track"><div class="bar-fill bar-gold-1" style="width: 85%"></div></div>
-                        <div class="revenue-val" data-editable="true" data-field="segment-1-value">$8.2M</div>
-                    </div>
-                    <div class="revenue-item">
-                        <div class="revenue-name" data-editable="true" data-field="segment-2-name">Mid-Market</div>
-                        <div class="bar-track"><div class="bar-fill bar-gold-2" style="width: 62%"></div></div>
-                        <div class="revenue-val" data-editable="true" data-field="segment-2-value">$4.8M</div>
-                    </div>
-                    <div class="revenue-item">
-                        <div class="revenue-name" data-editable="true" data-field="segment-3-name">SMB</div>
-                        <div class="bar-track"><div class="bar-fill bar-gold-3" style="width: 38%"></div></div>
-                        <div class="revenue-val" data-editable="true" data-field="segment-3-value">$2.9M</div>
-                    </div>
-                    <div class="revenue-item">
-                        <div class="revenue-name" data-editable="true" data-field="segment-4-name">Professional Svcs</div>
-                        <div class="bar-track"><div class="bar-fill bar-gold-4" style="width: 22%"></div></div>
-                        <div class="revenue-val" data-editable="true" data-field="segment-4-value">$1.6M</div>
-                    </div>
-                    <div class="revenue-item">
-                        <div class="revenue-name" data-editable="true" data-field="segment-5-name">Marketplace</div>
-                        <div class="bar-track"><div class="bar-fill bar-gold-5" style="width: 12%"></div></div>
-                        <div class="revenue-val" data-editable="true" data-field="segment-5-value">$0.9M</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="targets-panel">
-                <div class="panel-title" data-editable="true" data-field="targets-panel-title">Strategic Targets</div>
-                <div class="target-item">
-                    <div>
-                        <div class="target-name" data-editable="true" data-field="target-1-name">ARR Growth Target</div>
-                        <div class="target-progress"><div class="target-fill bar-gold-1" style="width: 78%"></div></div>
-                    </div>
-                    <div class="target-right">
-                        <div class="target-value" data-editable="true" data-field="target-1-value">78%</div>
-                        <div class="target-label" data-editable="true" data-field="target-1-label">of $24M goal</div>
-                    </div>
-                </div>
-                <div class="target-item">
-                    <div>
-                        <div class="target-name" data-editable="true" data-field="target-2-name">Net Revenue Retention</div>
-                        <div class="target-progress"><div class="target-fill bar-gold-2" style="width: 92%"></div></div>
-                    </div>
-                    <div class="target-right">
-                        <div class="target-value" data-editable="true" data-field="target-2-value">118%</div>
-                        <div class="target-label" data-editable="true" data-field="target-2-label">Target: 120%</div>
-                    </div>
-                </div>
-                <div class="target-item">
-                    <div>
-                        <div class="target-name" data-editable="true" data-field="target-3-name">CAC Payback Period</div>
-                        <div class="target-progress"><div class="target-fill bar-gold-3" style="width: 85%"></div></div>
-                    </div>
-                    <div class="target-right">
-                        <div class="target-value" data-editable="true" data-field="target-3-value">14mo</div>
-                        <div class="target-label" data-editable="true" data-field="target-3-label">Target: &lt;12mo</div>
-                    </div>
-                </div>
-                <div class="target-item">
-                    <div>
-                        <div class="target-name" data-editable="true" data-field="target-4-name">Employee Satisfaction</div>
-                        <div class="target-progress"><div class="target-fill bar-gold-1" style="width: 88%"></div></div>
-                    </div>
-                    <div class="target-right">
-                        <div class="target-value" data-editable="true" data-field="target-4-value">4.4/5</div>
-                        <div class="target-label" data-editable="true" data-field="target-4-label">eNPS: 62</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="footer">
-            <div class="footer-left" data-editable="true" data-field="footer-text">Confidential - For Internal Distribution Only</div>
-            <div class="footer-right" data-editable="true" data-field="footer-source">Source: Finance & Analytics | Next board review: March 15, 2026</div>
-        </div>
+  <div class="frame"></div>
+  <div class="container">
+    <div class="header">
+      <div>
+        <div class="eyebrow">Executive Suite</div>
+        <h1 class="header-title" data-editable="true" data-field="dashboard-title">Executive Performance</h1>
+        <div class="header-subtitle" data-editable="true" data-field="dashboard-subtitle">Company-wide metrics and financial performance</div>
+      </div>
+      <div class="header-right">
+        <div class="quarter-badge" data-editable="true" data-field="quarter">Q1 FY2026</div>
+        <div class="update-info"><span data-editable="true" data-field="update-time">Updated 09:30 AM</span></div>
+      </div>
     </div>
+
+    <div class="hero-row">
+      <div class="hero-card">
+        <div class="hero-header">
+          <div class="hero-label" data-editable="true" data-field="hero-1-label">Annual Revenue</div>
+          <svg class="hero-icon" viewBox="0 0 24 24" fill="none"><path d="M12 3v18M8 7h6a3 3 0 010 6H9a3 3 0 000 6h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </div>
+        <div class="hero-value" data-editable="true" data-field="hero-1-value">$18.4M</div>
+        <div class="hero-trend">↑ <span data-editable="true" data-field="hero-1-trend">24.6% YoY</span></div>
+        <div class="hero-comparison" data-editable="true" data-field="hero-1-comparison">vs $14.8M last year</div>
+      </div>
+
+      <div class="hero-card">
+        <div class="hero-header">
+          <div class="hero-label" data-editable="true" data-field="hero-2-label">Gross Margin</div>
+          <svg class="hero-icon" viewBox="0 0 24 24" fill="none"><path d="M3 17l6-6 4 4 8-8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 7h4v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </div>
+        <div class="hero-value" data-editable="true" data-field="hero-2-value">72.3%</div>
+        <div class="hero-trend">↑ <span data-editable="true" data-field="hero-2-trend">3.1% QoQ</span></div>
+        <div class="hero-comparison" data-editable="true" data-field="hero-2-comparison">Target: 70%</div>
+      </div>
+
+      <div class="hero-card">
+        <div class="hero-header">
+          <div class="hero-label" data-editable="true" data-field="hero-3-label">Customer Count</div>
+          <svg class="hero-icon" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3.5" stroke="currentColor" stroke-width="1.6"/><circle cx="17" cy="9" r="2.5" stroke="currentColor" stroke-width="1.6"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M15 20c0-2.2 1.8-4 4-4s2 1.5 2 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </div>
+        <div class="hero-value" data-editable="true" data-field="hero-3-value">2,847</div>
+        <div class="hero-trend">↑ <span data-editable="true" data-field="hero-3-trend">312 new</span></div>
+        <div class="hero-comparison" data-editable="true" data-field="hero-3-comparison">Churn: 2.1% (down)</div>
+      </div>
+
+      <div class="hero-card">
+        <div class="hero-header">
+          <div class="hero-label" data-editable="true" data-field="hero-4-label">Headcount</div>
+          <svg class="hero-icon" viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="1.6"/></svg>
+        </div>
+        <div class="hero-value" data-editable="true" data-field="hero-4-value">428</div>
+        <div class="hero-trend">↑ <span data-editable="true" data-field="hero-4-trend">38 hires Q1</span></div>
+        <div class="hero-comparison" data-editable="true" data-field="hero-4-comparison">Revenue/head: $43K</div>
+      </div>
+    </div>
+
+    <div class="panels-row">
+      <div class="panel">
+        <div class="panel-title" data-editable="true" data-field="revenue-panel-title">Revenue by Segment</div>
+        <div class="revenue-row">
+          <div class="revenue-name" data-editable="true" data-field="segment-1-name">Enterprise SaaS</div>
+          <div class="revenue-val" data-editable="true" data-field="segment-1-value">$8.2M</div>
+        </div>
+        <div class="revenue-row">
+          <div class="revenue-name" data-editable="true" data-field="segment-2-name">Mid-Market</div>
+          <div class="revenue-val" data-editable="true" data-field="segment-2-value">$4.8M</div>
+        </div>
+        <div class="revenue-row">
+          <div class="revenue-name" data-editable="true" data-field="segment-3-name">SMB</div>
+          <div class="revenue-val" data-editable="true" data-field="segment-3-value">$2.9M</div>
+        </div>
+        <div class="revenue-row">
+          <div class="revenue-name" data-editable="true" data-field="segment-4-name">Professional Svcs</div>
+          <div class="revenue-val" data-editable="true" data-field="segment-4-value">$1.6M</div>
+        </div>
+        <div class="revenue-row">
+          <div class="revenue-name" data-editable="true" data-field="segment-5-name">Marketplace</div>
+          <div class="revenue-val" data-editable="true" data-field="segment-5-value">$0.9M</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title" data-editable="true" data-field="targets-panel-title">Strategic Targets</div>
+        <div class="target-row">
+          <div class="target-name" data-editable="true" data-field="target-1-name">ARR Growth Target</div>
+          <div>
+            <div class="target-value" data-editable="true" data-field="target-1-value">78%</div>
+            <div class="target-label" data-editable="true" data-field="target-1-label">of $24M goal</div>
+          </div>
+        </div>
+        <div class="target-row">
+          <div class="target-name" data-editable="true" data-field="target-2-name">Net Revenue Retention</div>
+          <div>
+            <div class="target-value" data-editable="true" data-field="target-2-value">118%</div>
+            <div class="target-label" data-editable="true" data-field="target-2-label">Target: 120%</div>
+          </div>
+        </div>
+        <div class="target-row">
+          <div class="target-name" data-editable="true" data-field="target-3-name">CAC Payback Period</div>
+          <div>
+            <div class="target-value" data-editable="true" data-field="target-3-value">14mo</div>
+            <div class="target-label" data-editable="true" data-field="target-3-label">Target: &lt;12mo</div>
+          </div>
+        </div>
+        <div class="target-row">
+          <div class="target-name" data-editable="true" data-field="target-4-name">Employee Satisfaction</div>
+          <div>
+            <div class="target-value" data-editable="true" data-field="target-4-value">4.4/5</div>
+            <div class="target-label" data-editable="true" data-field="target-4-label">eNPS: 62</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="footer-left" data-editable="true" data-field="footer-text">Confidential - For Internal Distribution Only</div>
+      <div class="footer-right" data-editable="true" data-field="footer-source">Source: Finance & Analytics | Next board review: March 15, 2026</div>
+    </div>
+  </div>
 </body>
 </html>

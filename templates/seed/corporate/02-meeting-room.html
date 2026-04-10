@@ -1,566 +1,272 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=1920, height=1080">
-    <title>Meeting Room Status</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700;800&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <title>Meeting Room Status</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Cormorant+SC:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --ink: #2C1810;
+      --ink-body: #4A2D18;
+      --ink-muted: #7A4A28;
+      --brass: #8B6F2E;
+      --royal: #3D1F14;
+      --rule: rgba(139,111,46,0.4);
+    }
+    body {
+      width: 1920px; height: 1080px; overflow: hidden; position: relative;
+      font-family: 'Lora', serif; color: var(--ink-body);
+      background:
+        radial-gradient(ellipse at 70% 20%, rgba(139,111,46,0.08), transparent 55%),
+        radial-gradient(ellipse at 20% 90%, rgba(61,31,20,0.05), transparent 55%),
+        linear-gradient(160deg, #EADDBE 0%, #D9C4A0 100%);
+    }
+    body::before {
+      content: ''; position: absolute; inset: 0; pointer-events: none;
+      background-image:
+        radial-gradient(circle at 19% 27%, rgba(44,24,16,0.032) 0.6px, transparent 1.1px),
+        radial-gradient(circle at 71% 64%, rgba(44,24,16,0.025) 0.5px, transparent 1px);
+      background-size: 42px 42px, 58px 58px;
+    }
+    .frame {
+      position: absolute; inset: 60px; border: 1px solid var(--brass); z-index: 1;
+    }
+    .frame::before {
+      content: ''; position: absolute; inset: 10px;
+      border: 1px solid rgba(139,111,46,0.22);
+    }
 
-        :root {
-            --navy-900: #061C22;
-            --navy-800: #0A2E36;
-            --navy-700: #0F3B45;
-            --navy-600: #14525E;
-            --gold-500: #D4AF55;
-            --gold-400: #E6C877;
-            --gold-300: #F0D99A;
-            --ivory: #F5EFE0;
-        }
+    .container {
+      position: absolute; inset: 60px; z-index: 2;
+      display: grid; grid-template-columns: 540px 1fr;
+    }
 
-        body {
-            width: 1920px;
-            height: 1080px;
-            overflow: hidden;
-            font-family: 'Inter', sans-serif;
-            background:
-                radial-gradient(ellipse at 70% 30%, rgba(212, 175, 85, 0.14) 0%, transparent 55%),
-                radial-gradient(ellipse at 30% 80%, rgba(20, 82, 94, 0.55) 0%, transparent 55%),
-                linear-gradient(160deg, #050f13 0%, #0A2E36 50%, #061C22 100%);
-            color: var(--ivory);
-            position: relative;
-        }
+    .sidebar {
+      padding: 80px 60px 80px 80px;
+      display: flex; flex-direction: column; justify-content: center;
+      border-right: 1px solid var(--rule);
+    }
+    .room-label {
+      font-family: 'Cormorant SC', serif;
+      font-size: 18px; letter-spacing: 6px; font-weight: 600;
+      color: var(--brass); text-transform: uppercase;
+      margin-bottom: 20px;
+      display: flex; align-items: center; gap: 16px;
+    }
+    .room-label::before {
+      content: ''; width: 38px; height: 1px; background: var(--brass);
+    }
+    .room-name {
+      font-family: 'DM Serif Display', serif;
+      font-size: 92px; color: var(--royal);
+      line-height: 1; margin-bottom: 20px; letter-spacing: -1px;
+    }
+    .room-floor {
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 22px; color: var(--ink-muted);
+      margin-bottom: 48px;
+    }
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 12px;
+      padding: 14px 32px;
+      border: 1px solid var(--brass);
+      background: rgba(255,248,232,0.4);
+      font-family: 'Cormorant SC', serif;
+      font-size: 20px; font-weight: 600;
+      letter-spacing: 4px; text-transform: uppercase;
+      color: var(--royal); align-self: flex-start;
+    }
+    .status-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--brass);
+    }
+    .capacity {
+      font-family: 'Lora', serif; font-size: 20px;
+      color: var(--ink-muted); margin-top: 32px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .capacity-icon { width: 22px; height: 22px; color: var(--brass); }
 
-        /* Subtle stripe texture */
-        body::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: repeating-linear-gradient(
-                90deg,
-                transparent,
-                transparent 119px,
-                rgba(212, 175, 85, 0.04) 119px,
-                rgba(212, 175, 85, 0.04) 120px
-            );
-            z-index: 0;
-        }
+    .content-area {
+      padding: 80px 80px 80px 70px;
+      display: grid; grid-template-rows: auto 1fr auto; gap: 32px;
+    }
+    .section-label {
+      font-family: 'Cormorant SC', serif;
+      font-size: 16px; letter-spacing: 5px; font-weight: 600;
+      color: var(--brass); text-transform: uppercase;
+      margin-bottom: 18px;
+      display: flex; align-items: center; gap: 14px;
+    }
+    .section-label::before {
+      content: ''; width: 32px; height: 1px; background: var(--brass);
+    }
 
-        /* Glowing status circle top-right */
-        .status-glow {
-            position: absolute;
-            top: 60px;
-            right: 80px;
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            background: var(--gold-500);
-            box-shadow:
-                0 0 24px rgba(212, 175, 85, 0.8),
-                0 0 60px rgba(212, 175, 85, 0.4);
-            z-index: 2;
-            animation: pulse 3s ease-in-out infinite;
-        }
+    .current-meeting {
+      background: rgba(255,248,232,0.34);
+      border: 1px solid var(--brass);
+      padding: 44px 48px;
+      position: relative;
+    }
+    .current-meeting::before {
+      content: ''; position: absolute; inset: 8px;
+      border: 1px solid rgba(139,111,46,0.22); pointer-events: none;
+    }
+    .meeting-title {
+      font-family: 'DM Serif Display', serif;
+      font-size: 40px; color: var(--royal);
+      line-height: 1.15; margin-bottom: 18px;
+    }
+    .meeting-time {
+      font-family: 'Lora', serif; font-size: 24px;
+      color: var(--brass); font-weight: 600;
+      margin-bottom: 12px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .meeting-time-icon, .organizer-icon { width: 22px; height: 22px; color: var(--brass); }
+    .meeting-organizer {
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 19px; color: var(--ink-muted);
+      display: flex; align-items: center; gap: 12px;
+    }
 
-        .status-glow::after {
-            content: '';
-            position: absolute;
-            inset: -8px;
-            border-radius: 50%;
-            border: 2px solid rgba(212, 175, 85, 0.4);
-        }
+    .upcoming-meetings { display: flex; flex-direction: column; gap: 12px; }
+    .upcoming-card {
+      border: 1px solid rgba(139,111,46,0.32);
+      padding: 22px 32px;
+      display: grid; grid-template-columns: 160px 1fr auto;
+      align-items: center; gap: 30px;
+      background: rgba(255,248,232,0.22);
+    }
+    .upcoming-time {
+      font-family: 'DM Serif Display', serif;
+      font-size: 26px; color: var(--brass); letter-spacing: 0.5px;
+    }
+    .upcoming-title {
+      font-family: 'Lora', serif; font-size: 22px; color: var(--ink);
+    }
+    .upcoming-organizer {
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 16px; color: var(--ink-muted);
+    }
 
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.15); opacity: 0.85; }
-        }
-
-        /* Vertical gold accent line */
-        .accent-line-left {
-            position: absolute;
-            top: 0;
-            left: 80px;
-            width: 2px;
-            height: 100%;
-            background: linear-gradient(180deg, transparent, rgba(212, 175, 85, 0.5) 30%, rgba(212, 175, 85, 0.5) 70%, transparent);
-            z-index: 0;
-            box-shadow: 0 0 16px rgba(212, 175, 85, 0.3);
-        }
-
-        .container {
-            position: relative;
-            z-index: 1;
-            width: 100%;
-            height: 100%;
-            display: grid;
-            grid-template-columns: 500px 1fr;
-            grid-template-rows: 1fr;
-        }
-
-        /* Left sidebar */
-        .sidebar {
-            padding: 80px 50px 80px 120px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            border-right: 1px solid rgba(212, 175, 85, 0.18);
-            position: relative;
-        }
-
-        .room-icon-wrap {
-            width: 180px;
-            height: 180px;
-            border-radius: 28px;
-            background: linear-gradient(145deg, rgba(212, 175, 85, 0.18) 0%, rgba(212, 175, 85, 0.05) 100%);
-            border: 1px solid rgba(212, 175, 85, 0.4);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 40px;
-            box-shadow:
-                0 15px 50px rgba(212, 175, 85, 0.2),
-                inset 0 1px 0 rgba(240, 217, 154, 0.2);
-            position: relative;
-        }
-
-        .room-icon-wrap::after {
-            content: '';
-            position: absolute;
-            inset: 10px;
-            border-radius: 20px;
-            border: 1px solid rgba(212, 175, 85, 0.15);
-        }
-
-        .room-icon {
-            width: 104px;
-            height: 104px;
-            color: var(--gold-400);
-            filter: drop-shadow(0 6px 20px rgba(212, 175, 85, 0.5));
-        }
-
-        .room-label {
-            font-family: 'Montserrat', sans-serif;
-            font-size: 14px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 5px;
-            color: var(--gold-500);
-            margin-bottom: 14px;
-            display: flex;
-            align-items: center;
-            gap: 14px;
-        }
-
-        .room-label::before {
-            content: '';
-            width: 36px;
-            height: 2px;
-            background: linear-gradient(90deg, var(--gold-500), transparent);
-        }
-
-        .room-name {
-            font-family: 'Playfair Display', serif;
-            font-size: 76px;
-            font-weight: 700;
-            color: #fbf7ec;
-            line-height: 1.05;
-            margin-bottom: 16px;
-            text-shadow: 0 2px 20px rgba(212, 175, 85, 0.2);
-        }
-
-        .room-floor {
-            font-family: 'Inter', sans-serif;
-            font-size: 20px;
-            font-weight: 400;
-            color: rgba(245, 239, 224, 0.55);
-            margin-bottom: 36px;
-        }
-
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 12px;
-            padding: 14px 28px;
-            border-radius: 40px;
-            font-family: 'Montserrat', sans-serif;
-            font-size: 18px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 3px;
-            align-self: flex-start;
-        }
-
-        .status-available {
-            background: rgba(212, 175, 85, 0.15);
-            border: 1px solid rgba(212, 175, 85, 0.5);
-            color: var(--gold-300);
-            box-shadow: 0 6px 20px rgba(212, 175, 85, 0.2);
-        }
-
-        .status-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: var(--gold-500);
-            box-shadow: 0 0 14px rgba(212, 175, 85, 0.9);
-        }
-
-        .capacity {
-            font-family: 'Inter', sans-serif;
-            font-size: 18px;
-            color: rgba(245, 239, 224, 0.55);
-            margin-top: 28px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .capacity-icon {
-            width: 22px;
-            height: 22px;
-            color: var(--gold-500);
-        }
-
-        /* Right content area */
-        .content-area {
-            padding: 80px 80px 80px 70px;
-            display: grid;
-            grid-template-rows: auto 1fr auto;
-            gap: 36px;
-        }
-
-        .section-label {
-            font-family: 'Montserrat', sans-serif;
-            font-size: 13px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 5px;
-            color: var(--gold-500);
-            margin-bottom: 18px;
-            display: flex;
-            align-items: center;
-            gap: 14px;
-        }
-
-        .section-label::before {
-            content: '';
-            width: 34px;
-            height: 2px;
-            background: linear-gradient(90deg, var(--gold-500), transparent);
-        }
-
-        /* Current meeting card */
-        .current-meeting {
-            background: linear-gradient(145deg, rgba(15, 59, 69, 0.75) 0%, rgba(10, 46, 54, 0.6) 100%);
-            border: 1px solid rgba(212, 175, 85, 0.3);
-            backdrop-filter: blur(22px);
-            -webkit-backdrop-filter: blur(22px);
-            border-radius: 22px;
-            padding: 44px;
-            box-shadow:
-                0 15px 50px rgba(0, 0, 0, 0.4),
-                inset 0 1px 0 rgba(212, 175, 85, 0.15);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .current-meeting::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            bottom: 0;
-            width: 5px;
-            background: linear-gradient(180deg, var(--gold-500), var(--gold-300));
-            box-shadow: 0 0 18px rgba(212, 175, 85, 0.5);
-        }
-
-        .meeting-title {
-            font-family: 'Playfair Display', serif;
-            font-size: 38px;
-            font-weight: 700;
-            color: #fbf7ec;
-            margin-bottom: 14px;
-            line-height: 1.2;
-        }
-
-        .meeting-time {
-            font-family: 'Inter', sans-serif;
-            font-size: 24px;
-            color: var(--gold-300);
-            font-weight: 600;
-            margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .meeting-time-icon {
-            width: 22px;
-            height: 22px;
-            color: var(--gold-500);
-        }
-
-        .meeting-organizer {
-            font-family: 'Inter', sans-serif;
-            font-size: 19px;
-            color: rgba(245, 239, 224, 0.65);
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .organizer-icon {
-            width: 22px;
-            height: 22px;
-            color: var(--gold-500);
-        }
-
-        /* Upcoming meetings */
-        .upcoming-meetings {
-            display: flex;
-            flex-direction: column;
-            gap: 14px;
-        }
-
-        .upcoming-card {
-            background: rgba(10, 46, 54, 0.55);
-            border: 1px solid rgba(212, 175, 85, 0.15);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border-radius: 16px;
-            padding: 26px 34px;
-            display: grid;
-            grid-template-columns: 170px 1fr auto;
-            align-items: center;
-            gap: 32px;
-            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
-            position: relative;
-        }
-
-        .upcoming-card::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 20%;
-            bottom: 20%;
-            width: 3px;
-            background: rgba(212, 175, 85, 0.4);
-            border-radius: 0 2px 2px 0;
-        }
-
-        .upcoming-time {
-            font-family: 'JetBrains Mono', 'Montserrat', monospace;
-            font-size: 22px;
-            font-weight: 700;
-            color: var(--gold-400);
-            letter-spacing: 1px;
-        }
-
-        .upcoming-title {
-            font-family: 'Inter', sans-serif;
-            font-size: 22px;
-            font-weight: 500;
-            color: #fbf7ec;
-        }
-
-        .upcoming-organizer {
-            font-family: 'Inter', sans-serif;
-            font-size: 16px;
-            color: rgba(245, 239, 224, 0.5);
-        }
-
-        /* Bottom bar */
-        .bottom-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding-top: 22px;
-            border-top: 1px solid rgba(212, 175, 85, 0.18);
-        }
-
-        .equipment-list {
-            display: flex;
-            gap: 18px;
-        }
-
-        .equipment-item {
-            width: 52px;
-            height: 52px;
-            border-radius: 12px;
-            background: rgba(212, 175, 85, 0.08);
-            border: 1px solid rgba(212, 175, 85, 0.25);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--gold-400);
-            box-shadow: inset 0 1px 0 rgba(240, 217, 154, 0.1);
-        }
-
-        .equipment-item svg {
-            width: 26px;
-            height: 26px;
-        }
-
-        .current-time-small {
-            font-family: 'JetBrains Mono', 'Montserrat', monospace;
-            font-size: 26px;
-            font-weight: 600;
-            color: var(--gold-300);
-            letter-spacing: 1px;
-        }
-
-        /* Decorative SVG */
-        .corner-svg {
-            position: absolute;
-            z-index: 0;
-        }
-    </style>
+    .bottom-bar {
+      display: flex; justify-content: space-between; align-items: center;
+      padding-top: 22px; border-top: 1px solid var(--rule);
+    }
+    .equipment-list { display: flex; gap: 16px; }
+    .equipment-item {
+      width: 52px; height: 52px;
+      border: 1px solid var(--brass);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--brass);
+    }
+    .equipment-item svg { width: 26px; height: 26px; }
+    .current-time-small {
+      font-family: 'DM Serif Display', serif;
+      font-size: 30px; color: var(--royal);
+    }
+  </style>
 </head>
 <body>
-    <div class="status-glow"></div>
-    <div class="accent-line-left"></div>
-
-    <!-- Decorative SVG corner rings -->
-    <svg class="corner-svg" style="bottom:0;right:0;" width="340" height="340" viewBox="0 0 300 300" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="300" cy="300" r="220" stroke="rgba(212,175,85,0.08)" stroke-width="1" fill="none"/>
-        <circle cx="300" cy="300" r="160" stroke="rgba(212,175,85,0.06)" stroke-width="1" fill="none"/>
-        <circle cx="300" cy="300" r="100" stroke="rgba(212,175,85,0.05)" stroke-width="1" fill="none"/>
-        <circle cx="300" cy="300" r="40" stroke="rgba(212,175,85,0.04)" stroke-width="1" fill="none"/>
-    </svg>
-
-    <!-- Diamond pattern top -->
-    <svg class="corner-svg" style="top:40px;left:50%;transform:translateX(-50%);" width="220" height="40" viewBox="0 0 200 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M100 0 L110 20 L100 40 L90 20 Z" fill="rgba(212,175,85,0.22)"/>
-        <path d="M60 10 L68 20 L60 30 L52 20 Z" fill="rgba(212,175,85,0.15)"/>
-        <path d="M140 10 L148 20 L140 30 L132 20 Z" fill="rgba(212,175,85,0.15)"/>
-        <path d="M25 15 L31 20 L25 25 L19 20 Z" fill="rgba(212,175,85,0.08)"/>
-        <path d="M175 15 L181 20 L175 25 L169 20 Z" fill="rgba(212,175,85,0.08)"/>
-    </svg>
-
-    <div class="container">
-        <div class="sidebar">
-            <div class="room-icon-wrap">
-                <!-- Meeting room / door with chair icon -->
-                <svg class="room-icon" viewBox="0 0 104 104" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <defs>
-                        <linearGradient id="roomGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" stop-color="#F0D99A"/>
-                            <stop offset="100%" stop-color="#D4AF55"/>
-                        </linearGradient>
-                    </defs>
-                    <!-- Room frame -->
-                    <path d="M16 22 L16 86 L88 86 L88 22 Z" stroke="url(#roomGrad)" stroke-width="2.5" fill="none" stroke-linejoin="round"/>
-                    <!-- Door -->
-                    <path d="M16 22 L52 14 L52 86" stroke="url(#roomGrad)" stroke-width="2" fill="none" stroke-linejoin="round" opacity="0.85"/>
-                    <circle cx="46" cy="52" r="1.8" fill="url(#roomGrad)"/>
-                    <!-- Conference table -->
-                    <ellipse cx="68" cy="58" rx="18" ry="6" stroke="url(#roomGrad)" stroke-width="2" fill="none"/>
-                    <!-- Chairs -->
-                    <rect x="58" y="42" width="6" height="6" rx="1" fill="url(#roomGrad)" opacity="0.9"/>
-                    <rect x="72" y="42" width="6" height="6" rx="1" fill="url(#roomGrad)" opacity="0.9"/>
-                    <rect x="58" y="68" width="6" height="6" rx="1" fill="url(#roomGrad)" opacity="0.9"/>
-                    <rect x="72" y="68" width="6" height="6" rx="1" fill="url(#roomGrad)" opacity="0.9"/>
-                </svg>
-            </div>
-            <div class="room-label">Meeting Room</div>
-            <div class="room-name" data-editable="true" data-field="room-name">Atlas</div>
-            <div class="room-floor" data-editable="true" data-field="room-floor">Building A - Floor 3, Room 312</div>
-            <div class="status-badge status-available">
-                <span class="status-dot"></span>
-                <span data-editable="true" data-field="status">Available</span>
-            </div>
-            <div class="capacity">
-                <svg class="capacity-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="9" cy="8" r="3.5" stroke="currentColor" stroke-width="2"/>
-                    <circle cx="17" cy="9" r="2.5" stroke="currentColor" stroke-width="2"/>
-                    <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    <path d="M15 20c0-2.2 1.8-4 4-4s2 1.5 2 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                </svg>
-                <span data-editable="true" data-field="capacity">Capacity: 12 people</span>
-            </div>
-        </div>
-
-        <div class="content-area">
-            <div>
-                <div class="section-label">Current Meeting</div>
-                <div class="current-meeting">
-                    <div class="meeting-title" data-editable="true" data-field="current-meeting-title">Q1 Product Strategy Review</div>
-                    <div class="meeting-time">
-                        <svg class="meeting-time-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
-                            <path d="M12 7v5l3.5 2.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                        </svg>
-                        <span data-editable="true" data-field="current-meeting-time">10:00 AM - 11:30 AM</span>
-                    </div>
-                    <div class="meeting-organizer">
-                        <svg class="organizer-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2"/>
-                            <path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                        </svg>
-                        <span data-editable="true" data-field="current-meeting-organizer">Sarah Chen - Product Lead</span>
-                    </div>
-                </div>
-            </div>
-
-            <div>
-                <div class="section-label">Upcoming</div>
-                <div class="upcoming-meetings">
-                    <div class="upcoming-card">
-                        <div class="upcoming-time" data-editable="true" data-field="upcoming-1-time">12:00 PM</div>
-                        <div class="upcoming-title" data-editable="true" data-field="upcoming-1-title">Design Sprint Kickoff</div>
-                        <div class="upcoming-organizer" data-editable="true" data-field="upcoming-1-organizer">Alex Rivera</div>
-                    </div>
-                    <div class="upcoming-card">
-                        <div class="upcoming-time" data-editable="true" data-field="upcoming-2-time">2:00 PM</div>
-                        <div class="upcoming-title" data-editable="true" data-field="upcoming-2-title">Engineering Standup</div>
-                        <div class="upcoming-organizer" data-editable="true" data-field="upcoming-2-organizer">Dev Team</div>
-                    </div>
-                    <div class="upcoming-card">
-                        <div class="upcoming-time" data-editable="true" data-field="upcoming-3-time">4:00 PM</div>
-                        <div class="upcoming-title" data-editable="true" data-field="upcoming-3-title">Client Onboarding Call</div>
-                        <div class="upcoming-organizer" data-editable="true" data-field="upcoming-3-organizer">Jessica Park</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bottom-bar">
-                <div class="equipment-list">
-                    <div class="equipment-item" title="Projector">
-                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <rect x="3" y="8" width="14" height="9" rx="2" stroke="currentColor" stroke-width="2"/>
-                            <circle cx="10" cy="12.5" r="2" stroke="currentColor" stroke-width="2"/>
-                            <path d="M17 12h4l-3 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            <line x1="6" y1="20" x2="14" y2="20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                        </svg>
-                    </div>
-                    <div class="equipment-item" title="Whiteboard">
-                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <rect x="3" y="4" width="18" height="13" rx="2" stroke="currentColor" stroke-width="2"/>
-                            <line x1="8" y1="9" x2="16" y2="9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                            <line x1="8" y1="12" x2="14" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                            <line x1="10" y1="20" x2="14" y2="20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                            <line x1="12" y1="17" x2="12" y2="20" stroke="currentColor" stroke-width="2"/>
-                        </svg>
-                    </div>
-                    <div class="equipment-item" title="Video Conference">
-                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <rect x="2" y="6" width="14" height="12" rx="2" stroke="currentColor" stroke-width="2"/>
-                            <path d="M16 10l6-3v10l-6-3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-                        </svg>
-                    </div>
-                    <div class="equipment-item" title="Phone">
-                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-                        </svg>
-                    </div>
-                </div>
-                <div class="current-time-small" data-editable="true" data-field="current-time">9:45 AM</div>
-            </div>
-        </div>
+  <div class="frame"></div>
+  <div class="container">
+    <div class="sidebar">
+      <div class="room-label">Meeting Room</div>
+      <h1 class="room-name" data-editable="true" data-field="room-name">Atlas</h1>
+      <div class="room-floor" data-editable="true" data-field="room-floor">Building A - Floor 3, Room 312</div>
+      <div class="status-badge">
+        <span class="status-dot"></span>
+        <span data-editable="true" data-field="status">Available</span>
+      </div>
+      <div class="capacity">
+        <svg class="capacity-icon" viewBox="0 0 24 24" fill="none">
+          <circle cx="9" cy="8" r="3.5" stroke="currentColor" stroke-width="1.6"/>
+          <circle cx="17" cy="9" r="2.5" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M15 20c0-2.2 1.8-4 4-4s2 1.5 2 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+        <span data-editable="true" data-field="capacity">Capacity: 12 people</span>
+      </div>
     </div>
+
+    <div class="content-area">
+      <div>
+        <div class="section-label">Current Meeting</div>
+        <div class="current-meeting">
+          <div class="meeting-title" data-editable="true" data-field="current-meeting-title">Q1 Product Strategy Review</div>
+          <div class="meeting-time">
+            <svg class="meeting-time-icon" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/>
+              <path d="M12 7v5l3.5 2.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+            <span data-editable="true" data-field="current-meeting-time">10:00 AM - 11:30 AM</span>
+          </div>
+          <div class="meeting-organizer">
+            <svg class="organizer-icon" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.6"/>
+              <path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+            <span data-editable="true" data-field="current-meeting-organizer">Sarah Chen - Product Lead</span>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-label">Upcoming</div>
+        <div class="upcoming-meetings">
+          <div class="upcoming-card">
+            <div class="upcoming-time" data-editable="true" data-field="upcoming-1-time">12:00 PM</div>
+            <div class="upcoming-title" data-editable="true" data-field="upcoming-1-title">Design Sprint Kickoff</div>
+            <div class="upcoming-organizer" data-editable="true" data-field="upcoming-1-organizer">Alex Rivera</div>
+          </div>
+          <div class="upcoming-card">
+            <div class="upcoming-time" data-editable="true" data-field="upcoming-2-time">2:00 PM</div>
+            <div class="upcoming-title" data-editable="true" data-field="upcoming-2-title">Engineering Standup</div>
+            <div class="upcoming-organizer" data-editable="true" data-field="upcoming-2-organizer">Dev Team</div>
+          </div>
+          <div class="upcoming-card">
+            <div class="upcoming-time" data-editable="true" data-field="upcoming-3-time">4:00 PM</div>
+            <div class="upcoming-title" data-editable="true" data-field="upcoming-3-title">Client Onboarding Call</div>
+            <div class="upcoming-organizer" data-editable="true" data-field="upcoming-3-organizer">Jessica Park</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bottom-bar">
+        <div class="equipment-list">
+          <div class="equipment-item">
+            <svg viewBox="0 0 24 24" fill="none">
+              <rect x="3" y="8" width="14" height="9" rx="1" stroke="currentColor" stroke-width="1.6"/>
+              <circle cx="10" cy="12.5" r="2" stroke="currentColor" stroke-width="1.6"/>
+              <path d="M17 12h4l-3 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="equipment-item">
+            <svg viewBox="0 0 24 24" fill="none">
+              <rect x="3" y="4" width="18" height="13" rx="1" stroke="currentColor" stroke-width="1.6"/>
+              <line x1="8" y1="9" x2="16" y2="9" stroke="currentColor" stroke-width="1.4"/>
+              <line x1="10" y1="20" x2="14" y2="20" stroke="currentColor" stroke-width="1.6"/>
+              <line x1="12" y1="17" x2="12" y2="20" stroke="currentColor" stroke-width="1.6"/>
+            </svg>
+          </div>
+          <div class="equipment-item">
+            <svg viewBox="0 0 24 24" fill="none">
+              <rect x="2" y="6" width="14" height="12" rx="1" stroke="currentColor" stroke-width="1.6"/>
+              <path d="M16 10l6-3v10l-6-3z" stroke="currentColor" stroke-width="1.6"/>
+            </svg>
+          </div>
+          <div class="equipment-item">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z" stroke="currentColor" stroke-width="1.6"/>
+            </svg>
+          </div>
+        </div>
+        <div class="current-time-small" data-editable="true" data-field="current-time">9:45 AM</div>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

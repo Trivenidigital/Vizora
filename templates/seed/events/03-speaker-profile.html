@@ -3,420 +3,149 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1920, height=1080">
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <title>Speaker Profile</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Cormorant+SC:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(28px); }
-      to { opacity: 1; transform: translateY(0); }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg-a: #EADDBE;
+      --bg-b: #E2D0B0;
+      --ink: #2C1810;
+      --ink-body: #4A2D18;
+      --ink-muted: #7A4A28;
+      --brass: #8B6F2E;
+      --royal: #3D1F14;
+      --accent: #8B6F2E;
+      --rule: rgba(139,111,46,0.4);
     }
-    @keyframes fadeLeft {
-      from { opacity: 0; transform: translateX(35px); }
-      to { opacity: 1; transform: translateX(0); }
-    }
-    @keyframes scaleIn {
-      from { opacity: 0; transform: scale(0.85); }
-      to { opacity: 1; transform: scale(1); }
-    }
-    @keyframes breathe {
-      0%, 100% { opacity: 0.6; transform: scale(1); }
-      50% { opacity: 1; transform: scale(1.04); }
-    }
-    @keyframes ringPulse {
-      0%, 100% { opacity: 0.15; transform: translate(-50%, -50%) scale(1); }
-      50% { opacity: 0.25; transform: translate(-50%, -50%) scale(1.02); }
-    }
-
     body {
-      width: 1920px;
-      height: 1080px;
-      overflow: hidden;
-      position: relative;
-      font-family: 'Inter', sans-serif;
+      width: 1920px; height: 1080px; overflow: hidden; position: relative;
+      font-family: 'Lora', serif; color: var(--ink-body);
       background:
-        /* Diagonal line texture */
-        repeating-linear-gradient(
-          68deg,
-          transparent,
-          transparent 24px,
-          rgba(255,255,255,0.01) 24px,
-          rgba(255,255,255,0.01) 25px
-        ),
-        repeating-linear-gradient(
-          112deg,
-          transparent,
-          transparent 32px,
-          rgba(255,255,255,0.007) 32px,
-          rgba(255,255,255,0.007) 33px
-        ),
-        /* Deep navy-charcoal gradient */
-        linear-gradient(150deg, #0c0a18 0%, #141028 35%, #0f0d1e 65%, #0a0814 100%);
-      color: #ede9df;
+        radial-gradient(ellipse at 30% 0%, rgba(139,111,46,0.08), transparent 60%),
+        radial-gradient(ellipse at 70% 100%, rgba(61,31,20,0.05), transparent 55%),
+        linear-gradient(165deg, #EADDBE 0%, #E2D0B0 100%);
     }
-
-    /* Dot grid texture */
     body::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background-image: radial-gradient(circle, rgba(200,170,80,0.03) 1px, transparent 1px);
-      background-size: 28px 28px;
-      z-index: 0;
+      content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+      background-image:
+        radial-gradient(circle at 21% 29%, rgba(44,24,16,0.035) 0.6px, transparent 1.1px),
+        radial-gradient(circle at 71% 64%, rgba(44,24,16,0.028) 0.5px, transparent 1px);
+      background-size: 38px 38px, 54px 54px;
     }
+    .frame { position: absolute; inset: 72px; border: 1px solid var(--brass); z-index: 1; }
+    .frame::before { content: ''; position: absolute; inset: 10px; border: 1px solid rgba(139,111,46,0.22); }
 
-    /* Gold accent stripe top */
-    body::after {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 4px;
-      background: linear-gradient(90deg, transparent, #C8A850, #DAA520, #C8A850, transparent);
-      z-index: 3;
-    }
-
-    /* Warm gold glow — behind profile */
-    .glow-gold {
-      position: absolute;
-      top: 200px; left: 350px;
-      width: 400px; height: 400px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(200,170,80,0.14) 0%, transparent 70%);
-      filter: blur(60px);
-      z-index: 0;
-      animation: breathe 7s ease-in-out infinite;
-    }
-
-    /* Secondary glow — right side */
-    .glow-right {
-      position: absolute;
-      bottom: 150px; right: 200px;
-      width: 300px; height: 300px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(200,170,80,0.08) 0%, transparent 70%);
-      filter: blur(40px);
-      z-index: 0;
-      animation: breathe 9s ease-in-out 3s infinite;
-    }
-
-    /* Ornamental gold lines */
-    .orn-line-left {
-      position: absolute;
-      top: 120px; left: 80px; bottom: 120px;
-      width: 1px;
-      background: linear-gradient(180deg, transparent, rgba(200,170,80,0.3), transparent);
-      z-index: 1;
-    }
-
-    .orn-line-right {
-      position: absolute;
-      top: 120px; right: 80px; bottom: 120px;
-      width: 1px;
-      background: linear-gradient(180deg, transparent, rgba(200,170,80,0.3), transparent);
-      z-index: 1;
-    }
-
-    /* Main layout grid */
-    .layout {
-      position: relative;
-      z-index: 2;
-      display: grid;
-      grid-template-columns: 620px 1fr;
-      grid-template-rows: auto 1fr auto;
-      height: 100%;
+    .container {
+      position: absolute; inset: 72px; z-index: 2;
+      display: grid; grid-template-columns: 720px 1fr;
+      align-items: center; gap: 40px;
       padding: 80px 120px;
-      gap: 60px;
     }
-
-    /* Top label */
-    .top-label {
-      grid-column: 1 / -1;
-      display: flex;
-      align-items: center;
-      gap: 20px;
-      animation: fadeUp 0.7s ease-out both;
-    }
-
-    .speaker-label {
-      font-family: 'Inter', sans-serif;
-      font-weight: 700;
-      font-size: 14px;
-      letter-spacing: 6px;
-      text-transform: uppercase;
-      color: #C8A850;
-    }
-
-    .label-line {
-      flex: 1;
-      height: 1px;
-      background: linear-gradient(90deg, rgba(200,170,80,0.4), transparent);
-    }
-
-    /* Profile area (left column) */
-    .profile-area {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 30px;
-      animation: scaleIn 0.8s ease-out 0.2s both;
-    }
-
-    /* Profile circle placeholder */
-    .profile-circle-wrapper {
+    .portrait-frame {
       position: relative;
-      width: 380px;
-      height: 380px;
+      width: 560px; height: 720px;
+      border: 1px solid var(--brass);
+      background: rgba(255,248,232,0.28);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .portrait-frame::before {
+      content: ''; position: absolute; inset: 10px;
+      border: 1px solid rgba(139,111,46,0.22);
+    }
+    .portrait-svg {
+      width: 300px; height: 300px; color: var(--accent);
+      opacity: 0.85;
+    }
+    .speaker-label-badge {
+      position: absolute; top: -14px; left: 50%;
+      transform: translateX(-50%);
+      background: var(--bg-a);
+      padding: 4px 24px;
+      font-family: 'Cormorant SC', serif;
+      font-size: 15px; letter-spacing: 5px; font-weight: 600;
+      color: var(--brass); text-transform: uppercase;
     }
 
-    .profile-circle {
-      width: 380px;
-      height: 380px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, rgba(200,170,80,0.1), rgba(200,170,80,0.05));
-      border: 3px solid rgba(200,170,80,0.35);
-      box-shadow:
-        0 0 60px rgba(200,170,80,0.1),
-        0 20px 60px rgba(0,0,0,0.4),
-        inset 0 0 80px rgba(200,170,80,0.03);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
+    .info {
+      padding-left: 20px;
     }
-
-    .profile-placeholder {
-      font-family: 'Inter', sans-serif;
-      font-weight: 600;
-      font-size: 15px;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color: rgba(200,170,80,0.4);
-    }
-
-    /* Decorative rings around profile */
-    .profile-ring {
-      position: absolute;
-      top: 50%; left: 50%;
-      width: 410px; height: 410px;
-      border-radius: 50%;
-      border: 1px solid rgba(200,170,80,0.15);
-      transform: translate(-50%, -50%);
-      animation: ringPulse 6s ease-in-out infinite;
-    }
-
-    .profile-ring-2 {
-      position: absolute;
-      top: 50%; left: 50%;
-      width: 440px; height: 440px;
-      border-radius: 50%;
-      border: 1px dashed rgba(200,170,80,0.08);
-      transform: translate(-50%, -50%);
-      animation: ringPulse 6s ease-in-out 1.5s infinite;
-    }
-
     .speaker-company {
-      font-family: 'Inter', sans-serif;
-      font-weight: 700;
-      font-size: 16px;
-      letter-spacing: 5px;
-      text-transform: uppercase;
-      color: rgba(200,170,80,0.7);
+      font-family: 'Cormorant SC', serif;
+      font-size: 18px; letter-spacing: 7px; font-weight: 600;
+      color: var(--brass); text-transform: uppercase;
+      margin-bottom: 16px;
+      display: flex; align-items: center; gap: 16px;
     }
-
-    /* Bio area (right column) */
-    .bio-area {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      gap: 24px;
+    .speaker-company::before {
+      content: ''; width: 40px; height: 1px; background: var(--brass);
     }
-
     .speaker-name {
-      font-family: 'Playfair Display', serif;
-      font-weight: 900;
-      font-size: 72px;
-      line-height: 1.1;
-      color: #ede9df;
-      text-shadow: 0 2px 20px rgba(0,0,0,0.4);
-      animation: fadeLeft 0.8s ease-out 0.3s both;
+      font-family: 'DM Serif Display', serif;
+      font-size: 110px; color: var(--royal);
+      line-height: 0.92; letter-spacing: -1px;
+      margin-bottom: 14px;
     }
-
     .speaker-title {
-      font-family: 'Inter', sans-serif;
-      font-weight: 700;
-      font-size: 20px;
-      color: rgba(200,170,80,0.85);
-      animation: fadeLeft 0.8s ease-out 0.45s both;
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 24px; color: var(--ink-muted);
+      margin-bottom: 26px;
     }
-
-    .talk-title-label {
-      font-family: 'Inter', sans-serif;
-      font-weight: 700;
-      font-size: 12px;
-      letter-spacing: 4px;
-      text-transform: uppercase;
-      color: rgba(200,170,80,0.55);
-      margin-bottom: -14px;
-      animation: fadeLeft 0.8s ease-out 0.55s both;
-    }
-
     .talk-title {
-      font-family: 'Playfair Display', serif;
-      font-weight: 700;
-      font-size: 34px;
-      font-style: italic;
-      line-height: 1.3;
-      color: rgba(237,233,223,0.92);
-      animation: fadeLeft 0.8s ease-out 0.65s both;
+      font-family: 'DM Serif Display', serif; font-style: italic;
+      font-size: 28px; color: var(--ink);
+      line-height: 1.3; margin-bottom: 22px;
+      padding: 18px 0;
+      border-top: 1px solid var(--rule);
+      border-bottom: 1px solid var(--rule);
     }
-
     .speaker-bio {
-      font-family: 'Inter', sans-serif;
-      font-size: 19px;
-      font-weight: 400;
-      line-height: 1.8;
-      color: rgba(237,233,223,0.58);
-      max-width: 660px;
-      animation: fadeLeft 0.8s ease-out 0.75s both;
+      font-family: 'Lora', serif;
+      font-size: 17px; color: var(--ink-body);
+      line-height: 1.6; margin-bottom: 26px;
+      max-width: 760px;
     }
-
-    /* Credentials pills */
     .credentials {
-      display: flex;
-      gap: 14px;
-      flex-wrap: wrap;
-      animation: fadeUp 0.7s ease-out 0.9s both;
+      display: flex; flex-wrap: wrap; gap: 14px;
     }
-
     .credential-pill {
-      background: rgba(200,170,80,0.08);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid rgba(200,170,80,0.2);
-      border-radius: 30px;
-      padding: 10px 22px;
-      font-family: 'Inter', sans-serif;
-      font-weight: 600;
-      font-size: 14px;
-      color: rgba(200,170,80,0.85);
-      box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+      padding: 8px 20px; border: 1px solid var(--brass);
+      background: rgba(255,248,232,0.34);
+      font-family: 'Cormorant SC', serif;
+      font-size: 13px; letter-spacing: 3px; font-weight: 600;
+      color: var(--brass); text-transform: uppercase;
     }
 
-    /* Bottom info bar */
-    .bottom-bar {
-      grid-column: 1 / -1;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding-top: 20px;
-      border-top: 1px solid rgba(200,170,80,0.12);
-      animation: fadeUp 0.7s ease-out 1s both;
-    }
-
-    .event-info {
-      font-family: 'Inter', sans-serif;
-      font-weight: 500;
-      font-size: 17px;
-      color: rgba(237,233,223,0.45);
-    }
-
-    .event-logo-text {
-      font-family: 'Playfair Display', serif;
-      font-weight: 800;
-      font-size: 20px;
-      color: rgba(200,170,80,0.6);
-      letter-spacing: 3px;
-    }
-
-    /* SVG decorations */
-    .svg-decor {
-      position: absolute;
-      z-index: 1;
-      pointer-events: none;
-    }
-
-    /* Corner SVGs */
-    .corner-svg {
-      position: absolute;
-      z-index: 1;
-      opacity: 0.2;
-    }
-
-    /* Gold stripe bottom */
-    .gold-stripe {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 4px;
-      background: linear-gradient(90deg, transparent, #C8A850, #DAA520, #C8A850, transparent);
-      z-index: 3;
+    .footer {
+      position: absolute; bottom: 110px; left: 120px; right: 120px;
+      z-index: 5;
+      display: flex; justify-content: space-between;
+      font-family: 'Cormorant SC', serif;
+      font-size: 16px; letter-spacing: 5px;
+      color: var(--brass); text-transform: uppercase;
+      padding-top: 16px;
+      border-top: 1px solid var(--rule);
     }
   </style>
 </head>
 <body>
-  <!-- Glowing orbs -->
-  <div class="glow-gold"></div>
-  <div class="glow-right"></div>
+  <div class="frame"></div>
 
-  <!-- Ornamental lines -->
-  <div class="orn-line-left"></div>
-  <div class="orn-line-right"></div>
-
-  <!-- SVG star decorations (replacing emoji) -->
-  <svg class="svg-decor" style="top:70px;right:130px;opacity:0.2;" width="50" height="50" viewBox="0 0 50 50" fill="none">
-    <path d="M25 2 L28 20 L48 25 L28 28 L25 48 L22 28 L2 25 L22 20 Z" stroke="#C8A850" stroke-width="1.5" fill="none"/>
-    <circle cx="25" cy="25" r="4" fill="rgba(200,170,80,0.3)"/>
-  </svg>
-  <svg class="svg-decor" style="bottom:140px;right:140px;opacity:0.15;" width="35" height="35" viewBox="0 0 35 35" fill="none">
-    <path d="M17.5 2 L19.5 14 L32 17.5 L19.5 20 L17.5 33 L15.5 20 L3 17.5 L15.5 14 Z" stroke="#C8A850" stroke-width="1" fill="none"/>
-  </svg>
-  <svg class="svg-decor" style="top:280px;right:95px;opacity:0.12;" width="28" height="28" viewBox="0 0 28 28" fill="none">
-    <circle cx="14" cy="14" r="3" fill="rgba(200,170,80,0.35)"/>
-    <circle cx="14" cy="14" r="9" stroke="rgba(200,170,80,0.15)" stroke-width="1" fill="none"/>
-    <circle cx="14" cy="14" r="13" stroke="rgba(200,170,80,0.08)" stroke-width="1" fill="none"/>
-  </svg>
-
-  <!-- Corner SVGs -->
-  <svg class="corner-svg" style="top:16px;left:16px;" width="55" height="55" viewBox="0 0 55 55" fill="none">
-    <path d="M0 28 L0 0 L28 0" stroke="#C8A850" stroke-width="2" fill="none"/>
-    <circle cx="3" cy="3" r="2.5" fill="#C8A850"/>
-  </svg>
-  <svg class="corner-svg" style="bottom:16px;right:16px;transform:rotate(180deg);" width="55" height="55" viewBox="0 0 55 55" fill="none">
-    <path d="M0 28 L0 0 L28 0" stroke="#C8A850" stroke-width="2" fill="none"/>
-    <circle cx="3" cy="3" r="2.5" fill="#C8A850"/>
-  </svg>
-
-  <!-- Geometric hexagon accent -->
-  <svg class="svg-decor" style="top:450px;left:40px;opacity:0.1;" width="60" height="68" viewBox="0 0 60 68" fill="none">
-    <polygon points="30,4 56,20 56,48 30,64 4,48 4,20" stroke="#C8A850" stroke-width="1.5" fill="none"/>
-  </svg>
-
-  <!-- Main layout -->
-  <div class="layout">
-    <!-- Top label -->
-    <div class="top-label">
-      <span class="speaker-label" data-editable="true" data-field="sectionLabel">Featured Speaker</span>
-      <span class="label-line"></span>
+  <div class="container">
+    <div class="portrait-frame">
+      <div class="speaker-label-badge"><span data-editable="true" data-field="sectionLabel">Featured Speaker</span></div>
+      <svg class="portrait-svg" viewBox="0 0 200 200" fill="none" stroke="currentColor" stroke-width="1.2">
+        <circle cx="100" cy="78" r="38"/>
+        <path d="M30 180 C30 140, 60 120, 100 120 C140 120, 170 140, 170 180"/>
+        <circle cx="100" cy="100" r="92" opacity="0.3"/>
+      </svg>
     </div>
 
-    <!-- Profile area -->
-    <div class="profile-area">
-      <div class="profile-circle-wrapper">
-        <div class="profile-ring-2"></div>
-        <div class="profile-ring"></div>
-        <div class="profile-circle">
-          <span class="profile-placeholder">Speaker Photo</span>
-        </div>
-      </div>
-      <span class="speaker-company" data-editable="true" data-field="speakerCompany">Nexawave Technologies</span>
-    </div>
-
-    <!-- Bio area -->
-    <div class="bio-area">
+    <div class="info">
+      <div class="speaker-company"><span data-editable="true" data-field="speakerCompany">Nexawave Technologies</span></div>
       <h1 class="speaker-name" data-editable="true" data-field="speakerName">Dr. Sarah<br>Chen</h1>
       <p class="speaker-title" data-editable="true" data-field="speakerTitle">Chief Technology Officer &amp; Co-Founder</p>
-      <span class="talk-title-label">Presenting</span>
-      <p class="talk-title" data-editable="true" data-field="talkTitle">"Building the Next Generation of Intelligent Systems"</p>
+      <p class="talk-title" data-editable="true" data-field="talkTitle">&ldquo;Building the Next Generation of Intelligent Systems&rdquo;</p>
       <p class="speaker-bio" data-editable="true" data-field="speakerBio">With over 15 years in AI research and distributed systems, Dr. Chen has led teams at Google Brain and MIT before co-founding Nexawave. Her work on neural architecture search has been cited over 12,000 times.</p>
       <div class="credentials">
         <span class="credential-pill" data-editable="true" data-field="credential1">MIT PhD, Computer Science</span>
@@ -424,15 +153,11 @@
         <span class="credential-pill" data-editable="true" data-field="credential3">3x Best Paper Award</span>
       </div>
     </div>
-
-    <!-- Bottom bar -->
-    <div class="bottom-bar">
-      <span class="event-info" data-editable="true" data-field="eventInfo">Main Stage &bull; April 22, 2026 &bull; 9:00 AM</span>
-      <span class="event-logo-text" data-editable="true" data-field="eventName">DEVFORWARD 2026</span>
-    </div>
   </div>
 
-  <!-- Gold stripe bottom -->
-  <div class="gold-stripe"></div>
+  <div class="footer">
+    <span data-editable="true" data-field="eventInfo">Main Stage &bull; April 22, 2026 &bull; 9:00 AM</span>
+    <span data-editable="true" data-field="eventName">DEVFORWARD 2026</span>
+  </div>
 </body>
 </html>

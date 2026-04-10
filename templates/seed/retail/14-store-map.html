@@ -3,596 +3,236 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1920, height=1080">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Montserrat:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Cormorant+SC:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg-a: #E2D0B0;
+      --bg-b: #D9C4A0;
+      --ink: #2C1810;
+      --ink-body: #4A2D18;
+      --ink-muted: #7A4A28;
+      --brass: #8B6F2E;
+      --accent: #8B6F2E;
+      --rule: rgba(139,111,46,0.4);
+    }
     body {
-      width: 1920px;
-      height: 1080px;
-      overflow: hidden;
-      position: relative;
-      font-family: 'Inter', sans-serif;
+      width: 1920px; height: 1080px; overflow: hidden; position: relative;
+      font-family: 'Lora', serif; color: var(--ink-body);
       background:
-        radial-gradient(ellipse at 25% 35%, rgba(59, 130, 246, 0.08) 0%, transparent 50%),
-        radial-gradient(ellipse at 75% 65%, rgba(99, 102, 241, 0.06) 0%, transparent 45%),
-        radial-gradient(ellipse at 50% 90%, rgba(59, 130, 246, 0.04) 0%, transparent 40%),
-        linear-gradient(155deg, #f8fafc 0%, #f1f5f9 30%, #e8eef5 60%, #f0f4f8 100%);
-      color: #1e293b;
+        radial-gradient(ellipse at 50% 0%, rgba(139,111,46,0.07), transparent 60%),
+        linear-gradient(168deg, var(--bg-a) 0%, var(--bg-b) 100%);
     }
-
-    /* Grid texture */
     body::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background-image: radial-gradient(circle, rgba(0,0,0,0.02) 1px, transparent 1px);
-      background-size: 24px 24px;
-      z-index: 0;
+      content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+      background-image:
+        radial-gradient(circle at 19% 27%, rgba(44,24,16,0.035) 0.6px, transparent 1.1px),
+        radial-gradient(circle at 71% 64%, rgba(44,24,16,0.028) 0.5px, transparent 1px);
+      background-size: 40px 40px, 60px 60px;
     }
+    .frame { position: absolute; inset: 72px; border: 1px solid var(--brass); z-index: 1; }
+    .frame::before { content: ''; position: absolute; inset: 10px; border: 1px solid rgba(139,111,46,0.22); }
 
-    /* Light stripe pattern */
-    body::after {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: repeating-linear-gradient(
-        0deg,
-        transparent,
-        transparent 120px,
-        rgba(59, 130, 246, 0.015) 120px,
-        rgba(59, 130, 246, 0.015) 121px
-      );
-      z-index: 0;
+    .top-bar {
+      position: absolute; top: 115px; left: 130px; right: 130px; z-index: 5;
+      display: flex; justify-content: space-between; align-items: center;
+      padding-bottom: 22px; border-bottom: 1px solid var(--rule);
     }
-
-    /* Light blue glow */
-    .glow-blue {
-      position: absolute;
-      top: 50%;
-      left: 40%;
-      transform: translate(-50%, -50%);
-      width: 800px;
-      height: 600px;
-      background: radial-gradient(ellipse, rgba(59, 130, 246, 0.04) 0%, transparent 70%);
-      filter: blur(60px);
-      z-index: 0;
-    }
-
-    /* Layout - 3 columns */
-    .layout {
-      position: relative;
-      z-index: 3;
-      display: grid;
-      grid-template-columns: 320px 1fr 320px;
-      grid-template-rows: auto 1fr auto;
-      height: 100%;
-      padding: 40px 50px;
-      gap: 25px;
-    }
-
-    /* Header - full width */
-    .header {
-      grid-column: 1 / -1;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .header-left {
-      display: flex;
-      align-items: center;
-      gap: 25px;
-    }
-
     .store-name {
-      font-family: 'Montserrat', sans-serif;
-      font-size: 26px;
-      font-weight: 900;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color: #1e293b;
+      font-family: 'Cormorant SC', serif;
+      font-size: 22px; letter-spacing: 8px;
+      color: var(--ink); text-transform: uppercase; font-weight: 600;
     }
-
-    .floor-selector {
-      display: flex;
-      gap: 8px;
-    }
-
-    .floor-btn {
-      font-family: 'Montserrat', sans-serif;
-      font-size: 14px;
-      font-weight: 700;
-      padding: 8px 18px;
-      border-radius: 8px;
-      letter-spacing: 1px;
-    }
-
-    .floor-btn.active {
-      background: #3b82f6;
-      color: #ffffff;
-      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-    }
-
-    .floor-btn.inactive {
-      background: rgba(59, 130, 246, 0.08);
-      color: #3b82f6;
-    }
-
     .header-title {
-      font-family: 'Montserrat', sans-serif;
-      font-size: 18px;
-      font-weight: 700;
-      color: rgba(30, 41, 59, 0.5);
-      letter-spacing: 4px;
-      text-transform: uppercase;
+      font-family: 'DM Serif Display', serif;
+      font-size: 32px; color: var(--accent);
     }
 
-    /* Left legend panel */
-    .legend-panel {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
+    .content {
+      position: absolute; top: 220px; bottom: 180px;
+      left: 140px; right: 140px; z-index: 5;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 50px;
     }
 
-    .legend-title {
-      font-family: 'Montserrat', sans-serif;
-      font-size: 14px;
-      font-weight: 800;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color: rgba(30, 41, 59, 0.4);
-      margin-bottom: 5px;
-    }
-
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 10px 14px;
-      background: rgba(255, 255, 255, 0.7);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      border: 1px solid rgba(0, 0, 0, 0.05);
-      border-radius: 10px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-    }
-
-    .legend-color {
-      width: 16px;
-      height: 16px;
-      border-radius: 4px;
-      flex-shrink: 0;
-    }
-
-    .legend-label {
-      font-family: 'Inter', sans-serif;
-      font-size: 14px;
-      font-weight: 500;
-      color: #1e293b;
-    }
-
-    /* Center - floor plan */
-    .floor-plan {
-      background: rgba(255, 255, 255, 0.6);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid rgba(0, 0, 0, 0.06);
-      border-radius: 20px;
+    /* Left: Floor plan visual */
+    .map {
       padding: 30px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      grid-template-rows: repeat(3, 1fr);
-      gap: 12px;
+      border: 1px solid var(--brass);
+      background: rgba(234,221,190,0.4);
       position: relative;
+      display: flex; flex-direction: column; gap: 18px;
     }
-
+    .map::before {
+      content: ''; position: absolute; inset: 8px;
+      border: 1px solid rgba(139,111,46,0.22);
+    }
+    .floors {
+      display: flex; justify-content: space-around;
+      padding-bottom: 14px; border-bottom: 1px solid var(--rule);
+      position: relative; z-index: 2;
+    }
+    .floor-label {
+      font-family: 'Cormorant SC', serif;
+      font-size: 14px; letter-spacing: 4px;
+      color: var(--accent); text-transform: uppercase; font-weight: 600;
+    }
+    .grid-map {
+      display: grid; grid-template-columns: repeat(5, 1fr);
+      gap: 10px; position: relative; z-index: 2;
+    }
     .zone {
-      border-radius: 12px;
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
+      padding: 18px 12px;
+      border: 1px solid rgba(139,111,46,0.4);
+      background: rgba(234,221,190,0.3);
       text-align: center;
-      gap: 8px;
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 13px; color: var(--ink-body);
+      line-height: 1.3; min-height: 66px;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* Right: Legend + info */
+    .right {
+      display: flex; flex-direction: column; gap: 24px;
+    }
+    .legend {
+      padding: 22px 28px;
+      border: 1px solid var(--brass);
+      background: rgba(234,221,190,0.35);
       position: relative;
-      border: 2px solid transparent;
+    }
+    .legend::before {
+      content: ''; position: absolute; inset: 6px;
+      border: 1px solid rgba(139,111,46,0.22);
+    }
+    .legend-title {
+      font-family: 'Cormorant SC', serif;
+      font-size: 16px; letter-spacing: 5px;
+      color: var(--accent); text-transform: uppercase; font-weight: 600;
+      text-align: center; padding-bottom: 10px;
+      border-bottom: 1px solid var(--rule); margin-bottom: 12px;
+      position: relative;
+    }
+    .legend-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px;
+      position: relative;
+    }
+    .legend-item {
+      font-family: 'Lora', serif;
+      font-size: 15px; color: var(--ink-body);
+      padding: 4px 0;
+    }
+    .legend-item::before {
+      content: '\2022'; color: var(--accent); margin-right: 8px;
     }
 
-    .zone-icon {
-      width: 36px;
-      height: 36px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    .info-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
     }
-
-    .zone-icon svg {
-      width: 32px;
-      height: 32px;
-      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.08));
+    .info-item {
+      padding: 12px 16px;
+      border: 1px solid var(--brass);
+      background: rgba(234,221,190,0.35);
     }
-
-    .zone-name {
-      font-family: 'Montserrat', sans-serif;
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-    }
-
-    /* Zone colors */
-    .zone.fashion { background: rgba(236, 72, 153, 0.08); border-color: rgba(236, 72, 153, 0.2); }
-    .zone.fashion .zone-name { color: #be185d; }
-    .zone.fashion .zone-icon svg { color: #db2777; }
-    .zone.shoes { background: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.2); }
-    .zone.shoes .zone-name { color: #b45309; }
-    .zone.shoes .zone-icon svg { color: #d97706; }
-    .zone.beauty { background: rgba(20, 184, 166, 0.08); border-color: rgba(20, 184, 166, 0.2); }
-    .zone.beauty .zone-name { color: #0d9488; }
-    .zone.beauty .zone-icon svg { color: #14b8a6; }
-    .zone.electronics { background: rgba(99, 102, 241, 0.08); border-color: rgba(99, 102, 241, 0.2); }
-    .zone.electronics .zone-name { color: #4338ca; }
-    .zone.electronics .zone-icon svg { color: #6366f1; }
-    .zone.home { background: rgba(59, 130, 246, 0.08); border-color: rgba(59, 130, 246, 0.2); }
-    .zone.home .zone-name { color: #1d4ed8; }
-    .zone.home .zone-icon svg { color: #3b82f6; }
-    .zone.food { background: rgba(234, 88, 12, 0.08); border-color: rgba(234, 88, 12, 0.2); }
-    .zone.food .zone-name { color: #c2410c; }
-    .zone.food .zone-icon svg { color: #ea580c; }
-    .zone.entrance { background: rgba(30, 41, 59, 0.06); border-color: rgba(30, 41, 59, 0.15); }
-    .zone.entrance .zone-name { color: #475569; }
-    .zone.entrance .zone-icon svg { color: #64748b; }
-    .zone.service { background: rgba(34, 197, 94, 0.08); border-color: rgba(34, 197, 94, 0.2); }
-    .zone.service .zone-name { color: #15803d; }
-    .zone.service .zone-icon svg { color: #22c55e; }
-    .zone.kids { background: rgba(244, 63, 94, 0.08); border-color: rgba(244, 63, 94, 0.2); }
-    .zone.kids .zone-name { color: #be123c; }
-    .zone.kids .zone-icon svg { color: #f43f5e; }
-    .zone.sports { background: rgba(139, 92, 246, 0.08); border-color: rgba(139, 92, 246, 0.2); }
-    .zone.sports .zone-name { color: #6d28d9; }
-    .zone.sports .zone-icon svg { color: #8b5cf6; }
-
-    /* Span adjustments */
-    .zone.wide { grid-column: span 2; }
-    .zone.tall { grid-row: span 2; }
-
-    /* Directional arrows SVG overlay */
-    .arrows-overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: 5;
-    }
-
-    /* Right info panel */
-    .info-panel {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-
     .info-title {
-      font-family: 'Montserrat', sans-serif;
-      font-size: 14px;
-      font-weight: 800;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color: rgba(30, 41, 59, 0.4);
-      margin-bottom: 5px;
-    }
-
-    .info-card {
-      background: rgba(255, 255, 255, 0.7);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      border: 1px solid rgba(0, 0, 0, 0.05);
-      border-radius: 12px;
-      padding: 16px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-    }
-
-    .info-card-icon {
-      width: 32px;
-      height: 32px;
-      margin-bottom: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .info-card-icon svg {
-      width: 28px;
-      height: 28px;
-      color: #3b82f6;
-    }
-
-    .info-card-title {
-      font-family: 'Montserrat', sans-serif;
-      font-size: 15px;
-      font-weight: 700;
-      color: #1e293b;
+      font-family: 'Cormorant SC', serif;
+      font-size: 13px; letter-spacing: 4px;
+      color: var(--accent); text-transform: uppercase; font-weight: 600;
       margin-bottom: 4px;
     }
-
-    .info-card-text {
-      font-family: 'Inter', sans-serif;
-      font-size: 13px;
-      color: rgba(30, 41, 59, 0.5);
-      line-height: 1.4;
+    .info-text {
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 13px; color: var(--ink-body); line-height: 1.4;
     }
 
-    /* Footer */
-    .footer {
-      grid-column: 1 / -1;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-top: 1px solid rgba(0, 0, 0, 0.06);
-      padding-top: 15px;
+    .bottom-bar {
+      position: absolute; bottom: 108px; left: 130px; right: 130px; z-index: 5;
+      display: flex; justify-content: space-between; align-items: center;
+      padding-top: 20px; border-top: 1px solid var(--rule);
     }
-
     .footer-text {
-      font-family: 'Inter', sans-serif;
-      font-size: 14px;
-      color: rgba(30, 41, 59, 0.35);
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 14px; color: var(--ink-muted);
     }
-
     .footer-help {
-      font-family: 'Montserrat', sans-serif;
-      font-size: 15px;
-      font-weight: 700;
-      color: #3b82f6;
-    }
-
-    /* SVG decorations */
-    .svg-deco {
-      position: absolute;
-      z-index: 1;
+      font-family: 'Cormorant SC', serif;
+      font-size: 16px; letter-spacing: 4px;
+      color: var(--accent); text-transform: uppercase; font-weight: 600;
     }
   </style>
 </head>
 <body>
-  <!-- Glow -->
-  <div class="glow-blue"></div>
+  <div class="frame"></div>
 
-  <!-- SVG compass -->
-  <svg class="svg-deco" style="top:30px;right:30px;opacity:0.1;" width="70" height="70" viewBox="0 0 70 70">
-    <circle cx="35" cy="35" r="30" fill="none" stroke="#3b82f6" stroke-width="1"/>
-    <polygon points="35,8 38,28 35,32 32,28" fill="#3b82f6" opacity="0.6"/>
-    <polygon points="35,62 38,42 35,38 32,42" fill="#94a3b8" opacity="0.4"/>
-    <text x="35" y="5" text-anchor="middle" fill="#3b82f6" font-size="7" font-family="Montserrat" font-weight="700">N</text>
-  </svg>
+  <div class="top-bar">
+    <div class="store-name" data-editable="true" data-field="store_name">STORE NAME</div>
+    <div class="header-title" data-editable="true" data-field="header_title">Store Map — Floor Plan</div>
+  </div>
 
-  <!-- SVG scale indicator -->
-  <svg class="svg-deco" style="bottom:60px;left:380px;opacity:0.15;" width="200" height="30" viewBox="0 0 200 30">
-    <line x1="10" y1="15" x2="190" y2="15" stroke="#1e293b" stroke-width="1"/>
-    <line x1="10" y1="8" x2="10" y2="22" stroke="#1e293b" stroke-width="1"/>
-    <line x1="190" y1="8" x2="190" y2="22" stroke="#1e293b" stroke-width="1"/>
-    <line x1="100" y1="10" x2="100" y2="20" stroke="#1e293b" stroke-width="0.5"/>
-    <text x="100" y="28" text-anchor="middle" fill="#1e293b" font-size="8" font-family="Inter">~200 ft</text>
-  </svg>
-
-  <div class="layout">
-    <div class="header">
-      <div class="header-left">
-        <div class="store-name" data-editable="true" data-field="store_name">STORE NAME</div>
-        <div class="floor-selector">
-          <div class="floor-btn active" data-editable="true" data-field="floor1_label">FLOOR 1</div>
-          <div class="floor-btn inactive" data-editable="true" data-field="floor2_label">FLOOR 2</div>
-          <div class="floor-btn inactive" data-editable="true" data-field="floor3_label">FLOOR 3</div>
-        </div>
+  <div class="content">
+    <div class="map">
+      <div class="floors">
+        <div class="floor-label" data-editable="true" data-field="floor1_label">FLOOR 1</div>
+        <div class="floor-label" data-editable="true" data-field="floor2_label">FLOOR 2</div>
+        <div class="floor-label" data-editable="true" data-field="floor3_label">FLOOR 3</div>
       </div>
-      <div class="header-title" data-editable="true" data-field="header_title">STORE MAP -- FLOOR PLAN</div>
-    </div>
-
-    <!-- Legend -->
-    <div class="legend-panel">
-      <div class="legend-title">Department Legend</div>
-      <div class="legend-item">
-        <div class="legend-color" style="background:#ec4899;"></div>
-        <div class="legend-label" data-editable="true" data-field="legend1">Women's Fashion</div>
-      </div>
-      <div class="legend-item">
-        <div class="legend-color" style="background:#f59e0b;"></div>
-        <div class="legend-label" data-editable="true" data-field="legend2">Shoes & Footwear</div>
-      </div>
-      <div class="legend-item">
-        <div class="legend-color" style="background:#14b8a6;"></div>
-        <div class="legend-label" data-editable="true" data-field="legend3">Beauty & Skincare</div>
-      </div>
-      <div class="legend-item">
-        <div class="legend-color" style="background:#6366f1;"></div>
-        <div class="legend-label" data-editable="true" data-field="legend4">Electronics & Tech</div>
-      </div>
-      <div class="legend-item">
-        <div class="legend-color" style="background:#3b82f6;"></div>
-        <div class="legend-label" data-editable="true" data-field="legend5">Home & Living</div>
-      </div>
-      <div class="legend-item">
-        <div class="legend-color" style="background:#ea580c;"></div>
-        <div class="legend-label" data-editable="true" data-field="legend6">Food Court</div>
-      </div>
-      <div class="legend-item">
-        <div class="legend-color" style="background:#22c55e;"></div>
-        <div class="legend-label" data-editable="true" data-field="legend7">Customer Service</div>
-      </div>
-      <div class="legend-item">
-        <div class="legend-color" style="background:#f43f5e;"></div>
-        <div class="legend-label" data-editable="true" data-field="legend8">Kids & Family</div>
+      <div class="grid-map">
+        <div class="zone" data-editable="true" data-field="zone1">Main Entrance</div>
+        <div class="zone" data-editable="true" data-field="zone2">Beauty &amp; Cosmetics</div>
+        <div class="zone" data-editable="true" data-field="zone3">Info Desk</div>
+        <div class="zone" data-editable="true" data-field="zone4">Women's Fashion</div>
+        <div class="zone" data-editable="true" data-field="zone5">Home</div>
+        <div class="zone" data-editable="true" data-field="zone6">Electronics</div>
+        <div class="zone" data-editable="true" data-field="zone7">Footwear</div>
+        <div class="zone" data-editable="true" data-field="zone8">Kids</div>
+        <div class="zone" data-editable="true" data-field="zone9">Food Court</div>
+        <div class="zone" data-editable="true" data-field="zone10">Exit</div>
       </div>
     </div>
 
-    <!-- Floor plan grid -->
-    <div class="floor-plan">
-      <!-- Main Entrance -->
-      <div class="zone entrance">
-        <div class="zone-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
-          </svg>
+    <div class="right">
+      <div class="legend">
+        <div class="legend-title">Directory</div>
+        <div class="legend-grid">
+          <div class="legend-item" data-editable="true" data-field="legend1">Women's Fashion</div>
+          <div class="legend-item" data-editable="true" data-field="legend2">Shoes &amp; Footwear</div>
+          <div class="legend-item" data-editable="true" data-field="legend3">Beauty &amp; Skincare</div>
+          <div class="legend-item" data-editable="true" data-field="legend4">Electronics &amp; Tech</div>
+          <div class="legend-item" data-editable="true" data-field="legend5">Home &amp; Living</div>
+          <div class="legend-item" data-editable="true" data-field="legend6">Food Court</div>
+          <div class="legend-item" data-editable="true" data-field="legend7">Customer Service</div>
+          <div class="legend-item" data-editable="true" data-field="legend8">Kids &amp; Family</div>
         </div>
-        <div class="zone-name" data-editable="true" data-field="zone1">Main Entrance</div>
-      </div>
-      <!-- Beauty -->
-      <div class="zone beauty wide">
-        <div class="zone-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="5" r="3"/><path d="M12 8v6"/><path d="M8 14h8l-1 8H9l-1-8z"/>
-          </svg>
-        </div>
-        <div class="zone-name" data-editable="true" data-field="zone2">Beauty & Cosmetics</div>
-      </div>
-      <!-- Info Desk -->
-      <div class="zone service">
-        <div class="zone-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
-          </svg>
-        </div>
-        <div class="zone-name" data-editable="true" data-field="zone3">Info Desk</div>
       </div>
 
-      <!-- Women's Fashion -->
-      <div class="zone fashion tall">
-        <div class="zone-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M6 2l3 6v4H5L2 22h20l-3-10h-4V8l3-6"/>
-          </svg>
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="info-title" data-editable="true" data-field="info1_title">Restrooms</div>
+          <div class="info-text" data-editable="true" data-field="info1_text">Located near Food Court and Main Entrance</div>
         </div>
-        <div class="zone-name" data-editable="true" data-field="zone4">Women's Fashion</div>
-      </div>
-      <!-- Home -->
-      <div class="zone home">
-        <div class="zone-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
-          </svg>
+        <div class="info-item">
+          <div class="info-title" data-editable="true" data-field="info2_title">Elevators</div>
+          <div class="info-text" data-editable="true" data-field="info2_text">Center of store, near Electronics dept.</div>
         </div>
-        <div class="zone-name" data-editable="true" data-field="zone5">Home</div>
-      </div>
-      <!-- Electronics -->
-      <div class="zone electronics">
-        <div class="zone-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>
-          </svg>
+        <div class="info-item">
+          <div class="info-title" data-editable="true" data-field="info3_title">Parking</div>
+          <div class="info-text" data-editable="true" data-field="info3_text">Levels P1-P3. Closest to Main Entrance.</div>
         </div>
-        <div class="zone-name" data-editable="true" data-field="zone6">Electronics</div>
-      </div>
-      <!-- Footwear -->
-      <div class="zone shoes">
-        <div class="zone-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M2 18h20v2H2z"/><path d="M4 18V8c0-1 .5-2 2-2h1c1 0 2 .5 2.5 1.5L12 12h6c2 0 4 1 4 3v3"/>
-          </svg>
+        <div class="info-item">
+          <div class="info-title" data-editable="true" data-field="info4_title">Accessibility</div>
+          <div class="info-text" data-editable="true" data-field="info4_text">Wheelchair accessible on all floors</div>
         </div>
-        <div class="zone-name" data-editable="true" data-field="zone7">Footwear</div>
-      </div>
-
-      <!-- Kids -->
-      <div class="zone kids">
-        <div class="zone-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="4" r="2"/><path d="M12 6v4"/><path d="M8 10h8"/><path d="M10 14l-3 7"/><path d="M14 14l3 7"/><path d="M8 10l-2 4"/><path d="M16 10l2 4"/>
-          </svg>
+        <div class="info-item" style="grid-column: 1 / -1;">
+          <div class="info-title" data-editable="true" data-field="info5_title">Assistance</div>
+          <div class="info-text" data-editable="true" data-field="info5_text">Dial ext. 100 from any house phone</div>
         </div>
-        <div class="zone-name" data-editable="true" data-field="zone8">Kids</div>
-      </div>
-      <!-- Food Court -->
-      <div class="zone food">
-        <div class="zone-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>
-          </svg>
-        </div>
-        <div class="zone-name" data-editable="true" data-field="zone9">Food Court</div>
-      </div>
-      <!-- Exit -->
-      <div class="zone entrance">
-        <div class="zone-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
-          </svg>
-        </div>
-        <div class="zone-name" data-editable="true" data-field="zone10">Exit</div>
-      </div>
-
-      <!-- Directional arrows overlay -->
-      <svg class="arrows-overlay" viewBox="0 0 800 500">
-        <defs>
-          <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-            <polygon points="0 0, 8 3, 0 6" fill="#3b82f6" opacity="0.4"/>
-          </marker>
-        </defs>
-        <line x1="100" y1="80" x2="100" y2="420" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="6,4" marker-end="url(#arrowhead)" opacity="0.3"/>
-        <line x1="200" y1="250" x2="600" y2="250" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="6,4" marker-end="url(#arrowhead)" opacity="0.3"/>
-      </svg>
-    </div>
-
-    <!-- Info panel -->
-    <div class="info-panel">
-      <div class="info-title">Quick Guide</div>
-      <!-- Restrooms -->
-      <div class="info-card">
-        <div class="info-card-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-          </svg>
-        </div>
-        <div class="info-card-title" data-editable="true" data-field="info1_title">Restrooms</div>
-        <div class="info-card-text" data-editable="true" data-field="info1_text">Located near Food Court and Main Entrance</div>
-      </div>
-      <!-- Elevators -->
-      <div class="info-card">
-        <div class="info-card-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2"/><polyline points="8 12 8 7"/><polyline points="6 9 8 7 10 9"/><polyline points="16 12 16 17"/><polyline points="14 15 16 17 18 15"/>
-          </svg>
-        </div>
-        <div class="info-card-title" data-editable="true" data-field="info2_title">Elevators</div>
-        <div class="info-card-text" data-editable="true" data-field="info2_text">Center of store, near Electronics dept.</div>
-      </div>
-      <!-- Parking -->
-      <div class="info-card">
-        <div class="info-card-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 17V7h4a3 3 0 0 1 0 6H9"/>
-          </svg>
-        </div>
-        <div class="info-card-title" data-editable="true" data-field="info3_title">Parking</div>
-        <div class="info-card-text" data-editable="true" data-field="info3_text">Levels P1-P3. Closest to Main Entrance.</div>
-      </div>
-      <!-- Accessibility -->
-      <div class="info-card">
-        <div class="info-card-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="4" r="2"/><path d="M12 6v6"/><path d="M8 12h8"/><path d="M9 18a4 4 0 0 0 6 0"/><path d="M8 12l-2 6"/><path d="M16 12l2 6"/>
-          </svg>
-        </div>
-        <div class="info-card-title" data-editable="true" data-field="info4_title">Accessibility</div>
-        <div class="info-card-text" data-editable="true" data-field="info4_text">Wheelchair accessible on all floors</div>
-      </div>
-      <!-- Assistance -->
-      <div class="info-card">
-        <div class="info-card-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
-          </svg>
-        </div>
-        <div class="info-card-title" data-editable="true" data-field="info5_title">Assistance</div>
-        <div class="info-card-text" data-editable="true" data-field="info5_text">Dial ext. 100 from any house phone</div>
       </div>
     </div>
+  </div>
 
-    <div class="footer">
-      <div class="footer-text" data-editable="true" data-field="footer_text">Floor plan is approximate. Ask any associate for directions.</div>
-      <div class="footer-help" data-editable="true" data-field="footer_help">NEED HELP? VISIT CUSTOMER SERVICE</div>
-    </div>
+  <div class="bottom-bar">
+    <div class="footer-text" data-editable="true" data-field="footer_text">Floor plan is approximate. Ask any associate for directions.</div>
+    <div class="footer-help" data-editable="true" data-field="footer_help">NEED HELP? VISIT CUSTOMER SERVICE</div>
   </div>
 </body>
 </html>

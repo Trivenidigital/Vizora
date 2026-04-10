@@ -3,451 +3,173 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1920, height=1080">
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <title>Event Announcement</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Cormorant+SC:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(30px); }
-      to { opacity: 1; transform: translateY(0); }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg-a: #EADDBE;
+      --bg-b: #E2D0B0;
+      --ink: #2C1810;
+      --ink-body: #4A2D18;
+      --ink-muted: #7A4A28;
+      --brass: #8B6F2E;
+      --royal: #3D1F14;
+      --accent: #6B2737;
+      --rule: rgba(139,111,46,0.4);
     }
-    @keyframes fadeLeft {
-      from { opacity: 0; transform: translateX(40px); }
-      to { opacity: 1; transform: translateX(0); }
-    }
-    @keyframes breathe {
-      0%, 100% { opacity: 0.6; transform: scale(1); }
-      50% { opacity: 1; transform: scale(1.05); }
-    }
-    @keyframes float {
-      0%, 100% { transform: translateY(0) rotate(45deg); }
-      50% { transform: translateY(-12px) rotate(45deg); }
-    }
-    @keyframes scaleIn {
-      from { opacity: 0; transform: scale(0.8); }
-      to { opacity: 1; transform: scale(1); }
-    }
-
     body {
-      width: 1920px;
-      height: 1080px;
-      overflow: hidden;
-      position: relative;
-      font-family: 'Inter', sans-serif;
+      width: 1920px; height: 1080px; overflow: hidden; position: relative;
+      font-family: 'Lora', serif; color: var(--ink-body);
       background:
-        /* Diagonal line texture */
-        repeating-linear-gradient(
-          65deg,
-          transparent,
-          transparent 20px,
-          rgba(255,255,255,0.012) 20px,
-          rgba(255,255,255,0.012) 21px
-        ),
-        repeating-linear-gradient(
-          115deg,
-          transparent,
-          transparent 28px,
-          rgba(255,255,255,0.008) 28px,
-          rgba(255,255,255,0.008) 29px
-        ),
-        /* Deep teal gradient */
-        linear-gradient(155deg, #0a2e2e 0%, #0d3b3b 30%, #0a2929 60%, #071f1f 100%);
-      color: #f0f5f0;
+        radial-gradient(ellipse at 30% 0%, rgba(139,111,46,0.08), transparent 60%),
+        radial-gradient(ellipse at 70% 100%, rgba(107,39,55,0.06), transparent 55%),
+        linear-gradient(165deg, #EADDBE 0%, #E2D0B0 100%);
     }
-
-    /* Dot grid texture overlay */
     body::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background-image: radial-gradient(circle, rgba(218,165,32,0.03) 1px, transparent 1px);
-      background-size: 32px 32px;
-      z-index: 0;
+      content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+      background-image:
+        radial-gradient(circle at 21% 29%, rgba(44,24,16,0.035) 0.6px, transparent 1.1px),
+        radial-gradient(circle at 71% 64%, rgba(44,24,16,0.028) 0.5px, transparent 1px),
+        radial-gradient(circle at 86% 34%, rgba(44,24,16,0.022) 0.5px, transparent 1px);
+      background-size: 38px 38px, 54px 54px, 70px 70px;
+    }
+    .frame { position: absolute; inset: 72px; border: 1px solid var(--brass); z-index: 1; }
+    .frame::before { content: ''; position: absolute; inset: 10px; border: 1px solid rgba(139,111,46,0.22); }
+
+    .top-meta {
+      position: absolute; top: 118px; left: 0; right: 0;
+      display: flex; justify-content: center; gap: 40px; z-index: 5;
+      font-family: 'Cormorant SC', serif;
+      font-size: 16px; letter-spacing: 5px; font-weight: 600;
+      color: var(--accent); text-transform: uppercase;
+    }
+    .top-meta span {
+      padding: 10px 24px; border: 1px solid var(--brass);
+      background: rgba(255,248,232,0.34);
     }
 
-    /* Warm amber glow — top left */
-    body::after {
-      content: '';
-      position: absolute;
-      top: -120px; left: -60px;
-      width: 700px; height: 700px;
-      background: radial-gradient(circle, rgba(218,165,32,0.12) 0%, rgba(218,165,32,0.04) 40%, transparent 70%);
-      border-radius: 50%;
-      z-index: 1;
-      pointer-events: none;
-      animation: breathe 6s ease-in-out infinite;
+    .hero {
+      position: absolute; top: 230px; left: 150px; right: 150px;
+      text-align: center; z-index: 5;
     }
-
-    /* Secondary glow — bottom right */
-    .glow-br {
-      position: absolute;
-      bottom: -100px; right: 80px;
-      width: 500px; height: 500px;
-      background: radial-gradient(circle, rgba(218,165,32,0.07) 0%, transparent 60%);
-      border-radius: 50%;
-      z-index: 1;
-      pointer-events: none;
-      animation: breathe 8s ease-in-out 2s infinite;
-    }
-
-    /* Left sidebar — geometric accent border */
-    .sidebar {
-      position: absolute;
-      top: 0; left: 0;
-      width: 180px; height: 100%;
-      background:
-        linear-gradient(180deg, rgba(218,165,32,0.1) 0%, rgba(218,165,32,0.04) 50%, rgba(218,165,32,0.1) 100%);
-      border-right: 2px solid rgba(218,165,32,0.3);
-      z-index: 2;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 0;
-    }
-
-    /* Repeating diamond pattern in sidebar */
-    .sidebar::before {
-      content: '';
-      position: absolute;
-      top: 0; right: -1px;
-      width: 36px; height: 100%;
-      background:
-        repeating-linear-gradient(
-          180deg,
-          transparent 0px,
-          transparent 30px,
-          rgba(218,165,32,0.2) 30px,
-          rgba(218,165,32,0.2) 32px,
-          transparent 32px,
-          transparent 62px
-        );
-      pointer-events: none;
-    }
-
-    .sidebar::after {
-      content: '';
-      position: absolute;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background:
-        radial-gradient(circle, rgba(218,165,32,0.25) 2.5px, transparent 2.5px);
-      background-size: 28px 56px;
-      background-position: center 0;
-      pointer-events: none;
-    }
-
-    .sidebar-text {
-      writing-mode: vertical-rl;
-      text-orientation: mixed;
-      font-family: 'Playfair Display', serif;
-      font-weight: 700;
-      font-size: 20px;
-      letter-spacing: 10px;
-      color: rgba(218,165,32,0.5);
-      text-transform: uppercase;
-      z-index: 1;
-    }
-
-    /* Vertical midrib line */
-    .midrib {
-      position: absolute;
-      top: 0; bottom: 0;
-      left: 176px;
-      width: 4px;
-      background: linear-gradient(180deg,
-        rgba(218,165,32,0.4) 0%,
-        rgba(218,165,32,0.2) 50%,
-        rgba(218,165,32,0.4) 100%
-      );
-      z-index: 0;
-    }
-
-    /* Main container */
-    .container {
-      position: relative;
-      z-index: 2;
-      margin-left: 180px;
-      height: 100%;
-      display: grid;
-      grid-template-columns: 1fr 460px;
-      grid-template-rows: auto 1fr auto;
-      padding: 60px 80px 50px 70px;
-      gap: 40px;
-    }
-
-    /* Top bar */
-    .top-bar {
-      grid-column: 1 / -1;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding-bottom: 25px;
-      border-bottom: 1px solid rgba(218,165,32,0.2);
-      animation: fadeUp 0.8s ease-out both;
-    }
-
-    .event-type {
-      font-family: 'Inter', sans-serif;
-      font-weight: 700;
-      font-size: 16px;
-      letter-spacing: 6px;
-      text-transform: uppercase;
-      color: rgba(218,165,32,0.85);
-    }
-
-    .event-date-top {
-      font-family: 'Inter', sans-serif;
-      font-weight: 600;
-      font-size: 18px;
-      color: rgba(240,245,240,0.6);
-    }
-
-    /* Main content area */
-    .main-content {
-      grid-column: 1;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      gap: 28px;
-    }
-
+    .crest { display: block; margin: 0 auto 22px; opacity: 0.85; }
     .event-name {
-      font-family: 'Playfair Display', serif;
-      font-weight: 900;
-      font-size: 96px;
-      line-height: 1.0;
-      letter-spacing: 2px;
-      color: #f0f5f0;
-      text-shadow: 0 0 50px rgba(218,165,32,0.15), 0 4px 20px rgba(0,0,0,0.4);
-      animation: fadeUp 0.8s ease-out 0.2s both;
+      font-family: 'DM Serif Display', serif;
+      font-size: 128px; color: var(--royal);
+      line-height: 0.92; letter-spacing: -1px;
     }
-
     .event-tagline {
-      font-family: 'Playfair Display', serif;
-      font-size: 34px;
-      font-weight: 700;
-      font-style: italic;
-      color: rgba(218,165,32,0.9);
-      text-shadow: 0 2px 10px rgba(0,0,0,0.3);
-      animation: fadeUp 0.8s ease-out 0.4s both;
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 30px; color: var(--accent);
+      margin-top: 20px;
     }
-
+    .event-tagline::before, .event-tagline::after {
+      content: '\2014'; color: var(--brass); margin: 0 18px;
+    }
     .event-description {
-      font-family: 'Inter', sans-serif;
-      font-size: 22px;
-      font-weight: 400;
-      line-height: 1.75;
-      color: rgba(240,245,240,0.7);
-      max-width: 720px;
-      animation: fadeUp 0.8s ease-out 0.6s both;
+      font-family: 'Lora', serif;
+      font-size: 20px; color: var(--ink-body);
+      max-width: 1000px; margin: 22px auto 0;
+      line-height: 1.55;
     }
 
-    /* Right sidebar: details cards */
-    .details-panel {
-      grid-column: 2;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      gap: 22px;
+    .details {
+      position: absolute; bottom: 240px; left: 200px; right: 200px;
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 32px; z-index: 5;
     }
-
     .detail-card {
-      background: rgba(218,165,32,0.04);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid rgba(218,165,32,0.15);
-      border-radius: 18px;
-      padding: 28px 32px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04);
+      background: rgba(255,248,232,0.34);
+      border: 1px solid var(--brass);
+      padding: 28px 30px;
       position: relative;
-      overflow: hidden;
+      text-align: center;
     }
-
     .detail-card::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0;
-      width: 4px; height: 100%;
-      background: linear-gradient(180deg, #DAA520, #B8860B);
-      border-radius: 4px 0 0 4px;
+      content: ''; position: absolute; inset: 7px;
+      border: 1px solid rgba(139,111,46,0.22); pointer-events: none;
     }
-
-    .detail-card:nth-child(1) { animation: fadeLeft 0.7s ease-out 0.3s both; }
-    .detail-card:nth-child(2) { animation: fadeLeft 0.7s ease-out 0.5s both; }
-    .detail-card:nth-child(3) { animation: fadeLeft 0.7s ease-out 0.7s both; }
-
-    .detail-card-label {
-      font-family: 'Inter', sans-serif;
-      font-weight: 700;
-      font-size: 13px;
-      letter-spacing: 4px;
-      text-transform: uppercase;
-      color: rgba(218,165,32,0.75);
-      margin-bottom: 10px;
+    .detail-card-icon {
+      width: 32px; height: 32px; margin: 0 auto 12px;
+      color: var(--accent);
     }
-
     .detail-card-value {
-      font-family: 'Playfair Display', serif;
-      font-weight: 900;
-      font-size: 36px;
-      letter-spacing: 1px;
-      color: #f0f5f0;
+      font-family: 'DM Serif Display', serif;
+      font-size: 26px; color: var(--royal); line-height: 1.1;
+      margin-bottom: 6px;
     }
-
     .detail-card-sub {
-      font-family: 'Inter', sans-serif;
-      font-size: 16px;
-      color: rgba(240,245,240,0.55);
-      margin-top: 6px;
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 15px; color: var(--ink-muted);
     }
 
-    /* Bottom bar */
-    .bottom-bar {
-      grid-column: 1 / -1;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding-top: 20px;
-      border-top: 1px solid rgba(218,165,32,0.15);
-      animation: fadeUp 0.8s ease-out 0.9s both;
+    .cta-row {
+      position: absolute; bottom: 110px; left: 0; right: 0;
+      text-align: center; z-index: 5;
     }
-
     .cta-text {
-      font-family: 'Inter', sans-serif;
-      font-weight: 700;
-      font-size: 20px;
-      color: rgba(240,245,240,0.8);
-      letter-spacing: 1px;
+      font-family: 'DM Serif Display', serif;
+      font-size: 32px; color: var(--royal); font-style: italic;
     }
-
     .website-url {
-      font-family: 'Inter', sans-serif;
-      font-weight: 600;
-      font-size: 18px;
-      color: rgba(218,165,32,0.85);
-    }
-
-    /* Geometric floating shapes */
-    .geo-shape {
-      position: absolute;
-      z-index: 1;
-      pointer-events: none;
-    }
-
-    .geo-diamond-1 {
-      top: 160px;
-      right: 70px;
-      width: 60px; height: 60px;
-      border: 2px solid rgba(218,165,32,0.25);
-      border-radius: 10px;
-      transform: rotate(45deg);
-      animation: float 5s ease-in-out infinite;
-    }
-
-    .geo-diamond-2 {
-      top: 195px;
-      right: 105px;
-      width: 35px; height: 35px;
-      border: 1.5px solid rgba(218,165,32,0.15);
-      border-radius: 6px;
-      transform: rotate(45deg);
-      animation: float 5s ease-in-out 1s infinite;
-    }
-
-    /* Teal accent stripe bottom */
-    .accent-stripe {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      width: 100%;
-      height: 5px;
-      background: linear-gradient(90deg, #0d3b3b, #DAA520, #B8860B, #DAA520, #0d3b3b);
-      z-index: 3;
-    }
-
-    /* Corner SVG decoration class */
-    .corner-svg {
-      position: absolute;
-      z-index: 3;
-      opacity: 0.25;
+      display: block; margin-top: 10px;
+      font-family: 'Cormorant SC', serif;
+      font-size: 18px; letter-spacing: 6px;
+      color: var(--brass); text-transform: uppercase;
     }
   </style>
 </head>
 <body>
-  <div class="glow-br"></div>
-  <div class="midrib"></div>
+  <div class="frame"></div>
 
-  <!-- Geometric floating shapes -->
-  <div class="geo-shape geo-diamond-1"></div>
-  <div class="geo-shape geo-diamond-2"></div>
-
-  <!-- SVG corner decorations -->
-  <svg class="corner-svg" style="top:18px;right:18px;" width="70" height="70" viewBox="0 0 70 70" fill="none">
-    <path d="M65 5 L65 35 Q65 5 35 5" stroke="#DAA520" stroke-width="2" fill="none"/>
-    <path d="M55 15 L55 28 Q55 15 42 15" stroke="#DAA520" stroke-width="1" fill="none"/>
-    <circle cx="62" cy="8" r="3" fill="#DAA520"/>
-  </svg>
-  <svg class="corner-svg" style="bottom:18px;left:190px;" width="70" height="70" viewBox="0 0 70 70" fill="none">
-    <path d="M5 65 L5 35 Q5 65 35 65" stroke="#DAA520" stroke-width="2" fill="none"/>
-    <path d="M15 55 L15 42 Q15 55 28 55" stroke="#DAA520" stroke-width="1" fill="none"/>
-    <circle cx="8" cy="62" r="3" fill="#DAA520"/>
-  </svg>
-
-  <!-- Inline SVG: geometric star burst replacing emoji -->
-  <svg style="position:absolute;bottom:90px;left:40px;z-index:3;opacity:0.3;" width="90" height="90" viewBox="0 0 90 90" fill="none">
-    <path d="M45 5 L49 36 L80 22 L55 45 L80 68 L49 54 L45 85 L41 54 L10 68 L35 45 L10 22 L41 36 Z" stroke="#DAA520" stroke-width="1.5" fill="none"/>
-    <circle cx="45" cy="45" r="6" fill="rgba(218,165,32,0.3)"/>
-    <circle cx="45" cy="45" r="16" stroke="rgba(218,165,32,0.15)" stroke-width="1" fill="none"/>
-  </svg>
-
-  <!-- Left sidebar -->
-  <div class="sidebar">
-    <span class="sidebar-text">EVENT</span>
+  <div class="top-meta">
+    <span data-editable="true" data-field="eventType">Live Event</span>
+    <span data-editable="true" data-field="eventDateShort">March 15, 2026</span>
   </div>
 
-  <!-- Main layout grid -->
-  <div class="container">
-    <!-- Top bar -->
-    <div class="top-bar">
-      <span class="event-type" data-editable="true" data-field="eventType">Live Event</span>
-      <span class="event-date-top" data-editable="true" data-field="eventDateShort">March 15, 2026</span>
-    </div>
+  <div class="hero">
+    <svg class="crest" width="108" height="42" viewBox="0 0 108 42">
+      <g fill="none" stroke="#8B6F2E" stroke-width="1.2">
+        <path d="M12 38 L12 18 L28 30 L46 6 L54 22 L62 6 L80 30 L96 18 L96 38 Z" fill="rgba(139,111,46,0.14)"/>
+        <circle cx="54" cy="4" r="2.2" fill="#6B2737" stroke="none"/>
+      </g>
+    </svg>
+    <h1 class="event-name" data-editable="true" data-field="eventName">INNOVATION<br>SUMMIT 2026</h1>
+    <p class="event-tagline" data-editable="true" data-field="eventTagline">Where Ideas Ignite the Future</p>
+    <p class="event-description" data-editable="true" data-field="eventDescription">Join 2,000+ visionaries, tech leaders, and creative minds for two unforgettable days of breakthrough ideas, hands-on workshops, and world-class networking.</p>
+  </div>
 
-    <!-- Main content -->
-    <div class="main-content">
-      <h1 class="event-name" data-editable="true" data-field="eventName">INNOVATION<br>SUMMIT 2026</h1>
-      <p class="event-tagline" data-editable="true" data-field="eventTagline">Where Ideas Ignite the Future</p>
-      <p class="event-description" data-editable="true" data-field="eventDescription">Join 2,000+ visionaries, tech leaders, and creative minds for two unforgettable days of breakthrough ideas, hands-on workshops, and world-class networking.</p>
+  <div class="details">
+    <div class="detail-card">
+      <svg class="detail-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <rect x="3" y="4" width="18" height="18" rx="2"/>
+        <path d="M16 2v4M8 2v4M3 10h18"/>
+      </svg>
+      <div class="detail-card-value" data-editable="true" data-field="eventDate">MAR 15-16, 2026</div>
+      <div class="detail-card-sub" data-editable="true" data-field="eventTime">Doors Open at 8:00 AM</div>
     </div>
-
-    <!-- Details panel -->
-    <div class="details-panel">
-      <div class="detail-card">
-        <div class="detail-card-label">Date &amp; Time</div>
-        <div class="detail-card-value" data-editable="true" data-field="eventDate">MAR 15-16, 2026</div>
-        <div class="detail-card-sub" data-editable="true" data-field="eventTime">Doors Open at 8:00 AM</div>
-      </div>
-      <div class="detail-card">
-        <div class="detail-card-label">Venue</div>
-        <div class="detail-card-value" data-editable="true" data-field="venueName">GRAND PAVILION</div>
-        <div class="detail-card-sub" data-editable="true" data-field="venueAddress">500 Convention Blvd, San Francisco, CA</div>
-      </div>
-      <div class="detail-card">
-        <div class="detail-card-label">Admission</div>
-        <div class="detail-card-value" data-editable="true" data-field="ticketPrice">$299 EARLY BIRD</div>
-        <div class="detail-card-sub" data-editable="true" data-field="ticketNote">Limited seats available</div>
-      </div>
+    <div class="detail-card">
+      <svg class="detail-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z"/>
+        <circle cx="12" cy="9" r="2.5"/>
+      </svg>
+      <div class="detail-card-value" data-editable="true" data-field="venueName">GRAND PAVILION</div>
+      <div class="detail-card-sub" data-editable="true" data-field="venueAddress">500 Convention Blvd, San Francisco, CA</div>
     </div>
-
-    <!-- Bottom bar -->
-    <div class="bottom-bar">
-      <span class="cta-text" data-editable="true" data-field="ctaText">Reserve Your Spot Today</span>
-      <span class="website-url" data-editable="true" data-field="websiteUrl">innovationsummit.io</span>
+    <div class="detail-card">
+      <svg class="detail-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <path d="M20 12V8H6a2 2 0 0 1 0-4h12v4"/>
+        <path d="M20 12v4H6a2 2 0 0 0 0 4h14v-4"/>
+      </svg>
+      <div class="detail-card-value" data-editable="true" data-field="ticketPrice">$299 EARLY BIRD</div>
+      <div class="detail-card-sub" data-editable="true" data-field="ticketNote">Limited seats available</div>
     </div>
   </div>
 
-  <!-- Bottom accent stripe -->
-  <div class="accent-stripe"></div>
+  <div class="cta-row">
+    <span class="cta-text" data-editable="true" data-field="ctaText">Reserve Your Spot Today</span>
+    <span class="website-url" data-editable="true" data-field="websiteUrl">innovationsummit.io</span>
+  </div>
 </body>
 </html>

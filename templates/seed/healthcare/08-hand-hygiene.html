@@ -3,424 +3,226 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1920, height=1080">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700;800&family=Montserrat:wght@700;800&display=swap" rel="stylesheet">
+  <title>Hand Hygiene Guide</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Cormorant+SC:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg-a: #EADDBE;
+      --bg-b: #E2D0B0;
+      --ink: #2C1810;
+      --ink-body: #4A2D18;
+      --ink-muted: #7A4A28;
+      --brass: #8B6F2E;
+      --royal: #3D1F14;
+      --accent: #2F5233;
+      --rule: rgba(139,111,46,0.4);
+    }
     body {
-      width: 1920px;
-      height: 1080px;
-      overflow: hidden;
-      position: relative;
-      font-family: 'Inter', sans-serif;
+      width: 1920px; height: 1080px; overflow: hidden; position: relative;
+      font-family: 'Lora', serif; color: var(--ink-body);
       background:
-        radial-gradient(ellipse at 30% 20%, rgba(59, 130, 246, 0.08) 0%, transparent 50%),
-        radial-gradient(ellipse at 70% 80%, rgba(6, 182, 212, 0.06) 0%, transparent 50%),
-        linear-gradient(150deg, #eff6ff 0%, #f0f9ff 30%, #ecfeff 60%, #f0fdf4 100%);
-      color: #1e293b;
+        radial-gradient(ellipse at 30% 0%, rgba(139,111,46,0.08), transparent 60%),
+        radial-gradient(ellipse at 70% 100%, rgba(47,82,51,0.06), transparent 55%),
+        linear-gradient(165deg, #EADDBE 0%, #E2D0B0 100%);
     }
-
-    /* Dot pattern */
     body::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background-image: radial-gradient(circle, rgba(59, 130, 246, 0.04) 1.3px, transparent 1.3px);
-      background-size: 30px 30px;
-      pointer-events: none;
-      z-index: 0;
+      content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+      background-image:
+        radial-gradient(circle at 21% 29%, rgba(44,24,16,0.035) 0.6px, transparent 1.1px),
+        radial-gradient(circle at 71% 64%, rgba(44,24,16,0.028) 0.5px, transparent 1px);
+      background-size: 38px 38px, 54px 54px;
     }
+    .frame { position: absolute; inset: 64px; border: 1px solid var(--brass); z-index: 1; }
+    .frame::before { content: ''; position: absolute; inset: 10px; border: 1px solid rgba(139,111,46,0.22); }
 
-    /* Diagonal stripe */
-    body::after {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: repeating-linear-gradient(
-        135deg,
-        transparent,
-        transparent 40px,
-        rgba(6, 182, 212, 0.012) 40px,
-        rgba(6, 182, 212, 0.012) 41px
-      );
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    /* Glow decorations */
-    .glow-a {
-      position: absolute;
-      top: -100px; left: 50%;
-      transform: translateX(-50%);
-      width: 600px; height: 400px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(59, 130, 246, 0.06), transparent 60%);
-      filter: blur(70px);
-      z-index: 0;
-    }
-
-    .glow-b {
-      position: absolute;
-      bottom: -60px; left: 100px;
-      width: 300px; height: 300px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(6, 182, 212, 0.08), transparent 60%);
-      filter: blur(50px);
-      z-index: 0;
-    }
-
-    .glow-c {
-      position: absolute;
-      top: 300px; right: -40px;
-      width: 250px; height: 250px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(16, 185, 129, 0.06), transparent 60%);
-      filter: blur(40px);
-      z-index: 0;
-    }
-
-    /* Top accent */
-    .top-accent {
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 5px;
-      background: linear-gradient(90deg, #3b82f6, #06b6d4, #10b981, #3b82f6);
-      z-index: 3;
-    }
-
-    .layout {
-      position: relative;
-      z-index: 1;
-      display: grid;
-      grid-template-rows: auto 1fr auto;
-      height: 100%;
-      padding-top: 5px;
-    }
-
-    /* Header */
     .header {
-      display: grid;
-      grid-template-columns: auto 1fr auto;
-      align-items: center;
-      gap: 28px;
-      padding: 36px 80px 28px;
+      position: absolute; top: 110px; left: 130px; right: 130px;
+      z-index: 5;
+      display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 40px;
+      padding-bottom: 26px; border-bottom: 1px solid var(--rule);
     }
-
-    .header-emoji {
-      font-size: 180px;
-      filter: drop-shadow(0 8px 24px rgba(59, 130, 246, 0.2));
-      line-height: 1;
+    .eyebrow {
+      font-family: 'Cormorant SC', serif;
+      font-size: 16px; letter-spacing: 5px; font-weight: 600;
+      color: var(--accent); text-transform: uppercase;
+      margin-bottom: 10px;
     }
-
-    .header-text h1 {
-      font-family: 'Montserrat', sans-serif;
-      font-weight: 800;
-      font-size: 64px;
-      color: #0c4a6e;
-      letter-spacing: -2px;
-      line-height: 1;
+    h1 {
+      font-family: 'DM Serif Display', serif;
+      font-size: 64px; color: var(--royal); line-height: 1;
     }
-
-    .header-text p {
-      font-size: 20px;
-      color: #64748b;
-      margin-top: 8px;
+    .header p {
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 18px; color: var(--ink-muted);
+      margin-top: 10px; max-width: 880px;
       line-height: 1.5;
     }
-
-    .compliance-badge {
+    .compliance {
+      padding: 22px 36px;
+      border: 1px solid var(--accent);
+      background: rgba(47,82,51,0.08);
       text-align: center;
-      padding: 18px 24px;
-      background: rgba(255, 255, 255, 0.7);
-      backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.8);
-      border-radius: 18px;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+      flex-shrink: 0;
     }
-
-    .compliance-label {
-      font-family: 'Poppins', sans-serif;
-      font-size: 12px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      color: #94a3b8;
-    }
-
     .compliance-value {
-      font-family: 'Montserrat', sans-serif;
-      font-weight: 800;
-      font-size: 48px;
-      color: #16a34a;
-      line-height: 1.1;
+      font-family: 'DM Serif Display', serif;
+      font-size: 56px; color: var(--accent);
+      line-height: 1;
     }
-
     .compliance-sub {
-      font-size: 14px;
-      color: #64748b;
-      margin-top: 2px;
+      font-family: 'Cormorant SC', serif;
+      font-size: 12px; letter-spacing: 4px; font-weight: 600;
+      color: var(--brass); text-transform: uppercase;
+      margin-top: 4px;
     }
 
-    /* Ornamental line */
-    .ornament-divider {
-      margin: 0 80px;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.15), rgba(6, 182, 212, 0.15), transparent);
-    }
-
-    /* Steps grid */
-    .steps-area {
-      display: grid;
-      grid-template-columns: repeat(6, 1fr);
+    .steps {
+      position: absolute; top: 360px; left: 130px; right: 130px; bottom: 200px;
+      z-index: 5;
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: 1fr 1fr;
       gap: 22px;
-      padding: 32px 80px;
-      align-items: start;
     }
-
-    .step-card {
-      background: rgba(255, 255, 255, 0.72);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid rgba(255, 255, 255, 0.8);
-      border-radius: 22px;
-      padding: 30px 22px 28px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      text-align: center;
-      gap: 14px;
-      box-shadow:
-        0 4px 20px rgba(0, 0, 0, 0.04),
-        0 1px 4px rgba(0, 0, 0, 0.02),
-        inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    .step {
+      background: rgba(255,248,232,0.34);
+      border: 1px solid var(--brass);
+      padding: 24px 28px;
       position: relative;
-      overflow: hidden;
+      display: grid; grid-template-columns: auto 1fr auto;
+      gap: 18px; align-items: center;
     }
-
-    .step-card::after {
-      content: '';
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 4px;
+    .step::before {
+      content: ''; position: absolute; inset: 7px;
+      border: 1px solid rgba(139,111,46,0.22); pointer-events: none;
     }
-
-    .step-card:nth-child(1)::after { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
-    .step-card:nth-child(2)::after { background: linear-gradient(90deg, #06b6d4, #22d3ee); }
-    .step-card:nth-child(3)::after { background: linear-gradient(90deg, #10b981, #34d399); }
-    .step-card:nth-child(4)::after { background: linear-gradient(90deg, #8b5cf6, #a78bfa); }
-    .step-card:nth-child(5)::after { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
-    .step-card:nth-child(6)::after { background: linear-gradient(90deg, #ec4899, #f472b6); }
-
-    .step-number {
-      width: 52px;
-      height: 52px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: 'Montserrat', sans-serif;
-      font-weight: 800;
-      font-size: 24px;
-      color: #ffffff;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    .step-num {
+      font-family: 'DM Serif Display', serif;
+      font-size: 56px; color: var(--accent);
+      line-height: 1; font-style: italic;
+      position: relative; z-index: 1;
     }
-
-    .step-card:nth-child(1) .step-number { background: linear-gradient(135deg, #3b82f6, #2563eb); }
-    .step-card:nth-child(2) .step-number { background: linear-gradient(135deg, #06b6d4, #0891b2); }
-    .step-card:nth-child(3) .step-number { background: linear-gradient(135deg, #10b981, #059669); }
-    .step-card:nth-child(4) .step-number { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
-    .step-card:nth-child(5) .step-number { background: linear-gradient(135deg, #f59e0b, #d97706); }
-    .step-card:nth-child(6) .step-number { background: linear-gradient(135deg, #ec4899, #db2777); }
-
-    .step-icon {
-      font-size: 48px;
-      filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.08));
-    }
-
+    .step-body { position: relative; z-index: 1; }
     .step-title {
-      font-family: 'Poppins', sans-serif;
-      font-weight: 700;
-      font-size: 20px;
-      color: #0f2942;
-      line-height: 1.2;
+      font-family: 'DM Serif Display', serif;
+      font-size: 22px; color: var(--ink);
+      line-height: 1.1; margin-bottom: 6px;
     }
-
     .step-desc {
-      font-size: 15px;
-      color: #64748b;
-      line-height: 1.5;
+      font-family: 'Lora', serif;
+      font-size: 13px; color: var(--ink-body);
+      line-height: 1.45;
     }
-
     .step-duration {
-      font-family: 'Poppins', sans-serif;
-      font-size: 13px;
-      font-weight: 600;
-      color: #94a3b8;
-      padding: 4px 14px;
-      background: rgba(148, 163, 184, 0.08);
-      border-radius: 20px;
+      font-family: 'Cormorant SC', serif;
+      font-size: 12px; letter-spacing: 3px; font-weight: 600;
+      color: var(--brass); text-transform: uppercase;
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      position: relative; z-index: 1;
+      padding: 6px 0;
+      border-left: 1px solid var(--rule);
+      padding-left: 8px;
     }
 
-    /* SVG water droplet decorations */
-    .svg-drop {
-      position: absolute;
-      opacity: 0.04;
-      z-index: 0;
-    }
-
-    .svg-drop-1 { top: 160px; left: 30px; }
-    .svg-drop-2 { bottom: 120px; right: 40px; }
-
-    /* Footer */
     .footer {
-      display: flex;
+      position: absolute; bottom: 80px; left: 130px; right: 130px;
+      z-index: 5;
+      display: grid; grid-template-columns: 1fr auto; gap: 30px;
       align-items: center;
-      justify-content: space-between;
-      padding: 20px 80px 36px;
+      padding-top: 20px; border-top: 1px solid var(--rule);
     }
-
-    .footer-message {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      padding: 16px 28px;
-      background: rgba(255, 255, 255, 0.6);
-      backdrop-filter: blur(12px);
-      border-radius: 14px;
-      border: 1px solid rgba(255, 255, 255, 0.7);
-      flex: 1;
-      margin-right: 24px;
-    }
-
-    .footer-emoji {
-      font-size: 36px;
-      filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.08));
-    }
-
     .footer-text {
-      font-family: 'Poppins', sans-serif;
-      font-weight: 600;
-      font-size: 20px;
-      color: #0c4a6e;
+      font-family: 'DM Serif Display', serif; font-style: italic;
+      font-size: 26px; color: var(--royal);
     }
-
     .footer-sub {
-      font-size: 14px;
-      color: #64748b;
-      font-weight: 400;
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 14px; color: var(--ink-muted);
+      margin-top: 4px;
     }
-
     .footer-standard {
-      text-align: right;
-      font-size: 13px;
-      color: #94a3b8;
-      line-height: 1.5;
-    }
-
-    .footer-standard strong {
-      color: #64748b;
-      font-weight: 600;
+      padding: 12px 22px; border: 1px solid var(--brass);
+      background: rgba(255,248,232,0.34);
+      font-family: 'Cormorant SC', serif;
+      font-size: 11px; letter-spacing: 3px; font-weight: 600;
+      color: var(--brass); text-transform: uppercase;
+      text-align: right; line-height: 1.6;
     }
   </style>
 </head>
 <body>
-  <div class="top-accent"></div>
-  <div class="glow-a"></div>
-  <div class="glow-b"></div>
-  <div class="glow-c"></div>
+  <div class="frame"></div>
 
-  <!-- SVG water drop decorations -->
-  <svg class="svg-drop svg-drop-1" width="100" height="140" viewBox="0 0 100 140" fill="none">
-    <path d="M50 0C50 0 0 70 0 95a50 50 0 00100 0C100 70 50 0 50 0z" fill="#3b82f6"/>
-  </svg>
-  <svg class="svg-drop svg-drop-2" width="80" height="112" viewBox="0 0 80 112" fill="none">
-    <path d="M40 0C40 0 0 56 0 76a40 40 0 0080 0C80 56 40 0 40 0z" fill="#06b6d4"/>
-  </svg>
-
-  <div class="layout">
+  <div class="header">
     <div>
-      <div class="header">
-        <span class="header-emoji">🧼</span>
-        <div class="header-text">
-          <h1 data-editable="true" data-field="title">Hand Hygiene Guide</h1>
-          <p data-editable="true" data-field="subtitle">Proper handwashing is the single most effective way to prevent the spread of infection. Follow these 6 steps every time.</p>
-        </div>
-        <div class="compliance-badge">
-          <div class="compliance-label">Compliance Rate</div>
-          <div class="compliance-value" data-editable="true" data-field="complianceRate">94%</div>
-          <div class="compliance-sub" data-editable="true" data-field="compliancePeriod">This month</div>
-        </div>
-      </div>
-      <div class="ornament-divider"></div>
+      <div class="eyebrow">Infection Prevention</div>
+      <h1 data-editable="true" data-field="title">Hand Hygiene Guide</h1>
+      <p data-editable="true" data-field="subtitle">Proper handwashing is the single most effective way to prevent the spread of infection. Follow these 6 steps every time.</p>
     </div>
+    <div class="compliance">
+      <div class="compliance-value" data-editable="true" data-field="complianceRate">94%</div>
+      <div class="compliance-sub" data-editable="true" data-field="compliancePeriod">This month</div>
+    </div>
+  </div>
 
-    <div class="steps-area">
-      <!-- Step 1 -->
-      <div class="step-card">
-        <div class="step-number">1</div>
-        <span class="step-icon">💧</span>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">I</div>
+      <div class="step-body">
         <div class="step-title" data-editable="true" data-field="step1Title">Wet Hands</div>
         <div class="step-desc" data-editable="true" data-field="step1Desc">Wet hands thoroughly under clean, running water. Turn off the tap to conserve water.</div>
-        <div class="step-duration" data-editable="true" data-field="step1Time">5 seconds</div>
       </div>
-
-      <!-- Step 2 -->
-      <div class="step-card">
-        <div class="step-number">2</div>
-        <span class="step-icon">🧴</span>
+      <div class="step-duration" data-editable="true" data-field="step1Time">5 seconds</div>
+    </div>
+    <div class="step">
+      <div class="step-num">II</div>
+      <div class="step-body">
         <div class="step-title" data-editable="true" data-field="step2Title">Apply Soap</div>
         <div class="step-desc" data-editable="true" data-field="step2Desc">Apply enough soap to cover all surfaces of your hands. Use liquid or foam soap from the dispenser.</div>
-        <div class="step-duration" data-editable="true" data-field="step2Time">3 seconds</div>
       </div>
-
-      <!-- Step 3 -->
-      <div class="step-card">
-        <div class="step-number">3</div>
-        <span class="step-icon">🤲</span>
+      <div class="step-duration" data-editable="true" data-field="step2Time">3 seconds</div>
+    </div>
+    <div class="step">
+      <div class="step-num">III</div>
+      <div class="step-body">
         <div class="step-title" data-editable="true" data-field="step3Title">Lather &amp; Scrub</div>
         <div class="step-desc" data-editable="true" data-field="step3Desc">Rub palms together, then scrub backs of hands, between fingers, and under nails vigorously.</div>
-        <div class="step-duration" data-editable="true" data-field="step3Time">20 seconds</div>
       </div>
-
-      <!-- Step 4 -->
-      <div class="step-card">
-        <div class="step-number">4</div>
-        <span class="step-icon">👐</span>
+      <div class="step-duration" data-editable="true" data-field="step3Time">20 seconds</div>
+    </div>
+    <div class="step">
+      <div class="step-num">IV</div>
+      <div class="step-body">
         <div class="step-title" data-editable="true" data-field="step4Title">Rinse Well</div>
         <div class="step-desc" data-editable="true" data-field="step4Desc">Rinse hands thoroughly under clean running water. Ensure all soap residue is completely removed.</div>
-        <div class="step-duration" data-editable="true" data-field="step4Time">10 seconds</div>
       </div>
-
-      <!-- Step 5 -->
-      <div class="step-card">
-        <div class="step-number">5</div>
-        <span class="step-icon">🧻</span>
+      <div class="step-duration" data-editable="true" data-field="step4Time">10 seconds</div>
+    </div>
+    <div class="step">
+      <div class="step-num">V</div>
+      <div class="step-body">
         <div class="step-title" data-editable="true" data-field="step5Title">Dry Hands</div>
         <div class="step-desc" data-editable="true" data-field="step5Desc">Dry hands completely using a clean paper towel or air dryer. Moist hands spread more germs.</div>
-        <div class="step-duration" data-editable="true" data-field="step5Time">10 seconds</div>
       </div>
-
-      <!-- Step 6 -->
-      <div class="step-card">
-        <div class="step-number">6</div>
-        <span class="step-icon">🚪</span>
+      <div class="step-duration" data-editable="true" data-field="step5Time">10 seconds</div>
+    </div>
+    <div class="step">
+      <div class="step-num">VI</div>
+      <div class="step-body">
         <div class="step-title" data-editable="true" data-field="step6Title">Turn Off Tap</div>
         <div class="step-desc" data-editable="true" data-field="step6Desc">Use a paper towel to turn off the faucet and open the door to avoid recontamination.</div>
-        <div class="step-duration" data-editable="true" data-field="step6Time">5 seconds</div>
       </div>
+      <div class="step-duration" data-editable="true" data-field="step6Time">5 seconds</div>
     </div>
+  </div>
 
-    <div class="footer">
-      <div class="footer-message">
-        <span class="footer-emoji">🛡️</span>
-        <div>
-          <div class="footer-text" data-editable="true" data-field="footerMessage">Clean Hands Save Lives</div>
-          <div class="footer-sub" data-editable="true" data-field="footerSub">Wash hands before and after patient contact, before procedures, and after touching surroundings</div>
-        </div>
-      </div>
-      <div class="footer-standard">
-        <span data-editable="true" data-field="footerStandard"><strong>WHO Guidelines</strong><br/>5 Moments for Hand Hygiene<br/>Infection Prevention &amp; Control Dept.</span>
-      </div>
+  <div class="footer">
+    <div>
+      <div class="footer-text" data-editable="true" data-field="footerMessage">Clean Hands Save Lives</div>
+      <div class="footer-sub" data-editable="true" data-field="footerSub">Wash hands before and after patient contact, before procedures, and after touching surroundings</div>
     </div>
+    <div class="footer-standard"><span data-editable="true" data-field="footerStandard"><strong>WHO Guidelines</strong><br/>5 Moments for Hand Hygiene<br/>Infection Prevention &amp; Control Dept.</span></div>
   </div>
 </body>
 </html>

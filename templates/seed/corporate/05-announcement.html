@@ -1,465 +1,229 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=1920, height=1080">
-    <title>Corporate Announcement</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700;800&family=Playfair+Display:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <title>Corporate Announcement</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Cormorant+SC:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --ink: #2C1810;
+      --ink-body: #4A2D18;
+      --ink-muted: #7A4A28;
+      --brass: #8B6F2E;
+      --royal: #3D1F14;
+      --rule: rgba(139,111,46,0.4);
+    }
+    body {
+      width: 1920px; height: 1080px; overflow: hidden; position: relative;
+      font-family: 'Lora', serif; color: var(--ink-body);
+      background:
+        radial-gradient(ellipse at 80% 40%, rgba(139,111,46,0.1), transparent 55%),
+        linear-gradient(160deg, #EADDBE 0%, #E2D0B0 50%, #D9C4A0 100%);
+    }
+    body::before {
+      content: ''; position: absolute; inset: 0; pointer-events: none;
+      background-image: radial-gradient(circle, rgba(44,24,16,0.035) 0.6px, transparent 1.1px);
+      background-size: 48px 48px;
+    }
+    .frame { position: absolute; inset: 56px; border: 1px solid var(--brass); z-index: 1; }
+    .frame::before { content: ''; position: absolute; inset: 10px; border: 1px solid rgba(139,111,46,0.22); }
 
-        :root {
-            --navy-900: #061C22;
-            --navy-800: #0A2E36;
-            --navy-700: #0F3B45;
-            --gold-500: #D4AF55;
-            --gold-400: #E6C877;
-            --ivory: #F5EFE0;
-        }
+    .container {
+      position: absolute; inset: 56px; z-index: 2;
+      display: grid; grid-template-columns: 110px 460px 1fr;
+    }
 
-        body {
-            width: 1920px;
-            height: 1080px;
-            overflow: hidden;
-            font-family: 'Inter', sans-serif;
-            background:
-                radial-gradient(ellipse at 85% 40%, rgba(20, 82, 94, 0.45) 0%, transparent 55%),
-                radial-gradient(ellipse at 20% 80%, rgba(212, 175, 85, 0.12) 0%, transparent 50%),
-                linear-gradient(135deg, #061C22 0%, #0A2E36 45%, #0F3B45 100%);
-            color: var(--ivory);
-            position: relative;
-        }
+    .sidebar {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: space-between;
+      padding: 60px 0;
+      border-right: 1px solid var(--rule);
+    }
+    .sidebar-logo { width: 44px; height: 44px; color: var(--brass); }
+    .sidebar-text {
+      font-family: 'Cormorant SC', serif;
+      font-size: 14px; letter-spacing: 5px; font-weight: 600;
+      color: var(--brass); text-transform: uppercase;
+      writing-mode: vertical-rl; text-orientation: mixed;
+    }
+    .sidebar-year {
+      font-family: 'DM Serif Display', serif;
+      font-size: 20px; color: var(--royal);
+    }
 
-        /* Dot grid texture */
-        body::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background-image: radial-gradient(circle, rgba(212, 175, 85, 0.07) 1px, transparent 1px);
-            background-size: 48px 48px;
-            z-index: 0;
-        }
+    .meta-section {
+      padding: 100px 50px 100px 60px;
+      display: flex; flex-direction: column; justify-content: center;
+      border-right: 1px solid var(--rule);
+    }
+    .announcement-type {
+      font-family: 'Cormorant SC', serif;
+      font-size: 14px; letter-spacing: 5px; font-weight: 600;
+      color: var(--brass); text-transform: uppercase;
+      margin-bottom: 28px;
+      display: flex; align-items: center; gap: 14px;
+    }
+    .type-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--brass); }
+    .announcement-icon-wrap {
+      width: 170px; height: 170px;
+      border: 1px solid var(--brass);
+      background: rgba(255,248,232,0.35);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 40px; position: relative;
+    }
+    .announcement-icon-wrap::before {
+      content: ''; position: absolute; inset: 8px;
+      border: 1px solid rgba(139,111,46,0.22);
+    }
+    .announcement-icon { width: 90px; height: 90px; color: var(--brass); }
+    .pub-date {
+      font-family: 'DM Serif Display', serif;
+      font-size: 22px; color: var(--royal); margin-bottom: 6px;
+    }
+    .pub-category {
+      font-family: 'Cormorant SC', serif;
+      font-size: 13px; letter-spacing: 4px; font-weight: 600;
+      color: var(--brass); text-transform: uppercase;
+      margin-bottom: 28px;
+    }
+    .priority-badge {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 12px 22px;
+      background: rgba(255,248,232,0.4);
+      border: 1px solid var(--brass);
+      font-family: 'Cormorant SC', serif;
+      font-size: 13px; font-weight: 600;
+      color: var(--royal); text-transform: uppercase;
+      letter-spacing: 3px; align-self: flex-start;
+    }
+    .priority-icon { width: 16px; height: 16px; color: var(--brass); }
 
-        /* Gold sidebar */
-        .accent-glow {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 110px;
-            height: 100%;
-            background:
-                linear-gradient(180deg, #0F3B45 0%, #0A2E36 50%, #061C22 100%);
-            border-right: 2px solid var(--gold-500);
-            box-shadow:
-                2px 0 30px rgba(212, 175, 85, 0.15),
-                inset -1px 0 0 rgba(212, 175, 85, 0.4);
-            z-index: 0;
-        }
-
-        .accent-glow::before {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 2px;
-            height: 60%;
-            background: linear-gradient(180deg, transparent, rgba(212, 175, 85, 0.6), transparent);
-        }
-
-        /* Ornamental horizontal lines */
-        .ornament-top {
-            position: absolute;
-            top: 70px;
-            left: 150px;
-            right: 80px;
-            height: 1px;
-            background: linear-gradient(90deg, rgba(212, 175, 85, 0.5), rgba(212, 175, 85, 0.15) 50%, transparent);
-            z-index: 1;
-        }
-
-        .ornament-bottom {
-            position: absolute;
-            bottom: 70px;
-            left: 150px;
-            right: 80px;
-            height: 1px;
-            background: linear-gradient(90deg, rgba(212, 175, 85, 0.5), rgba(212, 175, 85, 0.15) 50%, transparent);
-            z-index: 1;
-        }
-
-        .container {
-            position: relative;
-            z-index: 1;
-            width: 100%;
-            height: 100%;
-            display: grid;
-            grid-template-columns: 110px 520px 1fr;
-            grid-template-rows: 1fr;
-        }
-
-        /* Sidebar */
-        .sidebar {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: space-between;
-            padding: 60px 0;
-            position: relative;
-        }
-
-        .sidebar-logo {
-            width: 48px;
-            height: 48px;
-            color: var(--gold-400);
-            filter: drop-shadow(0 2px 10px rgba(212, 175, 85, 0.5));
-        }
-
-        .sidebar-text {
-            font-family: 'Montserrat', sans-serif;
-            font-size: 12px;
-            font-weight: 700;
-            color: var(--gold-500);
-            text-transform: uppercase;
-            letter-spacing: 4px;
-            writing-mode: vertical-rl;
-            text-orientation: mixed;
-        }
-
-        .sidebar-year {
-            font-family: 'Playfair Display', serif;
-            font-size: 16px;
-            font-weight: 600;
-            color: rgba(212, 175, 85, 0.7);
-            font-style: italic;
-        }
-
-        /* Meta section */
-        .meta-section {
-            padding: 110px 60px 110px 70px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            border-right: 1px solid rgba(212, 175, 85, 0.15);
-            position: relative;
-        }
-
-        .announcement-type {
-            font-family: 'Inter', sans-serif;
-            font-size: 13px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 5px;
-            color: var(--gold-500);
-            margin-bottom: 32px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .type-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--gold-500);
-            box-shadow: 0 0 10px rgba(212, 175, 85, 0.8);
-        }
-
-        /* Large announcement icon block */
-        .announcement-icon-wrap {
-            width: 180px;
-            height: 180px;
-            border-radius: 24px;
-            background: linear-gradient(145deg, rgba(212, 175, 85, 0.16) 0%, rgba(212, 175, 85, 0.04) 100%);
-            border: 1px solid rgba(212, 175, 85, 0.35);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 44px;
-            box-shadow:
-                0 15px 50px rgba(0, 0, 0, 0.4),
-                inset 0 1px 0 rgba(240, 217, 154, 0.2);
-            position: relative;
-        }
-
-        .announcement-icon-wrap::before {
-            content: '';
-            position: absolute;
-            inset: 10px;
-            border-radius: 16px;
-            border: 1px solid rgba(212, 175, 85, 0.12);
-        }
-
-        .announcement-icon {
-            width: 100px;
-            height: 100px;
-            color: var(--gold-400);
-            filter: drop-shadow(0 4px 16px rgba(212, 175, 85, 0.5));
-        }
-
-        .pub-date {
-            font-family: 'Playfair Display', serif;
-            font-size: 22px;
-            color: rgba(245, 239, 224, 0.7);
-            margin-bottom: 8px;
-            font-style: italic;
-        }
-
-        .pub-category {
-            font-family: 'Inter', sans-serif;
-            font-size: 14px;
-            font-weight: 600;
-            color: rgba(212, 175, 85, 0.7);
-            text-transform: uppercase;
-            letter-spacing: 3px;
-            margin-bottom: 32px;
-        }
-
-        .priority-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            padding: 12px 22px;
-            background: rgba(212, 175, 85, 0.12);
-            border: 1px solid rgba(212, 175, 85, 0.4);
-            border-radius: 10px;
-            font-family: 'Montserrat', sans-serif;
-            font-size: 13px;
-            font-weight: 700;
-            color: var(--gold-400);
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            align-self: flex-start;
-        }
-
-        .priority-icon {
-            width: 16px;
-            height: 16px;
-            color: var(--gold-500);
-        }
-
-        /* Main content */
-        .main-content {
-            padding: 110px 100px 110px 90px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            position: relative;
-        }
-
-        .headline {
-            font-family: 'Playfair Display', serif;
-            font-size: 76px;
-            font-weight: 800;
-            color: #fbf7ec;
-            line-height: 1.08;
-            margin-bottom: 44px;
-            text-shadow: 0 2px 24px rgba(0, 0, 0, 0.4);
-        }
-
-        .headline-accent {
-            display: block;
-            width: 100px;
-            height: 4px;
-            background: linear-gradient(90deg, var(--gold-500), transparent);
-            margin-bottom: 44px;
-            border-radius: 2px;
-            box-shadow: 0 0 14px rgba(212, 175, 85, 0.4);
-        }
-
-        .body-text {
-            font-family: 'Inter', sans-serif;
-            font-size: 26px;
-            font-weight: 300;
-            color: rgba(245, 239, 224, 0.78);
-            line-height: 1.7;
-            margin-bottom: 52px;
-            max-width: 960px;
-        }
-
-        .cta-section {
-            display: flex;
-            align-items: center;
-            gap: 32px;
-            margin-bottom: 52px;
-        }
-
-        .cta-button {
-            display: inline-flex;
-            align-items: center;
-            gap: 14px;
-            padding: 18px 36px;
-            background: linear-gradient(135deg, var(--gold-500), var(--gold-400));
-            border-radius: 12px;
-            font-family: 'Inter', sans-serif;
-            font-size: 18px;
-            font-weight: 700;
-            color: var(--navy-900);
-            box-shadow:
-                0 10px 30px rgba(212, 175, 85, 0.35),
-                inset 0 1px 0 rgba(255, 255, 255, 0.4);
-            letter-spacing: 0.5px;
-        }
-
-        .cta-icon {
-            width: 20px;
-            height: 20px;
-        }
-
-        .cta-secondary {
-            font-family: 'Inter', sans-serif;
-            font-size: 18px;
-            font-weight: 500;
-            color: rgba(245, 239, 224, 0.55);
-        }
-
-        .attribution {
-            display: flex;
-            align-items: center;
-            gap: 18px;
-            padding-top: 36px;
-            border-top: 1px solid rgba(212, 175, 85, 0.2);
-        }
-
-        .author-avatar {
-            width: 58px;
-            height: 58px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, rgba(212, 175, 85, 0.2), rgba(212, 175, 85, 0.08));
-            border: 2px solid rgba(212, 175, 85, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
-        }
-
-        .author-avatar svg {
-            width: 30px;
-            height: 30px;
-            color: var(--gold-400);
-        }
-
-        .author-name {
-            font-family: 'Inter', sans-serif;
-            font-size: 19px;
-            font-weight: 600;
-            color: #fbf7ec;
-        }
-
-        .author-role {
-            font-family: 'Inter', sans-serif;
-            font-size: 14px;
-            color: rgba(212, 175, 85, 0.7);
-            letter-spacing: 0.5px;
-            margin-top: 2px;
-        }
-
-        /* Decorative SVG */
-        .deco-svg {
-            position: absolute;
-            z-index: 0;
-        }
-    </style>
+    .main-content {
+      padding: 100px 100px 100px 90px;
+      display: flex; flex-direction: column; justify-content: center;
+    }
+    .headline {
+      font-family: 'DM Serif Display', serif;
+      font-size: 78px; color: var(--royal);
+      line-height: 1.05; margin-bottom: 36px;
+    }
+    .headline-accent {
+      display: block; width: 100px; height: 1px; background: var(--brass);
+      margin-bottom: 36px;
+    }
+    .body-text {
+      font-family: 'Lora', serif; font-size: 24px;
+      color: var(--ink-body); line-height: 1.65;
+      margin-bottom: 44px; max-width: 920px;
+    }
+    .cta-section {
+      display: flex; align-items: center; gap: 32px; margin-bottom: 48px;
+    }
+    .cta-button {
+      display: inline-flex; align-items: center; gap: 14px;
+      padding: 16px 36px;
+      background: rgba(139,111,46,0.12);
+      border: 1px solid var(--brass);
+      font-family: 'Cormorant SC', serif;
+      font-size: 16px; font-weight: 600;
+      color: var(--royal); text-transform: uppercase;
+      letter-spacing: 3px;
+    }
+    .cta-icon { width: 20px; height: 20px; }
+    .cta-secondary {
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 18px; color: var(--ink-muted);
+    }
+    .attribution {
+      display: flex; align-items: center; gap: 18px;
+      padding-top: 32px; border-top: 1px solid var(--rule);
+    }
+    .author-avatar {
+      width: 56px; height: 56px; border-radius: 50%;
+      border: 1px solid var(--brass);
+      background: rgba(255,248,232,0.4);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .author-avatar svg { width: 28px; height: 28px; color: var(--brass); }
+    .author-name {
+      font-family: 'DM Serif Display', serif;
+      font-size: 22px; color: var(--royal);
+    }
+    .author-role {
+      font-family: 'Cormorant SC', serif;
+      font-size: 12px; letter-spacing: 3px; font-weight: 600;
+      color: var(--brass); text-transform: uppercase; margin-top: 4px;
+    }
+  </style>
 </head>
 <body>
-    <div class="accent-glow"></div>
-    <div class="ornament-top"></div>
-    <div class="ornament-bottom"></div>
-
-    <!-- Decorative SVG quote mark -->
-    <svg class="deco-svg" style="top:140px;right:110px;opacity:0.09;" width="220" height="180" viewBox="0 0 200 160" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M0 100 C0 44.8 44.8 0 100 0 L100 40 C66.9 40 40 66.9 40 100 L40 160 L0 160 Z" fill="#D4AF55"/>
-        <path d="M110 100 C110 44.8 154.8 0 210 0 L210 40 C176.9 40 150 66.9 150 100 L150 160 L110 160 Z" fill="#D4AF55"/>
-    </svg>
-
-    <!-- Corner brackets -->
-    <svg class="deco-svg" style="bottom:110px;right:90px;" width="90" height="90" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M80 0 L80 80 L0 80" stroke="rgba(212,175,85,0.35)" stroke-width="2" fill="none"/>
-        <circle cx="80" cy="80" r="4" fill="rgba(212,175,85,0.7)"/>
-    </svg>
-
-    <svg class="deco-svg" style="top:110px;left:150px;" width="70" height="70" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M0 60 L0 0 L60 0" stroke="rgba(212,175,85,0.35)" stroke-width="2" fill="none"/>
-        <circle cx="0" cy="0" r="4" fill="rgba(212,175,85,0.7)"/>
-    </svg>
-
-    <div class="container">
-        <div class="sidebar">
-            <!-- Building monogram icon -->
-            <svg class="sidebar-logo" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M10 42 L10 14 L24 6 L38 14 L38 42 Z" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round"/>
-                <path d="M16 42 L16 22 L24 18 L32 22 L32 42" stroke="currentColor" stroke-width="1.5" fill="none" opacity="0.8"/>
-                <rect x="21" y="30" width="6" height="12" fill="currentColor"/>
-                <circle cx="24" cy="6" r="1.5" fill="currentColor"/>
-            </svg>
-            <span class="sidebar-text" data-editable="true" data-field="sidebar-text">Company News</span>
-            <span class="sidebar-year" data-editable="true" data-field="year">2026</span>
-        </div>
-
-        <div class="meta-section">
-            <div class="announcement-type">
-                <span class="type-dot"></span>
-                <span data-editable="true" data-field="announcement-type">Announcement</span>
-            </div>
-            <div class="announcement-icon-wrap">
-                <!-- Megaphone SVG -->
-                <svg class="announcement-icon" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <defs>
-                        <linearGradient id="megaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" stop-color="#F0D99A"/>
-                            <stop offset="100%" stop-color="#D4AF55"/>
-                        </linearGradient>
-                    </defs>
-                    <path d="M20 40 L20 60 L35 60 L70 78 L70 22 L35 40 Z" fill="url(#megaGrad)" stroke="url(#megaGrad)" stroke-width="2" stroke-linejoin="round"/>
-                    <path d="M35 40 L35 60" stroke="#0A2E36" stroke-width="2"/>
-                    <path d="M75 35 Q82 42 82 50 Q82 58 75 65" stroke="url(#megaGrad)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-                    <path d="M82 28 Q92 40 92 50 Q92 60 82 72" stroke="url(#megaGrad)" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.6"/>
-                    <path d="M38 62 L42 82 L50 82 L46 62" fill="url(#megaGrad)"/>
-                </svg>
-            </div>
-            <div class="pub-date" data-editable="true" data-field="publish-date">February 26, 2026</div>
-            <div class="pub-category" data-editable="true" data-field="category">Corporate Update</div>
-            <div class="priority-badge">
-                <svg class="priority-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 2 L14.5 9 L22 9.5 L16 14.5 L18 22 L12 18 L6 22 L8 14.5 L2 9.5 L9.5 9 Z" fill="currentColor" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/>
-                </svg>
-                <span data-editable="true" data-field="priority">High Priority</span>
-            </div>
-        </div>
-
-        <div class="main-content">
-            <h1 class="headline" data-editable="true" data-field="headline">New Hybrid Work Policy Takes Effect March 1st</h1>
-            <div class="headline-accent"></div>
-            <div class="body-text" data-editable="true" data-field="body-text">We are excited to announce our updated hybrid work policy, designed to give teams greater flexibility while maintaining our collaborative culture. Starting March 1st, all departments will transition to a flexible 3-2 model with designated collaboration days on Tuesday and Thursday.</div>
-
-            <div class="cta-section">
-                <div class="cta-button">
-                    <svg class="cta-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/>
-                        <path d="M14 2V8H20" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-                        <line x1="8" y1="13" x2="16" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                        <line x1="8" y1="17" x2="14" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    </svg>
-                    <span data-editable="true" data-field="cta-text">Read Full Policy</span>
-                </div>
-                <div class="cta-secondary" data-editable="true" data-field="cta-secondary">Questions? Contact HR</div>
-            </div>
-
-            <div class="attribution">
-                <div class="author-avatar">
-                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2"/>
-                        <path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    </svg>
-                </div>
-                <div>
-                    <div class="author-name" data-editable="true" data-field="author-name">Maria Rodriguez</div>
-                    <div class="author-role" data-editable="true" data-field="author-role">Chief People Officer</div>
-                </div>
-            </div>
-        </div>
+  <div class="frame"></div>
+  <div class="container">
+    <div class="sidebar">
+      <svg class="sidebar-logo" viewBox="0 0 48 48" fill="none">
+        <path d="M10 42 L10 14 L24 6 L38 14 L38 42 Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+        <path d="M16 42 L16 22 L24 18 L32 22 L32 42" stroke="currentColor" stroke-width="1.4" opacity="0.8"/>
+        <rect x="21" y="30" width="6" height="12" fill="currentColor"/>
+      </svg>
+      <span class="sidebar-text" data-editable="true" data-field="sidebar-text">Company News</span>
+      <span class="sidebar-year" data-editable="true" data-field="year">2026</span>
     </div>
+
+    <div class="meta-section">
+      <div class="announcement-type">
+        <span class="type-dot"></span>
+        <span data-editable="true" data-field="announcement-type">Announcement</span>
+      </div>
+      <div class="announcement-icon-wrap">
+        <svg class="announcement-icon" viewBox="0 0 100 100" fill="none">
+          <path d="M20 40 L20 60 L35 60 L70 78 L70 22 L35 40 Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M75 35 Q82 42 82 50 Q82 58 75 65" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M82 28 Q92 40 92 50 Q92 60 82 72" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity="0.6"/>
+          <path d="M38 62 L42 82 L50 82 L46 62" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="pub-date" data-editable="true" data-field="publish-date">February 26, 2026</div>
+      <div class="pub-category" data-editable="true" data-field="category">Corporate Update</div>
+      <div class="priority-badge">
+        <svg class="priority-icon" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2 L14.5 9 L22 9.5 L16 14.5 L18 22 L12 18 L6 22 L8 14.5 L2 9.5 L9.5 9 Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+        </svg>
+        <span data-editable="true" data-field="priority">High Priority</span>
+      </div>
+    </div>
+
+    <div class="main-content">
+      <h1 class="headline" data-editable="true" data-field="headline">New Hybrid Work Policy Takes Effect March 1st</h1>
+      <div class="headline-accent"></div>
+      <p class="body-text" data-editable="true" data-field="body-text">We are excited to announce our updated hybrid work policy, designed to give teams greater flexibility while maintaining our collaborative culture. Starting March 1st, all departments will transition to a flexible 3-2 model with designated collaboration days on Tuesday and Thursday.</p>
+
+      <div class="cta-section">
+        <div class="cta-button">
+          <svg class="cta-icon" viewBox="0 0 24 24" fill="none">
+            <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+            <path d="M14 2V8H20" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+            <line x1="8" y1="13" x2="16" y2="13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+          <span data-editable="true" data-field="cta-text">Read Full Policy</span>
+        </div>
+        <div class="cta-secondary" data-editable="true" data-field="cta-secondary">Questions? Contact HR</div>
+      </div>
+
+      <div class="attribution">
+        <div class="author-avatar">
+          <svg viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.6"/>
+            <path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div>
+          <div class="author-name" data-editable="true" data-field="author-name">Maria Rodriguez</div>
+          <div class="author-role" data-editable="true" data-field="author-role">Chief People Officer</div>
+        </div>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

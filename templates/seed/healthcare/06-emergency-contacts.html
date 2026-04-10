@@ -3,460 +3,198 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1920, height=1080">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Bebas+Neue&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <title>Emergency Contacts</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Cormorant+SC:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg-a: #E2D0B0;
+      --bg-b: #D9C4A0;
+      --ink: #2C1810;
+      --ink-body: #4A2D18;
+      --ink-muted: #7A4A28;
+      --brass: #8B6F2E;
+      --royal: #3D1F14;
+      --accent: #6B2737;
+      --rule: rgba(139,111,46,0.4);
+    }
     body {
-      width: 1920px;
-      height: 1080px;
-      overflow: hidden;
-      position: relative;
-      font-family: 'Inter', sans-serif;
+      width: 1920px; height: 1080px; overflow: hidden; position: relative;
+      font-family: 'Lora', serif; color: var(--ink-body);
       background:
-        radial-gradient(ellipse at 50% 0%, rgba(239, 68, 68, 0.08) 0%, transparent 50%),
-        radial-gradient(ellipse at 80% 90%, rgba(30, 58, 95, 0.1) 0%, transparent 50%),
-        linear-gradient(180deg, #0f172a 0%, #1e293b 40%, #0f172a 100%);
-      color: #f1f5f9;
+        radial-gradient(ellipse at 30% 0%, rgba(139,111,46,0.08), transparent 60%),
+        radial-gradient(ellipse at 70% 100%, rgba(107,39,55,0.06), transparent 55%),
+        linear-gradient(165deg, #E2D0B0 0%, #D9C4A0 100%);
     }
-
-    /* Dot grid */
     body::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background-image: radial-gradient(circle, rgba(239, 68, 68, 0.03) 1px, transparent 1px);
-      background-size: 30px 30px;
-      pointer-events: none;
-      z-index: 0;
+      content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+      background-image:
+        radial-gradient(circle at 21% 29%, rgba(44,24,16,0.035) 0.6px, transparent 1.1px),
+        radial-gradient(circle at 71% 64%, rgba(44,24,16,0.028) 0.5px, transparent 1px);
+      background-size: 38px 38px, 54px 54px;
     }
+    .frame { position: absolute; inset: 56px; border: 1px solid var(--brass); z-index: 1; }
+    .frame::before { content: ''; position: absolute; inset: 10px; border: 1px solid rgba(139,111,46,0.22); }
 
-    /* Vertical stripe texture */
-    body::after {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: repeating-linear-gradient(
-        90deg,
-        transparent,
-        transparent 6px,
-        rgba(255, 255, 255, 0.003) 6px,
-        rgba(255, 255, 255, 0.003) 7px
-      );
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    /* Glowing red accents */
-    .glow-red-top {
-      position: absolute;
-      top: -100px; left: 50%;
-      transform: translateX(-50%);
-      width: 800px; height: 400px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(239, 68, 68, 0.06), transparent 60%);
-      filter: blur(80px);
-      z-index: 0;
-    }
-
-    .glow-blue-br {
-      position: absolute;
-      bottom: -80px; right: -80px;
-      width: 400px; height: 400px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(59, 130, 246, 0.06), transparent 60%);
-      filter: blur(60px);
-      z-index: 0;
-    }
-
-    .glow-red-left {
-      position: absolute;
-      top: 50%; left: -60px;
-      width: 200px; height: 200px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(239, 68, 68, 0.08), transparent 60%);
-      filter: blur(40px);
-      z-index: 0;
-    }
-
-    /* Top danger bar */
-    .danger-bar {
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 6px;
-      background: linear-gradient(90deg, #dc2626, #ef4444, #f87171, #ef4444, #dc2626);
-      z-index: 3;
-    }
-
-    .layout {
-      position: relative;
-      z-index: 1;
-      display: grid;
-      grid-template-rows: auto 1fr auto;
-      height: 100%;
-      padding-top: 6px;
-    }
-
-    /* Header */
     .header {
-      display: grid;
-      grid-template-columns: auto 1fr auto;
-      align-items: center;
-      gap: 30px;
-      padding: 40px 80px 30px;
+      position: absolute; top: 86px; left: 120px; right: 120px;
+      z-index: 5;
+      display: grid; grid-template-columns: 1fr auto; align-items: end;
+      padding-bottom: 22px; border-bottom: 1px solid var(--rule);
     }
-
-    .header-icon {
-      width: 80px;
-      height: 80px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    /* SVG emergency cross */
-    .emergency-cross-svg {
-      filter: drop-shadow(0 0 20px rgba(239, 68, 68, 0.4));
-    }
-
-    .header-text h1 {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 72px;
-      letter-spacing: 4px;
-      color: #ffffff;
-      line-height: 1;
-      text-transform: uppercase;
-    }
-
-    .header-text p {
-      font-size: 18px;
-      color: #94a3b8;
-      margin-top: 4px;
-    }
-
-    .critical-badge {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 14px 28px;
-      background: rgba(239, 68, 68, 0.1);
-      border: 2px solid rgba(239, 68, 68, 0.3);
-      border-radius: 14px;
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 700;
-      font-size: 18px;
-      color: #fca5a5;
-      letter-spacing: 1px;
-    }
-
-    .critical-dot {
-      width: 10px; height: 10px;
-      border-radius: 50%;
-      background: #ef4444;
-      box-shadow: 0 0 12px rgba(239, 68, 68, 0.6);
-    }
-
-    /* Ornamental divider */
-    .divider-line {
-      margin: 0 80px;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(239, 68, 68, 0.2), rgba(148, 163, 184, 0.1), transparent);
-    }
-
-    /* Contact sections */
-    .contacts-area {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 32px;
-      padding: 36px 80px;
-      align-items: start;
-    }
-
-    .contact-section {
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-
-    .section-header {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      padding-bottom: 14px;
-      border-bottom: 2px solid;
-    }
-
-    .section-emergency .section-header { border-color: rgba(239, 68, 68, 0.3); }
-    .section-urgent .section-header { border-color: rgba(245, 158, 11, 0.3); }
-    .section-general .section-header { border-color: rgba(59, 130, 246, 0.3); }
-
-    .section-icon {
-      font-size: 36px;
-      filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
-    }
-
-    .section-title {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 36px;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-    }
-
-    .section-emergency .section-title { color: #ef4444; }
-    .section-urgent .section-title { color: #f59e0b; }
-    .section-general .section-title { color: #3b82f6; }
-
-    .contact-card {
-      background: rgba(30, 41, 59, 0.6);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid rgba(148, 163, 184, 0.08);
-      border-radius: 18px;
-      padding: 24px 28px;
-      box-shadow:
-        0 4px 20px rgba(0, 0, 0, 0.15),
-        inset 0 1px 0 rgba(255, 255, 255, 0.04);
-      position: relative;
-      overflow: hidden;
-    }
-
-    .contact-card::before {
-      content: '';
-      position: absolute;
-      left: 0; top: 0; bottom: 0;
-      width: 4px;
-    }
-
-    .section-emergency .contact-card::before { background: #ef4444; }
-    .section-urgent .contact-card::before { background: #f59e0b; }
-    .section-general .contact-card::before { background: #3b82f6; }
-
-    .contact-name {
-      font-weight: 700;
-      font-size: 20px;
-      color: #e2e8f0;
+    .eyebrow {
+      font-family: 'Cormorant SC', serif;
+      font-size: 15px; letter-spacing: 5px; font-weight: 600;
+      color: var(--accent); text-transform: uppercase;
       margin-bottom: 8px;
     }
+    h1 {
+      font-family: 'DM Serif Display', serif;
+      font-size: 64px; color: var(--royal); line-height: 1;
+    }
+    .header p {
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 18px; color: var(--ink-muted);
+      margin-top: 8px;
+    }
+    .badge {
+      padding: 12px 26px; border: 1px solid var(--accent);
+      background: rgba(107,39,55,0.08);
+      font-family: 'Cormorant SC', serif;
+      font-size: 14px; letter-spacing: 5px; font-weight: 600;
+      color: var(--accent); text-transform: uppercase;
+    }
 
+    .columns {
+      position: absolute; top: 280px; left: 120px; right: 120px; bottom: 130px;
+      z-index: 5;
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      gap: 32px;
+    }
+    .column {
+      display: flex; flex-direction: column; gap: 16px;
+    }
+    .col-head {
+      text-align: center; padding-bottom: 12px;
+      border-bottom: 1px solid var(--rule);
+      font-family: 'Cormorant SC', serif;
+      font-size: 18px; letter-spacing: 6px; font-weight: 600;
+      color: var(--accent); text-transform: uppercase;
+    }
+    .contact {
+      background: rgba(255,248,232,0.32);
+      border: 1px solid var(--brass);
+      padding: 22px 26px;
+      position: relative;
+    }
+    .contact::before {
+      content: ''; position: absolute; inset: 7px;
+      border: 1px solid rgba(139,111,46,0.22); pointer-events: none;
+    }
+    .contact-name {
+      font-family: 'DM Serif Display', serif;
+      font-size: 19px; color: var(--ink);
+      line-height: 1.15; margin-bottom: 6px;
+      position: relative; z-index: 1;
+    }
     .contact-number {
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 700;
-      font-size: 48px;
-      line-height: 1.1;
-      letter-spacing: -1px;
+      font-family: 'DM Serif Display', serif;
+      font-size: 28px; color: var(--accent);
+      line-height: 1; margin-bottom: 8px;
+      position: relative; z-index: 1;
     }
-
-    .section-emergency .contact-number { color: #fca5a5; text-shadow: 0 0 20px rgba(239, 68, 68, 0.2); }
-    .section-urgent .contact-number { color: #fde68a; text-shadow: 0 0 20px rgba(245, 158, 11, 0.2); }
-    .section-general .contact-number { color: #93c5fd; text-shadow: 0 0 20px rgba(59, 130, 246, 0.2); }
-
     .contact-desc {
-      font-size: 14px;
-      color: #64748b;
-      margin-top: 6px;
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 13px; color: var(--ink-muted);
+      line-height: 1.4;
+      position: relative; z-index: 1;
     }
 
-    .contact-availability {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      margin-top: 10px;
-      padding: 4px 12px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 600;
-      letter-spacing: 0.5px;
-    }
-
-    .section-emergency .contact-availability {
-      background: rgba(239, 68, 68, 0.1);
-      color: #fca5a5;
-    }
-    .section-urgent .contact-availability {
-      background: rgba(245, 158, 11, 0.1);
-      color: #fde68a;
-    }
-    .section-general .contact-availability {
-      background: rgba(59, 130, 246, 0.1);
-      color: #93c5fd;
-    }
-
-    /* SVG background decorations */
-    .bg-cross {
-      position: absolute;
-      opacity: 0.02;
-      z-index: 0;
-    }
-
-    .bg-cross-1 { top: 200px; right: 60px; }
-    .bg-cross-2 { bottom: 200px; left: 60px; }
-
-    /* Footer */
     .footer {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 40px;
-      padding: 24px 80px 36px;
-      border-top: 1px solid rgba(148, 163, 184, 0.06);
-    }
-
-    .footer-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 15px;
-      color: #64748b;
-    }
-
-    .footer-separator {
-      width: 4px; height: 4px;
-      border-radius: 50%;
-      background: #475569;
+      position: absolute; bottom: 70px; left: 120px; right: 120px;
+      z-index: 5;
+      display: flex; justify-content: space-between;
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 14px; color: var(--ink-muted);
+      padding-top: 12px; border-top: 1px solid var(--rule);
     }
   </style>
 </head>
 <body>
-  <div class="danger-bar"></div>
-  <div class="glow-red-top"></div>
-  <div class="glow-blue-br"></div>
-  <div class="glow-red-left"></div>
+  <div class="frame"></div>
 
-  <!-- Background cross decorations -->
-  <svg class="bg-cross bg-cross-1" width="250" height="250" viewBox="0 0 250 250" fill="none">
-    <rect x="95" y="10" width="60" height="230" rx="8" fill="#ef4444"/>
-    <rect x="10" y="95" width="230" height="60" rx="8" fill="#ef4444"/>
-  </svg>
-  <svg class="bg-cross bg-cross-2" width="200" height="200" viewBox="0 0 200 200" fill="none">
-    <rect x="75" y="8" width="50" height="184" rx="6" fill="#ef4444"/>
-    <rect x="8" y="75" width="184" height="50" rx="6" fill="#ef4444"/>
-  </svg>
-
-  <div class="layout">
+  <div class="header">
     <div>
-      <div class="header">
-        <div class="header-icon">
-          <!-- Emergency cross SVG -->
-          <svg class="emergency-cross-svg" width="72" height="72" viewBox="0 0 72 72" fill="none">
-            <rect x="4" y="4" width="64" height="64" rx="16" fill="rgba(239,68,68,0.15)" stroke="#ef4444" stroke-width="2"/>
-            <rect x="28" y="14" width="16" height="44" rx="3" fill="#ef4444"/>
-            <rect x="14" y="28" width="44" height="16" rx="3" fill="#ef4444"/>
-          </svg>
-        </div>
-        <div class="header-text">
-          <h1 data-editable="true" data-field="title">Emergency Contacts</h1>
-          <p data-editable="true" data-field="subtitle">Critical contact numbers for staff and visitors &mdash; Meridian Health Medical Center</p>
-        </div>
-        <div class="critical-badge">
-          <span class="critical-dot"></span>
-          <span data-editable="true" data-field="badgeText">CRITICAL INFO</span>
-        </div>
-      </div>
-      <div class="divider-line"></div>
+      <div class="eyebrow">Always Available</div>
+      <h1 data-editable="true" data-field="title">Emergency Contacts</h1>
+      <p data-editable="true" data-field="subtitle">Critical contact numbers for staff and visitors &mdash; Meridian Health Medical Center</p>
     </div>
+    <div class="badge"><span data-editable="true" data-field="badgeText">CRITICAL INFO</span></div>
+  </div>
 
-    <div class="contacts-area">
-      <!-- Emergency Column -->
-      <div class="contact-section section-emergency">
-        <div class="section-header">
-          <span class="section-icon">🚨</span>
-          <span class="section-title" data-editable="true" data-field="emergencyLabel">Emergency</span>
-        </div>
-
-        <div class="contact-card">
-          <div class="contact-name" data-editable="true" data-field="emerg1Name">Emergency Services (911)</div>
-          <div class="contact-number" data-editable="true" data-field="emerg1Number">911</div>
-          <div class="contact-desc" data-editable="true" data-field="emerg1Desc">Police, Fire, Ambulance &mdash; Life threatening emergencies</div>
-          <div class="contact-availability">24/7 ALWAYS AVAILABLE</div>
-        </div>
-
-        <div class="contact-card">
-          <div class="contact-name" data-editable="true" data-field="emerg2Name">Hospital Emergency Dept</div>
-          <div class="contact-number" data-editable="true" data-field="emerg2Number">(555) 234-9111</div>
-          <div class="contact-desc" data-editable="true" data-field="emerg2Desc">Direct line to ER triage &mdash; Level 1 Trauma Center</div>
-          <div class="contact-availability">24/7 STAFFED</div>
-        </div>
-
-        <div class="contact-card">
-          <div class="contact-name" data-editable="true" data-field="emerg3Name">Code Blue / Rapid Response</div>
-          <div class="contact-number" data-editable="true" data-field="emerg3Number">Ext. 5555</div>
-          <div class="contact-desc" data-editable="true" data-field="emerg3Desc">Internal cardiac/respiratory emergency response team</div>
-          <div class="contact-availability">INTERNAL ONLY</div>
-        </div>
+  <div class="columns">
+    <div class="column">
+      <div class="col-head"><span data-editable="true" data-field="emergencyLabel">Emergency</span></div>
+      <div class="contact">
+        <div class="contact-name" data-editable="true" data-field="emerg1Name">Emergency Services</div>
+        <div class="contact-number" data-editable="true" data-field="emerg1Number">911</div>
+        <div class="contact-desc" data-editable="true" data-field="emerg1Desc">Police, Fire, Ambulance &mdash; Life threatening emergencies</div>
       </div>
-
-      <!-- Urgent Column -->
-      <div class="contact-section section-urgent">
-        <div class="section-header">
-          <span class="section-icon">⚠️</span>
-          <span class="section-title" data-editable="true" data-field="urgentLabel">Urgent Care</span>
-        </div>
-
-        <div class="contact-card">
-          <div class="contact-name" data-editable="true" data-field="urgent1Name">Nurse Hotline</div>
-          <div class="contact-number" data-editable="true" data-field="urgent1Number">(555) 234-7000</div>
-          <div class="contact-desc" data-editable="true" data-field="urgent1Desc">Medical advice from registered nurses</div>
-          <div class="contact-availability">24/7 AVAILABLE</div>
-        </div>
-
-        <div class="contact-card">
-          <div class="contact-name" data-editable="true" data-field="urgent2Name">Urgent Care Walk-In</div>
-          <div class="contact-number" data-editable="true" data-field="urgent2Number">(555) 234-8500</div>
-          <div class="contact-desc" data-editable="true" data-field="urgent2Desc">Non-life-threatening injuries and illnesses</div>
-          <div class="contact-availability">7 AM &ndash; 11 PM</div>
-        </div>
-
-        <div class="contact-card">
-          <div class="contact-name" data-editable="true" data-field="urgent3Name">Poison Control</div>
-          <div class="contact-number" data-editable="true" data-field="urgent3Number">(800) 222-1222</div>
-          <div class="contact-desc" data-editable="true" data-field="urgent3Desc">National Poison Control Center &mdash; immediate advice</div>
-          <div class="contact-availability">24/7 NATIONAL LINE</div>
-        </div>
+      <div class="contact">
+        <div class="contact-name" data-editable="true" data-field="emerg2Name">Hospital Emergency Dept</div>
+        <div class="contact-number" data-editable="true" data-field="emerg2Number">(555) 234-9111</div>
+        <div class="contact-desc" data-editable="true" data-field="emerg2Desc">Direct line to ER triage &mdash; Level 1 Trauma Center</div>
       </div>
-
-      <!-- General Column -->
-      <div class="contact-section section-general">
-        <div class="section-header">
-          <span class="section-icon">📞</span>
-          <span class="section-title" data-editable="true" data-field="generalLabel">General</span>
-        </div>
-
-        <div class="contact-card">
-          <div class="contact-name" data-editable="true" data-field="general1Name">Main Switchboard</div>
-          <div class="contact-number" data-editable="true" data-field="general1Number">(555) 234-5678</div>
-          <div class="contact-desc" data-editable="true" data-field="general1Desc">General inquiries, patient information, room connections</div>
-          <div class="contact-availability">24/7 OPERATOR</div>
-        </div>
-
-        <div class="contact-card">
-          <div class="contact-name" data-editable="true" data-field="general2Name">Patient Relations</div>
-          <div class="contact-number" data-editable="true" data-field="general2Number">(555) 234-6200</div>
-          <div class="contact-desc" data-editable="true" data-field="general2Desc">Complaints, compliments, and patient advocacy</div>
-          <div class="contact-availability">MON&ndash;FRI 8 AM&ndash;5 PM</div>
-        </div>
-
-        <div class="contact-card">
-          <div class="contact-name" data-editable="true" data-field="general3Name">Security</div>
-          <div class="contact-number" data-editable="true" data-field="general3Number">Ext. 4444</div>
-          <div class="contact-desc" data-editable="true" data-field="general3Desc">Campus safety, escorts, lost &amp; found</div>
-          <div class="contact-availability">24/7 ON CAMPUS</div>
-        </div>
+      <div class="contact">
+        <div class="contact-name" data-editable="true" data-field="emerg3Name">Code Blue / Rapid Response</div>
+        <div class="contact-number" data-editable="true" data-field="emerg3Number">Ext. 5555</div>
+        <div class="contact-desc" data-editable="true" data-field="emerg3Desc">Internal cardiac/respiratory emergency response team</div>
       </div>
     </div>
 
-    <div class="footer">
-      <div class="footer-item">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="#64748b" stroke-width="1.2"/><path d="M8 4v4l2.5 2.5" stroke="#64748b" stroke-width="1.2" stroke-linecap="round"/></svg>
-        <span data-editable="true" data-field="footerInfo1">All emergency lines are answered immediately</span>
+    <div class="column">
+      <div class="col-head"><span data-editable="true" data-field="urgentLabel">Urgent Care</span></div>
+      <div class="contact">
+        <div class="contact-name" data-editable="true" data-field="urgent1Name">Nurse Hotline</div>
+        <div class="contact-number" data-editable="true" data-field="urgent1Number">(555) 234-7000</div>
+        <div class="contact-desc" data-editable="true" data-field="urgent1Desc">Medical advice from registered nurses</div>
       </div>
-      <div class="footer-separator"></div>
-      <div class="footer-item">
-        <span data-editable="true" data-field="footerInfo2">For non-urgent matters, please visit the main reception desk</span>
+      <div class="contact">
+        <div class="contact-name" data-editable="true" data-field="urgent2Name">Urgent Care Walk-In</div>
+        <div class="contact-number" data-editable="true" data-field="urgent2Number">(555) 234-8500</div>
+        <div class="contact-desc" data-editable="true" data-field="urgent2Desc">Non-life-threatening injuries and illnesses</div>
       </div>
-      <div class="footer-separator"></div>
-      <div class="footer-item">
-        <span data-editable="true" data-field="footerInfo3">Numbers verified: February 2026</span>
+      <div class="contact">
+        <div class="contact-name" data-editable="true" data-field="urgent3Name">Poison Control</div>
+        <div class="contact-number" data-editable="true" data-field="urgent3Number">(800) 222-1222</div>
+        <div class="contact-desc" data-editable="true" data-field="urgent3Desc">National Poison Control Center &mdash; immediate advice</div>
       </div>
     </div>
+
+    <div class="column">
+      <div class="col-head"><span data-editable="true" data-field="generalLabel">General</span></div>
+      <div class="contact">
+        <div class="contact-name" data-editable="true" data-field="general1Name">Main Switchboard</div>
+        <div class="contact-number" data-editable="true" data-field="general1Number">(555) 234-5678</div>
+        <div class="contact-desc" data-editable="true" data-field="general1Desc">General inquiries, patient information, room connections</div>
+      </div>
+      <div class="contact">
+        <div class="contact-name" data-editable="true" data-field="general2Name">Patient Relations</div>
+        <div class="contact-number" data-editable="true" data-field="general2Number">(555) 234-6200</div>
+        <div class="contact-desc" data-editable="true" data-field="general2Desc">Complaints, compliments, and patient advocacy</div>
+      </div>
+      <div class="contact">
+        <div class="contact-name" data-editable="true" data-field="general3Name">Security</div>
+        <div class="contact-number" data-editable="true" data-field="general3Number">Ext. 4444</div>
+        <div class="contact-desc" data-editable="true" data-field="general3Desc">Campus safety, escorts, lost &amp; found</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span data-editable="true" data-field="footerInfo1">All emergency lines are answered immediately</span>
+    <span data-editable="true" data-field="footerInfo2">For non-urgent matters, please visit the main reception desk</span>
+    <span data-editable="true" data-field="footerInfo3">Numbers verified: February 2026</span>
   </div>
 </body>
 </html>

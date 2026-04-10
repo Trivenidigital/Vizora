@@ -3,392 +3,230 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1920, height=1080">
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=Inter:wght@300;400;500;600&family=Cormorant+Garamond:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Cormorant+SC:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --ink: #2C1810;
+      --ink-body: #4A2D18;
+      --ink-muted: #7A4A28;
+      --accent: #6B2737;
+      --brass: #8B6F2E;
+      --rule: rgba(107,39,55,0.35);
+    }
     body {
-      width: 1920px;
-      height: 1080px;
-      overflow: hidden;
-      position: relative;
-      font-family: 'Inter', sans-serif;
+      width: 1920px; height: 1080px; overflow: hidden; position: relative;
+      font-family: 'Lora', serif; color: var(--ink-body);
       background:
-        repeating-linear-gradient(
-          60deg,
-          transparent,
-          transparent 50px,
-          rgba(212,175,85,0.02) 50px,
-          rgba(212,175,85,0.02) 51px
-        ),
-        repeating-linear-gradient(
-          -60deg,
-          transparent,
-          transparent 50px,
-          rgba(212,175,85,0.02) 50px,
-          rgba(212,175,85,0.02) 51px
-        ),
-        radial-gradient(ellipse at 50% 0%, rgba(212,175,85,0.06) 0%, transparent 50%),
-        linear-gradient(180deg, #0a0a0a 0%, #111111 50%, #080808 100%);
-      color: #e8e0d0;
+        radial-gradient(ellipse at 50% 0%, rgba(107,39,55,0.06), transparent 60%),
+        linear-gradient(168deg, #D9C4A0 0%, #C9B082 100%);
     }
-
-    /* Art deco geometric CSS pattern */
     body::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background:
-        repeating-linear-gradient(
-          0deg,
-          transparent,
-          transparent 108px,
-          rgba(212,175,85,0.04) 108px,
-          rgba(212,175,85,0.04) 110px
-        ),
-        repeating-linear-gradient(
-          90deg,
-          transparent,
-          transparent 108px,
-          rgba(212,175,85,0.04) 108px,
-          rgba(212,175,85,0.04) 110px
-        );
-      pointer-events: none;
-      z-index: 0;
+      content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+      background-image:
+        radial-gradient(circle at 19% 27%, rgba(44,24,16,0.035) 0.6px, transparent 1.1px),
+        radial-gradient(circle at 71% 64%, rgba(44,24,16,0.028) 0.5px, transparent 1px);
+      background-size: 40px 40px, 58px 58px;
+    }
+    body::after {
+      content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+      background: repeating-linear-gradient(42deg, transparent 0 90px, rgba(107,39,55,0.02) 90px 91px);
     }
 
-    /* Gold glow accents */
-    .deco-glow-1 {
-      position: absolute;
-      top: -100px; left: 50%;
-      transform: translateX(-50%);
-      width: 1000px; height: 400px;
-      background: radial-gradient(ellipse, rgba(212,175,85,0.08) 0%, transparent 70%);
-      z-index: 1;
+    .frame {
+      position: absolute; inset: 50px;
+      border: 1px solid var(--brass); z-index: 1;
     }
-    .deco-glow-2 {
-      position: absolute;
-      bottom: -150px; left: 200px;
-      width: 500px; height: 500px;
-      background: radial-gradient(circle, rgba(212,175,85,0.04) 0%, transparent 60%);
-      border-radius: 50%;
-      z-index: 1;
-    }
-    .deco-glow-3 {
-      position: absolute;
-      bottom: -100px; right: 200px;
-      width: 500px; height: 500px;
-      background: radial-gradient(circle, rgba(212,175,85,0.04) 0%, transparent 60%);
-      border-radius: 50%;
-      z-index: 1;
+    .frame::before {
+      content: ''; position: absolute; inset: 10px;
+      border: 1px solid rgba(139,111,46,0.22);
     }
 
-    .container {
-      position: relative;
-      z-index: 2;
-      display: grid;
-      grid-template-rows: auto 1fr;
-      height: 100%;
-      padding: 50px 80px;
-    }
-
-    /* Header with art deco styling */
     .header {
-      text-align: center;
-      margin-bottom: 30px;
+      position: absolute; top: 90px; left: 0; right: 0;
+      text-align: center; z-index: 5;
     }
-
-    .deco-line-top {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 16px;
-      margin-bottom: 14px;
-    }
-    .deco-segment {
-      height: 1px;
-      background: linear-gradient(90deg, transparent, #d4af55, transparent);
-    }
-    .deco-segment-long { width: 200px; }
-    .deco-segment-short { width: 80px; }
-    .deco-diamond {
-      width: 8px; height: 8px;
-      background: #d4af55;
-      transform: rotate(45deg);
-      flex-shrink: 0;
-    }
-
-    .bar-name {
-      font-family: 'Playfair Display', serif;
-      font-weight: 900;
-      font-size: 80px;
-      color: #d4af55;
-      letter-spacing: 12px;
-      text-transform: uppercase;
-      text-shadow: 0 2px 30px rgba(212,175,85,0.2);
-      line-height: 1;
-      margin-bottom: 6px;
-    }
-
-    .bar-subtitle {
-      font-family: 'Cormorant Garamond', serif;
-      font-weight: 300;
-      font-size: 22px;
-      color: rgba(232,224,208,0.4);
-      letter-spacing: 10px;
-      text-transform: uppercase;
-    }
-
-    /* 4-column cocktail grid */
-    .cocktail-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 24px;
-      align-content: start;
-    }
-
-    .cocktail-card {
-      background: rgba(255,255,255,0.02);
-      border: 1px solid rgba(212,175,85,0.12);
-      border-radius: 4px;
-      padding: 28px 24px;
-      position: relative;
-      overflow: hidden;
-    }
-
-    /* Gold top accent on each card */
-    .cocktail-card::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 20%; right: 20%;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, #d4af55, transparent);
-    }
-
-    /* Art deco corner SVG on cards */
-    .cocktail-card::after {
-      content: '';
-      position: absolute;
-      bottom: 8px; right: 8px;
-      width: 24px; height: 24px;
-      border-right: 1px solid rgba(212,175,85,0.2);
-      border-bottom: 1px solid rgba(212,175,85,0.2);
-    }
-
-    .cocktail-name {
-      font-family: 'Playfair Display', serif;
-      font-weight: 700;
-      font-size: 30px;
-      color: #d4af55;
-      margin-bottom: 6px;
-      line-height: 1.1;
-    }
-
-    .cocktail-price {
-      font-family: 'Cormorant Garamond', serif;
-      font-weight: 600;
-      font-size: 24px;
-      color: rgba(212,175,85,0.7);
+    .eyebrow {
+      font-family: 'Cormorant SC', serif;
+      font-size: 20px; letter-spacing: 8px;
+      color: var(--accent); text-transform: uppercase; font-weight: 500;
       margin-bottom: 12px;
     }
+    .bar-name {
+      font-family: 'DM Serif Display', serif;
+      font-size: 80px; font-weight: 400;
+      color: var(--ink); letter-spacing: -0.5px; line-height: 0.95;
+    }
+    .bar-subtitle {
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 22px; color: var(--ink-muted);
+      letter-spacing: 1px; margin-top: 12px;
+    }
+    .bar-subtitle::before, .bar-subtitle::after {
+      content: '\2014'; color: var(--brass); margin: 0 14px;
+    }
 
-    .cocktail-ingredients {
+    .cocktails {
+      position: absolute;
+      top: 340px; bottom: 70px;
+      left: 100px; right: 100px;
+      z-index: 5;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px 70px;
+    }
+    .cocktail-card {
+      padding: 14px 0;
+      border-bottom: 1px dotted rgba(139,111,46,0.4);
+    }
+    .cocktail-header {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: baseline;
+      gap: 0 12px;
+      margin-bottom: 6px;
+    }
+    .cocktail-name {
+      font-family: 'DM Serif Display', serif;
+      font-size: 28px; color: var(--ink);
+    }
+    .cocktail-price {
+      font-family: 'DM Serif Display', serif;
+      font-size: 26px; color: var(--accent);
+    }
+    .ingredients {
       list-style: none;
-      padding: 0;
+      display: flex; flex-wrap: wrap;
+      gap: 4px 12px;
+      font-family: 'Lora', serif;
+      font-size: 14px; color: var(--ink-muted);
+      margin-bottom: 6px;
     }
-    .cocktail-ingredients li {
-      font-family: 'Cormorant Garamond', serif;
-      font-weight: 400;
-      font-size: 18px;
-      color: rgba(232,224,208,0.5);
-      padding: 4px 0;
-      border-bottom: 1px solid rgba(212,175,85,0.05);
-      line-height: 1.3;
+    .ingredients li:not(:last-child)::after {
+      content: '\00B7';
+      margin-left: 12px;
+      color: var(--brass);
     }
-    .cocktail-ingredients li:last-child {
-      border-bottom: none;
-    }
-
     .cocktail-desc {
-      font-family: 'Inter', sans-serif;
-      font-weight: 300;
-      font-size: 13px;
-      color: rgba(232,224,208,0.35);
-      margin-top: 10px;
-      line-height: 1.4;
-      font-style: italic;
-    }
-
-    /* SVG art deco frame corners */
-    .frame-corner {
-      position: absolute;
-      z-index: 3;
-      opacity: 0.3;
-    }
-    .fc-tl { top: 16px; left: 16px; }
-    .fc-tr { top: 16px; right: 16px; transform: scaleX(-1); }
-    .fc-bl { bottom: 16px; left: 16px; transform: scaleY(-1); }
-    .fc-br { bottom: 16px; right: 16px; transform: scale(-1,-1); }
-
-    /* Bottom gold line */
-    .bottom-gold {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 3px;
-      background: linear-gradient(90deg, transparent, #d4af55, transparent);
-      z-index: 3;
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 14px; color: var(--ink-muted);
     }
   </style>
 </head>
 <body>
-  <div class="deco-glow-1"></div>
-  <div class="deco-glow-2"></div>
-  <div class="deco-glow-3"></div>
+  <div class="frame"></div>
 
-  <!-- SVG art deco corner frames -->
-  <svg class="frame-corner fc-tl" width="80" height="80" viewBox="0 0 80 80" fill="none" stroke="#d4af55" stroke-width="1.5">
-    <path d="M5 40 L5 5 L40 5"/>
-    <path d="M5 5 L25 25"/>
-    <path d="M12 5 L12 12 L5 12"/>
-    <circle cx="5" cy="5" r="2" fill="#d4af55"/>
-  </svg>
-  <svg class="frame-corner fc-tr" width="80" height="80" viewBox="0 0 80 80" fill="none" stroke="#d4af55" stroke-width="1.5">
-    <path d="M5 40 L5 5 L40 5"/>
-    <path d="M5 5 L25 25"/>
-    <path d="M12 5 L12 12 L5 12"/>
-    <circle cx="5" cy="5" r="2" fill="#d4af55"/>
-  </svg>
-  <svg class="frame-corner fc-bl" width="80" height="80" viewBox="0 0 80 80" fill="none" stroke="#d4af55" stroke-width="1.5">
-    <path d="M5 40 L5 5 L40 5"/>
-    <path d="M5 5 L25 25"/>
-    <path d="M12 5 L12 12 L5 12"/>
-    <circle cx="5" cy="5" r="2" fill="#d4af55"/>
-  </svg>
-  <svg class="frame-corner fc-br" width="80" height="80" viewBox="0 0 80 80" fill="none" stroke="#d4af55" stroke-width="1.5">
-    <path d="M5 40 L5 5 L40 5"/>
-    <path d="M5 5 L25 25"/>
-    <path d="M12 5 L12 12 L5 12"/>
-    <circle cx="5" cy="5" r="2" fill="#d4af55"/>
-  </svg>
-
-  <div class="container">
-    <div class="header">
-      <div class="deco-line-top">
-        <span class="deco-segment deco-segment-long"></span>
-        <span class="deco-diamond"></span>
-        <span class="deco-segment deco-segment-short"></span>
-        <span class="deco-diamond"></span>
-        <span class="deco-segment deco-segment-long"></span>
-      </div>
-      <h1 class="bar-name" data-editable="true" data-field="barName">The Gilded Fox</h1>
-      <p class="bar-subtitle" data-editable="true" data-field="subtitle">Cocktail Lounge &amp; Speakeasy</p>
-      <div class="deco-line-top" style="margin-top: 14px; margin-bottom: 0;">
-        <span class="deco-segment deco-segment-long"></span>
-        <span class="deco-diamond"></span>
-        <span class="deco-segment deco-segment-short"></span>
-        <span class="deco-diamond"></span>
-        <span class="deco-segment deco-segment-long"></span>
-      </div>
-    </div>
-
-    <div class="cocktail-grid">
-      <div class="cocktail-card">
-        <div class="cocktail-name" data-editable="true" data-field="cocktail1Name">Old Fashioned</div>
-        <div class="cocktail-price" data-editable="true" data-field="cocktail1Price">$18</div>
-        <ul class="cocktail-ingredients">
-          <li data-editable="true" data-field="cocktail1Ing1">Woodford Reserve bourbon</li>
-          <li data-editable="true" data-field="cocktail1Ing2">Demerara sugar</li>
-          <li data-editable="true" data-field="cocktail1Ing3">Angostura bitters</li>
-          <li data-editable="true" data-field="cocktail1Ing4">Orange peel</li>
-        </ul>
-        <p class="cocktail-desc" data-editable="true" data-field="cocktail1Desc">The timeless classic, crafted with precision</p>
-      </div>
-
-      <div class="cocktail-card">
-        <div class="cocktail-name" data-editable="true" data-field="cocktail2Name">Negroni</div>
-        <div class="cocktail-price" data-editable="true" data-field="cocktail2Price">$17</div>
-        <ul class="cocktail-ingredients">
-          <li data-editable="true" data-field="cocktail2Ing1">London dry gin</li>
-          <li data-editable="true" data-field="cocktail2Ing2">Campari</li>
-          <li data-editable="true" data-field="cocktail2Ing3">Sweet vermouth</li>
-          <li data-editable="true" data-field="cocktail2Ing4">Orange twist</li>
-        </ul>
-        <p class="cocktail-desc" data-editable="true" data-field="cocktail2Desc">Bittersweet perfection since 1919</p>
-      </div>
-
-      <div class="cocktail-card">
-        <div class="cocktail-name" data-editable="true" data-field="cocktail3Name">Espresso Martini</div>
-        <div class="cocktail-price" data-editable="true" data-field="cocktail3Price">$19</div>
-        <ul class="cocktail-ingredients">
-          <li data-editable="true" data-field="cocktail3Ing1">Belvedere vodka</li>
-          <li data-editable="true" data-field="cocktail3Ing2">Fresh espresso</li>
-          <li data-editable="true" data-field="cocktail3Ing3">Coffee liqueur</li>
-          <li data-editable="true" data-field="cocktail3Ing4">Vanilla syrup</li>
-        </ul>
-        <p class="cocktail-desc" data-editable="true" data-field="cocktail3Desc">Bold, caffeinated elegance</p>
-      </div>
-
-      <div class="cocktail-card">
-        <div class="cocktail-name" data-editable="true" data-field="cocktail4Name">Paper Plane</div>
-        <div class="cocktail-price" data-editable="true" data-field="cocktail4Price">$18</div>
-        <ul class="cocktail-ingredients">
-          <li data-editable="true" data-field="cocktail4Ing1">Bourbon whiskey</li>
-          <li data-editable="true" data-field="cocktail4Ing2">Aperol</li>
-          <li data-editable="true" data-field="cocktail4Ing3">Amaro Nonino</li>
-          <li data-editable="true" data-field="cocktail4Ing4">Fresh lemon juice</li>
-        </ul>
-        <p class="cocktail-desc" data-editable="true" data-field="cocktail4Desc">Modern classic with bittersweet complexity</p>
-      </div>
-
-      <div class="cocktail-card">
-        <div class="cocktail-name" data-editable="true" data-field="cocktail5Name">Penicillin</div>
-        <div class="cocktail-price" data-editable="true" data-field="cocktail5Price">$19</div>
-        <ul class="cocktail-ingredients">
-          <li data-editable="true" data-field="cocktail5Ing1">Blended Scotch</li>
-          <li data-editable="true" data-field="cocktail5Ing2">Honey ginger syrup</li>
-          <li data-editable="true" data-field="cocktail5Ing3">Fresh lemon juice</li>
-          <li data-editable="true" data-field="cocktail5Ing4">Islay Scotch float</li>
-        </ul>
-        <p class="cocktail-desc" data-editable="true" data-field="cocktail5Desc">Smoky, sweet, and deeply satisfying</p>
-      </div>
-
-      <div class="cocktail-card">
-        <div class="cocktail-name" data-editable="true" data-field="cocktail6Name">Daiquiri</div>
-        <div class="cocktail-price" data-editable="true" data-field="cocktail6Price">$16</div>
-        <ul class="cocktail-ingredients">
-          <li data-editable="true" data-field="cocktail6Ing1">White rum</li>
-          <li data-editable="true" data-field="cocktail6Ing2">Fresh lime juice</li>
-          <li data-editable="true" data-field="cocktail6Ing3">Simple syrup</li>
-          <li data-editable="true" data-field="cocktail6Ing4">Lime wheel</li>
-        </ul>
-        <p class="cocktail-desc" data-editable="true" data-field="cocktail6Desc">Pure simplicity, perfectly balanced</p>
-      </div>
-
-      <div class="cocktail-card">
-        <div class="cocktail-name" data-editable="true" data-field="cocktail7Name">Manhattan</div>
-        <div class="cocktail-price" data-editable="true" data-field="cocktail7Price">$18</div>
-        <ul class="cocktail-ingredients">
-          <li data-editable="true" data-field="cocktail7Ing1">Rye whiskey</li>
-          <li data-editable="true" data-field="cocktail7Ing2">Sweet vermouth</li>
-          <li data-editable="true" data-field="cocktail7Ing3">Angostura bitters</li>
-          <li data-editable="true" data-field="cocktail7Ing4">Luxardo cherry</li>
-        </ul>
-        <p class="cocktail-desc" data-editable="true" data-field="cocktail7Desc">A stirred masterpiece of the golden age</p>
-      </div>
-
-      <div class="cocktail-card">
-        <div class="cocktail-name" data-editable="true" data-field="cocktail8Name">Bee's Knees</div>
-        <div class="cocktail-price" data-editable="true" data-field="cocktail8Price">$17</div>
-        <ul class="cocktail-ingredients">
-          <li data-editable="true" data-field="cocktail8Ing1">London dry gin</li>
-          <li data-editable="true" data-field="cocktail8Ing2">Honey syrup</li>
-          <li data-editable="true" data-field="cocktail8Ing3">Fresh lemon juice</li>
-          <li data-editable="true" data-field="cocktail8Ing4">Lavender garnish</li>
-        </ul>
-        <p class="cocktail-desc" data-editable="true" data-field="cocktail8Desc">Prohibition-era charm, floral and bright</p>
-      </div>
-    </div>
+  <div class="header">
+    <div class="eyebrow">Craft Cocktails</div>
+    <h1 class="bar-name" data-editable="true" data-field="barName">The Gilded Fox</h1>
+    <p class="bar-subtitle" data-editable="true" data-field="subtitle">Cocktail Lounge &amp; Speakeasy</p>
   </div>
 
-  <div class="bottom-gold"></div>
+  <div class="cocktails">
+    <div class="cocktail-card">
+      <div class="cocktail-header">
+        <div class="cocktail-name" data-editable="true" data-field="cocktail1Name">Old Fashioned</div>
+        <div class="cocktail-price" data-editable="true" data-field="cocktail1Price">$18</div>
+      </div>
+      <ul class="ingredients">
+        <li data-editable="true" data-field="cocktail1Ing1">Woodford Reserve bourbon</li>
+        <li data-editable="true" data-field="cocktail1Ing2">Demerara sugar</li>
+        <li data-editable="true" data-field="cocktail1Ing3">Angostura bitters</li>
+        <li data-editable="true" data-field="cocktail1Ing4">Orange peel</li>
+      </ul>
+      <p class="cocktail-desc" data-editable="true" data-field="cocktail1Desc">The timeless classic, crafted with precision</p>
+    </div>
+    <div class="cocktail-card">
+      <div class="cocktail-header">
+        <div class="cocktail-name" data-editable="true" data-field="cocktail2Name">Negroni</div>
+        <div class="cocktail-price" data-editable="true" data-field="cocktail2Price">$17</div>
+      </div>
+      <ul class="ingredients">
+        <li data-editable="true" data-field="cocktail2Ing1">London dry gin</li>
+        <li data-editable="true" data-field="cocktail2Ing2">Campari</li>
+        <li data-editable="true" data-field="cocktail2Ing3">Sweet vermouth</li>
+        <li data-editable="true" data-field="cocktail2Ing4">Orange twist</li>
+      </ul>
+      <p class="cocktail-desc" data-editable="true" data-field="cocktail2Desc">Bittersweet perfection since 1919</p>
+    </div>
+    <div class="cocktail-card">
+      <div class="cocktail-header">
+        <div class="cocktail-name" data-editable="true" data-field="cocktail3Name">Espresso Martini</div>
+        <div class="cocktail-price" data-editable="true" data-field="cocktail3Price">$19</div>
+      </div>
+      <ul class="ingredients">
+        <li data-editable="true" data-field="cocktail3Ing1">Belvedere vodka</li>
+        <li data-editable="true" data-field="cocktail3Ing2">Fresh espresso</li>
+        <li data-editable="true" data-field="cocktail3Ing3">Coffee liqueur</li>
+        <li data-editable="true" data-field="cocktail3Ing4">Vanilla syrup</li>
+      </ul>
+      <p class="cocktail-desc" data-editable="true" data-field="cocktail3Desc">Bold, caffeinated elegance</p>
+    </div>
+    <div class="cocktail-card">
+      <div class="cocktail-header">
+        <div class="cocktail-name" data-editable="true" data-field="cocktail4Name">Paper Plane</div>
+        <div class="cocktail-price" data-editable="true" data-field="cocktail4Price">$18</div>
+      </div>
+      <ul class="ingredients">
+        <li data-editable="true" data-field="cocktail4Ing1">Bourbon whiskey</li>
+        <li data-editable="true" data-field="cocktail4Ing2">Aperol</li>
+        <li data-editable="true" data-field="cocktail4Ing3">Amaro Nonino</li>
+        <li data-editable="true" data-field="cocktail4Ing4">Fresh lemon juice</li>
+      </ul>
+      <p class="cocktail-desc" data-editable="true" data-field="cocktail4Desc">Modern classic with bittersweet complexity</p>
+    </div>
+    <div class="cocktail-card">
+      <div class="cocktail-header">
+        <div class="cocktail-name" data-editable="true" data-field="cocktail5Name">Penicillin</div>
+        <div class="cocktail-price" data-editable="true" data-field="cocktail5Price">$19</div>
+      </div>
+      <ul class="ingredients">
+        <li data-editable="true" data-field="cocktail5Ing1">Blended Scotch</li>
+        <li data-editable="true" data-field="cocktail5Ing2">Honey ginger syrup</li>
+        <li data-editable="true" data-field="cocktail5Ing3">Fresh lemon juice</li>
+        <li data-editable="true" data-field="cocktail5Ing4">Islay Scotch float</li>
+      </ul>
+      <p class="cocktail-desc" data-editable="true" data-field="cocktail5Desc">Smoky, sweet, and deeply satisfying</p>
+    </div>
+    <div class="cocktail-card">
+      <div class="cocktail-header">
+        <div class="cocktail-name" data-editable="true" data-field="cocktail6Name">Daiquiri</div>
+        <div class="cocktail-price" data-editable="true" data-field="cocktail6Price">$16</div>
+      </div>
+      <ul class="ingredients">
+        <li data-editable="true" data-field="cocktail6Ing1">White rum</li>
+        <li data-editable="true" data-field="cocktail6Ing2">Fresh lime juice</li>
+        <li data-editable="true" data-field="cocktail6Ing3">Simple syrup</li>
+        <li data-editable="true" data-field="cocktail6Ing4">Lime wheel</li>
+      </ul>
+      <p class="cocktail-desc" data-editable="true" data-field="cocktail6Desc">Pure simplicity, perfectly balanced</p>
+    </div>
+    <div class="cocktail-card">
+      <div class="cocktail-header">
+        <div class="cocktail-name" data-editable="true" data-field="cocktail7Name">Manhattan</div>
+        <div class="cocktail-price" data-editable="true" data-field="cocktail7Price">$18</div>
+      </div>
+      <ul class="ingredients">
+        <li data-editable="true" data-field="cocktail7Ing1">Rye whiskey</li>
+        <li data-editable="true" data-field="cocktail7Ing2">Sweet vermouth</li>
+        <li data-editable="true" data-field="cocktail7Ing3">Angostura bitters</li>
+        <li data-editable="true" data-field="cocktail7Ing4">Luxardo cherry</li>
+      </ul>
+      <p class="cocktail-desc" data-editable="true" data-field="cocktail7Desc">A stirred masterpiece of the golden age</p>
+    </div>
+    <div class="cocktail-card">
+      <div class="cocktail-header">
+        <div class="cocktail-name" data-editable="true" data-field="cocktail8Name">Bee's Knees</div>
+        <div class="cocktail-price" data-editable="true" data-field="cocktail8Price">$17</div>
+      </div>
+      <ul class="ingredients">
+        <li data-editable="true" data-field="cocktail8Ing1">London dry gin</li>
+        <li data-editable="true" data-field="cocktail8Ing2">Honey syrup</li>
+        <li data-editable="true" data-field="cocktail8Ing3">Fresh lemon juice</li>
+        <li data-editable="true" data-field="cocktail8Ing4">Lavender garnish</li>
+      </ul>
+      <p class="cocktail-desc" data-editable="true" data-field="cocktail8Desc">Prohibition-era charm, floral and bright</p>
+    </div>
+  </div>
 </body>
 </html>

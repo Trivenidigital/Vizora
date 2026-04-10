@@ -3,581 +3,169 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1920, height=1080">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Montserrat:wght@400;600;700;800;900&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Cormorant+SC:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg-a: #E2D0B0;
+      --bg-b: #D9C4A0;
+      --ink: #2C1810;
+      --ink-body: #4A2D18;
+      --ink-muted: #7A4A28;
+      --brass: #8B6F2E;
+      --accent: #8B6F2E;
+      --rule: rgba(139,111,46,0.4);
+    }
     body {
-      width: 1920px;
-      height: 1080px;
-      overflow: hidden;
-      position: relative;
-      font-family: 'Inter', sans-serif;
+      width: 1920px; height: 1080px; overflow: hidden; position: relative;
+      font-family: 'Lora', serif; color: var(--ink-body);
       background:
-        repeating-linear-gradient(
-          -45deg,
-          transparent,
-          transparent 80px,
-          rgba(99, 102, 241, 0.012) 80px,
-          rgba(99, 102, 241, 0.012) 82px
-        ),
-        radial-gradient(ellipse at 15% 25%, rgba(99, 102, 241, 0.14) 0%, transparent 50%),
-        radial-gradient(ellipse at 85% 75%, rgba(168, 85, 247, 0.1) 0%, transparent 45%),
-        radial-gradient(ellipse at 50% 50%, rgba(59, 130, 246, 0.08) 0%, transparent 55%),
-        linear-gradient(160deg, #0a0a14 0%, #111128 30%, #0d0d1e 60%, #0a0a18 100%);
-      color: #e8edf5;
+        radial-gradient(ellipse at 50% 0%, rgba(139,111,46,0.07), transparent 60%),
+        linear-gradient(168deg, var(--bg-a) 0%, var(--bg-b) 100%);
     }
-
     body::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background-image: radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px);
-      background-size: 34px 34px;
-      z-index: 0;
+      content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+      background-image:
+        radial-gradient(circle at 19% 27%, rgba(44,24,16,0.035) 0.6px, transparent 1.1px),
+        radial-gradient(circle at 71% 64%, rgba(44,24,16,0.028) 0.5px, transparent 1px);
+      background-size: 40px 40px, 60px 60px;
     }
-
-    body::after {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: repeating-linear-gradient(
-        90deg,
-        transparent,
-        transparent 240px,
-        rgba(99, 102, 241, 0.025) 240px,
-        rgba(99, 102, 241, 0.025) 241px
-      );
-      z-index: 0;
-    }
-
-    .glow {
-      position: absolute;
-      border-radius: 50%;
-      z-index: 0;
-    }
-
-    .glow-1 {
-      top: -120px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 900px;
-      height: 400px;
-      background: radial-gradient(ellipse, rgba(99, 102, 241, 0.12) 0%, transparent 70%);
-      filter: blur(50px);
-    }
-
-    .glow-2 {
-      bottom: -100px;
-      right: 200px;
-      width: 500px;
-      height: 500px;
-      background: radial-gradient(circle, rgba(168, 85, 247, 0.1) 0%, transparent 70%);
-      filter: blur(60px);
-    }
-
-    .glow-3 {
-      top: 40%;
-      left: -100px;
-      width: 400px;
-      height: 400px;
-      background: radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 70%);
-      filter: blur(50px);
-    }
-
-    .layout {
-      position: relative;
-      z-index: 3;
-      display: grid;
-      grid-template-rows: auto 1fr auto;
-      height: 100%;
-      padding: 50px 70px;
-      gap: 32px;
-    }
+    .frame { position: absolute; inset: 72px; border: 1px solid var(--brass); z-index: 1; }
+    .frame::before { content: ''; position: absolute; inset: 10px; border: 1px solid rgba(139,111,46,0.22); }
 
     .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      animation: fadeDown 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+      position: absolute; top: 130px; left: 0; right: 0;
+      text-align: center; z-index: 5;
+    }
+    .store-name {
+      font-family: 'Cormorant SC', serif;
+      font-size: 22px; letter-spacing: 10px;
+      color: var(--brass); text-transform: uppercase; font-weight: 500;
+      margin-bottom: 14px;
+    }
+    .title {
+      font-family: 'DM Serif Display', serif;
+      font-size: 96px; font-weight: 400;
+      color: var(--ink); letter-spacing: -0.5px; line-height: 0.95;
+    }
+    .info {
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 22px; color: var(--ink-muted);
+      letter-spacing: 1px; margin-top: 14px;
+    }
+    .info::before, .info::after {
+      content: '\2014'; color: var(--brass); margin: 0 14px;
     }
 
-    .header-left {
-      display: flex;
-      align-items: center;
-      gap: 32px;
+    .grid {
+      position: absolute; top: 380px; bottom: 190px;
+      left: 140px; right: 140px; z-index: 5;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 24px 48px;
+      align-content: start;
     }
-
-    .store-logo {
-      font-family: 'Montserrat', sans-serif;
-      font-size: 30px;
-      font-weight: 900;
-      letter-spacing: 5px;
-      text-transform: uppercase;
-      color: #ffffff;
-      text-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+    .dept {
+      display: grid; grid-template-columns: 1fr auto;
+      align-items: baseline; gap: 4px 20px;
+      padding: 14px 4px;
+      border-bottom: 1px dotted rgba(139,111,46,0.4);
     }
-
-    .header-divider {
-      width: 2px;
-      height: 42px;
-      background: linear-gradient(180deg, transparent, rgba(99, 102, 241, 0.6), transparent);
-    }
-
-    .page-title {
-      font-family: 'Playfair Display', serif;
-      font-size: 42px;
-      font-weight: 700;
-      color: rgba(255, 255, 255, 0.92);
-      font-style: italic;
-    }
-
-    .header-info {
-      font-family: 'Inter', sans-serif;
-      font-size: 18px;
-      color: rgba(255, 255, 255, 0.45);
-      text-align: right;
-      line-height: 1.5;
-    }
-
-    .header-info strong {
-      color: #818cf8;
-      font-weight: 700;
-    }
-
-    .dept-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      grid-template-rows: repeat(2, 1fr);
-      gap: 22px;
-      animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
-      animation-delay: 0.15s;
-    }
-
-    .dept-card {
-      background: rgba(255, 255, 255, 0.04);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 22px;
-      padding: 32px 30px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      position: relative;
-      overflow: hidden;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-    }
-
-    .dept-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 4px;
-    }
-
-    .dept-card::after {
-      content: '';
-      position: absolute;
-      top: -40px;
-      right: -40px;
-      width: 140px;
-      height: 140px;
-      border-radius: 50%;
-      opacity: 0.08;
-      filter: blur(20px);
-    }
-
-    .dept-card.fashion::before { background: linear-gradient(90deg, #ec4899, #f472b6); }
-    .dept-card.fashion::after { background: #ec4899; }
-    .dept-card.shoes::before { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
-    .dept-card.shoes::after { background: #f59e0b; }
-    .dept-card.jewelry::before { background: linear-gradient(90deg, #8b5cf6, #a78bfa); }
-    .dept-card.jewelry::after { background: #8b5cf6; }
-    .dept-card.beauty::before { background: linear-gradient(90deg, #14b8a6, #5eead4); }
-    .dept-card.beauty::after { background: #14b8a6; }
-    .dept-card.home::before { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
-    .dept-card.home::after { background: #3b82f6; }
-    .dept-card.electronics::before { background: linear-gradient(90deg, #6366f1, #818cf8); }
-    .dept-card.electronics::after { background: #6366f1; }
-    .dept-card.kids::before { background: linear-gradient(90deg, #f43f5e, #fb7185); }
-    .dept-card.kids::after { background: #f43f5e; }
-    .dept-card.sports::before { background: linear-gradient(90deg, #22c55e, #4ade80); }
-    .dept-card.sports::after { background: #22c55e; }
-
-    .dept-icon-wrap {
-      width: 80px;
-      height: 80px;
-      border-radius: 18px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 18px;
-      position: relative;
-      z-index: 2;
-    }
-
-    .dept-card.fashion .dept-icon-wrap { background: linear-gradient(135deg, rgba(236, 72, 153, 0.15), rgba(236, 72, 153, 0.05)); border: 1px solid rgba(236, 72, 153, 0.25); }
-    .dept-card.shoes .dept-icon-wrap { background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(245, 158, 11, 0.05)); border: 1px solid rgba(245, 158, 11, 0.25); }
-    .dept-card.jewelry .dept-icon-wrap { background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(139, 92, 246, 0.05)); border: 1px solid rgba(139, 92, 246, 0.25); }
-    .dept-card.beauty .dept-icon-wrap { background: linear-gradient(135deg, rgba(20, 184, 166, 0.15), rgba(20, 184, 166, 0.05)); border: 1px solid rgba(20, 184, 166, 0.25); }
-    .dept-card.home .dept-icon-wrap { background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.05)); border: 1px solid rgba(59, 130, 246, 0.25); }
-    .dept-card.electronics .dept-icon-wrap { background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(99, 102, 241, 0.05)); border: 1px solid rgba(99, 102, 241, 0.25); }
-    .dept-card.kids .dept-icon-wrap { background: linear-gradient(135deg, rgba(244, 63, 94, 0.15), rgba(244, 63, 94, 0.05)); border: 1px solid rgba(244, 63, 94, 0.25); }
-    .dept-card.sports .dept-icon-wrap { background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(34, 197, 94, 0.05)); border: 1px solid rgba(34, 197, 94, 0.25); }
-
     .dept-name {
-      font-family: 'Montserrat', sans-serif;
-      font-size: 25px;
-      font-weight: 800;
-      color: #ffffff;
-      margin-bottom: 8px;
-      letter-spacing: 0.3px;
-      position: relative;
-      z-index: 2;
+      font-family: 'DM Serif Display', serif;
+      font-size: 30px; color: var(--ink);
     }
-
-    .dept-desc {
-      font-family: 'Inter', sans-serif;
-      font-size: 15px;
-      color: rgba(255, 255, 255, 0.5);
-      line-height: 1.5;
-      margin-bottom: 18px;
-      position: relative;
-      z-index: 2;
-    }
-
     .dept-floor {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      position: relative;
-      z-index: 2;
+      font-family: 'Cormorant SC', serif;
+      font-size: 16px; letter-spacing: 3px;
+      color: var(--accent); text-transform: uppercase; font-weight: 600;
+    }
+    .dept-desc {
+      grid-column: 1; font-family: 'Lora', serif; font-style: italic;
+      font-size: 14px; color: var(--ink-muted);
+    }
+    .dept-location {
+      grid-column: 2; font-family: 'Lora', serif;
+      font-size: 14px; color: var(--ink-muted);
     }
 
-    .floor-badge {
-      font-family: 'Montserrat', sans-serif;
-      font-size: 13px;
-      font-weight: 800;
-      padding: 5px 14px;
-      border-radius: 12px;
-      letter-spacing: 1.2px;
+    .bottom-bar {
+      position: absolute; bottom: 108px; left: 130px; right: 130px; z-index: 5;
+      display: flex; justify-content: space-between; align-items: center;
+      padding-top: 20px; border-top: 1px solid var(--rule);
     }
-
-    .dept-card.fashion .floor-badge { background: rgba(236, 72, 153, 0.2); color: #f472b6; border: 1px solid rgba(236, 72, 153, 0.35); }
-    .dept-card.shoes .floor-badge { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.35); }
-    .dept-card.jewelry .floor-badge { background: rgba(139, 92, 246, 0.2); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.35); }
-    .dept-card.beauty .floor-badge { background: rgba(20, 184, 166, 0.2); color: #5eead4; border: 1px solid rgba(20, 184, 166, 0.35); }
-    .dept-card.home .floor-badge { background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.35); }
-    .dept-card.electronics .floor-badge { background: rgba(99, 102, 241, 0.2); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.35); }
-    .dept-card.kids .floor-badge { background: rgba(244, 63, 94, 0.2); color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.35); }
-    .dept-card.sports .floor-badge { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.35); }
-
-    .floor-label {
-      font-family: 'Inter', sans-serif;
-      font-size: 14px;
-      color: rgba(255, 255, 255, 0.4);
-      font-weight: 500;
+    .help {
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 16px; color: var(--ink-muted);
     }
-
-    .footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
-      padding-top: 22px;
-      animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
-      animation-delay: 0.4s;
-    }
-
-    .footer-help {
-      font-family: 'Inter', sans-serif;
-      font-size: 18px;
-      color: rgba(255, 255, 255, 0.45);
-    }
-
-    .footer-help strong {
-      color: rgba(255, 255, 255, 0.85);
-      font-weight: 700;
-    }
-
-    .footer-logo {
-      font-family: 'Montserrat', sans-serif;
-      font-size: 16px;
-      font-weight: 800;
-      letter-spacing: 6px;
-      text-transform: uppercase;
-      color: rgba(255, 255, 255, 0.25);
-    }
-
-    .svg-deco {
-      position: absolute;
-      z-index: 1;
-    }
-
-    .accent-bar-top {
-      position: absolute;
-      top: 0; left: 0;
-      width: 100%;
-      height: 3px;
-      background: linear-gradient(90deg, transparent 10%, rgba(99, 102, 241, 0.6) 30%, rgba(168, 85, 247, 0.7) 50%, rgba(99, 102, 241, 0.6) 70%, transparent 90%);
-      z-index: 5;
-    }
-
-    .accent-bar {
-      position: absolute;
-      bottom: 0; left: 0;
-      width: 100%;
-      height: 4px;
-      background: linear-gradient(90deg, transparent 5%, #6366f1 20%, #a78bfa 50%, #6366f1 80%, transparent 95%);
-      z-index: 5;
-    }
-
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes fadeDown {
-      from { opacity: 0; transform: translateY(-20px); }
-      to { opacity: 1; transform: translateY(0); }
+    .logo {
+      font-family: 'Cormorant SC', serif;
+      font-size: 18px; letter-spacing: 6px;
+      color: var(--accent); text-transform: uppercase; font-weight: 600;
     }
   </style>
 </head>
 <body>
-  <div class="glow glow-1"></div>
-  <div class="glow glow-2"></div>
-  <div class="glow glow-3"></div>
-  <div class="accent-bar-top"></div>
+  <div class="frame"></div>
 
-  <!-- SVG compass rose -->
-  <svg class="svg-deco" style="top:60%;right:30px;transform:translateY(-50%);opacity:0.1;" width="90" height="90" viewBox="0 0 90 90">
-    <circle cx="45" cy="45" r="40" fill="none" stroke="#6366f1" stroke-width="1"/>
-    <circle cx="45" cy="45" r="28" fill="none" stroke="#a78bfa" stroke-width="0.6"/>
-    <line x1="45" y1="5" x2="45" y2="85" stroke="#6366f1" stroke-width="0.7"/>
-    <line x1="5" y1="45" x2="85" y2="45" stroke="#6366f1" stroke-width="0.7"/>
-    <polygon points="45,8 49,28 41,28" fill="#818cf8"/>
-    <text x="45" y="4" text-anchor="middle" fill="#818cf8" font-size="8" font-family="Inter" font-weight="700">N</text>
-  </svg>
+  <div class="header">
+    <div class="store-name" data-editable="true" data-field="store_name">STORE NAME</div>
+    <h1 class="title" data-editable="true" data-field="page_title">Store Directory</h1>
+    <p class="info" data-editable="true" data-field="header_info">3 Floors | 120+ Brands</p>
+  </div>
 
-  <svg class="svg-deco" style="bottom:80px;left:30px;opacity:0.08;" width="110" height="110" viewBox="0 0 110 110">
-    <rect x="0" y="0" width="110" height="110" fill="none" stroke="#a78bfa" stroke-width="0.6"/>
-    <line x1="55" y1="0" x2="55" y2="110" stroke="#a78bfa" stroke-width="0.6"/>
-    <line x1="0" y1="55" x2="110" y2="55" stroke="#a78bfa" stroke-width="0.6"/>
-    <line x1="27" y1="0" x2="27" y2="110" stroke="#a78bfa" stroke-width="0.3"/>
-    <line x1="83" y1="0" x2="83" y2="110" stroke="#a78bfa" stroke-width="0.3"/>
-    <line x1="0" y1="27" x2="110" y2="27" stroke="#a78bfa" stroke-width="0.3"/>
-    <line x1="0" y1="83" x2="110" y2="83" stroke="#a78bfa" stroke-width="0.3"/>
-    <circle cx="55" cy="55" r="3" fill="#6366f1"/>
-  </svg>
-
-  <svg class="svg-deco" style="top:30px;right:30px;opacity:0.12;" width="70" height="70" viewBox="0 0 70 70">
-    <path d="M35,6 L64,58 L35,46 L6,58 Z" fill="none" stroke="#6366f1" stroke-width="1.5"/>
-  </svg>
-
-  <svg class="svg-deco" style="top:50%;left:25px;transform:translateY(-50%);opacity:0.15;" width="30" height="340" viewBox="0 0 30 340">
-    <line x1="15" y1="0" x2="15" y2="340" stroke="#6366f1" stroke-width="1"/>
-    <circle cx="15" cy="60" r="3" fill="#6366f1"/>
-    <circle cx="15" cy="170" r="3" fill="#a78bfa"/>
-    <circle cx="15" cy="280" r="3" fill="#6366f1"/>
-  </svg>
-
-  <div class="layout">
-    <div class="header">
-      <div class="header-left">
-        <div class="store-logo" data-editable="true" data-field="store_name">STORE NAME</div>
-        <div class="header-divider"></div>
-        <div class="page-title" data-editable="true" data-field="page_title">Store Directory</div>
-      </div>
-      <div class="header-info" data-editable="true" data-field="header_info">3 Floors | 120+ Brands<br>Open Daily 10AM — 9PM</div>
+  <div class="grid">
+    <div class="dept">
+      <div class="dept-name" data-editable="true" data-field="dept1_name">Fashion</div>
+      <div class="dept-floor" data-editable="true" data-field="dept1_floor">FLOOR 1</div>
+      <div class="dept-desc" data-editable="true" data-field="dept1_desc">Men's &amp; women's apparel, designer collections</div>
+      <div class="dept-location" data-editable="true" data-field="dept1_location">North Wing</div>
     </div>
-
-    <div class="dept-grid">
-      <!-- Fashion: dress/hanger SVG -->
-      <div class="dept-card fashion">
-        <div>
-          <div class="dept-icon-wrap">
-            <svg width="50" height="50" viewBox="0 0 50 50">
-              <circle cx="25" cy="6" r="3" fill="none" stroke="#f472b6" stroke-width="2"/>
-              <path d="M25,9 L25,14 L8,22 L42,22 L25,14" fill="none" stroke="#f472b6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M14,22 L10,44 L40,44 L36,22 Z" fill="#ec4899" opacity="0.25" stroke="#f472b6" stroke-width="2" stroke-linejoin="round"/>
-              <path d="M20,30 L25,38 L30,30" fill="none" stroke="#f472b6" stroke-width="1.5" opacity="0.7"/>
-            </svg>
-          </div>
-          <div class="dept-name" data-editable="true" data-field="dept1_name">Fashion</div>
-          <div class="dept-desc" data-editable="true" data-field="dept1_desc">Men's & women's apparel, designer collections</div>
-        </div>
-        <div class="dept-floor">
-          <span class="floor-badge" data-editable="true" data-field="dept1_floor">FLOOR 1</span>
-          <span class="floor-label" data-editable="true" data-field="dept1_location">North Wing</span>
-        </div>
-      </div>
-
-      <!-- Shoes: heel SVG -->
-      <div class="dept-card shoes">
-        <div>
-          <div class="dept-icon-wrap">
-            <svg width="50" height="50" viewBox="0 0 50 50">
-              <path d="M5,32 Q5,20 18,20 L30,20 Q38,20 40,28 L44,40 Q44,44 40,44 L8,44 Q5,44 5,40 Z" fill="#fbbf24" opacity="0.25" stroke="#fbbf24" stroke-width="2" stroke-linejoin="round"/>
-              <path d="M30,20 L42,6 L44,10 L34,24" fill="#fbbf24" opacity="0.3" stroke="#fbbf24" stroke-width="2" stroke-linejoin="round"/>
-              <circle cx="14" cy="34" r="2" fill="#fbbf24"/>
-              <circle cx="24" cy="34" r="2" fill="#fbbf24"/>
-              <circle cx="34" cy="34" r="2" fill="#fbbf24"/>
-            </svg>
-          </div>
-          <div class="dept-name" data-editable="true" data-field="dept2_name">Footwear</div>
-          <div class="dept-desc" data-editable="true" data-field="dept2_desc">Shoes, sneakers, boots, and sandals</div>
-        </div>
-        <div class="dept-floor">
-          <span class="floor-badge" data-editable="true" data-field="dept2_floor">FLOOR 1</span>
-          <span class="floor-label" data-editable="true" data-field="dept2_location">South Wing</span>
-        </div>
-      </div>
-
-      <!-- Jewelry: diamond SVG -->
-      <div class="dept-card jewelry">
-        <div>
-          <div class="dept-icon-wrap">
-            <svg width="50" height="50" viewBox="0 0 50 50">
-              <path d="M12,16 L25,4 L38,16 L25,46 Z" fill="#a78bfa" opacity="0.3" stroke="#a78bfa" stroke-width="2" stroke-linejoin="round"/>
-              <path d="M12,16 L38,16" stroke="#a78bfa" stroke-width="2"/>
-              <path d="M18,16 L25,4 L32,16 L25,46" fill="none" stroke="#a78bfa" stroke-width="1.5" opacity="0.8"/>
-              <path d="M18,16 L25,24 L32,16" fill="none" stroke="#c4b5fd" stroke-width="1" opacity="0.9"/>
-            </svg>
-          </div>
-          <div class="dept-name" data-editable="true" data-field="dept3_name">Jewelry</div>
-          <div class="dept-desc" data-editable="true" data-field="dept3_desc">Fine jewelry, watches, and accessories</div>
-        </div>
-        <div class="dept-floor">
-          <span class="floor-badge" data-editable="true" data-field="dept3_floor">FLOOR 1</span>
-          <span class="floor-label" data-editable="true" data-field="dept3_location">Center Atrium</span>
-        </div>
-      </div>
-
-      <!-- Beauty: lipstick SVG -->
-      <div class="dept-card beauty">
-        <div>
-          <div class="dept-icon-wrap">
-            <svg width="50" height="50" viewBox="0 0 50 50">
-              <rect x="17" y="20" width="16" height="24" rx="2" fill="#5eead4" opacity="0.3" stroke="#5eead4" stroke-width="2"/>
-              <rect x="15" y="18" width="20" height="4" fill="#5eead4" opacity="0.5" stroke="#5eead4" stroke-width="1.5"/>
-              <path d="M19,6 L31,6 L29,18 L21,18 Z" fill="#14b8a6" opacity="0.7" stroke="#5eead4" stroke-width="2" stroke-linejoin="round"/>
-              <path d="M23,6 L27,2 L27,6" fill="#5eead4" stroke="#5eead4" stroke-width="1.5" stroke-linejoin="round"/>
-              <line x1="20" y1="28" x2="30" y2="28" stroke="#5eead4" stroke-width="1"/>
-              <line x1="20" y1="34" x2="30" y2="34" stroke="#5eead4" stroke-width="1"/>
-            </svg>
-          </div>
-          <div class="dept-name" data-editable="true" data-field="dept4_name">Beauty</div>
-          <div class="dept-desc" data-editable="true" data-field="dept4_desc">Skincare, cosmetics, and fragrances</div>
-        </div>
-        <div class="dept-floor">
-          <span class="floor-badge" data-editable="true" data-field="dept4_floor">FLOOR 1</span>
-          <span class="floor-label" data-editable="true" data-field="dept4_location">East Entrance</span>
-        </div>
-      </div>
-
-      <!-- Home: house SVG -->
-      <div class="dept-card home">
-        <div>
-          <div class="dept-icon-wrap">
-            <svg width="50" height="50" viewBox="0 0 50 50">
-              <path d="M6,24 L25,6 L44,24 L44,44 L6,44 Z" fill="#60a5fa" opacity="0.25" stroke="#60a5fa" stroke-width="2" stroke-linejoin="round"/>
-              <path d="M6,24 L25,6 L44,24" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linejoin="round"/>
-              <rect x="20" y="30" width="10" height="14" fill="#60a5fa" opacity="0.4"/>
-              <rect x="11" y="28" width="6" height="6" fill="none" stroke="#60a5fa" stroke-width="1.5"/>
-              <rect x="33" y="28" width="6" height="6" fill="none" stroke="#60a5fa" stroke-width="1.5"/>
-              <rect x="31" y="10" width="5" height="8" fill="#60a5fa" opacity="0.5"/>
-            </svg>
-          </div>
-          <div class="dept-name" data-editable="true" data-field="dept5_name">Home & Living</div>
-          <div class="dept-desc" data-editable="true" data-field="dept5_desc">Furniture, decor, bedding, and kitchenware</div>
-        </div>
-        <div class="dept-floor">
-          <span class="floor-badge" data-editable="true" data-field="dept5_floor">FLOOR 2</span>
-          <span class="floor-label" data-editable="true" data-field="dept5_location">Full Floor</span>
-        </div>
-      </div>
-
-      <!-- Electronics: controller/device SVG -->
-      <div class="dept-card electronics">
-        <div>
-          <div class="dept-icon-wrap">
-            <svg width="50" height="50" viewBox="0 0 50 50">
-              <rect x="6" y="14" width="38" height="26" rx="6" fill="#818cf8" opacity="0.25" stroke="#818cf8" stroke-width="2"/>
-              <circle cx="15" cy="27" r="2" fill="#818cf8"/>
-              <circle cx="35" cy="24" r="2.2" fill="#818cf8"/>
-              <circle cx="39" cy="30" r="2.2" fill="#818cf8"/>
-              <line x1="13" y1="23" x2="17" y2="23" stroke="#818cf8" stroke-width="1.5"/>
-              <line x1="15" y1="21" x2="15" y2="25" stroke="#818cf8" stroke-width="1.5"/>
-              <path d="M6,20 Q6,14 12,14" fill="none" stroke="#818cf8" stroke-width="2"/>
-              <path d="M44,20 Q44,14 38,14" fill="none" stroke="#818cf8" stroke-width="2"/>
-            </svg>
-          </div>
-          <div class="dept-name" data-editable="true" data-field="dept6_name">Electronics</div>
-          <div class="dept-desc" data-editable="true" data-field="dept6_desc">Gadgets, gaming, audio, and smart devices</div>
-        </div>
-        <div class="dept-floor">
-          <span class="floor-badge" data-editable="true" data-field="dept6_floor">FLOOR 3</span>
-          <span class="floor-label" data-editable="true" data-field="dept6_location">North Wing</span>
-        </div>
-      </div>
-
-      <!-- Kids: teddy bear SVG -->
-      <div class="dept-card kids">
-        <div>
-          <div class="dept-icon-wrap">
-            <svg width="50" height="50" viewBox="0 0 50 50">
-              <circle cx="13" cy="14" r="5" fill="#fb7185" opacity="0.7" stroke="#fb7185" stroke-width="1.5"/>
-              <circle cx="37" cy="14" r="5" fill="#fb7185" opacity="0.7" stroke="#fb7185" stroke-width="1.5"/>
-              <circle cx="13" cy="14" r="2" fill="#fb7185"/>
-              <circle cx="37" cy="14" r="2" fill="#fb7185"/>
-              <circle cx="25" cy="24" r="13" fill="#fb7185" opacity="0.3" stroke="#fb7185" stroke-width="2"/>
-              <circle cx="20" cy="22" r="1.5" fill="#fb7185"/>
-              <circle cx="30" cy="22" r="1.5" fill="#fb7185"/>
-              <circle cx="25" cy="27" r="2" fill="none" stroke="#fb7185" stroke-width="1.5"/>
-              <path d="M22,31 Q25,34 28,31" fill="none" stroke="#fb7185" stroke-width="1.5" stroke-linecap="round"/>
-              <circle cx="15" cy="40" r="4" fill="#fb7185" opacity="0.4" stroke="#fb7185" stroke-width="1.5"/>
-              <circle cx="35" cy="40" r="4" fill="#fb7185" opacity="0.4" stroke="#fb7185" stroke-width="1.5"/>
-            </svg>
-          </div>
-          <div class="dept-name" data-editable="true" data-field="dept7_name">Kids & Toys</div>
-          <div class="dept-desc" data-editable="true" data-field="dept7_desc">Children's clothing, toys, and baby gear</div>
-        </div>
-        <div class="dept-floor">
-          <span class="floor-badge" data-editable="true" data-field="dept7_floor">FLOOR 3</span>
-          <span class="floor-label" data-editable="true" data-field="dept7_location">South Wing</span>
-        </div>
-      </div>
-
-      <!-- Sports: dumbbell SVG -->
-      <div class="dept-card sports">
-        <div>
-          <div class="dept-icon-wrap">
-            <svg width="50" height="50" viewBox="0 0 50 50">
-              <rect x="4" y="16" width="6" height="18" rx="1.5" fill="#4ade80" opacity="0.6" stroke="#4ade80" stroke-width="1.5"/>
-              <rect x="40" y="16" width="6" height="18" rx="1.5" fill="#4ade80" opacity="0.6" stroke="#4ade80" stroke-width="1.5"/>
-              <rect x="10" y="19" width="4" height="12" rx="1" fill="#4ade80" opacity="0.8"/>
-              <rect x="36" y="19" width="4" height="12" rx="1" fill="#4ade80" opacity="0.8"/>
-              <rect x="14" y="22" width="22" height="6" rx="1" fill="#4ade80" opacity="0.5" stroke="#4ade80" stroke-width="1.5"/>
-              <circle cx="25" cy="25" r="1.2" fill="#4ade80"/>
-            </svg>
-          </div>
-          <div class="dept-name" data-editable="true" data-field="dept8_name">Sports & Fitness</div>
-          <div class="dept-desc" data-editable="true" data-field="dept8_desc">Athletic wear, equipment, and outdoor gear</div>
-        </div>
-        <div class="dept-floor">
-          <span class="floor-badge" data-editable="true" data-field="dept8_floor">FLOOR 3</span>
-          <span class="floor-label" data-editable="true" data-field="dept8_location">West Wing</span>
-        </div>
-      </div>
+    <div class="dept">
+      <div class="dept-name" data-editable="true" data-field="dept2_name">Footwear</div>
+      <div class="dept-floor" data-editable="true" data-field="dept2_floor">FLOOR 1</div>
+      <div class="dept-desc" data-editable="true" data-field="dept2_desc">Shoes, sneakers, boots, and sandals</div>
+      <div class="dept-location" data-editable="true" data-field="dept2_location">South Wing</div>
     </div>
-
-    <div class="footer">
-      <div class="footer-help" data-editable="true" data-field="footer_help"><strong>Need help?</strong> Visit our Information Desk at the Main Entrance or call ext. 100</div>
-      <div class="footer-logo" data-editable="true" data-field="footer_logo">YOUR STORE</div>
+    <div class="dept">
+      <div class="dept-name" data-editable="true" data-field="dept3_name">Jewelry</div>
+      <div class="dept-floor" data-editable="true" data-field="dept3_floor">FLOOR 1</div>
+      <div class="dept-desc" data-editable="true" data-field="dept3_desc">Fine jewelry, watches, and accessories</div>
+      <div class="dept-location" data-editable="true" data-field="dept3_location">Center Atrium</div>
+    </div>
+    <div class="dept">
+      <div class="dept-name" data-editable="true" data-field="dept4_name">Beauty</div>
+      <div class="dept-floor" data-editable="true" data-field="dept4_floor">FLOOR 1</div>
+      <div class="dept-desc" data-editable="true" data-field="dept4_desc">Skincare, cosmetics, and fragrances</div>
+      <div class="dept-location" data-editable="true" data-field="dept4_location">East Entrance</div>
+    </div>
+    <div class="dept">
+      <div class="dept-name" data-editable="true" data-field="dept5_name">Home &amp; Living</div>
+      <div class="dept-floor" data-editable="true" data-field="dept5_floor">FLOOR 2</div>
+      <div class="dept-desc" data-editable="true" data-field="dept5_desc">Furniture, decor, bedding, and kitchenware</div>
+      <div class="dept-location" data-editable="true" data-field="dept5_location">Full Floor</div>
+    </div>
+    <div class="dept">
+      <div class="dept-name" data-editable="true" data-field="dept6_name">Electronics</div>
+      <div class="dept-floor" data-editable="true" data-field="dept6_floor">FLOOR 3</div>
+      <div class="dept-desc" data-editable="true" data-field="dept6_desc">Gadgets, gaming, audio, and smart devices</div>
+      <div class="dept-location" data-editable="true" data-field="dept6_location">North Wing</div>
+    </div>
+    <div class="dept">
+      <div class="dept-name" data-editable="true" data-field="dept7_name">Kids &amp; Toys</div>
+      <div class="dept-floor" data-editable="true" data-field="dept7_floor">FLOOR 3</div>
+      <div class="dept-desc" data-editable="true" data-field="dept7_desc">Children's clothing, toys, and baby gear</div>
+      <div class="dept-location" data-editable="true" data-field="dept7_location">South Wing</div>
+    </div>
+    <div class="dept">
+      <div class="dept-name" data-editable="true" data-field="dept8_name">Sports &amp; Fitness</div>
+      <div class="dept-floor" data-editable="true" data-field="dept8_floor">FLOOR 3</div>
+      <div class="dept-desc" data-editable="true" data-field="dept8_desc">Athletic wear, equipment, and outdoor gear</div>
+      <div class="dept-location" data-editable="true" data-field="dept8_location">West Wing</div>
     </div>
   </div>
 
-  <div class="accent-bar"></div>
+  <div class="bottom-bar">
+    <div class="help" data-editable="true" data-field="footer_help">Visit Customer Service for assistance</div>
+    <div class="logo" data-editable="true" data-field="footer_logo">YOUR STORE</div>
+  </div>
 </body>
 </html>

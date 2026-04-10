@@ -1,488 +1,234 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=1920, height=1080">
-    <title>Office Directory</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <title>Office Directory</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Cormorant+SC:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --ink: #2C1810;
+      --ink-body: #4A2D18;
+      --ink-muted: #7A4A28;
+      --brass: #8B6F2E;
+      --royal: #3D1F14;
+      --rule: rgba(139,111,46,0.4);
+    }
+    body {
+      width: 1920px; height: 1080px; overflow: hidden; position: relative;
+      font-family: 'Lora', serif; color: var(--ink-body);
+      background: linear-gradient(165deg, #EADDBE 0%, #E2D0B0 100%);
+    }
+    body::before {
+      content: ''; position: absolute; inset: 0; pointer-events: none;
+      background-image: radial-gradient(circle, rgba(44,24,16,0.03) 0.6px, transparent 1.1px);
+      background-size: 44px 44px;
+    }
+    .frame { position: absolute; inset: 48px; border: 1px solid var(--brass); z-index: 1; }
+    .frame::before { content: ''; position: absolute; inset: 10px; border: 1px solid rgba(139,111,46,0.22); }
 
-        body {
-            width: 1920px;
-            height: 1080px;
-            overflow: hidden;
-            font-family: 'Inter', sans-serif;
-            background:
-                radial-gradient(ellipse at 50% 0%, rgba(15, 50, 80, 0.12) 0%, transparent 50%),
-                radial-gradient(ellipse at 0% 100%, rgba(13, 148, 136, 0.08) 0%, transparent 40%),
-                linear-gradient(180deg, #0a1628 0%, #132240 50%, #0f172a 100%);
-            color: #f1f5f9;
-            position: relative;
-        }
+    .container {
+      position: absolute; inset: 48px; z-index: 2;
+      display: flex; flex-direction: column;
+      padding: 54px 68px;
+    }
+    .header {
+      display: flex; justify-content: space-between; align-items: flex-end;
+      padding-bottom: 24px; border-bottom: 1px solid var(--rule); margin-bottom: 40px;
+    }
+    .header-left { display: flex; flex-direction: column; gap: 8px; }
+    .eyebrow {
+      font-family: 'Cormorant SC', serif;
+      font-size: 16px; letter-spacing: 6px; font-weight: 600;
+      color: var(--brass); text-transform: uppercase;
+    }
+    .header-title {
+      font-family: 'DM Serif Display', serif;
+      font-size: 60px; color: var(--royal); line-height: 1;
+    }
+    .building-info {
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 22px; color: var(--ink-muted);
+      display: flex; align-items: center; gap: 12px;
+    }
+    .building-info svg { width: 22px; height: 22px; color: var(--brass); }
 
-        /* Dot grid texture */
-        body::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background-image: radial-gradient(circle, rgba(148, 163, 184, 0.04) 1px, transparent 1px);
-            background-size: 36px 36px;
-            z-index: 0;
-        }
-
-        /* Decorative horizontal accent lines */
-        .h-line-1 {
-            position: absolute;
-            top: 100px;
-            left: 0;
-            width: 100%;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, rgba(13, 148, 136, 0.15) 20%, rgba(37, 99, 235, 0.15) 80%, transparent);
-            z-index: 0;
-        }
-
-        .h-line-2 {
-            position: absolute;
-            bottom: 60px;
-            left: 0;
-            width: 100%;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, rgba(217, 170, 83, 0.1) 20%, rgba(217, 170, 83, 0.1) 80%, transparent);
-            z-index: 0;
-        }
-
-        /* Glowing orb */
-        .glow-orb {
-            position: absolute;
-            top: -100px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 800px;
-            height: 300px;
-            background: radial-gradient(ellipse, rgba(13, 148, 136, 0.06) 0%, transparent 70%);
-            filter: blur(40px);
-            z-index: 0;
-        }
-
-        .container {
-            position: relative;
-            z-index: 1;
-            width: 100%;
-            height: 100%;
-            display: grid;
-            grid-template-rows: auto 1fr;
-            padding: 32px 64px 28px;
-            gap: 28px;
-        }
-
-        /* Header */
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding-bottom: 20px;
-        }
-
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
-
-        .header-icon-wrap {
-            width: 56px;
-            height: 56px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, rgba(13, 148, 136, 0.15), rgba(37, 99, 235, 0.15));
-            border: 1px solid rgba(13, 148, 136, 0.25);
-            border-radius: 14px;
-            box-shadow: 0 4px 20px rgba(13, 148, 136, 0.15);
-        }
-
-        .header-icon-wrap svg {
-            width: 30px;
-            height: 30px;
-        }
-
-        .header-title {
-            font-family: 'Montserrat', sans-serif;
-            font-size: 36px;
-            font-weight: 700;
-            color: #f8fafc;
-        }
-
-        .header-right {
-            font-family: 'Inter', sans-serif;
-            font-size: 16px;
-            color: #64748b;
-        }
-
-        .floor-indicator {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 8px 20px;
-            background: rgba(13, 148, 136, 0.1);
-            border: 1px solid rgba(13, 148, 136, 0.2);
-            border-radius: 10px;
-            font-family: 'Montserrat', sans-serif;
-            font-size: 14px;
-            font-weight: 600;
-            color: #5eead4;
-        }
-
-        .floor-indicator svg {
-            width: 18px;
-            height: 18px;
-            flex-shrink: 0;
-        }
-
-        /* Department grid */
-        .dept-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            grid-template-rows: repeat(2, 1fr);
-            gap: 20px;
-        }
-
-        .dept-card {
-            background: rgba(30, 41, 59, 0.6);
-            border: 1px solid rgba(71, 85, 105, 0.25);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border-radius: 20px;
-            padding: 32px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            box-shadow:
-                0 8px 32px rgba(0, 0, 0, 0.2),
-                inset 0 1px 0 rgba(255, 255, 255, 0.03);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .dept-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-        }
-
-        .dept-card:nth-child(1)::before { background: linear-gradient(90deg, #6366f1, #818cf8); }
-        .dept-card:nth-child(2)::before { background: linear-gradient(90deg, #10b981, #34d399); }
-        .dept-card:nth-child(3)::before { background: linear-gradient(90deg, #d9aa53, #f5d78e); }
-        .dept-card:nth-child(4)::before { background: linear-gradient(90deg, #ec4899, #f472b6); }
-        .dept-card:nth-child(5)::before { background: linear-gradient(90deg, #0d9488, #5eead4); }
-        .dept-card:nth-child(6)::before { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
-        .dept-card:nth-child(7)::before { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
-        .dept-card:nth-child(8)::before { background: linear-gradient(90deg, #84cc16, #a3e635); }
-
-        .dept-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 20px;
-        }
-
-        .dept-icon-wrap {
-            width: 52px;
-            height: 52px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 14px;
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-        }
-
-        .dept-icon-wrap svg {
-            width: 26px;
-            height: 26px;
-        }
-
-        .dept-card:nth-child(1) .dept-icon-wrap { background: rgba(99, 102, 241, 0.1); border-color: rgba(99, 102, 241, 0.2); }
-        .dept-card:nth-child(1) .dept-icon-wrap svg { color: #818cf8; }
-        .dept-card:nth-child(2) .dept-icon-wrap { background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.2); }
-        .dept-card:nth-child(2) .dept-icon-wrap svg { color: #34d399; }
-        .dept-card:nth-child(3) .dept-icon-wrap { background: rgba(217, 170, 83, 0.1); border-color: rgba(217, 170, 83, 0.2); }
-        .dept-card:nth-child(3) .dept-icon-wrap svg { color: #d9aa53; }
-        .dept-card:nth-child(4) .dept-icon-wrap { background: rgba(236, 72, 153, 0.1); border-color: rgba(236, 72, 153, 0.2); }
-        .dept-card:nth-child(4) .dept-icon-wrap svg { color: #f472b6; }
-        .dept-card:nth-child(5) .dept-icon-wrap { background: rgba(13, 148, 136, 0.1); border-color: rgba(13, 148, 136, 0.2); }
-        .dept-card:nth-child(5) .dept-icon-wrap svg { color: #5eead4; }
-        .dept-card:nth-child(6) .dept-icon-wrap { background: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.2); }
-        .dept-card:nth-child(6) .dept-icon-wrap svg { color: #60a5fa; }
-        .dept-card:nth-child(7) .dept-icon-wrap { background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.2); }
-        .dept-card:nth-child(7) .dept-icon-wrap svg { color: #fbbf24; }
-        .dept-card:nth-child(8) .dept-icon-wrap { background: rgba(132, 204, 22, 0.1); border-color: rgba(132, 204, 22, 0.2); }
-        .dept-card:nth-child(8) .dept-icon-wrap svg { color: #a3e635; }
-
-        .dept-floor {
-            font-family: 'Montserrat', sans-serif;
-            font-size: 32px;
-            font-weight: 800;
-            color: rgba(255, 255, 255, 0.12);
-        }
-
-        .dept-name {
-            font-family: 'Montserrat', sans-serif;
-            font-size: 22px;
-            font-weight: 700;
-            color: #f8fafc;
-            margin-bottom: 8px;
-        }
-
-        .dept-desc {
-            font-family: 'Inter', sans-serif;
-            font-size: 14px;
-            color: #94a3b8;
-            margin-bottom: 20px;
-            line-height: 1.4;
-        }
-
-        .dept-meta {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .dept-meta-item {
-            font-family: 'Inter', sans-serif;
-            font-size: 14px;
-            color: #64748b;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .meta-icon {
-            width: 14px;
-            height: 14px;
-            flex-shrink: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .meta-icon svg {
-            width: 14px;
-            height: 14px;
-        }
-
-        /* SVG decoration */
-        .deco-svg {
-            position: absolute;
-            z-index: 0;
-        }
-    </style>
+    .dept-grid {
+      flex: 1; display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      grid-template-rows: repeat(2, 1fr);
+      gap: 22px;
+    }
+    .dept-card {
+      background: rgba(255,248,232,0.32);
+      border: 1px solid var(--brass);
+      padding: 28px 32px;
+      display: flex; flex-direction: column;
+      position: relative;
+    }
+    .dept-card::before {
+      content: ''; position: absolute; inset: 6px;
+      border: 1px solid rgba(139,111,46,0.22); pointer-events: none;
+    }
+    .dept-top {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 18px; position: relative; z-index: 1;
+    }
+    .dept-icon-wrap {
+      width: 46px; height: 46px;
+      border: 1px solid var(--brass);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--brass);
+    }
+    .dept-icon-wrap svg { width: 22px; height: 22px; }
+    .dept-floor {
+      font-family: 'DM Serif Display', serif;
+      font-size: 26px; color: var(--royal);
+    }
+    .dept-name {
+      font-family: 'DM Serif Display', serif;
+      font-size: 32px; color: var(--ink); line-height: 1;
+      margin-bottom: 10px; position: relative; z-index: 1;
+    }
+    .dept-desc {
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 14px; color: var(--ink-muted);
+      line-height: 1.5; margin-bottom: 18px;
+      position: relative; z-index: 1;
+    }
+    .dept-meta {
+      display: flex; flex-direction: column; gap: 6px;
+      padding-top: 14px; border-top: 1px dotted rgba(139,111,46,0.35);
+      position: relative; z-index: 1;
+    }
+    .dept-meta-item {
+      font-family: 'Lora', serif; font-size: 13px;
+      color: var(--ink-muted);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .meta-icon svg { width: 14px; height: 14px; color: var(--brass); }
+  </style>
 </head>
 <body>
-    <div class="h-line-1"></div>
-    <div class="h-line-2"></div>
-    <div class="glow-orb"></div>
-
-    <!-- Decorative SVG compass rose -->
-    <svg class="deco-svg" style="bottom:20px;right:40px;opacity:0.06;" width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="100" cy="100" r="80" stroke="#5eead4" stroke-width="1"/>
-        <circle cx="100" cy="100" r="60" stroke="#5eead4" stroke-width="0.5"/>
-        <line x1="100" y1="10" x2="100" y2="190" stroke="#5eead4" stroke-width="0.5"/>
-        <line x1="10" y1="100" x2="190" y2="100" stroke="#5eead4" stroke-width="0.5"/>
-        <polygon points="100,20 105,50 100,40 95,50" fill="rgba(94,234,212,0.3)"/>
-        <text x="100" y="15" text-anchor="middle" fill="rgba(94,234,212,0.4)" font-size="12" font-family="Inter">N</text>
-    </svg>
-
-    <!-- Decorative SVG building outline -->
-    <svg class="deco-svg" style="bottom:80px;left:40px;opacity:0.04;" width="160" height="200" viewBox="0 0 160 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect x="20" y="40" width="120" height="160" rx="4" stroke="#5eead4" stroke-width="2"/>
-        <rect x="40" y="60" width="20" height="20" rx="2" stroke="#5eead4" stroke-width="1"/>
-        <rect x="80" y="60" width="20" height="20" rx="2" stroke="#5eead4" stroke-width="1"/>
-        <rect x="40" y="100" width="20" height="20" rx="2" stroke="#5eead4" stroke-width="1"/>
-        <rect x="80" y="100" width="20" height="20" rx="2" stroke="#5eead4" stroke-width="1"/>
-        <rect x="60" y="160" width="30" height="40" rx="2" stroke="#5eead4" stroke-width="1"/>
-        <polygon points="10,40 80,0 150,40" stroke="#5eead4" stroke-width="1.5" fill="none"/>
-    </svg>
-
-    <div class="container">
-        <div class="header">
-            <div class="header-left">
-                <div class="header-icon-wrap">
-                    <!-- Building SVG icon -->
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:#5eead4;">
-                        <rect x="4" y="2" width="16" height="20" rx="2"/>
-                        <line x1="9" y1="22" x2="9" y2="18"/><line x1="15" y1="22" x2="15" y2="18"/>
-                        <rect x="8" y="6" width="3" height="3" rx="0.5"/><rect x="13" y="6" width="3" height="3" rx="0.5"/>
-                        <rect x="8" y="12" width="3" height="3" rx="0.5"/><rect x="13" y="12" width="3" height="3" rx="0.5"/>
-                    </svg>
-                </div>
-                <div class="header-title" data-editable="true" data-field="directory-title">Office Directory</div>
-            </div>
-            <div class="header-right">
-                <div class="floor-indicator">
-                    <!-- Map/wayfinding SVG icon -->
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:#5eead4;">
-                        <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/>
-                        <line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/>
-                    </svg>
-                    <span data-editable="true" data-field="building-info">Building A - Main Campus</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="dept-grid">
-            <!-- Engineering -->
-            <div class="dept-card">
-                <div class="dept-top">
-                    <div class="dept-icon-wrap">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
-                        </svg>
-                    </div>
-                    <span class="dept-floor" data-editable="true" data-field="dept-1-floor">F3</span>
-                </div>
-                <div class="dept-name" data-editable="true" data-field="dept-1-name">Engineering</div>
-                <div class="dept-desc" data-editable="true" data-field="dept-1-desc">Software development, infrastructure, and QA teams</div>
-                <div class="dept-meta">
-                    <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span> <span data-editable="true" data-field="dept-1-location">Rooms 301-320</span></div>
-                    <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span> <span data-editable="true" data-field="dept-1-phone">Ext. 3000</span></div>
-                </div>
-            </div>
-
-            <!-- Marketing -->
-            <div class="dept-card">
-                <div class="dept-top">
-                    <div class="dept-icon-wrap">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                            <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
-                        </svg>
-                    </div>
-                    <span class="dept-floor" data-editable="true" data-field="dept-2-floor">F4</span>
-                </div>
-                <div class="dept-name" data-editable="true" data-field="dept-2-name">Marketing</div>
-                <div class="dept-desc" data-editable="true" data-field="dept-2-desc">Brand strategy, content, and digital marketing</div>
-                <div class="dept-meta">
-                    <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span> <span data-editable="true" data-field="dept-2-location">Rooms 401-412</span></div>
-                    <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span> <span data-editable="true" data-field="dept-2-phone">Ext. 4000</span></div>
-                </div>
-            </div>
-
-            <!-- Finance -->
-            <div class="dept-card">
-                <div class="dept-top">
-                    <div class="dept-icon-wrap">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                            <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-                        </svg>
-                    </div>
-                    <span class="dept-floor" data-editable="true" data-field="dept-3-floor">F5</span>
-                </div>
-                <div class="dept-name" data-editable="true" data-field="dept-3-name">Finance</div>
-                <div class="dept-desc" data-editable="true" data-field="dept-3-desc">Accounting, budgeting, and financial planning</div>
-                <div class="dept-meta">
-                    <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span> <span data-editable="true" data-field="dept-3-location">Rooms 501-508</span></div>
-                    <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span> <span data-editable="true" data-field="dept-3-phone">Ext. 5000</span></div>
-                </div>
-            </div>
-
-            <!-- Design -->
-            <div class="dept-card">
-                <div class="dept-top">
-                    <div class="dept-icon-wrap">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/>
-                        </svg>
-                    </div>
-                    <span class="dept-floor" data-editable="true" data-field="dept-4-floor">F2</span>
-                </div>
-                <div class="dept-name" data-editable="true" data-field="dept-4-name">Design</div>
-                <div class="dept-desc" data-editable="true" data-field="dept-4-desc">Product design, UX research, and creative</div>
-                <div class="dept-meta">
-                    <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span> <span data-editable="true" data-field="dept-4-location">Rooms 201-210</span></div>
-                    <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span> <span data-editable="true" data-field="dept-4-phone">Ext. 2000</span></div>
-                </div>
-            </div>
-
-            <!-- Human Resources -->
-            <div class="dept-card">
-                <div class="dept-top">
-                    <div class="dept-icon-wrap">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                        </svg>
-                    </div>
-                    <span class="dept-floor" data-editable="true" data-field="dept-5-floor">F1</span>
-                </div>
-                <div class="dept-name" data-editable="true" data-field="dept-5-name">Human Resources</div>
-                <div class="dept-desc" data-editable="true" data-field="dept-5-desc">Recruitment, benefits, and employee relations</div>
-                <div class="dept-meta">
-                    <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span> <span data-editable="true" data-field="dept-5-location">Rooms 101-108</span></div>
-                    <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span> <span data-editable="true" data-field="dept-5-phone">Ext. 1000</span></div>
-                </div>
-            </div>
-
-            <!-- Sales -->
-            <div class="dept-card">
-                <div class="dept-top">
-                    <div class="dept-icon-wrap">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
-                            <path d="M7 8h2l2 3 2-6 2 3h2"/>
-                        </svg>
-                    </div>
-                    <span class="dept-floor" data-editable="true" data-field="dept-6-floor">F2</span>
-                </div>
-                <div class="dept-name" data-editable="true" data-field="dept-6-name">Sales</div>
-                <div class="dept-desc" data-editable="true" data-field="dept-6-desc">Business development and client relations</div>
-                <div class="dept-meta">
-                    <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span> <span data-editable="true" data-field="dept-6-location">Rooms 211-224</span></div>
-                    <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span> <span data-editable="true" data-field="dept-6-phone">Ext. 2100</span></div>
-                </div>
-            </div>
-
-            <!-- Legal -->
-            <div class="dept-card">
-                <div class="dept-top">
-                    <div class="dept-icon-wrap">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                            <line x1="12" y1="2" x2="12" y2="14"/><path d="M4 8l8-4 8 4"/><path d="M4 8v2a4 4 0 0 0 4 4"/><path d="M20 8v2a4 4 0 0 1-4 4"/>
-                            <line x1="2" y1="20" x2="22" y2="20"/><line x1="12" y1="14" x2="12" y2="20"/>
-                        </svg>
-                    </div>
-                    <span class="dept-floor" data-editable="true" data-field="dept-7-floor">F5</span>
-                </div>
-                <div class="dept-name" data-editable="true" data-field="dept-7-name">Legal</div>
-                <div class="dept-desc" data-editable="true" data-field="dept-7-desc">Contracts, compliance, and corporate governance</div>
-                <div class="dept-meta">
-                    <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span> <span data-editable="true" data-field="dept-7-location">Rooms 509-514</span></div>
-                    <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span> <span data-editable="true" data-field="dept-7-phone">Ext. 5100</span></div>
-                </div>
-            </div>
-
-            <!-- Facilities -->
-            <div class="dept-card">
-                <div class="dept-top">
-                    <div class="dept-icon-wrap">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
-                        </svg>
-                    </div>
-                    <span class="dept-floor" data-editable="true" data-field="dept-8-floor">B1</span>
-                </div>
-                <div class="dept-name" data-editable="true" data-field="dept-8-name">Facilities</div>
-                <div class="dept-desc" data-editable="true" data-field="dept-8-desc">Building maintenance and office management</div>
-                <div class="dept-meta">
-                    <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span> <span data-editable="true" data-field="dept-8-location">Basement Level 1</span></div>
-                    <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span> <span data-editable="true" data-field="dept-8-phone">Ext. 9000</span></div>
-                </div>
-            </div>
-        </div>
+  <div class="frame"></div>
+  <div class="container">
+    <div class="header">
+      <div class="header-left">
+        <div class="eyebrow">Wayfinding</div>
+        <h1 class="header-title" data-editable="true" data-field="directory-title">Office Directory</h1>
+      </div>
+      <div class="building-info">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M3 21h18M5 21V10l7-5 7 5v11" stroke="currentColor" stroke-width="1.6"/></svg>
+        <span data-editable="true" data-field="building-info">Building A - Main Campus</span>
+      </div>
     </div>
+
+    <div class="dept-grid">
+      <div class="dept-card">
+        <div class="dept-top">
+          <div class="dept-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></div>
+          <span class="dept-floor" data-editable="true" data-field="dept-1-floor">F3</span>
+        </div>
+        <div class="dept-name" data-editable="true" data-field="dept-1-name">Engineering</div>
+        <div class="dept-desc" data-editable="true" data-field="dept-1-desc">Software development, infrastructure, and QA teams</div>
+        <div class="dept-meta">
+          <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="10" r="3" stroke="currentColor" stroke-width="1.6"/></svg></span><span data-editable="true" data-field="dept-1-location">Rooms 301-320</span></div>
+          <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z" stroke="currentColor" stroke-width="1.6"/></svg></span><span data-editable="true" data-field="dept-1-phone">Ext. 3000</span></div>
+        </div>
+      </div>
+
+      <div class="dept-card">
+        <div class="dept-top">
+          <div class="dept-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
+          <span class="dept-floor" data-editable="true" data-field="dept-2-floor">F4</span>
+        </div>
+        <div class="dept-name" data-editable="true" data-field="dept-2-name">Marketing</div>
+        <div class="dept-desc" data-editable="true" data-field="dept-2-desc">Brand strategy, content, and digital marketing</div>
+        <div class="dept-meta">
+          <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="10" r="3" stroke="currentColor" stroke-width="1.6"/></svg></span><span data-editable="true" data-field="dept-2-location">Rooms 401-412</span></div>
+          <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z" stroke="currentColor" stroke-width="1.6"/></svg></span><span data-editable="true" data-field="dept-2-phone">Ext. 4000</span></div>
+        </div>
+      </div>
+
+      <div class="dept-card">
+        <div class="dept-top">
+          <div class="dept-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div>
+          <span class="dept-floor" data-editable="true" data-field="dept-3-floor">F5</span>
+        </div>
+        <div class="dept-name" data-editable="true" data-field="dept-3-name">Finance</div>
+        <div class="dept-desc" data-editable="true" data-field="dept-3-desc">Accounting, budgeting, and financial planning</div>
+        <div class="dept-meta">
+          <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="10" r="3" stroke="currentColor" stroke-width="1.6"/></svg></span><span data-editable="true" data-field="dept-3-location">Rooms 501-508</span></div>
+          <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z" stroke="currentColor" stroke-width="1.6"/></svg></span><span data-editable="true" data-field="dept-3-phone">Ext. 5000</span></div>
+        </div>
+      </div>
+
+      <div class="dept-card">
+        <div class="dept-top">
+          <div class="dept-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="21.17" y1="8" x2="12" y2="8"/><line x1="3.95" y1="6.06" x2="8.54" y2="14"/></svg></div>
+          <span class="dept-floor" data-editable="true" data-field="dept-4-floor">F2</span>
+        </div>
+        <div class="dept-name" data-editable="true" data-field="dept-4-name">Design</div>
+        <div class="dept-desc" data-editable="true" data-field="dept-4-desc">Product design, UX research, and creative</div>
+        <div class="dept-meta">
+          <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="10" r="3" stroke="currentColor" stroke-width="1.6"/></svg></span><span data-editable="true" data-field="dept-4-location">Rooms 201-210</span></div>
+          <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z" stroke="currentColor" stroke-width="1.6"/></svg></span><span data-editable="true" data-field="dept-4-phone">Ext. 2100</span></div>
+        </div>
+      </div>
+
+      <div class="dept-card">
+        <div class="dept-top">
+          <div class="dept-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></div>
+          <span class="dept-floor" data-editable="true" data-field="dept-5-floor">F1</span>
+        </div>
+        <div class="dept-name" data-editable="true" data-field="dept-5-name">Human Resources</div>
+        <div class="dept-desc" data-editable="true" data-field="dept-5-desc">Recruitment, benefits, and employee relations</div>
+        <div class="dept-meta">
+          <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="10" r="3" stroke="currentColor" stroke-width="1.6"/></svg></span><span data-editable="true" data-field="dept-5-location">Rooms 101-108</span></div>
+          <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z" stroke="currentColor" stroke-width="1.6"/></svg></span><span data-editable="true" data-field="dept-5-phone">Ext. 1100</span></div>
+        </div>
+      </div>
+
+      <div class="dept-card">
+        <div class="dept-top">
+          <div class="dept-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg></div>
+          <span class="dept-floor" data-editable="true" data-field="dept-6-floor">F2</span>
+        </div>
+        <div class="dept-name" data-editable="true" data-field="dept-6-name">Sales</div>
+        <div class="dept-desc" data-editable="true" data-field="dept-6-desc">Business development and client relations</div>
+        <div class="dept-meta">
+          <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="10" r="3" stroke="currentColor" stroke-width="1.6"/></svg></span><span data-editable="true" data-field="dept-6-location">Rooms 211-224</span></div>
+          <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z" stroke="currentColor" stroke-width="1.6"/></svg></span><span data-editable="true" data-field="dept-6-phone">Ext. 2200</span></div>
+        </div>
+      </div>
+
+      <div class="dept-card">
+        <div class="dept-top">
+          <div class="dept-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 6l9-3 9 3"/><path d="M5 6v12"/><path d="M19 6v12"/><path d="M3 18h18"/><path d="M10 12v4"/><path d="M14 12v4"/></svg></div>
+          <span class="dept-floor" data-editable="true" data-field="dept-7-floor">F5</span>
+        </div>
+        <div class="dept-name" data-editable="true" data-field="dept-7-name">Legal</div>
+        <div class="dept-desc" data-editable="true" data-field="dept-7-desc">Contracts, compliance, and corporate governance</div>
+        <div class="dept-meta">
+          <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="10" r="3" stroke="currentColor" stroke-width="1.6"/></svg></span><span data-editable="true" data-field="dept-7-location">Rooms 509-514</span></div>
+          <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z" stroke="currentColor" stroke-width="1.6"/></svg></span><span data-editable="true" data-field="dept-7-phone">Ext. 5500</span></div>
+        </div>
+      </div>
+
+      <div class="dept-card">
+        <div class="dept-top">
+          <div class="dept-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg></div>
+          <span class="dept-floor" data-editable="true" data-field="dept-8-floor">B1</span>
+        </div>
+        <div class="dept-name" data-editable="true" data-field="dept-8-name">Facilities</div>
+        <div class="dept-desc" data-editable="true" data-field="dept-8-desc">Building maintenance and office management</div>
+        <div class="dept-meta">
+          <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="10" r="3" stroke="currentColor" stroke-width="1.6"/></svg></span><span data-editable="true" data-field="dept-8-location">Basement Level 1</span></div>
+          <div class="dept-meta-item"><span class="meta-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z" stroke="currentColor" stroke-width="1.6"/></svg></span><span data-editable="true" data-field="dept-8-phone">Ext. 9000</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

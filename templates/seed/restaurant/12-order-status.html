@@ -3,399 +3,239 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1920, height=1080">
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Cormorant+SC:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --ink: #2C1810;
+      --ink-body: #4A2D18;
+      --ink-muted: #7A4A28;
+      --accent: #8B4513;
+      --brass: #8B6F2E;
+      --rule: rgba(139,111,46,0.4);
+      --prep: #A85A3E;
+      --ready: #2F5233;
+      --done: #7A4A28;
+    }
     body {
-      width: 1920px;
-      height: 1080px;
-      overflow: hidden;
-      position: relative;
-      font-family: 'Inter', sans-serif;
+      width: 1920px; height: 1080px; overflow: hidden; position: relative;
+      font-family: 'Lora', serif; color: var(--ink-body);
       background:
-        radial-gradient(ellipse at 20% 20%, rgba(255,60,60,0.04) 0%, transparent 40%),
-        radial-gradient(ellipse at 50% 80%, rgba(255,200,50,0.03) 0%, transparent 40%),
-        radial-gradient(ellipse at 80% 20%, rgba(50,200,100,0.04) 0%, transparent 40%),
-        linear-gradient(175deg, #111118 0%, #0e0e16 40%, #0a0a12 100%);
-      color: #e4e0ec;
+        radial-gradient(ellipse at 50% 0%, rgba(139,111,46,0.07), transparent 60%),
+        linear-gradient(168deg, #E2D0B0 0%, #D4BC8E 100%);
     }
-
-    /* Subtle grid pattern */
     body::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background:
-        repeating-linear-gradient(
-          0deg,
-          transparent,
-          transparent 59px,
-          rgba(255,255,255,0.02) 59px,
-          rgba(255,255,255,0.02) 60px
-        ),
-        repeating-linear-gradient(
-          90deg,
-          transparent,
-          transparent 59px,
-          rgba(255,255,255,0.02) 59px,
-          rgba(255,255,255,0.02) 60px
-        );
-      pointer-events: none;
-      z-index: 0;
+      content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+      background-image:
+        radial-gradient(circle at 19% 27%, rgba(44,24,16,0.035) 0.6px, transparent 1.1px),
+        radial-gradient(circle at 71% 64%, rgba(44,24,16,0.028) 0.5px, transparent 1px);
+      background-size: 40px 40px, 58px 58px;
+    }
+    body::after {
+      content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+      background: repeating-linear-gradient(42deg, transparent 0 90px, rgba(139,69,19,0.018) 90px 91px);
     }
 
-    /* Glow circles behind each column */
-    .status-glow-red {
-      position: absolute;
-      top: 200px; left: 100px;
-      width: 500px; height: 500px;
-      background: radial-gradient(circle, rgba(255,60,60,0.06) 0%, transparent 60%);
-      border-radius: 50%;
-      z-index: 1;
+    .frame {
+      position: absolute; inset: 50px;
+      border: 1px solid var(--brass); z-index: 1;
     }
-    .status-glow-yellow {
-      position: absolute;
-      top: 150px; left: 50%;
-      transform: translateX(-50%);
-      width: 500px; height: 500px;
-      background: radial-gradient(circle, rgba(255,200,50,0.05) 0%, transparent 60%);
-      border-radius: 50%;
-      z-index: 1;
-    }
-    .status-glow-green {
-      position: absolute;
-      top: 200px; right: 100px;
-      width: 500px; height: 500px;
-      background: radial-gradient(circle, rgba(50,200,100,0.06) 0%, transparent 60%);
-      border-radius: 50%;
-      z-index: 1;
+    .frame::before {
+      content: ''; position: absolute; inset: 10px;
+      border: 1px solid rgba(139,111,46,0.22);
     }
 
-    .container {
-      position: relative;
-      z-index: 2;
-      display: grid;
-      grid-template-rows: auto 1fr;
-      height: 100%;
-      padding: 40px 60px;
-      gap: 30px;
-    }
-
-    /* Header */
     .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      position: absolute; top: 90px; left: 0; right: 0;
+      text-align: center; z-index: 5;
     }
-
-    .header-left {
-      display: flex;
-      align-items: center;
-      gap: 20px;
+    .eyebrow {
+      font-family: 'Cormorant SC', serif;
+      font-size: 20px; letter-spacing: 8px;
+      color: var(--accent); text-transform: uppercase; font-weight: 500;
+      margin-bottom: 12px;
     }
-
     .kitchen-title {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 56px;
-      color: #fff;
-      letter-spacing: 6px;
-      text-shadow: 0 2px 20px rgba(255,255,255,0.1);
+      font-family: 'DM Serif Display', serif;
+      font-size: 88px; font-weight: 400;
+      color: var(--ink); letter-spacing: -0.5px; line-height: 0.95;
     }
-
-    .live-badge {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: rgba(255,60,60,0.15);
-      border: 1px solid rgba(255,60,60,0.3);
-      border-radius: 50px;
-      padding: 8px 20px;
-    }
-    .live-dot {
-      width: 10px; height: 10px;
-      background: #ff3c3c;
-      border-radius: 50%;
-      box-shadow: 0 0 10px rgba(255,60,60,0.5);
-    }
-    .live-text {
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 600;
-      font-size: 14px;
-      color: #ff3c3c;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-    }
-
     .header-time {
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 500;
-      font-size: 28px;
-      color: rgba(228,224,236,0.4);
+      font-family: 'DM Serif Display', serif;
+      font-size: 32px; color: var(--brass);
+      margin-top: 14px;
     }
 
-    /* 3-column status grid */
-    .status-grid {
+    .columns {
+      position: absolute;
+      top: 340px; bottom: 80px;
+      left: 100px; right: 100px;
+      z-index: 5;
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
-      gap: 28px;
+      gap: 40px;
     }
-
-    .status-column {
-      display: flex;
-      flex-direction: column;
-      gap: 0;
-      border-radius: 20px;
-      overflow: hidden;
-      background: rgba(255,255,255,0.02);
-      border: 1px solid rgba(255,255,255,0.06);
+    .status-col {
+      display: flex; flex-direction: column;
     }
-
     .status-header {
-      padding: 22px 28px;
-      display: flex;
-      align-items: center;
-      gap: 14px;
+      text-align: center;
+      margin-bottom: 22px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--brass);
+      position: relative;
     }
-    .status-header.preparing {
-      background: rgba(255,60,60,0.08);
-      border-bottom: 2px solid rgba(255,60,60,0.2);
-    }
-    .status-header.ready {
-      background: rgba(255,200,50,0.08);
-      border-bottom: 2px solid rgba(255,200,50,0.2);
-    }
-    .status-header.done {
-      background: rgba(50,200,100,0.08);
-      border-bottom: 2px solid rgba(50,200,100,0.2);
-    }
-
-    .status-emoji {
-      font-size: 36px;
-      filter: drop-shadow(0 2px 8px rgba(0,0,0,0.3));
-    }
-
     .status-label {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 36px;
-      letter-spacing: 4px;
+      font-family: 'Cormorant SC', serif;
+      font-size: 22px; letter-spacing: 7px; font-weight: 600;
+      text-transform: uppercase;
     }
-    .status-label.preparing { color: #ff3c3c; }
-    .status-label.ready { color: #ffc832; }
-    .status-label.done { color: #32c864; }
+    .status-label.preparing { color: var(--prep); }
+    .status-label.ready { color: var(--ready); }
+    .status-label.done { color: var(--done); }
 
-    .status-count {
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 600;
-      font-size: 18px;
-      color: rgba(228,224,236,0.4);
-      margin-left: auto;
+    .order-list {
+      display: flex; flex-direction: column; gap: 14px;
     }
-
-    .status-body {
-      flex: 1;
-      padding: 16px 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .order-card {
-      display: flex;
-      justify-content: space-between;
+    .order-row {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 0 24px;
       align-items: center;
       padding: 18px 22px;
-      border-radius: 14px;
-      backdrop-filter: blur(8px);
+      border: 1px solid rgba(139,111,46,0.35);
+      background: rgba(255,248,232,0.22);
+      position: relative;
     }
-    .order-card.preparing {
-      background: rgba(255,60,60,0.05);
-      border: 1px solid rgba(255,60,60,0.1);
+    .order-row::before {
+      content: ''; position: absolute; inset: 4px;
+      border: 1px solid rgba(139,111,46,0.15);
+      pointer-events: none;
     }
-    .order-card.ready {
-      background: rgba(255,200,50,0.05);
-      border: 1px solid rgba(255,200,50,0.1);
-    }
-    .order-card.done {
-      background: rgba(50,200,100,0.05);
-      border: 1px solid rgba(50,200,100,0.1);
-    }
-
     .order-number {
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 800;
+      font-family: 'DM Serif Display', serif;
       font-size: 44px;
       line-height: 1;
     }
-    .order-number.preparing { color: #ff3c3c; }
-    .order-number.ready { color: #ffc832; }
-    .order-number.done { color: #32c864; }
-
-    .order-details { text-align: right; }
-
+    .order-number.preparing { color: var(--prep); }
+    .order-number.ready { color: var(--ready); }
+    .order-number.done { color: var(--done); opacity: 0.7; }
+    .order-info {}
     .order-name {
-      font-family: 'Inter', sans-serif;
-      font-weight: 500;
-      font-size: 18px;
-      color: rgba(228,224,236,0.7);
+      font-family: 'DM Serif Display', serif;
+      font-size: 22px; color: var(--ink);
+      line-height: 1.1;
     }
     .order-items {
-      font-family: 'Inter', sans-serif;
-      font-weight: 300;
-      font-size: 14px;
-      color: rgba(228,224,236,0.35);
-      margin-top: 2px;
-    }
-
-    /* SVG pulse decoration */
-    .pulse-deco {
-      position: absolute;
-      z-index: 1;
-      opacity: 0.05;
-    }
-    .pulse-1 { bottom: 30px; left: 30px; }
-    .pulse-2 { top: 30px; right: 30px; }
-
-    /* Color-coded bottom bar */
-    .bottom-bar {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 5px;
-      background: linear-gradient(90deg, #ff3c3c 33%, #ffc832 33%, #ffc832 66%, #32c864 66%);
-      z-index: 3;
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 14px; color: var(--ink-muted);
+      margin-top: 3px;
     }
   </style>
 </head>
 <body>
-  <div class="status-glow-red"></div>
-  <div class="status-glow-yellow"></div>
-  <div class="status-glow-green"></div>
+  <div class="frame"></div>
 
-  <!-- SVG heartbeat/pulse decoration -->
-  <svg class="pulse-deco pulse-1" width="300" height="60" viewBox="0 0 300 60" fill="none" stroke="#fff" stroke-width="2">
-    <polyline points="0,30 60,30 80,10 100,50 120,20 140,40 160,30 300,30"/>
-  </svg>
-  <svg class="pulse-deco pulse-2" width="250" height="50" viewBox="0 0 250 50" fill="none" stroke="#fff" stroke-width="2">
-    <polyline points="0,25 50,25 65,8 80,42 95,15 110,35 125,25 250,25"/>
-  </svg>
+  <div class="header">
+    <div class="eyebrow">Kitchen Display</div>
+    <h1 class="kitchen-title" data-editable="true" data-field="title">Order Status</h1>
+    <div class="header-time" data-editable="true" data-field="time">12:45 PM</div>
+  </div>
 
-  <div class="container">
-    <div class="header">
-      <div class="header-left">
-        <h1 class="kitchen-title" data-editable="true" data-field="title">ORDER STATUS</h1>
-        <div class="live-badge">
-          <div class="live-dot"></div>
-          <span class="live-text">Live</span>
+  <div class="columns">
+    <div class="status-col">
+      <div class="status-header">
+        <span class="status-label preparing" data-editable="true" data-field="preparingLabel">PREPARING</span>
+      </div>
+      <div class="order-list">
+        <div class="order-row">
+          <div class="order-number preparing" data-editable="true" data-field="prep1Number">#047</div>
+          <div class="order-info">
+            <div class="order-name" data-editable="true" data-field="prep1Name">Sarah M.</div>
+            <div class="order-items" data-editable="true" data-field="prep1Items">2x Burger, 1x Fries</div>
+          </div>
+        </div>
+        <div class="order-row">
+          <div class="order-number preparing" data-editable="true" data-field="prep2Number">#048</div>
+          <div class="order-info">
+            <div class="order-name" data-editable="true" data-field="prep2Name">James K.</div>
+            <div class="order-items" data-editable="true" data-field="prep2Items">1x Pizza, 1x Salad</div>
+          </div>
+        </div>
+        <div class="order-row">
+          <div class="order-number preparing" data-editable="true" data-field="prep3Number">#049</div>
+          <div class="order-info">
+            <div class="order-name" data-editable="true" data-field="prep3Name">Lisa R.</div>
+            <div class="order-items" data-editable="true" data-field="prep3Items">3x Tacos, 2x Drinks</div>
+          </div>
+        </div>
+        <div class="order-row">
+          <div class="order-number preparing" data-editable="true" data-field="prep4Number">#050</div>
+          <div class="order-info">
+            <div class="order-name" data-editable="true" data-field="prep4Name">David W.</div>
+            <div class="order-items" data-editable="true" data-field="prep4Items">1x Steak, 1x Wine</div>
+          </div>
         </div>
       </div>
-      <div class="header-time" data-editable="true" data-field="time">12:45 PM</div>
     </div>
 
-    <div class="status-grid">
-      <!-- Preparing column -->
-      <div class="status-column">
-        <div class="status-header preparing">
-          <span class="status-emoji">&#128308;</span>
-          <span class="status-label preparing" data-editable="true" data-field="preparingLabel">PREPARING</span>
-          <span class="status-count">4 orders</span>
+    <div class="status-col">
+      <div class="status-header">
+        <span class="status-label ready" data-editable="true" data-field="readyLabel">READY</span>
+      </div>
+      <div class="order-list">
+        <div class="order-row">
+          <div class="order-number ready" data-editable="true" data-field="ready1Number">#044</div>
+          <div class="order-info">
+            <div class="order-name" data-editable="true" data-field="ready1Name">Mike T.</div>
+            <div class="order-items" data-editable="true" data-field="ready1Items">1x Pasta, 1x Bread</div>
+          </div>
         </div>
-        <div class="status-body">
-          <div class="order-card preparing">
-            <div class="order-number preparing" data-editable="true" data-field="prep1Number">#047</div>
-            <div class="order-details">
-              <div class="order-name" data-editable="true" data-field="prep1Name">Sarah M.</div>
-              <div class="order-items" data-editable="true" data-field="prep1Items">2x Burger, 1x Fries</div>
-            </div>
+        <div class="order-row">
+          <div class="order-number ready" data-editable="true" data-field="ready2Number">#045</div>
+          <div class="order-info">
+            <div class="order-name" data-editable="true" data-field="ready2Name">Emma L.</div>
+            <div class="order-items" data-editable="true" data-field="ready2Items">2x Sushi Roll, 1x Miso</div>
           </div>
-          <div class="order-card preparing">
-            <div class="order-number preparing" data-editable="true" data-field="prep2Number">#048</div>
-            <div class="order-details">
-              <div class="order-name" data-editable="true" data-field="prep2Name">James K.</div>
-              <div class="order-items" data-editable="true" data-field="prep2Items">1x Pizza, 1x Salad</div>
-            </div>
-          </div>
-          <div class="order-card preparing">
-            <div class="order-number preparing" data-editable="true" data-field="prep3Number">#049</div>
-            <div class="order-details">
-              <div class="order-name" data-editable="true" data-field="prep3Name">Lisa R.</div>
-              <div class="order-items" data-editable="true" data-field="prep3Items">3x Tacos, 2x Drinks</div>
-            </div>
-          </div>
-          <div class="order-card preparing">
-            <div class="order-number preparing" data-editable="true" data-field="prep4Number">#050</div>
-            <div class="order-details">
-              <div class="order-name" data-editable="true" data-field="prep4Name">David W.</div>
-              <div class="order-items" data-editable="true" data-field="prep4Items">1x Steak, 1x Wine</div>
-            </div>
+        </div>
+        <div class="order-row">
+          <div class="order-number ready" data-editable="true" data-field="ready3Number">#046</div>
+          <div class="order-info">
+            <div class="order-name" data-editable="true" data-field="ready3Name">Alex P.</div>
+            <div class="order-items" data-editable="true" data-field="ready3Items">1x Chicken, 2x Sides</div>
           </div>
         </div>
       </div>
+    </div>
 
-      <!-- Ready column -->
-      <div class="status-column">
-        <div class="status-header ready">
-          <span class="status-emoji">&#128993;</span>
-          <span class="status-label ready" data-editable="true" data-field="readyLabel">READY</span>
-          <span class="status-count">3 orders</span>
-        </div>
-        <div class="status-body">
-          <div class="order-card ready">
-            <div class="order-number ready" data-editable="true" data-field="ready1Number">#044</div>
-            <div class="order-details">
-              <div class="order-name" data-editable="true" data-field="ready1Name">Mike T.</div>
-              <div class="order-items" data-editable="true" data-field="ready1Items">1x Pasta, 1x Bread</div>
-            </div>
-          </div>
-          <div class="order-card ready">
-            <div class="order-number ready" data-editable="true" data-field="ready2Number">#045</div>
-            <div class="order-details">
-              <div class="order-name" data-editable="true" data-field="ready2Name">Emma L.</div>
-              <div class="order-items" data-editable="true" data-field="ready2Items">2x Sushi Roll, 1x Miso</div>
-            </div>
-          </div>
-          <div class="order-card ready">
-            <div class="order-number ready" data-editable="true" data-field="ready3Number">#046</div>
-            <div class="order-details">
-              <div class="order-name" data-editable="true" data-field="ready3Name">Alex P.</div>
-              <div class="order-items" data-editable="true" data-field="ready3Items">1x Chicken, 2x Sides</div>
-            </div>
-          </div>
-        </div>
+    <div class="status-col">
+      <div class="status-header">
+        <span class="status-label done" data-editable="true" data-field="doneLabel">COMPLETE</span>
       </div>
-
-      <!-- Done column -->
-      <div class="status-column">
-        <div class="status-header done">
-          <span class="status-emoji">&#9989;</span>
-          <span class="status-label done" data-editable="true" data-field="doneLabel">COMPLETE</span>
-          <span class="status-count">3 orders</span>
+      <div class="order-list">
+        <div class="order-row">
+          <div class="order-number done" data-editable="true" data-field="done1Number">#041</div>
+          <div class="order-info">
+            <div class="order-name" data-editable="true" data-field="done1Name">Chris B.</div>
+            <div class="order-items" data-editable="true" data-field="done1Items">1x Burger Combo</div>
+          </div>
         </div>
-        <div class="status-body">
-          <div class="order-card done">
-            <div class="order-number done" data-editable="true" data-field="done1Number">#041</div>
-            <div class="order-details">
-              <div class="order-name" data-editable="true" data-field="done1Name">Chris B.</div>
-              <div class="order-items" data-editable="true" data-field="done1Items">1x Burger Combo</div>
-            </div>
+        <div class="order-row">
+          <div class="order-number done" data-editable="true" data-field="done2Number">#042</div>
+          <div class="order-info">
+            <div class="order-name" data-editable="true" data-field="done2Name">Nina F.</div>
+            <div class="order-items" data-editable="true" data-field="done2Items">2x Salad, 2x Juice</div>
           </div>
-          <div class="order-card done">
-            <div class="order-number done" data-editable="true" data-field="done2Number">#042</div>
-            <div class="order-details">
-              <div class="order-name" data-editable="true" data-field="done2Name">Nina F.</div>
-              <div class="order-items" data-editable="true" data-field="done2Items">2x Salad, 2x Juice</div>
-            </div>
-          </div>
-          <div class="order-card done">
-            <div class="order-number done" data-editable="true" data-field="done3Number">#043</div>
-            <div class="order-details">
-              <div class="order-name" data-editable="true" data-field="done3Name">Tom H.</div>
-              <div class="order-items" data-editable="true" data-field="done3Items">1x Fish &amp; Chips</div>
-            </div>
+        </div>
+        <div class="order-row">
+          <div class="order-number done" data-editable="true" data-field="done3Number">#043</div>
+          <div class="order-info">
+            <div class="order-name" data-editable="true" data-field="done3Name">Tom H.</div>
+            <div class="order-items" data-editable="true" data-field="done3Items">1x Fish &amp; Chips</div>
           </div>
         </div>
       </div>
     </div>
   </div>
-
-  <div class="bottom-bar"></div>
 </body>
 </html>
