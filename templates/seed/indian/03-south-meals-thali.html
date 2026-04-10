@@ -3,395 +3,332 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1920, height=1080">
-  <link href="https://fonts.googleapis.com/css2?family=Yatra+One&family=Cormorant+Garamond:wght@400;600;700&family=Tiro+Devanagari+Marathi&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Yatra+One&display=swap" rel="stylesheet">
   <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --cream: #FBF6EC;
+      --cream-warm: #F5EDE0;
+      --ink: #1F2A18;
+      --ink-soft: #4A5540;
+      --accent: #2F5233;
+      --accent-soft: #527A52;
+      --gold: #A8823C;
+      --brass: #C9962C;
+      --rule: rgba(47,82,51,0.28);
+    }
     body {
-      width:1920px; height:1080px; overflow:hidden; position:relative;
-      font-family:'Poppins', sans-serif; color:#FFF4D6;
+      width: 1920px; height: 1080px; overflow: hidden; position: relative;
+      font-family: 'Lora', serif; color: var(--ink);
       background:
-        /* banana leaf veins */
-        repeating-linear-gradient(72deg, transparent 0, transparent 24px, rgba(255,244,214,0.02) 24px, rgba(255,244,214,0.02) 25px),
-        repeating-linear-gradient(108deg, transparent 0, transparent 32px, rgba(255,244,214,0.015) 32px, rgba(255,244,214,0.015) 33px),
-        radial-gradient(ellipse at 50% 50%, rgba(228,155,15,0.15) 0%, transparent 55%),
-        linear-gradient(160deg, #0a1f0a 0%, #1a3810 30%, #0f2408 60%, #1c4012 100%);
+        radial-gradient(ellipse at 50% 0%, rgba(47,82,51,0.06), transparent 60%),
+        radial-gradient(ellipse at 50% 100%, rgba(168,130,60,0.06), transparent 55%),
+        linear-gradient(180deg, #FBF6EC 0%, #F5EDE0 100%);
     }
-    /* midrib */
     body::before {
-      content:''; position:absolute; top:40px; bottom:40px; left:50%;
-      width:3px;
-      background: linear-gradient(180deg, transparent, rgba(197,220,120,0.3) 20%, rgba(197,220,120,0.3) 80%, transparent);
-      z-index:0;
+      content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+      background-image:
+        radial-gradient(circle at 25% 30%, rgba(31,42,24,0.022) 0.5px, transparent 1px),
+        radial-gradient(circle at 75% 60%, rgba(31,42,24,0.018) 0.5px, transparent 1px);
+      background-size: 45px 45px, 60px 60px;
     }
 
-    .border-frame {
-      position:absolute; inset:40px;
-      border: 2px solid rgba(232,155,15,0.35);
-      border-radius: 6px;
-      box-shadow:
-        0 0 0 1px rgba(232,155,15,0.15),
-        0 0 0 7px rgba(184,115,51,0.1),
-        inset 0 0 100px rgba(0,0,0,0.4);
-      z-index:1;
+    .frame {
+      position: absolute; inset: 70px;
+      border: 1px solid var(--rule); z-index: 1;
     }
-    .border-frame::before, .border-frame::after {
-      content:'';
-      position:absolute; left:22px; right:22px; height:1px;
-      background: linear-gradient(90deg, transparent, rgba(232,155,15,0.5), transparent);
+    .frame::before {
+      content: ''; position: absolute; inset: 8px;
+      border: 1px solid rgba(47,82,51,0.14);
     }
-    .border-frame::before { top:14px; }
-    .border-frame::after { bottom:14px; }
 
-    /* kalasha corner ornaments */
-    .kalasha { position:absolute; z-index:5; opacity:0.55; }
-
-    /* Header */
     .header {
-      position:absolute; top:80px; left:0; right:0; z-index:3;
-      text-align:center;
+      position: absolute; top: 120px; left: 0; right: 0;
+      text-align: center; z-index: 5;
     }
     .eyebrow {
-      font-family:'Cormorant Garamond', serif;
-      font-size:20px; letter-spacing:12px;
-      color:#FF9933; font-weight:600;
-      text-transform:uppercase;
-    }
-    .eyebrow::before, .eyebrow::after {
-      content:'\2740'; color:#E8B931; margin:0 18px;
-    }
-    .main-title {
-      font-family:'Yatra One', cursive;
-      font-size: 80px; line-height: 1;
-      color: #FFD86B;
-      letter-spacing: 3px;
-      text-shadow: 0 2px 0 #8B4513, 0 0 40px rgba(255,153,51,0.35);
-      margin: 10px 0 8px;
-    }
-    .main-subtitle {
-      font-family:'Cormorant Garamond', serif;
-      font-style:italic;
-      font-size: 24px;
-      color: rgba(255,244,214,0.7);
-      letter-spacing: 1.5px;
-    }
-    .serving-badge {
-      display:inline-block;
-      margin-top:12px;
-      padding: 8px 30px;
-      border: 1px solid rgba(232,155,15,0.45);
-      background: rgba(184,115,51,0.15);
-      font-family:'Poppins', sans-serif;
-      font-weight:500;
-      font-size:14px; letter-spacing:4px;
-      color:#FFD86B; text-transform:uppercase;
-    }
-
-    /* Hero thali - centered brass plate */
-    .thali-hero {
-      position:absolute;
-      top: 290px; left: 50%;
-      transform: translateX(-50%);
-      width: 480px; height: 480px;
-      z-index:2;
-      filter: drop-shadow(0 10px 40px rgba(255,153,51,0.35));
-    }
-
-    /* Left meal card */
-    .meal-card {
-      position:absolute;
-      top: 370px;
-      width: 380px;
-      padding: 28px 30px;
-      background:
-        linear-gradient(180deg, rgba(228,155,15,0.1), rgba(184,115,51,0.05));
-      border: 1px solid rgba(232,155,15,0.35);
-      border-radius: 8px;
-      box-shadow: inset 0 1px 0 rgba(255,216,107,0.15), 0 6px 30px rgba(0,0,0,0.4);
-      z-index:3;
-    }
-    .meal-card.left { left:120px; }
-    .meal-card.right { right:120px; }
-
-    .meal-card::before {
-      content:''; position:absolute; top:-10px; left:50%;
-      margin-left:-14px;
-      width:28px; height:20px;
-      background:
-        radial-gradient(ellipse at bottom, #E8B931 70%, transparent 72%);
-    }
-
-    .meal-type {
-      font-family:'Yatra One', cursive;
-      font-size: 28px; letter-spacing: 3px;
-      color: #FFD86B;
-      text-align:center;
-      text-shadow: 0 0 15px rgba(255,216,107,0.4);
-      padding-bottom: 10px;
-      border-bottom: 1px dotted rgba(232,155,15,0.4);
-      margin-bottom: 12px;
-    }
-    .meal-price {
-      font-family:'Cormorant Garamond', serif;
-      font-weight:700;
-      font-size: 54px;
-      color: #FF9933;
-      text-align:center;
-      text-shadow: 0 0 25px rgba(255,153,51,0.4);
-      line-height: 1;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 16px; letter-spacing: 10px;
+      color: var(--gold); text-transform: uppercase; font-weight: 500;
       margin-bottom: 14px;
     }
-    .meal-items {
-      font-family:'Cormorant Garamond', serif;
-      font-size: 19px;
-      color: rgba(255,244,214,0.85);
-      text-align:center;
-      line-height: 1.6;
-      font-style:italic;
+    .eyebrow::before, .eyebrow::after {
+      content: ''; display: inline-block;
+      width: 50px; height: 1px; background: var(--gold);
+      vertical-align: middle; margin: 0 20px;
+    }
+    .main-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 92px; font-weight: 500;
+      color: var(--accent); letter-spacing: 3px; line-height: 0.9;
+    }
+    .main-subtitle {
+      font-family: 'Cormorant Garamond', serif; font-style: italic;
+      font-size: 24px; color: var(--ink-soft);
+      letter-spacing: 3px; margin-top: 12px;
+    }
+    .serving-badge {
+      display: inline-block;
+      margin-top: 16px;
+      padding: 9px 28px;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 15px; letter-spacing: 5px;
+      text-transform: uppercase; color: var(--accent);
+      border: 1px solid var(--gold);
+      background: rgba(255,255,255,0.4);
     }
 
-    /* Banana leaf label strip below hero */
-    .leaf-strip {
-      position:absolute;
-      top: 820px; left:50%;
+    .thali-hero {
+      position: absolute;
+      top: 390px; left: 50%;
       transform: translateX(-50%);
-      z-index:3;
+      width: 540px; height: 540px;
+      z-index: 2;
     }
+
+    .meal-card {
+      position: absolute;
+      z-index: 5;
+      width: 380px;
+      padding: 30px 36px;
+      background: rgba(255,255,255,0.55);
+      border: 1px solid var(--gold);
+      text-align: center;
+      box-shadow: 0 2px 0 rgba(168,130,60,0.22), 0 16px 30px rgba(47,82,51,0.06);
+    }
+    .meal-card::before {
+      content: ''; position: absolute; inset: 5px;
+      border: 1px solid rgba(168,130,60,0.2);
+      pointer-events: none;
+    }
+    .meal-left { top: 450px; left: 140px; }
+    .meal-right { top: 450px; right: 140px; }
+
+    .meal-type {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 20px; font-weight: 600;
+      color: var(--gold); letter-spacing: 6px;
+      text-transform: uppercase; margin-bottom: 10px;
+    }
+    .meal-price {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 56px; font-weight: 600;
+      color: var(--accent); line-height: 1; margin-bottom: 14px;
+    }
+    .meal-items {
+      font-family: 'Cormorant Garamond', serif; font-style: italic;
+      font-size: 17px; color: var(--ink-soft);
+      line-height: 1.6;
+    }
+
     .leaf-label {
-      font-family:'Cormorant Garamond', serif;
-      font-style:italic;
-      font-size:22px;
-      color:#E8B931;
-      letter-spacing:3px;
-      padding:0 30px;
-      position:relative;
+      position: absolute;
+      bottom: 250px; left: 0; right: 0;
+      text-align: center;
+      z-index: 5;
+      font-family: 'Cormorant Garamond', serif; font-style: italic;
+      font-size: 18px; color: var(--gold);
+      letter-spacing: 4px;
     }
     .leaf-label::before, .leaf-label::after {
-      content:'\2766';
-      color:#FF9933;
-      margin: 0 15px;
-      font-size: 18px;
+      content: ''; display: inline-block;
+      width: 50px; height: 1px; background: var(--gold);
+      vertical-align: middle; margin: 0 18px;
     }
 
-    /* Premium thali banner */
-    .premium-banner {
-      position:absolute;
-      bottom: 100px; left: 120px; right: 120px;
-      height: 140px;
-      background:
-        linear-gradient(90deg, rgba(196,30,58,0.3), rgba(255,153,51,0.25), rgba(196,30,58,0.3));
-      border: 2px solid rgba(232,155,15,0.5);
-      border-radius: 10px;
-      box-shadow:
-        inset 0 1px 0 rgba(255,216,107,0.25),
-        0 8px 30px rgba(0,0,0,0.5);
-      z-index:3;
-      display:grid;
-      grid-template-columns: 1.2fr 1fr 1fr;
-      align-items:center;
-      padding: 0 40px;
-      gap: 30px;
+    .premium-footer {
+      position: absolute;
+      bottom: 75px; left: 110px; right: 110px;
+      z-index: 5;
+      padding: 22px 40px;
+      background: rgba(47,82,51,0.04);
+      border: 1px solid var(--gold);
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 40px;
+      align-items: center;
     }
-    .premium-banner::before, .premium-banner::after {
-      content:'';
-      position:absolute;
-      top:-8px; bottom:-8px;
-      width:16px;
-      background: radial-gradient(ellipse at center, #E8B931, #B87333);
-      border-radius: 50%;
+    .premium-footer::before {
+      content: ''; position: absolute; inset: 5px;
+      border: 1px solid rgba(168,130,60,0.2);
+      pointer-events: none;
     }
-    .premium-banner::before { left:-8px; }
-    .premium-banner::after { right:-8px; }
-
-    .premium-left { text-align:left; }
     .premium-title {
-      font-family:'Yatra One', cursive;
-      font-size: 38px; letter-spacing: 3px;
-      color: #FFD86B;
-      text-shadow: 0 0 20px rgba(255,216,107,0.5);
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 22px; font-weight: 600;
+      color: var(--gold); letter-spacing: 6px;
+      text-transform: uppercase; line-height: 1;
+      margin-bottom: 6px;
     }
     .premium-price {
-      font-family:'Cormorant Garamond', serif;
-      font-weight: 700;
-      font-size: 62px;
-      color: #FFD86B;
-      text-shadow: 0 0 30px rgba(255,216,107,0.6);
-      line-height: 1;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 48px; font-weight: 600;
+      color: var(--accent); line-height: 1;
     }
-    .premium-center { text-align:center; }
+    .premium-middle { text-align: center; }
     .premium-items {
-      font-family:'Cormorant Garamond', serif;
-      font-size: 18px;
-      color: rgba(255,244,214,0.85);
-      margin-bottom: 4px;
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 600; font-size: 17px;
+      color: var(--ink); letter-spacing: 2px;
+      text-transform: uppercase; margin-bottom: 6px;
     }
     .choice-label {
-      font-family:'Cormorant Garamond', serif;
-      font-style:italic;
-      font-size: 17px;
-      color: #FF9933;
-      margin-bottom: 4px;
+      font-family: 'Cormorant Garamond', serif; font-style: italic;
+      font-size: 15px; color: var(--gold); margin-bottom: 4px;
     }
     .choice-items {
-      font-family:'Cormorant Garamond', serif;
-      font-size: 19px;
-      color: #FFF4D6;
-      font-weight: 600;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 18px; color: var(--ink);
     }
-    .premium-right { text-align:right; }
+    .premium-right { text-align: right; }
     .refills-text {
-      font-family:'Cormorant Garamond', serif;
-      font-style:italic;
-      font-size: 18px;
-      color: #FFD86B;
-      margin-bottom: 8px;
+      font-family: 'Cormorant Garamond', serif; font-style: italic;
+      font-size: 15px; color: var(--ink-soft); margin-bottom: 4px;
     }
     .refills-time {
-      font-family:'Poppins', sans-serif;
-      font-size: 12px;
-      letter-spacing: 3px;
-      color: rgba(255,244,214,0.6);
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 14px; letter-spacing: 3px;
+      color: var(--accent); font-weight: 600;
     }
   </style>
 </head>
 <body>
-  <div class="border-frame"></div>
-
-  <!-- Kalasha corner ornaments -->
-  <svg class="kalasha" style="top:50px; left:50px;" width="70" height="100" viewBox="0 0 70 100">
-    <g fill="none" stroke="#E8B931" stroke-width="1.5">
-      <path d="M35 5 L30 15 L40 15 Z" fill="#FF9933"/>
-      <ellipse cx="35" cy="25" rx="18" ry="6"/>
-      <path d="M17 25 Q10 50 20 75 Q35 90 50 75 Q60 50 53 25"/>
-      <ellipse cx="35" cy="75" rx="22" ry="5"/>
-      <path d="M13 75 L8 95 L62 95 L57 75"/>
-    </g>
-  </svg>
-  <svg class="kalasha" style="top:50px; right:50px;" width="70" height="100" viewBox="0 0 70 100">
-    <g fill="none" stroke="#E8B931" stroke-width="1.5">
-      <path d="M35 5 L30 15 L40 15 Z" fill="#FF9933"/>
-      <ellipse cx="35" cy="25" rx="18" ry="6"/>
-      <path d="M17 25 Q10 50 20 75 Q35 90 50 75 Q60 50 53 25"/>
-      <ellipse cx="35" cy="75" rx="22" ry="5"/>
-      <path d="M13 75 L8 95 L62 95 L57 75"/>
-    </g>
-  </svg>
+  <div class="frame"></div>
 
   <div class="header">
-    <div class="eyebrow">Traditional Meals</div>
-    <h1 class="main-title" data-editable="true" data-field="title">SOUTH INDIAN MEALS</h1>
+    <div class="eyebrow">Traditional Feast</div>
+    <h1 class="main-title" data-editable="true" data-field="title">South Indian Meals</h1>
     <p class="main-subtitle" data-editable="true" data-field="subtitle">Served on Banana Leaf &bull; Unlimited Rice &amp; Sambar</p>
     <div class="serving-badge" data-editable="true" data-field="servingTime">12:00 PM &ndash; 3:30 PM</div>
   </div>
 
-  <!-- Thali brass plate hero SVG -->
-  <svg class="thali-hero" viewBox="0 0 480 480">
+  <!-- Large prominent brass thali -->
+  <svg class="thali-hero" viewBox="0 0 560 560">
     <defs>
-      <radialGradient id="brass" cx="50%" cy="45%">
-        <stop offset="0%" stop-color="#FFD86B"/>
-        <stop offset="60%" stop-color="#E8B931"/>
-        <stop offset="100%" stop-color="#8B4513"/>
+      <radialGradient id="brassGrad" cx="50%" cy="45%" r="55%">
+        <stop offset="0%" stop-color="#E8C36A"/>
+        <stop offset="60%" stop-color="#C9962C"/>
+        <stop offset="100%" stop-color="#8B6914"/>
       </radialGradient>
-      <radialGradient id="brassRim" cx="50%" cy="50%">
-        <stop offset="0%" stop-color="#FFD86B" stop-opacity="0.4"/>
-        <stop offset="100%" stop-color="#B87333" stop-opacity="0.8"/>
+      <radialGradient id="brassRim" cx="50%" cy="50%" r="50%">
+        <stop offset="90%" stop-color="#D4A836"/>
+        <stop offset="100%" stop-color="#6B4F10"/>
       </radialGradient>
     </defs>
-    <!-- Outer rim -->
-    <circle cx="240" cy="240" r="230" fill="url(#brassRim)" opacity="0.35"/>
-    <circle cx="240" cy="240" r="215" fill="none" stroke="#E8B931" stroke-width="3"/>
-    <circle cx="240" cy="240" r="205" fill="none" stroke="#B87333" stroke-width="1"/>
-    <!-- Inner plate -->
-    <circle cx="240" cy="240" r="195" fill="url(#brass)" opacity="0.25"/>
-    <!-- Ornamental engraving ring -->
-    <g fill="none" stroke="#E8B931" stroke-width="1" opacity="0.6">
-      <circle cx="240" cy="240" r="185"/>
-      <circle cx="240" cy="240" r="170"/>
+
+    <circle cx="280" cy="280" r="260" fill="url(#brassRim)" opacity="0.55"/>
+    <circle cx="280" cy="280" r="250" fill="url(#brassGrad)" stroke="#8B6914" stroke-width="2"/>
+    <circle cx="280" cy="280" r="240" fill="none" stroke="#8B6914" stroke-width="1" opacity="0.5"/>
+    <circle cx="280" cy="280" r="228" fill="none" stroke="#8B6914" stroke-width="1" opacity="0.4"/>
+
+    <g fill="none" stroke="#8B6914" stroke-width="1" opacity="0.6">
+      <circle cx="280" cy="40" r="5"/>
+      <circle cx="280" cy="520" r="5"/>
+      <circle cx="40" cy="280" r="5"/>
+      <circle cx="520" cy="280" r="5"/>
+      <circle cx="110" cy="110" r="4"/>
+      <circle cx="450" cy="110" r="4"/>
+      <circle cx="110" cy="450" r="4"/>
+      <circle cx="450" cy="450" r="4"/>
     </g>
-    <!-- Etched pattern ring between -->
-    <g stroke="#E8B931" stroke-width="1" opacity="0.5">
-      <g id="tick">
-        <line x1="240" y1="56" x2="240" y2="74"/>
-      </g>
-      <use href="#tick" transform="rotate(15 240 240)"/>
-      <use href="#tick" transform="rotate(30 240 240)"/>
-      <use href="#tick" transform="rotate(45 240 240)"/>
-      <use href="#tick" transform="rotate(60 240 240)"/>
-      <use href="#tick" transform="rotate(75 240 240)"/>
-      <use href="#tick" transform="rotate(90 240 240)"/>
-      <use href="#tick" transform="rotate(105 240 240)"/>
-      <use href="#tick" transform="rotate(120 240 240)"/>
-      <use href="#tick" transform="rotate(135 240 240)"/>
-      <use href="#tick" transform="rotate(150 240 240)"/>
-      <use href="#tick" transform="rotate(165 240 240)"/>
-      <use href="#tick" transform="rotate(180 240 240)"/>
-      <use href="#tick" transform="rotate(195 240 240)"/>
-      <use href="#tick" transform="rotate(210 240 240)"/>
-      <use href="#tick" transform="rotate(225 240 240)"/>
-      <use href="#tick" transform="rotate(240 240 240)"/>
-      <use href="#tick" transform="rotate(255 240 240)"/>
-      <use href="#tick" transform="rotate(270 240 240)"/>
-      <use href="#tick" transform="rotate(285 240 240)"/>
-      <use href="#tick" transform="rotate(300 240 240)"/>
-      <use href="#tick" transform="rotate(315 240 240)"/>
-      <use href="#tick" transform="rotate(330 240 240)"/>
-      <use href="#tick" transform="rotate(345 240 240)"/>
+
+    <!-- inner plate + banana leaf -->
+    <circle cx="280" cy="280" r="215" fill="#FBF6EC" stroke="#A8823C" stroke-width="1.5"/>
+    <ellipse cx="280" cy="290" rx="200" ry="185" fill="#4A6B3C" opacity="0.85"/>
+    <line x1="80" y1="290" x2="480" y2="290" stroke="#6B8A4A" stroke-width="2"/>
+    <g stroke="#6B8A4A" stroke-width="0.8" opacity="0.6" fill="none">
+      <path d="M280 290 Q200 200 110 195"/>
+      <path d="M280 290 Q200 230 100 240"/>
+      <path d="M280 290 Q200 260 95 280"/>
+      <path d="M280 290 Q200 320 100 330"/>
+      <path d="M280 290 Q200 360 110 385"/>
+      <path d="M280 290 Q360 200 450 195"/>
+      <path d="M280 290 Q360 230 460 240"/>
+      <path d="M280 290 Q360 260 465 280"/>
+      <path d="M280 290 Q360 320 460 330"/>
+      <path d="M280 290 Q360 360 450 385"/>
     </g>
-    <!-- Small katori bowls around perimeter -->
+
+    <!-- top row bowls -->
     <g>
-      <circle cx="240" cy="100" r="30" fill="#B87333" stroke="#FFD86B" stroke-width="2"/>
-      <circle cx="240" cy="100" r="24" fill="#FF9933" opacity="0.5"/>
-      <text x="240" y="106" text-anchor="middle" fill="#FFD86B" font-size="14" font-family="serif">sambar</text>
+      <ellipse cx="180" cy="190" rx="40" ry="32" fill="url(#brassGrad)" stroke="#8B6914" stroke-width="1.5"/>
+      <ellipse cx="180" cy="186" rx="34" ry="26" fill="#C94810"/>
+      <ellipse cx="180" cy="184" rx="30" ry="22" fill="#E8761A"/>
     </g>
     <g>
-      <circle cx="100" cy="240" r="30" fill="#B87333" stroke="#FFD86B" stroke-width="2"/>
-      <circle cx="100" cy="240" r="24" fill="#E49B0F" opacity="0.6"/>
-      <text x="100" y="246" text-anchor="middle" fill="#FFD86B" font-size="14" font-family="serif">rasam</text>
+      <ellipse cx="280" cy="170" rx="42" ry="33" fill="url(#brassGrad)" stroke="#8B6914" stroke-width="1.5"/>
+      <ellipse cx="280" cy="166" rx="35" ry="27" fill="#E8B931"/>
+      <ellipse cx="280" cy="164" rx="31" ry="23" fill="#F0C550"/>
     </g>
     <g>
-      <circle cx="380" cy="240" r="30" fill="#B87333" stroke="#FFD86B" stroke-width="2"/>
-      <circle cx="380" cy="240" r="24" fill="#FFF4D6" opacity="0.4"/>
-      <text x="380" y="246" text-anchor="middle" fill="#FFD86B" font-size="14" font-family="serif">curd</text>
+      <ellipse cx="380" cy="190" rx="40" ry="32" fill="url(#brassGrad)" stroke="#8B6914" stroke-width="1.5"/>
+      <ellipse cx="380" cy="186" rx="34" ry="26" fill="#FFF8E0"/>
+      <ellipse cx="380" cy="184" rx="30" ry="22" fill="#FFFAF0"/>
+    </g>
+    <!-- middle row -->
+    <g>
+      <ellipse cx="130" cy="290" rx="38" ry="30" fill="url(#brassGrad)" stroke="#8B6914" stroke-width="1.5"/>
+      <ellipse cx="130" cy="286" rx="32" ry="24" fill="#7A3D12"/>
+      <ellipse cx="130" cy="284" rx="28" ry="20" fill="#9C5A0F"/>
     </g>
     <g>
-      <circle cx="150" cy="150" r="26" fill="#B87333" stroke="#FFD86B" stroke-width="2"/>
-      <circle cx="150" cy="150" r="20" fill="#046307" opacity="0.5"/>
+      <ellipse cx="430" cy="290" rx="38" ry="30" fill="url(#brassGrad)" stroke="#8B6914" stroke-width="1.5"/>
+      <ellipse cx="430" cy="286" rx="32" ry="24" fill="#5C8C2E"/>
+      <ellipse cx="430" cy="284" rx="28" ry="20" fill="#7A8E4F"/>
+    </g>
+    <!-- rice mound center -->
+    <ellipse cx="280" cy="310" rx="75" ry="55" fill="#FFFAF0" stroke="#B08A3E" stroke-width="1.5"/>
+    <ellipse cx="280" cy="305" rx="65" ry="45" fill="#FFFDF5"/>
+    <g fill="#E8D8B0" opacity="0.7">
+      <ellipse cx="260" cy="300" rx="2" ry="1"/>
+      <ellipse cx="280" cy="295" rx="2" ry="1"/>
+      <ellipse cx="300" cy="302" rx="2" ry="1"/>
+      <ellipse cx="270" cy="310" rx="2" ry="1"/>
+      <ellipse cx="290" cy="315" rx="2" ry="1"/>
+      <ellipse cx="265" cy="320" rx="2" ry="1"/>
+      <ellipse cx="295" cy="320" rx="2" ry="1"/>
+    </g>
+
+    <!-- bottom bowls -->
+    <g>
+      <ellipse cx="180" cy="400" rx="40" ry="32" fill="url(#brassGrad)" stroke="#8B6914" stroke-width="1.5"/>
+      <ellipse cx="180" cy="396" rx="34" ry="26" fill="#D4A836"/>
+      <ellipse cx="180" cy="394" rx="30" ry="22" fill="#E8B931"/>
     </g>
     <g>
-      <circle cx="330" cy="150" r="26" fill="#B87333" stroke="#FFD86B" stroke-width="2"/>
-      <circle cx="330" cy="150" r="20" fill="#C41E3A" opacity="0.5"/>
+      <ellipse cx="280" cy="420" rx="42" ry="33" fill="url(#brassGrad)" stroke="#8B6914" stroke-width="1.5"/>
+      <ellipse cx="280" cy="416" rx="35" ry="27" fill="#FFFAF0"/>
+      <ellipse cx="280" cy="414" rx="31" ry="23" fill="#FFFDF5"/>
     </g>
-    <!-- Center rice mound -->
-    <ellipse cx="240" cy="280" rx="70" ry="35" fill="#FFF4D6" opacity="0.7"/>
-    <ellipse cx="240" cy="275" rx="50" ry="22" fill="#FFF4D6" opacity="0.9"/>
-    <circle cx="240" cy="270" r="8" fill="#FFD86B"/>
-    <!-- ghee drop -->
-    <circle cx="240" cy="270" r="4" fill="#E49B0F"/>
+    <g>
+      <ellipse cx="380" cy="400" rx="40" ry="32" fill="url(#brassGrad)" stroke="#8B6914" stroke-width="1.5"/>
+      <ellipse cx="380" cy="396" rx="34" ry="26" fill="#6B8A4A"/>
+      <ellipse cx="380" cy="394" rx="30" ry="22" fill="#7A8E4F"/>
+    </g>
   </svg>
 
-  <!-- Left meal card -->
-  <div class="meal-card left">
-    <div class="meal-type" data-editable="true" data-field="meal1Type">LUNCH SPECIAL</div>
+  <div class="meal-card meal-left">
+    <div class="meal-type" data-editable="true" data-field="meal1Type">Lunch Special</div>
     <div class="meal-price" data-editable="true" data-field="meal1Price">$12.99</div>
     <div class="meal-items" data-editable="true" data-field="meal1Items">Rice &bull; Sambar &bull; Rasam &bull; Kootu<br>Poriyal &bull; Curd &bull; Pickle &bull; Papad<br>Payasam &bull; Banana</div>
   </div>
 
-  <!-- Right meal card -->
-  <div class="meal-card right">
-    <div class="meal-type" data-editable="true" data-field="meal2Type">MINI MEALS</div>
+  <div class="meal-card meal-right">
+    <div class="meal-type" data-editable="true" data-field="meal2Type">Mini Meals</div>
     <div class="meal-price" data-editable="true" data-field="meal2Price">$9.99</div>
     <div class="meal-items" data-editable="true" data-field="meal2Items">Rice &bull; Sambar &bull; Rasam<br>Poriyal &bull; Curd &bull; Papad</div>
   </div>
 
-  <div class="leaf-strip">
-    <span class="leaf-label" data-editable="true" data-field="leafLabel">Traditional Banana Leaf Service</span>
+  <div class="leaf-label">
+    <span data-editable="true" data-field="leafLabel">Traditional Banana Leaf Service</span>
   </div>
 
-  <div class="premium-banner">
-    <div class="premium-left">
-      <div class="premium-title" data-editable="true" data-field="premiumType">PREMIUM THALI</div>
+  <div class="premium-footer">
+    <div>
+      <div class="premium-title" data-editable="true" data-field="premiumType">Premium Thali</div>
       <div class="premium-price" data-editable="true" data-field="premiumPrice">$16.99</div>
     </div>
-    <div class="premium-center">
+    <div class="premium-middle">
       <div class="premium-items" data-editable="true" data-field="premiumItems">All of Lunch Special PLUS:</div>
       <div class="choice-label" data-editable="true" data-field="choiceLabel">Choice of:</div>
       <div class="choice-items" data-editable="true" data-field="choiceItems">Chettinad Chicken / Fish Fry / Paneer Butter Masala</div>

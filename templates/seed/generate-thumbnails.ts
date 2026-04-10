@@ -74,7 +74,7 @@ async function main() {
         await page.setViewport(viewport);
 
         // Load template HTML
-        await page.setContent(html, { waitUntil: 'networkidle0', timeout: 15000 });
+        await page.setContent(html, { waitUntil: 'networkidle0', timeout: 45000 });
 
         // Wait a bit for fonts to load
         await page.evaluate(() => document.fonts?.ready);

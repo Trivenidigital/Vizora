@@ -3,423 +3,233 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1920, height=1080">
-  <link href="https://fonts.googleapis.com/css2?family=Yatra+One&family=Cormorant+Garamond:wght@500;600;700&family=Tiro+Devanagari+Marathi&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Yatra+One&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      width: 1920px;
-      height: 1080px;
-      overflow: hidden;
-      position: relative;
-      font-family: 'Poppins', sans-serif;
-      color: #FFF8E7;
-      background: linear-gradient(180deg, #0a1f12 0%, #0d2415 50%, #071a0e 100%);
+      width: 1920px; height: 1080px; overflow: hidden; position: relative;
+      font-family: 'Lora', serif;
+      color: #2C1810;
+      background: #FBF7F0;
+    }
+    body::before {
+      content:''; position:absolute; inset:0; z-index:0; pointer-events:none;
+      background: radial-gradient(ellipse at 50% 50%, #FFFAF0 0%, #F5EDE0 100%);
     }
 
-    /* Split diagonal backgrounds — Chettinad (left fire) vs Kerala (right water) */
-    .bg-chettinad {
-      position: absolute;
-      top: 0; left: 0; bottom: 0;
-      width: 55%;
-      background:
-        repeating-linear-gradient(
-          45deg,
-          transparent,
-          transparent 40px,
-          rgba(196,30,58,0.04) 40px,
-          rgba(196,30,58,0.04) 41px
-        ),
-        radial-gradient(ellipse at 30% 40%, rgba(196,30,58,0.18) 0%, transparent 55%),
-        radial-gradient(ellipse at 20% 80%, rgba(232,93,4,0.12) 0%, transparent 50%),
-        linear-gradient(135deg, #3d0d0d 0%, #2a0808 50%, #1a0404 100%);
-      clip-path: polygon(0 0, 100% 0, 85% 100%, 0 100%);
+    /* Thin gold border frame */
+    .frame {
+      position:absolute; inset:50px;
+      border: 1px solid rgba(184,115,51,0.45);
       z-index: 1;
     }
-
-    .bg-kerala {
-      position: absolute;
-      top: 0; right: 0; bottom: 0;
-      width: 55%;
-      background:
-        repeating-linear-gradient(
-          -45deg,
-          transparent,
-          transparent 40px,
-          rgba(4,99,7,0.04) 40px,
-          rgba(4,99,7,0.04) 41px
-        ),
-        radial-gradient(ellipse at 70% 50%, rgba(4,99,7,0.2) 0%, transparent 55%),
-        radial-gradient(ellipse at 85% 85%, rgba(20,150,120,0.12) 0%, transparent 50%),
-        linear-gradient(225deg, #063b1e 0%, #042a18 50%, #021810 100%);
-      clip-path: polygon(15% 0, 100% 0, 100% 100%, 0 100%);
-      z-index: 1;
+    .frame::before {
+      content:''; position:absolute; inset:8px;
+      border: 1px solid rgba(184,115,51,0.22);
     }
 
-    /* Kasavu (gold border) frame — traditional Kerala sari border */
-    .kasavu-frame {
-      position: absolute;
-      inset: 30px;
-      border: 5px solid transparent;
-      border-image: linear-gradient(135deg, #E8B931, #B87333, #FFD700, #B87333, #E8B931) 1;
-      pointer-events: none;
-      z-index: 4;
-    }
-    .kasavu-frame::before {
-      content: '';
-      position: absolute;
-      inset: 8px;
-      border: 1px solid rgba(232,185,49,0.4);
-    }
-    .kasavu-frame::after {
-      content: '';
-      position: absolute;
-      inset: 12px;
-      border: 1px dotted rgba(232,185,49,0.25);
-    }
-
-    /* Kasavu repeating border pattern — gold temple stripe on top/bottom */
-    .kasavu-top {
-      position: absolute;
-      top: 38px; left: 38px; right: 38px;
-      height: 18px;
-      background:
-        linear-gradient(90deg, #8B5A2B 0%, #E8B931 20%, #FFD700 50%, #E8B931 80%, #8B5A2B 100%);
-      z-index: 3;
-    }
-    .kasavu-top::before {
-      content: '';
-      position: absolute;
-      bottom: -8px; left: 0; right: 0;
-      height: 8px;
-      background: repeating-linear-gradient(
-        90deg,
-        #8B5A2B 0, #8B5A2B 12px,
-        #E8B931 12px, #E8B931 24px
-      );
-      clip-path: polygon(0 0, 100% 0, 96% 100%, 92% 0, 88% 100%, 84% 0, 80% 100%, 76% 0, 72% 100%, 68% 0, 64% 100%, 60% 0, 56% 100%, 52% 0, 48% 100%, 44% 0, 40% 100%, 36% 0, 32% 100%, 28% 0, 24% 100%, 20% 0, 16% 100%, 12% 0, 8% 100%, 4% 0, 0 100%);
-    }
-    .kasavu-bottom {
-      position: absolute;
-      bottom: 38px; left: 38px; right: 38px;
-      height: 18px;
-      background:
-        linear-gradient(90deg, #8B5A2B 0%, #E8B931 20%, #FFD700 50%, #E8B931 80%, #8B5A2B 100%);
-      z-index: 3;
-    }
-
-    /* Header */
+    /* Top header */
     .top-header {
       position: absolute;
-      top: 75px; left: 0; right: 0;
+      top: 90px; left: 0; right: 0;
       z-index: 5;
       text-align: center;
     }
-
-    .devanagari-title {
-      font-family: 'Tiro Devanagari Marathi', serif;
-      font-size: 24px;
-      color: #E8B931;
-      letter-spacing: 6px;
-      margin-bottom: 2px;
-    }
-
-    .restaurant-name {
+    .eyebrow {
       font-family: 'Yatra One', cursive;
-      font-size: 40px;
-      color: #FFD700;
-      letter-spacing: 6px;
-      text-shadow:
-        0 2px 0 #8B5A2B,
-        0 4px 20px rgba(255,215,0,0.4);
+      font-size: 20px;
+      color: #8B5A2B;
+      letter-spacing: 10px;
+      margin-bottom: 16px;
+      opacity: 0.75;
     }
-
+    .restaurant-name {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 500;
+      font-size: 78px;
+      line-height: 1;
+      color: #2C1810;
+      letter-spacing: 3px;
+    }
     .name-flourish {
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 20px;
-      margin-top: 4px;
+      margin-top: 16px;
     }
     .nf-line {
-      width: 200px; height: 1px;
-      background: linear-gradient(90deg, transparent, #E8B931, transparent);
+      width: 220px; height: 1px;
+      background: linear-gradient(90deg, transparent, #B87333, transparent);
     }
-    .nf-dot {
-      width: 8px; height: 8px;
-      background: #FFD700;
-      transform: rotate(45deg);
-    }
-
-    /* Main layout */
-    .container {
-      position: absolute;
-      top: 170px; left: 70px; right: 70px; bottom: 200px;
-      z-index: 4;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 40px;
-    }
-
-    /* Panel */
-    .panel {
-      position: relative;
-      padding: 30px 34px;
-      border-radius: 20px;
-      backdrop-filter: blur(12px);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-
-    .panel-chettinad {
-      background: linear-gradient(160deg, rgba(60,15,15,0.85) 0%, rgba(30,5,5,0.8) 100%);
-      border: 2px solid #C41E3A;
-      box-shadow: 0 15px 50px rgba(0,0,0,0.5), inset 0 0 50px rgba(196,30,58,0.15);
-    }
-
-    .panel-kerala {
-      background: linear-gradient(160deg, rgba(8,40,24,0.85) 0%, rgba(3,24,14,0.8) 100%);
-      border: 2px solid #046307;
-      box-shadow: 0 15px 50px rgba(0,0,0,0.5), inset 0 0 50px rgba(4,99,7,0.15);
-    }
-
-    /* Panel header with illustration */
-    .panel-header {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-      padding-bottom: 16px;
-      border-bottom: 2px dotted rgba(232,185,49,0.35);
-      margin-bottom: 14px;
-    }
-
-    .panel-illust {
-      width: 90px;
-      height: 90px;
-      flex-shrink: 0;
-    }
-
-    .panel-header-text {
-      flex: 1;
-    }
-
-    .panel-devanagari {
-      font-family: 'Tiro Devanagari Marathi', serif;
+    .nf-ornament {
+      color: #B87333;
+      font-family: 'Cormorant Garamond', serif;
       font-size: 20px;
-      letter-spacing: 3px;
-      margin-bottom: 2px;
     }
-    .panel-devanagari.red { color: #FF6B6B; }
-    .panel-devanagari.green { color: #90EE90; }
 
-    .panel-title {
-      font-family: 'Yatra One', cursive;
-      font-size: 38px;
+    /* Horizontal split — top Chettinad, bottom Kerala */
+    .region {
+      position: absolute;
+      left: 120px; right: 120px;
+      padding: 32px 40px;
+      z-index: 3;
+      display: grid;
+      grid-template-columns: 160px 1fr;
+      gap: 40px;
+      align-items: center;
+    }
+    .region-top {
+      top: 320px; height: 300px;
+      border-top: 1px solid rgba(184,115,51,0.35);
+      border-bottom: 1px solid rgba(184,115,51,0.22);
+    }
+    .region-bot {
+      top: 650px; height: 300px;
+      border-top: 1px solid rgba(184,115,51,0.22);
+      border-bottom: 1px solid rgba(184,115,51,0.35);
+    }
+
+    .region-illust {
+      width: 150px; height: 240px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .region-illust svg { width: 100%; height: 100%; }
+
+    .region-content { display: flex; flex-direction: column; }
+    .region-header {
+      padding-bottom: 14px;
+      margin-bottom: 14px;
+      border-bottom: 1px solid rgba(184,115,51,0.25);
+    }
+    .region-accent-top { border-bottom-color: rgba(192,57,43,0.35); }
+    .region-accent-bot { border-bottom-color: rgba(46,125,50,0.35); }
+
+    .region-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 600;
+      font-size: 44px;
       line-height: 1;
       letter-spacing: 2px;
-      margin-bottom: 4px;
+      color: #2C1810;
     }
-    .title-chettinad { color: #FF8080; text-shadow: 0 2px 12px rgba(196,30,58,0.6); }
-    .title-kerala { color: #90EE90; text-shadow: 0 2px 12px rgba(4,99,7,0.6); }
+    .title-chet-accent { color: #8B2C1A; }
+    .title-ker-accent { color: #1F5C3A; }
 
-    .panel-tagline {
+    .region-tagline {
       font-family: 'Cormorant Garamond', serif;
       font-style: italic;
-      font-size: 18px;
-      color: rgba(255,248,231,0.6);
+      font-size: 19px;
+      color: #6B4423;
+      margin-top: 4px;
+      letter-spacing: 1.5px;
     }
 
-    /* Menu list */
     .menu-list {
-      display: flex;
-      flex-direction: column;
-      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 32px;
     }
-
     .menu-item {
       display: grid;
       grid-template-columns: 1fr auto;
-      padding: 10px 4px;
-      border-bottom: 1px dashed rgba(232,185,49,0.15);
+      padding: 4px 0;
     }
-    .menu-item:last-child { border-bottom: none; }
-
     .item-name {
-      font-family: 'Yatra One', cursive;
-      font-size: 22px;
-      color: #FFF8E7;
-      grid-column: 1;
-      grid-row: 1;
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 600;
+      font-size: 20px;
+      color: #2C1810;
     }
-
     .item-price {
-      font-family: 'Yatra One', cursive;
-      font-size: 22px;
-      color: #E8B931;
-      grid-column: 2;
-      grid-row: 1;
-      text-shadow: 0 0 12px rgba(232,185,49,0.3);
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 600;
+      font-size: 20px;
+      color: #B87333;
     }
-
     .item-desc {
       font-family: 'Cormorant Garamond', serif;
       font-style: italic;
-      font-size: 15px;
-      color: rgba(255,248,231,0.5);
+      font-size: 13px;
+      color: #6B4423;
       grid-column: 1 / -1;
-      grid-row: 2;
-      margin-top: 1px;
+      margin-top: 0px;
     }
 
-    /* Bottom strip panel */
+    /* Bottom strip - sides & breads */
     .bottom-strip {
       position: absolute;
-      bottom: 85px; left: 70px; right: 70px;
+      bottom: 85px; left: 120px; right: 120px;
       z-index: 4;
-      background: linear-gradient(90deg, rgba(60,15,15,0.7), rgba(40,30,10,0.85), rgba(8,40,24,0.7));
-      border: 2px solid #E8B931;
-      border-radius: 16px;
-      padding: 18px 36px;
+      padding: 16px 36px;
+      border: 1px solid rgba(184,115,51,0.35);
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 40px;
-      backdrop-filter: blur(10px);
     }
-
-    .bottom-section {
-      display: flex;
-      flex-direction: column;
-    }
-
+    .bottom-section { display: flex; flex-direction: column; }
     .bottom-title {
-      font-family: 'Yatra One', cursive;
-      font-size: 22px;
-      color: #FFD700;
-      letter-spacing: 4px;
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 600;
+      font-size: 18px;
+      color: #B87333;
+      letter-spacing: 5px;
+      text-transform: uppercase;
       margin-bottom: 8px;
       text-align: center;
       padding-bottom: 6px;
-      border-bottom: 1px solid rgba(232,185,49,0.3);
+      border-bottom: 1px solid rgba(184,115,51,0.25);
     }
-
     .bottom-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 4px 10px;
+      padding: 3px 8px;
     }
-
     .bottom-item-name {
       font-family: 'Cormorant Garamond', serif;
       font-size: 17px;
-      color: rgba(255,248,231,0.8);
+      color: #2C1810;
     }
-
     .bottom-item-price {
-      font-family: 'Poppins', sans-serif;
+      font-family: 'Cormorant Garamond', serif;
       font-weight: 600;
       font-size: 17px;
-      color: #E8B931;
-    }
-
-    /* Floating illustrations */
-    .palm-silhouette {
-      position: absolute;
-      bottom: 50px; right: 0;
-      z-index: 2;
-      opacity: 0.22;
-    }
-
-    .chili-silhouette {
-      position: absolute;
-      top: 160px; left: -20px;
-      z-index: 2;
-      opacity: 0.25;
-      transform: rotate(-15deg);
-    }
-
-    .spice-deco {
-      position: absolute;
-      z-index: 2;
-      opacity: 0.18;
+      color: #B87333;
     }
   </style>
 </head>
 <body>
-  <div class="bg-chettinad"></div>
-  <div class="bg-kerala"></div>
-
-  <!-- Chili pepper silhouette (Chettinad side) -->
-  <svg class="chili-silhouette" width="200" height="400" viewBox="0 0 200 400">
-    <g fill="#C41E3A" stroke="#8B0000" stroke-width="2">
-      <path d="M100 20 Q110 10 120 20 L115 40 Q110 35 105 40 Z" fill="#046307"/>
-      <path d="M105 35 Q130 100 140 200 Q145 300 120 370 Q100 380 85 370 Q60 300 65 200 Q75 100 95 35 Z"/>
-      <path d="M95 60 Q105 100 100 150 Q95 200 105 240" stroke="#FF6B6B" stroke-width="1.5" fill="none"/>
-    </g>
-  </svg>
-
-  <!-- Coconut palm silhouette (Kerala side) -->
-  <svg class="palm-silhouette" width="450" height="700" viewBox="0 0 450 700">
-    <g fill="none" stroke="#046307" stroke-width="3">
-      <path d="M220 700 Q215 500 225 350 Q235 200 220 80" stroke-width="6"/>
-      <!-- Leaf fronds -->
-      <path d="M220 80 Q140 60 60 100 M220 80 Q150 50 80 40 M220 80 Q155 20 120 -10" stroke-width="4"/>
-      <path d="M220 80 Q300 60 380 100 M220 80 Q290 50 360 40 M220 80 Q285 20 320 -10" stroke-width="4"/>
-      <path d="M220 80 Q180 30 190 -20 M220 80 Q250 30 240 -20" stroke-width="4"/>
-      <!-- Frond details -->
-      <path d="M80 95 L60 80 M100 95 L80 75 M120 90 L100 70 M140 85 L120 65"/>
-      <path d="M340 95 L360 80 M320 95 L340 75 M300 90 L320 70 M280 85 L300 65"/>
-      <!-- Coconuts -->
-      <circle cx="200" cy="105" r="12" fill="#5C3317"/>
-      <circle cx="230" cy="100" r="10" fill="#5C3317"/>
-      <circle cx="218" cy="118" r="10" fill="#5C3317"/>
-    </g>
-    <!-- Backwater ripples at bottom -->
-    <g stroke="#14966E" stroke-width="1.5" fill="none" opacity="0.6">
-      <path d="M50 680 Q150 675 250 680 T450 680"/>
-      <path d="M0 690 Q100 686 200 690 T400 690"/>
-      <path d="M80 665 Q180 662 280 665 T450 665"/>
-    </g>
-  </svg>
-
-  <!-- Spice scatter -->
-  <svg class="spice-deco" style="top: 220px; right: 80px;" width="40" height="40" viewBox="0 0 40 40">
-    <g fill="#E8B931"><circle cx="10" cy="10" r="3"/><circle cx="25" cy="15" r="3"/><circle cx="15" cy="25" r="3"/><circle cx="28" cy="28" r="3"/></g>
-  </svg>
-
-  <div class="kasavu-frame"></div>
-  <div class="kasavu-top"></div>
-  <div class="kasavu-bottom"></div>
+  <div class="frame"></div>
 
   <!-- Header -->
   <div class="top-header">
-    <div class="devanagari-title">&#2325;&#2375;&#2352;&#2354;&#2366; &bull; &#2330;&#2375;&#2335;&#2381;&#2335;&#2367;&#2344;&#2366;&#2337;&#2369;</div>
+    <div class="eyebrow">KERALA &bull; CHETTINAD</div>
     <h1 class="restaurant-name" data-editable="true" data-field="restaurantName">Spice Coast Kitchen</h1>
     <div class="name-flourish">
       <span class="nf-line"></span>
-      <span class="nf-dot"></span>
+      <span class="nf-ornament">&#10086;</span>
       <span class="nf-line"></span>
     </div>
   </div>
 
-  <div class="container">
-    <!-- Chettinad Panel -->
-    <div class="panel panel-chettinad">
-      <div class="panel-header">
-        <svg class="panel-illust" viewBox="0 0 90 90">
+  <!-- Chettinad Region (top) -->
+  <div class="region region-top">
+    <div class="region-illust">
+      <svg viewBox="0 0 150 240">
+        <g fill="none" stroke="#8B2C1A" stroke-width="1.8">
           <!-- Chili pepper -->
-          <g>
-            <path d="M45 12 Q50 5 58 10 L55 22 Q50 18 46 22 Z" fill="#046307" stroke="#022d03" stroke-width="1.5"/>
-            <path d="M46 22 Q60 35 65 55 Q68 72 55 82 Q45 85 38 82 Q28 72 30 55 Q35 35 44 22 Z" fill="#C41E3A" stroke="#8B0000" stroke-width="2"/>
-            <path d="M42 30 Q48 45 45 60 Q43 72 48 78" stroke="#FF6B6B" stroke-width="1.2" fill="none"/>
-            <ellipse cx="38" cy="45" rx="2" ry="8" fill="#FF8080" opacity="0.6"/>
-          </g>
-        </svg>
-        <div class="panel-header-text">
-          <div class="panel-devanagari red">&#2330;&#2375;&#2335;&#2381;&#2335;&#2367;&#2344;&#2366;&#2337;&#2369;</div>
-          <h2 class="panel-title title-chettinad" data-editable="true" data-field="chettinadTitle">Chettinad Specials</h2>
-          <p class="panel-tagline" data-editable="true" data-field="chettinadTagline">Bold Spice • Authentic Heat</p>
-        </div>
+          <path d="M72 18 Q82 8 92 18 L88 36 Q78 30 72 36 Z" fill="#2E6B30" stroke="#1F4520"/>
+          <path d="M74 35 Q104 90 112 150 Q118 200 90 220 Q70 225 55 218 Q30 200 32 150 Q42 90 70 35 Z" fill="#8B2C1A" fill-opacity="0.85" stroke="#5C1810"/>
+          <path d="M68 60 Q78 100 72 140 Q65 180 75 210" stroke="#C0392B" stroke-width="1.2" opacity="0.6"/>
+          <ellipse cx="58" cy="110" rx="4" ry="18" fill="#C0392B" fill-opacity="0.4" stroke="none"/>
+        </g>
+      </svg>
+    </div>
+    <div class="region-content">
+      <div class="region-header region-accent-top">
+        <h2 class="region-title title-chet-accent" data-editable="true" data-field="chettinadTitle">Chettinad Specials</h2>
+        <p class="region-tagline" data-editable="true" data-field="chettinadTagline">Bold Spice &bull; Authentic Heat</p>
       </div>
       <div class="menu-list">
         <div class="menu-item">
@@ -449,28 +259,38 @@
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- Kerala Panel -->
-    <div class="panel panel-kerala">
-      <div class="panel-header">
-        <svg class="panel-illust" viewBox="0 0 90 90">
-          <!-- Coconut -->
-          <g>
-            <circle cx="45" cy="50" r="32" fill="#5C3317" stroke="#3d1f08" stroke-width="2"/>
-            <circle cx="45" cy="50" r="26" fill="#FFF5D4"/>
-            <circle cx="45" cy="50" r="20" fill="#FFFAFA"/>
-            <circle cx="38" cy="42" r="3" fill="#5C3317"/>
-            <circle cx="52" cy="42" r="3" fill="#5C3317"/>
-            <circle cx="45" cy="50" r="3" fill="#5C3317"/>
-            <!-- Palm leaves from top -->
-            <path d="M30 20 Q35 10 25 5 M45 18 Q45 8 40 0 M60 20 Q55 10 65 5" stroke="#046307" stroke-width="2.5" fill="none"/>
+  <!-- Kerala Region (bottom) -->
+  <div class="region region-bot">
+    <div class="region-illust">
+      <svg viewBox="0 0 150 240">
+        <g fill="none" stroke="#1F5C3A" stroke-width="2">
+          <!-- Coconut palm trunk -->
+          <path d="M75 240 Q72 170 78 110 Q82 60 75 30" stroke-width="5"/>
+          <!-- Fronds -->
+          <path d="M75 30 Q35 15 5 35" stroke-width="2.5"/>
+          <path d="M75 30 Q40 5 25 -5" stroke-width="2.5"/>
+          <path d="M75 30 Q115 15 145 35" stroke-width="2.5"/>
+          <path d="M75 30 Q110 5 125 -5" stroke-width="2.5"/>
+          <path d="M75 30 Q60 0 55 -15" stroke-width="2.5"/>
+          <path d="M75 30 Q90 0 95 -15" stroke-width="2.5"/>
+          <!-- Frond details -->
+          <g stroke-width="1">
+            <path d="M25 28 L15 18 M40 30 L30 18 M55 28 L45 15"/>
+            <path d="M125 28 L135 18 M110 30 L120 18 M95 28 L105 15"/>
           </g>
-        </svg>
-        <div class="panel-header-text">
-          <div class="panel-devanagari green">&#2325;&#2375;&#2352;&#2354;&#2366;</div>
-          <h2 class="panel-title title-kerala" data-editable="true" data-field="keralaTitle">Kerala Specials</h2>
-          <p class="panel-tagline" data-editable="true" data-field="keralaTagline">Coconut • Curry Leaf • Sea Fresh</p>
-        </div>
+          <!-- Coconuts -->
+          <circle cx="65" cy="52" r="7" fill="#2E6B30" fill-opacity="0.6"/>
+          <circle cx="82" cy="48" r="6" fill="#2E6B30" fill-opacity="0.6"/>
+          <circle cx="74" cy="62" r="6" fill="#2E6B30" fill-opacity="0.6"/>
+        </g>
+      </svg>
+    </div>
+    <div class="region-content">
+      <div class="region-header region-accent-bot">
+        <h2 class="region-title title-ker-accent" data-editable="true" data-field="keralaTitle">Kerala Specials</h2>
+        <p class="region-tagline" data-editable="true" data-field="keralaTagline">Coconut &bull; Curry Leaf &bull; Sea Fresh</p>
       </div>
       <div class="menu-list">
         <div class="menu-item">

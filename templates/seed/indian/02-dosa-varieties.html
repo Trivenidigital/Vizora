@@ -3,321 +3,303 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1920, height=1080">
-  <link href="https://fonts.googleapis.com/css2?family=Yatra+One&family=Cormorant+Garamond:wght@400;600;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Yatra+One&display=swap" rel="stylesheet">
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     body {
       width:1920px; height:1080px; overflow:hidden; position:relative;
-      font-family:'Poppins', sans-serif; color:#FFF4D6;
-      background:
-        radial-gradient(ellipse 900px 600px at 50% 60%, rgba(255,153,51,0.22) 0%, rgba(228,155,15,0.12) 30%, transparent 60%),
-        radial-gradient(circle at 15% 20%, rgba(196,30,58,0.15) 0%, transparent 40%),
-        radial-gradient(circle at 85% 80%, rgba(196,30,58,0.12) 0%, transparent 40%),
-        linear-gradient(160deg, #1a0f08 0%, #2a1810 25%, #120908 60%, #1f140c 100%);
+      font-family:'Lora', serif; color:#2C1810;
+      background: #FBF7F0;
     }
+    /* Subtle rangoli watermark */
     body::before {
       content:''; position:absolute; inset:0; z-index:0;
-      background:
-        repeating-radial-gradient(circle at 30% 40%, transparent 0, transparent 2px, rgba(255,255,255,0.01) 2px, rgba(255,255,255,0.01) 3px),
-        repeating-linear-gradient(45deg, transparent 0, transparent 40px, rgba(184,115,51,0.03) 40px, rgba(184,115,51,0.03) 41px);
+      background-image:
+        radial-gradient(circle at 50% 50%, rgba(139,90,43,0.04) 1px, transparent 1.5px);
+      background-size: 48px 48px;
+      opacity: 0.9;
     }
-    .ember {
-      position:absolute; bottom:-100px; left:0; right:0; height:400px;
-      background: radial-gradient(ellipse at center bottom, rgba(255,100,20,0.35) 0%, rgba(255,153,51,0.15) 30%, transparent 60%);
-      z-index:1; pointer-events:none;
+    /* Soft warm vignette */
+    body::after {
+      content:''; position:absolute; inset:0; z-index:0; pointer-events:none;
+      background: radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(139,90,43,0.06) 100%);
     }
-    .top-border, .bot-border {
-      position:absolute; left:0; right:0; height:4px; z-index:5;
-      background: linear-gradient(90deg, transparent, #B87333 20%, #E8B931 50%, #B87333 80%, transparent);
-    }
-    .top-border { top:40px; }
-    .bot-border { bottom:40px; }
-    .top-border::before, .bot-border::before {
-      content:''; position:absolute; left:0; right:0; height:1px;
-      background: linear-gradient(90deg, transparent, rgba(232,155,15,0.5), transparent);
-    }
-    .top-border::before { top:-8px; }
-    .bot-border::before { bottom:-8px; }
 
-    .dosa-hero {
-      position:absolute; top:180px; left:50%;
-      transform: translateX(-50%);
-      width:620px; height:260px;
-      opacity:0.18; z-index:1; pointer-events:none;
+    /* Thin gold border frame */
+    .frame {
+      position:absolute; inset:50px;
+      border: 1px solid rgba(184,115,51,0.45);
+      z-index: 1;
     }
-    .kolam { position:absolute; z-index:4; opacity:0.6; }
+    .frame::before {
+      content:''; position:absolute; inset:8px;
+      border: 1px solid rgba(184,115,51,0.2);
+    }
 
+    /* Large central watermark rangoli */
+    .rangoli-wm {
+      position:absolute; top:50%; left:50%;
+      transform: translate(-50%, -50%);
+      width: 900px; height: 900px;
+      z-index: 1;
+      opacity: 0.05;
+      pointer-events:none;
+    }
+
+    /* Header */
     .header {
-      position:relative; z-index:3; text-align:center; padding-top:70px;
+      position:relative; z-index:3; text-align:center; padding-top:110px;
     }
-    .eyebrow {
-      font-family:'Cormorant Garamond', serif;
-      font-size:20px; letter-spacing:12px;
-      color:#FF9933; text-transform:uppercase; font-weight:600;
-    }
-    .eyebrow::before, .eyebrow::after {
-      content:'\2740'; color:#E8B931; margin:0 20px; font-size:14px;
+    .devanagari {
+      font-family:'Yatra One', cursive;
+      font-size: 22px;
+      color: #8B5A2B;
+      letter-spacing: 8px;
+      margin-bottom: 18px;
+      opacity: 0.75;
     }
     .title {
-      font-family:'Yatra One', cursive;
-      font-size: 100px; line-height: 0.95;
-      color: #FFD86B;
-      letter-spacing: 3px;
-      text-shadow: 0 0 40px rgba(255,153,51,0.6), 0 0 100px rgba(255,100,20,0.3), 0 3px 0 #8B4513;
-      margin: 12px 0 10px;
+      font-family:'Cormorant Garamond', serif;
+      font-weight: 500;
+      font-size: 96px;
+      line-height: 1;
+      color: #2C1810;
+      letter-spacing: 4px;
+      margin-bottom: 18px;
+    }
+    .title-rule {
+      display:flex; align-items:center; justify-content:center;
+      gap: 24px; margin: 0 auto 18px;
+    }
+    .title-rule .line {
+      width: 140px; height: 1px;
+      background: linear-gradient(90deg, transparent, #B87333, transparent);
+    }
+    .title-rule .ornament {
+      color: #B87333; font-size: 18px;
+      font-family:'Cormorant Garamond', serif;
     }
     .tagline {
       font-family:'Cormorant Garamond', serif;
-      font-style:italic; font-size:26px;
-      color: rgba(255,244,214,0.75);
-      letter-spacing: 2px;
+      font-style: italic;
+      font-weight: 400;
+      font-size: 28px;
+      color: #6B4423;
+      letter-spacing: 3px;
     }
     .chutney-note {
-      display:inline-block; margin-top:14px; padding:8px 28px;
-      border-top: 1px solid rgba(232,155,15,0.4);
-      border-bottom: 1px solid rgba(232,155,15,0.4);
+      display:inline-block; margin-top: 22px;
       font-family:'Cormorant Garamond', serif;
-      font-size:18px; color:#E8B931; letter-spacing:1px;
+      font-style: italic;
+      font-size: 19px;
+      color: #8B5A2B;
+      letter-spacing: 1px;
+      padding: 10px 40px;
+      border-top: 1px solid rgba(184,115,51,0.3);
+      border-bottom: 1px solid rgba(184,115,51,0.3);
     }
 
+    /* Hero dosa SVG */
+    .dosa-hero {
+      position:absolute;
+      top: 390px; left: 50%;
+      transform: translateX(-50%);
+      width: 720px; height: 180px;
+      z-index: 2;
+      opacity: 0.55;
+      pointer-events:none;
+    }
+
+    /* Panels grid */
     .panels {
-      position:absolute; top: 450px; left: 80px; right: 80px;
-      z-index:3; display:grid;
-      grid-template-columns: 1fr 1fr 1fr; gap: 36px;
+      position:absolute; top: 600px; left: 120px; right: 120px;
+      z-index: 3;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 40px;
     }
     .panel {
-      background: linear-gradient(180deg, rgba(255,153,51,0.06) 0%, rgba(184,115,51,0.03) 50%, rgba(196,30,58,0.06) 100%);
-      border: 1px solid rgba(232,155,15,0.3);
-      border-radius: 6px;
-      padding: 28px 26px 26px;
-      position:relative;
-      box-shadow: inset 0 1px 0 rgba(255,216,107,0.12), 0 4px 30px rgba(0,0,0,0.4);
+      background: rgba(255,255,255,0.35);
+      border: 1px solid rgba(184,115,51,0.3);
+      padding: 28px 30px 26px;
+      position: relative;
     }
     .panel::before {
-      content:''; position:absolute; top:-1px; left:50%;
-      transform:translateX(-50%);
-      width: 80px; height: 18px;
-      background:
-        radial-gradient(circle at 10px 18px, transparent 7px, #E8B931 7px 8px, transparent 9px),
-        radial-gradient(circle at 30px 18px, transparent 7px, #E8B931 7px 8px, transparent 9px),
-        radial-gradient(circle at 50px 18px, transparent 7px, #E8B931 7px 8px, transparent 9px),
-        radial-gradient(circle at 70px 18px, transparent 7px, #E8B931 7px 8px, transparent 9px);
+      content:''; position:absolute;
+      top: -1px; left: 20px; right: 20px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #B87333, transparent);
     }
-
     .col-header {
-      font-family:'Yatra One', cursive;
-      font-size: 32px; text-align:center;
-      letter-spacing: 4px;
-      margin-bottom: 6px; padding-top: 6px;
-    }
-    .col-header.classic  { color:#FFD86B; text-shadow: 0 0 20px rgba(255,216,107,0.4); }
-    .col-header.special  { color:#FF9933; text-shadow: 0 0 20px rgba(255,153,51,0.5); }
-    .col-header.premium  { color:#E34234; text-shadow: 0 0 20px rgba(227,66,52,0.5); }
-
-    .col-sub {
-      text-align:center;
       font-family:'Cormorant Garamond', serif;
-      font-style:italic;
-      font-size:15px;
-      color: rgba(255,244,214,0.5);
-      padding-bottom: 14px; margin-bottom: 14px;
-      border-bottom: 1px dotted rgba(232,155,15,0.3);
+      font-weight: 600;
+      font-size: 28px;
+      text-align: center;
+      letter-spacing: 5px;
+      color: #2C1810;
+      text-transform: uppercase;
+      margin-bottom: 4px;
     }
-    .dosa-list { display:flex; flex-direction:column; gap:10px; }
+    .col-sub {
+      text-align: center;
+      font-family:'Cormorant Garamond', serif;
+      font-style: italic;
+      font-size: 15px;
+      color: #8B5A2B;
+      padding-bottom: 16px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid rgba(184,115,51,0.25);
+      letter-spacing: 1px;
+    }
+    .dosa-list { display:flex; flex-direction:column; gap: 12px; }
     .dosa-row {
-      display:flex; align-items:baseline;
-      padding: 9px 8px 9px 24px;
-      position:relative;
-      background: rgba(255,244,214,0.02);
-      border-radius: 3px;
+      display:flex; align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 4px 2px;
     }
-    .dosa-row::before {
-      content:''; position:absolute; left: 8px; top: 50%;
-      margin-top: -4px;
-      width:8px; height:8px;
-      background:#E8B931; transform: rotate(45deg);
-      box-shadow: 0 0 8px rgba(232,155,15,0.6);
+    .dosa-row .dots {
+      flex: 1;
+      border-bottom: 1px dotted rgba(139,90,43,0.35);
+      margin: 0 6px 6px;
+      min-width: 10px;
     }
     .dosa-name {
       font-family:'Cormorant Garamond', serif;
-      font-weight:700; font-size: 22px;
-      color: #FFF4D6; flex: 1;
+      font-weight: 500;
+      font-size: 21px;
+      color: #2C1810;
+      white-space: nowrap;
     }
     .dosa-price {
       font-family:'Cormorant Garamond', serif;
-      font-weight:700; font-size: 22px;
-      color: #FFD86B;
-      text-shadow: 0 0 10px rgba(255,216,107,0.4);
+      font-weight: 600;
+      font-size: 21px;
+      color: #B87333;
+      white-space: nowrap;
     }
+
     .footer {
-      position:absolute; bottom: 60px; left: 0; right: 0;
-      text-align:center; z-index:3;
+      position:absolute; bottom: 80px; left: 0; right: 0;
+      text-align: center; z-index: 3;
     }
     .footer-text {
       font-family:'Cormorant Garamond', serif;
-      font-style:italic; font-size: 20px;
-      color: rgba(255,244,214,0.65);
+      font-style: italic;
+      font-size: 19px;
+      color: #6B4423;
       letter-spacing: 1.5px;
     }
   </style>
 </head>
 <body>
-  <div class="ember"></div>
+  <div class="frame"></div>
 
-  <svg class="dosa-hero" viewBox="0 0 620 260">
+  <!-- Subtle rangoli watermark -->
+  <svg class="rangoli-wm" viewBox="0 0 400 400">
+    <g fill="none" stroke="#8B5A2B" stroke-width="0.8">
+      <circle cx="200" cy="200" r="60"/>
+      <circle cx="200" cy="200" r="100"/>
+      <circle cx="200" cy="200" r="140"/>
+      <circle cx="200" cy="200" r="180"/>
+      <g>
+        <path d="M200 40 Q230 120 200 200 Q170 120 200 40Z"/>
+        <path d="M200 360 Q230 280 200 200 Q170 280 200 360Z"/>
+        <path d="M40 200 Q120 230 200 200 Q120 170 40 200Z"/>
+        <path d="M360 200 Q280 230 200 200 Q280 170 360 200Z"/>
+      </g>
+      <g transform="rotate(45 200 200)">
+        <path d="M200 40 Q230 120 200 200 Q170 120 200 40Z"/>
+        <path d="M200 360 Q230 280 200 200 Q170 280 200 360Z"/>
+        <path d="M40 200 Q120 230 200 200 Q120 170 40 200Z"/>
+        <path d="M360 200 Q280 230 200 200 Q280 170 360 200Z"/>
+      </g>
+      <circle cx="200" cy="200" r="20" fill="#B87333" fill-opacity="0.15"/>
+    </g>
+  </svg>
+
+  <!-- Hero dosa illustration: crescent dosa with two chutney bowls -->
+  <svg class="dosa-hero" viewBox="0 0 720 180">
     <defs>
-      <radialGradient id="dosaGrad" cx="50%" cy="50%">
-        <stop offset="0%" stop-color="#FFD86B" stop-opacity="0.9"/>
-        <stop offset="60%" stop-color="#E8B931" stop-opacity="0.5"/>
-        <stop offset="100%" stop-color="#8B4513" stop-opacity="0.1"/>
-      </radialGradient>
+      <linearGradient id="dosaWash" x1="0" x2="0" y1="0" y2="1">
+        <stop offset="0%" stop-color="#E8B931" stop-opacity="0.55"/>
+        <stop offset="60%" stop-color="#D4A05A" stop-opacity="0.35"/>
+        <stop offset="100%" stop-color="#8B5A2B" stop-opacity="0.2"/>
+      </linearGradient>
     </defs>
-    <path d="M60 200 Q180 40 440 60 Q560 80 580 160 Q520 220 300 240 Q140 250 60 200 Z"
-          fill="url(#dosaGrad)" stroke="#E8B931" stroke-width="2"/>
-    <path d="M100 200 Q200 80 420 80" fill="none" stroke="#FFD86B" stroke-width="1" opacity="0.5"/>
-    <path d="M120 210 Q240 100 440 110" fill="none" stroke="#FFD86B" stroke-width="1" opacity="0.4"/>
-    <ellipse cx="100" cy="235" rx="38" ry="10" fill="none" stroke="#E8B931" stroke-width="2"/>
-    <ellipse cx="100" cy="233" rx="32" ry="7" fill="#C41E3A" opacity="0.4"/>
-    <ellipse cx="520" cy="235" rx="38" ry="10" fill="none" stroke="#E8B931" stroke-width="2"/>
-    <ellipse cx="520" cy="233" rx="32" ry="7" fill="#FFF4D6" opacity="0.2"/>
-    <ellipse cx="310" cy="248" rx="38" ry="10" fill="none" stroke="#E8B931" stroke-width="2"/>
-    <ellipse cx="310" cy="246" rx="32" ry="7" fill="#046307" opacity="0.3"/>
-  </svg>
-
-  <div class="top-border"></div>
-  <div class="bot-border"></div>
-
-  <svg class="kolam" style="top:70px; left:70px;" width="100" height="100" viewBox="0 0 100 100">
-    <g fill="none" stroke="#E8B931" stroke-width="1.5">
-      <circle cx="50" cy="50" r="18"/>
-      <circle cx="50" cy="50" r="32"/>
-      <path d="M50 18 L58 42 L82 50 L58 58 L50 82 L42 58 L18 50 L42 42 Z"/>
+    <!-- Left chutney bowl (coconut white) -->
+    <g transform="translate(60 120)">
+      <ellipse cx="0" cy="30" rx="60" ry="6" fill="none" stroke="#8B5A2B" stroke-width="1.2" opacity="0.5"/>
+      <path d="M-55 10 Q-55 40 0 40 Q55 40 55 10 Z" fill="none" stroke="#8B5A2B" stroke-width="1.5"/>
+      <ellipse cx="0" cy="10" rx="55" ry="8" fill="#FFFAF0" stroke="#8B5A2B" stroke-width="1.2"/>
+      <ellipse cx="0" cy="8" rx="48" ry="5" fill="#F5EDE0"/>
     </g>
-    <circle cx="50" cy="50" r="5" fill="#FF9933"/>
-  </svg>
-  <svg class="kolam" style="top:70px; right:70px;" width="100" height="100" viewBox="0 0 100 100">
-    <g fill="none" stroke="#E8B931" stroke-width="1.5">
-      <circle cx="50" cy="50" r="18"/>
-      <circle cx="50" cy="50" r="32"/>
-      <path d="M50 18 L58 42 L82 50 L58 58 L50 82 L42 58 L18 50 L42 42 Z"/>
+    <!-- Right chutney bowl (tomato ochre) -->
+    <g transform="translate(660 120)">
+      <ellipse cx="0" cy="30" rx="60" ry="6" fill="none" stroke="#8B5A2B" stroke-width="1.2" opacity="0.5"/>
+      <path d="M-55 10 Q-55 40 0 40 Q55 40 55 10 Z" fill="none" stroke="#8B5A2B" stroke-width="1.5"/>
+      <ellipse cx="0" cy="10" rx="55" ry="8" fill="#E89662" stroke="#8B5A2B" stroke-width="1.2"/>
+      <ellipse cx="0" cy="8" rx="48" ry="5" fill="#D97706" opacity="0.7"/>
     </g>
-    <circle cx="50" cy="50" r="5" fill="#FF9933"/>
-  </svg>
-  <svg class="kolam" style="bottom:70px; left:70px;" width="100" height="100" viewBox="0 0 100 100">
-    <g fill="none" stroke="#E8B931" stroke-width="1.5">
-      <circle cx="50" cy="50" r="18"/>
-      <circle cx="50" cy="50" r="32"/>
-      <path d="M50 18 L58 42 L82 50 L58 58 L50 82 L42 58 L18 50 L42 42 Z"/>
+    <!-- Crescent dosa -->
+    <g>
+      <path d="M150 150 Q180 30 420 30 Q570 40 570 100 Q520 160 320 165 Q180 165 150 150 Z"
+            fill="url(#dosaWash)" stroke="#8B5A2B" stroke-width="1.8"/>
+      <path d="M180 140 Q220 60 410 55" fill="none" stroke="#8B5A2B" stroke-width="0.8" opacity="0.45"/>
+      <path d="M200 150 Q260 80 440 75" fill="none" stroke="#8B5A2B" stroke-width="0.8" opacity="0.35"/>
+      <path d="M230 158 Q300 95 470 90" fill="none" stroke="#8B5A2B" stroke-width="0.8" opacity="0.3"/>
     </g>
-    <circle cx="50" cy="50" r="5" fill="#FF9933"/>
-  </svg>
-  <svg class="kolam" style="bottom:70px; right:70px;" width="100" height="100" viewBox="0 0 100 100">
-    <g fill="none" stroke="#E8B931" stroke-width="1.5">
-      <circle cx="50" cy="50" r="18"/>
-      <circle cx="50" cy="50" r="32"/>
-      <path d="M50 18 L58 42 L82 50 L58 58 L50 82 L42 58 L18 50 L42 42 Z"/>
-    </g>
-    <circle cx="50" cy="50" r="5" fill="#FF9933"/>
   </svg>
 
   <div class="header">
-    <div class="eyebrow">Hot Off The Tawa</div>
-    <h1 class="title" data-editable="true" data-field="title">DOSA VARIETIES</h1>
+    <div class="devanagari">HOT OFF THE TAWA</div>
+    <h1 class="title" data-editable="true" data-field="title">Dosa Varieties</h1>
+    <div class="title-rule">
+      <span class="line"></span>
+      <span class="ornament">&#10086;</span>
+      <span class="line"></span>
+    </div>
     <p class="tagline" data-editable="true" data-field="tagline">Crispy &bull; Golden &bull; Made to Order</p>
     <div class="chutney-note" data-editable="true" data-field="chutneyNote">All dosas served with sambar, coconut chutney &amp; tomato chutney</div>
   </div>
 
   <div class="panels">
     <div class="panel">
-      <h3 class="col-header classic" data-editable="true" data-field="col1Title">CLASSIC</h3>
+      <h3 class="col-header" data-editable="true" data-field="col1Title">Classic</h3>
       <div class="col-sub">Time-honored favorites</div>
       <div class="dosa-list">
-        <div class="dosa-row">
-          <span class="dosa-name" data-editable="true" data-field="c1Name">Plain Dosa</span>
-          <span class="dosa-price" data-editable="true" data-field="c1Price">$5.99</span>
-        </div>
-        <div class="dosa-row">
-          <span class="dosa-name" data-editable="true" data-field="c2Name">Masala Dosa</span>
-          <span class="dosa-price" data-editable="true" data-field="c2Price">$7.99</span>
-        </div>
-        <div class="dosa-row">
-          <span class="dosa-name" data-editable="true" data-field="c3Name">Paper Dosa</span>
-          <span class="dosa-price" data-editable="true" data-field="c3Price">$7.49</span>
-        </div>
-        <div class="dosa-row">
-          <span class="dosa-name" data-editable="true" data-field="c4Name">Rava Dosa</span>
-          <span class="dosa-price" data-editable="true" data-field="c4Price">$7.99</span>
-        </div>
-        <div class="dosa-row">
-          <span class="dosa-name" data-editable="true" data-field="c5Name">Set Dosa (3)</span>
-          <span class="dosa-price" data-editable="true" data-field="c5Price">$6.99</span>
-        </div>
-        <div class="dosa-row">
-          <span class="dosa-name" data-editable="true" data-field="c6Name">Neer Dosa (3)</span>
-          <span class="dosa-price" data-editable="true" data-field="c6Price">$6.99</span>
-        </div>
+        <div class="dosa-row"><span class="dosa-name" data-editable="true" data-field="c1Name">Plain Dosa</span><span class="dots"></span><span class="dosa-price" data-editable="true" data-field="c1Price">$5.99</span></div>
+        <div class="dosa-row"><span class="dosa-name" data-editable="true" data-field="c2Name">Masala Dosa</span><span class="dots"></span><span class="dosa-price" data-editable="true" data-field="c2Price">$7.99</span></div>
+        <div class="dosa-row"><span class="dosa-name" data-editable="true" data-field="c3Name">Paper Dosa</span><span class="dots"></span><span class="dosa-price" data-editable="true" data-field="c3Price">$7.49</span></div>
+        <div class="dosa-row"><span class="dosa-name" data-editable="true" data-field="c4Name">Rava Dosa</span><span class="dots"></span><span class="dosa-price" data-editable="true" data-field="c4Price">$7.99</span></div>
+        <div class="dosa-row"><span class="dosa-name" data-editable="true" data-field="c5Name">Set Dosa (3)</span><span class="dots"></span><span class="dosa-price" data-editable="true" data-field="c5Price">$6.99</span></div>
+        <div class="dosa-row"><span class="dosa-name" data-editable="true" data-field="c6Name">Neer Dosa (3)</span><span class="dots"></span><span class="dosa-price" data-editable="true" data-field="c6Price">$6.99</span></div>
       </div>
     </div>
 
     <div class="panel">
-      <h3 class="col-header special" data-editable="true" data-field="col2Title">SPECIAL</h3>
+      <h3 class="col-header" data-editable="true" data-field="col2Title">Special</h3>
       <div class="col-sub">Chef's creations</div>
       <div class="dosa-list">
-        <div class="dosa-row">
-          <span class="dosa-name" data-editable="true" data-field="s1Name">Mysore Masala</span>
-          <span class="dosa-price" data-editable="true" data-field="s1Price">$8.99</span>
-        </div>
-        <div class="dosa-row">
-          <span class="dosa-name" data-editable="true" data-field="s2Name">Onion Dosa</span>
-          <span class="dosa-price" data-editable="true" data-field="s2Price">$7.49</span>
-        </div>
-        <div class="dosa-row">
-          <span class="dosa-name" data-editable="true" data-field="s3Name">Tomato Dosa</span>
-          <span class="dosa-price" data-editable="true" data-field="s3Price">$7.49</span>
-        </div>
-        <div class="dosa-row">
-          <span class="dosa-name" data-editable="true" data-field="s4Name">Egg Dosa</span>
-          <span class="dosa-price" data-editable="true" data-field="s4Price">$8.49</span>
-        </div>
-        <div class="dosa-row">
-          <span class="dosa-name" data-editable="true" data-field="s5Name">Spring Dosa</span>
-          <span class="dosa-price" data-editable="true" data-field="s5Price">$8.49</span>
-        </div>
-        <div class="dosa-row">
-          <span class="dosa-name" data-editable="true" data-field="s6Name">Uttapam</span>
-          <span class="dosa-price" data-editable="true" data-field="s6Price">$7.99</span>
-        </div>
+        <div class="dosa-row"><span class="dosa-name" data-editable="true" data-field="s1Name">Mysore Masala</span><span class="dots"></span><span class="dosa-price" data-editable="true" data-field="s1Price">$8.99</span></div>
+        <div class="dosa-row"><span class="dosa-name" data-editable="true" data-field="s2Name">Onion Dosa</span><span class="dots"></span><span class="dosa-price" data-editable="true" data-field="s2Price">$7.49</span></div>
+        <div class="dosa-row"><span class="dosa-name" data-editable="true" data-field="s3Name">Tomato Dosa</span><span class="dots"></span><span class="dosa-price" data-editable="true" data-field="s3Price">$7.49</span></div>
+        <div class="dosa-row"><span class="dosa-name" data-editable="true" data-field="s4Name">Egg Dosa</span><span class="dots"></span><span class="dosa-price" data-editable="true" data-field="s4Price">$8.49</span></div>
+        <div class="dosa-row"><span class="dosa-name" data-editable="true" data-field="s5Name">Spring Dosa</span><span class="dots"></span><span class="dosa-price" data-editable="true" data-field="s5Price">$8.49</span></div>
+        <div class="dosa-row"><span class="dosa-name" data-editable="true" data-field="s6Name">Uttapam</span><span class="dots"></span><span class="dosa-price" data-editable="true" data-field="s6Price">$7.99</span></div>
       </div>
     </div>
 
     <div class="panel">
-      <h3 class="col-header premium" data-editable="true" data-field="col3Title">PREMIUM</h3>
+      <h3 class="col-header" data-editable="true" data-field="col3Title">Premium</h3>
       <div class="col-sub">Royal indulgence</div>
       <div class="dosa-list">
-        <div class="dosa-row">
-          <span class="dosa-name" data-editable="true" data-field="p1Name">Ghee Roast</span>
-          <span class="dosa-price" data-editable="true" data-field="p1Price">$9.99</span>
-        </div>
-        <div class="dosa-row">
-          <span class="dosa-name" data-editable="true" data-field="p2Name">Cheese Dosa</span>
-          <span class="dosa-price" data-editable="true" data-field="p2Price">$9.49</span>
-        </div>
-        <div class="dosa-row">
-          <span class="dosa-name" data-editable="true" data-field="p3Name">Paneer Dosa</span>
-          <span class="dosa-price" data-editable="true" data-field="p3Price">$9.99</span>
-        </div>
-        <div class="dosa-row">
-          <span class="dosa-name" data-editable="true" data-field="p4Name">Family Dosa</span>
-          <span class="dosa-price" data-editable="true" data-field="p4Price">$14.99</span>
-        </div>
-        <div class="dosa-row">
-          <span class="dosa-name" data-editable="true" data-field="p5Name">Chettinad Dosa</span>
-          <span class="dosa-price" data-editable="true" data-field="p5Price">$10.99</span>
-        </div>
-        <div class="dosa-row">
-          <span class="dosa-name" data-editable="true" data-field="p6Name">Kothu Parotta</span>
-          <span class="dosa-price" data-editable="true" data-field="p6Price">$8.99</span>
-        </div>
+        <div class="dosa-row"><span class="dosa-name" data-editable="true" data-field="p1Name">Ghee Roast</span><span class="dots"></span><span class="dosa-price" data-editable="true" data-field="p1Price">$9.99</span></div>
+        <div class="dosa-row"><span class="dosa-name" data-editable="true" data-field="p2Name">Cheese Dosa</span><span class="dots"></span><span class="dosa-price" data-editable="true" data-field="p2Price">$9.49</span></div>
+        <div class="dosa-row"><span class="dosa-name" data-editable="true" data-field="p3Name">Paneer Dosa</span><span class="dots"></span><span class="dosa-price" data-editable="true" data-field="p3Price">$9.99</span></div>
+        <div class="dosa-row"><span class="dosa-name" data-editable="true" data-field="p4Name">Family Dosa</span><span class="dots"></span><span class="dosa-price" data-editable="true" data-field="p4Price">$14.99</span></div>
+        <div class="dosa-row"><span class="dosa-name" data-editable="true" data-field="p5Name">Chettinad Dosa</span><span class="dots"></span><span class="dosa-price" data-editable="true" data-field="p5Price">$10.99</span></div>
+        <div class="dosa-row"><span class="dosa-name" data-editable="true" data-field="p6Name">Kothu Parotta</span><span class="dots"></span><span class="dosa-price" data-editable="true" data-field="p6Price">$8.99</span></div>
       </div>
     </div>
   </div>

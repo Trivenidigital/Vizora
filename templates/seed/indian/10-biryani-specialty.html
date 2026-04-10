@@ -3,384 +3,233 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1920, height=1080">
-  <link href="https://fonts.googleapis.com/css2?family=Yatra+One&family=Cormorant+Garamond:wght@400;600;700&family=Tiro+Devanagari+Marathi&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Yatra+One&display=swap" rel="stylesheet">
   <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --cream: #FBF6EC;
+      --cream-warm: #F5EDE0;
+      --ink: #2C1810;
+      --ink-soft: #5B4636;
+      --accent: #5C1A1B;
+      --accent-soft: #8A2E2F;
+      --gold: #A8823C;
+      --gold-soft: #D4B572;
+      --rule: rgba(168,130,60,0.4);
+    }
     body {
-      width:1920px; height:1080px; overflow:hidden; position:relative;
-      font-family:'Poppins', sans-serif; color:#FFF4D6;
+      width: 1920px; height: 1080px; overflow: hidden; position: relative;
+      font-family: 'Lora', serif; color: var(--ink);
       background:
-        radial-gradient(ellipse at 50% 30%, rgba(255,153,51,0.25) 0%, transparent 55%),
-        radial-gradient(ellipse at 15% 85%, rgba(196,30,58,0.3) 0%, transparent 50%),
-        radial-gradient(ellipse at 85% 85%, rgba(228,155,15,0.25) 0%, transparent 50%),
-        linear-gradient(160deg, #3a0a0e 0%, #5c0a10 30%, #2a0608 55%, #4d0e14 100%);
+        radial-gradient(ellipse at 50% 0%, rgba(228,155,15,0.10), transparent 55%),
+        radial-gradient(ellipse at 50% 100%, rgba(92,26,27,0.04), transparent 50%),
+        linear-gradient(180deg, #FBF6EC 0%, #F5EDE0 100%);
     }
-    /* saffron thread pattern */
     body::before {
-      content:''; position:absolute; inset:0; z-index:0; opacity:0.08;
-      background:
-        repeating-linear-gradient(25deg, transparent 0, transparent 80px, rgba(255,153,51,0.3) 80px, rgba(255,153,51,0.3) 81px, transparent 81px, transparent 140px),
-        repeating-linear-gradient(-25deg, transparent 0, transparent 80px, rgba(255,216,107,0.2) 80px, rgba(255,216,107,0.2) 81px, transparent 81px, transparent 140px);
+      content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+      background-image:
+        radial-gradient(circle at 30% 30%, rgba(44,24,16,0.025) 0.5px, transparent 1px),
+        radial-gradient(circle at 70% 60%, rgba(44,24,16,0.02) 0.5px, transparent 1px);
+      background-size: 45px 45px, 60px 60px;
     }
 
-    /* Ornate royal border */
-    .royal-border {
-      position:absolute; inset:40px;
-      border: 3px double #E8B931;
-      border-radius: 4px;
-      box-shadow:
-        0 0 0 1px rgba(255,216,107,0.3),
-        0 0 0 10px rgba(196,30,58,0.2),
-        0 0 0 11px rgba(232,155,15,0.4),
-        inset 0 0 120px rgba(0,0,0,0.5);
-      z-index:2;
+    .frame {
+      position: absolute; inset: 70px;
+      border: 1px solid var(--rule); z-index: 1;
     }
-    .royal-border::before, .royal-border::after {
-      content:'';
-      position:absolute;
-      left:20px; right:20px; height:1px;
-      background: linear-gradient(90deg, transparent, rgba(255,216,107,0.6), transparent);
+    .frame::before {
+      content: ''; position: absolute; inset: 8px;
+      border: 1px solid rgba(168,130,60,0.18);
     }
-    .royal-border::before { top:16px; }
-    .royal-border::after { bottom:16px; }
-
-    /* Corner peacock ornaments */
-    .peacock { position:absolute; z-index:5; opacity:0.5; }
 
     /* Header */
     .header {
-      position:absolute; top: 75px; left:0; right:0; z-index:5;
-      text-align:center;
+      position: absolute; top: 120px; left: 0; right: 0;
+      text-align: center; z-index: 5;
     }
-    .crown-svg {
-      display:block;
-      margin: 0 auto 10px;
-      opacity: 0.85;
+    .crown-svg { display: block; margin: 0 auto 18px; opacity: 0.85; }
+    .eyebrow {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 16px; letter-spacing: 10px;
+      color: var(--gold); text-transform: uppercase; font-weight: 500;
+      margin-bottom: 14px;
     }
     .title {
-      font-family:'Yatra One', cursive;
-      font-size: 100px;
-      line-height: 0.9;
-      color: #FFD86B;
-      letter-spacing: 5px;
-      text-shadow:
-        0 0 40px rgba(255,153,51,0.7),
-        0 0 100px rgba(255,50,10,0.4),
-        0 4px 0 #8B4513,
-        0 5px 1px #3a0000;
-      margin-bottom: 8px;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 110px; font-weight: 500;
+      color: var(--accent); letter-spacing: 3px; line-height: 0.9;
     }
     .subtitle {
-      font-family:'Cormorant Garamond', serif;
-      font-style: italic;
-      font-size: 26px;
-      color: rgba(255,244,214,0.85);
-      letter-spacing: 3px;
+      font-family: 'Cormorant Garamond', serif; font-style: italic;
+      font-size: 26px; color: var(--ink-soft);
+      letter-spacing: 3px; margin-top: 14px;
     }
     .subtitle::before, .subtitle::after {
-      content:'\2740';
-      color: #E8B931;
-      margin: 0 18px;
-      font-size: 22px;
+      content: '\2014'; color: var(--gold); margin: 0 16px;
     }
 
-    /* Hero handi (dum pot) SVG - top center behind title */
+    /* small handi SVG as hero accent */
     .handi-svg {
-      position:absolute;
-      top: 70px; left: 50%;
+      position: absolute; top: 360px; left: 50%;
       transform: translateX(-50%);
-      width: 420px; height: 340px;
-      z-index:1;
-      opacity: 0.22;
-      filter: drop-shadow(0 0 60px rgba(255,153,51,0.5));
+      width: 130px; height: 130px; z-index: 4; opacity: 0.9;
     }
 
-    /* Hero card - signature */
+    /* Hero signature card */
     .hero-card {
-      position:absolute;
-      top: 300px; left: 120px; right: 120px;
-      z-index:4;
-      display:grid;
+      position: absolute;
+      top: 510px; left: 180px; right: 180px; z-index: 5;
+      display: grid;
       grid-template-columns: 1fr auto;
-      align-items:center;
-      gap: 40px;
-      padding: 30px 50px;
-      background:
-        linear-gradient(90deg, rgba(255,153,51,0.2), rgba(196,30,58,0.2), rgba(255,153,51,0.2));
-      border: 2px solid rgba(255,216,107,0.55);
-      border-radius: 10px;
-      box-shadow:
-        inset 0 1px 0 rgba(255,216,107,0.3),
-        0 15px 50px rgba(0,0,0,0.6),
-        0 0 60px rgba(255,153,51,0.15);
+      align-items: center; gap: 40px;
+      padding: 26px 50px;
+      background: rgba(255,251,242,0.6);
+      border: 1px solid var(--gold);
+      border-radius: 2px;
+      box-shadow: 0 2px 0 rgba(168,130,60,0.25), 0 20px 40px rgba(92,26,27,0.05);
     }
-    .hero-card::before, .hero-card::after {
-      content:'';
-      position:absolute;
-      top:-8px; bottom:-8px; width: 18px;
-      background: radial-gradient(ellipse at center, #FFD86B, #B87333);
-      border-radius: 50%;
-      box-shadow: 0 0 15px rgba(255,216,107,0.6);
-    }
-    .hero-card::before { left:-9px; }
-    .hero-card::after { right:-9px; }
-
-    .hero-left { flex:1; }
     .hero-label {
-      font-family:'Cormorant Garamond', serif;
-      font-size: 18px;
-      letter-spacing: 6px;
-      color: #FF9933;
-      text-transform: uppercase;
-      font-weight: 600;
-      margin-bottom: 6px;
-    }
-    .hero-name {
-      font-family:'Yatra One', cursive;
-      font-size: 58px;
-      line-height: 1;
-      color: #FFD86B;
-      letter-spacing: 2px;
-      text-shadow: 0 0 30px rgba(255,216,107,0.5), 0 3px 0 #8B4513;
-      margin-bottom: 8px;
-    }
-    .hero-desc {
-      font-family:'Cormorant Garamond', serif;
-      font-style: italic;
-      font-size: 20px;
-      color: rgba(255,244,214,0.8);
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 14px; letter-spacing: 8px;
+      color: var(--gold); text-transform: uppercase; font-weight: 600;
       margin-bottom: 4px;
     }
+    .hero-name {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 48px; font-weight: 600;
+      color: var(--accent); line-height: 1; margin-bottom: 6px;
+    }
+    .hero-desc {
+      font-family: 'Cormorant Garamond', serif; font-style: italic;
+      font-size: 19px; color: var(--ink-soft); margin-bottom: 4px;
+    }
     .hero-quote {
-      font-family:'Cormorant Garamond', serif;
-      font-size: 16px;
-      color: rgba(255,216,107,0.75);
-      font-style: italic;
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 14px; color: var(--gold);
     }
     .hero-price {
-      font-family:'Cormorant Garamond', serif;
-      font-weight: 700;
-      font-size: 80px;
-      color: #FFD86B;
-      text-shadow: 0 0 30px rgba(255,216,107,0.6), 0 4px 0 #8B4513;
-      line-height: 1;
+      font-family: 'Cormorant Garamond', serif; font-weight: 600;
+      font-size: 72px; color: var(--accent); line-height: 1;
     }
 
-    /* Two column layout */
+    /* Columns */
     .columns {
-      position:absolute;
-      top: 490px;
-      bottom: 100px;
-      left: 120px;
-      right: 120px;
-      z-index:4;
-      display:grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 40px;
+      position: absolute;
+      top: 680px; bottom: 80px;
+      left: 180px; right: 180px;
+      z-index: 5;
+      display: grid;
+      grid-template-columns: 1fr 1px 1fr;
+      gap: 0 60px;
+      align-items: start;
     }
-
+    .col-divider {
+      background: linear-gradient(180deg, transparent, var(--rule) 10%, var(--rule) 90%, transparent);
+    }
     .section-header {
-      font-family:'Yatra One', cursive;
-      font-size: 30px;
-      color: #FFD86B;
-      text-align: center;
-      letter-spacing: 4px;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 24px; font-weight: 600;
+      color: var(--accent); letter-spacing: 6px;
+      text-transform: uppercase; text-align: center;
+      padding-bottom: 8px; margin-bottom: 14px;
+      position: relative;
+    }
+    .section-header::after {
+      content: ''; position: absolute;
+      bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 32px; height: 1px; background: var(--gold);
+    }
+    .item {
+      display: grid; grid-template-columns: 1fr auto;
+      align-items: baseline; gap: 0 16px;
       padding: 8px 0;
-      border-top: 1px solid rgba(255,216,107,0.4);
-      border-bottom: 1px solid rgba(255,216,107,0.4);
-      text-shadow: 0 0 18px rgba(255,153,51,0.5);
-      margin-bottom: 16px;
-    }
-
-    .items { display:flex; flex-direction:column; gap: 10px; }
-    .biryani-item {
-      display:grid;
-      grid-template-columns: 1fr auto;
-      grid-template-rows: auto auto;
-      gap: 0 12px;
-      padding: 10px 14px 10px 26px;
-      background: linear-gradient(90deg, rgba(255,153,51,0.08), rgba(255,153,51,0.02));
-      border-left: 3px solid #FFD86B;
-      border-radius: 4px;
-      position:relative;
-    }
-    .biryani-item::before {
-      content:'';
-      position:absolute;
-      left: 8px; top: 50%;
-      margin-top: -5px;
-      width: 10px; height: 10px;
-      background: radial-gradient(circle, #FF9933, #C41E3A);
-      transform: rotate(45deg);
-      box-shadow: 0 0 10px rgba(255,216,107,0.6);
+      border-bottom: 1px dotted rgba(168,130,60,0.28);
     }
     .item-name {
-      font-family:'Cormorant Garamond', serif;
-      font-weight: 700;
-      font-size: 21px;
-      color: #FFF4D6;
-      grid-column: 1; grid-row: 1;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 21px; font-weight: 600; color: var(--ink);
     }
     .item-price {
-      font-family:'Cormorant Garamond', serif;
-      font-weight: 700;
-      font-size: 22px;
-      color: #FFD86B;
-      grid-column: 2; grid-row: 1;
-      text-shadow: 0 0 12px rgba(255,216,107,0.5);
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 21px; font-weight: 600; color: var(--accent);
     }
     .item-desc {
-      font-family:'Poppins', sans-serif;
-      font-size: 12px;
-      font-weight: 300;
-      font-style: italic;
-      color: rgba(255,244,214,0.6);
-      grid-column: 1 / -1; grid-row: 2;
-      margin-top: 2px;
+      grid-column: 1 / -1;
+      font-family: 'Lora', serif; font-style: italic;
+      font-size: 12px; color: var(--ink-soft);
+      margin-top: 1px;
     }
 
-    /* Accompaniments sub-panel */
     .acc-panel {
-      margin-top: 18px;
-      padding: 16px 20px;
-      background: rgba(196,30,58,0.15);
-      border: 1px solid rgba(255,216,107,0.35);
-      border-radius: 6px;
-    }
-    .acc-panel .section-header {
-      font-size: 22px;
-      border: none;
-      padding: 0;
-      margin: 0 0 10px;
+      margin-top: 16px; padding-top: 14px;
+      border-top: 1px solid var(--rule);
     }
     .acc-grid {
-      display:grid;
+      display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 6px 20px;
+      gap: 4px 30px;
+      margin-top: 8px;
     }
     .acc-row {
-      display:flex;
-      justify-content: space-between;
-      align-items: baseline;
-      padding: 4px 0;
-      border-bottom: 1px dotted rgba(255,216,107,0.25);
+      display: flex; justify-content: space-between;
+      padding: 5px 0;
+      border-bottom: 1px dotted rgba(168,130,60,0.2);
     }
     .acc-name {
-      font-family:'Cormorant Garamond', serif;
-      font-size: 18px;
-      color: #FFF4D6;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 17px; color: var(--ink);
     }
     .acc-price {
-      font-family:'Cormorant Garamond', serif;
-      font-weight: 700;
-      font-size: 18px;
-      color: #FFD86B;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 17px; font-weight: 600; color: var(--accent);
     }
   </style>
 </head>
 <body>
-  <!-- Handi (dum pot) SVG hero -->
-  <svg class="handi-svg" viewBox="0 0 420 340">
-    <defs>
-      <radialGradient id="handiBrass" cx="50%" cy="50%">
-        <stop offset="0%" stop-color="#FFD86B"/>
-        <stop offset="60%" stop-color="#E8B931"/>
-        <stop offset="100%" stop-color="#8B4513"/>
-      </radialGradient>
-    </defs>
-    <!-- Steam from lid seal -->
-    <g fill="none" stroke="#FFD86B" stroke-width="2.5" opacity="0.7">
-      <path d="M130 60 Q120 30 135 0 Q150 -30 135 -55"/>
-      <path d="M180 55 Q170 25 185 -5 Q200 -35 185 -60"/>
-      <path d="M230 55 Q220 25 235 -5 Q250 -35 235 -60"/>
-      <path d="M280 60 Q270 30 285 0 Q300 -30 285 -55"/>
-    </g>
-    <!-- Lid top knob -->
-    <circle cx="210" cy="85" r="10" fill="url(#handiBrass)"/>
-    <rect x="205" y="90" width="10" height="15" fill="#B87333"/>
-    <!-- Lid -->
-    <ellipse cx="210" cy="110" rx="110" ry="18" fill="url(#handiBrass)"/>
-    <ellipse cx="210" cy="108" rx="110" ry="14" fill="none" stroke="#8B4513" stroke-width="2"/>
-    <!-- Dough seal strip (atta seal) -->
-    <ellipse cx="210" cy="125" rx="112" ry="10" fill="#E49B0F" opacity="0.5"/>
-    <path d="M98 125 Q98 135 105 135 L315 135 Q322 135 322 125" fill="none" stroke="#FFF4D6" stroke-width="2" stroke-dasharray="4 3" opacity="0.6"/>
-    <!-- Pot body (handi curve) -->
-    <path d="M100 130 Q70 200 100 270 Q140 320 210 320 Q280 320 320 270 Q350 200 320 130 Z"
-          fill="url(#handiBrass)" stroke="#8B4513" stroke-width="3"/>
-    <!-- Handles -->
-    <path d="M95 180 Q60 180 60 210 Q60 230 95 225" fill="none" stroke="#8B4513" stroke-width="4"/>
-    <path d="M325 180 Q360 180 360 210 Q360 230 325 225" fill="none" stroke="#8B4513" stroke-width="4"/>
-    <!-- Engraved horizontal bands -->
-    <g fill="none" stroke="#8B4513" stroke-width="1.5" opacity="0.7">
-      <path d="M90 180 Q210 195 330 180"/>
-      <path d="M85 230 Q210 250 335 230"/>
-      <path d="M95 275 Q210 295 325 275"/>
-    </g>
-    <!-- Decorative motif on belly -->
-    <g fill="none" stroke="#FFD86B" stroke-width="1.5" opacity="0.8">
-      <path d="M210 205 L220 220 L210 235 L200 220 Z"/>
-      <circle cx="180" cy="220" r="6"/>
-      <circle cx="240" cy="220" r="6"/>
-    </g>
-  </svg>
-
-  <!-- Corner peacock ornaments -->
-  <svg class="peacock" style="top:50px; left:50px;" width="100" height="100" viewBox="0 0 100 100">
-    <g fill="none" stroke="#E8B931" stroke-width="1.5">
-      <!-- body -->
-      <path d="M30 70 Q30 50 45 45 Q55 42 58 30 Q60 22 55 18"/>
-      <circle cx="55" cy="15" r="3" fill="#FF9933"/>
-      <!-- crest -->
-      <path d="M55 13 L52 5 M55 13 L58 5 M55 13 L55 3"/>
-      <!-- tail feathers -->
-      <path d="M30 70 Q20 90 10 90"/>
-      <path d="M35 75 Q30 95 20 98"/>
-      <path d="M40 78 Q45 98 55 95"/>
-      <path d="M45 75 Q60 90 75 88"/>
-      <!-- eyes on feathers -->
-      <circle cx="15" cy="88" r="3" fill="#C41E3A"/>
-      <circle cx="28" cy="95" r="3" fill="#C41E3A"/>
-      <circle cx="55" cy="94" r="3" fill="#C41E3A"/>
-      <circle cx="72" cy="86" r="3" fill="#C41E3A"/>
-    </g>
-  </svg>
-  <svg class="peacock" style="top:50px; right:50px; transform: scaleX(-1);" width="100" height="100" viewBox="0 0 100 100">
-    <g fill="none" stroke="#E8B931" stroke-width="1.5">
-      <path d="M30 70 Q30 50 45 45 Q55 42 58 30 Q60 22 55 18"/>
-      <circle cx="55" cy="15" r="3" fill="#FF9933"/>
-      <path d="M55 13 L52 5 M55 13 L58 5 M55 13 L55 3"/>
-      <path d="M30 70 Q20 90 10 90"/>
-      <path d="M35 75 Q30 95 20 98"/>
-      <path d="M40 78 Q45 98 55 95"/>
-      <path d="M45 75 Q60 90 75 88"/>
-      <circle cx="15" cy="88" r="3" fill="#C41E3A"/>
-      <circle cx="28" cy="95" r="3" fill="#C41E3A"/>
-      <circle cx="55" cy="94" r="3" fill="#C41E3A"/>
-      <circle cx="72" cy="86" r="3" fill="#C41E3A"/>
-    </g>
-  </svg>
-
-  <div class="royal-border"></div>
+  <div class="frame"></div>
 
   <div class="header">
-    <!-- Crown SVG -->
-    <svg class="crown-svg" width="120" height="50" viewBox="0 0 120 50">
-      <g fill="#FFD86B" stroke="#8B4513" stroke-width="1.5">
-        <path d="M10 45 L10 25 L25 35 L40 15 L55 30 L60 10 L65 30 L80 15 L95 35 L110 25 L110 45 Z"/>
+    <svg class="crown-svg" width="80" height="32" viewBox="0 0 80 32">
+      <g fill="none" stroke="#A8823C" stroke-width="1.2">
+        <path d="M8 28 L8 14 L20 22 L32 6 L40 18 L48 6 L60 22 L72 14 L72 28 Z" fill="rgba(168,130,60,0.1)"/>
+        <circle cx="40" cy="4" r="1.8" fill="#5C1A1B" stroke="none"/>
+        <circle cx="20" cy="22" r="1.3" fill="#5C1A1B" stroke="none"/>
+        <circle cx="60" cy="22" r="1.3" fill="#5C1A1B" stroke="none"/>
       </g>
-      <circle cx="60" cy="8" r="3" fill="#C41E3A"/>
-      <circle cx="25" cy="35" r="2" fill="#C41E3A"/>
-      <circle cx="95" cy="35" r="2" fill="#C41E3A"/>
-      <rect x="10" y="42" width="100" height="5" fill="#B87333"/>
     </svg>
-    <h1 class="title" data-editable="true" data-field="title">DUM BIRYANI</h1>
+    <div class="eyebrow">Signature</div>
+    <h1 class="title" data-editable="true" data-field="title">Dum Biryani</h1>
     <p class="subtitle" data-editable="true" data-field="subtitle">Slow Cooked in Sealed Handi &bull; Saffron Infused</p>
   </div>
 
-  <!-- Hero signature card -->
+  <!-- Small handi SVG -->
+  <svg class="handi-svg" viewBox="0 0 130 130">
+    <g fill="none" stroke="#5C1A1B" stroke-width="1.5">
+      <!-- steam -->
+      <path d="M50 18 Q48 10 54 4 M65 15 Q63 6 69 0 M80 18 Q78 10 84 4" stroke="#A8823C" stroke-width="1" opacity="0.7"/>
+      <!-- knob -->
+      <circle cx="65" cy="30" r="3" fill="#A8823C" stroke="none"/>
+      <!-- lid -->
+      <ellipse cx="65" cy="38" rx="38" ry="5" fill="rgba(168,130,60,0.15)"/>
+      <ellipse cx="65" cy="38" rx="38" ry="5"/>
+      <!-- seal -->
+      <ellipse cx="65" cy="44" rx="39" ry="3" fill="rgba(212,181,114,0.35)" stroke="none"/>
+      <!-- body -->
+      <path d="M27 44 Q18 70 27 95 Q40 112 65 112 Q90 112 103 95 Q112 70 103 44 Z" fill="rgba(168,130,60,0.08)"/>
+      <!-- bands -->
+      <path d="M25 60 Q65 68 105 60" opacity="0.5"/>
+      <path d="M22 80 Q65 88 108 80" opacity="0.5"/>
+      <!-- handles -->
+      <path d="M24 62 Q12 62 12 78 Q12 88 24 86" stroke-width="1.5"/>
+      <path d="M106 62 Q118 62 118 78 Q118 88 106 86" stroke-width="1.5"/>
+      <!-- motif -->
+      <path d="M65 72 L70 80 L65 88 L60 80 Z" stroke="#A8823C"/>
+    </g>
+  </svg>
+
   <div class="hero-card">
-    <div class="hero-left">
-      <div class="hero-label" data-editable="true" data-field="heroLabel">SIGNATURE HYDERABADI BIRYANI</div>
+    <div>
+      <div class="hero-label" data-editable="true" data-field="heroLabel">Signature Hyderabadi Biryani</div>
       <div class="hero-name" data-editable="true" data-field="heroName">Goat Biryani</div>
       <div class="hero-desc" data-editable="true" data-field="heroDesc">Tender goat, basmati rice, saffron, fried onions</div>
       <div class="hero-quote" data-editable="true" data-field="heroQuote">&ldquo;Our award-winning recipe since 2005&rdquo;</div>
@@ -389,62 +238,60 @@
   </div>
 
   <div class="columns">
-    <!-- Left column -->
+    <!-- Left -->
     <div>
       <div class="section-header" data-editable="true" data-field="leftSectionTitle">Biryani Varieties</div>
-      <div class="items">
-        <div class="biryani-item">
-          <span class="item-name" data-editable="true" data-field="item1Name">Chicken Biryani</span>
-          <span class="item-price" data-editable="true" data-field="item1Price">$13.99</span>
-          <span class="item-desc" data-editable="true" data-field="item1Desc">Classic aromatic chicken biryani</span>
-        </div>
-        <div class="biryani-item">
-          <span class="item-name" data-editable="true" data-field="item2Name">Mutton Biryani</span>
-          <span class="item-price" data-editable="true" data-field="item2Price">$15.99</span>
-          <span class="item-desc" data-editable="true" data-field="item2Desc">Tender mutton, rich gravy spices</span>
-        </div>
-        <div class="biryani-item">
-          <span class="item-name" data-editable="true" data-field="item3Name">Egg Biryani</span>
-          <span class="item-price" data-editable="true" data-field="item3Price">$11.99</span>
-          <span class="item-desc" data-editable="true" data-field="item3Desc">Boiled eggs in spiced basmati rice</span>
-        </div>
-        <div class="biryani-item">
-          <span class="item-name" data-editable="true" data-field="item4Name">Veg Biryani</span>
-          <span class="item-price" data-editable="true" data-field="item4Price">$11.99</span>
-          <span class="item-desc" data-editable="true" data-field="item4Desc">Mixed vegetable dum biryani</span>
-        </div>
-        <div class="biryani-item">
-          <span class="item-name" data-editable="true" data-field="item5Name">Paneer Biryani</span>
-          <span class="item-price" data-editable="true" data-field="item5Price">$12.99</span>
-          <span class="item-desc" data-editable="true" data-field="item5Desc">Cottage cheese layered biryani</span>
-        </div>
-        <div class="biryani-item">
-          <span class="item-name" data-editable="true" data-field="item6Name">Prawn Biryani</span>
-          <span class="item-price" data-editable="true" data-field="item6Price">$16.99</span>
-          <span class="item-desc" data-editable="true" data-field="item6Desc">Jumbo prawns dum style biryani</span>
-        </div>
+      <div class="item">
+        <span class="item-name" data-editable="true" data-field="item1Name">Chicken Biryani</span>
+        <span class="item-price" data-editable="true" data-field="item1Price">$13.99</span>
+        <span class="item-desc" data-editable="true" data-field="item1Desc">Classic aromatic chicken biryani</span>
+      </div>
+      <div class="item">
+        <span class="item-name" data-editable="true" data-field="item2Name">Mutton Biryani</span>
+        <span class="item-price" data-editable="true" data-field="item2Price">$15.99</span>
+        <span class="item-desc" data-editable="true" data-field="item2Desc">Tender mutton, rich gravy spices</span>
+      </div>
+      <div class="item">
+        <span class="item-name" data-editable="true" data-field="item3Name">Egg Biryani</span>
+        <span class="item-price" data-editable="true" data-field="item3Price">$11.99</span>
+        <span class="item-desc" data-editable="true" data-field="item3Desc">Boiled eggs in spiced basmati rice</span>
+      </div>
+      <div class="item">
+        <span class="item-name" data-editable="true" data-field="item4Name">Veg Biryani</span>
+        <span class="item-price" data-editable="true" data-field="item4Price">$11.99</span>
+        <span class="item-desc" data-editable="true" data-field="item4Desc">Mixed vegetable dum biryani</span>
+      </div>
+      <div class="item">
+        <span class="item-name" data-editable="true" data-field="item5Name">Paneer Biryani</span>
+        <span class="item-price" data-editable="true" data-field="item5Price">$12.99</span>
+        <span class="item-desc" data-editable="true" data-field="item5Desc">Cottage cheese layered biryani</span>
+      </div>
+      <div class="item">
+        <span class="item-name" data-editable="true" data-field="item6Name">Prawn Biryani</span>
+        <span class="item-price" data-editable="true" data-field="item6Price">$16.99</span>
+        <span class="item-desc" data-editable="true" data-field="item6Desc">Jumbo prawns dum style biryani</span>
       </div>
     </div>
 
-    <!-- Right column -->
+    <div class="col-divider"></div>
+
+    <!-- Right -->
     <div>
       <div class="section-header" data-editable="true" data-field="rightSectionTitle">Biryani Platters</div>
-      <div class="items">
-        <div class="biryani-item">
-          <span class="item-name" data-editable="true" data-field="platter1Name">Family Pack (Serves 4)</span>
-          <span class="item-price" data-editable="true" data-field="platter1Price">$44.99</span>
-          <span class="item-desc" data-editable="true" data-field="platter1Desc">Choice of any biryani variety</span>
-        </div>
-        <div class="biryani-item">
-          <span class="item-name" data-editable="true" data-field="platter2Name">Party Pack (Serves 8)</span>
-          <span class="item-price" data-editable="true" data-field="platter2Price">$79.99</span>
-          <span class="item-desc" data-editable="true" data-field="platter2Desc">Choice of 2 biryanis + sides</span>
-        </div>
-        <div class="biryani-item">
-          <span class="item-name" data-editable="true" data-field="platter3Name">Weekend Special</span>
-          <span class="item-price" data-editable="true" data-field="platter3Price">$18.99</span>
-          <span class="item-desc" data-editable="true" data-field="platter3Desc">Biryani + kebab + dessert combo</span>
-        </div>
+      <div class="item">
+        <span class="item-name" data-editable="true" data-field="platter1Name">Family Pack (Serves 4)</span>
+        <span class="item-price" data-editable="true" data-field="platter1Price">$44.99</span>
+        <span class="item-desc" data-editable="true" data-field="platter1Desc">Choice of any biryani variety</span>
+      </div>
+      <div class="item">
+        <span class="item-name" data-editable="true" data-field="platter2Name">Party Pack (Serves 8)</span>
+        <span class="item-price" data-editable="true" data-field="platter2Price">$79.99</span>
+        <span class="item-desc" data-editable="true" data-field="platter2Desc">Choice of 2 biryanis + sides</span>
+      </div>
+      <div class="item">
+        <span class="item-name" data-editable="true" data-field="platter3Name">Weekend Special</span>
+        <span class="item-price" data-editable="true" data-field="platter3Price">$18.99</span>
+        <span class="item-desc" data-editable="true" data-field="platter3Desc">Biryani + kebab + dessert combo</span>
       </div>
 
       <div class="acc-panel">
