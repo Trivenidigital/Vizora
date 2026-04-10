@@ -79,9 +79,22 @@
             gap: 20px;
         }
 
-        .header-emoji {
-            font-size: 44px;
-            filter: drop-shadow(0 3px 8px rgba(37, 99, 235, 0.2));
+        .header-icon-wrap {
+            width: 52px;
+            height: 52px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.1), rgba(99, 102, 241, 0.1));
+            border: 1px solid rgba(37, 99, 235, 0.15);
+            border-radius: 14px;
+            box-shadow: 0 4px 16px rgba(37, 99, 235, 0.1);
+        }
+
+        .header-icon-wrap svg {
+            width: 28px;
+            height: 28px;
+            color: #2563eb;
         }
 
         .header-title {
@@ -224,7 +237,17 @@
         }
 
         .session-detail-icon {
-            font-size: 12px;
+            width: 14px;
+            height: 14px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .session-detail-icon svg {
+            width: 13px;
+            height: 13px;
         }
 
         .session-badge {
@@ -311,7 +334,12 @@
     <div class="container">
         <div class="header">
             <div class="header-left">
-                <span class="header-emoji">📚</span>
+                <div class="header-icon-wrap">
+                    <!-- Graduation cap / book SVG icon -->
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+                    </svg>
+                </div>
                 <div>
                     <div class="header-title" data-editable="true" data-field="schedule-title">Training Schedule</div>
                     <div class="header-subtitle" data-editable="true" data-field="schedule-subtitle">Professional Development & Learning Programs</div>
@@ -333,8 +361,8 @@
                     <div class="session-time" data-editable="true" data-field="mon-1-time">9:00 - 11:00 AM</div>
                     <div class="session-title" data-editable="true" data-field="mon-1-title">Cloud Architecture Fundamentals</div>
                     <div class="session-meta">
-                        <div class="session-detail"><span class="session-detail-icon">👤</span> <span data-editable="true" data-field="mon-1-instructor">Dr. James Park</span></div>
-                        <div class="session-detail"><span class="session-detail-icon">📍</span> <span data-editable="true" data-field="mon-1-room">Room 301</span></div>
+                        <div class="session-detail"><span class="session-detail-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span> <span data-editable="true" data-field="mon-1-instructor">Dr. James Park</span></div>
+                        <div class="session-detail"><span class="session-detail-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span> <span data-editable="true" data-field="mon-1-room">Room 301</span></div>
                     </div>
                     <span class="session-badge badge-tech">Technical</span>
                 </div>
@@ -342,8 +370,8 @@
                     <div class="session-time" data-editable="true" data-field="mon-2-time">2:00 - 3:30 PM</div>
                     <div class="session-title" data-editable="true" data-field="mon-2-title">Effective Communication</div>
                     <div class="session-meta">
-                        <div class="session-detail"><span class="session-detail-icon">👤</span> <span data-editable="true" data-field="mon-2-instructor">Lisa Chen</span></div>
-                        <div class="session-detail"><span class="session-detail-icon">📍</span> <span data-editable="true" data-field="mon-2-room">Room 205</span></div>
+                        <div class="session-detail"><span class="session-detail-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span> <span data-editable="true" data-field="mon-2-instructor">Lisa Chen</span></div>
+                        <div class="session-detail"><span class="session-detail-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span> <span data-editable="true" data-field="mon-2-room">Room 205</span></div>
                     </div>
                     <span class="session-badge badge-soft">Soft Skills</span>
                 </div>
@@ -359,8 +387,8 @@
                     <div class="session-time" data-editable="true" data-field="tue-1-time">9:00 - 10:30 AM</div>
                     <div class="session-title" data-editable="true" data-field="tue-1-title">Fire Safety & Evacuation Drill</div>
                     <div class="session-meta">
-                        <div class="session-detail"><span class="session-detail-icon">👤</span> <span data-editable="true" data-field="tue-1-instructor">Mark Thompson</span></div>
-                        <div class="session-detail"><span class="session-detail-icon">📍</span> <span data-editable="true" data-field="tue-1-room">Main Lobby</span></div>
+                        <div class="session-detail"><span class="session-detail-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span> <span data-editable="true" data-field="tue-1-instructor">Mark Thompson</span></div>
+                        <div class="session-detail"><span class="session-detail-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span> <span data-editable="true" data-field="tue-1-room">Main Lobby</span></div>
                     </div>
                     <span class="session-badge badge-safety">Safety</span>
                 </div>
@@ -368,8 +396,8 @@
                     <div class="session-time" data-editable="true" data-field="tue-2-time">1:00 - 3:00 PM</div>
                     <div class="session-title" data-editable="true" data-field="tue-2-title">Data Analytics with Python</div>
                     <div class="session-meta">
-                        <div class="session-detail"><span class="session-detail-icon">👤</span> <span data-editable="true" data-field="tue-2-instructor">Anika Patel</span></div>
-                        <div class="session-detail"><span class="session-detail-icon">📍</span> <span data-editable="true" data-field="tue-2-room">Lab 401</span></div>
+                        <div class="session-detail"><span class="session-detail-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span> <span data-editable="true" data-field="tue-2-instructor">Anika Patel</span></div>
+                        <div class="session-detail"><span class="session-detail-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span> <span data-editable="true" data-field="tue-2-room">Lab 401</span></div>
                     </div>
                     <span class="session-badge badge-tech">Technical</span>
                 </div>
@@ -385,8 +413,8 @@
                     <div class="session-time" data-editable="true" data-field="wed-1-time">10:00 - 12:00 PM</div>
                     <div class="session-title" data-editable="true" data-field="wed-1-title">Management Essentials</div>
                     <div class="session-meta">
-                        <div class="session-detail"><span class="session-detail-icon">👤</span> <span data-editable="true" data-field="wed-1-instructor">Robert Garcia</span></div>
-                        <div class="session-detail"><span class="session-detail-icon">📍</span> <span data-editable="true" data-field="wed-1-room">Exec Suite</span></div>
+                        <div class="session-detail"><span class="session-detail-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span> <span data-editable="true" data-field="wed-1-instructor">Robert Garcia</span></div>
+                        <div class="session-detail"><span class="session-detail-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span> <span data-editable="true" data-field="wed-1-room">Exec Suite</span></div>
                     </div>
                     <span class="session-badge badge-leadership">Leadership</span>
                 </div>
@@ -394,8 +422,8 @@
                     <div class="session-time" data-editable="true" data-field="wed-2-time">12:30 - 1:30 PM</div>
                     <div class="session-title" data-editable="true" data-field="wed-2-title">Mindfulness & Stress Mgmt</div>
                     <div class="session-meta">
-                        <div class="session-detail"><span class="session-detail-icon">👤</span> <span data-editable="true" data-field="wed-2-instructor">Maya Williams</span></div>
-                        <div class="session-detail"><span class="session-detail-icon">📍</span> <span data-editable="true" data-field="wed-2-room">Wellness Room</span></div>
+                        <div class="session-detail"><span class="session-detail-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span> <span data-editable="true" data-field="wed-2-instructor">Maya Williams</span></div>
+                        <div class="session-detail"><span class="session-detail-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span> <span data-editable="true" data-field="wed-2-room">Wellness Room</span></div>
                     </div>
                     <span class="session-badge badge-wellness">Wellness</span>
                 </div>
@@ -411,8 +439,8 @@
                     <div class="session-time" data-editable="true" data-field="thu-1-time">9:00 - 11:30 AM</div>
                     <div class="session-title" data-editable="true" data-field="thu-1-title">Cybersecurity Awareness</div>
                     <div class="session-meta">
-                        <div class="session-detail"><span class="session-detail-icon">👤</span> <span data-editable="true" data-field="thu-1-instructor">David Kim</span></div>
-                        <div class="session-detail"><span class="session-detail-icon">📍</span> <span data-editable="true" data-field="thu-1-room">Room 302</span></div>
+                        <div class="session-detail"><span class="session-detail-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span> <span data-editable="true" data-field="thu-1-instructor">David Kim</span></div>
+                        <div class="session-detail"><span class="session-detail-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span> <span data-editable="true" data-field="thu-1-room">Room 302</span></div>
                     </div>
                     <span class="session-badge badge-tech">Technical</span>
                 </div>
@@ -420,8 +448,8 @@
                     <div class="session-time" data-editable="true" data-field="thu-2-time">2:00 - 4:00 PM</div>
                     <div class="session-title" data-editable="true" data-field="thu-2-title">Presentation Skills Workshop</div>
                     <div class="session-meta">
-                        <div class="session-detail"><span class="session-detail-icon">👤</span> <span data-editable="true" data-field="thu-2-instructor">Sarah Adams</span></div>
-                        <div class="session-detail"><span class="session-detail-icon">📍</span> <span data-editable="true" data-field="thu-2-room">Room 205</span></div>
+                        <div class="session-detail"><span class="session-detail-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span> <span data-editable="true" data-field="thu-2-instructor">Sarah Adams</span></div>
+                        <div class="session-detail"><span class="session-detail-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span> <span data-editable="true" data-field="thu-2-room">Room 205</span></div>
                     </div>
                     <span class="session-badge badge-soft">Soft Skills</span>
                 </div>
@@ -437,8 +465,8 @@
                     <div class="session-time" data-editable="true" data-field="fri-1-time">9:30 - 11:00 AM</div>
                     <div class="session-title" data-editable="true" data-field="fri-1-title">Project Management Agile</div>
                     <div class="session-meta">
-                        <div class="session-detail"><span class="session-detail-icon">👤</span> <span data-editable="true" data-field="fri-1-instructor">Tom Wilson</span></div>
-                        <div class="session-detail"><span class="session-detail-icon">📍</span> <span data-editable="true" data-field="fri-1-room">Room 310</span></div>
+                        <div class="session-detail"><span class="session-detail-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span> <span data-editable="true" data-field="fri-1-instructor">Tom Wilson</span></div>
+                        <div class="session-detail"><span class="session-detail-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span> <span data-editable="true" data-field="fri-1-room">Room 310</span></div>
                     </div>
                     <span class="session-badge badge-leadership">Leadership</span>
                 </div>
@@ -446,8 +474,8 @@
                     <div class="session-time" data-editable="true" data-field="fri-2-time">3:00 - 4:00 PM</div>
                     <div class="session-title" data-editable="true" data-field="fri-2-title">Friday Yoga & Stretch</div>
                     <div class="session-meta">
-                        <div class="session-detail"><span class="session-detail-icon">👤</span> <span data-editable="true" data-field="fri-2-instructor">Maya Williams</span></div>
-                        <div class="session-detail"><span class="session-detail-icon">📍</span> <span data-editable="true" data-field="fri-2-room">Rooftop Terrace</span></div>
+                        <div class="session-detail"><span class="session-detail-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span> <span data-editable="true" data-field="fri-2-instructor">Maya Williams</span></div>
+                        <div class="session-detail"><span class="session-detail-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span> <span data-editable="true" data-field="fri-2-room">Rooftop Terrace</span></div>
                     </div>
                     <span class="session-badge badge-wellness">Wellness</span>
                 </div>

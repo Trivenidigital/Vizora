@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1920, height=1080">
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700;800;900&family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700;800;900&family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Bebas+Neue&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -13,86 +13,69 @@
       position: relative;
       font-family: 'Inter', sans-serif;
       background:
-        radial-gradient(ellipse at 30% 30%, rgba(168, 85, 247, 0.1) 0%, transparent 50%),
-        radial-gradient(ellipse at 70% 70%, rgba(236, 72, 153, 0.08) 0%, transparent 45%),
-        radial-gradient(ellipse at 50% 50%, rgba(139, 92, 246, 0.06) 0%, transparent 55%),
-        linear-gradient(145deg, #0d0520 0%, #1a0a35 25%, #150830 50%, #0f0522 75%, #0a0318 100%);
-      color: #f0e6ff;
+        repeating-linear-gradient(
+          -45deg,
+          transparent,
+          transparent 70px,
+          rgba(212, 175, 55, 0.015) 70px,
+          rgba(212, 175, 55, 0.015) 72px
+        ),
+        radial-gradient(ellipse at 25% 30%, rgba(180, 140, 60, 0.18) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 70%, rgba(212, 175, 55, 0.12) 0%, transparent 45%),
+        linear-gradient(145deg, #1a1208 0%, #24180a 25%, #1c1208 50%, #12090a 75%, #0a0605 100%);
+      color: #fff8e7;
     }
 
-    /* Shimmer dots */
     body::before {
       content: '';
       position: absolute;
       top: 0; left: 0; right: 0; bottom: 0;
-      background-image:
-        radial-gradient(circle, rgba(255,255,255,0.025) 1px, transparent 1px),
-        radial-gradient(circle, rgba(168,85,247,0.015) 1px, transparent 1px);
-      background-size: 30px 30px, 45px 45px;
-      background-position: 0 0, 15px 15px;
+      background-image: radial-gradient(circle, rgba(212, 175, 55, 0.035) 1px, transparent 1px);
+      background-size: 28px 28px;
       z-index: 0;
     }
 
-    /* Gradient lines */
     body::after {
       content: '';
       position: absolute;
       top: 0; left: 0; right: 0; bottom: 0;
       background: repeating-linear-gradient(
-        60deg,
+        45deg,
         transparent,
-        transparent 80px,
-        rgba(236, 72, 153, 0.01) 80px,
-        rgba(236, 72, 153, 0.01) 81px
+        transparent 100px,
+        rgba(212, 175, 55, 0.02) 100px,
+        rgba(212, 175, 55, 0.02) 102px
       );
       z-index: 0;
     }
 
-    /* Purple glow */
-    .glow-purple {
+    .glow-gold {
       position: absolute;
-      top: 30%;
-      left: 40%;
-      width: 600px;
-      height: 400px;
-      background: radial-gradient(ellipse, rgba(168, 85, 247, 0.1) 0%, transparent 70%);
+      top: 25%;
+      left: 15%;
+      width: 700px;
+      height: 500px;
+      background: radial-gradient(ellipse, rgba(212, 175, 55, 0.15) 0%, transparent 70%);
+      filter: blur(70px);
+      z-index: 0;
+    }
+
+    .glow-cream {
+      position: absolute;
+      bottom: 5%;
+      right: 10%;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(245, 215, 122, 0.1) 0%, transparent 70%);
       filter: blur(60px);
       z-index: 0;
     }
 
-    .glow-pink {
+    /* SVG decorative ribbons */
+    .ribbon-deco {
       position: absolute;
-      bottom: 10%;
-      right: 20%;
-      width: 400px;
-      height: 400px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(236, 72, 153, 0.06) 0%, transparent 70%);
-      filter: blur(50px);
-      z-index: 0;
-    }
-
-    /* Gift emoji */
-    .emoji-gift {
-      position: absolute;
-      font-size: 140px;
-      z-index: 2;
-    }
-
-    .emoji-gift.g1 {
-      top: 60px;
-      right: 120px;
-      filter: drop-shadow(0 6px 30px rgba(236, 72, 153, 0.4));
-      transform: rotate(10deg);
-    }
-
-    .emoji-gift.g2 {
-      bottom: 80px;
-      left: 100px;
-      font-size: 100px;
-      filter: drop-shadow(0 4px 20px rgba(168, 85, 247, 0.3));
-      opacity: 0.7;
-      transform: rotate(-8deg);
+      z-index: 1;
     }
 
     /* Layout */
@@ -107,65 +90,83 @@
       gap: 30px;
     }
 
-    /* Header */
     .header {
       grid-column: 1 / -1;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      animation: fadeDown 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
 
     .store-name {
       font-family: 'Montserrat', sans-serif;
-      font-size: 22px;
+      font-size: 24px;
       font-weight: 800;
-      letter-spacing: 5px;
+      letter-spacing: 6px;
       text-transform: uppercase;
-      color: rgba(240, 230, 255, 0.5);
+      color: rgba(255, 248, 231, 0.65);
     }
 
     .header-badge {
       font-family: 'Inter', sans-serif;
       font-size: 14px;
-      font-weight: 600;
-      letter-spacing: 3px;
+      font-weight: 700;
+      letter-spacing: 4px;
       text-transform: uppercase;
-      color: #ec4899;
-      background: rgba(236, 72, 153, 0.1);
-      border: 1px solid rgba(236, 72, 153, 0.2);
-      padding: 8px 20px;
-      border-radius: 4px;
+      color: #d4af37;
+      background: rgba(212, 175, 55, 0.1);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(212, 175, 55, 0.3);
+      padding: 10px 26px;
+      border-radius: 50px;
     }
 
-    /* Left - gift card visual */
     .card-display {
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      gap: 30px;
+      gap: 34px;
+      position: relative;
+      animation: fadeLeft 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+      animation-delay: 0.1s;
+    }
+
+    /* Decorative SVG Gift Box BEHIND the card */
+    .gift-box-bg {
+      position: absolute;
+      top: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 620px;
+      height: 400px;
+      z-index: -1;
+      opacity: 0.06;
     }
 
     .gift-card-visual {
-      width: 580px;
-      height: 360px;
-      background: linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(236, 72, 153, 0.1), rgba(139, 92, 246, 0.12));
+      width: 600px;
+      height: 370px;
+      background:
+        linear-gradient(135deg, rgba(245, 215, 122, 0.18), rgba(212, 175, 55, 0.12), rgba(139, 105, 20, 0.15));
       backdrop-filter: blur(30px);
       -webkit-backdrop-filter: blur(30px);
-      border: 2px solid rgba(255, 255, 255, 0.1);
+      border: 2px solid rgba(212, 175, 55, 0.4);
       border-radius: 24px;
-      padding: 40px;
+      padding: 42px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       position: relative;
       box-shadow:
-        0 20px 60px rgba(0, 0, 0, 0.4),
-        0 0 40px rgba(168, 85, 247, 0.1);
+        0 24px 70px rgba(0, 0, 0, 0.55),
+        0 0 50px rgba(212, 175, 55, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
       overflow: hidden;
     }
 
-    /* Holographic shimmer effect */
+    /* Holographic shimmer */
     .gift-card-visual::before {
       content: '';
       position: absolute;
@@ -176,183 +177,211 @@
       background: linear-gradient(
         45deg,
         transparent 30%,
-        rgba(255, 255, 255, 0.03) 40%,
-        rgba(255, 255, 255, 0.06) 50%,
-        rgba(255, 255, 255, 0.03) 60%,
+        rgba(255, 248, 231, 0.06) 40%,
+        rgba(245, 215, 122, 0.1) 50%,
+        rgba(255, 248, 231, 0.06) 60%,
         transparent 70%
       );
       transform: rotate(-15deg);
+    }
+
+    /* Embossed corner ornament on card */
+    .gift-card-visual::after {
+      content: '';
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 70px;
+      height: 70px;
+      background: radial-gradient(circle, rgba(212, 175, 55, 0.25) 0%, transparent 70%);
+      border-radius: 50%;
     }
 
     .card-top {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
+      position: relative;
+      z-index: 2;
     }
 
     .card-brand {
-      font-family: 'Montserrat', sans-serif;
-      font-size: 20px;
-      font-weight: 800;
-      letter-spacing: 4px;
-      text-transform: uppercase;
-      color: rgba(255, 255, 255, 0.8);
+      font-family: 'Playfair Display', serif;
+      font-size: 24px;
+      font-weight: 900;
+      font-style: italic;
+      letter-spacing: 2px;
+      color: #fff8e7;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     }
 
     .card-type {
-      font-family: 'Inter', sans-serif;
-      font-size: 13px;
-      font-weight: 500;
-      letter-spacing: 3px;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 4px;
       text-transform: uppercase;
-      color: rgba(255, 255, 255, 0.4);
+      color: rgba(255, 248, 231, 0.55);
     }
 
     .card-middle {
       text-align: center;
+      position: relative;
+      z-index: 2;
     }
 
     .card-amount {
       font-family: 'Playfair Display', serif;
-      font-size: 80px;
+      font-size: 110px;
       font-weight: 900;
-      background: linear-gradient(135deg, #ffffff 0%, #e0c3fc 50%, #f5c6ec 100%);
+      background: linear-gradient(180deg, #fff8e7 0%, #f5d77a 35%, #d4af37 70%, #b8941f 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
-      filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.2));
+      filter: drop-shadow(0 6px 15px rgba(0, 0, 0, 0.4));
+      line-height: 1;
     }
 
     .card-bottom {
       display: flex;
       justify-content: space-between;
       align-items: flex-end;
+      position: relative;
+      z-index: 2;
     }
 
     .card-number {
-      font-family: 'JetBrains Mono', 'Inter', monospace;
+      font-family: 'Inter', monospace;
       font-size: 16px;
       font-weight: 500;
       letter-spacing: 4px;
-      color: rgba(255, 255, 255, 0.35);
+      color: rgba(255, 248, 231, 0.45);
     }
 
     .card-valid {
-      font-family: 'Inter', sans-serif;
-      font-size: 12px;
-      font-weight: 500;
-      color: rgba(255, 255, 255, 0.3);
+      font-family: 'Montserrat', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      color: rgba(255, 248, 231, 0.4);
       text-align: right;
+      text-transform: uppercase;
     }
 
-    /* Amount chips */
     .amount-chips {
       display: flex;
       gap: 16px;
     }
 
     .chip {
-      background: rgba(255, 255, 255, 0.05);
+      background: rgba(255, 248, 231, 0.06);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 12px;
-      padding: 14px 28px;
+      border: 1px solid rgba(212, 175, 55, 0.2);
+      border-radius: 14px;
+      padding: 16px 30px;
       font-family: 'Montserrat', sans-serif;
-      font-size: 22px;
+      font-size: 24px;
       font-weight: 700;
-      color: rgba(240, 230, 255, 0.8);
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+      color: rgba(255, 248, 231, 0.85);
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
     }
 
     .chip.featured {
-      background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(236, 72, 153, 0.15));
-      border-color: rgba(168, 85, 247, 0.3);
-      color: #ffffff;
+      background: linear-gradient(135deg, rgba(245, 215, 122, 0.25), rgba(212, 175, 55, 0.18));
+      border-color: rgba(245, 215, 122, 0.5);
+      color: #fff8e7;
+      box-shadow: 0 6px 22px rgba(212, 175, 55, 0.3);
     }
 
-    /* Right - details */
     .details-panel {
       display: flex;
       flex-direction: column;
       justify-content: center;
-      gap: 30px;
+      gap: 28px;
       padding-left: 50px;
+      animation: fadeRight 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+      animation-delay: 0.2s;
     }
 
     .details-title {
       font-family: 'Playfair Display', serif;
-      font-size: 56px;
+      font-size: 68px;
       font-weight: 900;
-      line-height: 1.1;
-      color: #ffffff;
+      line-height: 1.05;
+      color: #fff8e7;
+      letter-spacing: -0.5px;
     }
 
     .details-title .accent {
-      color: #ec4899;
+      background: linear-gradient(135deg, #f5d77a 0%, #d4af37 50%, #b8941f 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      font-style: italic;
     }
 
     .details-subtitle {
       font-family: 'Playfair Display', serif;
-      font-size: 24px;
+      font-size: 26px;
       font-style: italic;
-      color: rgba(240, 230, 255, 0.5);
+      color: rgba(255, 248, 231, 0.55);
     }
 
     .details-desc {
       font-family: 'Inter', sans-serif;
-      font-size: 20px;
-      font-weight: 300;
+      font-size: 19px;
+      font-weight: 400;
       line-height: 1.7;
-      color: rgba(240, 230, 255, 0.55);
+      color: rgba(255, 248, 231, 0.6);
     }
 
     .details-features {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 14px;
+      margin-top: 6px;
     }
 
     .feature-row {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 14px;
     }
 
     .feature-check {
-      width: 24px;
-      height: 24px;
+      width: 28px;
+      height: 28px;
       border-radius: 50%;
-      background: rgba(168, 85, 247, 0.15);
-      border: 1px solid rgba(168, 85, 247, 0.3);
+      background: linear-gradient(135deg, rgba(245, 215, 122, 0.2), rgba(212, 175, 55, 0.12));
+      border: 1px solid rgba(212, 175, 55, 0.45);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 12px;
-      color: #a855f7;
       flex-shrink: 0;
     }
 
     .feature-label {
       font-family: 'Inter', sans-serif;
       font-size: 17px;
-      color: rgba(240, 230, 255, 0.65);
+      color: rgba(255, 248, 231, 0.72);
     }
 
-    /* Footer */
     .footer {
       grid-column: 1 / -1;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-top: 1px solid rgba(168, 85, 247, 0.1);
-      padding-top: 20px;
+      border-top: 1px solid rgba(212, 175, 55, 0.18);
+      padding-top: 22px;
+      animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+      animation-delay: 0.4s;
     }
 
     .footer-text {
       font-family: 'Inter', sans-serif;
       font-size: 15px;
-      color: rgba(240, 230, 255, 0.3);
+      color: rgba(255, 248, 231, 0.38);
     }
 
     .footer-cta {
@@ -361,39 +390,124 @@
       font-weight: 700;
       letter-spacing: 3px;
       text-transform: uppercase;
-      color: #ec4899;
+      color: #d4af37;
     }
 
-    /* SVG decorations */
     .svg-deco {
       position: absolute;
       z-index: 1;
     }
+
+    .accent-bar-top {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 3px;
+      background: linear-gradient(90deg, transparent 10%, rgba(180, 140, 60, 0.5) 30%, rgba(245, 215, 122, 0.8) 50%, rgba(180, 140, 60, 0.5) 70%, transparent 90%);
+      z-index: 5;
+    }
+
+    .accent-bar {
+      position: absolute;
+      bottom: 0; left: 0;
+      width: 100%;
+      height: 5px;
+      background: linear-gradient(90deg, transparent 5%, #8B6914 20%, #D4AF37 50%, #8B6914 80%, transparent 95%);
+      z-index: 5;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeDown {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeLeft {
+      from { opacity: 0; transform: translateX(-30px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes fadeRight {
+      from { opacity: 0; transform: translateX(30px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes glowPulse {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 1; }
+    }
   </style>
 </head>
 <body>
-  <!-- Glows -->
-  <div class="glow-purple"></div>
-  <div class="glow-pink"></div>
+  <div class="glow-gold"></div>
+  <div class="glow-cream"></div>
+  <div class="accent-bar-top"></div>
 
-  <!-- Gift emojis -->
-  <div class="emoji-gift g1">🎁</div>
-  <div class="emoji-gift g2">🎁</div>
-
-  <!-- SVG decorations -->
-  <svg class="svg-deco" style="top:30px;left:30px;opacity:0.08;" width="100" height="100" viewBox="0 0 100 100">
-    <rect x="10" y="10" width="80" height="80" rx="10" fill="none" stroke="#a855f7" stroke-width="1"/>
-    <line x1="50" y1="10" x2="50" y2="90" stroke="#ec4899" stroke-width="0.5"/>
-    <line x1="10" y1="50" x2="90" y2="50" stroke="#ec4899" stroke-width="0.5"/>
+  <!-- Large SVG Gift Box - top right replaces emoji -->
+  <svg class="ribbon-deco" style="top:50px;right:90px;" width="320" height="320" viewBox="0 0 320 320">
+    <defs>
+      <linearGradient id="boxGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#f5d77a"/>
+        <stop offset="50%" stop-color="#d4af37"/>
+        <stop offset="100%" stop-color="#8b6914"/>
+      </linearGradient>
+      <linearGradient id="ribbonGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#fff8e7"/>
+        <stop offset="100%" stop-color="#d4af37"/>
+      </linearGradient>
+    </defs>
+    <!-- Box body -->
+    <rect x="40" y="130" width="240" height="150" rx="6" fill="url(#boxGrad)" stroke="#f5d77a" stroke-width="2" opacity="0.9"/>
+    <!-- Box lid -->
+    <rect x="30" y="100" width="260" height="50" rx="4" fill="url(#boxGrad)" stroke="#f5d77a" stroke-width="2"/>
+    <!-- Vertical ribbon body -->
+    <rect x="140" y="130" width="40" height="150" fill="url(#ribbonGrad)" opacity="0.85"/>
+    <!-- Horizontal ribbon lid -->
+    <rect x="140" y="100" width="40" height="50" fill="url(#ribbonGrad)" opacity="0.95"/>
+    <!-- Bow center -->
+    <circle cx="160" cy="100" r="14" fill="url(#ribbonGrad)"/>
+    <!-- Bow loops -->
+    <path d="M160,100 Q120,60 100,70 Q80,80 100,100 Q120,110 160,100" fill="url(#ribbonGrad)" opacity="0.9" stroke="#d4af37" stroke-width="1.5"/>
+    <path d="M160,100 Q200,60 220,70 Q240,80 220,100 Q200,110 160,100" fill="url(#ribbonGrad)" opacity="0.9" stroke="#d4af37" stroke-width="1.5"/>
+    <!-- Ribbon trails -->
+    <path d="M150,110 Q140,135 135,150" fill="none" stroke="#fff8e7" stroke-width="6" stroke-linecap="round" opacity="0.7"/>
+    <path d="M170,110 Q180,135 185,150" fill="none" stroke="#fff8e7" stroke-width="6" stroke-linecap="round" opacity="0.7"/>
+    <circle cx="160" cy="100" r="4" fill="#8b6914"/>
   </svg>
 
-  <svg class="svg-deco" style="bottom:30px;right:30px;opacity:0.06;" width="120" height="120" viewBox="0 0 120 120">
-    <circle cx="60" cy="60" r="55" fill="none" stroke="#a855f7" stroke-width="0.5"/>
-    <polygon points="60,10 105,40 105,80 60,110 15,80 15,40" fill="none" stroke="#ec4899" stroke-width="0.5"/>
+  <!-- Small gift box SVG bottom left (replaces second emoji) -->
+  <svg class="ribbon-deco" style="bottom:70px;left:80px;opacity:0.55;transform:rotate(-10deg);" width="180" height="180" viewBox="0 0 180 180">
+    <defs>
+      <linearGradient id="boxGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#d4af37"/>
+        <stop offset="100%" stop-color="#8b6914"/>
+      </linearGradient>
+    </defs>
+    <rect x="25" y="75" width="130" height="85" rx="4" fill="url(#boxGrad2)" stroke="#f5d77a" stroke-width="1.5"/>
+    <rect x="18" y="55" width="144" height="28" rx="3" fill="url(#boxGrad2)" stroke="#f5d77a" stroke-width="1.5"/>
+    <rect x="78" y="55" width="24" height="105" fill="#fff8e7" opacity="0.8"/>
+    <circle cx="90" cy="55" r="10" fill="#fff8e7" opacity="0.9"/>
+    <path d="M90,55 Q65,32 55,45 Q50,58 72,62 Q86,60 90,55" fill="#fff8e7" opacity="0.75"/>
+    <path d="M90,55 Q115,32 125,45 Q130,58 108,62 Q94,60 90,55" fill="#fff8e7" opacity="0.75"/>
   </svg>
 
-  <svg class="svg-deco" style="top:200px;left:50px;opacity:0.04;" width="60" height="60" viewBox="0 0 60 60">
-    <path d="M30,5 L55,20 L55,45 L30,55 L5,45 L5,20 Z" fill="none" stroke="#a855f7" stroke-width="1"/>
+  <!-- Corner ornaments -->
+  <svg class="svg-deco" style="top:30px;left:30px;opacity:0.15;" width="120" height="120" viewBox="0 0 120 120">
+    <path d="M0,0 L120,0 L120,6 L6,6 L6,120 L0,120 Z" fill="#d4af37"/>
+    <circle cx="20" cy="20" r="3" fill="#d4af37"/>
+  </svg>
+
+  <svg class="svg-deco" style="bottom:30px;right:30px;opacity:0.15;" width="150" height="150" viewBox="0 0 150 150">
+    <path d="M150,0 L150,150 L0,150" fill="none" stroke="#d4af37" stroke-width="2"/>
+    <path d="M150,30 L150,150 L30,150" fill="none" stroke="#8b6914" stroke-width="1"/>
+    <circle cx="150" cy="150" r="4" fill="#d4af37"/>
+  </svg>
+
+  <svg class="svg-deco" style="top:55%;right:55px;transform:translateY(-50%);opacity:0.12;" width="30" height="300" viewBox="0 0 30 300">
+    <line x1="15" y1="0" x2="15" y2="300" stroke="#d4af37" stroke-width="1"/>
+    <circle cx="15" cy="50" r="3" fill="#d4af37"/>
+    <circle cx="15" cy="150" r="3" fill="#f5d77a"/>
+    <circle cx="15" cy="250" r="3" fill="#d4af37"/>
   </svg>
 
   <div class="layout">
@@ -435,19 +549,27 @@
 
       <div class="details-features">
         <div class="feature-row">
-          <div class="feature-check">✓</div>
+          <div class="feature-check">
+            <svg width="14" height="14" viewBox="0 0 14 14"><path d="M2,7 L6,11 L12,3" stroke="#f5d77a" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
           <div class="feature-label" data-editable="true" data-field="feature1">No expiration date — use anytime</div>
         </div>
         <div class="feature-row">
-          <div class="feature-check">✓</div>
+          <div class="feature-check">
+            <svg width="14" height="14" viewBox="0 0 14 14"><path d="M2,7 L6,11 L12,3" stroke="#f5d77a" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
           <div class="feature-label" data-editable="true" data-field="feature2">Redeemable in-store and online</div>
         </div>
         <div class="feature-row">
-          <div class="feature-check">✓</div>
+          <div class="feature-check">
+            <svg width="14" height="14" viewBox="0 0 14 14"><path d="M2,7 L6,11 L12,3" stroke="#f5d77a" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
           <div class="feature-label" data-editable="true" data-field="feature3">Free gift packaging included</div>
         </div>
         <div class="feature-row">
-          <div class="feature-check">✓</div>
+          <div class="feature-check">
+            <svg width="14" height="14" viewBox="0 0 14 14"><path d="M2,7 L6,11 L12,3" stroke="#f5d77a" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
           <div class="feature-label" data-editable="true" data-field="feature4">Balance can be checked online or in-store</div>
         </div>
       </div>
@@ -458,5 +580,7 @@
       <div class="footer-cta" data-editable="true" data-field="footer_cta">AVAILABLE AT CUSTOMER SERVICE →</div>
     </div>
   </div>
+
+  <div class="accent-bar"></div>
 </body>
 </html>

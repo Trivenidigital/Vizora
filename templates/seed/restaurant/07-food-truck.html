@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1080, height=1920">
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700;800&family=Barlow:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Permanent+Marker&family=Caveat+Brush&family=Barlow+Condensed:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -12,56 +12,75 @@
       overflow: hidden;
       position: relative;
       font-family: 'Inter', sans-serif;
+      color: #f4f0e4;
       background:
-        repeating-linear-gradient(
-          -45deg,
-          transparent,
-          transparent 30px,
-          rgba(255,60,40,0.04) 30px,
-          rgba(255,60,40,0.04) 32px
-        ),
-        radial-gradient(ellipse at 50% 20%, rgba(255,200,0,0.12) 0%, transparent 50%),
-        radial-gradient(ellipse at 20% 80%, rgba(255,60,40,0.08) 0%, transparent 50%),
-        linear-gradient(180deg, #1a1a2e 0%, #16132b 50%, #0f0d20 100%);
-      color: #f0ece4;
+        radial-gradient(ellipse at 50% 15%, rgba(255,220,60,0.1) 0%, transparent 50%),
+        radial-gradient(ellipse at 20% 85%, rgba(255,70,50,0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 70%, rgba(80,200,255,0.05) 0%, transparent 50%),
+        linear-gradient(180deg, #1a1a1a 0%, #0f0f0f 30%, #0a0a0a 60%, #0f0f0f 100%);
     }
 
-    /* Grunge overlay texture */
+    /* Chalkboard scratch texture */
     body::before {
       content: '';
       position: absolute;
       top: 0; left: 0; right: 0; bottom: 0;
       background:
-        radial-gradient(circle, rgba(255,255,255,0.02) 1px, transparent 1px),
-        radial-gradient(circle, rgba(255,255,255,0.015) 1px, transparent 1px);
-      background-size: 16px 16px, 25px 25px;
-      background-position: 0 0, 8px 8px;
+        repeating-linear-gradient(
+          23deg,
+          transparent,
+          transparent 140px,
+          rgba(255,255,255,0.015) 140px,
+          rgba(255,255,255,0.015) 142px
+        ),
+        repeating-linear-gradient(
+          -67deg,
+          transparent,
+          transparent 180px,
+          rgba(255,255,255,0.012) 180px,
+          rgba(255,255,255,0.012) 181px
+        ),
+        radial-gradient(circle, rgba(255,255,255,0.02) 1px, transparent 1.5px);
+      background-size: auto, auto, 8px 8px;
       pointer-events: none;
       z-index: 0;
     }
 
-    /* Bright glow spots */
+    /* Chalk dust */
+    body::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background:
+        radial-gradient(ellipse 400px 80px at 30% 10%, rgba(255,255,255,0.03) 0%, transparent 70%),
+        radial-gradient(ellipse 300px 60px at 70% 50%, rgba(255,255,255,0.025) 0%, transparent 70%),
+        radial-gradient(ellipse 500px 90px at 40% 90%, rgba(255,255,255,0.02) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Neon accent glows */
     .glow-yellow {
       position: absolute;
-      top: -100px; left: 50%;
+      top: -150px; left: 50%;
       transform: translateX(-50%);
-      width: 700px; height: 500px;
-      background: radial-gradient(ellipse, rgba(255,200,0,0.15) 0%, transparent 60%);
+      width: 800px; height: 600px;
+      background: radial-gradient(ellipse, rgba(255,220,60,0.15) 0%, transparent 65%);
       z-index: 1;
     }
-    .glow-red {
+    .glow-coral {
       position: absolute;
-      bottom: 200px; left: -100px;
-      width: 500px; height: 500px;
-      background: radial-gradient(circle, rgba(255,60,40,0.1) 0%, transparent 60%);
+      bottom: 300px; left: -150px;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(255,70,50,0.12) 0%, transparent 65%);
       border-radius: 50%;
       z-index: 1;
     }
-    .glow-blue {
+    .glow-cyan {
       position: absolute;
-      bottom: -100px; right: -50px;
-      width: 400px; height: 400px;
-      background: radial-gradient(circle, rgba(50,150,255,0.06) 0%, transparent 60%);
+      bottom: -100px; right: -100px;
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(80,200,255,0.08) 0%, transparent 65%);
       border-radius: 50%;
       z-index: 1;
     }
@@ -72,185 +91,323 @@
       display: grid;
       grid-template-rows: auto 1fr auto;
       height: 100%;
-      padding: 50px 40px;
-      gap: 30px;
+      padding: 75px 55px 60px;
+      gap: 35px;
     }
 
-    /* Header section */
     .header {
       text-align: center;
+      position: relative;
     }
 
-    .truck-emoji {
-      font-size: 100px;
-      filter: drop-shadow(0 4px 20px rgba(255,200,0,0.3));
+    .truck-svg {
+      margin: 0 auto 16px;
+      filter: drop-shadow(0 6px 20px rgba(255,220,60,0.3));
+    }
+
+    .eyebrow {
+      font-family: 'Permanent Marker', cursive;
+      font-size: 28px;
+      color: #ff6e4a;
+      letter-spacing: 6px;
+      text-transform: uppercase;
       margin-bottom: 10px;
+      text-shadow:
+        0 0 20px rgba(255,70,50,0.5),
+        2px 2px 0 rgba(0,0,0,0.4);
+      transform: rotate(-1.5deg);
+      display: inline-block;
     }
 
     .truck-name {
       font-family: 'Bebas Neue', sans-serif;
-      font-size: 96px;
-      color: #ffc800;
-      letter-spacing: 8px;
+      font-size: 128px;
+      color: #ffdc3c;
+      letter-spacing: 6px;
+      line-height: 0.85;
+      margin-bottom: 12px;
       text-shadow:
-        0 0 30px rgba(255,200,0,0.4),
-        0 4px 20px rgba(0,0,0,0.5);
-      line-height: 0.9;
-      margin-bottom: 6px;
+        0 0 40px rgba(255,220,60,0.5),
+        4px 4px 0 rgba(255,70,50,0.3),
+        6px 6px 0 rgba(0,0,0,0.6);
+      -webkit-text-stroke: 1px rgba(255,255,255,0.15);
     }
 
     .truck-tagline {
-      font-family: 'Barlow', sans-serif;
-      font-weight: 500;
-      font-size: 22px;
-      color: rgba(240,236,228,0.5);
-      letter-spacing: 8px;
-      text-transform: uppercase;
+      font-family: 'Caveat Brush', cursive;
+      font-size: 42px;
+      color: #f4f0e4;
+      letter-spacing: 2px;
+      text-shadow: 2px 2px 0 rgba(0,0,0,0.4);
+      transform: rotate(0.5deg);
+      display: inline-block;
+      margin-bottom: 18px;
     }
 
-    .header-line {
-      width: 100%;
-      height: 3px;
-      background: linear-gradient(90deg, transparent, #ffc800, transparent);
-      margin-top: 20px;
+    .header-ornament {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      margin-top: 10px;
+    }
+    .header-ornament::before,
+    .header-ornament::after {
+      content: '';
+      flex: 1;
+      max-width: 200px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #ffdc3c, transparent);
+      box-shadow: 0 0 8px rgba(255,220,60,0.6);
+    }
+    .header-star {
+      width: 28px; height: 28px;
     }
 
-    /* Menu items */
     .menu-list {
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 16px;
+      justify-content: center;
       overflow: hidden;
     }
 
     .combo-item {
       display: grid;
-      grid-template-columns: 80px 1fr auto;
-      gap: 20px;
+      grid-template-columns: 90px 1fr auto;
+      gap: 22px;
       align-items: center;
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,200,0,0.1);
-      border-radius: 20px;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.02) 100%);
+      border: 2px solid rgba(255,220,60,0.15);
+      border-radius: 4px;
       padding: 24px 28px;
       backdrop-filter: blur(10px);
-      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+      box-shadow:
+        0 6px 24px rgba(0,0,0,0.4),
+        inset 0 1px 0 rgba(255,255,255,0.08);
+      position: relative;
+    }
+    .combo-item::before {
+      content: '';
+      position: absolute;
+      top: -2px; left: -2px;
+      width: 18px; height: 18px;
+      border-top: 3px solid #ffdc3c;
+      border-left: 3px solid #ffdc3c;
+    }
+    .combo-item::after {
+      content: '';
+      position: absolute;
+      bottom: -2px; right: -2px;
+      width: 18px; height: 18px;
+      border-bottom: 3px solid #ff6e4a;
+      border-right: 3px solid #ff6e4a;
     }
 
     .combo-number {
-      width: 70px;
-      height: 70px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #ffc800, #ff8c00);
+      width: 82px;
+      height: 82px;
       display: flex;
       align-items: center;
       justify-content: center;
       font-family: 'Bebas Neue', sans-serif;
-      font-size: 36px;
-      color: #1a1a2e;
-      box-shadow: 0 4px 15px rgba(255,200,0,0.3);
+      font-size: 46px;
+      color: #0f0f0f;
+      background: linear-gradient(135deg, #ffdc3c 0%, #ff9a28 100%);
+      box-shadow:
+        0 6px 20px rgba(255,220,60,0.4),
+        inset 0 2px 0 rgba(255,255,255,0.4),
+        inset 0 -4px 0 rgba(0,0,0,0.15);
       flex-shrink: 0;
+      position: relative;
+      transform: rotate(-3deg);
+      clip-path: polygon(15% 0, 100% 10%, 90% 100%, 0 85%);
     }
 
-    .combo-info { flex: 1; }
+    .combo-info { flex: 1; min-width: 0; }
 
     .combo-name {
-      font-family: 'Barlow', sans-serif;
-      font-weight: 800;
-      font-size: 32px;
-      color: #f0ece4;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 900;
+      font-size: 36px;
+      color: #f4f0e4;
       text-transform: uppercase;
-      letter-spacing: 1px;
+      letter-spacing: 1.5px;
       line-height: 1;
+      text-shadow: 2px 2px 0 rgba(0,0,0,0.5);
     }
 
     .combo-desc {
-      font-family: 'Inter', sans-serif;
-      font-weight: 300;
-      font-size: 16px;
-      color: rgba(240,236,228,0.45);
-      margin-top: 4px;
-      line-height: 1.3;
+      font-family: 'Caveat Brush', cursive;
+      font-size: 22px;
+      color: rgba(244,240,228,0.65);
+      margin-top: 6px;
+      line-height: 1.25;
+      letter-spacing: 0.5px;
     }
 
     .combo-price {
       font-family: 'Bebas Neue', sans-serif;
-      font-size: 48px;
-      color: #ffc800;
-      text-shadow: 0 0 20px rgba(255,200,0,0.3);
+      font-size: 62px;
+      color: #ffdc3c;
       white-space: nowrap;
+      line-height: 0.9;
+      text-shadow:
+        0 0 25px rgba(255,220,60,0.5),
+        3px 3px 0 rgba(255,70,50,0.4),
+        4px 4px 0 rgba(0,0,0,0.5);
+      -webkit-text-stroke: 0.5px rgba(255,255,255,0.2);
     }
 
-    /* Footer CTA */
     .footer-cta {
       text-align: center;
+      padding-top: 8px;
     }
 
-    .order-arrow {
+    .order-cta {
       font-family: 'Bebas Neue', sans-serif;
-      font-size: 60px;
-      color: #ffc800;
-      letter-spacing: 6px;
-      text-shadow: 0 0 30px rgba(255,200,0,0.4);
+      font-size: 72px;
+      color: #ffdc3c;
+      letter-spacing: 10px;
+      text-shadow:
+        0 0 30px rgba(255,220,60,0.5),
+        4px 4px 0 rgba(255,70,50,0.5),
+        6px 6px 0 rgba(0,0,0,0.6);
+      line-height: 1;
+      margin-bottom: 10px;
+      -webkit-text-stroke: 1px rgba(255,255,255,0.15);
     }
 
     .social-handle {
-      font-family: 'Inter', sans-serif;
-      font-weight: 400;
-      font-size: 20px;
-      color: rgba(240,236,228,0.4);
-      letter-spacing: 3px;
-      margin-top: 8px;
+      font-family: 'Permanent Marker', cursive;
+      font-size: 30px;
+      color: #ff6e4a;
+      letter-spacing: 4px;
+      text-shadow:
+        0 0 15px rgba(255,110,74,0.4),
+        2px 2px 0 rgba(0,0,0,0.5);
+      transform: rotate(-1deg);
+      display: inline-block;
     }
 
-    /* SVG geometric decoration */
-    .geo-deco {
+    .graffiti {
       position: absolute;
       z-index: 1;
-      opacity: 0.06;
+      pointer-events: none;
     }
-    .geo-1 { top: 50px; right: 30px; }
-    .geo-2 { bottom: 80px; left: 20px; transform: rotate(45deg); }
+    .graffiti-1 { top: 70px; left: 30px; opacity: 0.35; }
+    .graffiti-2 { top: 90px; right: 25px; opacity: 0.3; transform: rotate(12deg); }
+    .graffiti-3 { bottom: 240px; left: 20px; opacity: 0.3; transform: rotate(-8deg); }
+    .graffiti-4 { bottom: 280px; right: 15px; opacity: 0.32; transform: rotate(5deg); }
 
-    /* Side stripe accents */
     .side-stripe-left {
       position: absolute;
       top: 0; left: 0;
-      width: 6px; height: 100%;
-      background: linear-gradient(180deg, #ffc800, #ff3c28, #ffc800);
+      width: 8px; height: 100%;
+      background: linear-gradient(180deg, #ffdc3c 0%, #ff6e4a 50%, #ffdc3c 100%);
+      box-shadow: 0 0 25px rgba(255,220,60,0.5);
       z-index: 3;
     }
     .side-stripe-right {
       position: absolute;
       top: 0; right: 0;
-      width: 6px; height: 100%;
-      background: linear-gradient(180deg, #ffc800, #ff3c28, #ffc800);
+      width: 8px; height: 100%;
+      background: linear-gradient(180deg, #ffdc3c 0%, #ff6e4a 50%, #ffdc3c 100%);
+      box-shadow: 0 0 25px rgba(255,220,60,0.5);
       z-index: 3;
+    }
+
+    .frame {
+      position: absolute;
+      top: 24px; left: 24px; right: 24px; bottom: 24px;
+      border: 2px dashed rgba(255,220,60,0.25);
+      border-radius: 6px;
+      z-index: 1;
+      pointer-events: none;
+    }
+    .frame::before {
+      content: '';
+      position: absolute;
+      top: 4px; left: 4px; right: 4px; bottom: 4px;
+      border: 1px solid rgba(255,110,74,0.15);
     }
   </style>
 </head>
 <body>
   <div class="glow-yellow"></div>
-  <div class="glow-red"></div>
-  <div class="glow-blue"></div>
+  <div class="glow-coral"></div>
+  <div class="glow-cyan"></div>
   <div class="side-stripe-left"></div>
   <div class="side-stripe-right"></div>
 
-  <!-- SVG geometric decorations -->
-  <svg class="geo-deco geo-1" width="120" height="120" viewBox="0 0 120 120" fill="none" stroke="#ffc800" stroke-width="2">
-    <polygon points="60,5 115,90 5,90"/>
-    <polygon points="60,30 95,82 25,82"/>
+  <div class="frame"></div>
+
+  <svg class="graffiti graffiti-1" width="80" height="80" viewBox="0 0 80 80" fill="none">
+    <path d="M40 5 L48 30 L75 30 L53 46 L61 72 L40 56 L19 72 L27 46 L5 30 L32 30 Z" fill="#ffdc3c" stroke="#ff6e4a" stroke-width="2" stroke-linejoin="round"/>
+    <circle cx="40" cy="38" r="4" fill="#ff6e4a"/>
   </svg>
-  <svg class="geo-deco geo-2" width="100" height="100" viewBox="0 0 100 100" fill="none" stroke="#ff3c28" stroke-width="2">
-    <rect x="10" y="10" width="80" height="80"/>
-    <rect x="25" y="25" width="50" height="50"/>
+  <svg class="graffiti graffiti-2" width="70" height="70" viewBox="0 0 70 70" fill="none">
+    <path d="M35 5 Q45 15 55 10 Q60 20 65 30 Q58 40 63 50 Q53 55 48 63 Q38 58 30 62 Q22 55 12 55 Q15 45 8 37 Q18 30 15 20 Q25 18 30 8 Q32 6 35 5 Z" fill="none" stroke="#ff6e4a" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M30 25 Q35 30 40 25 M28 40 Q35 45 42 40" stroke="#ffdc3c" stroke-width="1.5" fill="none"/>
+  </svg>
+  <svg class="graffiti graffiti-3" width="90" height="50" viewBox="0 0 90 50" fill="none">
+    <path d="M5 25 L12 15 L22 28 L32 12 L42 30 L52 10 L62 26 L72 14 L85 25" stroke="#ffdc3c" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="5" cy="25" r="3" fill="#ff6e4a"/>
+    <circle cx="85" cy="25" r="3" fill="#ff6e4a"/>
+  </svg>
+  <svg class="graffiti graffiti-4" width="75" height="75" viewBox="0 0 75 75" fill="none">
+    <polygon points="37,5 50,25 72,28 55,45 60,70 37,57 14,70 19,45 2,28 24,25" fill="none" stroke="#ffdc3c" stroke-width="2.5" stroke-linejoin="round"/>
+    <polygon points="37,18 44,30 56,32 47,40 50,52 37,45 24,52 27,40 18,32 30,30" fill="#ff6e4a" opacity="0.5"/>
   </svg>
 
   <div class="container">
     <div class="header">
-      <div class="truck-emoji">&#128666;</div>
+      <svg class="truck-svg" width="200" height="130" viewBox="0 0 200 130" fill="none">
+        <defs>
+          <linearGradient id="truckBody" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#ffdc3c"/>
+            <stop offset="100%" stop-color="#ff9a28"/>
+          </linearGradient>
+          <linearGradient id="truckCab" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#ff6e4a"/>
+            <stop offset="100%" stop-color="#d84820"/>
+          </linearGradient>
+        </defs>
+        <ellipse cx="100" cy="118" rx="85" ry="4" fill="rgba(255,220,60,0.15)"/>
+        <path d="M20 40 L150 40 L150 105 L20 105 Z" fill="url(#truckBody)" stroke="#0f0f0f" stroke-width="2.5"/>
+        <rect x="32" y="50" width="105" height="35" fill="#0f0f0f" stroke="#f4f0e4" stroke-width="1.5" rx="2"/>
+        <path d="M25 40 L145 40 L140 28 L30 28 Z" fill="#ff6e4a" stroke="#0f0f0f" stroke-width="2"/>
+        <path d="M35 28 L35 40 M55 28 L55 40 M75 28 L75 40 M95 28 L95 40 M115 28 L115 40 M135 28 L135 40" stroke="#0f0f0f" stroke-width="1" opacity="0.4"/>
+        <path d="M150 55 L180 55 L185 70 L185 105 L150 105 Z" fill="url(#truckCab)" stroke="#0f0f0f" stroke-width="2.5"/>
+        <rect x="155" y="60" width="22" height="18" fill="#80c8ff" stroke="#0f0f0f" stroke-width="1.5" rx="1"/>
+        <circle cx="50" cy="105" r="14" fill="#0f0f0f"/>
+        <circle cx="50" cy="105" r="7" fill="#333"/>
+        <circle cx="50" cy="105" r="3" fill="#ffdc3c"/>
+        <circle cx="120" cy="105" r="14" fill="#0f0f0f"/>
+        <circle cx="120" cy="105" r="7" fill="#333"/>
+        <circle cx="120" cy="105" r="3" fill="#ffdc3c"/>
+        <circle cx="165" cy="105" r="14" fill="#0f0f0f"/>
+        <circle cx="165" cy="105" r="7" fill="#333"/>
+        <circle cx="165" cy="105" r="3" fill="#ffdc3c"/>
+        <circle cx="18" cy="18" r="6" fill="#f4f0e4" opacity="0.6"/>
+        <circle cx="10" cy="10" r="4" fill="#f4f0e4" opacity="0.5"/>
+        <circle cx="25" cy="8" r="3" fill="#f4f0e4" opacity="0.4"/>
+        <rect x="40" y="58" width="20" height="20" fill="#f4f0e4" opacity="0.15"/>
+        <line x1="43" y1="62" x2="57" y2="62" stroke="#f4f0e4" stroke-width="0.8" opacity="0.5"/>
+        <line x1="43" y1="66" x2="54" y2="66" stroke="#f4f0e4" stroke-width="0.8" opacity="0.5"/>
+        <line x1="43" y1="70" x2="57" y2="70" stroke="#f4f0e4" stroke-width="0.8" opacity="0.5"/>
+      </svg>
+
+      <div class="eyebrow">Fresh &middot; Bold &middot; Loaded</div>
       <h1 class="truck-name" data-editable="true" data-field="truckName">STREET EATS</h1>
       <p class="truck-tagline" data-editable="true" data-field="tagline">Fresh from the grill</p>
-      <div class="header-line"></div>
+
+      <div class="header-ornament">
+        <svg class="header-star" viewBox="0 0 28 28" fill="none">
+          <path d="M14 2 L17 11 L26 11 L19 17 L22 26 L14 20 L6 26 L9 17 L2 11 L11 11 Z" fill="#ffdc3c" stroke="#ff6e4a" stroke-width="1.5"/>
+        </svg>
+      </div>
     </div>
 
     <div class="menu-list">
@@ -258,7 +415,7 @@
         <div class="combo-number">#1</div>
         <div class="combo-info">
           <div class="combo-name" data-editable="true" data-field="combo1Name">Classic Smash Burger</div>
-          <div class="combo-desc" data-editable="true" data-field="combo1Desc">Double patty, American cheese, pickles, special sauce, fries</div>
+          <div class="combo-desc" data-editable="true" data-field="combo1Desc">Double patty, American cheese, tangy relish, special sauce, fries</div>
         </div>
         <div class="combo-price" data-editable="true" data-field="combo1Price">$12</div>
       </div>
@@ -276,7 +433,7 @@
         <div class="combo-number">#3</div>
         <div class="combo-info">
           <div class="combo-name" data-editable="true" data-field="combo3Name">Nashville Hot Chicken</div>
-          <div class="combo-desc" data-editable="true" data-field="combo3Desc">Spicy fried chicken, coleslaw, pickles, brioche bun, fries</div>
+          <div class="combo-desc" data-editable="true" data-field="combo3Desc">Spicy fried chicken, coleslaw, tangy relish, brioche bun, fries</div>
         </div>
         <div class="combo-price" data-editable="true" data-field="combo3Price">$15</div>
       </div>
@@ -310,7 +467,7 @@
     </div>
 
     <div class="footer-cta">
-      <div class="order-arrow" data-editable="true" data-field="ctaText">ORDER HERE &#10148;</div>
+      <div class="order-cta" data-editable="true" data-field="ctaText">ORDER HERE &#10148;</div>
       <div class="social-handle" data-editable="true" data-field="social">@STREETEATS</div>
     </div>
   </div>

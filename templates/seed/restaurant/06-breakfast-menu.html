@@ -3,58 +3,93 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1920, height=1080">
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes softGlow {
+      0%, 100% { opacity: 0.85; }
+      50%      { opacity: 1; }
+    }
+    @keyframes sunRotate {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+
     body {
       width: 1920px;
       height: 1080px;
       overflow: hidden;
       position: relative;
       font-family: 'Inter', sans-serif;
+      color: #3d2a10;
       background:
-        radial-gradient(ellipse at 30% 0%, rgba(255,180,50,0.15) 0%, transparent 50%),
-        radial-gradient(ellipse at 80% 80%, rgba(255,140,30,0.08) 0%, transparent 50%),
-        radial-gradient(ellipse at 10% 90%, rgba(255,200,80,0.06) 0%, transparent 40%),
-        linear-gradient(175deg, #fffcf5 0%, #fff8eb 30%, #fff3dc 100%);
-      color: #3a2510;
+        radial-gradient(ellipse at 50% -10%, rgba(255,190,80,0.38) 0%, transparent 55%),
+        radial-gradient(ellipse at 15% 15%, rgba(255,160,60,0.18) 0%, transparent 45%),
+        radial-gradient(ellipse at 85% 90%, rgba(255,140,40,0.14) 0%, transparent 50%),
+        linear-gradient(178deg, #fff7e3 0%, #fdecc2 35%, #fae0a1 70%, #f5d388 100%);
     }
 
-    /* Subtle pattern */
+    /* Linen paper texture dot overlay */
     body::before {
       content: '';
       position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
+      inset: 0;
       background:
-        radial-gradient(circle, rgba(255,160,40,0.04) 1.5px, transparent 1.5px);
-      background-size: 32px 32px;
+        radial-gradient(circle, rgba(190,120,30,0.06) 1.2px, transparent 1.6px),
+        radial-gradient(circle, rgba(160,90,20,0.035) 1px, transparent 1.4px);
+      background-size: 26px 26px, 41px 41px;
+      background-position: 0 0, 13px 13px;
       pointer-events: none;
       z-index: 0;
     }
 
-    /* Warm glow spots */
-    .sunrise-glow-1 {
+    /* Sunrise radial bands */
+    body::after {
+      content: '';
       position: absolute;
-      top: -200px; left: 300px;
-      width: 800px; height: 500px;
-      background: radial-gradient(ellipse, rgba(255,180,50,0.12) 0%, transparent 70%);
-      z-index: 1;
+      top: -300px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 1600px; height: 1600px;
+      background:
+        repeating-radial-gradient(
+          circle at center,
+          transparent 0 120px,
+          rgba(255,180,50,0.04) 120px 122px
+        );
+      pointer-events: none;
+      z-index: 0;
     }
-    .sunrise-glow-2 {
+
+    /* Ambient warm glows */
+    .glow {
       position: absolute;
-      bottom: -100px; right: 100px;
-      width: 500px; height: 500px;
-      background: radial-gradient(circle, rgba(255,140,40,0.06) 0%, transparent 60%);
-      border-radius: 50%;
+      pointer-events: none;
       z-index: 1;
+      animation: softGlow 8s ease-in-out infinite;
     }
-    .sunrise-glow-3 {
-      position: absolute;
-      top: 400px; left: -100px;
-      width: 400px; height: 400px;
-      background: radial-gradient(circle, rgba(255,200,100,0.08) 0%, transparent 60%);
+    .glow-sun {
+      top: -250px; left: 300px;
+      width: 900px; height: 600px;
+      background: radial-gradient(ellipse, rgba(255,180,50,0.22) 0%, transparent 70%);
+    }
+    .glow-amber {
+      bottom: -120px; right: 120px;
+      width: 620px; height: 620px;
+      background: radial-gradient(circle, rgba(255,130,40,0.14) 0%, transparent 60%);
       border-radius: 50%;
-      z-index: 1;
+      animation-delay: 3s;
+    }
+    .glow-peach {
+      top: 360px; left: -160px;
+      width: 520px; height: 520px;
+      background: radial-gradient(circle, rgba(255,210,120,0.18) 0%, transparent 60%);
+      border-radius: 50%;
+      animation-delay: 5s;
     }
 
     .container {
@@ -64,286 +99,463 @@
       grid-template-columns: 520px 1fr 1fr;
       grid-template-rows: 1fr;
       height: 100%;
-      padding: 50px 60px;
+      padding: 54px 60px 72px;
       gap: 40px;
+      animation: fadeUp 1.2s ease-out both;
     }
 
-    /* Left hero area */
+    /* ============ Hero panel ============ */
     .hero-panel {
+      position: relative;
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
       text-align: center;
-      background: rgba(255,255,255,0.4);
-      border-radius: 28px;
-      border: 1px solid rgba(255,180,50,0.15);
-      padding: 40px;
-      backdrop-filter: blur(20px);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.65), rgba(255,245,215,0.55));
+      border-radius: 30px;
+      border: 1px solid rgba(212,140,30,0.22);
+      padding: 52px 40px;
+      backdrop-filter: blur(18px);
       box-shadow:
-        0 20px 60px rgba(200,140,40,0.08),
-        inset 0 1px 0 rgba(255,255,255,0.8);
+        0 26px 70px rgba(200,120,20,0.15),
+        inset 0 1px 0 rgba(255,255,255,0.85),
+        inset 0 0 60px rgba(255,200,100,0.12);
+      overflow: hidden;
     }
 
-    .emoji-hero {
-      font-size: 160px;
-      line-height: 1;
-      filter: drop-shadow(0 8px 20px rgba(255,160,40,0.25));
-      margin-bottom: 20px;
+    .hero-panel::before {
+      content: '';
+      position: absolute;
+      inset: 16px;
+      border-radius: 20px;
+      border: 1px dashed rgba(200,120,20,0.25);
+      pointer-events: none;
+    }
+
+    .sun-hero {
+      position: relative;
+      width: 200px;
+      height: 200px;
+      margin-bottom: 16px;
+      filter:
+        drop-shadow(0 0 40px rgba(255,180,50,0.55))
+        drop-shadow(0 10px 20px rgba(200,120,20,0.25));
+    }
+    .sun-hero svg { display: block; }
+    .sun-rays-spin {
+      position: absolute;
+      inset: 0;
+      animation: sunRotate 60s linear infinite;
     }
 
     .breakfast-title {
-      font-family: 'Poppins', sans-serif;
-      font-weight: 800;
-      font-size: 56px;
-      color: #c27a10;
-      line-height: 1;
-      margin-bottom: 8px;
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 72px;
+      color: #b9550a;
+      line-height: 0.95;
+      letter-spacing: 1.5px;
+      text-shadow: 0 3px 22px rgba(255,160,40,0.25);
+      margin-bottom: 6px;
     }
 
     .breakfast-subtitle {
-      font-family: 'Playfair Display', serif;
+      font-family: 'Cormorant Garamond', serif;
       font-style: italic;
-      font-size: 26px;
-      color: #b08030;
+      font-weight: 600;
+      font-size: 28px;
+      color: #a0682a;
+      letter-spacing: 2px;
       margin-bottom: 28px;
     }
 
+    .divider-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 30px;
+    }
+    .divider-row .line {
+      width: 80px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #c27a10, transparent);
+    }
+    .divider-row .dot {
+      width: 8px; height: 8px;
+      background: #c27a10;
+      transform: rotate(45deg);
+      box-shadow: 0 0 10px rgba(194,122,16,0.5);
+    }
+
     .time-badge {
-      background: linear-gradient(135deg, #f0a020, #e08818);
+      background: linear-gradient(135deg, #f0a020, #d97815);
       color: #fff;
-      font-family: 'Poppins', sans-serif;
-      font-weight: 600;
-      font-size: 18px;
-      padding: 12px 32px;
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: 16px;
+      padding: 14px 34px;
       border-radius: 50px;
-      letter-spacing: 2px;
-      box-shadow: 0 6px 20px rgba(224,136,24,0.3);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      box-shadow:
+        0 10px 28px rgba(217,120,21,0.4),
+        inset 0 1px 0 rgba(255,255,255,0.4);
     }
 
-    /* SVG sun rays decoration */
-    .sun-rays {
-      position: absolute;
-      top: -40px; right: -40px;
-      opacity: 0.04;
-      z-index: 1;
-    }
-
-    /* Menu columns */
+    /* ============ Menu columns ============ */
     .menu-col {
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,245,215,0.5));
+      border: 1px solid rgba(212,140,30,0.2);
+      border-radius: 24px;
+      padding: 0;
+      backdrop-filter: blur(12px);
+      box-shadow:
+        0 22px 60px rgba(200,120,20,0.12),
+        inset 0 1px 0 rgba(255,255,255,0.8);
+      overflow: hidden;
     }
 
-    .col-title-bar {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 8px;
+    .col-header {
+      padding: 28px 32px 16px;
+      text-align: center;
+      border-bottom: 1px solid rgba(212,140,30,0.18);
+      background: linear-gradient(180deg, rgba(255,200,80,0.15), transparent);
+      position: relative;
     }
-    .col-icon {
-      font-size: 36px;
-      filter: drop-shadow(0 2px 6px rgba(200,120,20,0.2));
+    .col-icon-wrap {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 6px;
     }
     .col-title {
-      font-family: 'Poppins', sans-serif;
-      font-weight: 700;
-      font-size: 32px;
-      color: #8b5510;
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 34px;
+      color: #b9550a;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      line-height: 1;
+    }
+    .col-subtitle {
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-size: 20px;
+      color: #a0682a;
+      margin-top: 2px;
+    }
+    .col-header::after {
+      content: '';
+      display: block;
+      width: 80px;
+      height: 1px;
+      margin: 12px auto 0;
+      background: linear-gradient(90deg, transparent, #c27a10, transparent);
+    }
+
+    .col-body {
+      padding: 20px 28px 28px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      justify-content: center;
     }
 
     .menu-card {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      column-gap: 18px;
+      padding: 16px 20px;
       background: rgba(255,255,255,0.5);
-      border: 1px solid rgba(200,140,40,0.1);
-      border-radius: 18px;
-      padding: 22px 26px;
-      backdrop-filter: blur(12px);
-      box-shadow: 0 4px 20px rgba(200,140,40,0.05);
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 16px;
+      border: 1px solid rgba(212,140,30,0.14);
+      border-radius: 14px;
+      box-shadow: 0 4px 14px rgba(200,120,20,0.05);
+    }
+    .menu-card:nth-child(even) {
+      background: rgba(255,250,225,0.65);
     }
 
-    .card-info { flex: 1; }
+    .card-info { min-width: 0; }
 
     .card-name {
-      font-family: 'Poppins', sans-serif;
-      font-weight: 600;
-      font-size: 26px;
-      color: #3a2510;
-      line-height: 1.1;
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 24px;
+      color: #3d2a10;
+      line-height: 1.15;
     }
     .card-desc {
-      font-family: 'Inter', sans-serif;
-      font-weight: 300;
-      font-size: 15px;
-      color: #8b6b40;
-      line-height: 1.4;
-      margin-top: 4px;
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-size: 17px;
+      color: #8b6328;
+      line-height: 1.35;
+      margin-top: 3px;
     }
-
     .card-price {
-      font-family: 'Poppins', sans-serif;
+      font-family: 'Playfair Display', serif;
       font-weight: 700;
       font-size: 28px;
       color: #c27a10;
       white-space: nowrap;
+      align-self: center;
+      text-shadow: 0 0 16px rgba(255,180,50,0.25);
     }
 
-    /* Ornamental bottom line */
-    .bottom-line {
+    /* ============ Corner ornaments ============ */
+    .corner-decor {
       position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 5px;
-      background: linear-gradient(90deg, #f0a020, #e08818, #f0c040, #e08818, #f0a020);
       z-index: 3;
+      opacity: 0.3;
     }
+    .corner-tl { top: 24px; left: 24px; }
+    .corner-tr { top: 24px; right: 24px; transform: scaleX(-1); }
+    .corner-bl { bottom: 30px; left: 24px; transform: scaleY(-1); }
+    .corner-br { bottom: 30px; right: 24px; transform: scale(-1,-1); }
 
-    /* SVG decorative leaf */
-    .leaf-deco {
+    /* Decorative wheat & berries */
+    .nature-deco {
       position: absolute;
       z-index: 1;
-      opacity: 0.06;
+      opacity: 0.12;
+      pointer-events: none;
     }
-    .leaf-1 { bottom: 60px; left: 40px; }
-    .leaf-2 { top: 60px; right: 60px; transform: rotate(120deg); }
+    .wheat-l { bottom: 70px; left: 30px; }
+    .wheat-r { top: 90px; right: 40px; transform: rotate(16deg); }
+    .berry-1 { top: 320px; right: 70px; }
+
+    /* Bottom gradient strip */
+    .bottom-strip {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 6px;
+      background: linear-gradient(90deg,
+        #f5d388, #f0a020, #ffcb4a, #f0a020, #f5d388);
+      z-index: 3;
+      box-shadow: 0 -4px 20px rgba(255,160,40,0.3);
+    }
   </style>
 </head>
 <body>
-  <div class="sunrise-glow-1"></div>
-  <div class="sunrise-glow-2"></div>
-  <div class="sunrise-glow-3"></div>
+  <div class="glow glow-sun"></div>
+  <div class="glow glow-amber"></div>
+  <div class="glow glow-peach"></div>
 
-  <!-- SVG sun rays -->
-  <svg class="sun-rays" width="500" height="500" viewBox="0 0 500 500" fill="#c27a10">
-    <circle cx="250" cy="250" r="80"/>
-    <line x1="250" y1="20" x2="250" y2="120" stroke="#c27a10" stroke-width="8" stroke-linecap="round"/>
-    <line x1="250" y1="380" x2="250" y2="480" stroke="#c27a10" stroke-width="8" stroke-linecap="round"/>
-    <line x1="20" y1="250" x2="120" y2="250" stroke="#c27a10" stroke-width="8" stroke-linecap="round"/>
-    <line x1="380" y1="250" x2="480" y2="250" stroke="#c27a10" stroke-width="8" stroke-linecap="round"/>
-    <line x1="87" y1="87" x2="157" y2="157" stroke="#c27a10" stroke-width="6" stroke-linecap="round"/>
-    <line x1="343" y1="343" x2="413" y2="413" stroke="#c27a10" stroke-width="6" stroke-linecap="round"/>
-    <line x1="413" y1="87" x2="343" y2="157" stroke="#c27a10" stroke-width="6" stroke-linecap="round"/>
-    <line x1="157" y1="343" x2="87" y2="413" stroke="#c27a10" stroke-width="6" stroke-linecap="round"/>
+  <!-- Decorative wheat SVGs -->
+  <svg class="nature-deco wheat-l" width="140" height="220" viewBox="0 0 140 220" fill="none">
+    <line x1="70" y1="220" x2="70" y2="30" stroke="#8b5510" stroke-width="3" stroke-linecap="round"/>
+    <g fill="#c27a10" stroke="#8b5510" stroke-width="1.5">
+      <ellipse cx="52" cy="36" rx="16" ry="9" transform="rotate(-28 52 36)"/>
+      <ellipse cx="88" cy="58" rx="16" ry="9" transform="rotate(28 88 58)"/>
+      <ellipse cx="52" cy="82" rx="16" ry="9" transform="rotate(-28 52 82)"/>
+      <ellipse cx="88" cy="104" rx="16" ry="9" transform="rotate(28 88 104)"/>
+      <ellipse cx="52" cy="128" rx="16" ry="9" transform="rotate(-28 52 128)"/>
+      <ellipse cx="88" cy="150" rx="16" ry="9" transform="rotate(28 88 150)"/>
+    </g>
   </svg>
 
-  <!-- SVG leaf decorations -->
-  <svg class="leaf-deco leaf-1" width="120" height="180" viewBox="0 0 120 180" fill="#5a8020">
-    <path d="M60 180 Q60 90 30 50 Q10 20 60 0 Q110 20 90 50 Q60 90 60 180Z"/>
-    <line x1="60" y1="180" x2="60" y2="30" stroke="#fffcf5" stroke-width="2"/>
+  <svg class="nature-deco wheat-r" width="130" height="210" viewBox="0 0 140 220" fill="none">
+    <line x1="70" y1="220" x2="70" y2="30" stroke="#8b5510" stroke-width="3" stroke-linecap="round"/>
+    <g fill="#c27a10" stroke="#8b5510" stroke-width="1.5">
+      <ellipse cx="52" cy="36" rx="16" ry="9" transform="rotate(-28 52 36)"/>
+      <ellipse cx="88" cy="58" rx="16" ry="9" transform="rotate(28 88 58)"/>
+      <ellipse cx="52" cy="82" rx="16" ry="9" transform="rotate(-28 52 82)"/>
+      <ellipse cx="88" cy="104" rx="16" ry="9" transform="rotate(28 88 104)"/>
+      <ellipse cx="52" cy="128" rx="16" ry="9" transform="rotate(-28 52 128)"/>
+      <ellipse cx="88" cy="150" rx="16" ry="9" transform="rotate(28 88 150)"/>
+    </g>
   </svg>
-  <svg class="leaf-deco leaf-2" width="100" height="150" viewBox="0 0 100 150" fill="#5a8020">
-    <path d="M50 150 Q50 75 25 40 Q8 16 50 0 Q92 16 75 40 Q50 75 50 150Z"/>
-    <line x1="50" y1="150" x2="50" y2="25" stroke="#fffcf5" stroke-width="2"/>
+
+  <!-- Decorative berry cluster -->
+  <svg class="nature-deco berry-1" width="120" height="120" viewBox="0 0 120 120">
+    <circle cx="40" cy="50" r="14" fill="#8b1a35"/>
+    <circle cx="66" cy="42" r="13" fill="#a02040"/>
+    <circle cx="78" cy="68" r="14" fill="#8b1a35"/>
+    <circle cx="52" cy="75" r="13" fill="#a02040"/>
+    <path d="M60 20 L55 8 M60 20 L68 10 M60 20 L62 5" stroke="#2d6020" stroke-width="2"/>
+    <ellipse cx="44" cy="16" rx="10" ry="5" fill="#2d6020" transform="rotate(-20 44 16)"/>
+    <ellipse cx="78" cy="18" rx="10" ry="5" fill="#2d6020" transform="rotate(25 78 18)"/>
+  </svg>
+
+  <!-- Corner ornaments -->
+  <svg class="corner-decor corner-tl" width="90" height="90" viewBox="0 0 90 90" fill="none">
+    <path d="M6 6 L6 48 Q6 6 48 6" stroke="#c27a10" stroke-width="2"/>
+    <path d="M20 20 L20 36 Q20 20 36 20" stroke="#c27a10" stroke-width="1"/>
+    <circle cx="9" cy="9" r="3.2" fill="#c27a10"/>
+  </svg>
+  <svg class="corner-decor corner-tr" width="90" height="90" viewBox="0 0 90 90" fill="none">
+    <path d="M6 6 L6 48 Q6 6 48 6" stroke="#c27a10" stroke-width="2"/>
+    <path d="M20 20 L20 36 Q20 20 36 20" stroke="#c27a10" stroke-width="1"/>
+    <circle cx="9" cy="9" r="3.2" fill="#c27a10"/>
+  </svg>
+  <svg class="corner-decor corner-bl" width="90" height="90" viewBox="0 0 90 90" fill="none">
+    <path d="M6 6 L6 48 Q6 6 48 6" stroke="#c27a10" stroke-width="2"/>
+    <path d="M20 20 L20 36 Q20 20 36 20" stroke="#c27a10" stroke-width="1"/>
+    <circle cx="9" cy="9" r="3.2" fill="#c27a10"/>
+  </svg>
+  <svg class="corner-decor corner-br" width="90" height="90" viewBox="0 0 90 90" fill="none">
+    <path d="M6 6 L6 48 Q6 6 48 6" stroke="#c27a10" stroke-width="2"/>
+    <path d="M20 20 L20 36 Q20 20 36 20" stroke="#c27a10" stroke-width="1"/>
+    <circle cx="9" cy="9" r="3.2" fill="#c27a10"/>
   </svg>
 
   <div class="container">
+    <!-- HERO PANEL -->
     <div class="hero-panel">
-      <div class="emoji-hero">&#9728;&#65039;</div>
+      <div class="sun-hero">
+        <div class="sun-rays-spin">
+          <svg width="200" height="200" viewBox="0 0 200 200" fill="none">
+            <g stroke="#f0a020" stroke-width="5" stroke-linecap="round">
+              <line x1="100" y1="8" x2="100" y2="32"/>
+              <line x1="100" y1="168" x2="100" y2="192"/>
+              <line x1="8" y1="100" x2="32" y2="100"/>
+              <line x1="168" y1="100" x2="192" y2="100"/>
+              <line x1="35" y1="35" x2="52" y2="52"/>
+              <line x1="148" y1="148" x2="165" y2="165"/>
+              <line x1="165" y1="35" x2="148" y2="52"/>
+              <line x1="52" y1="148" x2="35" y2="165"/>
+            </g>
+          </svg>
+        </div>
+        <svg width="200" height="200" viewBox="0 0 200 200" style="position:absolute; inset:0;">
+          <defs>
+            <radialGradient id="sunCore" cx="0.5" cy="0.45" r="0.6">
+              <stop offset="0" stop-color="#ffdb6e"/>
+              <stop offset="0.7" stop-color="#f0a020"/>
+              <stop offset="1" stop-color="#d97815"/>
+            </radialGradient>
+          </defs>
+          <circle cx="100" cy="100" r="52" fill="url(#sunCore)" stroke="#b9550a" stroke-width="2"/>
+          <circle cx="100" cy="100" r="42" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="1.5"/>
+        </svg>
+      </div>
+
       <h1 class="breakfast-title" data-editable="true" data-field="title">Rise &amp; Dine</h1>
-      <p class="breakfast-subtitle" data-editable="true" data-field="subtitle">Breakfast &amp; Brunch Menu</p>
-      <div class="time-badge" data-editable="true" data-field="hours">SERVED 7AM - 12PM</div>
+      <p class="breakfast-subtitle" data-editable="true" data-field="subtitle">Breakfast &amp; Brunch</p>
+
+      <div class="divider-row">
+        <span class="line"></span>
+        <span class="dot"></span>
+        <span class="line"></span>
+      </div>
+
+      <div class="time-badge" data-editable="true" data-field="hours">Served 7AM — 12PM</div>
     </div>
 
-    <!-- Eggs & Mains column -->
+    <!-- MAINS column -->
     <div class="menu-col">
-      <div class="col-title-bar">
-        <span class="col-icon">&#127859;</span>
+      <div class="col-header">
+        <div class="col-icon-wrap">
+          <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+            <ellipse cx="22" cy="28" rx="18" ry="6" fill="#f0a020" stroke="#b9550a" stroke-width="2"/>
+            <ellipse cx="22" cy="22" rx="14" ry="8" fill="#ffdb6e" stroke="#b9550a" stroke-width="2"/>
+            <circle cx="22" cy="20" r="5" fill="#c27a10"/>
+          </svg>
+        </div>
         <h2 class="col-title" data-editable="true" data-field="mainsTitle">Mains</h2>
+        <p class="col-subtitle">hearty morning classics</p>
       </div>
-
-      <div class="menu-card">
-        <div class="card-info">
-          <div class="card-name" data-editable="true" data-field="main1Name">Classic Benedict</div>
-          <div class="card-desc" data-editable="true" data-field="main1Desc">Poached eggs, Canadian bacon, hollandaise, English muffin</div>
+      <div class="col-body">
+        <div class="menu-card">
+          <div class="card-info">
+            <div class="card-name" data-editable="true" data-field="main1Name">Classic Benedict</div>
+            <div class="card-desc" data-editable="true" data-field="main1Desc">Poached eggs, Canadian bacon, hollandaise, English muffin</div>
+          </div>
+          <div class="card-price" data-editable="true" data-field="main1Price">$16</div>
         </div>
-        <div class="card-price" data-editable="true" data-field="main1Price">$16</div>
-      </div>
-
-      <div class="menu-card">
-        <div class="card-info">
-          <div class="card-name" data-editable="true" data-field="main2Name">Buttermilk Pancakes</div>
-          <div class="card-desc" data-editable="true" data-field="main2Desc">Stack of three, maple syrup, whipped butter, seasonal berries</div>
+        <div class="menu-card">
+          <div class="card-info">
+            <div class="card-name" data-editable="true" data-field="main2Name">Buttermilk Pancakes</div>
+            <div class="card-desc" data-editable="true" data-field="main2Desc">Stack of three, maple syrup, whipped butter, seasonal berries</div>
+          </div>
+          <div class="card-price" data-editable="true" data-field="main2Price">$14</div>
         </div>
-        <div class="card-price" data-editable="true" data-field="main2Price">$14</div>
-      </div>
-
-      <div class="menu-card">
-        <div class="card-info">
-          <div class="card-name" data-editable="true" data-field="main3Name">Avocado Toast</div>
-          <div class="card-desc" data-editable="true" data-field="main3Desc">Sourdough, smashed avocado, poached egg, chili flakes, microgreens</div>
+        <div class="menu-card">
+          <div class="card-info">
+            <div class="card-name" data-editable="true" data-field="main3Name">Avocado Toast</div>
+            <div class="card-desc" data-editable="true" data-field="main3Desc">Sourdough, smashed avocado, poached egg, chili, microgreens</div>
+          </div>
+          <div class="card-price" data-editable="true" data-field="main3Price">$15</div>
         </div>
-        <div class="card-price" data-editable="true" data-field="main3Price">$15</div>
-      </div>
-
-      <div class="menu-card">
-        <div class="card-info">
-          <div class="card-name" data-editable="true" data-field="main4Name">Shakshuka</div>
-          <div class="card-desc" data-editable="true" data-field="main4Desc">Baked eggs in spiced tomato sauce, feta, fresh herbs, warm pita</div>
+        <div class="menu-card">
+          <div class="card-info">
+            <div class="card-name" data-editable="true" data-field="main4Name">Shakshuka</div>
+            <div class="card-desc" data-editable="true" data-field="main4Desc">Baked eggs in spiced tomato, feta, fresh herbs, warm pita</div>
+          </div>
+          <div class="card-price" data-editable="true" data-field="main4Price">$17</div>
         </div>
-        <div class="card-price" data-editable="true" data-field="main4Price">$17</div>
-      </div>
-
-      <div class="menu-card">
-        <div class="card-info">
-          <div class="card-name" data-editable="true" data-field="main5Name">French Toast</div>
-          <div class="card-desc" data-editable="true" data-field="main5Desc">Brioche, vanilla custard, caramelized bananas, cinnamon sugar</div>
+        <div class="menu-card">
+          <div class="card-info">
+            <div class="card-name" data-editable="true" data-field="main5Name">Brioche French Toast</div>
+            <div class="card-desc" data-editable="true" data-field="main5Desc">Vanilla custard, caramelized banana, cinnamon sugar</div>
+          </div>
+          <div class="card-price" data-editable="true" data-field="main5Price">$15</div>
         </div>
-        <div class="card-price" data-editable="true" data-field="main5Price">$15</div>
       </div>
     </div>
 
-    <!-- Lighter fare column -->
+    <!-- LIGHTER FARE column -->
     <div class="menu-col">
-      <div class="col-title-bar">
-        <span class="col-icon">&#129382;</span>
+      <div class="col-header">
+        <div class="col-icon-wrap">
+          <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+            <circle cx="16" cy="22" r="6" fill="#8b1a35" stroke="#5a0f20" stroke-width="1.5"/>
+            <circle cx="26" cy="18" r="6" fill="#a02040" stroke="#5a0f20" stroke-width="1.5"/>
+            <circle cx="30" cy="28" r="6" fill="#8b1a35" stroke="#5a0f20" stroke-width="1.5"/>
+            <circle cx="20" cy="30" r="6" fill="#a02040" stroke="#5a0f20" stroke-width="1.5"/>
+            <path d="M22 10 Q14 4 10 8 M22 10 Q30 4 34 8" stroke="#2d6020" stroke-width="2" fill="none"/>
+            <ellipse cx="14" cy="10" rx="5" ry="3" fill="#2d6020" transform="rotate(-30 14 10)"/>
+            <ellipse cx="30" cy="10" rx="5" ry="3" fill="#2d6020" transform="rotate(30 30 10)"/>
+          </svg>
+        </div>
         <h2 class="col-title" data-editable="true" data-field="lighterTitle">Light &amp; Fresh</h2>
+        <p class="col-subtitle">bright, healthy, delicious</p>
       </div>
-
-      <div class="menu-card">
-        <div class="card-info">
-          <div class="card-name" data-editable="true" data-field="light1Name">Acai Bowl</div>
-          <div class="card-desc" data-editable="true" data-field="light1Desc">Acai blend, granola, banana, coconut flakes, honey drizzle</div>
+      <div class="col-body">
+        <div class="menu-card">
+          <div class="card-info">
+            <div class="card-name" data-editable="true" data-field="light1Name">Acai Bowl</div>
+            <div class="card-desc" data-editable="true" data-field="light1Desc">Acai blend, granola, banana, coconut flakes, honey drizzle</div>
+          </div>
+          <div class="card-price" data-editable="true" data-field="light1Price">$14</div>
         </div>
-        <div class="card-price" data-editable="true" data-field="light1Price">$14</div>
-      </div>
-
-      <div class="menu-card">
-        <div class="card-info">
-          <div class="card-name" data-editable="true" data-field="light2Name">Greek Yogurt Parfait</div>
-          <div class="card-desc" data-editable="true" data-field="light2Desc">Thick yogurt, house granola, mixed berries, local honey</div>
+        <div class="menu-card">
+          <div class="card-info">
+            <div class="card-name" data-editable="true" data-field="light2Name">Greek Yogurt Parfait</div>
+            <div class="card-desc" data-editable="true" data-field="light2Desc">Thick yogurt, house granola, mixed berries, local honey</div>
+          </div>
+          <div class="card-price" data-editable="true" data-field="light2Price">$11</div>
         </div>
-        <div class="card-price" data-editable="true" data-field="light2Price">$11</div>
-      </div>
-
-      <div class="menu-card">
-        <div class="card-info">
-          <div class="card-name" data-editable="true" data-field="light3Name">Smoked Salmon Plate</div>
-          <div class="card-desc" data-editable="true" data-field="light3Desc">Nova lox, cream cheese, capers, red onion, everything bagel</div>
+        <div class="menu-card">
+          <div class="card-info">
+            <div class="card-name" data-editable="true" data-field="light3Name">Smoked Salmon Plate</div>
+            <div class="card-desc" data-editable="true" data-field="light3Desc">Nova lox, cream cheese, capers, red onion, everything bagel</div>
+          </div>
+          <div class="card-price" data-editable="true" data-field="light3Price">$18</div>
         </div>
-        <div class="card-price" data-editable="true" data-field="light3Price">$18</div>
-      </div>
-
-      <div class="menu-card">
-        <div class="card-info">
-          <div class="card-name" data-editable="true" data-field="light4Name">Overnight Oats</div>
-          <div class="card-desc" data-editable="true" data-field="light4Desc">Chia seeds, oat milk, peanut butter, banana, dark chocolate</div>
+        <div class="menu-card">
+          <div class="card-info">
+            <div class="card-name" data-editable="true" data-field="light4Name">Overnight Oats</div>
+            <div class="card-desc" data-editable="true" data-field="light4Desc">Chia, oat milk, peanut butter, banana, dark chocolate</div>
+          </div>
+          <div class="card-price" data-editable="true" data-field="light4Price">$10</div>
         </div>
-        <div class="card-price" data-editable="true" data-field="light4Price">$10</div>
-      </div>
-
-      <div class="menu-card">
-        <div class="card-info">
-          <div class="card-name" data-editable="true" data-field="light5Name">Fresh Juice</div>
-          <div class="card-desc" data-editable="true" data-field="light5Desc">Orange / Green Detox / Tropical Mango — cold pressed daily</div>
+        <div class="menu-card">
+          <div class="card-info">
+            <div class="card-name" data-editable="true" data-field="light5Name">Cold-Pressed Juice</div>
+            <div class="card-desc" data-editable="true" data-field="light5Desc">Orange · Green Detox · Tropical Mango — pressed daily</div>
+          </div>
+          <div class="card-price" data-editable="true" data-field="light5Price">$8</div>
         </div>
-        <div class="card-price" data-editable="true" data-field="light5Price">$8</div>
       </div>
     </div>
   </div>
 
-  <div class="bottom-line"></div>
+  <div class="bottom-strip"></div>
 </body>
 </html>

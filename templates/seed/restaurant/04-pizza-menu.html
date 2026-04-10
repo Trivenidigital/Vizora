@@ -3,298 +3,486 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1920, height=1080">
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(22px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes emberPulse {
+      0%, 100% { opacity: 0.85; }
+      50%      { opacity: 1; }
+    }
+
     body {
       width: 1920px;
       height: 1080px;
       overflow: hidden;
       position: relative;
       font-family: 'Inter', sans-serif;
+      color: #f2e7d0;
       background:
-        repeating-linear-gradient(
-          -45deg,
-          transparent,
-          transparent 40px,
-          rgba(180,30,20,0.03) 40px,
-          rgba(180,30,20,0.03) 42px
-        ),
-        radial-gradient(ellipse at 10% 50%, rgba(200,40,20,0.08) 0%, transparent 50%),
-        radial-gradient(ellipse at 90% 30%, rgba(34,120,50,0.06) 0%, transparent 40%),
-        linear-gradient(160deg, #fdf5e8 0%, #f8eed6 40%, #f2e4c4 100%);
-      color: #2d1810;
+        radial-gradient(ellipse at 15% 20%, rgba(220,70,30,0.18) 0%, transparent 55%),
+        radial-gradient(ellipse at 85% 85%, rgba(34,130,60,0.10) 0%, transparent 55%),
+        radial-gradient(ellipse at 50% 50%, rgba(255,160,60,0.06) 0%, transparent 70%),
+        linear-gradient(165deg, #241814 0%, #1a1210 50%, #120a08 100%);
     }
 
-    /* Diagonal stripe pattern overlay */
+    /* Subtle brick wall texture: horizontal mortar + offset vertical seams */
     body::before {
       content: '';
       position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background:
+      inset: 0;
+      background-image:
         repeating-linear-gradient(
-          45deg,
-          transparent,
-          transparent 80px,
-          rgba(34,120,50,0.02) 80px,
-          rgba(34,120,50,0.02) 82px
+          0deg,
+          transparent 0 58px,
+          rgba(255,180,120,0.035) 58px 60px
+        ),
+        repeating-linear-gradient(
+          90deg,
+          transparent 0 118px,
+          rgba(255,180,120,0.03) 118px 120px
         );
       pointer-events: none;
       z-index: 0;
     }
-
-    /* Warm glowing circles */
-    .glow-red {
+    /* Offset second row of bricks */
+    body::after {
+      content: '';
       position: absolute;
-      top: -100px; left: -100px;
-      width: 600px; height: 600px;
-      background: radial-gradient(circle, rgba(200,40,20,0.06) 0%, transparent 70%);
-      border-radius: 50%;
-      z-index: 1;
+      inset: 0;
+      background-image:
+        repeating-linear-gradient(
+          90deg,
+          transparent 0 118px,
+          rgba(255,180,120,0.025) 118px 120px
+        );
+      background-position: 60px 60px;
+      pointer-events: none;
+      z-index: 0;
+      mix-blend-mode: overlay;
     }
-    .glow-green {
+
+    /* Oven firelight glows */
+    .glow {
       position: absolute;
-      bottom: -80px; right: 200px;
-      width: 500px; height: 500px;
-      background: radial-gradient(circle, rgba(34,120,50,0.05) 0%, transparent 70%);
       border-radius: 50%;
+      pointer-events: none;
       z-index: 1;
+      animation: emberPulse 7s ease-in-out infinite;
+    }
+    .glow-red {
+      top: -140px; left: -80px;
+      width: 700px; height: 700px;
+      background: radial-gradient(circle, rgba(240,80,30,0.22) 0%, transparent 65%);
     }
     .glow-gold {
-      position: absolute;
-      top: 200px; right: -50px;
-      width: 400px; height: 400px;
-      background: radial-gradient(circle, rgba(220,180,80,0.08) 0%, transparent 60%);
-      border-radius: 50%;
-      z-index: 1;
+      top: 260px; right: -80px;
+      width: 520px; height: 520px;
+      background: radial-gradient(circle, rgba(255,190,80,0.14) 0%, transparent 65%);
+      animation-delay: 2.5s;
+    }
+    .glow-green {
+      bottom: -140px; right: 380px;
+      width: 560px; height: 560px;
+      background: radial-gradient(circle, rgba(60,160,80,0.10) 0%, transparent 65%);
+      animation-delay: 4s;
     }
 
     .container {
       position: relative;
       z-index: 2;
       display: grid;
-      grid-template-columns: 480px 1fr;
+      grid-template-columns: 500px 1fr;
       grid-template-rows: 1fr;
       height: 100%;
-      padding: 50px 60px;
-      gap: 50px;
+      padding: 56px 60px 72px;
+      gap: 52px;
+      animation: fadeUp 1.2s ease-out both;
     }
 
-    /* Left hero panel */
+    /* ======== Hero panel ======== */
     .hero-panel {
+      position: relative;
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
       text-align: center;
-      background: rgba(200,40,20,0.05);
-      border-radius: 28px;
-      border: 2px solid rgba(200,40,20,0.1);
-      padding: 40px;
-      position: relative;
+      background:
+        linear-gradient(180deg, rgba(50,22,16,0.65), rgba(22,10,8,0.7));
+      border-radius: 30px;
+      border: 1px solid rgba(212,175,85,0.3);
+      padding: 56px 40px;
+      backdrop-filter: blur(14px);
+      box-shadow:
+        0 30px 80px rgba(0,0,0,0.6),
+        inset 0 1px 0 rgba(255,200,120,0.15),
+        inset 0 0 80px rgba(240,80,30,0.08);
       overflow: hidden;
     }
 
     .hero-panel::before {
       content: '';
       position: absolute;
-      top: -2px; left: -2px; right: -2px; bottom: -2px;
-      border-radius: 30px;
-      border: 3px solid transparent;
-      background: linear-gradient(135deg, rgba(200,40,20,0.3), transparent, rgba(34,120,50,0.3)) border-box;
-      -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
-      mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
-      -webkit-mask-composite: xor;
-      mask-composite: exclude;
+      inset: 16px;
+      border-radius: 20px;
+      border: 1px dashed rgba(212,175,85,0.22);
+      pointer-events: none;
     }
 
-    .emoji-hero {
-      font-size: 180px;
-      line-height: 1;
-      filter: drop-shadow(0 12px 24px rgba(200,40,20,0.2));
-      margin-bottom: 24px;
+    .hero-flag-top {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 8px;
+      background: linear-gradient(90deg,
+        #2d8b45 0 33.33%,
+        #f2e7d0 33.33% 66.66%,
+        #c4271c 66.66% 100%);
+      box-shadow: 0 2px 20px rgba(0,0,0,0.4);
+    }
+
+    .slice-hero {
+      margin-bottom: 18px;
+      filter:
+        drop-shadow(0 0 40px rgba(255,170,60,0.5))
+        drop-shadow(0 14px 24px rgba(0,0,0,0.7));
     }
 
     .pizzeria-name {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 80px;
-      color: #b41e14;
-      letter-spacing: 6px;
-      line-height: 0.9;
-      text-shadow: 0 3px 15px rgba(180,30,20,0.15);
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 78px;
+      color: #f4dc8e;
+      letter-spacing: 3px;
+      line-height: 0.92;
+      text-shadow:
+        0 3px 30px rgba(255,170,60,0.35),
+        0 0 2px rgba(255,220,140,0.5);
+      text-transform: uppercase;
       margin-bottom: 8px;
     }
 
     .pizzeria-subtitle {
-      font-family: 'Playfair Display', serif;
+      font-family: 'Cormorant Garamond', serif;
       font-style: italic;
-      font-size: 24px;
-      color: #227832;
+      font-weight: 600;
+      font-size: 28px;
+      color: rgba(242,231,208,0.82);
       letter-spacing: 4px;
       margin-bottom: 30px;
     }
 
+    .divider-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 26px;
+    }
+    .divider-row .line {
+      width: 80px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #d4af55, transparent);
+    }
+    .divider-row .dot {
+      width: 8px; height: 8px;
+      background: #d4af55;
+      transform: rotate(45deg);
+      box-shadow: 0 0 12px rgba(212,175,85,0.7);
+    }
+
     .italian-flag {
       display: flex;
-      gap: 0;
       border-radius: 4px;
       overflow: hidden;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.5);
     }
-    .flag-green { width: 40px; height: 8px; background: #227832; }
-    .flag-white { width: 40px; height: 8px; background: #f0ebe0; }
-    .flag-red { width: 40px; height: 8px; background: #b41e14; }
+    .italian-flag div { width: 46px; height: 10px; }
+    .flag-green { background: #2d8b45; }
+    .flag-white { background: #f2e7d0; }
+    .flag-red   { background: #c4271c; }
 
-    /* Right menu area */
+    /* ======== Menu area ======== */
     .menu-area {
       display: grid;
       grid-template-rows: auto 1fr;
-      gap: 20px;
+      gap: 22px;
     }
 
     .size-legend {
       display: flex;
-      gap: 32px;
+      gap: 36px;
       align-items: center;
       justify-content: center;
-      background: rgba(255,255,255,0.5);
-      border-radius: 16px;
-      padding: 16px 32px;
-      border: 1px solid rgba(45,24,16,0.08);
+      background:
+        linear-gradient(180deg, rgba(50,22,16,0.6), rgba(22,10,8,0.65));
+      border-radius: 18px;
+      padding: 18px 36px;
+      border: 1px solid rgba(212,175,85,0.28);
       backdrop-filter: blur(10px);
+      box-shadow:
+        0 16px 40px rgba(0,0,0,0.45),
+        inset 0 1px 0 rgba(255,200,120,0.12);
     }
-    .size-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
+    .legend-label {
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-size: 20px;
+      color: rgba(242,231,208,0.6);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-right: 4px;
     }
+    .size-item { display: flex; align-items: center; gap: 12px; }
     .size-circle {
       border-radius: 50%;
-      border: 2px solid #b41e14;
+      border: 2px solid #d4af55;
+      background: radial-gradient(circle, rgba(240,80,30,0.25), transparent 70%);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-family: 'Bebas Neue', sans-serif;
-      color: #b41e14;
-      font-size: 16px;
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      color: #f4dc8e;
+      box-shadow:
+        0 0 18px rgba(212,175,85,0.35),
+        inset 0 0 10px rgba(240,80,30,0.2);
     }
-    .size-sm { width: 36px; height: 36px; }
-    .size-md { width: 44px; height: 44px; }
-    .size-lg { width: 52px; height: 52px; }
+    .size-sm { width: 40px; height: 40px; font-size: 18px; }
+    .size-md { width: 50px; height: 50px; font-size: 22px; }
+    .size-lg { width: 60px; height: 60px; font-size: 26px; }
     .size-label {
       font-family: 'Inter', sans-serif;
       font-size: 15px;
       font-weight: 500;
-      color: #5a3a2a;
+      color: rgba(242,231,208,0.75);
     }
 
     .pizza-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 16px;
+      gap: 18px;
     }
 
     .pizza-card {
-      background: rgba(255,255,255,0.45);
-      border: 1px solid rgba(45,24,16,0.08);
+      position: relative;
+      background:
+        linear-gradient(180deg, rgba(50,22,16,0.55), rgba(22,10,8,0.6));
+      border: 1px solid rgba(212,175,85,0.22);
       border-radius: 18px;
-      padding: 24px 26px;
-      backdrop-filter: blur(8px);
-      box-shadow: 0 4px 20px rgba(100,50,20,0.05);
+      padding: 22px 26px;
+      backdrop-filter: blur(10px);
+      box-shadow:
+        0 14px 40px rgba(0,0,0,0.45),
+        inset 0 1px 0 rgba(255,200,120,0.1);
       display: grid;
       grid-template-columns: 1fr auto;
       grid-template-rows: auto auto auto;
-      gap: 2px 16px;
+      column-gap: 18px;
+      row-gap: 4px;
+    }
+    .pizza-card::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 22px; bottom: 22px;
+      width: 3px;
+      background: linear-gradient(180deg, transparent, #d4af55, transparent);
+      border-radius: 0 2px 2px 0;
+      opacity: 0.55;
+    }
+    .pizza-card::after {
+      content: '';
+      position: absolute;
+      top: 14px; right: 14px;
+      width: 10px; height: 10px;
+      background: #c4271c;
+      border-radius: 50%;
+      box-shadow:
+        0 0 12px rgba(240,80,30,0.8),
+        0 0 2px rgba(255,220,160,0.6);
     }
 
     .pizza-name {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 34px;
-      color: #b41e14;
-      letter-spacing: 2px;
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 32px;
+      color: #f4dc8e;
+      letter-spacing: 1.5px;
       grid-column: 1 / -1;
       line-height: 1;
+      text-shadow: 0 0 20px rgba(212,175,85,0.25);
+      text-transform: uppercase;
     }
 
     .pizza-desc {
-      font-family: 'Inter', sans-serif;
-      font-size: 14px;
-      font-weight: 300;
-      color: #6b4a38;
-      line-height: 1.4;
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-size: 18px;
+      color: rgba(242,231,208,0.62);
+      line-height: 1.3;
       grid-column: 1 / -1;
       margin: 4px 0 10px;
     }
 
     .pizza-prices {
       display: flex;
-      gap: 20px;
+      gap: 22px;
       grid-column: 1 / -1;
+      padding-top: 8px;
+      border-top: 1px dashed rgba(212,175,85,0.2);
     }
     .price-tag {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 22px;
-      color: #227832;
       display: flex;
-      align-items: center;
-      gap: 4px;
+      align-items: baseline;
+      gap: 8px;
     }
     .price-size {
       font-family: 'Inter', sans-serif;
       font-size: 11px;
-      font-weight: 600;
-      color: #9a7a60;
-      text-transform: uppercase;
-      letter-spacing: 1px;
+      font-weight: 700;
+      color: #c4271c;
+      letter-spacing: 1.5px;
+      padding: 2px 8px;
+      border: 1px solid rgba(196,39,28,0.4);
+      border-radius: 4px;
+      background: rgba(196,39,28,0.08);
+    }
+    .price-value {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 22px;
+      color: #d4af55;
+      text-shadow: 0 0 14px rgba(212,175,85,0.3);
     }
 
-    /* SVG decorative wheat */
-    .wheat-deco {
+    /* ======== Decorative pizza slice SVGs ======== */
+    .slice-deco {
       position: absolute;
       z-index: 1;
-      opacity: 0.06;
+      opacity: 0.07;
+      pointer-events: none;
     }
-    .wheat-1 { bottom: 40px; left: 40px; }
-    .wheat-2 { top: 40px; right: 40px; transform: rotate(180deg); }
+    .slice-tr { top: -80px; right: -60px; transform: rotate(25deg); }
+    .slice-bl { bottom: 20px; left: -60px; transform: rotate(-15deg); }
 
-    /* Bottom Italian stripe */
+    /* Corner ornaments */
+    .corner-decor {
+      position: absolute;
+      z-index: 3;
+      opacity: 0.3;
+    }
+    .corner-tl { top: 24px; left: 24px; }
+    .corner-tr { top: 24px; right: 24px; transform: scaleX(-1); }
+    .corner-bl { bottom: 30px; left: 24px; transform: scaleY(-1); }
+    .corner-br { bottom: 30px; right: 24px; transform: scale(-1,-1); }
+
+    /* Bottom Italian tricolor stripe */
     .italian-stripe {
       position: absolute;
       bottom: 0; left: 0; right: 0;
-      height: 6px;
-      background: linear-gradient(90deg, #227832 33%, #f0ebe0 33%, #f0ebe0 66%, #b41e14 66%);
+      height: 8px;
+      background: linear-gradient(90deg,
+        #2d8b45 0 33.33%,
+        #f2e7d0 33.33% 66.66%,
+        #c4271c 66.66% 100%);
       z-index: 3;
+      box-shadow: 0 -6px 30px rgba(0,0,0,0.5);
     }
   </style>
 </head>
 <body>
-  <div class="glow-red"></div>
-  <div class="glow-green"></div>
-  <div class="glow-gold"></div>
+  <div class="glow glow-red"></div>
+  <div class="glow glow-gold"></div>
+  <div class="glow glow-green"></div>
 
-  <!-- SVG wheat decorations -->
-  <svg class="wheat-deco wheat-1" width="150" height="200" viewBox="0 0 150 200" fill="#5a3a2a">
-    <path d="M75 200 L75 20" stroke="#5a3a2a" stroke-width="2" fill="none"/>
-    <ellipse cx="60" cy="30" rx="20" ry="12" transform="rotate(-30 60 30)"/>
-    <ellipse cx="90" cy="55" rx="18" ry="11" transform="rotate(30 90 55)"/>
-    <ellipse cx="60" cy="80" rx="20" ry="12" transform="rotate(-30 60 80)"/>
-    <ellipse cx="90" cy="105" rx="18" ry="11" transform="rotate(30 90 105)"/>
-    <ellipse cx="65" cy="130" rx="16" ry="10" transform="rotate(-25 65 130)"/>
+  <!-- Large decorative pizza slices -->
+  <svg class="slice-deco slice-tr" width="360" height="360" viewBox="0 0 360 360">
+    <defs>
+      <linearGradient id="crust1" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#f4dc8e"/>
+        <stop offset="1" stop-color="#c47a1e"/>
+      </linearGradient>
+    </defs>
+    <path d="M180 180 L40 320 Q180 360 320 320 Z" fill="url(#crust1)"/>
+    <path d="M180 180 L60 302 Q180 338 300 302 Z" fill="#c4271c"/>
+    <circle cx="140" cy="260" r="14" fill="#f2e7d0"/>
+    <circle cx="200" cy="240" r="12" fill="#f2e7d0"/>
+    <circle cx="230" cy="285" r="14" fill="#f2e7d0"/>
+    <circle cx="170" cy="300" r="10" fill="#f2e7d0"/>
+    <circle cx="100" cy="290" r="8" fill="#2d8b45"/>
+    <circle cx="250" cy="260" r="8" fill="#2d8b45"/>
   </svg>
-  <svg class="wheat-deco wheat-2" width="150" height="200" viewBox="0 0 150 200" fill="#5a3a2a">
-    <path d="M75 200 L75 20" stroke="#5a3a2a" stroke-width="2" fill="none"/>
-    <ellipse cx="60" cy="30" rx="20" ry="12" transform="rotate(-30 60 30)"/>
-    <ellipse cx="90" cy="55" rx="18" ry="11" transform="rotate(30 90 55)"/>
-    <ellipse cx="60" cy="80" rx="20" ry="12" transform="rotate(-30 60 80)"/>
-    <ellipse cx="90" cy="105" rx="18" ry="11" transform="rotate(30 90 105)"/>
-    <ellipse cx="65" cy="130" rx="16" ry="10" transform="rotate(-25 65 130)"/>
+
+  <svg class="slice-deco slice-bl" width="300" height="300" viewBox="0 0 360 360">
+    <path d="M180 180 L40 320 Q180 360 320 320 Z" fill="#d4af55"/>
+    <path d="M180 180 L60 302 Q180 338 300 302 Z" fill="#c4271c"/>
+    <circle cx="140" cy="260" r="14" fill="#f2e7d0"/>
+    <circle cx="210" cy="250" r="12" fill="#f2e7d0"/>
+    <circle cx="225" cy="290" r="14" fill="#f2e7d0"/>
+  </svg>
+
+  <!-- Corner ornaments -->
+  <svg class="corner-decor corner-tl" width="90" height="90" viewBox="0 0 90 90" fill="none">
+    <path d="M6 6 L6 48 Q6 6 48 6" stroke="#d4af55" stroke-width="2"/>
+    <path d="M20 20 L20 36 Q20 20 36 20" stroke="#d4af55" stroke-width="1"/>
+    <circle cx="9" cy="9" r="3.2" fill="#d4af55"/>
+  </svg>
+  <svg class="corner-decor corner-tr" width="90" height="90" viewBox="0 0 90 90" fill="none">
+    <path d="M6 6 L6 48 Q6 6 48 6" stroke="#d4af55" stroke-width="2"/>
+    <path d="M20 20 L20 36 Q20 20 36 20" stroke="#d4af55" stroke-width="1"/>
+    <circle cx="9" cy="9" r="3.2" fill="#d4af55"/>
+  </svg>
+  <svg class="corner-decor corner-bl" width="90" height="90" viewBox="0 0 90 90" fill="none">
+    <path d="M6 6 L6 48 Q6 6 48 6" stroke="#d4af55" stroke-width="2"/>
+    <path d="M20 20 L20 36 Q20 20 36 20" stroke="#d4af55" stroke-width="1"/>
+    <circle cx="9" cy="9" r="3.2" fill="#d4af55"/>
+  </svg>
+  <svg class="corner-decor corner-br" width="90" height="90" viewBox="0 0 90 90" fill="none">
+    <path d="M6 6 L6 48 Q6 6 48 6" stroke="#d4af55" stroke-width="2"/>
+    <path d="M20 20 L20 36 Q20 20 36 20" stroke="#d4af55" stroke-width="1"/>
+    <circle cx="9" cy="9" r="3.2" fill="#d4af55"/>
   </svg>
 
   <div class="container">
+    <!-- HERO PANEL -->
     <div class="hero-panel">
-      <div class="emoji-hero">&#127829;</div>
-      <h1 class="pizzeria-name" data-editable="true" data-field="pizzeriaName">LUIGI'S<br>PIZZERIA</h1>
-      <p class="pizzeria-subtitle" data-editable="true" data-field="subtitle">Authentic Wood-Fired</p>
+      <div class="hero-flag-top"></div>
+
+      <svg class="slice-hero" width="200" height="200" viewBox="0 0 240 240">
+        <defs>
+          <radialGradient id="slice-grad" cx="0.5" cy="0.4" r="0.7">
+            <stop offset="0" stop-color="#ffd876"/>
+            <stop offset="1" stop-color="#c47a1e"/>
+          </radialGradient>
+        </defs>
+        <!-- crust wedge -->
+        <path d="M120 120 L20 210 Q120 240 220 210 Z" fill="url(#slice-grad)" stroke="#6b3818" stroke-width="3"/>
+        <!-- sauce -->
+        <path d="M120 120 L40 196 Q120 222 200 196 Z" fill="#c4271c"/>
+        <!-- cheese blobs -->
+        <ellipse cx="88" cy="172" rx="18" ry="12" fill="#f4dc8e"/>
+        <ellipse cx="138" cy="160" rx="14" ry="10" fill="#f4dc8e"/>
+        <ellipse cx="160" cy="190" rx="18" ry="12" fill="#f4dc8e"/>
+        <ellipse cx="110" cy="200" rx="14" ry="10" fill="#f4dc8e"/>
+        <!-- basil -->
+        <ellipse cx="72" cy="190" rx="8" ry="5" fill="#2d8b45" transform="rotate(-20 72 190)"/>
+        <ellipse cx="180" cy="170" rx="8" ry="5" fill="#2d8b45" transform="rotate(30 180 170)"/>
+        <!-- pepperoni hints -->
+        <circle cx="120" cy="185" r="7" fill="#8b1a10"/>
+        <circle cx="195" cy="202" r="6" fill="#8b1a10"/>
+      </svg>
+
+      <h1 class="pizzeria-name" data-editable="true" data-field="pizzeriaName">Napoli<br>Fire</h1>
+      <p class="pizzeria-subtitle" data-editable="true" data-field="subtitle">Wood-Fired · Since 1952</p>
+
+      <div class="divider-row">
+        <span class="line"></span>
+        <span class="dot"></span>
+        <span class="line"></span>
+      </div>
+
       <div class="italian-flag">
         <div class="flag-green"></div>
         <div class="flag-white"></div>
@@ -302,80 +490,82 @@
       </div>
     </div>
 
+    <!-- MENU AREA -->
     <div class="menu-area">
       <div class="size-legend">
+        <span class="legend-label">Sizes</span>
         <div class="size-item">
           <div class="size-circle size-sm">S</div>
-          <span class="size-label" data-editable="true" data-field="sizeSmall">10" Personal</span>
+          <span class="size-label" data-editable="true" data-field="sizeSmall">10" Personale</span>
         </div>
         <div class="size-item">
           <div class="size-circle size-md">M</div>
-          <span class="size-label" data-editable="true" data-field="sizeMedium">14" Medium</span>
+          <span class="size-label" data-editable="true" data-field="sizeMedium">14" Medio</span>
         </div>
         <div class="size-item">
           <div class="size-circle size-lg">L</div>
-          <span class="size-label" data-editable="true" data-field="sizeLarge">18" Family</span>
+          <span class="size-label" data-editable="true" data-field="sizeLarge">18" Famiglia</span>
         </div>
       </div>
 
       <div class="pizza-grid">
         <div class="pizza-card">
-          <div class="pizza-name" data-editable="true" data-field="pizza1Name">MARGHERITA</div>
-          <p class="pizza-desc" data-editable="true" data-field="pizza1Desc">San Marzano tomato, fresh mozzarella, basil, extra virgin olive oil</p>
+          <div class="pizza-name" data-editable="true" data-field="pizza1Name">Margherita</div>
+          <p class="pizza-desc" data-editable="true" data-field="pizza1Desc">San Marzano tomato, fior di latte, fresh basil, extra virgin olive oil</p>
           <div class="pizza-prices">
-            <span class="price-tag"><span class="price-size">S</span> <span data-editable="true" data-field="pizza1PriceS">$14</span></span>
-            <span class="price-tag"><span class="price-size">M</span> <span data-editable="true" data-field="pizza1PriceM">$20</span></span>
-            <span class="price-tag"><span class="price-size">L</span> <span data-editable="true" data-field="pizza1PriceL">$28</span></span>
+            <span class="price-tag"><span class="price-size">S</span><span class="price-value" data-editable="true" data-field="pizza1PriceS">$14</span></span>
+            <span class="price-tag"><span class="price-size">M</span><span class="price-value" data-editable="true" data-field="pizza1PriceM">$20</span></span>
+            <span class="price-tag"><span class="price-size">L</span><span class="price-value" data-editable="true" data-field="pizza1PriceL">$28</span></span>
           </div>
         </div>
 
         <div class="pizza-card">
-          <div class="pizza-name" data-editable="true" data-field="pizza2Name">DIAVOLA</div>
-          <p class="pizza-desc" data-editable="true" data-field="pizza2Desc">Spicy salami, roasted peppers, mozzarella, chili oil, fresh basil</p>
+          <div class="pizza-name" data-editable="true" data-field="pizza2Name">Diavola</div>
+          <p class="pizza-desc" data-editable="true" data-field="pizza2Desc">Spicy salami, roasted peppers, mozzarella, Calabrian chili oil</p>
           <div class="pizza-prices">
-            <span class="price-tag"><span class="price-size">S</span> <span data-editable="true" data-field="pizza2PriceS">$16</span></span>
-            <span class="price-tag"><span class="price-size">M</span> <span data-editable="true" data-field="pizza2PriceM">$23</span></span>
-            <span class="price-tag"><span class="price-size">L</span> <span data-editable="true" data-field="pizza2PriceL">$32</span></span>
+            <span class="price-tag"><span class="price-size">S</span><span class="price-value" data-editable="true" data-field="pizza2PriceS">$16</span></span>
+            <span class="price-tag"><span class="price-size">M</span><span class="price-value" data-editable="true" data-field="pizza2PriceM">$23</span></span>
+            <span class="price-tag"><span class="price-size">L</span><span class="price-value" data-editable="true" data-field="pizza2PriceL">$32</span></span>
           </div>
         </div>
 
         <div class="pizza-card">
-          <div class="pizza-name" data-editable="true" data-field="pizza3Name">QUATTRO FORMAGGI</div>
+          <div class="pizza-name" data-editable="true" data-field="pizza3Name">Quattro Formaggi</div>
           <p class="pizza-desc" data-editable="true" data-field="pizza3Desc">Mozzarella, gorgonzola, fontina, parmigiano, truffle honey drizzle</p>
           <div class="pizza-prices">
-            <span class="price-tag"><span class="price-size">S</span> <span data-editable="true" data-field="pizza3PriceS">$17</span></span>
-            <span class="price-tag"><span class="price-size">M</span> <span data-editable="true" data-field="pizza3PriceM">$24</span></span>
-            <span class="price-tag"><span class="price-size">L</span> <span data-editable="true" data-field="pizza3PriceL">$34</span></span>
+            <span class="price-tag"><span class="price-size">S</span><span class="price-value" data-editable="true" data-field="pizza3PriceS">$17</span></span>
+            <span class="price-tag"><span class="price-size">M</span><span class="price-value" data-editable="true" data-field="pizza3PriceM">$24</span></span>
+            <span class="price-tag"><span class="price-size">L</span><span class="price-value" data-editable="true" data-field="pizza3PriceL">$34</span></span>
           </div>
         </div>
 
         <div class="pizza-card">
-          <div class="pizza-name" data-editable="true" data-field="pizza4Name">PROSCIUTTO E RUCOLA</div>
-          <p class="pizza-desc" data-editable="true" data-field="pizza4Desc">Parma ham, wild arugula, shaved parmesan, balsamic glaze</p>
+          <div class="pizza-name" data-editable="true" data-field="pizza4Name">Prosciutto e Rucola</div>
+          <p class="pizza-desc" data-editable="true" data-field="pizza4Desc">Parma ham, wild arugula, shaved parmesan, aged balsamic</p>
           <div class="pizza-prices">
-            <span class="price-tag"><span class="price-size">S</span> <span data-editable="true" data-field="pizza4PriceS">$18</span></span>
-            <span class="price-tag"><span class="price-size">M</span> <span data-editable="true" data-field="pizza4PriceM">$25</span></span>
-            <span class="price-tag"><span class="price-size">L</span> <span data-editable="true" data-field="pizza4PriceL">$35</span></span>
+            <span class="price-tag"><span class="price-size">S</span><span class="price-value" data-editable="true" data-field="pizza4PriceS">$18</span></span>
+            <span class="price-tag"><span class="price-size">M</span><span class="price-value" data-editable="true" data-field="pizza4PriceM">$25</span></span>
+            <span class="price-tag"><span class="price-size">L</span><span class="price-value" data-editable="true" data-field="pizza4PriceL">$35</span></span>
           </div>
         </div>
 
         <div class="pizza-card">
-          <div class="pizza-name" data-editable="true" data-field="pizza5Name">FUNGHI TARTUFO</div>
-          <p class="pizza-desc" data-editable="true" data-field="pizza5Desc">Wild mushroom medley, truffle cream, mozzarella, thyme, garlic oil</p>
+          <div class="pizza-name" data-editable="true" data-field="pizza5Name">Funghi Tartufo</div>
+          <p class="pizza-desc" data-editable="true" data-field="pizza5Desc">Wild mushroom medley, truffle cream, thyme, garlic confit</p>
           <div class="pizza-prices">
-            <span class="price-tag"><span class="price-size">S</span> <span data-editable="true" data-field="pizza5PriceS">$17</span></span>
-            <span class="price-tag"><span class="price-size">M</span> <span data-editable="true" data-field="pizza5PriceM">$24</span></span>
-            <span class="price-tag"><span class="price-size">L</span> <span data-editable="true" data-field="pizza5PriceL">$33</span></span>
+            <span class="price-tag"><span class="price-size">S</span><span class="price-value" data-editable="true" data-field="pizza5PriceS">$17</span></span>
+            <span class="price-tag"><span class="price-size">M</span><span class="price-value" data-editable="true" data-field="pizza5PriceM">$24</span></span>
+            <span class="price-tag"><span class="price-size">L</span><span class="price-value" data-editable="true" data-field="pizza5PriceL">$33</span></span>
           </div>
         </div>
 
         <div class="pizza-card">
-          <div class="pizza-name" data-editable="true" data-field="pizza6Name">NAPOLI SPECIAL</div>
+          <div class="pizza-name" data-editable="true" data-field="pizza6Name">Napoli Special</div>
           <p class="pizza-desc" data-editable="true" data-field="pizza6Desc">Anchovies, capers, olives, San Marzano, oregano, garlic</p>
           <div class="pizza-prices">
-            <span class="price-tag"><span class="price-size">S</span> <span data-editable="true" data-field="pizza6PriceS">$15</span></span>
-            <span class="price-tag"><span class="price-size">M</span> <span data-editable="true" data-field="pizza6PriceM">$22</span></span>
-            <span class="price-tag"><span class="price-size">L</span> <span data-editable="true" data-field="pizza6PriceL">$30</span></span>
+            <span class="price-tag"><span class="price-size">S</span><span class="price-value" data-editable="true" data-field="pizza6PriceS">$15</span></span>
+            <span class="price-tag"><span class="price-size">M</span><span class="price-value" data-editable="true" data-field="pizza6PriceM">$22</span></span>
+            <span class="price-tag"><span class="price-size">L</span><span class="price-value" data-editable="true" data-field="pizza6PriceL">$30</span></span>
           </div>
         </div>
       </div>

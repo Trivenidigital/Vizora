@@ -6,9 +6,20 @@
     <title>Event Board</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700;800&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --navy-900: #061C22;
+            --navy-800: #0A2E36;
+            --navy-700: #0F3B45;
+            --navy-600: #14525E;
+            --gold-500: #D4AF55;
+            --gold-400: #E6C877;
+            --gold-300: #F0D99A;
+            --ivory: #F5EFE0;
+        }
 
         body {
             width: 1920px;
@@ -16,33 +27,34 @@
             overflow: hidden;
             font-family: 'Inter', sans-serif;
             background:
-                radial-gradient(ellipse at 15% 85%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
-                radial-gradient(ellipse at 85% 15%, rgba(236, 72, 153, 0.06) 0%, transparent 40%),
-                linear-gradient(145deg, #fafafa 0%, #f5f5f5 50%, #eff0f3 100%);
-            color: #18181b;
+                radial-gradient(ellipse at 15% 85%, rgba(20, 82, 94, 0.55) 0%, transparent 55%),
+                radial-gradient(ellipse at 85% 15%, rgba(212, 175, 85, 0.12) 0%, transparent 50%),
+                linear-gradient(145deg, #061C22 0%, #0A2E36 50%, #0F3B45 100%);
+            color: var(--ivory);
             position: relative;
         }
 
-        /* Subtle cross-hatch texture */
+        /* Cross-hatch texture */
         body::before {
             content: '';
             position: absolute;
             inset: 0;
             background:
-                linear-gradient(45deg, transparent 49.5%, rgba(161, 161, 170, 0.06) 49.5%, rgba(161, 161, 170, 0.06) 50.5%, transparent 50.5%),
-                linear-gradient(-45deg, transparent 49.5%, rgba(161, 161, 170, 0.06) 49.5%, rgba(161, 161, 170, 0.06) 50.5%, transparent 50.5%);
+                linear-gradient(45deg, transparent 49.5%, rgba(212, 175, 85, 0.05) 49.5%, rgba(212, 175, 85, 0.05) 50.5%, transparent 50.5%),
+                linear-gradient(-45deg, transparent 49.5%, rgba(212, 175, 85, 0.05) 49.5%, rgba(212, 175, 85, 0.05) 50.5%, transparent 50.5%);
             background-size: 60px 60px;
             z-index: 0;
         }
 
-        /* Decorative color bar top */
+        /* Gold color bar top */
         .color-bar {
             position: absolute;
             top: 0;
             left: 0;
             right: 0;
-            height: 6px;
-            background: linear-gradient(90deg, #6366f1, #ec4899, #f59e0b, #10b981, #06b6d4);
+            height: 5px;
+            background: linear-gradient(90deg, transparent 0%, var(--gold-500) 15%, var(--gold-300) 50%, var(--gold-500) 85%, transparent 100%);
+            box-shadow: 0 0 22px rgba(212, 175, 85, 0.55);
             z-index: 2;
         }
 
@@ -52,62 +64,120 @@
             width: 100%;
             height: 100%;
             display: grid;
-            grid-template-columns: 380px 1fr;
+            grid-template-columns: 440px 1fr;
             grid-template-rows: 1fr;
-            padding: 40px 60px 40px 60px;
-            gap: 48px;
+            padding: 60px 70px 60px 70px;
+            gap: 56px;
         }
 
-        /* Left column - header info */
+        /* Left column */
         .left-col {
             display: flex;
             flex-direction: column;
             justify-content: center;
             padding: 20px 0;
+            position: relative;
         }
 
-        .event-emoji {
-            font-size: 100px;
-            filter: drop-shadow(0 6px 16px rgba(99, 102, 241, 0.2));
-            margin-bottom: 32px;
+        .event-icon-wrap {
+            width: 150px;
+            height: 150px;
+            border-radius: 26px;
+            background: linear-gradient(145deg, rgba(212, 175, 85, 0.18) 0%, rgba(212, 175, 85, 0.05) 100%);
+            border: 1px solid rgba(212, 175, 85, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 36px;
+            box-shadow:
+                0 12px 40px rgba(212, 175, 85, 0.2),
+                inset 0 1px 0 rgba(240, 217, 154, 0.2);
+            position: relative;
+        }
+
+        .event-icon-wrap::after {
+            content: '';
+            position: absolute;
+            inset: 8px;
+            border-radius: 18px;
+            border: 1px solid rgba(212, 175, 85, 0.15);
+        }
+
+        .event-icon {
+            width: 84px;
+            height: 84px;
+            color: var(--gold-400);
+            filter: drop-shadow(0 6px 16px rgba(212, 175, 85, 0.5));
+        }
+
+        .board-label {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            color: var(--gold-500);
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .board-label::before {
+            content: '';
+            width: 36px;
+            height: 2px;
+            background: linear-gradient(90deg, var(--gold-500), transparent);
         }
 
         .board-title {
-            font-family: 'Poppins', sans-serif;
-            font-size: 56px;
+            font-family: 'Playfair Display', serif;
+            font-size: 62px;
             font-weight: 700;
-            color: #18181b;
-            line-height: 1.1;
-            margin-bottom: 16px;
+            color: #fbf7ec;
+            line-height: 1.05;
+            margin-bottom: 20px;
+            text-shadow: 0 2px 24px rgba(212, 175, 85, 0.2);
         }
 
         .board-subtitle {
             font-family: 'Inter', sans-serif;
             font-size: 20px;
-            font-weight: 400;
-            color: #71717a;
+            font-weight: 300;
+            color: rgba(245, 239, 224, 0.58);
             margin-bottom: 40px;
+            line-height: 1.5;
         }
 
         .month-badge {
             display: inline-flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
             padding: 14px 28px;
-            background: linear-gradient(135deg, #6366f1, #818cf8);
-            border-radius: 14px;
+            background: linear-gradient(135deg, var(--gold-500), var(--gold-400));
+            border-radius: 12px;
             font-family: 'Montserrat', sans-serif;
             font-size: 18px;
             font-weight: 700;
-            color: white;
-            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.3);
-            margin-bottom: 24px;
+            color: var(--navy-900);
+            box-shadow:
+                0 10px 30px rgba(212, 175, 85, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.4);
+            margin-bottom: 22px;
+            letter-spacing: 0.5px;
+            align-self: flex-start;
+        }
+
+        .month-badge-icon {
+            width: 20px;
+            height: 20px;
         }
 
         .total-events {
             font-family: 'Inter', sans-serif;
             font-size: 16px;
-            color: #a1a1aa;
+            color: rgba(212, 175, 85, 0.65);
+            letter-spacing: 0.5px;
         }
 
         /* Right column - events list */
@@ -115,23 +185,23 @@
             display: flex;
             flex-direction: column;
             justify-content: center;
-            gap: 20px;
+            gap: 18px;
         }
 
         .event-card {
             display: grid;
-            grid-template-columns: 100px 1fr auto;
-            gap: 28px;
+            grid-template-columns: 110px 1fr auto;
+            gap: 32px;
             align-items: center;
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(228, 228, 231, 0.6);
+            background: linear-gradient(145deg, rgba(15, 59, 69, 0.72) 0%, rgba(10, 46, 54, 0.55) 100%);
+            backdrop-filter: blur(22px);
+            -webkit-backdrop-filter: blur(22px);
+            border: 1px solid rgba(212, 175, 85, 0.18);
             border-radius: 18px;
-            padding: 28px 36px;
+            padding: 28px 38px;
             box-shadow:
-                0 4px 20px rgba(0, 0, 0, 0.04),
-                0 1px 3px rgba(0, 0, 0, 0.02);
+                0 8px 30px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(212, 175, 85, 0.1);
             position: relative;
             overflow: hidden;
         }
@@ -143,87 +213,118 @@
             top: 0;
             bottom: 0;
             width: 5px;
+            background: linear-gradient(180deg, var(--gold-500), var(--gold-300));
+            box-shadow: 0 0 14px rgba(212, 175, 85, 0.5);
         }
 
-        .event-card:nth-child(1)::before { background: #6366f1; }
-        .event-card:nth-child(2)::before { background: #ec4899; }
-        .event-card:nth-child(3)::before { background: #f59e0b; }
-        .event-card:nth-child(4)::before { background: #10b981; }
-        .event-card:nth-child(5)::before { background: #06b6d4; }
+        .event-card:nth-child(even)::before {
+            background: linear-gradient(180deg, #14525E, #1C6B79);
+            box-shadow: 0 0 14px rgba(20, 82, 94, 0.6);
+        }
 
         .date-badge {
             text-align: center;
+            padding: 14px 0;
+            border-right: 1px solid rgba(212, 175, 85, 0.18);
+            padding-right: 20px;
+            margin-right: -12px;
         }
 
         .date-day {
-            font-family: 'Montserrat', sans-serif;
-            font-size: 48px;
+            font-family: 'Playfair Display', serif;
+            font-size: 54px;
             font-weight: 800;
             line-height: 1;
+            color: var(--gold-300);
+            text-shadow: 0 2px 14px rgba(212, 175, 85, 0.3);
         }
 
-        .event-card:nth-child(1) .date-day { color: #6366f1; }
-        .event-card:nth-child(2) .date-day { color: #ec4899; }
-        .event-card:nth-child(3) .date-day { color: #f59e0b; }
-        .event-card:nth-child(4) .date-day { color: #10b981; }
-        .event-card:nth-child(5) .date-day { color: #06b6d4; }
+        .event-card:nth-child(even) .date-day {
+            color: #E6C877;
+        }
 
         .date-month {
-            font-family: 'Inter', sans-serif;
-            font-size: 14px;
-            font-weight: 600;
-            color: #a1a1aa;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+            color: rgba(212, 175, 85, 0.7);
             text-transform: uppercase;
-            letter-spacing: 2px;
+            letter-spacing: 3px;
+            margin-top: 6px;
         }
 
         .event-info {
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: 8px;
         }
 
         .event-title {
-            font-family: 'Poppins', sans-serif;
-            font-size: 24px;
+            font-family: 'Playfair Display', serif;
+            font-size: 26px;
             font-weight: 600;
-            color: #18181b;
+            color: #fbf7ec;
+            line-height: 1.25;
         }
 
         .event-details {
             font-family: 'Inter', sans-serif;
-            font-size: 16px;
-            color: #71717a;
+            font-size: 15px;
+            color: rgba(245, 239, 224, 0.55);
             display: flex;
-            gap: 20px;
+            gap: 22px;
         }
 
         .event-detail-item {
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
         }
 
         .detail-icon {
-            font-size: 16px;
+            width: 16px;
+            height: 16px;
+            color: var(--gold-500);
+            flex-shrink: 0;
         }
 
         .event-category {
-            padding: 8px 18px;
-            border-radius: 20px;
+            padding: 10px 20px;
+            border-radius: 24px;
             font-family: 'Montserrat', sans-serif;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 2px;
             white-space: nowrap;
+            border: 1px solid;
         }
 
-        .cat-workshop { background: rgba(99, 102, 241, 0.1); color: #6366f1; }
-        .cat-social { background: rgba(236, 72, 153, 0.1); color: #ec4899; }
-        .cat-training { background: rgba(245, 158, 11, 0.1); color: #d97706; }
-        .cat-wellness { background: rgba(16, 185, 129, 0.1); color: #059669; }
-        .cat-townhall { background: rgba(6, 182, 212, 0.1); color: #0891b2; }
+        .cat-workshop {
+            background: rgba(212, 175, 85, 0.14);
+            color: var(--gold-300);
+            border-color: rgba(212, 175, 85, 0.4);
+        }
+        .cat-social {
+            background: rgba(230, 200, 119, 0.12);
+            color: var(--gold-400);
+            border-color: rgba(230, 200, 119, 0.35);
+        }
+        .cat-training {
+            background: rgba(20, 82, 94, 0.4);
+            color: #7FB3BD;
+            border-color: rgba(20, 82, 94, 0.6);
+        }
+        .cat-wellness {
+            background: rgba(212, 175, 85, 0.1);
+            color: var(--gold-300);
+            border-color: rgba(212, 175, 85, 0.3);
+        }
+        .cat-townhall {
+            background: rgba(20, 82, 94, 0.35);
+            color: #9DC5CC;
+            border-color: rgba(20, 82, 94, 0.55);
+        }
 
         /* Decorative SVG */
         .deco-svg {
@@ -235,39 +336,61 @@
 <body>
     <div class="color-bar"></div>
 
-    <!-- Decorative SVG calendar icon -->
-    <svg class="deco-svg" style="bottom:40px;left:60px;opacity:0.04;" width="280" height="280" viewBox="0 0 280 280" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect x="20" y="50" width="240" height="210" rx="20" stroke="#6366f1" stroke-width="3" fill="none"/>
-        <line x1="20" y1="100" x2="260" y2="100" stroke="#6366f1" stroke-width="3"/>
-        <line x1="80" y1="50" x2="80" y2="20" stroke="#6366f1" stroke-width="4" stroke-linecap="round"/>
-        <line x1="200" y1="50" x2="200" y2="20" stroke="#6366f1" stroke-width="4" stroke-linecap="round"/>
-        <circle cx="90" cy="150" r="10" fill="rgba(99,102,241,0.3)"/>
-        <circle cx="140" cy="150" r="10" fill="rgba(236,72,153,0.3)"/>
-        <circle cx="190" cy="150" r="10" fill="rgba(245,158,11,0.3)"/>
-        <circle cx="90" cy="200" r="10" fill="rgba(16,185,129,0.3)"/>
-        <circle cx="140" cy="200" r="10" fill="rgba(6,182,212,0.3)"/>
+    <!-- Large decorative calendar icon -->
+    <svg class="deco-svg" style="bottom:40px;left:60px;opacity:0.06;" width="300" height="300" viewBox="0 0 280 280" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="20" y="50" width="240" height="210" rx="20" stroke="#D4AF55" stroke-width="3" fill="none"/>
+        <line x1="20" y1="100" x2="260" y2="100" stroke="#D4AF55" stroke-width="3"/>
+        <line x1="80" y1="50" x2="80" y2="20" stroke="#D4AF55" stroke-width="4" stroke-linecap="round"/>
+        <line x1="200" y1="50" x2="200" y2="20" stroke="#D4AF55" stroke-width="4" stroke-linecap="round"/>
+        <circle cx="90" cy="150" r="10" fill="rgba(212,175,85,0.5)"/>
+        <circle cx="140" cy="150" r="10" fill="rgba(212,175,85,0.4)"/>
+        <circle cx="190" cy="150" r="10" fill="rgba(212,175,85,0.3)"/>
+        <circle cx="90" cy="200" r="10" fill="rgba(212,175,85,0.4)"/>
+        <circle cx="140" cy="200" r="10" fill="rgba(212,175,85,0.5)"/>
     </svg>
 
-    <!-- Top-right decorative dots -->
-    <svg class="deco-svg" style="top:30px;right:60px;" width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="20" cy="20" r="3" fill="rgba(99,102,241,0.2)"/>
-        <circle cx="60" cy="20" r="3" fill="rgba(236,72,153,0.2)"/>
-        <circle cx="100" cy="20" r="3" fill="rgba(245,158,11,0.2)"/>
-        <circle cx="20" cy="60" r="3" fill="rgba(16,185,129,0.2)"/>
-        <circle cx="60" cy="60" r="3" fill="rgba(6,182,212,0.2)"/>
-        <circle cx="100" cy="60" r="3" fill="rgba(99,102,241,0.2)"/>
-        <circle cx="20" cy="100" r="3" fill="rgba(236,72,153,0.2)"/>
-        <circle cx="60" cy="100" r="3" fill="rgba(245,158,11,0.2)"/>
-        <circle cx="100" cy="100" r="3" fill="rgba(16,185,129,0.2)"/>
+    <!-- Corner dots grid -->
+    <svg class="deco-svg" style="top:30px;right:60px;" width="130" height="130" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="20" cy="20" r="3" fill="rgba(212,175,85,0.55)"/>
+        <circle cx="60" cy="20" r="3" fill="rgba(212,175,85,0.45)"/>
+        <circle cx="100" cy="20" r="3" fill="rgba(212,175,85,0.35)"/>
+        <circle cx="20" cy="60" r="3" fill="rgba(212,175,85,0.45)"/>
+        <circle cx="60" cy="60" r="3" fill="rgba(212,175,85,0.6)"/>
+        <circle cx="100" cy="60" r="3" fill="rgba(212,175,85,0.45)"/>
+        <circle cx="20" cy="100" r="3" fill="rgba(212,175,85,0.35)"/>
+        <circle cx="60" cy="100" r="3" fill="rgba(212,175,85,0.45)"/>
+        <circle cx="100" cy="100" r="3" fill="rgba(212,175,85,0.55)"/>
     </svg>
 
     <div class="container">
         <div class="left-col">
-            <div class="event-emoji" data-editable="true" data-field="header-emoji">📅</div>
+            <div class="event-icon-wrap">
+                <!-- Calendar with star SVG -->
+                <svg class="event-icon" viewBox="0 0 84 84" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="evGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#F0D99A"/>
+                            <stop offset="100%" stop-color="#D4AF55"/>
+                        </linearGradient>
+                    </defs>
+                    <rect x="10" y="18" width="64" height="58" rx="6" stroke="url(#evGrad)" stroke-width="2.5" fill="none"/>
+                    <line x1="10" y1="32" x2="74" y2="32" stroke="url(#evGrad)" stroke-width="2.5"/>
+                    <line x1="24" y1="10" x2="24" y2="22" stroke="url(#evGrad)" stroke-width="3" stroke-linecap="round"/>
+                    <line x1="60" y1="10" x2="60" y2="22" stroke="url(#evGrad)" stroke-width="3" stroke-linecap="round"/>
+                    <!-- Star in center -->
+                    <path d="M42 44 L45 52 L54 52.5 L47 58 L49.5 66 L42 61 L34.5 66 L37 58 L30 52.5 L39 52 Z" fill="url(#evGrad)" opacity="0.9"/>
+                </svg>
+            </div>
+            <div class="board-label">Company Events</div>
             <div class="board-title" data-editable="true" data-field="board-title">Upcoming Events</div>
             <div class="board-subtitle" data-editable="true" data-field="board-subtitle">Stay connected with what's happening at the office</div>
             <div class="month-badge">
-                <span>📆</span>
+                <svg class="month-badge-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" stroke-width="2" fill="none"/>
+                    <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" stroke-width="2"/>
+                    <line x1="8" y1="3" x2="8" y2="7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <line x1="16" y1="3" x2="16" y2="7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
                 <span data-editable="true" data-field="month-label">March 2026</span>
             </div>
             <div class="total-events" data-editable="true" data-field="total-events">5 events this month</div>
@@ -282,8 +405,14 @@
                 <div class="event-info">
                     <div class="event-title" data-editable="true" data-field="event-1-title">Innovation Workshop: AI in Practice</div>
                     <div class="event-details">
-                        <span class="event-detail-item"><span class="detail-icon">🕐</span> <span data-editable="true" data-field="event-1-time">2:00 PM - 5:00 PM</span></span>
-                        <span class="event-detail-item"><span class="detail-icon">📍</span> <span data-editable="true" data-field="event-1-location">Innovation Lab, Floor 4</span></span>
+                        <span class="event-detail-item">
+                            <svg class="detail-icon" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3.5 2.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                            <span data-editable="true" data-field="event-1-time">2:00 PM - 5:00 PM</span>
+                        </span>
+                        <span class="event-detail-item">
+                            <svg class="detail-icon" viewBox="0 0 24 24" fill="none"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="9" r="2.5" stroke="currentColor" stroke-width="2"/></svg>
+                            <span data-editable="true" data-field="event-1-location">Innovation Lab, Floor 4</span>
+                        </span>
                     </div>
                 </div>
                 <div class="event-category cat-workshop" data-editable="true" data-field="event-1-category">Workshop</div>
@@ -297,8 +426,14 @@
                 <div class="event-info">
                     <div class="event-title" data-editable="true" data-field="event-2-title">Team Social: March Madness Watch Party</div>
                     <div class="event-details">
-                        <span class="event-detail-item"><span class="detail-icon">🕐</span> <span data-editable="true" data-field="event-2-time">5:30 PM - 8:00 PM</span></span>
-                        <span class="event-detail-item"><span class="detail-icon">📍</span> <span data-editable="true" data-field="event-2-location">Rooftop Lounge</span></span>
+                        <span class="event-detail-item">
+                            <svg class="detail-icon" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3.5 2.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                            <span data-editable="true" data-field="event-2-time">5:30 PM - 8:00 PM</span>
+                        </span>
+                        <span class="event-detail-item">
+                            <svg class="detail-icon" viewBox="0 0 24 24" fill="none"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="9" r="2.5" stroke="currentColor" stroke-width="2"/></svg>
+                            <span data-editable="true" data-field="event-2-location">Rooftop Lounge</span>
+                        </span>
                     </div>
                 </div>
                 <div class="event-category cat-social" data-editable="true" data-field="event-2-category">Social</div>
@@ -312,8 +447,14 @@
                 <div class="event-info">
                     <div class="event-title" data-editable="true" data-field="event-3-title">Leadership Development Program</div>
                     <div class="event-details">
-                        <span class="event-detail-item"><span class="detail-icon">🕐</span> <span data-editable="true" data-field="event-3-time">9:00 AM - 12:00 PM</span></span>
-                        <span class="event-detail-item"><span class="detail-icon">📍</span> <span data-editable="true" data-field="event-3-location">Conference Center B</span></span>
+                        <span class="event-detail-item">
+                            <svg class="detail-icon" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3.5 2.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                            <span data-editable="true" data-field="event-3-time">9:00 AM - 12:00 PM</span>
+                        </span>
+                        <span class="event-detail-item">
+                            <svg class="detail-icon" viewBox="0 0 24 24" fill="none"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="9" r="2.5" stroke="currentColor" stroke-width="2"/></svg>
+                            <span data-editable="true" data-field="event-3-location">Conference Center B</span>
+                        </span>
                     </div>
                 </div>
                 <div class="event-category cat-training" data-editable="true" data-field="event-3-category">Training</div>
@@ -327,8 +468,14 @@
                 <div class="event-info">
                     <div class="event-title" data-editable="true" data-field="event-4-title">Wellness Wednesday: Yoga Session</div>
                     <div class="event-details">
-                        <span class="event-detail-item"><span class="detail-icon">🕐</span> <span data-editable="true" data-field="event-4-time">12:00 PM - 1:00 PM</span></span>
-                        <span class="event-detail-item"><span class="detail-icon">📍</span> <span data-editable="true" data-field="event-4-location">Wellness Room, Floor 2</span></span>
+                        <span class="event-detail-item">
+                            <svg class="detail-icon" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3.5 2.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                            <span data-editable="true" data-field="event-4-time">12:00 PM - 1:00 PM</span>
+                        </span>
+                        <span class="event-detail-item">
+                            <svg class="detail-icon" viewBox="0 0 24 24" fill="none"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="9" r="2.5" stroke="currentColor" stroke-width="2"/></svg>
+                            <span data-editable="true" data-field="event-4-location">Wellness Room, Floor 2</span>
+                        </span>
                     </div>
                 </div>
                 <div class="event-category cat-wellness" data-editable="true" data-field="event-4-category">Wellness</div>
@@ -342,8 +489,14 @@
                 <div class="event-info">
                     <div class="event-title" data-editable="true" data-field="event-5-title">All-Hands Town Hall: Q1 Results</div>
                     <div class="event-details">
-                        <span class="event-detail-item"><span class="detail-icon">🕐</span> <span data-editable="true" data-field="event-5-time">3:00 PM - 4:30 PM</span></span>
-                        <span class="event-detail-item"><span class="detail-icon">📍</span> <span data-editable="true" data-field="event-5-location">Main Auditorium</span></span>
+                        <span class="event-detail-item">
+                            <svg class="detail-icon" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3.5 2.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                            <span data-editable="true" data-field="event-5-time">3:00 PM - 4:30 PM</span>
+                        </span>
+                        <span class="event-detail-item">
+                            <svg class="detail-icon" viewBox="0 0 24 24" fill="none"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="9" r="2.5" stroke="currentColor" stroke-width="2"/></svg>
+                            <span data-editable="true" data-field="event-5-location">Main Auditorium</span>
+                        </span>
                     </div>
                 </div>
                 <div class="event-category cat-townhall" data-editable="true" data-field="event-5-category">Town Hall</div>

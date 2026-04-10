@@ -20,7 +20,7 @@
       color: #f5ebe0;
     }
 
-    /* Subtle snowflake dot pattern */
+    /* Subtle dot pattern */
     body::before {
       content: '';
       position: absolute;
@@ -73,34 +73,67 @@
       z-index: 0;
     }
 
-    /* Emoji decorations */
-    .emoji-snow {
+    /* CSS Snowflake */
+    .css-snowflake {
       position: absolute;
-      font-size: 150px;
-      filter: drop-shadow(0 4px 20px rgba(200, 220, 255, 0.3));
       z-index: 2;
     }
+    .css-snowflake .arm {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform-origin: 0 0;
+      background: linear-gradient(90deg, rgba(200, 220, 255, 0.7), rgba(200, 220, 255, 0.1));
+      border-radius: 1px;
+    }
+    .css-snowflake .arm::before,
+    .css-snowflake .arm::after {
+      content: '';
+      position: absolute;
+      background: rgba(200, 220, 255, 0.5);
+      border-radius: 1px;
+    }
 
-    .emoji-snow.s1 { top: 40px; right: 180px; opacity: 0.9; transform: rotate(15deg); }
-    .emoji-snow.s2 { top: 200px; right: 60px; font-size: 80px; opacity: 0.5; transform: rotate(-20deg); }
-    .emoji-snow.s3 { bottom: 120px; left: 150px; font-size: 100px; opacity: 0.6; transform: rotate(30deg); }
+    .snowflake-1 {
+      top: 30px;
+      right: 160px;
+      width: 140px;
+      height: 140px;
+      filter: drop-shadow(0 4px 20px rgba(200, 220, 255, 0.3));
+    }
+    .snowflake-2 {
+      top: 190px;
+      right: 50px;
+      width: 70px;
+      height: 70px;
+      opacity: 0.5;
+      filter: drop-shadow(0 2px 10px rgba(200, 220, 255, 0.2));
+    }
+    .snowflake-3 {
+      bottom: 110px;
+      left: 130px;
+      width: 90px;
+      height: 90px;
+      opacity: 0.55;
+      filter: drop-shadow(0 3px 15px rgba(200, 220, 255, 0.25));
+    }
 
-    .emoji-tree {
+    /* SVG Pine Tree */
+    .svg-tree {
+      position: absolute;
+      bottom: 30px;
+      right: 70px;
+      z-index: 2;
+      filter: drop-shadow(0 4px 25px rgba(0, 60, 0, 0.3));
+    }
+
+    /* SVG Gift Box */
+    .svg-gift {
       position: absolute;
       bottom: 60px;
-      right: 100px;
-      font-size: 150px;
-      filter: drop-shadow(0 4px 25px rgba(0, 100, 0, 0.3));
+      right: 280px;
       z-index: 2;
-    }
-
-    .emoji-gift {
-      position: absolute;
-      bottom: 80px;
-      right: 300px;
-      font-size: 100px;
       filter: drop-shadow(0 4px 15px rgba(200, 50, 50, 0.3));
-      z-index: 2;
       transform: rotate(-8deg);
     }
 
@@ -247,8 +280,12 @@
     }
 
     .gift-card-icon {
-      font-size: 52px;
-      filter: drop-shadow(0 2px 10px rgba(0,0,0,0.2));
+      width: 56px;
+      height: 56px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .gift-card-info h3 {
@@ -302,6 +339,14 @@
       position: absolute;
       z-index: 1;
     }
+
+    @keyframes snowflakeSpin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .snowflake-1 { animation: snowflakeSpin 30s linear infinite; }
+    .snowflake-2 { animation: snowflakeSpin 45s linear infinite reverse; }
+    .snowflake-3 { animation: snowflakeSpin 35s linear infinite; }
   </style>
 </head>
 <body>
@@ -347,12 +392,97 @@
     <circle cx="5" cy="100" r="3" fill="#d4af37" opacity="0.5"/>
   </svg>
 
-  <!-- Emoji decorations -->
-  <div class="emoji-snow s1">❄️</div>
-  <div class="emoji-snow s2">❄️</div>
-  <div class="emoji-snow s3">❄️</div>
-  <div class="emoji-tree">🎄</div>
-  <div class="emoji-gift">🎁</div>
+  <!-- SVG Snowflakes (replaces snowflake emojis) -->
+  <svg class="css-snowflake snowflake-1" width="140" height="140" viewBox="0 0 140 140">
+    <g stroke="rgba(200,220,255,0.8)" stroke-width="2" stroke-linecap="round" fill="none">
+      <!-- Main arms -->
+      <line x1="70" y1="10" x2="70" y2="130"/>
+      <line x1="17" y1="40" x2="123" y2="100"/>
+      <line x1="17" y1="100" x2="123" y2="40"/>
+      <!-- Branches on arm 1 -->
+      <line x1="70" y1="30" x2="55" y2="20"/>
+      <line x1="70" y1="30" x2="85" y2="20"/>
+      <line x1="70" y1="110" x2="55" y2="120"/>
+      <line x1="70" y1="110" x2="85" y2="120"/>
+      <!-- Branches on arm 2 -->
+      <line x1="35" y1="50" x2="28" y2="38"/>
+      <line x1="35" y1="50" x2="25" y2="55"/>
+      <line x1="105" y1="90" x2="112" y2="102"/>
+      <line x1="105" y1="90" x2="115" y2="85"/>
+      <!-- Branches on arm 3 -->
+      <line x1="35" y1="90" x2="25" y2="85"/>
+      <line x1="35" y1="90" x2="28" y2="102"/>
+      <line x1="105" y1="50" x2="115" y2="55"/>
+      <line x1="105" y1="50" x2="112" y2="38"/>
+    </g>
+    <circle cx="70" cy="70" r="6" fill="rgba(200,220,255,0.5)" stroke="rgba(200,220,255,0.8)" stroke-width="1.5"/>
+  </svg>
+
+  <svg class="css-snowflake snowflake-2" width="70" height="70" viewBox="0 0 70 70">
+    <g stroke="rgba(200,220,255,0.7)" stroke-width="1.5" stroke-linecap="round" fill="none">
+      <line x1="35" y1="5" x2="35" y2="65"/>
+      <line x1="9" y1="20" x2="61" y2="50"/>
+      <line x1="9" y1="50" x2="61" y2="20"/>
+      <line x1="35" y1="18" x2="28" y2="12"/>
+      <line x1="35" y1="18" x2="42" y2="12"/>
+      <line x1="35" y1="52" x2="28" y2="58"/>
+      <line x1="35" y1="52" x2="42" y2="58"/>
+    </g>
+    <circle cx="35" cy="35" r="3" fill="rgba(200,220,255,0.4)"/>
+  </svg>
+
+  <svg class="css-snowflake snowflake-3" width="90" height="90" viewBox="0 0 90 90">
+    <g stroke="rgba(200,220,255,0.65)" stroke-width="1.5" stroke-linecap="round" fill="none">
+      <line x1="45" y1="8" x2="45" y2="82"/>
+      <line x1="13" y1="26" x2="77" y2="64"/>
+      <line x1="13" y1="64" x2="77" y2="26"/>
+      <line x1="45" y1="22" x2="37" y2="15"/>
+      <line x1="45" y1="22" x2="53" y2="15"/>
+      <line x1="45" y1="68" x2="37" y2="75"/>
+      <line x1="45" y1="68" x2="53" y2="75"/>
+      <line x1="25" y1="34" x2="18" y2="28"/>
+      <line x1="65" y1="56" x2="72" y2="62"/>
+    </g>
+    <circle cx="45" cy="45" r="4" fill="rgba(200,220,255,0.4)"/>
+  </svg>
+
+  <!-- SVG Pine Tree (replaces tree emoji) -->
+  <svg class="svg-tree" width="180" height="240" viewBox="0 0 180 240">
+    <!-- Tree layers -->
+    <polygon points="90,10 130,70 110,65 145,120 120,115 155,170 25,170 60,115 35,120 70,65 50,70" fill="#1a4a2a" stroke="#0d3318" stroke-width="1"/>
+    <polygon points="90,15 125,68 108,63 140,115 118,110 148,165 32,165 62,110 40,115 72,63 55,68" fill="#1e5a32" stroke="none"/>
+    <!-- Inner highlight -->
+    <polygon points="90,25 115,65 105,62 128,105 115,102 135,155 45,155 65,102 52,105 75,62 65,65" fill="#24683a" stroke="none" opacity="0.5"/>
+    <!-- Trunk -->
+    <rect x="78" y="170" width="24" height="35" rx="3" fill="#5a3e28" stroke="#4a3020" stroke-width="1"/>
+    <rect x="82" y="170" width="16" height="35" rx="2" fill="#6a4830"/>
+    <!-- Star topper -->
+    <polygon points="90,5 93,14 102,14 95,20 97,29 90,24 83,29 85,20 78,14 87,14" fill="#d4af37" stroke="none"/>
+    <!-- Ornament dots -->
+    <circle cx="80" cy="80" r="4" fill="#c4302b" opacity="0.8"/>
+    <circle cx="105" cy="110" r="4" fill="#d4af37" opacity="0.8"/>
+    <circle cx="70" cy="130" r="4" fill="#c4302b" opacity="0.8"/>
+    <circle cx="110" cy="145" r="3.5" fill="#d4af37" opacity="0.7"/>
+    <circle cx="85" cy="155" r="3.5" fill="#c4302b" opacity="0.7"/>
+  </svg>
+
+  <!-- SVG Gift Box (replaces gift emoji) -->
+  <svg class="svg-gift" width="110" height="120" viewBox="0 0 110 120">
+    <!-- Box body -->
+    <rect x="10" y="45" width="90" height="65" rx="4" fill="#c4302b" stroke="#9a2020" stroke-width="2"/>
+    <!-- Box lid -->
+    <rect x="5" y="32" width="100" height="20" rx="4" fill="#d84040" stroke="#9a2020" stroke-width="2"/>
+    <!-- Ribbon vertical -->
+    <rect x="47" y="32" width="16" height="78" fill="#d4af37" stroke="#b8962e" stroke-width="1"/>
+    <!-- Ribbon horizontal -->
+    <rect x="5" y="36" width="100" height="12" fill="#d4af37" stroke="#b8962e" stroke-width="1"/>
+    <!-- Bow -->
+    <ellipse cx="42" cy="32" rx="16" ry="12" fill="#d4af37" stroke="#b8962e" stroke-width="1.5"/>
+    <ellipse cx="68" cy="32" rx="16" ry="12" fill="#d4af37" stroke="#b8962e" stroke-width="1.5"/>
+    <circle cx="55" cy="32" r="6" fill="#e8c84a" stroke="#b8962e" stroke-width="1.5"/>
+    <!-- Highlight -->
+    <rect x="18" y="55" width="25" height="3" rx="1.5" fill="rgba(255,255,255,0.15)"/>
+  </svg>
 
   <!-- Content -->
   <div class="layout">
@@ -373,7 +503,9 @@
 
     <div class="gift-section">
       <div class="gift-card">
-        <div class="gift-card-icon">🕯️</div>
+        <div class="gift-card-icon">
+          <svg width="52" height="52" viewBox="0 0 52 52"><path d="M18,44 L18,16 C18,14 20,12 22,12 L30,12 C32,12 34,14 34,16 L34,44" fill="none" stroke="#d4af37" stroke-width="2.5" stroke-linecap="round"/><ellipse cx="26" cy="10" rx="5" ry="3" fill="none" stroke="#d4af37" stroke-width="2"/><line x1="26" y1="18" x2="26" y2="24" stroke="#d4af37" stroke-width="1.5" stroke-linecap="round"/><circle cx="26" cy="26" r="2" fill="#d4af37" opacity="0.8"/><path d="M22,44 L22,38 C22,36 24,34 26,34 C28,34 30,36 30,38 L30,44" fill="none" stroke="#d4af37" stroke-width="1.5"/></svg>
+        </div>
         <div class="gift-card-info">
           <h3 data-editable="true" data-field="gift1_title">Holiday Home</h3>
           <p data-editable="true" data-field="gift1_desc">Candles, throws, and festive decor</p>
@@ -381,7 +513,9 @@
         </div>
       </div>
       <div class="gift-card">
-        <div class="gift-card-icon">🧣</div>
+        <div class="gift-card-icon">
+          <svg width="52" height="52" viewBox="0 0 52 52"><path d="M12,22 C12,22 14,14 26,14 C38,14 40,22 40,22" fill="none" stroke="#a8c4d4" stroke-width="2.5" stroke-linecap="round"/><path d="M8,22 L44,22 L42,44 L10,44 Z" fill="none" stroke="#a8c4d4" stroke-width="2.5" stroke-linejoin="round"/><path d="M16,28 L16,38" stroke="#a8c4d4" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="2 4"/><path d="M26,28 L26,38" stroke="#a8c4d4" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="2 4"/><path d="M36,28 L36,38" stroke="#a8c4d4" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="2 4"/><path d="M6,22 L8,18 L44,18 L46,22" fill="none" stroke="#a8c4d4" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
         <div class="gift-card-info">
           <h3 data-editable="true" data-field="gift2_title">Winter Fashion</h3>
           <p data-editable="true" data-field="gift2_desc">Scarves, gloves, and cozy knitwear</p>
@@ -389,7 +523,9 @@
         </div>
       </div>
       <div class="gift-card">
-        <div class="gift-card-icon">🍫</div>
+        <div class="gift-card-icon">
+          <svg width="52" height="52" viewBox="0 0 52 52"><rect x="10" y="12" width="32" height="28" rx="4" fill="none" stroke="#8b5e3c" stroke-width="2.5"/><rect x="10" y="12" width="32" height="8" rx="4" fill="none" stroke="#8b5e3c" stroke-width="2.5"/><line x1="26" y1="12" x2="26" y2="40" stroke="#8b5e3c" stroke-width="2" stroke-linecap="round"/><path d="M20,12 C20,12 20,6 26,6 C32,6 32,12 32,12" fill="none" stroke="#d4af37" stroke-width="2" stroke-linecap="round"/><rect x="14" y="26" width="8" height="8" rx="2" fill="none" stroke="#8b5e3c" stroke-width="1.5"/><rect x="30" y="26" width="8" height="8" rx="2" fill="none" stroke="#8b5e3c" stroke-width="1.5"/></svg>
+        </div>
         <div class="gift-card-info">
           <h3 data-editable="true" data-field="gift3_title">Gourmet Gifts</h3>
           <p data-editable="true" data-field="gift3_desc">Chocolate boxes, tea sets, and gift baskets</p>

@@ -78,7 +78,7 @@
       gap: 60px;
     }
 
-    /* Left panel — building info */
+    /* Left panel -- building info */
     .left-panel {
       display: flex;
       flex-direction: column;
@@ -86,10 +86,22 @@
       gap: 30px;
     }
 
-    .building-icon {
-      font-size: 100px;
-      filter: drop-shadow(0 4px 20px rgba(59, 130, 246, 0.3));
-      line-height: 1;
+    .building-icon-wrap {
+      width: 100px;
+      height: 100px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(217, 170, 83, 0.08));
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      border-radius: 24px;
+      box-shadow: 0 8px 32px rgba(59, 130, 246, 0.15);
+    }
+
+    .building-icon-wrap svg {
+      width: 56px;
+      height: 56px;
+      color: #60a5fa;
     }
 
     .building-name {
@@ -123,7 +135,7 @@
       font-weight: 600;
     }
 
-    /* Right panel — floor directory */
+    /* Right panel -- floor directory */
     .right-panel {
       display: flex;
       flex-direction: column;
@@ -262,12 +274,31 @@
   <div class="container">
     <!-- Left panel -->
     <div class="left-panel">
-      <div class="building-icon">🏢</div>
+      <div class="building-icon-wrap">
+        <!-- Abstract architectural building SVG -->
+        <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <!-- Main tower -->
+          <rect x="14" y="8" width="20" height="36" rx="2"/>
+          <!-- Windows row 1 -->
+          <rect x="18" y="13" width="4" height="4" rx="0.5"/><rect x="26" y="13" width="4" height="4" rx="0.5"/>
+          <!-- Windows row 2 -->
+          <rect x="18" y="21" width="4" height="4" rx="0.5"/><rect x="26" y="21" width="4" height="4" rx="0.5"/>
+          <!-- Windows row 3 -->
+          <rect x="18" y="29" width="4" height="4" rx="0.5"/><rect x="26" y="29" width="4" height="4" rx="0.5"/>
+          <!-- Door -->
+          <rect x="21" y="37" width="6" height="7" rx="1"/>
+          <!-- Spire/antenna -->
+          <line x1="24" y1="2" x2="24" y2="8"/>
+          <line x1="21" y1="5" x2="27" y2="5"/>
+          <!-- Base plinth -->
+          <line x1="10" y1="44" x2="38" y2="44"/>
+        </svg>
+      </div>
       <div class="building-name" data-editable="true" data-field="buildingName">Meridian Tower</div>
-      <div class="building-address" data-editable="true" data-field="buildingAddress">1200 Commerce Boulevard<br>Suite 100 – 800<br>San Francisco, CA 94105</div>
+      <div class="building-address" data-editable="true" data-field="buildingAddress">1200 Commerce Boulevard<br>Suite 100 - 800<br>San Francisco, CA 94105</div>
       <div class="building-hours">
         <strong>Building Hours</strong><br>
-        <span data-editable="true" data-field="buildingHours">Monday – Friday: 7:00 AM – 9:00 PM<br>Saturday: 8:00 AM – 5:00 PM<br>Sunday: Closed</span>
+        <span data-editable="true" data-field="buildingHours">Monday - Friday: 7:00 AM - 9:00 PM<br>Saturday: 8:00 AM - 5:00 PM<br>Sunday: Closed</span>
       </div>
     </div>
 
@@ -279,56 +310,56 @@
           <div class="floor-number">8F</div>
           <div class="floor-info">
             <div class="floor-name" data-editable="true" data-field="floor8Name">Executive Offices</div>
-            <div class="floor-rooms" data-editable="true" data-field="floor8Rooms">Rooms 800 – 820 · Boardroom</div>
+            <div class="floor-rooms" data-editable="true" data-field="floor8Rooms">Rooms 800 - 820 - Boardroom</div>
           </div>
         </div>
         <div class="floor-card floor-accent">
           <div class="floor-number">7F</div>
           <div class="floor-info">
             <div class="floor-name" data-editable="true" data-field="floor7Name">Legal & Compliance</div>
-            <div class="floor-rooms" data-editable="true" data-field="floor7Rooms">Rooms 700 – 740 · Conference A/B</div>
+            <div class="floor-rooms" data-editable="true" data-field="floor7Rooms">Rooms 700 - 740 - Conference A/B</div>
           </div>
         </div>
         <div class="floor-card">
           <div class="floor-number">6F</div>
           <div class="floor-info">
             <div class="floor-name" data-editable="true" data-field="floor6Name">Marketing & Design</div>
-            <div class="floor-rooms" data-editable="true" data-field="floor6Rooms">Rooms 600 – 650 · Studio Lab</div>
+            <div class="floor-rooms" data-editable="true" data-field="floor6Rooms">Rooms 600 - 650 - Studio Lab</div>
           </div>
         </div>
         <div class="floor-card floor-accent">
           <div class="floor-number">5F</div>
           <div class="floor-info">
             <div class="floor-name" data-editable="true" data-field="floor5Name">Engineering Hub</div>
-            <div class="floor-rooms" data-editable="true" data-field="floor5Rooms">Rooms 500 – 560 · Server Room</div>
+            <div class="floor-rooms" data-editable="true" data-field="floor5Rooms">Rooms 500 - 560 - Server Room</div>
           </div>
         </div>
         <div class="floor-card">
           <div class="floor-number">4F</div>
           <div class="floor-info">
             <div class="floor-name" data-editable="true" data-field="floor4Name">Human Resources</div>
-            <div class="floor-rooms" data-editable="true" data-field="floor4Rooms">Rooms 400 – 430 · Training Center</div>
+            <div class="floor-rooms" data-editable="true" data-field="floor4Rooms">Rooms 400 - 430 - Training Center</div>
           </div>
         </div>
         <div class="floor-card floor-accent">
           <div class="floor-number">3F</div>
           <div class="floor-info">
             <div class="floor-name" data-editable="true" data-field="floor3Name">Finance & Operations</div>
-            <div class="floor-rooms" data-editable="true" data-field="floor3Rooms">Rooms 300 – 350 · Audit Suite</div>
+            <div class="floor-rooms" data-editable="true" data-field="floor3Rooms">Rooms 300 - 350 - Audit Suite</div>
           </div>
         </div>
         <div class="floor-card">
           <div class="floor-number">2F</div>
           <div class="floor-info">
             <div class="floor-name" data-editable="true" data-field="floor2Name">Coworking & Events</div>
-            <div class="floor-rooms" data-editable="true" data-field="floor2Rooms">Rooms 200 – 240 · Event Hall</div>
+            <div class="floor-rooms" data-editable="true" data-field="floor2Rooms">Rooms 200 - 240 - Event Hall</div>
           </div>
         </div>
         <div class="floor-card floor-accent">
           <div class="floor-number">1F</div>
           <div class="floor-info">
             <div class="floor-name" data-editable="true" data-field="floor1Name">Lobby & Reception</div>
-            <div class="floor-rooms" data-editable="true" data-field="floor1Rooms">Main Entrance · Security · Café</div>
+            <div class="floor-rooms" data-editable="true" data-field="floor1Rooms">Main Entrance - Security - Cafe</div>
           </div>
         </div>
       </div>

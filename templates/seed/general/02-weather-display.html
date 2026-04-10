@@ -82,6 +82,17 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      animation: fadeUp 0.5s ease-out both;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes breathe {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 1; }
     }
 
     .location {
@@ -90,8 +101,9 @@
       gap: 16px;
     }
 
-    .location-pin {
-      font-size: 36px;
+    .location-pin-icon {
+      width: 36px;
+      height: 36px;
       filter: drop-shadow(0 2px 8px rgba(96, 165, 250, 0.4));
     }
 
@@ -126,6 +138,7 @@
       grid-template-columns: 1fr 1fr;
       gap: 80px;
       align-items: center;
+      animation: fadeUp 0.6s ease-out 0.1s both;
     }
 
     .current-temp-section {
@@ -135,10 +148,11 @@
       gap: 20px;
     }
 
-    .weather-emoji {
-      font-size: 120px;
+    .weather-icon-main {
+      width: 140px;
+      height: 140px;
       filter: drop-shadow(0 8px 30px rgba(250, 204, 21, 0.3));
-      line-height: 1;
+      animation: breathe 4s ease-in-out infinite;
     }
 
     .temp-display {
@@ -203,11 +217,15 @@
       font-size: 28px;
       font-weight: 600;
       color: #e2e8f0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
 
-    .detail-emoji {
-      font-size: 28px;
-      margin-right: 8px;
+    .detail-icon {
+      width: 28px;
+      height: 28px;
+      flex-shrink: 0;
     }
 
     /* Forecast row */
@@ -215,6 +233,7 @@
       display: grid;
       grid-template-columns: repeat(5, 1fr);
       gap: 20px;
+      animation: fadeUp 0.6s ease-out 0.2s both;
     }
 
     .forecast-card {
@@ -240,10 +259,11 @@
       margin-bottom: 12px;
     }
 
-    .forecast-emoji {
-      font-size: 80px;
+    .forecast-icon {
+      width: 80px;
+      height: 80px;
       display: block;
-      margin: 8px 0;
+      margin: 8px auto;
       filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.2));
     }
 
@@ -317,7 +337,11 @@
     <!-- Top bar -->
     <div class="top-bar">
       <div class="location">
-        <span class="location-pin">📍</span>
+        <!-- Location pin SVG -->
+        <svg class="location-pin-icon" viewBox="0 0 36 36" fill="none">
+          <path d="M18 3C11.373 3 6 8.373 6 15c0 9 12 18 12 18s12-9 12-18c0-6.627-5.373-12-12-12z" fill="rgba(96,165,250,0.2)" stroke="#60a5fa" stroke-width="2"/>
+          <circle cx="18" cy="15" r="5" fill="#60a5fa" opacity="0.8"/>
+        </svg>
         <div>
           <div class="location-name" data-editable="true" data-field="locationName">San Francisco, CA</div>
           <div class="location-date" data-editable="true" data-field="currentDate">Wednesday, January 15, 2026</div>
@@ -329,55 +353,170 @@
     <!-- Main weather -->
     <div class="main-weather">
       <div class="current-temp-section">
-        <div class="weather-emoji">☀️</div>
+        <!-- Sun SVG icon -->
+        <svg class="weather-icon-main" viewBox="0 0 140 140" fill="none">
+          <circle cx="70" cy="70" r="30" fill="#fbbf24" opacity="0.9"/>
+          <circle cx="70" cy="70" r="30" stroke="#fcd34d" stroke-width="2" fill="none"/>
+          <!-- Rays -->
+          <line x1="70" y1="10" x2="70" y2="28" stroke="#fbbf24" stroke-width="4" stroke-linecap="round"/>
+          <line x1="70" y1="112" x2="70" y2="130" stroke="#fbbf24" stroke-width="4" stroke-linecap="round"/>
+          <line x1="10" y1="70" x2="28" y2="70" stroke="#fbbf24" stroke-width="4" stroke-linecap="round"/>
+          <line x1="112" y1="70" x2="130" y2="70" stroke="#fbbf24" stroke-width="4" stroke-linecap="round"/>
+          <line x1="27.6" y1="27.6" x2="40.3" y2="40.3" stroke="#fbbf24" stroke-width="4" stroke-linecap="round"/>
+          <line x1="99.7" y1="99.7" x2="112.4" y2="112.4" stroke="#fbbf24" stroke-width="4" stroke-linecap="round"/>
+          <line x1="112.4" y1="27.6" x2="99.7" y2="40.3" stroke="#fbbf24" stroke-width="4" stroke-linecap="round"/>
+          <line x1="40.3" y1="99.7" x2="27.6" y2="112.4" stroke="#fbbf24" stroke-width="4" stroke-linecap="round"/>
+          <!-- Inner glow -->
+          <circle cx="70" cy="70" r="22" fill="rgba(253,224,71,0.3)"/>
+        </svg>
         <div class="temp-display" data-editable="true" data-field="temperature">72<span class="temp-unit">&deg;F</span></div>
-        <div class="weather-condition" data-editable="true" data-field="condition">Clear & Sunny</div>
+        <div class="weather-condition" data-editable="true" data-field="condition">Clear &amp; Sunny</div>
       </div>
       <div class="details-grid">
         <div class="detail-card">
           <div class="detail-label">Humidity</div>
-          <div class="detail-value"><span class="detail-emoji">💧</span><span data-editable="true" data-field="humidity">45%</span></div>
+          <div class="detail-value">
+            <!-- Droplet SVG -->
+            <svg class="detail-icon" viewBox="0 0 28 28" fill="none">
+              <path d="M14 3L6 15a8 8 0 1016 0L14 3z" fill="rgba(56,189,248,0.3)" stroke="#38bdf8" stroke-width="2"/>
+              <path d="M11 18a3 3 0 003 3" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+            </svg>
+            <span data-editable="true" data-field="humidity">45%</span>
+          </div>
         </div>
         <div class="detail-card">
           <div class="detail-label">Wind</div>
-          <div class="detail-value"><span class="detail-emoji">💨</span><span data-editable="true" data-field="wind">12 mph</span></div>
+          <div class="detail-value">
+            <!-- Wind SVG -->
+            <svg class="detail-icon" viewBox="0 0 28 28" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round">
+              <path d="M3 10h16a3 3 0 100-3"/>
+              <path d="M3 16h12a3 3 0 110 3"/>
+              <path d="M3 22h8a2.5 2.5 0 100-2.5" opacity="0.6"/>
+            </svg>
+            <span data-editable="true" data-field="wind">12 mph</span>
+          </div>
         </div>
         <div class="detail-card">
           <div class="detail-label">UV Index</div>
-          <div class="detail-value"><span class="detail-emoji">🌞</span><span data-editable="true" data-field="uvIndex">6 High</span></div>
+          <div class="detail-value">
+            <!-- Sun/UV SVG -->
+            <svg class="detail-icon" viewBox="0 0 28 28" fill="none">
+              <circle cx="14" cy="14" r="6" fill="#fbbf24" opacity="0.8"/>
+              <circle cx="14" cy="14" r="6" stroke="#fcd34d" stroke-width="1.5" fill="none"/>
+              <line x1="14" y1="2" x2="14" y2="6" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+              <line x1="14" y1="22" x2="14" y2="26" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+              <line x1="2" y1="14" x2="6" y2="14" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+              <line x1="22" y1="14" x2="26" y2="14" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+              <line x1="5.5" y1="5.5" x2="8.3" y2="8.3" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+              <line x1="19.7" y1="19.7" x2="22.5" y2="22.5" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+              <line x1="22.5" y1="5.5" x2="19.7" y2="8.3" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+              <line x1="8.3" y1="19.7" x2="5.5" y2="22.5" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <span data-editable="true" data-field="uvIndex">6 High</span>
+          </div>
         </div>
         <div class="detail-card">
           <div class="detail-label">Feels Like</div>
-          <div class="detail-value"><span class="detail-emoji">🌡️</span><span data-editable="true" data-field="feelsLike">70&deg;F</span></div>
+          <div class="detail-value">
+            <!-- Thermometer SVG -->
+            <svg class="detail-icon" viewBox="0 0 28 28" fill="none">
+              <rect x="10" y="3" width="8" height="18" rx="4" stroke="#ef4444" stroke-width="2" fill="none"/>
+              <circle cx="14" cy="22" r="4" fill="rgba(239,68,68,0.3)" stroke="#ef4444" stroke-width="2"/>
+              <rect x="12.5" y="10" width="3" height="10" rx="1.5" fill="#ef4444" opacity="0.7"/>
+              <line x1="20" y1="8" x2="23" y2="8" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
+              <line x1="20" y1="12" x2="22" y2="12" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
+              <line x1="20" y1="16" x2="23" y2="16" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <span data-editable="true" data-field="feelsLike">70&deg;F</span>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- 5-day forecast -->
     <div class="forecast-row">
+      <!-- Day 1: Sunny -->
       <div class="forecast-card">
         <div class="forecast-day" data-editable="true" data-field="day1Name">Thu</div>
-        <span class="forecast-emoji">☀️</span>
+        <svg class="forecast-icon" viewBox="0 0 80 80" fill="none">
+          <circle cx="40" cy="40" r="16" fill="#fbbf24" opacity="0.9"/>
+          <line x1="40" y1="10" x2="40" y2="18" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
+          <line x1="40" y1="62" x2="40" y2="70" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
+          <line x1="10" y1="40" x2="18" y2="40" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
+          <line x1="62" y1="40" x2="70" y2="40" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
+          <line x1="18.8" y1="18.8" x2="24.4" y2="24.4" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
+          <line x1="55.6" y1="55.6" x2="61.2" y2="61.2" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
+          <line x1="61.2" y1="18.8" x2="55.6" y2="24.4" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
+          <line x1="24.4" y1="55.6" x2="18.8" y2="61.2" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
+        </svg>
         <div class="forecast-temp" data-editable="true" data-field="day1Temp">74&deg; <span class="forecast-temp-low">/ 58&deg;</span></div>
       </div>
+      <!-- Day 2: Partly cloudy -->
       <div class="forecast-card">
         <div class="forecast-day" data-editable="true" data-field="day2Name">Fri</div>
-        <span class="forecast-emoji">🌤️</span>
+        <svg class="forecast-icon" viewBox="0 0 80 80" fill="none">
+          <circle cx="30" cy="30" r="12" fill="#fbbf24" opacity="0.7"/>
+          <line x1="30" y1="8" x2="30" y2="14" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="8" y1="30" x2="14" y2="30" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="14.4" y1="14.4" x2="18.7" y2="18.7" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="45.6" y1="14.4" x2="41.3" y2="18.7" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="14.4" y1="45.6" x2="18.7" y2="41.3" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M26 50a14 14 0 0128 0H26z" fill="rgba(148,163,184,0.15)"/>
+          <path d="M24 50a16 16 0 1132 0" stroke="#94a3b8" stroke-width="2.5" fill="rgba(148,163,184,0.2)" stroke-linecap="round"/>
+          <path d="M34 42a10 10 0 0118 8" stroke="#94a3b8" stroke-width="2.5" fill="rgba(148,163,184,0.15)" stroke-linecap="round"/>
+        </svg>
         <div class="forecast-temp" data-editable="true" data-field="day2Temp">68&deg; <span class="forecast-temp-low">/ 55&deg;</span></div>
       </div>
+      <!-- Day 3: Cloudy -->
       <div class="forecast-card">
         <div class="forecast-day" data-editable="true" data-field="day3Name">Sat</div>
-        <span class="forecast-emoji">⛅</span>
+        <svg class="forecast-icon" viewBox="0 0 80 80" fill="none">
+          <circle cx="28" cy="28" r="10" fill="#fbbf24" opacity="0.5"/>
+          <line x1="28" y1="10" x2="28" y2="15" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+          <line x1="10" y1="28" x2="15" y2="28" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+          <path d="M22 52a16 16 0 0136 0H22z" fill="rgba(148,163,184,0.15)"/>
+          <path d="M20 52a18 18 0 0140 0" stroke="#94a3b8" stroke-width="2.5" fill="rgba(148,163,184,0.25)" stroke-linecap="round"/>
+          <path d="M32 40a12 12 0 0120 12" stroke="#94a3b8" stroke-width="2.5" fill="rgba(148,163,184,0.2)" stroke-linecap="round"/>
+          <path d="M44 46a8 8 0 018 6" stroke="#94a3b8" stroke-width="2" fill="rgba(148,163,184,0.15)" stroke-linecap="round"/>
+        </svg>
         <div class="forecast-temp" data-editable="true" data-field="day3Temp">65&deg; <span class="forecast-temp-low">/ 52&deg;</span></div>
       </div>
+      <!-- Day 4: Rainy -->
       <div class="forecast-card">
         <div class="forecast-day" data-editable="true" data-field="day4Name">Sun</div>
-        <span class="forecast-emoji">🌧️</span>
+        <svg class="forecast-icon" viewBox="0 0 80 80" fill="none">
+          <path d="M16 42a18 18 0 0140 0" stroke="#64748b" stroke-width="2.5" fill="rgba(100,116,139,0.25)" stroke-linecap="round"/>
+          <path d="M28 32a12 12 0 0120 10" stroke="#64748b" stroke-width="2.5" fill="rgba(100,116,139,0.2)" stroke-linecap="round"/>
+          <line x1="58" y1="42" x2="16" y2="42" stroke="#64748b" stroke-width="2.5" stroke-linecap="round"/>
+          <!-- Rain lines -->
+          <line x1="26" y1="50" x2="22" y2="62" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="38" y1="50" x2="34" y2="62" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="50" y1="50" x2="46" y2="62" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="32" y1="56" x2="28" y2="68" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+          <line x1="44" y1="56" x2="40" y2="68" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+        </svg>
         <div class="forecast-temp" data-editable="true" data-field="day4Temp">60&deg; <span class="forecast-temp-low">/ 49&deg;</span></div>
       </div>
+      <!-- Day 5: Snow -->
       <div class="forecast-card">
         <div class="forecast-day" data-editable="true" data-field="day5Name">Mon</div>
-        <span class="forecast-emoji">❄️</span>
+        <svg class="forecast-icon" viewBox="0 0 80 80" fill="none">
+          <path d="M16 38a18 18 0 0140 0" stroke="#94a3b8" stroke-width="2.5" fill="rgba(148,163,184,0.2)" stroke-linecap="round"/>
+          <path d="M28 28a12 12 0 0120 10" stroke="#94a3b8" stroke-width="2.5" fill="rgba(148,163,184,0.15)" stroke-linecap="round"/>
+          <line x1="58" y1="38" x2="16" y2="38" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
+          <!-- Snowflake shapes (hexagonal) -->
+          <g stroke="#e0e7ff" stroke-width="1.5" stroke-linecap="round">
+            <line x1="26" y1="48" x2="26" y2="58"/><line x1="21.7" y1="50.5" x2="30.3" y2="55.5"/><line x1="30.3" y1="50.5" x2="21.7" y2="55.5"/>
+          </g>
+          <g stroke="#e0e7ff" stroke-width="1.5" stroke-linecap="round">
+            <line x1="42" y1="50" x2="42" y2="60"/><line x1="37.7" y1="52.5" x2="46.3" y2="57.5"/><line x1="46.3" y1="52.5" x2="37.7" y2="57.5"/>
+          </g>
+          <g stroke="#e0e7ff" stroke-width="1.5" stroke-linecap="round">
+            <line x1="54" y1="46" x2="54" y2="56"/><line x1="49.7" y1="48.5" x2="58.3" y2="53.5"/><line x1="58.3" y1="48.5" x2="49.7" y2="53.5"/>
+          </g>
+          <circle cx="34" cy="64" r="2" fill="rgba(224,231,255,0.5)"/>
+          <circle cx="50" cy="66" r="1.5" fill="rgba(224,231,255,0.4)"/>
+        </svg>
         <div class="forecast-temp" data-editable="true" data-field="day5Temp">45&deg; <span class="forecast-temp-low">/ 32&deg;</span></div>
       </div>
     </div>

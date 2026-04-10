@@ -3,9 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1920, height=1080">
-  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Lora:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Playfair+Display:wght@400;700;900&family=Caveat:wght@400;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes glowPulse {
+      0%, 100% { opacity: 0.85; }
+      50%      { opacity: 1; }
+    }
+    @keyframes driftSlow {
+      0%, 100% { transform: translate(0, 0); }
+      50%      { transform: translate(12px, -8px); }
+    }
+
     body {
       width: 1920px;
       height: 1080px;
@@ -14,56 +27,63 @@
       font-family: 'Inter', sans-serif;
       background:
         repeating-linear-gradient(
-          0deg,
+          92deg,
           transparent,
-          transparent 3px,
-          rgba(160,120,70,0.02) 3px,
-          rgba(160,120,70,0.02) 4px
+          transparent 4px,
+          rgba(120,70,30,0.035) 4px,
+          rgba(120,70,30,0.035) 5px
         ),
-        radial-gradient(ellipse at 30% 20%, rgba(180,140,80,0.12) 0%, transparent 50%),
-        radial-gradient(ellipse at 75% 80%, rgba(160,110,60,0.08) 0%, transparent 50%),
-        linear-gradient(170deg, #f5ede0 0%, #ede3d0 40%, #e8dbc8 100%);
-      color: #3d2b1f;
+        repeating-linear-gradient(
+          88deg,
+          transparent,
+          transparent 9px,
+          rgba(80,45,18,0.03) 9px,
+          rgba(80,45,18,0.03) 10px
+        ),
+        radial-gradient(ellipse at 25% 15%, rgba(212,175,85,0.12) 0%, transparent 55%),
+        radial-gradient(ellipse at 80% 85%, rgba(180,110,40,0.10) 0%, transparent 55%),
+        linear-gradient(175deg, #3b2a1a 0%, #2a1d10 45%, #1b120a 100%);
+      color: #f5ecd9;
     }
 
-    /* Paper texture overlay */
+    /* Roasted bean speckle overlay */
     body::before {
       content: '';
       position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
+      inset: 0;
       background:
-        radial-gradient(circle, rgba(120,80,40,0.04) 1px, transparent 1px),
-        radial-gradient(circle, rgba(100,60,30,0.03) 1px, transparent 1px);
-      background-size: 20px 20px, 33px 33px;
-      background-position: 0 0, 10px 10px;
+        radial-gradient(circle, rgba(212,175,85,0.05) 1px, transparent 1.5px),
+        radial-gradient(circle, rgba(255,200,110,0.03) 1px, transparent 1.5px);
+      background-size: 28px 28px, 47px 47px;
+      background-position: 0 0, 14px 14px;
       pointer-events: none;
       z-index: 0;
     }
 
-    /* Warm glow spots */
-    .glow-warm-1 {
+    /* Ambient amber firelight */
+    .glow {
       position: absolute;
-      top: 100px; left: 200px;
-      width: 600px; height: 600px;
-      background: radial-gradient(circle, rgba(200,150,80,0.1) 0%, transparent 60%);
       border-radius: 50%;
+      pointer-events: none;
       z-index: 1;
+      animation: glowPulse 8s ease-in-out infinite;
     }
-    .glow-warm-2 {
-      position: absolute;
-      bottom: 50px; right: 150px;
-      width: 500px; height: 500px;
-      background: radial-gradient(circle, rgba(180,120,60,0.08) 0%, transparent 60%);
-      border-radius: 50%;
-      z-index: 1;
+    .glow-1 {
+      top: -160px; left: 180px;
+      width: 680px; height: 680px;
+      background: radial-gradient(circle, rgba(255,180,60,0.14) 0%, transparent 70%);
     }
-    .glow-warm-3 {
-      position: absolute;
-      top: -100px; right: 600px;
-      width: 400px; height: 400px;
-      background: radial-gradient(circle, rgba(210,170,100,0.06) 0%, transparent 60%);
-      border-radius: 50%;
-      z-index: 1;
+    .glow-2 {
+      bottom: -140px; right: 220px;
+      width: 720px; height: 720px;
+      background: radial-gradient(circle, rgba(255,140,40,0.11) 0%, transparent 70%);
+      animation-delay: 3s;
+    }
+    .glow-3 {
+      top: 240px; right: -80px;
+      width: 460px; height: 460px;
+      background: radial-gradient(circle, rgba(255,210,110,0.09) 0%, transparent 70%);
+      animation-delay: 5s;
     }
 
     .container {
@@ -74,198 +94,311 @@
       grid-template-rows: 1fr;
       height: 100%;
       padding: 60px;
-      gap: 50px;
+      gap: 48px;
+      animation: fadeUp 1.2s ease-out both;
     }
 
-    /* Left branding panel */
+    /* ============= Branding column ============= */
     .branding {
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
       text-align: center;
-      background: rgba(255,255,255,0.3);
-      border-radius: 24px;
-      border: 1px solid rgba(160,120,70,0.15);
-      padding: 40px;
-      backdrop-filter: blur(20px);
+      background:
+        linear-gradient(180deg, rgba(60,38,20,0.55), rgba(30,20,10,0.55));
+      border-radius: 28px;
+      border: 1px solid rgba(212,175,85,0.28);
+      padding: 50px 40px;
+      backdrop-filter: blur(18px);
       box-shadow:
-        0 20px 60px rgba(100,60,20,0.08),
-        inset 0 1px 0 rgba(255,255,255,0.5);
+        0 30px 80px rgba(0,0,0,0.55),
+        inset 0 1px 0 rgba(255,210,120,0.15),
+        inset 0 0 60px rgba(255,170,60,0.05);
+      position: relative;
+    }
+
+    .branding::before {
+      content: '';
+      position: absolute;
+      inset: 14px;
+      border-radius: 18px;
+      border: 1px dashed rgba(212,175,85,0.18);
+      pointer-events: none;
+    }
+
+    .steam-deco {
+      margin-bottom: 14px;
+      opacity: 0.55;
+      animation: driftSlow 7s ease-in-out infinite;
     }
 
     .emoji-hero {
-      font-size: 180px;
+      font-size: 168px;
       line-height: 1;
-      filter: drop-shadow(0 10px 20px rgba(100,60,20,0.2));
-      margin-bottom: 24px;
+      filter:
+        drop-shadow(0 0 40px rgba(255,180,60,0.45))
+        drop-shadow(0 12px 20px rgba(0,0,0,0.65));
+      margin-bottom: 22px;
     }
 
     .shop-name {
-      font-family: 'Lora', serif;
+      font-family: 'Caveat', cursive;
       font-weight: 700;
-      font-size: 52px;
-      color: #5c3a1e;
-      line-height: 1.1;
-      margin-bottom: 10px;
+      font-size: 72px;
+      color: #e6c878;
+      line-height: 1;
+      letter-spacing: 1px;
+      text-shadow:
+        0 2px 30px rgba(212,175,85,0.45),
+        0 0 2px rgba(255,230,160,0.4);
+      margin-bottom: 4px;
     }
 
     .shop-tagline {
-      font-family: 'Caveat', cursive;
-      font-size: 30px;
-      color: #8b6b4a;
-      margin-bottom: 30px;
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-weight: 400;
+      font-size: 26px;
+      color: rgba(245,236,217,0.72);
+      letter-spacing: 1.5px;
+      margin-bottom: 36px;
+    }
+
+    .divider-ornament {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 36px;
+      opacity: 0.7;
+    }
+    .divider-ornament .line {
+      width: 70px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #d4af55, transparent);
+    }
+    .divider-ornament .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #d4af55;
+      box-shadow: 0 0 10px rgba(212,175,85,0.6);
     }
 
     .open-hours {
-      background: rgba(92,58,30,0.08);
-      border: 1px solid rgba(92,58,30,0.12);
+      background: rgba(212,175,85,0.12);
+      border: 1px solid rgba(212,175,85,0.35);
       border-radius: 12px;
-      padding: 14px 28px;
+      padding: 14px 32px;
       font-family: 'Inter', sans-serif;
       font-size: 16px;
-      font-weight: 500;
-      color: #5c3a1e;
-      letter-spacing: 2px;
+      font-weight: 600;
+      color: #e6c878;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      backdrop-filter: blur(8px);
     }
 
-    /* Decorative SVG steam lines */
-    .steam-deco {
-      margin-bottom: 20px;
-      opacity: 0.3;
-    }
-
-    /* Menu columns */
+    /* ============= Menu columns ============= */
     .menu-col {
       display: flex;
       flex-direction: column;
-      gap: 0;
+      background:
+        linear-gradient(180deg, rgba(60,38,20,0.5), rgba(30,20,10,0.5));
+      border: 1px solid rgba(212,175,85,0.22);
+      border-radius: 24px;
+      overflow: hidden;
+      backdrop-filter: blur(14px);
+      box-shadow:
+        0 26px 70px rgba(0,0,0,0.5),
+        inset 0 1px 0 rgba(255,210,120,0.12);
     }
 
     .col-header {
-      background: rgba(92,58,30,0.06);
-      border-radius: 16px 16px 0 0;
-      padding: 24px 28px 16px;
-      border: 1px solid rgba(92,58,30,0.1);
-      border-bottom: none;
+      padding: 34px 36px 20px;
+      text-align: center;
+      border-bottom: 1px solid rgba(212,175,85,0.18);
+      background: linear-gradient(180deg, rgba(212,175,85,0.08), transparent);
+      position: relative;
     }
     .col-title {
-      font-family: 'Lora', serif;
-      font-weight: 700;
-      font-size: 36px;
-      color: #5c3a1e;
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 42px;
+      color: #e6c878;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      text-shadow: 0 0 28px rgba(212,175,85,0.3);
     }
     .col-subtitle {
       font-family: 'Caveat', cursive;
-      font-size: 22px;
-      color: #a07850;
+      font-size: 26px;
+      color: rgba(245,236,217,0.6);
+      margin-top: 2px;
+    }
+    .col-header::after {
+      content: '';
+      display: block;
+      width: 90px;
+      height: 1px;
+      margin: 14px auto 0;
+      background: linear-gradient(90deg, transparent, rgba(212,175,85,0.7), transparent);
     }
 
     .col-body {
-      background: rgba(255,255,255,0.35);
-      border-radius: 0 0 16px 16px;
-      padding: 20px 28px 28px;
-      border: 1px solid rgba(92,58,30,0.1);
-      border-top: none;
+      padding: 22px 32px 32px;
       flex: 1;
-      backdrop-filter: blur(10px);
       display: flex;
       flex-direction: column;
-      gap: 18px;
+      gap: 14px;
+      justify-content: center;
     }
 
     .menu-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      padding-bottom: 16px;
-      border-bottom: 1px dashed rgba(92,58,30,0.12);
+      display: grid;
+      grid-template-columns: 1fr auto;
+      grid-template-rows: auto auto;
+      column-gap: 18px;
+      padding: 14px 18px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.025);
+      border: 1px solid rgba(212,175,85,0.08);
     }
-    .menu-item:last-child {
-      border-bottom: none;
-      padding-bottom: 0;
+    .menu-item:nth-child(even) {
+      background: rgba(255,255,255,0.045);
     }
 
-    .item-info { flex: 1; margin-right: 16px; }
+    .item-info { grid-column: 1; grid-row: 1 / span 2; min-width: 0; }
 
     .item-name {
-      font-family: 'Caveat', cursive;
-      font-size: 30px;
+      font-family: 'Playfair Display', serif;
       font-weight: 700;
-      color: #4a2c12;
-      line-height: 1.1;
-    }
-
-    .item-desc {
-      font-family: 'Inter', sans-serif;
-      font-size: 15px;
-      font-weight: 300;
-      color: #8b6b4a;
-      line-height: 1.4;
-      margin-top: 2px;
-    }
-
-    .item-price {
-      font-family: 'Lora', serif;
-      font-weight: 600;
       font-size: 26px;
-      color: #7a5230;
+      color: #f5ecd9;
+      line-height: 1.15;
+    }
+    .item-desc {
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-size: 17px;
+      color: rgba(245,236,217,0.55);
+      line-height: 1.35;
+      margin-top: 4px;
+    }
+    .item-price {
+      grid-column: 2; grid-row: 1 / span 2;
+      align-self: center;
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 28px;
+      color: #d4af55;
+      text-shadow: 0 0 18px rgba(212,175,85,0.35);
       white-space: nowrap;
     }
 
-    /* Bottom ornamental strip */
-    .bottom-strip {
+    /* ============= Corner ornaments ============= */
+    .corner-decor {
       position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 6px;
-      background: linear-gradient(90deg, #5c3a1e, #a07850, #d4af55, #a07850, #5c3a1e);
       z-index: 3;
+      opacity: 0.28;
     }
+    .corner-tl { top: 22px; left: 22px; }
+    .corner-tr { top: 22px; right: 22px; transform: scaleX(-1); }
+    .corner-bl { bottom: 28px; left: 22px; transform: scaleY(-1); }
+    .corner-br { bottom: 28px; right: 22px; transform: scale(-1,-1); }
 
-    /* SVG bean decorations */
+    /* Coffee bean scatter decorations */
     .bean-deco {
       position: absolute;
       z-index: 1;
       opacity: 0.08;
     }
-    .bean-1 { top: 80px; right: 80px; }
-    .bean-2 { bottom: 100px; left: 520px; transform: rotate(45deg); }
+    .bean-1 { top: 70px; left: 50%; transform: rotate(-18deg); }
+    .bean-2 { bottom: 120px; right: 120px; transform: rotate(32deg); }
+    .bean-3 { top: 320px; left: 40px; transform: rotate(55deg); }
+
+    /* Bottom warm light strip */
+    .ember-strip {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 5px;
+      background: linear-gradient(90deg,
+        rgba(60,30,10,0.9),
+        rgba(180,110,40,0.9),
+        #d4af55,
+        rgba(255,180,60,0.95),
+        #d4af55,
+        rgba(180,110,40,0.9),
+        rgba(60,30,10,0.9));
+      z-index: 3;
+      box-shadow: 0 -4px 30px rgba(255,170,50,0.35);
+    }
   </style>
 </head>
 <body>
-  <div class="glow-warm-1"></div>
-  <div class="glow-warm-2"></div>
-  <div class="glow-warm-3"></div>
+  <div class="glow glow-1"></div>
+  <div class="glow glow-2"></div>
+  <div class="glow glow-3"></div>
 
-  <!-- SVG coffee bean decorations -->
-  <svg class="bean-deco bean-1" width="120" height="120" viewBox="0 0 120 120" fill="#5c3a1e">
-    <ellipse cx="60" cy="60" rx="50" ry="35" transform="rotate(-20 60 60)"/>
-    <line x1="25" y1="45" x2="95" y2="75" stroke="#f5ede0" stroke-width="3"/>
+  <!-- Corner ornaments -->
+  <svg class="corner-decor corner-tl" width="90" height="90" viewBox="0 0 90 90" fill="none">
+    <path d="M6 6 L6 46 Q6 6 46 6" stroke="#d4af55" stroke-width="2"/>
+    <path d="M18 18 L18 34 Q18 18 34 18" stroke="#d4af55" stroke-width="1"/>
+    <circle cx="9" cy="9" r="3.2" fill="#d4af55"/>
   </svg>
-  <svg class="bean-deco bean-2" width="100" height="100" viewBox="0 0 100 100" fill="#5c3a1e">
-    <ellipse cx="50" cy="50" rx="42" ry="28"/>
-    <line x1="18" y1="38" x2="82" y2="62" stroke="#f5ede0" stroke-width="3"/>
+  <svg class="corner-decor corner-tr" width="90" height="90" viewBox="0 0 90 90" fill="none">
+    <path d="M6 6 L6 46 Q6 6 46 6" stroke="#d4af55" stroke-width="2"/>
+    <path d="M18 18 L18 34 Q18 18 34 18" stroke="#d4af55" stroke-width="1"/>
+    <circle cx="9" cy="9" r="3.2" fill="#d4af55"/>
+  </svg>
+  <svg class="corner-decor corner-bl" width="90" height="90" viewBox="0 0 90 90" fill="none">
+    <path d="M6 6 L6 46 Q6 6 46 6" stroke="#d4af55" stroke-width="2"/>
+    <path d="M18 18 L18 34 Q18 18 34 18" stroke="#d4af55" stroke-width="1"/>
+    <circle cx="9" cy="9" r="3.2" fill="#d4af55"/>
+  </svg>
+  <svg class="corner-decor corner-br" width="90" height="90" viewBox="0 0 90 90" fill="none">
+    <path d="M6 6 L6 46 Q6 6 46 6" stroke="#d4af55" stroke-width="2"/>
+    <path d="M18 18 L18 34 Q18 18 34 18" stroke="#d4af55" stroke-width="1"/>
+    <circle cx="9" cy="9" r="3.2" fill="#d4af55"/>
+  </svg>
+
+  <!-- Scattered coffee beans -->
+  <svg class="bean-deco bean-1" width="130" height="130" viewBox="0 0 130 130" fill="#d4af55">
+    <ellipse cx="65" cy="65" rx="52" ry="36"/>
+    <path d="M20 55 Q65 75 110 55" stroke="#1b120a" stroke-width="4" fill="none"/>
+  </svg>
+  <svg class="bean-deco bean-2" width="110" height="110" viewBox="0 0 110 110" fill="#d4af55">
+    <ellipse cx="55" cy="55" rx="45" ry="30"/>
+    <path d="M18 48 Q55 62 92 48" stroke="#1b120a" stroke-width="4" fill="none"/>
+  </svg>
+  <svg class="bean-deco bean-3" width="100" height="100" viewBox="0 0 100 100" fill="#d4af55">
+    <ellipse cx="50" cy="50" rx="40" ry="27"/>
+    <path d="M15 42 Q50 56 85 42" stroke="#1b120a" stroke-width="4" fill="none"/>
   </svg>
 
   <div class="container">
-    <!-- Branding column -->
+    <!-- Branding -->
     <div class="branding">
-      <svg class="steam-deco" width="80" height="50" viewBox="0 0 80 50" fill="none" stroke="#5c3a1e" stroke-width="1.5">
-        <path d="M15 45 Q15 30 25 25 Q35 20 30 5"/>
-        <path d="M40 45 Q40 28 50 22 Q60 16 55 0"/>
-        <path d="M65 45 Q65 32 72 27 Q80 22 76 8"/>
+      <svg class="steam-deco" width="90" height="56" viewBox="0 0 90 56" fill="none" stroke="#d4af55" stroke-width="1.8" stroke-linecap="round">
+        <path d="M18 52 Q18 34 28 28 Q40 22 34 4"/>
+        <path d="M44 52 Q44 32 54 24 Q66 16 60 -2"/>
+        <path d="M72 52 Q72 36 80 30 Q88 24 84 8"/>
       </svg>
       <div class="emoji-hero">&#9749;</div>
-      <h1 class="shop-name" data-editable="true" data-field="shopName">The Daily Grind</h1>
-      <p class="shop-tagline" data-editable="true" data-field="tagline">freshly roasted, locally loved</p>
-      <div class="open-hours" data-editable="true" data-field="hours">OPEN DAILY 6AM - 8PM</div>
+      <h1 class="shop-name" data-editable="true" data-field="shopName">Ember &amp; Brew</h1>
+      <p class="shop-tagline" data-editable="true" data-field="tagline">slow roasted · honestly served</p>
+      <div class="divider-ornament">
+        <span class="line"></span>
+        <span class="dot"></span>
+        <span class="line"></span>
+      </div>
+      <div class="open-hours" data-editable="true" data-field="hours">OPEN DAILY · 6AM — 8PM</div>
     </div>
 
-    <!-- Coffee & Drinks column -->
+    <!-- Coffee & Drinks -->
     <div class="menu-col">
       <div class="col-header">
-        <h2 class="col-title" data-editable="true" data-field="drinksTitle">Coffee &amp; Drinks</h2>
-        <p class="col-subtitle" data-editable="true" data-field="drinksSubtitle">our signature brews</p>
+        <h2 class="col-title" data-editable="true" data-field="drinksTitle">Coffee &amp; Brews</h2>
+        <p class="col-subtitle" data-editable="true" data-field="drinksSubtitle">handcrafted, single origin</p>
       </div>
       <div class="col-body">
         <div class="menu-item">
@@ -284,8 +417,8 @@
         </div>
         <div class="menu-item">
           <div class="item-info">
-            <div class="item-name" data-editable="true" data-field="drink3Name">Cold Brew</div>
-            <div class="item-desc" data-editable="true" data-field="drink3Desc">24-hour steeped, chocolate notes</div>
+            <div class="item-name" data-editable="true" data-field="drink3Name">Slow Cold Brew</div>
+            <div class="item-desc" data-editable="true" data-field="drink3Desc">24-hour steeped, deep chocolate notes</div>
           </div>
           <div class="item-price" data-editable="true" data-field="drink3Price">$5.50</div>
         </div>
@@ -298,22 +431,22 @@
         </div>
         <div class="menu-item">
           <div class="item-info">
-            <div class="item-name" data-editable="true" data-field="drink5Name">Chai Tea Latte</div>
-            <div class="item-desc" data-editable="true" data-field="drink5Desc">House-made spiced chai, steamed milk</div>
+            <div class="item-name" data-editable="true" data-field="drink5Name">Spiced Chai</div>
+            <div class="item-desc" data-editable="true" data-field="drink5Desc">House-made masala, steamed whole milk</div>
           </div>
           <div class="item-price" data-editable="true" data-field="drink5Price">$5.50</div>
         </div>
         <div class="menu-item">
           <div class="item-info">
-            <div class="item-name" data-editable="true" data-field="drink6Name">Fresh Juice</div>
-            <div class="item-desc" data-editable="true" data-field="drink6Desc">Orange, apple, or seasonal blend</div>
+            <div class="item-name" data-editable="true" data-field="drink6Name">Pressed Juice</div>
+            <div class="item-desc" data-editable="true" data-field="drink6Desc">Orange, apple, or the seasonal blend</div>
           </div>
           <div class="item-price" data-editable="true" data-field="drink6Price">$7.00</div>
         </div>
       </div>
     </div>
 
-    <!-- Food column -->
+    <!-- Pastries & Bites -->
     <div class="menu-col">
       <div class="col-header">
         <h2 class="col-title" data-editable="true" data-field="foodTitle">Bites &amp; Pastries</h2>
@@ -323,42 +456,42 @@
         <div class="menu-item">
           <div class="item-info">
             <div class="item-name" data-editable="true" data-field="food1Name">Butter Croissant</div>
-            <div class="item-desc" data-editable="true" data-field="food1Desc">Flaky, golden, French butter</div>
+            <div class="item-desc" data-editable="true" data-field="food1Desc">Flaky, golden, French butter layers</div>
           </div>
           <div class="item-price" data-editable="true" data-field="food1Price">$4.00</div>
         </div>
         <div class="menu-item">
           <div class="item-info">
             <div class="item-name" data-editable="true" data-field="food2Name">Avocado Toast</div>
-            <div class="item-desc" data-editable="true" data-field="food2Desc">Sourdough, smashed avo, chili flakes, poached egg</div>
+            <div class="item-desc" data-editable="true" data-field="food2Desc">Sourdough, smashed avo, chili, poached egg</div>
           </div>
           <div class="item-price" data-editable="true" data-field="food2Price">$12.00</div>
         </div>
         <div class="menu-item">
           <div class="item-info">
             <div class="item-name" data-editable="true" data-field="food3Name">Blueberry Muffin</div>
-            <div class="item-desc" data-editable="true" data-field="food3Desc">Wild blueberries, streusel topping</div>
+            <div class="item-desc" data-editable="true" data-field="food3Desc">Wild blueberries, vanilla streusel top</div>
           </div>
           <div class="item-price" data-editable="true" data-field="food3Price">$4.50</div>
         </div>
         <div class="menu-item">
           <div class="item-info">
             <div class="item-name" data-editable="true" data-field="food4Name">Granola Bowl</div>
-            <div class="item-desc" data-editable="true" data-field="food4Desc">Greek yogurt, house granola, honey, seasonal fruit</div>
+            <div class="item-desc" data-editable="true" data-field="food4Desc">Greek yogurt, house granola, honey, fruit</div>
           </div>
           <div class="item-price" data-editable="true" data-field="food4Price">$9.00</div>
         </div>
         <div class="menu-item">
           <div class="item-info">
             <div class="item-name" data-editable="true" data-field="food5Name">Breakfast Sandwich</div>
-            <div class="item-desc" data-editable="true" data-field="food5Desc">Egg, cheddar, bacon, brioche bun</div>
+            <div class="item-desc" data-editable="true" data-field="food5Desc">Egg, sharp cheddar, bacon, brioche</div>
           </div>
           <div class="item-price" data-editable="true" data-field="food5Price">$10.00</div>
         </div>
         <div class="menu-item">
           <div class="item-info">
-            <div class="item-name" data-editable="true" data-field="food6Name">Banana Bread</div>
-            <div class="item-desc" data-editable="true" data-field="food6Desc">Walnut, dark chocolate chips, warm</div>
+            <div class="item-name" data-editable="true" data-field="food6Name">Warm Banana Bread</div>
+            <div class="item-desc" data-editable="true" data-field="food6Desc">Walnut, dark chocolate, toasted &amp; served warm</div>
           </div>
           <div class="item-price" data-editable="true" data-field="food6Price">$5.00</div>
         </div>
@@ -366,6 +499,6 @@
     </div>
   </div>
 
-  <div class="bottom-strip"></div>
+  <div class="ember-strip"></div>
 </body>
 </html>

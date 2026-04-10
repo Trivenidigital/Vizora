@@ -98,46 +98,79 @@
       filter: blur(50px);
     }
 
-    /* Emoji decorations */
-    .emoji-sun {
+    /* CSS Sun */
+    .css-sun {
       position: absolute;
-      top: 60px;
-      right: 120px;
-      font-size: 160px;
-      filter: drop-shadow(0 8px 30px rgba(255, 200, 0, 0.5));
+      top: 40px;
+      right: 100px;
+      width: 160px;
+      height: 160px;
       z-index: 2;
       transform: rotate(15deg);
+      filter: drop-shadow(0 8px 30px rgba(255, 200, 0, 0.5));
     }
-
-    .emoji-palm {
+    .css-sun .core {
       position: absolute;
-      bottom: 80px;
-      left: 80px;
-      font-size: 160px;
-      filter: drop-shadow(0 8px 25px rgba(0, 150, 100, 0.4));
+      top: 50%;
+      left: 50%;
+      width: 70px;
+      height: 70px;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: radial-gradient(circle at 40% 35%, #ffe066, #ffb347 50%, #ff8e53 100%);
+      box-shadow: 0 0 40px rgba(255, 200, 50, 0.6), 0 0 80px rgba(255, 180, 50, 0.3);
+    }
+    .css-sun .ray {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 150px;
+      height: 4px;
+      transform-origin: 0 50%;
+      background: linear-gradient(90deg, rgba(255, 200, 80, 0.7), transparent);
+      border-radius: 2px;
+    }
+    .css-sun .ray:nth-child(1) { transform: rotate(0deg); }
+    .css-sun .ray:nth-child(2) { transform: rotate(30deg); }
+    .css-sun .ray:nth-child(3) { transform: rotate(60deg); }
+    .css-sun .ray:nth-child(4) { transform: rotate(90deg); }
+    .css-sun .ray:nth-child(5) { transform: rotate(120deg); }
+    .css-sun .ray:nth-child(6) { transform: rotate(150deg); }
+    .css-sun .ray:nth-child(7) { transform: rotate(180deg); }
+    .css-sun .ray:nth-child(8) { transform: rotate(210deg); }
+    .css-sun .ray:nth-child(9) { transform: rotate(240deg); }
+    .css-sun .ray:nth-child(10) { transform: rotate(270deg); }
+    .css-sun .ray:nth-child(11) { transform: rotate(300deg); }
+    .css-sun .ray:nth-child(12) { transform: rotate(330deg); }
+
+    /* SVG Palm tree */
+    .svg-palm {
+      position: absolute;
+      bottom: 30px;
+      left: 40px;
       z-index: 2;
+      filter: drop-shadow(0 8px 25px rgba(0, 80, 60, 0.35));
       transform: scaleX(-1);
     }
 
-    .emoji-wave {
+    /* CSS Wave pattern */
+    .css-wave-deco {
       position: absolute;
-      bottom: 200px;
-      right: 250px;
-      font-size: 100px;
-      filter: drop-shadow(0 4px 15px rgba(0, 150, 200, 0.4));
-      z-index: 2;
-      opacity: 0.8;
-    }
-
-    .emoji-shell {
-      position: absolute;
-      top: 280px;
-      left: 100px;
-      font-size: 80px;
-      filter: drop-shadow(0 4px 12px rgba(255, 150, 100, 0.4));
+      bottom: 160px;
+      right: 180px;
       z-index: 2;
       opacity: 0.7;
+    }
+
+    /* SVG Shell/nautilus */
+    .svg-shell {
+      position: absolute;
+      top: 260px;
+      left: 80px;
+      z-index: 2;
+      opacity: 0.6;
       transform: rotate(-20deg);
+      filter: drop-shadow(0 4px 12px rgba(255, 150, 100, 0.4));
     }
 
     /* Content grid */
@@ -270,8 +303,12 @@
     }
 
     .promo-icon {
-      font-size: 48px;
-      filter: drop-shadow(0 2px 8px rgba(0,0,0,0.15));
+      width: 56px;
+      height: 56px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .promo-info h3 {
@@ -320,6 +357,12 @@
       position: absolute;
       z-index: 1;
     }
+
+    @keyframes breathe {
+      0%, 100% { transform: rotate(15deg) scale(1); }
+      50% { transform: rotate(15deg) scale(1.04); }
+    }
+    .css-sun { animation: breathe 6s ease-in-out infinite; }
   </style>
 </head>
 <body>
@@ -354,11 +397,59 @@
     <polygon points="30,0 60,30 30,60 0,30" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
   </svg>
 
-  <!-- Emoji decorations -->
-  <div class="emoji-sun">☀️</div>
-  <div class="emoji-palm">🌴</div>
-  <div class="emoji-wave">🌊</div>
-  <div class="emoji-shell">🐚</div>
+  <!-- CSS Sun (replaces sun emoji) -->
+  <div class="css-sun">
+    <div class="ray"></div><div class="ray"></div><div class="ray"></div>
+    <div class="ray"></div><div class="ray"></div><div class="ray"></div>
+    <div class="ray"></div><div class="ray"></div><div class="ray"></div>
+    <div class="ray"></div><div class="ray"></div><div class="ray"></div>
+    <div class="core"></div>
+  </div>
+
+  <!-- SVG Palm Tree (replaces palm emoji) -->
+  <svg class="svg-palm" width="200" height="280" viewBox="0 0 200 280">
+    <!-- Trunk -->
+    <path d="M100,280 C98,220 94,170 96,130 C97,110 99,95 100,80" fill="none" stroke="#5a3e28" stroke-width="14" stroke-linecap="round"/>
+    <path d="M100,280 C98,220 94,170 96,130 C97,110 99,95 100,80" fill="none" stroke="#7a5638" stroke-width="10" stroke-linecap="round"/>
+    <!-- Trunk texture lines -->
+    <path d="M92,260 Q100,256 108,260" fill="none" stroke="#4a3020" stroke-width="1.5" opacity="0.5"/>
+    <path d="M93,240 Q100,236 107,240" fill="none" stroke="#4a3020" stroke-width="1.5" opacity="0.5"/>
+    <path d="M93,220 Q100,216 107,220" fill="none" stroke="#4a3020" stroke-width="1.5" opacity="0.5"/>
+    <path d="M94,200 Q100,196 106,200" fill="none" stroke="#4a3020" stroke-width="1.5" opacity="0.5"/>
+    <path d="M94,180 Q100,176 106,180" fill="none" stroke="#4a3020" stroke-width="1.5" opacity="0.5"/>
+    <path d="M95,160 Q100,156 105,160" fill="none" stroke="#4a3020" stroke-width="1.5" opacity="0.5"/>
+    <!-- Fronds -->
+    <path d="M100,80 C80,50 30,20 5,40" fill="none" stroke="#1a6b4a" stroke-width="4" stroke-linecap="round"/>
+    <path d="M100,80 C75,55 35,30 10,35" fill="none" stroke="#238b5e" stroke-width="3" stroke-linecap="round"/>
+    <path d="M100,80 C120,50 170,20 195,40" fill="none" stroke="#1a6b4a" stroke-width="4" stroke-linecap="round"/>
+    <path d="M100,80 C125,55 165,30 190,35" fill="none" stroke="#238b5e" stroke-width="3" stroke-linecap="round"/>
+    <path d="M100,80 C90,40 60,5 25,0" fill="none" stroke="#1a6b4a" stroke-width="4" stroke-linecap="round"/>
+    <path d="M100,80 C110,40 140,5 175,0" fill="none" stroke="#1a6b4a" stroke-width="4" stroke-linecap="round"/>
+    <path d="M100,80 C95,45 70,15 35,5" fill="none" stroke="#2a9d6a" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M100,80 C105,45 130,15 165,5" fill="none" stroke="#2a9d6a" stroke-width="2.5" stroke-linecap="round"/>
+    <!-- Leaf details (midribs) -->
+    <path d="M100,80 C85,52 42,28 12,38" fill="none" stroke="#34b87a" stroke-width="1" opacity="0.5"/>
+    <path d="M100,80 C115,52 158,28 188,38" fill="none" stroke="#34b87a" stroke-width="1" opacity="0.5"/>
+    <!-- Coconuts -->
+    <circle cx="95" cy="85" r="8" fill="#7a5638" stroke="#5a3e28" stroke-width="1.5"/>
+    <circle cx="108" cy="82" r="7" fill="#7a5638" stroke="#5a3e28" stroke-width="1.5"/>
+    <circle cx="100" cy="90" r="6" fill="#6a4830" stroke="#5a3e28" stroke-width="1.5"/>
+  </svg>
+
+  <!-- SVG Wave decoration (replaces wave emoji) -->
+  <svg class="css-wave-deco" width="140" height="70" viewBox="0 0 140 70">
+    <path d="M0,50 C15,30 30,30 45,50 C60,70 75,70 90,50 C105,30 120,30 140,50" fill="none" stroke="rgba(0,150,200,0.5)" stroke-width="4" stroke-linecap="round"/>
+    <path d="M0,40 C15,20 30,20 45,40 C60,60 75,60 90,40 C105,20 120,20 140,40" fill="none" stroke="rgba(0,180,220,0.35)" stroke-width="3" stroke-linecap="round"/>
+    <path d="M10,55 C25,35 40,35 55,55 C70,75 85,75 100,55 C115,35 130,35 140,45" fill="none" stroke="rgba(0,130,180,0.25)" stroke-width="2.5" stroke-linecap="round"/>
+  </svg>
+
+  <!-- SVG Shell/Nautilus (replaces shell emoji) -->
+  <svg class="svg-shell" width="90" height="90" viewBox="0 0 90 90">
+    <path d="M45,45 C45,30 55,15 65,12 C75,9 82,15 82,28 C82,42 70,58 50,60 C35,61 22,52 18,38 C14,22 22,8 38,5 C55,2 72,12 78,30" fill="none" stroke="rgba(220,170,120,0.7)" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M45,45 C45,35 50,25 58,20 C66,16 72,20 72,30 C72,40 64,50 52,52" fill="none" stroke="rgba(220,170,120,0.5)" stroke-width="2" stroke-linecap="round"/>
+    <path d="M45,45 C45,38 48,32 54,28 C60,25 64,28 64,34 C64,40 58,46 50,47" fill="none" stroke="rgba(220,170,120,0.35)" stroke-width="1.5" stroke-linecap="round"/>
+    <circle cx="45" cy="45" r="3" fill="rgba(220,170,120,0.5)"/>
+  </svg>
 
   <!-- Content -->
   <div class="content">
@@ -379,28 +470,36 @@
 
     <div class="promo-cards">
       <div class="promo-card">
-        <div class="promo-icon">👗</div>
+        <div class="promo-icon">
+          <svg width="52" height="52" viewBox="0 0 52 52"><path d="M10,48 L10,18 C10,12 16,6 26,6 C36,6 42,12 42,18 L42,48" fill="none" stroke="#d45d79" stroke-width="2.5" stroke-linecap="round"/><path d="M6,48 L46,48 L44,22 L8,22 Z" fill="none" stroke="#d45d79" stroke-width="2.5" stroke-linejoin="round"/><line x1="18" y1="30" x2="18" y2="38" stroke="#d45d79" stroke-width="2" stroke-linecap="round"/><line x1="26" y1="28" x2="26" y2="40" stroke="#d45d79" stroke-width="2" stroke-linecap="round"/><line x1="34" y1="30" x2="34" y2="38" stroke="#d45d79" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
         <div class="promo-info">
           <h3 data-editable="true" data-field="promo1_title">Summer Fashion</h3>
           <p data-editable="true" data-field="promo1_desc">Breezy dresses, swimwear, and resort wear</p>
         </div>
       </div>
       <div class="promo-card">
-        <div class="promo-icon">🕶️</div>
+        <div class="promo-icon">
+          <svg width="52" height="52" viewBox="0 0 52 52"><ellipse cx="26" cy="28" rx="22" ry="10" fill="none" stroke="#1a6b8a" stroke-width="2.5"/><path d="M4,28 C4,28 4,16 26,16 C48,16 48,28 48,28" fill="none" stroke="#1a6b8a" stroke-width="2.5"/><line x1="4" y1="28" x2="12" y2="28" stroke="#1a6b8a" stroke-width="2.5" stroke-linecap="round"/><line x1="40" y1="28" x2="48" y2="28" stroke="#1a6b8a" stroke-width="2.5" stroke-linecap="round"/><circle cx="26" cy="22" r="1.5" fill="#1a6b8a"/></svg>
+        </div>
         <div class="promo-info">
           <h3 data-editable="true" data-field="promo2_title">Accessories</h3>
           <p data-editable="true" data-field="promo2_desc">Sunglasses, hats, bags, and sandals</p>
         </div>
       </div>
       <div class="promo-card">
-        <div class="promo-icon">🧴</div>
+        <div class="promo-icon">
+          <svg width="52" height="52" viewBox="0 0 52 52"><rect x="16" y="8" width="20" height="36" rx="8" fill="none" stroke="#c87941" stroke-width="2.5"/><circle cx="26" cy="14" r="3" fill="none" stroke="#c87941" stroke-width="2"/><path d="M20,44 L20,48 L16,48" fill="none" stroke="#c87941" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M32,44 L32,48 L36,48" fill="none" stroke="#c87941" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><line x1="22" y1="24" x2="30" y2="24" stroke="#c87941" stroke-width="1.5" stroke-linecap="round"/><line x1="22" y1="30" x2="30" y2="30" stroke="#c87941" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </div>
         <div class="promo-info">
           <h3 data-editable="true" data-field="promo3_title">Beauty & Skincare</h3>
           <p data-editable="true" data-field="promo3_desc">SPF, glow serums, and summer essentials</p>
         </div>
       </div>
       <div class="promo-card">
-        <div class="promo-icon">🏖️</div>
+        <div class="promo-icon">
+          <svg width="52" height="52" viewBox="0 0 52 52"><path d="M8,42 L44,42" stroke="#0abde3" stroke-width="2.5" stroke-linecap="round"/><path d="M12,42 L12,28 L20,22 L26,26 L32,20 L40,28 L40,42" fill="none" stroke="#0abde3" stroke-width="2.5" stroke-linejoin="round"/><circle cx="36" cy="14" r="6" fill="none" stroke="#feca57" stroke-width="2.5"/><path d="M16,42 L16,34" stroke="#0abde3" stroke-width="2" stroke-linecap="round"/><path d="M22,42 L22,30" stroke="#0abde3" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
         <div class="promo-info">
           <h3 data-editable="true" data-field="promo4_title">Outdoor Living</h3>
           <p data-editable="true" data-field="promo4_desc">Patio furniture, grills, and garden decor</p>

@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeLeft { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes scaleIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+    @keyframes breathe { 0%,100% { opacity: 0.4; transform: scale(1); } 50% { opacity: 0.8; transform: scale(1.05); } }
+
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        repeating-linear-gradient(45deg, transparent, transparent 50px, rgba(255,255,255,0.015) 50px, rgba(255,255,255,0.015) 51px),
+        linear-gradient(155deg, #0a1733 0%, #0e1f40 35%, #081530 70%, #050e22 100%);
+      color: #e8e9ed;
+    }
+
+    body::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(212,175,55,0.05) 1px, transparent 1px);
+      background-size: 34px 34px;
+      z-index: 0;
+    }
+
+    .glow-tr {
+      position: absolute;
+      top: -140px; right: -80px;
+      width: 700px; height: 700px;
+      background: radial-gradient(circle, rgba(212,175,55,0.2) 0%, rgba(212,175,55,0.05) 40%, transparent 70%);
+      border-radius: 50%;
+      z-index: 1;
+      animation: breathe 7s ease-in-out infinite;
+    }
+    .glow-bl {
+      position: absolute;
+      bottom: -150px; left: -100px;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(212,175,55,0.12) 0%, transparent 60%);
+      border-radius: 50%;
+      z-index: 1;
+      animation: breathe 9s ease-in-out 2s infinite;
+    }
+
+    .top-stripe, .bottom-stripe {
+      position: absolute;
+      left: 0; right: 0;
+      height: 6px;
+      background: linear-gradient(90deg, #0e1f40, #d4af37 30%, #f5e09e 50%, #d4af37 70%, #0e1f40);
+      z-index: 5;
+    }
+    .top-stripe { top: 0; }
+    .bottom-stripe { bottom: 0; }
+
+    .container {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      height: 100%;
+      padding: 80px 100px;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 40px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 28px;
+      border-bottom: 2px solid rgba(212,175,55,0.3);
+      animation: fadeUp 0.8s ease-out both;
+    }
+
+    .brand-row {
+      display: flex;
+      align-items: center;
+      gap: 22px;
+    }
+    .brand-mark {
+      width: 70px; height: 70px;
+      background: linear-gradient(135deg, #d4af37, #b8860b);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 24px rgba(212,175,55,0.4);
+    }
+    .brand-name {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 38px;
+      letter-spacing: 2px;
+      color: #e8e9ed;
+    }
+    .brand-sub {
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      letter-spacing: 6px;
+      text-transform: uppercase;
+      color: rgba(212,175,55,0.85);
+      font-weight: 600;
+      margin-top: 6px;
+    }
+
+    .meeting-badge {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 28px;
+      background: rgba(212,175,55,0.1);
+      border: 1.5px solid rgba(212,175,55,0.4);
+      border-radius: 40px;
+    }
+    .meeting-badge .dot {
+      width: 10px; height: 10px;
+      background: #d4af37;
+      border-radius: 50%;
+      box-shadow: 0 0 16px #d4af37;
+      animation: breathe 2s ease-in-out infinite;
+    }
+    .meeting-badge span {
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: #d4af37;
+    }
+
+    .title-block {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      animation: fadeUp 0.9s ease-out 0.25s both;
+    }
+
+    .title-eyebrow {
+      font-family: 'Inter', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 8px;
+      text-transform: uppercase;
+      color: #d4af37;
+    }
+
+    .title-main {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 128px;
+      line-height: 0.92;
+      letter-spacing: -2px;
+      color: #e8e9ed;
+      text-shadow: 0 0 60px rgba(212,175,55,0.2), 0 4px 20px rgba(0,0,0,0.5);
+    }
+    .title-main em {
+      display: inline-block;
+      font-style: italic;
+      color: #d4af37;
+    }
+
+    .title-sub {
+      font-family: 'Inter', sans-serif;
+      font-weight: 300;
+      font-size: 24px;
+      color: rgba(232,233,237,0.75);
+      max-width: 1100px;
+      line-height: 1.55;
+      font-style: italic;
+    }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 60px;
+    }
+
+    .datetime-block {
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+      animation: fadeLeft 0.9s ease-out 0.4s both;
+    }
+
+    .datetime-row {
+      display: flex;
+      gap: 24px;
+    }
+
+    .dt-card {
+      flex: 1;
+      padding: 30px 32px;
+      background: rgba(212,175,55,0.06);
+      border: 1px solid rgba(212,175,55,0.3);
+      border-radius: 18px;
+      backdrop-filter: blur(10px);
+      position: relative;
+      overflow: hidden;
+    }
+    .dt-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 5px; height: 100%;
+      background: linear-gradient(180deg, #d4af37, #b8860b);
+    }
+
+    .dt-label {
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: rgba(212,175,55,0.85);
+    }
+    .dt-value {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 42px;
+      color: #e8e9ed;
+      margin-top: 8px;
+      line-height: 1;
+    }
+    .dt-sub {
+      font-family: 'Inter', sans-serif;
+      font-size: 15px;
+      color: rgba(232,233,237,0.6);
+      margin-top: 8px;
+    }
+
+    .speakers-section {
+      padding: 26px 30px;
+      background: rgba(14,31,64,0.6);
+      border: 1px solid rgba(212,175,55,0.25);
+      border-radius: 18px;
+      backdrop-filter: blur(10px);
+    }
+    .speakers-label {
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: rgba(212,175,55,0.85);
+      margin-bottom: 16px;
+    }
+    .speaker-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .speaker {
+      display: grid;
+      grid-template-columns: 50px 1fr;
+      align-items: center;
+      gap: 14px;
+    }
+    .speaker-avatar {
+      width: 50px; height: 50px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #d4af37, #b8860b);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 20px;
+      color: #0a1733;
+      border: 2px solid rgba(212,175,55,0.5);
+    }
+    .speaker-name {
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: 18px;
+      color: #e8e9ed;
+    }
+    .speaker-role {
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      color: rgba(212,175,55,0.8);
+      margin-top: 2px;
+      letter-spacing: 0.5px;
+    }
+
+    .agenda-panel {
+      background: rgba(10,23,51,0.7);
+      border: 1.5px solid rgba(212,175,55,0.35);
+      border-radius: 24px;
+      padding: 38px 42px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 25px 60px rgba(0,0,0,0.5);
+      animation: scaleIn 0.9s ease-out 0.5s both;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .agenda-title {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 34px;
+      color: #e8e9ed;
+      padding-bottom: 16px;
+      border-bottom: 2px solid rgba(212,175,55,0.3);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .agenda-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-top: 22px;
+    }
+
+    .agenda-item {
+      display: grid;
+      grid-template-columns: 48px 1fr;
+      gap: 18px;
+      align-items: flex-start;
+    }
+    .agenda-item:nth-child(1) { animation: fadeLeft 0.6s ease-out 0.7s both; }
+    .agenda-item:nth-child(2) { animation: fadeLeft 0.6s ease-out 0.82s both; }
+    .agenda-item:nth-child(3) { animation: fadeLeft 0.6s ease-out 0.94s both; }
+    .agenda-item:nth-child(4) { animation: fadeLeft 0.6s ease-out 1.06s both; }
+    .agenda-item:nth-child(5) { animation: fadeLeft 0.6s ease-out 1.18s both; }
+
+    .agenda-num {
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      background: rgba(212,175,55,0.12);
+      border: 1.5px solid #d4af37;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 18px;
+      color: #d4af37;
+      flex-shrink: 0;
+    }
+    .agenda-text {
+      padding-top: 4px;
+    }
+    .agenda-main {
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: 18px;
+      color: #e8e9ed;
+      letter-spacing: 0.3px;
+    }
+    .agenda-sub {
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      color: rgba(232,233,237,0.55);
+      margin-top: 3px;
+    }
+
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 24px;
+      border-top: 2px solid rgba(212,175,55,0.25);
+      animation: fadeUp 0.8s ease-out 1.2s both;
+    }
+    .footer-left {
+      font-family: 'Playfair Display', serif;
+      font-style: italic;
+      font-size: 22px;
+      color: rgba(232,233,237,0.7);
+    }
+    .footer-right {
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: 15px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #d4af37;
+    }
+
+    .corner-deco {
+      position: absolute;
+      z-index: 3;
+      opacity: 0.3;
+    }
+  </style>
+</head>
+<body>
+  <div class="top-stripe"></div>
+  <div class="bottom-stripe"></div>
+  <div class="glow-tr"></div>
+  <div class="glow-bl"></div>
+
+  <svg class="corner-deco" style="top:30px;left:30px;" width="90" height="90" viewBox="0 0 90 90" fill="none">
+    <path d="M10 80 L10 20 L80 20" stroke="#d4af37" stroke-width="1.5" fill="none"/>
+    <circle cx="10" cy="20" r="4" fill="#d4af37"/>
+  </svg>
+  <svg class="corner-deco" style="bottom:30px;right:30px;" width="90" height="90" viewBox="0 0 90 90" fill="none">
+    <path d="M80 10 L80 70 L10 70" stroke="#d4af37" stroke-width="1.5" fill="none"/>
+    <circle cx="80" cy="70" r="4" fill="#d4af37"/>
+  </svg>
+
+  <div class="container">
+    <div class="header">
+      <div class="brand-row">
+        <div class="brand-mark">
+          <svg width="38" height="38" viewBox="0 0 38 38" fill="none">
+            <path d="M19 5 L31 12 L31 26 L19 33 L7 26 L7 12 Z" stroke="#0a1733" stroke-width="2.5" fill="none"/>
+            <circle cx="19" cy="19" r="5" fill="#0a1733"/>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-name" data-editable="true" data-field="companyName">NEXUS CORP</div>
+          <div class="brand-sub" data-editable="true" data-field="companyTag">Global · Innovate · Deliver</div>
+        </div>
+      </div>
+      <div class="meeting-badge">
+        <div class="dot"></div>
+        <span data-editable="true" data-field="badgeText">Mandatory Attendance</span>
+      </div>
+    </div>
+
+    <div class="title-block">
+      <div class="title-eyebrow" data-editable="true" data-field="eyebrow">Q2 2026 Company-Wide</div>
+      <h1 class="title-main">
+        <span data-editable="true" data-field="titleMain">All-Hands</span>
+        <em data-editable="true" data-field="titleAccent">Meeting</em>
+      </h1>
+      <div class="title-sub" data-editable="true" data-field="titleSub">Join us for our quarterly company update as we celebrate wins, share strategic priorities, and chart the course for the exciting quarter ahead.</div>
+    </div>
+
+    <div class="content-grid">
+      <div class="datetime-block">
+        <div class="datetime-row">
+          <div class="dt-card">
+            <div class="dt-label" data-editable="true" data-field="dateLabel">Date</div>
+            <div class="dt-value" data-editable="true" data-field="dateValue">April 22</div>
+            <div class="dt-sub" data-editable="true" data-field="dateSub">Thursday · 2026</div>
+          </div>
+          <div class="dt-card">
+            <div class="dt-label" data-editable="true" data-field="timeLabel">Time</div>
+            <div class="dt-value" data-editable="true" data-field="timeValue">10:00 AM</div>
+            <div class="dt-sub" data-editable="true" data-field="timeSub">Pacific Time · 90 min</div>
+          </div>
+        </div>
+
+        <div class="speakers-section">
+          <div class="speakers-label" data-editable="true" data-field="speakersLabel">Featured Speakers</div>
+          <div class="speaker-list">
+            <div class="speaker">
+              <div class="speaker-avatar" data-editable="true" data-field="speaker1Initials">JR</div>
+              <div>
+                <div class="speaker-name" data-editable="true" data-field="speaker1Name">Jennifer Ruiz</div>
+                <div class="speaker-role" data-editable="true" data-field="speaker1Role">Chief Executive Officer</div>
+              </div>
+            </div>
+            <div class="speaker">
+              <div class="speaker-avatar" data-editable="true" data-field="speaker2Initials">DK</div>
+              <div>
+                <div class="speaker-name" data-editable="true" data-field="speaker2Name">David Kapoor</div>
+                <div class="speaker-role" data-editable="true" data-field="speaker2Role">Chief Financial Officer</div>
+              </div>
+            </div>
+            <div class="speaker">
+              <div class="speaker-avatar" data-editable="true" data-field="speaker3Initials">SO</div>
+              <div>
+                <div class="speaker-name" data-editable="true" data-field="speaker3Name">Sofia Okonkwo</div>
+                <div class="speaker-role" data-editable="true" data-field="speaker3Role">VP of Product &amp; Design</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="agenda-panel">
+        <div class="agenda-title">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+            <rect x="5" y="6" width="22" height="22" rx="2" stroke="#d4af37" stroke-width="2" fill="none"/>
+            <path d="M5 11 L27 11" stroke="#d4af37" stroke-width="2"/>
+            <path d="M10 3 L10 9 M22 3 L22 9" stroke="#d4af37" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="11" cy="17" r="1.5" fill="#d4af37"/>
+            <circle cx="11" cy="22" r="1.5" fill="#d4af37"/>
+            <path d="M15 17 L22 17 M15 22 L22 22" stroke="#d4af37" stroke-width="1.5"/>
+          </svg>
+          <span data-editable="true" data-field="agendaTitle">Meeting Agenda</span>
+        </div>
+        <div class="agenda-list">
+          <div class="agenda-item">
+            <div class="agenda-num">1</div>
+            <div class="agenda-text">
+              <div class="agenda-main" data-editable="true" data-field="agenda1">CEO Opening &amp; Q2 Highlights</div>
+              <div class="agenda-sub" data-editable="true" data-field="agenda1Sub">10:00 – 10:15 · Jennifer Ruiz</div>
+            </div>
+          </div>
+          <div class="agenda-item">
+            <div class="agenda-num">2</div>
+            <div class="agenda-text">
+              <div class="agenda-main" data-editable="true" data-field="agenda2">Financial Performance Review</div>
+              <div class="agenda-sub" data-editable="true" data-field="agenda2Sub">10:15 – 10:35 · David Kapoor</div>
+            </div>
+          </div>
+          <div class="agenda-item">
+            <div class="agenda-num">3</div>
+            <div class="agenda-text">
+              <div class="agenda-main" data-editable="true" data-field="agenda3">Product Roadmap &amp; Launches</div>
+              <div class="agenda-sub" data-editable="true" data-field="agenda3Sub">10:35 – 10:55 · Sofia Okonkwo</div>
+            </div>
+          </div>
+          <div class="agenda-item">
+            <div class="agenda-num">4</div>
+            <div class="agenda-text">
+              <div class="agenda-main" data-editable="true" data-field="agenda4">Employee Recognition Awards</div>
+              <div class="agenda-sub" data-editable="true" data-field="agenda4Sub">10:55 – 11:10 · Leadership Team</div>
+            </div>
+          </div>
+          <div class="agenda-item">
+            <div class="agenda-num">5</div>
+            <div class="agenda-text">
+              <div class="agenda-main" data-editable="true" data-field="agenda5">Live Q&amp;A Session</div>
+              <div class="agenda-sub" data-editable="true" data-field="agenda5Sub">11:10 – 11:30 · Open Forum</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="footer-left" data-editable="true" data-field="footerLeft">Join us in the Main Auditorium · Live stream available company-wide</div>
+      <div class="footer-right" data-editable="true" data-field="footerRight">INTRANET.NEXUS.COM/ALLHANDS</div>
+    </div>
+  </div>
+</body>
+</html>

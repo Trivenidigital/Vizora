@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1920, height=1080">
-  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=Cormorant+Garamond:wght@300;400;500;600;700&family=Italiana&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -12,47 +12,62 @@
       overflow: hidden;
       position: relative;
       font-family: 'Inter', sans-serif;
+      color: #4a2838;
       background:
-        radial-gradient(ellipse at 25% 30%, rgba(220,130,180,0.1) 0%, transparent 50%),
-        radial-gradient(ellipse at 75% 70%, rgba(180,140,220,0.08) 0%, transparent 50%),
-        radial-gradient(ellipse at 50% 50%, rgba(255,200,200,0.06) 0%, transparent 40%),
-        linear-gradient(165deg, #fff5f8 0%, #fef0f5 30%, #fceaf2 60%, #f8e4ee 100%);
-      color: #4a2040;
+        radial-gradient(ellipse at 22% 25%, rgba(255,210,220,0.6) 0%, transparent 45%),
+        radial-gradient(ellipse at 78% 75%, rgba(230,190,210,0.5) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 50%, rgba(255,240,230,0.4) 0%, transparent 55%),
+        linear-gradient(165deg, #fff8e7 0%, #fdf0e8 25%, #fce6dc 55%, #f8dde2 100%);
     }
 
-    /* Soft dot pattern */
+    /* Marble vein texture */
     body::before {
       content: '';
       position: absolute;
       top: 0; left: 0; right: 0; bottom: 0;
-      background: radial-gradient(circle, rgba(200,100,150,0.04) 1.5px, transparent 1.5px);
-      background-size: 36px 36px;
+      background:
+        radial-gradient(ellipse 800px 100px at 20% 30%, rgba(183,110,121,0.06) 0%, transparent 50%),
+        radial-gradient(ellipse 600px 80px at 70% 60%, rgba(183,110,121,0.05) 0%, transparent 50%),
+        radial-gradient(ellipse 900px 120px at 50% 85%, rgba(183,110,121,0.04) 0%, transparent 50%),
+        radial-gradient(ellipse 500px 70px at 85% 20%, rgba(183,110,121,0.05) 0%, transparent 50%);
+      filter: blur(2px);
       pointer-events: none;
       z-index: 0;
     }
 
-    /* Soft glow circles */
-    .pastel-glow-1 {
+    /* Subtle grain */
+    body::after {
+      content: '';
       position: absolute;
-      top: -150px; left: 200px;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: radial-gradient(circle, rgba(183,110,121,0.05) 1px, transparent 1.5px);
+      background-size: 42px 42px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Soft ambient glows */
+    .glow-rose {
+      position: absolute;
+      top: -200px; left: 250px;
+      width: 700px; height: 700px;
+      background: radial-gradient(circle, rgba(255,200,215,0.5) 0%, transparent 65%);
+      border-radius: 50%;
+      z-index: 1;
+    }
+    .glow-cream {
+      position: absolute;
+      bottom: -150px; right: 300px;
       width: 600px; height: 600px;
-      background: radial-gradient(circle, rgba(255,180,210,0.15) 0%, transparent 60%);
+      background: radial-gradient(circle, rgba(255,248,231,0.6) 0%, transparent 60%);
       border-radius: 50%;
       z-index: 1;
     }
-    .pastel-glow-2 {
+    .glow-blush {
       position: absolute;
-      bottom: -100px; right: 300px;
+      top: 350px; right: -80px;
       width: 500px; height: 500px;
-      background: radial-gradient(circle, rgba(200,170,240,0.12) 0%, transparent 60%);
-      border-radius: 50%;
-      z-index: 1;
-    }
-    .pastel-glow-3 {
-      position: absolute;
-      top: 400px; right: -50px;
-      width: 400px; height: 400px;
-      background: radial-gradient(circle, rgba(255,200,180,0.08) 0%, transparent 60%);
+      background: radial-gradient(circle, rgba(230,180,200,0.35) 0%, transparent 65%);
       border-radius: 50%;
       z-index: 1;
     }
@@ -61,95 +76,171 @@
       position: relative;
       z-index: 2;
       display: grid;
-      grid-template-columns: 480px 1fr 1fr;
+      grid-template-columns: 460px 1fr 1fr;
       grid-template-rows: 1fr;
       height: 100%;
-      padding: 60px;
-      gap: 50px;
+      padding: 70px;
+      gap: 55px;
     }
 
-    /* Left branding */
+    /* ===== BRANDING ===== */
     .branding {
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
       text-align: center;
-      background: rgba(255,255,255,0.4);
-      border-radius: 28px;
-      border: 1px solid rgba(220,150,190,0.2);
-      padding: 40px;
-      backdrop-filter: blur(20px);
+      background:
+        linear-gradient(165deg, rgba(255,248,231,0.8) 0%, rgba(255,240,235,0.6) 100%);
+      border-radius: 4px;
+      border: 1px solid rgba(183,110,121,0.25);
+      padding: 60px 40px;
+      backdrop-filter: blur(22px);
       box-shadow:
-        0 20px 60px rgba(200,100,150,0.08),
-        inset 0 1px 0 rgba(255,255,255,0.7);
+        0 20px 70px rgba(183,110,121,0.12),
+        0 4px 20px rgba(183,110,121,0.06),
+        inset 0 1px 0 rgba(255,255,255,0.9);
+      position: relative;
+    }
+    .branding::before,
+    .branding::after {
+      content: '';
+      position: absolute;
+      left: 30px; right: 30px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(183,110,121,0.4), transparent);
+    }
+    .branding::before { top: 20px; }
+    .branding::after { bottom: 20px; }
+
+    .brand-ornament {
+      margin-bottom: 24px;
     }
 
-    .emoji-row {
-      display: flex;
-      gap: 16px;
-      margin-bottom: 20px;
+    .dessert-hero-svg {
+      margin-bottom: 28px;
+      filter: drop-shadow(0 10px 24px rgba(183,110,121,0.18));
     }
-    .emoji-deco {
-      font-size: 140px;
-      line-height: 1;
-      filter: drop-shadow(0 8px 20px rgba(200,100,150,0.2));
+
+    .brand-eyebrow {
+      font-family: 'Italiana', serif;
+      font-size: 20px;
+      letter-spacing: 10px;
+      color: #b76e79;
+      text-transform: uppercase;
+      margin-bottom: 18px;
+      opacity: 0.85;
     }
 
     .dessert-title {
-      font-family: 'Dancing Script', cursive;
+      font-family: 'Playfair Display', serif;
       font-weight: 700;
-      font-size: 64px;
-      color: #c04880;
-      line-height: 1;
-      margin-bottom: 10px;
+      font-size: 62px;
+      color: #4a2838;
+      line-height: 0.95;
+      margin-bottom: 14px;
+      letter-spacing: -0.5px;
     }
 
     .dessert-subtitle {
-      font-family: 'Playfair Display', serif;
+      font-family: 'Cormorant Garamond', serif;
       font-weight: 400;
-      font-size: 22px;
-      color: #9a6080;
-      letter-spacing: 6px;
-      text-transform: uppercase;
-      margin-bottom: 30px;
+      font-style: italic;
+      font-size: 24px;
+      color: #b76e79;
+      letter-spacing: 3px;
+      margin-bottom: 28px;
+    }
+
+    .ornament-divider {
+      margin: 22px 0;
     }
 
     .note-text {
-      font-family: 'Dancing Script', cursive;
-      font-size: 24px;
-      color: #b08098;
-      line-height: 1.4;
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 400;
+      font-style: italic;
+      font-size: 22px;
+      color: #8a5868;
+      line-height: 1.5;
+      max-width: 320px;
     }
 
-    /* SVG ornamental dividers */
-    .ornament-svg {
-      margin: 20px 0;
-      opacity: 0.4;
-    }
-
-    /* Menu columns */
+    /* ===== MENU COLUMNS ===== */
     .menu-col {
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 18px;
+      justify-content: center;
     }
 
+    .col-header {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      margin-bottom: 6px;
+    }
+
+    .col-icon {
+      width: 54px;
+      height: 54px;
+      flex-shrink: 0;
+      filter: drop-shadow(0 4px 12px rgba(183,110,121,0.2));
+    }
+
+    .col-title-group {
+      display: flex;
+      flex-direction: column;
+    }
+    .col-eyebrow {
+      font-family: 'Italiana', serif;
+      font-size: 13px;
+      letter-spacing: 5px;
+      color: #b76e79;
+      text-transform: uppercase;
+      opacity: 0.8;
+    }
     .col-title {
-      font-family: 'Dancing Script', cursive;
+      font-family: 'Playfair Display', serif;
       font-weight: 700;
-      font-size: 42px;
-      color: #c04880;
-      margin-bottom: 8px;
+      font-size: 38px;
+      color: #4a2838;
+      letter-spacing: -0.3px;
+      line-height: 1.1;
+    }
+
+    .col-rule {
+      height: 1px;
+      background: linear-gradient(90deg, rgba(183,110,121,0.5), rgba(183,110,121,0.1));
+      margin-bottom: 4px;
     }
 
     .dessert-card {
-      background: rgba(255,255,255,0.45);
-      border: 1px solid rgba(220,150,190,0.15);
-      border-radius: 20px;
-      padding: 24px 28px;
-      backdrop-filter: blur(12px);
-      box-shadow: 0 4px 20px rgba(200,100,150,0.05);
+      background: linear-gradient(165deg, rgba(255,255,255,0.7) 0%, rgba(255,248,231,0.5) 100%);
+      border: 1px solid rgba(183,110,121,0.18);
+      border-radius: 2px;
+      padding: 24px 30px;
+      backdrop-filter: blur(14px);
+      box-shadow:
+        0 6px 24px rgba(183,110,121,0.08),
+        inset 0 1px 0 rgba(255,255,255,0.8);
+      position: relative;
+    }
+    .dessert-card::before {
+      content: '';
+      position: absolute;
+      top: 10px; left: 10px;
+      width: 8px; height: 8px;
+      border-top: 1px solid rgba(183,110,121,0.5);
+      border-left: 1px solid rgba(183,110,121,0.5);
+    }
+    .dessert-card::after {
+      content: '';
+      position: absolute;
+      bottom: 10px; right: 10px;
+      width: 8px; height: 8px;
+      border-bottom: 1px solid rgba(183,110,121,0.5);
+      border-right: 1px solid rgba(183,110,121,0.5);
     }
 
     .card-header {
@@ -157,99 +248,224 @@
       justify-content: space-between;
       align-items: baseline;
       margin-bottom: 6px;
+      gap: 16px;
     }
 
     .card-name {
       font-family: 'Playfair Display', serif;
       font-weight: 700;
-      font-size: 28px;
-      color: #4a2040;
+      font-size: 26px;
+      color: #4a2838;
+      letter-spacing: 0.2px;
+      line-height: 1.15;
+      display: flex;
+      align-items: baseline;
+      flex: 1;
+      min-width: 0;
+    }
+    .card-name::after {
+      content: '';
+      flex: 1;
+      margin: 0 12px;
+      border-bottom: 1px dotted rgba(183,110,121,0.45);
+      position: relative;
+      top: -5px;
     }
 
     .card-price {
-      font-family: 'Dancing Script', cursive;
+      font-family: 'Playfair Display', serif;
       font-weight: 700;
       font-size: 30px;
-      color: #c04880;
+      color: #b76e79;
       white-space: nowrap;
     }
 
     .card-desc {
-      font-family: 'Inter', sans-serif;
-      font-weight: 300;
-      font-size: 15px;
-      color: #9a7088;
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 400;
+      font-style: italic;
+      font-size: 18px;
+      color: #8a5868;
       line-height: 1.4;
     }
 
-    /* Delicate SVG dividers between cards */
-    .card-divider {
-      display: flex;
-      justify-content: center;
+    /* ===== FRAME DECORATION ===== */
+    .page-frame {
+      position: absolute;
+      top: 30px; left: 30px; right: 30px; bottom: 30px;
+      border: 1px solid rgba(183,110,121,0.25);
+      border-radius: 2px;
+      z-index: 1;
+      pointer-events: none;
+    }
+    .page-frame::before {
+      content: '';
+      position: absolute;
+      top: 6px; left: 6px; right: 6px; bottom: 6px;
+      border: 1px solid rgba(183,110,121,0.12);
     }
 
-    /* Bottom gradient strip */
+    /* Corner ornaments */
+    .ornament {
+      position: absolute;
+      z-index: 3;
+      opacity: 0.55;
+      pointer-events: none;
+    }
+    .orn-tl { top: 40px; left: 40px; }
+    .orn-tr { top: 40px; right: 40px; transform: scaleX(-1); }
+    .orn-bl { bottom: 40px; left: 40px; transform: scaleY(-1); }
+    .orn-br { bottom: 40px; right: 40px; transform: scale(-1,-1); }
+
+    /* Bottom ribbon */
     .bottom-strip {
       position: absolute;
       bottom: 0; left: 0; right: 0;
-      height: 4px;
-      background: linear-gradient(90deg, #f0b0d0, #c04880, #9060b0, #c04880, #f0b0d0);
-      z-index: 3;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, rgba(183,110,121,0.6), rgba(255,220,200,0.8), rgba(183,110,121,0.6), transparent);
+      z-index: 4;
     }
-
-    /* Corner ornament SVGs */
-    .corner-rose {
-      position: absolute;
-      z-index: 1;
-      opacity: 0.08;
-    }
-    .rose-tl { top: 20px; left: 20px; }
-    .rose-br { bottom: 20px; right: 20px; transform: rotate(180deg); }
   </style>
 </head>
 <body>
-  <div class="pastel-glow-1"></div>
-  <div class="pastel-glow-2"></div>
-  <div class="pastel-glow-3"></div>
+  <div class="glow-rose"></div>
+  <div class="glow-cream"></div>
+  <div class="glow-blush"></div>
 
-  <!-- SVG rose corner decorations -->
-  <svg class="corner-rose rose-tl" width="200" height="200" viewBox="0 0 200 200" fill="none" stroke="#c04880" stroke-width="1.5">
-    <path d="M10 10 Q10 60 30 80 Q50 100 80 100"/>
-    <path d="M10 10 Q60 10 80 30 Q100 50 100 80"/>
-    <circle cx="55" cy="55" r="20" stroke-width="1" opacity="0.5"/>
-    <path d="M30 10 Q30 40 50 55" stroke-width="1" opacity="0.4"/>
-    <path d="M10 30 Q40 30 55 50" stroke-width="1" opacity="0.4"/>
+  <div class="page-frame"></div>
+
+  <!-- Corner rose ornaments -->
+  <svg class="ornament orn-tl" width="150" height="150" viewBox="0 0 150 150" fill="none" stroke="#b76e79" stroke-width="1.2">
+    <circle cx="40" cy="40" r="22" opacity="0.4"/>
+    <circle cx="40" cy="40" r="14" opacity="0.5"/>
+    <circle cx="40" cy="40" r="7" opacity="0.6"/>
+    <path d="M40 18 Q55 25 62 40 Q55 55 40 62 Q25 55 18 40 Q25 25 40 18" opacity="0.5"/>
+    <path d="M10 10 Q10 45 25 55 Q40 65 60 60" opacity="0.4" fill="none"/>
+    <path d="M10 10 Q45 10 55 25 Q65 40 60 60" opacity="0.4" fill="none"/>
+    <circle cx="10" cy="10" r="2.5" fill="#b76e79"/>
+    <circle cx="75" cy="30" r="1.5" fill="#b76e79"/>
+    <circle cx="30" cy="75" r="1.5" fill="#b76e79"/>
   </svg>
-  <svg class="corner-rose rose-br" width="200" height="200" viewBox="0 0 200 200" fill="none" stroke="#c04880" stroke-width="1.5">
-    <path d="M10 10 Q10 60 30 80 Q50 100 80 100"/>
-    <path d="M10 10 Q60 10 80 30 Q100 50 100 80"/>
-    <circle cx="55" cy="55" r="20" stroke-width="1" opacity="0.5"/>
-    <path d="M30 10 Q30 40 50 55" stroke-width="1" opacity="0.4"/>
-    <path d="M10 30 Q40 30 55 50" stroke-width="1" opacity="0.4"/>
+  <svg class="ornament orn-tr" width="150" height="150" viewBox="0 0 150 150" fill="none" stroke="#b76e79" stroke-width="1.2">
+    <circle cx="40" cy="40" r="22" opacity="0.4"/>
+    <circle cx="40" cy="40" r="14" opacity="0.5"/>
+    <circle cx="40" cy="40" r="7" opacity="0.6"/>
+    <path d="M40 18 Q55 25 62 40 Q55 55 40 62 Q25 55 18 40 Q25 25 40 18" opacity="0.5"/>
+    <path d="M10 10 Q10 45 25 55 Q40 65 60 60" opacity="0.4" fill="none"/>
+    <path d="M10 10 Q45 10 55 25 Q65 40 60 60" opacity="0.4" fill="none"/>
+    <circle cx="10" cy="10" r="2.5" fill="#b76e79"/>
+  </svg>
+  <svg class="ornament orn-bl" width="150" height="150" viewBox="0 0 150 150" fill="none" stroke="#b76e79" stroke-width="1.2">
+    <circle cx="40" cy="40" r="22" opacity="0.4"/>
+    <circle cx="40" cy="40" r="14" opacity="0.5"/>
+    <circle cx="40" cy="40" r="7" opacity="0.6"/>
+    <path d="M40 18 Q55 25 62 40 Q55 55 40 62 Q25 55 18 40 Q25 25 40 18" opacity="0.5"/>
+    <path d="M10 10 Q10 45 25 55 Q40 65 60 60" opacity="0.4" fill="none"/>
+    <circle cx="10" cy="10" r="2.5" fill="#b76e79"/>
+  </svg>
+  <svg class="ornament orn-br" width="150" height="150" viewBox="0 0 150 150" fill="none" stroke="#b76e79" stroke-width="1.2">
+    <circle cx="40" cy="40" r="22" opacity="0.4"/>
+    <circle cx="40" cy="40" r="14" opacity="0.5"/>
+    <circle cx="40" cy="40" r="7" opacity="0.6"/>
+    <path d="M40 18 Q55 25 62 40 Q55 55 40 62 Q25 55 18 40 Q25 25 40 18" opacity="0.5"/>
+    <path d="M10 10 Q10 45 25 55 Q40 65 60 60" opacity="0.4" fill="none"/>
+    <circle cx="10" cy="10" r="2.5" fill="#b76e79"/>
   </svg>
 
   <div class="container">
+    <!-- ============ BRANDING ============ -->
     <div class="branding">
-      <div class="emoji-row">
-        <span class="emoji-deco">&#127856;</span>
-        <span class="emoji-deco">&#129473;</span>
-      </div>
+      <!-- Small top ornament -->
+      <svg class="brand-ornament" width="130" height="18" viewBox="0 0 130 18" fill="none" stroke="#b76e79" stroke-width="1">
+        <line x1="0" y1="9" x2="45" y2="9" opacity="0.6"/>
+        <circle cx="55" cy="9" r="2" fill="#b76e79"/>
+        <path d="M62 9 Q65 3 68 9 Q71 15 74 9" stroke-width="1.2"/>
+        <circle cx="75" cy="9" r="2" fill="#b76e79"/>
+        <line x1="85" y1="9" x2="130" y2="9" opacity="0.6"/>
+      </svg>
+
+      <!-- Hero dessert SVG: elegant cake silhouette -->
+      <svg class="dessert-hero-svg" width="220" height="220" viewBox="0 0 220 220" fill="none">
+        <defs>
+          <linearGradient id="cakeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#fff8e7"/>
+            <stop offset="100%" stop-color="#f8dde2"/>
+          </linearGradient>
+          <linearGradient id="cakeStroke" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#b76e79"/>
+            <stop offset="100%" stop-color="#8a5868"/>
+          </linearGradient>
+        </defs>
+        <!-- Cake plate -->
+        <ellipse cx="110" cy="195" rx="80" ry="8" fill="url(#cakeGrad)" stroke="url(#cakeStroke)" stroke-width="1.5"/>
+        <ellipse cx="110" cy="190" rx="78" ry="6" fill="none" stroke="url(#cakeStroke)" stroke-width="0.8" opacity="0.6"/>
+        <!-- Bottom tier -->
+        <path d="M42 190 L42 150 Q42 142 50 142 L170 142 Q178 142 178 150 L178 190 Z" fill="url(#cakeGrad)" stroke="url(#cakeStroke)" stroke-width="1.8"/>
+        <ellipse cx="110" cy="142" rx="68" ry="6" fill="#fff8e7" stroke="url(#cakeStroke)" stroke-width="1.5"/>
+        <!-- Decorative scallops -->
+        <path d="M50 155 Q58 163 66 155 Q74 163 82 155 Q90 163 98 155 Q106 163 114 155 Q122 163 130 155 Q138 163 146 155 Q154 163 162 155 Q170 163 178 155" stroke="#b76e79" stroke-width="1" fill="none" opacity="0.6"/>
+        <path d="M50 175 Q58 183 66 175 Q74 183 82 175 Q90 183 98 175 Q106 183 114 175 Q122 183 130 175 Q138 183 146 175 Q154 183 162 175 Q170 183 178 175" stroke="#b76e79" stroke-width="1" fill="none" opacity="0.4"/>
+        <!-- Middle tier -->
+        <path d="M62 142 L62 100 Q62 92 70 92 L150 92 Q158 92 158 100 L158 142 Z" fill="url(#cakeGrad)" stroke="url(#cakeStroke)" stroke-width="1.8"/>
+        <ellipse cx="110" cy="92" rx="48" ry="5" fill="#fff8e7" stroke="url(#cakeStroke)" stroke-width="1.5"/>
+        <path d="M70 108 Q78 116 86 108 Q94 116 102 108 Q110 116 118 108 Q126 116 134 108 Q142 116 150 108" stroke="#b76e79" stroke-width="1" fill="none" opacity="0.6"/>
+        <path d="M70 128 Q78 136 86 128 Q94 136 102 128 Q110 136 118 128 Q126 136 134 128 Q142 136 150 128" stroke="#b76e79" stroke-width="1" fill="none" opacity="0.4"/>
+        <!-- Top tier -->
+        <path d="M82 92 L82 55 Q82 48 90 48 L130 48 Q138 48 138 55 L138 92 Z" fill="url(#cakeGrad)" stroke="url(#cakeStroke)" stroke-width="1.8"/>
+        <ellipse cx="110" cy="48" rx="28" ry="4" fill="#fff8e7" stroke="url(#cakeStroke)" stroke-width="1.5"/>
+        <path d="M88 65 Q96 72 104 65 Q112 72 120 65 Q128 72 136 65" stroke="#b76e79" stroke-width="1" fill="none" opacity="0.6"/>
+        <!-- Top decoration - rose -->
+        <circle cx="110" cy="38" r="8" fill="#f8dde2" stroke="#b76e79" stroke-width="1.2"/>
+        <circle cx="110" cy="38" r="5" fill="none" stroke="#b76e79" stroke-width="0.8" opacity="0.7"/>
+        <circle cx="110" cy="38" r="2" fill="#b76e79"/>
+        <!-- Little stars -->
+        <circle cx="55" cy="30" r="1.5" fill="#b76e79" opacity="0.6"/>
+        <circle cx="165" cy="25" r="1.5" fill="#b76e79" opacity="0.6"/>
+        <circle cx="45" cy="70" r="1" fill="#b76e79" opacity="0.5"/>
+        <circle cx="175" cy="65" r="1" fill="#b76e79" opacity="0.5"/>
+      </svg>
+
+      <div class="brand-eyebrow">Patisserie</div>
       <h1 class="dessert-title" data-editable="true" data-field="title">Sweet Indulgence</h1>
       <p class="dessert-subtitle" data-editable="true" data-field="subtitle">Dessert Menu</p>
 
-      <!-- Ornamental SVG divider -->
-      <svg class="ornament-svg" width="200" height="20" viewBox="0 0 200 20" fill="none" stroke="#c04880" stroke-width="1">
-        <line x1="0" y1="10" x2="80" y2="10"/>
-        <circle cx="100" cy="10" r="5"/>
-        <line x1="120" y1="10" x2="200" y2="10"/>
+      <!-- Ornamental divider -->
+      <svg class="ornament-divider" width="260" height="22" viewBox="0 0 260 22" fill="none" stroke="#b76e79" stroke-width="1">
+        <line x1="0" y1="11" x2="90" y2="11" opacity="0.7"/>
+        <circle cx="100" cy="11" r="2" fill="#b76e79"/>
+        <path d="M108 11 Q112 5 116 11" fill="none"/>
+        <circle cx="120" cy="11" r="3" fill="none" stroke-width="1.3"/>
+        <circle cx="130" cy="11" r="4" fill="none" stroke-width="1.3"/>
+        <circle cx="140" cy="11" r="3" fill="none" stroke-width="1.3"/>
+        <path d="M144 11 Q148 17 152 11" fill="none"/>
+        <circle cx="160" cy="11" r="2" fill="#b76e79"/>
+        <line x1="170" y1="11" x2="260" y2="11" opacity="0.7"/>
       </svg>
 
       <p class="note-text" data-editable="true" data-field="note">All desserts are made fresh<br>daily by our pastry chef</p>
     </div>
 
-    <!-- Cakes & Pastries -->
+    <!-- ============ CAKES & PASTRIES ============ -->
     <div class="menu-col">
-      <h2 class="col-title" data-editable="true" data-field="cakesTitle">Cakes &amp; Pastries</h2>
+      <div class="col-header">
+        <!-- Cupcake icon -->
+        <svg class="col-icon" viewBox="0 0 60 60" fill="none">
+          <path d="M14 30 L16 50 Q16 54 20 54 L40 54 Q44 54 44 50 L46 30 Z" fill="#fff8e7" stroke="#b76e79" stroke-width="1.5"/>
+          <path d="M14 30 L46 30" stroke="#b76e79" stroke-width="1"/>
+          <path d="M18 36 L42 36 M19 42 L41 42 M20 48 L40 48" stroke="#b76e79" stroke-width="0.6" opacity="0.5"/>
+          <!-- Frosting swirls -->
+          <path d="M14 30 Q12 20 20 18 Q22 10 30 12 Q38 10 40 18 Q48 20 46 30 Q46 24 40 24 Q38 16 30 18 Q22 16 20 24 Q14 24 14 30 Z" fill="#f8dde2" stroke="#b76e79" stroke-width="1.3"/>
+          <circle cx="30" cy="12" r="2" fill="#b76e79"/>
+          <!-- Cherry -->
+          <circle cx="30" cy="8" r="2.5" fill="#b76e79"/>
+          <line x1="30" y1="6" x2="33" y2="2" stroke="#b76e79" stroke-width="1"/>
+        </svg>
+        <div class="col-title-group">
+          <span class="col-eyebrow">Les Gâteaux</span>
+          <h2 class="col-title" data-editable="true" data-field="cakesTitle">Cakes &amp; Pastries</h2>
+        </div>
+      </div>
+      <div class="col-rule"></div>
 
       <div class="dessert-card">
         <div class="card-header">
@@ -257,12 +473,6 @@
           <span class="card-price" data-editable="true" data-field="cake1Price">$14</span>
         </div>
         <p class="card-desc" data-editable="true" data-field="cake1Desc">Espresso-soaked ladyfingers, mascarpone cream, cocoa dust</p>
-      </div>
-
-      <div class="card-divider">
-        <svg width="60" height="12" viewBox="0 0 60 12" fill="none" stroke="#c04880" stroke-width="0.8" opacity="0.3">
-          <path d="M0 6 Q15 0 30 6 Q45 12 60 6"/>
-        </svg>
       </div>
 
       <div class="dessert-card">
@@ -273,24 +483,12 @@
         <p class="card-desc" data-editable="true" data-field="cake2Desc">Three layers, cream cheese frosting, white chocolate shavings</p>
       </div>
 
-      <div class="card-divider">
-        <svg width="60" height="12" viewBox="0 0 60 12" fill="none" stroke="#c04880" stroke-width="0.8" opacity="0.3">
-          <path d="M0 6 Q15 0 30 6 Q45 12 60 6"/>
-        </svg>
-      </div>
-
       <div class="dessert-card">
         <div class="card-header">
           <span class="card-name" data-editable="true" data-field="cake3Name">Mille-Feuille</span>
           <span class="card-price" data-editable="true" data-field="cake3Price">$15</span>
         </div>
         <p class="card-desc" data-editable="true" data-field="cake3Desc">Caramelized puff pastry, vanilla pastry cream, raspberry coulis</p>
-      </div>
-
-      <div class="card-divider">
-        <svg width="60" height="12" viewBox="0 0 60 12" fill="none" stroke="#c04880" stroke-width="0.8" opacity="0.3">
-          <path d="M0 6 Q15 0 30 6 Q45 12 60 6"/>
-        </svg>
       </div>
 
       <div class="dessert-card">
@@ -302,9 +500,30 @@
       </div>
     </div>
 
-    <!-- Frozen & Specialty -->
+    <!-- ============ FROZEN & SPECIALTY ============ -->
     <div class="menu-col">
-      <h2 class="col-title" data-editable="true" data-field="frozenTitle">Frozen &amp; Specialty</h2>
+      <div class="col-header">
+        <!-- Ice cream cone icon -->
+        <svg class="col-icon" viewBox="0 0 60 60" fill="none">
+          <!-- Cone -->
+          <path d="M18 30 L42 30 L30 55 Z" fill="#fff8e7" stroke="#b76e79" stroke-width="1.5"/>
+          <line x1="22" y1="36" x2="34" y2="50" stroke="#b76e79" stroke-width="0.6" opacity="0.5"/>
+          <line x1="28" y1="36" x2="38" y2="44" stroke="#b76e79" stroke-width="0.6" opacity="0.5"/>
+          <line x1="32" y1="36" x2="26" y2="46" stroke="#b76e79" stroke-width="0.6" opacity="0.5"/>
+          <!-- Scoops -->
+          <circle cx="22" cy="22" r="8" fill="#f8dde2" stroke="#b76e79" stroke-width="1.3"/>
+          <circle cx="38" cy="22" r="8" fill="#fce6dc" stroke="#b76e79" stroke-width="1.3"/>
+          <circle cx="30" cy="14" r="8" fill="#fff8e7" stroke="#b76e79" stroke-width="1.3"/>
+          <!-- Cherry on top -->
+          <circle cx="30" cy="6" r="2.5" fill="#b76e79"/>
+          <path d="M30 4 Q33 1 35 3" stroke="#b76e79" stroke-width="1" fill="none"/>
+        </svg>
+        <div class="col-title-group">
+          <span class="col-eyebrow">Les Glaces</span>
+          <h2 class="col-title" data-editable="true" data-field="frozenTitle">Frozen &amp; Specialty</h2>
+        </div>
+      </div>
+      <div class="col-rule"></div>
 
       <div class="dessert-card">
         <div class="card-header">
@@ -312,12 +531,6 @@
           <span class="card-price" data-editable="true" data-field="frozen1Price">$11</span>
         </div>
         <p class="card-desc" data-editable="true" data-field="frozen1Desc">Three scoops of artisanal gelato, waffle cone, whipped cream</p>
-      </div>
-
-      <div class="card-divider">
-        <svg width="60" height="12" viewBox="0 0 60 12" fill="none" stroke="#9060b0" stroke-width="0.8" opacity="0.3">
-          <path d="M0 6 Q15 0 30 6 Q45 12 60 6"/>
-        </svg>
       </div>
 
       <div class="dessert-card">
@@ -328,24 +541,12 @@
         <p class="card-desc" data-editable="true" data-field="frozen2Desc">Vanilla gelato, hot espresso, amaretti biscuit, cocoa</p>
       </div>
 
-      <div class="card-divider">
-        <svg width="60" height="12" viewBox="0 0 60 12" fill="none" stroke="#9060b0" stroke-width="0.8" opacity="0.3">
-          <path d="M0 6 Q15 0 30 6 Q45 12 60 6"/>
-        </svg>
-      </div>
-
       <div class="dessert-card">
         <div class="card-header">
           <span class="card-name" data-editable="true" data-field="frozen3Name">Chocolate Fondant</span>
           <span class="card-price" data-editable="true" data-field="frozen3Price">$16</span>
         </div>
         <p class="card-desc" data-editable="true" data-field="frozen3Desc">Warm molten center, vanilla bean ice cream, salted caramel</p>
-      </div>
-
-      <div class="card-divider">
-        <svg width="60" height="12" viewBox="0 0 60 12" fill="none" stroke="#9060b0" stroke-width="0.8" opacity="0.3">
-          <path d="M0 6 Q15 0 30 6 Q45 12 60 6"/>
-        </svg>
       </div>
 
       <div class="dessert-card">

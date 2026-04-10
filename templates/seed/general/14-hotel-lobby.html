@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeLeft { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes fadeRight { from { opacity: 0; transform: translateX(-40px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes breathe { 0%,100% { opacity: 0.5; transform: scale(1); } 50% { opacity: 0.95; transform: scale(1.05); } }
+    @keyframes shimmer {
+      0%,100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(ellipse at 30% 20%, rgba(212,175,55,0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(212,175,55,0.06) 0%, transparent 55%),
+        linear-gradient(155deg, #0b1426 0%, #0f1e38 30%, #0a1628 65%, #060f1d 100%);
+      color: #f5ecd7;
+    }
+
+    body::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        radial-gradient(circle at 20% 30%, rgba(245,236,215,0.015) 0%, transparent 30%),
+        radial-gradient(circle at 70% 60%, rgba(245,236,215,0.02) 0%, transparent 25%),
+        radial-gradient(circle at 40% 80%, rgba(245,236,215,0.018) 0%, transparent 28%);
+      z-index: 0;
+    }
+
+    body::after {
+      content: '';
+      position: absolute;
+      top: -150px; right: -100px;
+      width: 800px; height: 800px;
+      background: radial-gradient(circle, rgba(212,175,55,0.15) 0%, rgba(212,175,55,0.04) 40%, transparent 70%);
+      border-radius: 50%;
+      z-index: 1;
+      animation: breathe 8s ease-in-out infinite;
+    }
+
+    .glow-bl {
+      position: absolute;
+      bottom: -200px; left: -150px;
+      width: 700px; height: 700px;
+      background: radial-gradient(circle, rgba(212,175,55,0.1) 0%, transparent 60%);
+      border-radius: 50%;
+      z-index: 1;
+      animation: breathe 10s ease-in-out 2s infinite;
+    }
+
+    .top-border, .bottom-border {
+      position: absolute;
+      left: 0; right: 0;
+      height: 6px;
+      background: linear-gradient(90deg,
+        transparent 0%,
+        #b8860b 15%,
+        #d4af37 30%,
+        #f5ecd7 50%,
+        #d4af37 70%,
+        #b8860b 85%,
+        transparent 100%);
+      background-size: 200% 100%;
+      animation: shimmer 6s ease-in-out infinite;
+      z-index: 5;
+    }
+    .top-border { top: 0; }
+    .bottom-border { bottom: 0; }
+
+    .container {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      height: 100%;
+      padding: 80px 90px;
+      display: grid;
+      grid-template-columns: 1.3fr 0.7fr;
+      grid-template-rows: auto 1fr auto;
+      gap: 50px 70px;
+    }
+
+    .header {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 32px;
+      border-bottom: 1px solid rgba(212,175,55,0.3);
+      animation: fadeUp 0.9s ease-out both;
+    }
+
+    .hotel-brand {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .hotel-crest {
+      width: 82px; height: 82px;
+      border: 2px solid #d4af37;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .hotel-crest::before {
+      content: '';
+      position: absolute;
+      inset: 5px;
+      border: 1px solid rgba(212,175,55,0.5);
+      border-radius: 50%;
+    }
+
+    .brand-text-block {
+      display: flex;
+      flex-direction: column;
+    }
+    .brand-name {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 44px;
+      letter-spacing: 4px;
+      color: #f5ecd7;
+      line-height: 1;
+    }
+    .brand-sub {
+      font-family: 'Inter', sans-serif;
+      font-weight: 400;
+      font-size: 13px;
+      letter-spacing: 8px;
+      text-transform: uppercase;
+      color: rgba(212,175,55,0.85);
+      margin-top: 8px;
+    }
+
+    .date-block {
+      text-align: right;
+    }
+    .date-day {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 28px;
+      color: #d4af37;
+      letter-spacing: 2px;
+    }
+    .date-full {
+      font-family: 'Inter', sans-serif;
+      font-weight: 400;
+      font-size: 16px;
+      color: rgba(245,236,215,0.7);
+      letter-spacing: 2px;
+      margin-top: 4px;
+    }
+
+    .welcome-block {
+      grid-column: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 34px;
+    }
+
+    .welcome-script {
+      font-family: 'Playfair Display', serif;
+      font-weight: 400;
+      font-style: italic;
+      font-size: 38px;
+      color: #d4af37;
+      letter-spacing: 2px;
+      animation: fadeUp 0.9s ease-out 0.2s both;
+    }
+
+    .welcome-title {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 108px;
+      line-height: 0.95;
+      letter-spacing: -1px;
+      color: #f5ecd7;
+      text-shadow: 0 0 60px rgba(212,175,55,0.2), 0 4px 20px rgba(0,0,0,0.5);
+      animation: fadeUp 0.9s ease-out 0.35s both;
+    }
+    .welcome-title em {
+      display: block;
+      font-style: italic;
+      font-size: 72px;
+      color: #d4af37;
+      margin-top: 8px;
+    }
+
+    .welcome-message {
+      font-family: 'Inter', sans-serif;
+      font-weight: 300;
+      font-size: 22px;
+      line-height: 1.7;
+      color: rgba(245,236,215,0.75);
+      max-width: 780px;
+      font-style: italic;
+      padding-left: 24px;
+      border-left: 2px solid rgba(212,175,55,0.4);
+      animation: fadeUp 0.9s ease-out 0.55s both;
+    }
+
+    .side-panel {
+      grid-column: 2;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+      justify-content: center;
+    }
+
+    .info-card {
+      background: rgba(245,236,215,0.03);
+      border: 1px solid rgba(212,175,55,0.25);
+      border-radius: 16px;
+      padding: 26px 30px;
+      backdrop-filter: blur(12px);
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05);
+    }
+    .info-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 4px; height: 100%;
+      background: linear-gradient(180deg, #d4af37, #b8860b);
+    }
+    .info-card:nth-child(1) { animation: fadeLeft 0.8s ease-out 0.4s both; }
+    .info-card:nth-child(2) { animation: fadeLeft 0.8s ease-out 0.55s both; }
+    .info-card:nth-child(3) { animation: fadeLeft 0.8s ease-out 0.7s both; }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    .card-icon {
+      width: 38px; height: 38px;
+      background: rgba(212,175,55,0.12);
+      border: 1px solid rgba(212,175,55,0.4);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .card-label {
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: 11px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: rgba(212,175,55,0.85);
+    }
+    .card-value {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 26px;
+      color: #f5ecd7;
+      line-height: 1.2;
+    }
+    .card-sub {
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      color: rgba(245,236,215,0.6);
+      margin-top: 6px;
+      line-height: 1.5;
+    }
+
+    .weather-row {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      margin-top: 4px;
+    }
+    .weather-temp {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 52px;
+      color: #f5ecd7;
+      line-height: 1;
+    }
+
+    .attractions {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: auto 1fr 1fr 1fr;
+      align-items: center;
+      gap: 30px;
+      padding: 26px 36px;
+      background: rgba(212,175,55,0.04);
+      border: 1px solid rgba(212,175,55,0.2);
+      border-radius: 18px;
+      animation: fadeUp 0.9s ease-out 0.85s both;
+    }
+    .attractions-label {
+      font-family: 'Playfair Display', serif;
+      font-style: italic;
+      font-size: 22px;
+      color: #d4af37;
+      padding-right: 28px;
+      border-right: 1px solid rgba(212,175,55,0.3);
+      letter-spacing: 1px;
+    }
+    .attraction-item {
+      display: flex;
+      flex-direction: column;
+    }
+    .attraction-name {
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: 17px;
+      color: #f5ecd7;
+      letter-spacing: 0.5px;
+    }
+    .attraction-distance {
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      color: rgba(212,175,55,0.8);
+      margin-top: 4px;
+      letter-spacing: 1px;
+    }
+
+    .corner-ornament {
+      position: absolute;
+      z-index: 3;
+      opacity: 0.35;
+    }
+  </style>
+</head>
+<body>
+  <div class="top-border"></div>
+  <div class="bottom-border"></div>
+  <div class="glow-bl"></div>
+
+  <!-- Ornamental corners -->
+  <svg class="corner-ornament" style="top:24px;left:24px;" width="110" height="110" viewBox="0 0 110 110" fill="none">
+    <path d="M10 100 L10 40 Q10 10 40 10 L100 10" stroke="#d4af37" stroke-width="1.5" fill="none"/>
+    <path d="M18 100 L18 48 Q18 18 48 18 L100 18" stroke="#d4af37" stroke-width="0.8" fill="none" opacity="0.6"/>
+    <circle cx="14" cy="14" r="3" fill="#d4af37"/>
+    <path d="M30 10 L40 10 M10 30 L10 40" stroke="#d4af37" stroke-width="2"/>
+  </svg>
+  <svg class="corner-ornament" style="top:24px;right:24px;" width="110" height="110" viewBox="0 0 110 110" fill="none">
+    <path d="M100 100 L100 40 Q100 10 70 10 L10 10" stroke="#d4af37" stroke-width="1.5" fill="none"/>
+    <path d="M92 100 L92 48 Q92 18 62 18 L10 18" stroke="#d4af37" stroke-width="0.8" fill="none" opacity="0.6"/>
+    <circle cx="96" cy="14" r="3" fill="#d4af37"/>
+  </svg>
+  <svg class="corner-ornament" style="bottom:24px;left:24px;" width="110" height="110" viewBox="0 0 110 110" fill="none">
+    <path d="M10 10 L10 70 Q10 100 40 100 L100 100" stroke="#d4af37" stroke-width="1.5" fill="none"/>
+    <circle cx="14" cy="96" r="3" fill="#d4af37"/>
+  </svg>
+  <svg class="corner-ornament" style="bottom:24px;right:24px;" width="110" height="110" viewBox="0 0 110 110" fill="none">
+    <path d="M100 10 L100 70 Q100 100 70 100 L10 100" stroke="#d4af37" stroke-width="1.5" fill="none"/>
+    <circle cx="96" cy="96" r="3" fill="#d4af37"/>
+  </svg>
+
+  <div class="container">
+    <div class="header">
+      <div class="hotel-brand">
+        <div class="hotel-crest">
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+            <path d="M24 6 L30 18 L42 20 L33 29 L35 42 L24 36 L13 42 L15 29 L6 20 L18 18 Z" fill="#d4af37"/>
+          </svg>
+        </div>
+        <div class="brand-text-block">
+          <div class="brand-name" data-editable="true" data-field="hotelName">THE GRAND MERIDIAN</div>
+          <div class="brand-sub" data-editable="true" data-field="hotelTagline">Five Star Luxury · Est. 1928</div>
+        </div>
+      </div>
+      <div class="date-block">
+        <div class="date-day" data-editable="true" data-field="dayName">Friday Evening</div>
+        <div class="date-full" data-editable="true" data-field="dateFull">April 9, 2026</div>
+      </div>
+    </div>
+
+    <div class="welcome-block">
+      <div class="welcome-script" data-editable="true" data-field="welcomeScript">A warm welcome to</div>
+      <h1 class="welcome-title">
+        <span data-editable="true" data-field="welcomeMain">Our Esteemed</span>
+        <em data-editable="true" data-field="welcomeSub">Guests</em>
+      </h1>
+      <p class="welcome-message" data-editable="true" data-field="welcomeMessage">It is our absolute pleasure to host you today. Our concierge is available around the clock to ensure your stay with us is nothing short of extraordinary. Please enjoy complimentary refreshments in the lounge.</p>
+    </div>
+
+    <div class="side-panel">
+      <div class="info-card">
+        <div class="card-header">
+          <div class="card-icon">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <circle cx="10" cy="10" r="8" stroke="#d4af37" stroke-width="1.8"/>
+              <circle cx="10" cy="10" r="3" fill="#d4af37"/>
+              <path d="M10 2 L10 5 M10 15 L10 18 M2 10 L5 10 M15 10 L18 10" stroke="#d4af37" stroke-width="1.5"/>
+            </svg>
+          </div>
+          <div class="card-label" data-editable="true" data-field="weatherLabel">Today's Weather</div>
+        </div>
+        <div class="weather-row">
+          <div class="weather-temp" data-editable="true" data-field="weatherTemp">22°</div>
+          <div>
+            <div class="card-value" data-editable="true" data-field="weatherCondition">Clear Skies</div>
+            <div class="card-sub" data-editable="true" data-field="weatherDetail">Light breeze · 65% humidity</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="card-header">
+          <div class="card-icon">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <rect x="3" y="5" width="14" height="12" rx="1.5" stroke="#d4af37" stroke-width="1.6"/>
+              <path d="M3 9 L17 9" stroke="#d4af37" stroke-width="1.6"/>
+              <path d="M7 3 L7 7 M13 3 L13 7" stroke="#d4af37" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="card-label" data-editable="true" data-field="checkinLabel">Check-in & Out</div>
+        </div>
+        <div class="card-value" data-editable="true" data-field="checkinTime">3:00 PM · 11:00 AM</div>
+        <div class="card-sub" data-editable="true" data-field="checkinSub">Express check-out available via in-room tablet</div>
+      </div>
+
+      <div class="info-card">
+        <div class="card-header">
+          <div class="card-icon">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path d="M10 2 C6 2 3 5 3 9 C3 14 10 19 10 19 C10 19 17 14 17 9 C17 5 14 2 10 2 Z" stroke="#d4af37" stroke-width="1.6" fill="none"/>
+              <circle cx="10" cy="9" r="2.5" fill="#d4af37"/>
+            </svg>
+          </div>
+          <div class="card-label" data-editable="true" data-field="conciergeLabel">Concierge</div>
+        </div>
+        <div class="card-value" data-editable="true" data-field="conciergePhone">Dial 0 · 24 Hours</div>
+        <div class="card-sub" data-editable="true" data-field="conciergeSub">Dining reservations · spa · transport</div>
+      </div>
+    </div>
+
+    <div class="attractions">
+      <div class="attractions-label" data-editable="true" data-field="attractionsLabel">Nearby</div>
+      <div class="attraction-item">
+        <div class="attraction-name" data-editable="true" data-field="attraction1Name">Royal Opera House</div>
+        <div class="attraction-distance" data-editable="true" data-field="attraction1Distance">0.4 MI · 8 MIN WALK</div>
+      </div>
+      <div class="attraction-item">
+        <div class="attraction-name" data-editable="true" data-field="attraction2Name">Meridian Art Museum</div>
+        <div class="attraction-distance" data-editable="true" data-field="attraction2Distance">0.7 MI · 14 MIN WALK</div>
+      </div>
+      <div class="attraction-item">
+        <div class="attraction-name" data-editable="true" data-field="attraction3Name">Harbor Boardwalk</div>
+        <div class="attraction-distance" data-editable="true" data-field="attraction3Distance">1.2 MI · 5 MIN DRIVE</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
