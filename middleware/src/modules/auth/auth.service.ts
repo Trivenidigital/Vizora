@@ -10,6 +10,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { OAuth2Client, TokenPayload } from 'google-auth-library';
 import { DatabaseService } from '../database/database.service';
 import { RedisService } from '../redis/redis.service';
 import { MailService } from '../mail/mail.service';
@@ -28,6 +29,8 @@ const LOCKOUT_TTL_SECONDS = 15 * 60; // 15 minutes
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
+  // Reuse a single OAuth2Client — it caches Google's JWKS public keys internally
+  private readonly googleClient = new OAuth2Client();
 
   constructor(
     private databaseService: DatabaseService,
@@ -150,47 +153,36 @@ export class AuthService {
   }
 
   async googleLogin(credential: string) {
-    // C2: Validate audience — MANDATORY. Must be checked before any processing.
+    // C2: Audience must be configured — fail closed if missing.
     const clientId = process.env.GOOGLE_CLIENT_ID;
     if (!clientId) {
       throw new ServiceUnavailableException('Google OAuth is not configured');
     }
 
-    // C1: Decode Google ID token locally (standard JWT) instead of HTTP roundtrip to Google
-    let payload: { email?: string; email_verified?: boolean; given_name?: string; family_name?: string; name?: string; aud?: string; exp?: number; iss?: string };
+    // Cryptographically verify the Google ID token against Google's public keys (JWKS).
+    // verifyIdToken() validates: RS256 signature, audience, issuer, and expiry.
+    // The library caches Google's keys internally with TTL (~5ms typical verification).
+    let payload: TokenPayload | undefined;
     try {
-      const parts = credential.split('.');
-      if (parts.length !== 3) {
-        throw new UnauthorizedException('Invalid token format');
-      }
-
-      const header = JSON.parse(Buffer.from(parts[0], 'base64url').toString());
-      payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+      const ticket = await this.googleClient.verifyIdToken({
+        idToken: credential,
+        audience: clientId,
+      });
+      payload = ticket.getPayload();
     } catch (error) {
-      if (error instanceof UnauthorizedException) throw error;
-      if (error instanceof ServiceUnavailableException) throw error;
-      this.logger.error(`Google token decode failed: ${error instanceof Error ? error.message : 'Unknown'}`);
-      throw new UnauthorizedException('Failed to verify Google token');
+      this.logger.warn(
+        `Google token verification failed: ${error instanceof Error ? error.message : 'Unknown'}`,
+      );
+      throw new UnauthorizedException('Invalid Google token');
     }
 
-    // Validate required fields
+    if (!payload) {
+      throw new UnauthorizedException('Invalid Google token payload');
+    }
+
+    // Email must be verified by Google (we rely on this for account auto-registration)
     if (!payload.email || !payload.email_verified) {
       throw new UnauthorizedException('Email not verified by Google');
-    }
-
-    // Validate expiry
-    if (payload.exp && payload.exp * 1000 < Date.now()) {
-      throw new UnauthorizedException('Google token has expired');
-    }
-
-    // Validate issuer
-    if (!['accounts.google.com', 'https://accounts.google.com'].includes(payload.iss || '')) {
-      throw new UnauthorizedException('Invalid token issuer');
-    }
-
-    // C2: Validate audience matches our client ID
-    if (payload.aud !== clientId) {
-      throw new UnauthorizedException('Google token audience mismatch');
     }
 
     // Find existing user

@@ -8,11 +8,23 @@ import { GeoService } from '../common/services/geo.service';
 import * as bcrypt from 'bcryptjs';
 
 /**
- * Helper: build a fake Google ID token (3-part base64url JWT) for testing.
+ * Mock google-auth-library's OAuth2Client — we test our business logic,
+ * not Google's signature verification (which the library handles internally).
+ * Tests can override `mockVerifyIdToken` implementation per-test.
  */
-function buildGoogleIdToken(payloadOverrides: Record<string, unknown> = {}): string {
-  const header = { alg: 'RS256', typ: 'JWT' };
-  const payload = {
+const mockVerifyIdToken = jest.fn();
+jest.mock('google-auth-library', () => ({
+  OAuth2Client: jest.fn().mockImplementation(() => ({
+    verifyIdToken: mockVerifyIdToken,
+  })),
+}));
+
+/**
+ * Helper: build a fake Google ID token payload. The actual token string is
+ * opaque — the verifyIdToken mock returns this payload directly.
+ */
+function buildGooglePayload(payloadOverrides: Record<string, unknown> = {}) {
+  return {
     iss: 'accounts.google.com',
     aud: 'test-google-client-id',
     email: 'googleuser@gmail.com',
@@ -22,8 +34,23 @@ function buildGoogleIdToken(payloadOverrides: Record<string, unknown> = {}): str
     exp: Math.floor(Date.now() / 1000) + 3600,
     ...payloadOverrides,
   };
-  const enc = (obj: unknown) => Buffer.from(JSON.stringify(obj)).toString('base64url');
-  return `${enc(header)}.${enc(payload)}.fake-signature`;
+}
+
+/**
+ * Set up the verifyIdToken mock to succeed and return the given payload.
+ */
+function mockGoogleSuccess(payload: Record<string, unknown>) {
+  mockVerifyIdToken.mockResolvedValue({
+    getPayload: () => payload,
+  });
+}
+
+/**
+ * Set up the verifyIdToken mock to reject (simulates signature, audience,
+ * expiry, or issuer verification failure from google-auth-library).
+ */
+function mockGoogleFailure(message: string) {
+  mockVerifyIdToken.mockRejectedValue(new Error(message));
 }
 
 // Mock bcryptjs
@@ -584,9 +611,11 @@ describe('AuthService', () => {
 
   describe('googleLogin', () => {
     const originalEnv = process.env;
+    const FAKE_TOKEN = 'opaque-google-id-token-string';
 
     beforeEach(() => {
       process.env = { ...originalEnv, GOOGLE_CLIENT_ID: 'test-google-client-id' };
+      mockVerifyIdToken.mockReset();
     });
 
     afterEach(() => {
@@ -594,7 +623,7 @@ describe('AuthService', () => {
     });
 
     it('should return user and token for a valid Google token (existing OAuth user)', async () => {
-      const token = buildGoogleIdToken();
+      mockGoogleSuccess(buildGooglePayload());
       const oauthUser = {
         ...mockUser,
         passwordHash: '', // OAuth user has no password
@@ -604,44 +633,48 @@ describe('AuthService', () => {
       mockDatabaseService.user.update.mockResolvedValue(oauthUser);
       mockDatabaseService.auditLog.create.mockResolvedValue({});
 
-      const result = await service.googleLogin(token);
+      const result = await service.googleLogin(FAKE_TOKEN);
 
       expect(result).toHaveProperty('token', 'mock-jwt-token');
       expect(result).toHaveProperty('user');
       expect(result.isNewUser).toBe(false);
+      expect(mockVerifyIdToken).toHaveBeenCalledWith({
+        idToken: FAKE_TOKEN,
+        audience: 'test-google-client-id',
+      });
     });
 
-    it('should throw UnauthorizedException for expired token', async () => {
-      const token = buildGoogleIdToken({ exp: Math.floor(Date.now() / 1000) - 3600 });
+    it('should throw UnauthorizedException when google-auth-library rejects (expired/invalid signature)', async () => {
+      // google-auth-library throws for signature failures, audience mismatch, expiry, issuer, etc.
+      mockGoogleFailure('Token used too late, 1000000000 > 999999999');
 
-      await expect(service.googleLogin(token)).rejects.toThrow(UnauthorizedException);
-      await expect(service.googleLogin(token)).rejects.toThrow('Google token has expired');
+      await expect(service.googleLogin(FAKE_TOKEN)).rejects.toThrow(UnauthorizedException);
+      await expect(service.googleLogin(FAKE_TOKEN)).rejects.toThrow('Invalid Google token');
     });
 
     it('should throw UnauthorizedException when email is not verified', async () => {
-      const token = buildGoogleIdToken({ email_verified: false });
+      mockGoogleSuccess(buildGooglePayload({ email_verified: false }));
 
-      await expect(service.googleLogin(token)).rejects.toThrow(UnauthorizedException);
-      await expect(service.googleLogin(token)).rejects.toThrow('Email not verified by Google');
+      await expect(service.googleLogin(FAKE_TOKEN)).rejects.toThrow(UnauthorizedException);
+      await expect(service.googleLogin(FAKE_TOKEN)).rejects.toThrow('Email not verified by Google');
     });
 
-    it('should throw UnauthorizedException for audience mismatch', async () => {
-      const token = buildGoogleIdToken({ aud: 'wrong-client-id' });
+    it('should throw UnauthorizedException for audience mismatch (library rejects)', async () => {
+      mockGoogleFailure('Wrong recipient, payload audience != requiredAudience');
 
-      await expect(service.googleLogin(token)).rejects.toThrow(UnauthorizedException);
-      await expect(service.googleLogin(token)).rejects.toThrow('Google token audience mismatch');
+      await expect(service.googleLogin(FAKE_TOKEN)).rejects.toThrow(UnauthorizedException);
+      await expect(service.googleLogin(FAKE_TOKEN)).rejects.toThrow('Invalid Google token');
     });
 
     it('should throw ServiceUnavailableException when GOOGLE_CLIENT_ID is not set', async () => {
       delete process.env.GOOGLE_CLIENT_ID;
-      const token = buildGoogleIdToken();
 
-      await expect(service.googleLogin(token)).rejects.toThrow(ServiceUnavailableException);
-      await expect(service.googleLogin(token)).rejects.toThrow('Google OAuth is not configured');
+      await expect(service.googleLogin(FAKE_TOKEN)).rejects.toThrow(ServiceUnavailableException);
+      await expect(service.googleLogin(FAKE_TOKEN)).rejects.toThrow('Google OAuth is not configured');
     });
 
     it('should throw UnauthorizedException when existing user has a password (prevent account takeover)', async () => {
-      const token = buildGoogleIdToken();
+      mockGoogleSuccess(buildGooglePayload());
       const passwordUser = {
         ...mockUser,
         passwordHash: '$2a$14$somehash', // Has password
@@ -649,16 +682,15 @@ describe('AuthService', () => {
       };
       mockDatabaseService.user.findUnique.mockResolvedValue(passwordUser);
 
-      await expect(service.googleLogin(token)).rejects.toThrow(UnauthorizedException);
-      await expect(service.googleLogin(token)).rejects.toThrow(
+      await expect(service.googleLogin(FAKE_TOKEN)).rejects.toThrow(UnauthorizedException);
+      await expect(service.googleLogin(FAKE_TOKEN)).rejects.toThrow(
         'This email is registered with a password',
       );
     });
 
     it('should create new org + user for first-time Google login', async () => {
-      const token = buildGoogleIdToken();
+      mockGoogleSuccess(buildGooglePayload());
       mockDatabaseService.user.findUnique.mockResolvedValue(null);
-      // $transaction mock returns the callback result
       const newUser = {
         ...mockUser,
         email: 'googleuser@gmail.com',
@@ -672,7 +704,7 @@ describe('AuthService', () => {
       mockDatabaseService.auditLog.create.mockResolvedValue({});
       mockDatabaseService.user.update.mockResolvedValue(newUser);
 
-      const result = await service.googleLogin(token);
+      const result = await service.googleLogin(FAKE_TOKEN);
 
       expect(result.isNewUser).toBe(true);
       expect(result).toHaveProperty('token');
@@ -688,17 +720,18 @@ describe('AuthService', () => {
       );
     });
 
-    it('should throw UnauthorizedException for invalid token format (not 3 parts)', async () => {
-      await expect(service.googleLogin('not.a.valid.jwt.token')).rejects.toThrow(
-        UnauthorizedException,
-      );
+    it('should throw UnauthorizedException when payload is missing (verifyIdToken returns empty)', async () => {
+      mockVerifyIdToken.mockResolvedValue({ getPayload: () => undefined });
+
+      await expect(service.googleLogin(FAKE_TOKEN)).rejects.toThrow(UnauthorizedException);
+      await expect(service.googleLogin(FAKE_TOKEN)).rejects.toThrow('Invalid Google token payload');
     });
 
-    it('should throw UnauthorizedException for invalid issuer', async () => {
-      const token = buildGoogleIdToken({ iss: 'https://evil.example.com' });
+    it('should throw UnauthorizedException when library rejects invalid token format', async () => {
+      mockGoogleFailure('Wrong number of segments in token: abc');
 
-      await expect(service.googleLogin(token)).rejects.toThrow(UnauthorizedException);
-      await expect(service.googleLogin(token)).rejects.toThrow('Invalid token issuer');
+      await expect(service.googleLogin('malformed')).rejects.toThrow(UnauthorizedException);
+      await expect(service.googleLogin('malformed')).rejects.toThrow('Invalid Google token');
     });
   });
 });
