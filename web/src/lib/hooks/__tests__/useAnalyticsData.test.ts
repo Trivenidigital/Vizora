@@ -21,76 +21,76 @@ jest.mock('@/lib/api', () => ({
 
 describe('useAnalyticsData hooks', () => {
   describe('useDeviceMetrics', () => {
-    it('falls back to mock data when API unavailable', async () => {
+    it('returns empty data when API unavailable', async () => {
       const { result } = renderHook(() => useDeviceMetrics('month'));
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
       });
-      expect(result.current.data.length).toBe(30);
+      expect(result.current.data).toEqual([]);
       expect(result.current.isMockData).toBe(true);
       expect(result.current.error).toBeNull();
     });
 
-    it('returns 7 days for week range', async () => {
+    it('returns empty data for week range', async () => {
       const { result } = renderHook(() => useDeviceMetrics('week'));
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
       });
-      expect(result.current.data.length).toBe(7);
+      expect(result.current.data).toEqual([]);
     });
   });
 
   describe('useContentPerformance', () => {
-    it('falls back to mock data', async () => {
+    it('returns empty data when API unavailable', async () => {
       const { result } = renderHook(() => useContentPerformance('month'));
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
       });
-      expect(result.current.data.length).toBeGreaterThan(0);
+      expect(result.current.data).toEqual([]);
       expect(result.current.isMockData).toBe(true);
     });
   });
 
   describe('useUsageTrends', () => {
-    it('falls back to mock data', async () => {
+    it('returns empty data when API unavailable', async () => {
       const { result } = renderHook(() => useUsageTrends('month'));
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
       });
-      expect(result.current.data.length).toBe(30);
+      expect(result.current.data).toEqual([]);
       expect(result.current.isMockData).toBe(true);
     });
   });
 
   describe('useDeviceDistribution', () => {
-    it('falls back to mock data', async () => {
+    it('returns empty data when API unavailable', async () => {
       const { result } = renderHook(() => useDeviceDistribution());
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
       });
-      expect(result.current.data.length).toBeGreaterThan(0);
+      expect(result.current.data).toEqual([]);
       expect(result.current.isMockData).toBe(true);
     });
   });
 
   describe('useBandwidthUsage', () => {
-    it('falls back to mock data', async () => {
+    it('returns empty data when API unavailable', async () => {
       const { result } = renderHook(() => useBandwidthUsage('month'));
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
       });
-      expect(result.current.data.length).toBeGreaterThan(0);
+      expect(result.current.data).toEqual([]);
       expect(result.current.isMockData).toBe(true);
     });
   });
 
   describe('usePlaylistPerformance', () => {
-    it('falls back to mock data', async () => {
+    it('returns empty data when API unavailable', async () => {
       const { result } = renderHook(() => usePlaylistPerformance('month'));
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
       });
-      expect(result.current.data.length).toBeGreaterThan(0);
+      expect(result.current.data).toEqual([]);
       expect(result.current.isMockData).toBe(true);
     });
   });
