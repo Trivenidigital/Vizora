@@ -119,9 +119,6 @@ export default function SchedulesClient() {
  enabled: true,
  onConnectionChange: (connected) => {
  setRealtimeStatus(connected ? 'connected' : 'offline');
- if (connected) {
- toast.info('Real-time schedule monitoring enabled');
- }
  },
  });
 

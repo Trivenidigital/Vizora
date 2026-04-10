@@ -41,25 +41,15 @@ export function useDeviceMetrics(dateRange: DateRange = 'month') {
             return;
           }
         } catch (apiError) {
-          // Fall through to mock data if API not available
+          // Fall through to empty state if API not available
           if (process.env.NODE_ENV === 'development') {
-            devLog('Analytics API not available, using mock data');
+            devLog('Analytics API not available, showing empty state');
           }
         }
 
-        // Generate mock data if API unavailable
+        // No real data available — show empty state
         setIsMockData(true);
-        const mockData = Array.from({ length: days }, (_, i) => ({
-          date: new Date(Date.now() - (days - 1 - i) * 24 * 60 * 60 * 1000).toLocaleDateString(
-            'en-US',
-            { month: 'short', day: 'numeric' }
-          ),
-          mobile: 85 + Math.random() * 10,
-          tablet: 92 + Math.random() * 8,
-          desktop: 98 + Math.random() * 2,
-        }));
-
-        setData(mockData);
+        setData([]);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch device metrics');
         setData([]);
@@ -99,22 +89,13 @@ export function useContentPerformance(dateRange: DateRange = 'month') {
           }
         } catch (apiError) {
           if (process.env.NODE_ENV === 'development') {
-            devLog('Content performance API not available, using mock data');
+            devLog('Content performance API not available, showing empty state');
           }
         }
 
-        // Mock data fallback
+        // No real data available — show empty state
         setIsMockData(true);
-        const mockData = [
-          { title: 'Welcome Video', views: 1240, engagement: 87, shares: 45 },
-          { title: 'Product Demo', views: 980, engagement: 76, shares: 32 },
-          { title: 'Tutorial Series', views: 2100, engagement: 92, shares: 58 },
-          { title: 'Company Overview', views: 650, engagement: 64, shares: 18 },
-          { title: 'Customer Testimonials', views: 1580, engagement: 89, shares: 42 },
-          { title: 'FAQ Section', views: 420, engagement: 45, shares: 12 },
-        ];
-
-        setData(mockData);
+        setData([]);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch content performance');
         setData([]);
@@ -161,24 +142,13 @@ export function useUsageTrends(dateRange: DateRange = 'month') {
           }
         } catch (apiError) {
           if (process.env.NODE_ENV === 'development') {
-            devLog('Usage trends API not available, using mock data');
+            devLog('Usage trends API not available, showing empty state');
           }
         }
 
-        // Mock data fallback
+        // No real data available — show empty state
         setIsMockData(true);
-        const mockData = Array.from({ length: days }, (_, i) => ({
-          date: new Date(Date.now() - (days - 1 - i) * 24 * 60 * 60 * 1000).toLocaleDateString(
-            'en-US',
-            { month: 'short', day: 'numeric' }
-          ),
-          video: 2400 + Math.random() * 800,
-          image: 1200 + Math.random() * 400,
-          text: 600 + Math.random() * 300,
-          interactive: 800 + Math.random() * 400,
-        }));
-
-        setData(mockData);
+        setData([]);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch usage trends');
         setData([]);
@@ -218,21 +188,13 @@ export function useDeviceDistribution() {
           }
         } catch (apiError) {
           if (process.env.NODE_ENV === 'development') {
-            devLog('Device distribution API not available, using mock data');
+            devLog('Device distribution API not available, showing empty state');
           }
         }
 
-        // Mock data fallback
+        // No real data available — show empty state
         setIsMockData(true);
-        const mockData = [
-          { name: 'Smartphones', value: 35, color: '#3B82F6' },
-          { name: 'Tablets', value: 25, color: '#8B5CF6' },
-          { name: 'Desktop Displays', value: 28, color: '#EC4899' },
-          { name: 'Smart TVs', value: 8, color: '#F59E0B' },
-          { name: 'Interactive Kiosks', value: 4, color: '#10B981' },
-        ];
-
-        setData(mockData);
+        setData([]);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch device distribution');
         setData([]);
@@ -279,23 +241,13 @@ export function useBandwidthUsage(dateRange: DateRange = 'month') {
           }
         } catch (apiError) {
           if (process.env.NODE_ENV === 'development') {
-            devLog('Bandwidth usage API not available, using mock data');
+            devLog('Bandwidth usage API not available, showing empty state');
           }
         }
 
-        // Mock data fallback
+        // No real data available — show empty state
         setIsMockData(true);
-        const mockData = Array.from({ length: days }, (_, i) => ({
-          date: new Date(Date.now() - (days - 1 - i) * 24 * 60 * 60 * 1000).toLocaleDateString(
-            'en-US',
-            { month: 'short', day: 'numeric' }
-          ),
-          current: 2400 + Math.random() * 1000,
-          average: 2200,
-          peak: 3200,
-        }));
-
-        setData(mockData);
+        setData([]);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch bandwidth usage');
         setData([]);
@@ -335,21 +287,13 @@ export function usePlaylistPerformance(dateRange: DateRange = 'month') {
           }
         } catch (apiError) {
           if (process.env.NODE_ENV === 'development') {
-            devLog('Playlist performance API not available, using mock data');
+            devLog('Playlist performance API not available, showing empty state');
           }
         }
 
-        // Mock data fallback
+        // No real data available — show empty state
         setIsMockData(true);
-        const mockData = [
-          { name: 'Morning Promotions', plays: 234, engagement: 87, uniqueDevices: 12 },
-          { name: 'Lunch Specials', plays: 189, engagement: 92, uniqueDevices: 10 },
-          { name: 'Evening Content', plays: 156, engagement: 78, uniqueDevices: 8 },
-          { name: 'Educational Videos', plays: 298, engagement: 85, uniqueDevices: 15 },
-          { name: 'Emergency Alerts', plays: 45, engagement: 95, uniqueDevices: 5 },
-        ];
-
-        setData(mockData);
+        setData([]);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch playlist performance');
         setData([]);

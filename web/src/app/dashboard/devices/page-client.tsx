@@ -78,7 +78,6 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  const handleConnectionChange = useCallback((isConnected: boolean | null) => {
  if (isConnected === true) {
  setRealtimeStatus('connected');
- toast.info('Real-time connection established');
  } else if (isConnected === false) {
  setRealtimeStatus('offline');
  }

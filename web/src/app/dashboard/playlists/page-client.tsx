@@ -156,9 +156,6 @@ export default function PlaylistsClient() {
  },
  onConnectionChange: (isConnected) => {
  setRealtimeStatus(isConnected ? 'connected' : 'offline');
- if (isConnected) {
- toast.info('Real-time connection established');
- }
  },
  });
 

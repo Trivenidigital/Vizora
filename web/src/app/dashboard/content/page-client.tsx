@@ -110,7 +110,6 @@ export default function ContentClient() {
  }
  if (connected === true) {
  setRealtimeStatus('connected');
- toast.info('Real-time sync enabled');
  } else if (connected === false) {
  setRealtimeStatus('offline');
  } else {

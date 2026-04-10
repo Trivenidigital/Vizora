@@ -17,6 +17,13 @@ import {
  usePlaylistPerformance,
 } from '@/lib/hooks/useAnalyticsData';
 
+const EmptyChartState: React.FC<{ message?: string }> = ({ message }) => (
+ <div className="h-80 flex flex-col items-center justify-center text-[var(--foreground-tertiary)]">
+ <Icon name="analytics" size="lg" className="mb-3 opacity-40" />
+ <p className="text-sm">{message || 'No data yet. Analytics will appear as devices report content playback.'}</p>
+ </div>
+);
+
 interface KPICardProps {
  label: string;
  value: string;
@@ -112,9 +119,6 @@ export default function AnalyticsClient() {
  },
  onConnectionChange: (connected) => {
  setRealtimeStatus(connected ? 'connected' : 'offline');
- if (connected) {
- toast.info('Real-time analytics enabled');
- }
  },
  });
 
@@ -265,12 +269,12 @@ export default function AnalyticsClient() {
  />
  </div>
 
- {/* Mock data notice */}
+ {/* Empty data notice */}
  {allMockData && (
-   <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-4 py-3 flex items-center gap-3">
-     <span className="text-amber-400 text-sm font-medium">Demo Data</span>
+   <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg px-4 py-3 flex items-center gap-3">
+     <span className="text-blue-400 text-sm font-medium">No Data Yet</span>
      <span className="text-sm text-[var(--foreground-secondary)]">
-       Connect devices and generate content to see real analytics.
+       Analytics will appear as devices report content playback. Connect devices and upload content to get started.
      </span>
    </div>
  )}
@@ -296,6 +300,8 @@ export default function AnalyticsClient() {
  <div className="w-8 h-8 border-4 border-[var(--border)] border-t-primary-600 dark:border-t-primary-400 rounded-full" />
  </div>
  </div>
+ ) : deviceMetrics.data.length === 0 ? (
+ <EmptyChartState message="No device uptime data available yet." />
  ) : (
  <LineChart
  data={deviceMetrics.data}
@@ -326,6 +332,8 @@ export default function AnalyticsClient() {
  <div className="w-8 h-8 border-4 border-[var(--border)] border-t-primary-600 dark:border-t-primary-400 rounded-full" />
  </div>
  </div>
+ ) : contentPerformance.data.length === 0 ? (
+ <EmptyChartState message="No content performance data yet. Upload content to track views." />
  ) : (
  <BarChart
  data={contentPerformance.data}
@@ -352,6 +360,8 @@ export default function AnalyticsClient() {
  <div className="w-8 h-8 border-4 border-[var(--border)] border-t-primary-600 dark:border-t-primary-400 rounded-full" />
  </div>
  </div>
+ ) : deviceDistribution.data.length === 0 ? (
+ <EmptyChartState message="No devices registered yet. Pair devices to see distribution." />
  ) : (
  <PieChart
  data={deviceDistribution.data}
@@ -378,6 +388,8 @@ export default function AnalyticsClient() {
  <div className="w-8 h-8 border-4 border-[var(--border)] border-t-primary-600 dark:border-t-primary-400 rounded-full" />
  </div>
  </div>
+ ) : usageTrends.data.length === 0 ? (
+ <EmptyChartState message="No usage data yet. Trends will appear as content is played on devices." />
  ) : (
  <AreaChart
  data={usageTrends.data}
@@ -410,6 +422,8 @@ export default function AnalyticsClient() {
  <div className="w-8 h-8 border-4 border-[var(--border)] border-t-primary-600 dark:border-t-primary-400 rounded-full" />
  </div>
  </div>
+ ) : bandwidthUsage.data.length === 0 ? (
+ <EmptyChartState message="No bandwidth data yet. Usage will be tracked as devices stream content." />
  ) : (
  <ComposedChart
  data={bandwidthUsage.data}
@@ -440,6 +454,8 @@ export default function AnalyticsClient() {
  <div className="w-8 h-8 border-4 border-[var(--border)] border-t-primary-600 dark:border-t-primary-400 rounded-full" />
  </div>
  </div>
+ ) : playlistPerformance.data.length === 0 ? (
+ <EmptyChartState message="No playlist data yet. Create playlists and assign them to devices." />
  ) : (
  <BarChart
  data={playlistPerformance.data}

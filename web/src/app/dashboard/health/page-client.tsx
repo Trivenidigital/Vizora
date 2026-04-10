@@ -44,11 +44,6 @@ export default function HealthMonitoringClient() {
  enabled: true,
  onConnectionChange: (isConnected) => {
  setRealtimeStatus(isConnected ? 'connected' : 'offline');
- if (isConnected) {
- toast.info('Real-time health monitoring connected');
- } else {
- toast.warning('Real-time health monitoring disconnected');
- }
  },
  });
 
