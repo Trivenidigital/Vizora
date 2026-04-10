@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1920, height=1080">
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@300;400;500;600&family=Caveat:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Yatra+One&family=Cormorant+Garamond:wght@500;600;700&family=Tiro+Devanagari+Marathi&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -11,514 +11,437 @@
       height: 1080px;
       overflow: hidden;
       position: relative;
-      font-family: 'Inter', sans-serif;
-      background:
-        repeating-linear-gradient(
-          60deg,
-          transparent,
-          transparent 70px,
-          rgba(196,30,58,0.02) 70px,
-          rgba(196,30,58,0.02) 71px
-        ),
-        repeating-linear-gradient(
-          -60deg,
-          transparent,
-          transparent 70px,
-          rgba(45,80,22,0.02) 70px,
-          rgba(45,80,22,0.02) 71px
-        ),
-        radial-gradient(ellipse at 25% 50%, rgba(196,30,58,0.06) 0%, transparent 50%),
-        radial-gradient(ellipse at 75% 50%, rgba(45,80,22,0.06) 0%, transparent 50%),
-        linear-gradient(180deg, #0d0805 0%, #0a0603 50%, #070402 100%);
+      font-family: 'Poppins', sans-serif;
       color: #FFF8E7;
+      background: linear-gradient(180deg, #0a1f12 0%, #0d2415 50%, #071a0e 100%);
     }
 
-    /* Spice dots texture */
-    body::before {
-      content: '';
+    /* Split diagonal backgrounds — Chettinad (left fire) vs Kerala (right water) */
+    .bg-chettinad {
       position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
+      top: 0; left: 0; bottom: 0;
+      width: 55%;
       background:
-        radial-gradient(circle, rgba(196,30,58,0.04) 1px, transparent 1px),
-        radial-gradient(circle, rgba(92,51,23,0.05) 1px, transparent 1px);
-      background-size: 45px 45px, 73px 73px;
-      background-position: 0 0, 22px 22px;
-      pointer-events: none;
-      z-index: 0;
+        repeating-linear-gradient(
+          45deg,
+          transparent,
+          transparent 40px,
+          rgba(196,30,58,0.04) 40px,
+          rgba(196,30,58,0.04) 41px
+        ),
+        radial-gradient(ellipse at 30% 40%, rgba(196,30,58,0.18) 0%, transparent 55%),
+        radial-gradient(ellipse at 20% 80%, rgba(232,93,4,0.12) 0%, transparent 50%),
+        linear-gradient(135deg, #3d0d0d 0%, #2a0808 50%, #1a0404 100%);
+      clip-path: polygon(0 0, 100% 0, 85% 100%, 0 100%);
+      z-index: 1;
     }
 
-    /* Heat/smoke gradient at top */
-    body::after {
+    .bg-kerala {
+      position: absolute;
+      top: 0; right: 0; bottom: 0;
+      width: 55%;
+      background:
+        repeating-linear-gradient(
+          -45deg,
+          transparent,
+          transparent 40px,
+          rgba(4,99,7,0.04) 40px,
+          rgba(4,99,7,0.04) 41px
+        ),
+        radial-gradient(ellipse at 70% 50%, rgba(4,99,7,0.2) 0%, transparent 55%),
+        radial-gradient(ellipse at 85% 85%, rgba(20,150,120,0.12) 0%, transparent 50%),
+        linear-gradient(225deg, #063b1e 0%, #042a18 50%, #021810 100%);
+      clip-path: polygon(15% 0, 100% 0, 100% 100%, 0 100%);
+      z-index: 1;
+    }
+
+    /* Kasavu (gold border) frame — traditional Kerala sari border */
+    .kasavu-frame {
+      position: absolute;
+      inset: 30px;
+      border: 5px solid transparent;
+      border-image: linear-gradient(135deg, #E8B931, #B87333, #FFD700, #B87333, #E8B931) 1;
+      pointer-events: none;
+      z-index: 4;
+    }
+    .kasavu-frame::before {
       content: '';
       position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 200px;
-      background: linear-gradient(180deg, rgba(232,93,4,0.06) 0%, rgba(196,30,58,0.03) 50%, transparent 100%);
-      pointer-events: none;
-      z-index: 0;
+      inset: 8px;
+      border: 1px solid rgba(232,185,49,0.4);
+    }
+    .kasavu-frame::after {
+      content: '';
+      position: absolute;
+      inset: 12px;
+      border: 1px dotted rgba(232,185,49,0.25);
     }
 
-    /* Fiery glow spots */
-    .glow-red-1 {
+    /* Kasavu repeating border pattern — gold temple stripe on top/bottom */
+    .kasavu-top {
       position: absolute;
-      top: 100px; left: 100px;
-      width: 600px; height: 600px;
-      background: radial-gradient(circle, rgba(196,30,58,0.1) 0%, transparent 65%);
-      border-radius: 50%;
-      z-index: 1;
+      top: 38px; left: 38px; right: 38px;
+      height: 18px;
+      background:
+        linear-gradient(90deg, #8B5A2B 0%, #E8B931 20%, #FFD700 50%, #E8B931 80%, #8B5A2B 100%);
+      z-index: 3;
     }
-    .glow-red-2 {
+    .kasavu-top::before {
+      content: '';
       position: absolute;
-      bottom: 50px; left: 200px;
-      width: 400px; height: 400px;
-      background: radial-gradient(circle, rgba(232,93,4,0.06) 0%, transparent 60%);
-      border-radius: 50%;
-      z-index: 1;
+      bottom: -8px; left: 0; right: 0;
+      height: 8px;
+      background: repeating-linear-gradient(
+        90deg,
+        #8B5A2B 0, #8B5A2B 12px,
+        #E8B931 12px, #E8B931 24px
+      );
+      clip-path: polygon(0 0, 100% 0, 96% 100%, 92% 0, 88% 100%, 84% 0, 80% 100%, 76% 0, 72% 100%, 68% 0, 64% 100%, 60% 0, 56% 100%, 52% 0, 48% 100%, 44% 0, 40% 100%, 36% 0, 32% 100%, 28% 0, 24% 100%, 20% 0, 16% 100%, 12% 0, 8% 100%, 4% 0, 0 100%);
     }
-    .glow-green-1 {
+    .kasavu-bottom {
       position: absolute;
-      top: 100px; right: 100px;
-      width: 600px; height: 600px;
-      background: radial-gradient(circle, rgba(45,80,22,0.1) 0%, transparent 65%);
-      border-radius: 50%;
-      z-index: 1;
-    }
-    .glow-green-2 {
-      position: absolute;
-      bottom: 50px; right: 200px;
-      width: 400px; height: 400px;
-      background: radial-gradient(circle, rgba(45,80,22,0.06) 0%, transparent 60%);
-      border-radius: 50%;
-      z-index: 1;
-    }
-    .glow-center {
-      position: absolute;
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      width: 300px; height: 800px;
-      background: radial-gradient(ellipse, rgba(184,134,11,0.04) 0%, transparent 70%);
-      z-index: 1;
+      bottom: 38px; left: 38px; right: 38px;
+      height: 18px;
+      background:
+        linear-gradient(90deg, #8B5A2B 0%, #E8B931 20%, #FFD700 50%, #E8B931 80%, #8B5A2B 100%);
+      z-index: 3;
     }
 
-    /* Header area */
+    /* Header */
     .top-header {
       position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 80px;
-      z-index: 4;
+      top: 75px; left: 0; right: 0;
+      z-index: 5;
+      text-align: center;
+    }
+
+    .devanagari-title {
+      font-family: 'Tiro Devanagari Marathi', serif;
+      font-size: 24px;
+      color: #E8B931;
+      letter-spacing: 6px;
+      margin-bottom: 2px;
+    }
+
+    .restaurant-name {
+      font-family: 'Yatra One', cursive;
+      font-size: 40px;
+      color: #FFD700;
+      letter-spacing: 6px;
+      text-shadow:
+        0 2px 0 #8B5A2B,
+        0 4px 20px rgba(255,215,0,0.4);
+    }
+
+    .name-flourish {
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 20px;
+      margin-top: 4px;
     }
-
-    .header-line-l {
-      width: 300px;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(196,30,58,0.5), rgba(184,134,11,0.3));
+    .nf-line {
+      width: 200px; height: 1px;
+      background: linear-gradient(90deg, transparent, #E8B931, transparent);
     }
-    .header-line-r {
-      width: 300px;
-      height: 1px;
-      background: linear-gradient(90deg, rgba(184,134,11,0.3), rgba(45,80,22,0.5), transparent);
-    }
-
-    .header-title {
-      font-family: 'Playfair Display', serif;
-      font-weight: 900;
-      font-size: 24px;
-      color: #B8860B;
-      letter-spacing: 6px;
-      text-transform: uppercase;
-      text-shadow: 0 0 20px rgba(184,134,11,0.3);
+    .nf-dot {
+      width: 8px; height: 8px;
+      background: #FFD700;
+      transform: rotate(45deg);
     }
 
     /* Main layout */
     .container {
-      position: relative;
-      z-index: 3;
+      position: absolute;
+      top: 170px; left: 70px; right: 70px; bottom: 200px;
+      z-index: 4;
       display: grid;
       grid-template-columns: 1fr 1fr;
-      grid-template-rows: 1fr auto;
-      height: 100%;
-      padding: 90px 50px 100px;
-      gap: 40px 40px;
+      gap: 40px;
     }
 
-    /* Glass morphism panels */
+    /* Panel */
     .panel {
-      background: rgba(255,248,231,0.03);
+      position: relative;
+      padding: 30px 34px;
       border-radius: 20px;
-      padding: 36px 32px;
-      backdrop-filter: blur(15px);
-      box-shadow:
-        0 20px 60px rgba(0,0,0,0.3),
-        inset 0 1px 0 rgba(255,248,231,0.04);
+      backdrop-filter: blur(12px);
       display: flex;
       flex-direction: column;
-      position: relative;
       overflow: hidden;
     }
 
     .panel-chettinad {
-      border: 1px solid rgba(196,30,58,0.2);
-    }
-    .panel-chettinad::before {
-      content: '';
-      position: absolute;
-      top: -200px; left: -200px;
-      width: 500px; height: 500px;
-      background: radial-gradient(circle, rgba(196,30,58,0.05) 0%, transparent 60%);
-      pointer-events: none;
+      background: linear-gradient(160deg, rgba(60,15,15,0.85) 0%, rgba(30,5,5,0.8) 100%);
+      border: 2px solid #C41E3A;
+      box-shadow: 0 15px 50px rgba(0,0,0,0.5), inset 0 0 50px rgba(196,30,58,0.15);
     }
 
     .panel-kerala {
-      border: 1px solid rgba(45,80,22,0.2);
-    }
-    .panel-kerala::before {
-      content: '';
-      position: absolute;
-      top: -200px; right: -200px;
-      width: 500px; height: 500px;
-      background: radial-gradient(circle, rgba(45,80,22,0.05) 0%, transparent 60%);
-      pointer-events: none;
+      background: linear-gradient(160deg, rgba(8,40,24,0.85) 0%, rgba(3,24,14,0.8) 100%);
+      border: 2px solid #046307;
+      box-shadow: 0 15px 50px rgba(0,0,0,0.5), inset 0 0 50px rgba(4,99,7,0.15);
     }
 
-    /* Panel headers */
+    /* Panel header with illustration */
     .panel-header {
       display: flex;
       align-items: center;
-      gap: 16px;
-      margin-bottom: 8px;
-      position: relative;
+      gap: 20px;
+      padding-bottom: 16px;
+      border-bottom: 2px dotted rgba(232,185,49,0.35);
+      margin-bottom: 14px;
     }
 
-    .panel-emoji {
-      font-size: 80px;
-      line-height: 1;
-      filter: drop-shadow(0 0 25px rgba(232,93,4,0.4)) drop-shadow(0 4px 8px rgba(0,0,0,0.5));
-    }
-
-    .panel-emoji-kerala {
-      filter: drop-shadow(0 0 25px rgba(45,80,22,0.4)) drop-shadow(0 4px 8px rgba(0,0,0,0.5));
+    .panel-illust {
+      width: 90px;
+      height: 90px;
+      flex-shrink: 0;
     }
 
     .panel-header-text {
-      display: flex;
-      flex-direction: column;
+      flex: 1;
     }
+
+    .panel-devanagari {
+      font-family: 'Tiro Devanagari Marathi', serif;
+      font-size: 20px;
+      letter-spacing: 3px;
+      margin-bottom: 2px;
+    }
+    .panel-devanagari.red { color: #FF6B6B; }
+    .panel-devanagari.green { color: #90EE90; }
 
     .panel-title {
-      font-family: 'Playfair Display', serif;
-      font-weight: 900;
-      font-size: 36px;
-      text-transform: uppercase;
+      font-family: 'Yatra One', cursive;
+      font-size: 38px;
+      line-height: 1;
       letter-spacing: 2px;
-      line-height: 1.1;
+      margin-bottom: 4px;
     }
-    .title-chettinad { color: #C41E3A; text-shadow: 0 2px 20px rgba(196,30,58,0.3); }
-    .title-kerala { color: #2D5016; text-shadow: 0 2px 20px rgba(45,80,22,0.3); }
+    .title-chettinad { color: #FF8080; text-shadow: 0 2px 12px rgba(196,30,58,0.6); }
+    .title-kerala { color: #90EE90; text-shadow: 0 2px 12px rgba(4,99,7,0.6); }
 
     .panel-tagline {
-      font-family: 'Caveat', cursive;
-      font-size: 22px;
-      color: rgba(255,248,231,0.45);
-      margin-top: 2px;
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-size: 18px;
+      color: rgba(255,248,231,0.6);
     }
 
-    .panel-divider {
-      height: 1px;
-      margin: 12px 0 16px;
-    }
-    .divider-red { background: linear-gradient(90deg, rgba(196,30,58,0.4), transparent); }
-    .divider-green { background: linear-gradient(90deg, rgba(45,80,22,0.4), transparent); }
-
-    /* Menu items */
+    /* Menu list */
     .menu-list {
       display: flex;
       flex-direction: column;
-      gap: 4px;
       flex: 1;
     }
 
     .menu-item {
       display: grid;
       grid-template-columns: 1fr auto;
-      grid-template-rows: auto auto;
-      gap: 0 14px;
-      padding: 10px 14px;
-      border-radius: 10px;
-      position: relative;
+      padding: 10px 4px;
+      border-bottom: 1px dashed rgba(232,185,49,0.15);
     }
-
-    .menu-item:nth-child(odd) {
-      background: rgba(255,255,255,0.02);
-    }
+    .menu-item:last-child { border-bottom: none; }
 
     .item-name {
-      font-family: 'Playfair Display', serif;
-      font-weight: 700;
-      font-size: 23px;
+      font-family: 'Yatra One', cursive;
+      font-size: 22px;
       color: #FFF8E7;
       grid-column: 1;
       grid-row: 1;
-      display: flex;
-      align-items: baseline;
-    }
-
-    .item-name::after {
-      content: '';
-      flex: 1;
-      margin: 0 10px;
-      border-bottom: 1px dotted rgba(184,134,11,0.25);
-      position: relative;
-      top: -3px;
     }
 
     .item-price {
-      font-family: 'Inter', sans-serif;
-      font-weight: 600;
+      font-family: 'Yatra One', cursive;
       font-size: 22px;
       color: #E8B931;
       grid-column: 2;
       grid-row: 1;
-      text-align: right;
-      text-shadow: 0 0 12px rgba(232,185,49,0.2);
+      text-shadow: 0 0 12px rgba(232,185,49,0.3);
     }
 
     .item-desc {
-      font-family: 'Inter', sans-serif;
-      font-weight: 300;
-      font-size: 13px;
-      color: rgba(255,248,231,0.35);
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-size: 15px;
+      color: rgba(255,248,231,0.5);
       grid-column: 1 / -1;
       grid-row: 2;
       margin-top: 1px;
     }
 
-    /* Bottom strip: Sides & Breads */
-    .bottom-panel {
-      grid-column: 1 / -1;
+    /* Bottom strip panel */
+    .bottom-strip {
+      position: absolute;
+      bottom: 85px; left: 70px; right: 70px;
+      z-index: 4;
+      background: linear-gradient(90deg, rgba(60,15,15,0.7), rgba(40,30,10,0.85), rgba(8,40,24,0.7));
+      border: 2px solid #E8B931;
+      border-radius: 16px;
+      padding: 18px 36px;
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 40px;
-      background: rgba(255,248,231,0.03);
-      border: 1px solid rgba(184,134,11,0.12);
-      border-radius: 16px;
-      padding: 20px 32px;
       backdrop-filter: blur(10px);
-      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
     }
 
     .bottom-section {
       display: flex;
       flex-direction: column;
-      gap: 6px;
     }
 
     .bottom-title {
-      font-family: 'Playfair Display', serif;
-      font-weight: 700;
-      font-size: 20px;
-      color: #B8860B;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      margin-bottom: 6px;
+      font-family: 'Yatra One', cursive;
+      font-size: 22px;
+      color: #FFD700;
+      letter-spacing: 4px;
+      margin-bottom: 8px;
+      text-align: center;
+      padding-bottom: 6px;
+      border-bottom: 1px solid rgba(232,185,49,0.3);
     }
 
-    .bottom-item {
+    .bottom-row {
       display: flex;
       justify-content: space-between;
-      align-items: baseline;
+      align-items: center;
+      padding: 4px 10px;
     }
 
     .bottom-item-name {
-      font-family: 'Inter', sans-serif;
-      font-weight: 400;
-      font-size: 16px;
-      color: rgba(255,248,231,0.7);
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 17px;
+      color: rgba(255,248,231,0.8);
     }
 
     .bottom-item-price {
-      font-family: 'Inter', sans-serif;
-      font-weight: 500;
-      font-size: 16px;
+      font-family: 'Poppins', sans-serif;
+      font-weight: 600;
+      font-size: 17px;
       color: #E8B931;
     }
 
-    /* Coconut palm SVG silhouette */
-    .palm-svg {
+    /* Floating illustrations */
+    .palm-silhouette {
+      position: absolute;
+      bottom: 50px; right: 0;
+      z-index: 2;
+      opacity: 0.22;
+    }
+
+    .chili-silhouette {
+      position: absolute;
+      top: 160px; left: -20px;
+      z-index: 2;
+      opacity: 0.25;
+      transform: rotate(-15deg);
+    }
+
+    .spice-deco {
       position: absolute;
       z-index: 2;
-      opacity: 0.06;
-    }
-
-    /* Curry leaf vine SVG */
-    .curry-leaf-vine {
-      position: absolute;
-      z-index: 2;
-      opacity: 0.08;
-    }
-
-    /* Spice scatter decoration (chili/pepper shapes) */
-    .spice-dot {
-      position: absolute;
-      border-radius: 50%;
-      z-index: 0;
-    }
-
-    /* Frame corners */
-    .frame-corner {
-      position: absolute;
-      z-index: 4;
       opacity: 0.18;
-    }
-    .fc-tl { top: 82px; left: 16px; }
-    .fc-tr { top: 82px; right: 16px; transform: scaleX(-1); }
-    .fc-bl { bottom: 16px; left: 16px; transform: scaleY(-1); }
-    .fc-br { bottom: 16px; right: 16px; transform: scale(-1,-1); }
-
-    /* Bottom gradient strip */
-    .bottom-strip {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 4px;
-      background: linear-gradient(90deg, #0d0805, #C41E3A, #E85D04, #B8860B, #2D5016, #0d0805);
-      z-index: 5;
-    }
-
-    /* Center divider line */
-    .center-divider {
-      position: absolute;
-      top: 100px; bottom: 100px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 1px;
-      background: linear-gradient(180deg, transparent, rgba(184,134,11,0.15), rgba(184,134,11,0.2), rgba(184,134,11,0.15), transparent);
-      z-index: 2;
     }
   </style>
 </head>
 <body>
-  <div class="glow-red-1"></div>
-  <div class="glow-red-2"></div>
-  <div class="glow-green-1"></div>
-  <div class="glow-green-2"></div>
-  <div class="glow-center"></div>
+  <div class="bg-chettinad"></div>
+  <div class="bg-kerala"></div>
 
-  <!-- Center divider -->
-  <div class="center-divider"></div>
-
-  <!-- Spice scatter dots -->
-  <div class="spice-dot" style="width:5px;height:5px;background:rgba(196,30,58,0.12);top:130px;left:80px;"></div>
-  <div class="spice-dot" style="width:7px;height:7px;background:rgba(196,30,58,0.1);top:300px;left:120px;"></div>
-  <div class="spice-dot" style="width:4px;height:4px;background:rgba(92,51,23,0.12);top:550px;left:60px;"></div>
-  <div class="spice-dot" style="width:6px;height:6px;background:rgba(196,30,58,0.08);top:750px;left:150px;"></div>
-  <div class="spice-dot" style="width:5px;height:5px;background:rgba(45,80,22,0.12);top:130px;right:80px;"></div>
-  <div class="spice-dot" style="width:7px;height:7px;background:rgba(45,80,22,0.1);top:350px;right:100px;"></div>
-  <div class="spice-dot" style="width:4px;height:4px;background:rgba(45,80,22,0.12);top:600px;right:60px;"></div>
-  <div class="spice-dot" style="width:6px;height:6px;background:rgba(45,80,22,0.08);top:800px;right:140px;"></div>
-  <div class="spice-dot" style="width:5px;height:5px;background:rgba(92,51,23,0.1);top:200px;left:900px;"></div>
-  <div class="spice-dot" style="width:4px;height:4px;background:rgba(232,93,4,0.08);top:450px;left:960px;"></div>
-
-  <!-- Coconut palm SVG silhouette (Kerala side) -->
-  <svg class="palm-svg" style="top:90px;right:40px;" width="140" height="280" viewBox="0 0 140 280" fill="none" stroke="#2D5016" stroke-width="1.5">
-    <!-- trunk -->
-    <path d="M70 280 Q68 200 72 150 Q76 100 70 60" stroke-width="3"/>
-    <!-- fronds -->
-    <path d="M70 60 Q30 30 5 50"/>
-    <path d="M70 60 Q40 15 15 5"/>
-    <path d="M70 60 Q90 10 130 5"/>
-    <path d="M70 60 Q110 25 135 45"/>
-    <path d="M70 60 Q55 20 60 0"/>
-    <path d="M70 60 Q85 15 80 0"/>
-    <!-- coconuts -->
-    <circle cx="62" cy="65" r="6" fill="rgba(45,80,22,0.15)"/>
-    <circle cx="78" cy="63" r="5" fill="rgba(45,80,22,0.12)"/>
-    <circle cx="70" cy="72" r="5" fill="rgba(45,80,22,0.1)"/>
+  <!-- Chili pepper silhouette (Chettinad side) -->
+  <svg class="chili-silhouette" width="200" height="400" viewBox="0 0 200 400">
+    <g fill="#C41E3A" stroke="#8B0000" stroke-width="2">
+      <path d="M100 20 Q110 10 120 20 L115 40 Q110 35 105 40 Z" fill="#046307"/>
+      <path d="M105 35 Q130 100 140 200 Q145 300 120 370 Q100 380 85 370 Q60 300 65 200 Q75 100 95 35 Z"/>
+      <path d="M95 60 Q105 100 100 150 Q95 200 105 240" stroke="#FF6B6B" stroke-width="1.5" fill="none"/>
+    </g>
   </svg>
 
-  <!-- Curry leaf vine SVG (left side) -->
-  <svg class="curry-leaf-vine" style="top:100px;left:30px;" width="30" height="600" viewBox="0 0 30 600" fill="none" stroke="#2D5016" stroke-width="1">
-    <path d="M15 0 Q15 100 15 200 Q15 300 15 400 Q15 500 15 600"/>
-    <!-- leaves along the vine -->
-    <ellipse cx="8" cy="50" rx="6" ry="10" fill="rgba(45,80,22,0.2)" transform="rotate(-20 8 50)"/>
-    <ellipse cx="22" cy="100" rx="6" ry="10" fill="rgba(45,80,22,0.2)" transform="rotate(20 22 100)"/>
-    <ellipse cx="8" cy="160" rx="6" ry="10" fill="rgba(45,80,22,0.18)" transform="rotate(-15 8 160)"/>
-    <ellipse cx="22" cy="220" rx="6" ry="10" fill="rgba(45,80,22,0.18)" transform="rotate(15 22 220)"/>
-    <ellipse cx="8" cy="290" rx="6" ry="10" fill="rgba(45,80,22,0.15)" transform="rotate(-20 8 290)"/>
-    <ellipse cx="22" cy="360" rx="6" ry="10" fill="rgba(45,80,22,0.15)" transform="rotate(20 22 360)"/>
-    <ellipse cx="8" cy="430" rx="6" ry="10" fill="rgba(45,80,22,0.12)" transform="rotate(-15 8 430)"/>
-    <ellipse cx="22" cy="500" rx="6" ry="10" fill="rgba(45,80,22,0.12)" transform="rotate(15 22 500)"/>
-    <ellipse cx="8" cy="560" rx="6" ry="10" fill="rgba(45,80,22,0.1)" transform="rotate(-20 8 560)"/>
+  <!-- Coconut palm silhouette (Kerala side) -->
+  <svg class="palm-silhouette" width="450" height="700" viewBox="0 0 450 700">
+    <g fill="none" stroke="#046307" stroke-width="3">
+      <path d="M220 700 Q215 500 225 350 Q235 200 220 80" stroke-width="6"/>
+      <!-- Leaf fronds -->
+      <path d="M220 80 Q140 60 60 100 M220 80 Q150 50 80 40 M220 80 Q155 20 120 -10" stroke-width="4"/>
+      <path d="M220 80 Q300 60 380 100 M220 80 Q290 50 360 40 M220 80 Q285 20 320 -10" stroke-width="4"/>
+      <path d="M220 80 Q180 30 190 -20 M220 80 Q250 30 240 -20" stroke-width="4"/>
+      <!-- Frond details -->
+      <path d="M80 95 L60 80 M100 95 L80 75 M120 90 L100 70 M140 85 L120 65"/>
+      <path d="M340 95 L360 80 M320 95 L340 75 M300 90 L320 70 M280 85 L300 65"/>
+      <!-- Coconuts -->
+      <circle cx="200" cy="105" r="12" fill="#5C3317"/>
+      <circle cx="230" cy="100" r="10" fill="#5C3317"/>
+      <circle cx="218" cy="118" r="10" fill="#5C3317"/>
+    </g>
+    <!-- Backwater ripples at bottom -->
+    <g stroke="#14966E" stroke-width="1.5" fill="none" opacity="0.6">
+      <path d="M50 680 Q150 675 250 680 T450 680"/>
+      <path d="M0 690 Q100 686 200 690 T400 690"/>
+      <path d="M80 665 Q180 662 280 665 T450 665"/>
+    </g>
   </svg>
 
-  <!-- Frame corners -->
-  <svg class="frame-corner fc-tl" width="60" height="60" viewBox="0 0 60 60" fill="none" stroke="#B8860B" stroke-width="1.5">
-    <path d="M5 5 L5 30 Q5 5 30 5"/>
-    <path d="M12 12 L12 22 Q12 12 22 12"/>
-    <circle cx="6" cy="6" r="2" fill="#B8860B"/>
-  </svg>
-  <svg class="frame-corner fc-tr" width="60" height="60" viewBox="0 0 60 60" fill="none" stroke="#B8860B" stroke-width="1.5">
-    <path d="M5 5 L5 30 Q5 5 30 5"/>
-    <path d="M12 12 L12 22 Q12 12 22 12"/>
-    <circle cx="6" cy="6" r="2" fill="#B8860B"/>
-  </svg>
-  <svg class="frame-corner fc-bl" width="60" height="60" viewBox="0 0 60 60" fill="none" stroke="#B8860B" stroke-width="1.5">
-    <path d="M5 5 L5 30 Q5 5 30 5"/>
-    <path d="M12 12 L12 22 Q12 12 22 12"/>
-    <circle cx="6" cy="6" r="2" fill="#B8860B"/>
-  </svg>
-  <svg class="frame-corner fc-br" width="60" height="60" viewBox="0 0 60 60" fill="none" stroke="#B8860B" stroke-width="1.5">
-    <path d="M5 5 L5 30 Q5 5 30 5"/>
-    <path d="M12 12 L12 22 Q12 12 22 12"/>
-    <circle cx="6" cy="6" r="2" fill="#B8860B"/>
+  <!-- Spice scatter -->
+  <svg class="spice-deco" style="top: 220px; right: 80px;" width="40" height="40" viewBox="0 0 40 40">
+    <g fill="#E8B931"><circle cx="10" cy="10" r="3"/><circle cx="25" cy="15" r="3"/><circle cx="15" cy="25" r="3"/><circle cx="28" cy="28" r="3"/></g>
   </svg>
 
-  <!-- Top header -->
+  <div class="kasavu-frame"></div>
+  <div class="kasavu-top"></div>
+  <div class="kasavu-bottom"></div>
+
+  <!-- Header -->
   <div class="top-header">
-    <span class="header-line-l"></span>
-    <span class="header-title" data-editable="true" data-field="restaurantName">Spice Coast Kitchen</span>
-    <span class="header-line-r"></span>
+    <div class="devanagari-title">&#2325;&#2375;&#2352;&#2354;&#2366; &bull; &#2330;&#2375;&#2335;&#2381;&#2335;&#2367;&#2344;&#2366;&#2337;&#2369;</div>
+    <h1 class="restaurant-name" data-editable="true" data-field="restaurantName">Spice Coast Kitchen</h1>
+    <div class="name-flourish">
+      <span class="nf-line"></span>
+      <span class="nf-dot"></span>
+      <span class="nf-line"></span>
+    </div>
   </div>
 
   <div class="container">
-    <!-- Left panel: Chettinad Specials -->
+    <!-- Chettinad Panel -->
     <div class="panel panel-chettinad">
       <div class="panel-header">
-        <div class="panel-emoji">&#127798;&#65039;</div>
+        <svg class="panel-illust" viewBox="0 0 90 90">
+          <!-- Chili pepper -->
+          <g>
+            <path d="M45 12 Q50 5 58 10 L55 22 Q50 18 46 22 Z" fill="#046307" stroke="#022d03" stroke-width="1.5"/>
+            <path d="M46 22 Q60 35 65 55 Q68 72 55 82 Q45 85 38 82 Q28 72 30 55 Q35 35 44 22 Z" fill="#C41E3A" stroke="#8B0000" stroke-width="2"/>
+            <path d="M42 30 Q48 45 45 60 Q43 72 48 78" stroke="#FF6B6B" stroke-width="1.2" fill="none"/>
+            <ellipse cx="38" cy="45" rx="2" ry="8" fill="#FF8080" opacity="0.6"/>
+          </g>
+        </svg>
         <div class="panel-header-text">
+          <div class="panel-devanagari red">&#2330;&#2375;&#2335;&#2381;&#2335;&#2367;&#2344;&#2366;&#2337;&#2369;</div>
           <h2 class="panel-title title-chettinad" data-editable="true" data-field="chettinadTitle">Chettinad Specials</h2>
-          <p class="panel-tagline" data-editable="true" data-field="chettinadTagline">Bold Spice &bull; Authentic Heat</p>
+          <p class="panel-tagline" data-editable="true" data-field="chettinadTagline">Bold Spice • Authentic Heat</p>
         </div>
       </div>
-      <div class="panel-divider divider-red"></div>
-
       <div class="menu-list">
         <div class="menu-item">
           <span class="item-name" data-editable="true" data-field="chet1Name">Chettinad Chicken</span>
           <span class="item-price" data-editable="true" data-field="chet1Price">$13.99</span>
           <span class="item-desc" data-editable="true" data-field="chet1Desc">Pepper &amp; star anise gravy, aromatic spice blend</span>
         </div>
-
         <div class="menu-item">
           <span class="item-name" data-editable="true" data-field="chet2Name">Chicken Sukka</span>
           <span class="item-price" data-editable="true" data-field="chet2Price">$12.99</span>
           <span class="item-desc" data-editable="true" data-field="chet2Desc">Dry roast with curry leaf &amp; fresh coconut</span>
         </div>
-
         <div class="menu-item">
           <span class="item-name" data-editable="true" data-field="chet3Name">Mutton Kuzhambu</span>
           <span class="item-price" data-editable="true" data-field="chet3Price">$14.99</span>
           <span class="item-desc" data-editable="true" data-field="chet3Desc">Rich tamarind curry, slow-simmered tender mutton</span>
         </div>
-
         <div class="menu-item">
           <span class="item-name" data-editable="true" data-field="chet4Name">Egg Pepper Fry</span>
           <span class="item-price" data-editable="true" data-field="chet4Price">$9.99</span>
           <span class="item-desc" data-editable="true" data-field="chet4Desc">Black pepper egg roast, fiery &amp; fragrant</span>
         </div>
-
         <div class="menu-item">
           <span class="item-name" data-editable="true" data-field="chet5Name">Crab Masala</span>
           <span class="item-price" data-editable="true" data-field="chet5Price">$16.99</span>
@@ -527,42 +450,49 @@
       </div>
     </div>
 
-    <!-- Right panel: Kerala Specials -->
+    <!-- Kerala Panel -->
     <div class="panel panel-kerala">
       <div class="panel-header">
-        <div class="panel-emoji panel-emoji-kerala">&#127796;</div>
+        <svg class="panel-illust" viewBox="0 0 90 90">
+          <!-- Coconut -->
+          <g>
+            <circle cx="45" cy="50" r="32" fill="#5C3317" stroke="#3d1f08" stroke-width="2"/>
+            <circle cx="45" cy="50" r="26" fill="#FFF5D4"/>
+            <circle cx="45" cy="50" r="20" fill="#FFFAFA"/>
+            <circle cx="38" cy="42" r="3" fill="#5C3317"/>
+            <circle cx="52" cy="42" r="3" fill="#5C3317"/>
+            <circle cx="45" cy="50" r="3" fill="#5C3317"/>
+            <!-- Palm leaves from top -->
+            <path d="M30 20 Q35 10 25 5 M45 18 Q45 8 40 0 M60 20 Q55 10 65 5" stroke="#046307" stroke-width="2.5" fill="none"/>
+          </g>
+        </svg>
         <div class="panel-header-text">
+          <div class="panel-devanagari green">&#2325;&#2375;&#2352;&#2354;&#2366;</div>
           <h2 class="panel-title title-kerala" data-editable="true" data-field="keralaTitle">Kerala Specials</h2>
-          <p class="panel-tagline" data-editable="true" data-field="keralaTagline">Coconut &bull; Curry Leaf &bull; Sea Fresh</p>
+          <p class="panel-tagline" data-editable="true" data-field="keralaTagline">Coconut • Curry Leaf • Sea Fresh</p>
         </div>
       </div>
-      <div class="panel-divider divider-green"></div>
-
       <div class="menu-list">
         <div class="menu-item">
           <span class="item-name" data-editable="true" data-field="ker1Name">Kerala Fish Curry</span>
           <span class="item-price" data-editable="true" data-field="ker1Price">$14.99</span>
           <span class="item-desc" data-editable="true" data-field="ker1Desc">Coconut tamarind gravy with fresh catch</span>
         </div>
-
         <div class="menu-item">
           <span class="item-name" data-editable="true" data-field="ker2Name">Prawn Masala</span>
           <span class="item-price" data-editable="true" data-field="ker2Price">$15.99</span>
           <span class="item-desc" data-editable="true" data-field="ker2Desc">Spiced coconut prawns, Alleppey style</span>
         </div>
-
         <div class="menu-item">
           <span class="item-name" data-editable="true" data-field="ker3Name">Meen Pollichathu</span>
           <span class="item-price" data-editable="true" data-field="ker3Price">$16.99</span>
           <span class="item-desc" data-editable="true" data-field="ker3Desc">Fish wrapped &amp; roasted in banana leaf</span>
         </div>
-
         <div class="menu-item">
           <span class="item-name" data-editable="true" data-field="ker4Name">Kerala Beef Fry</span>
           <span class="item-price" data-editable="true" data-field="ker4Price">$13.99</span>
           <span class="item-desc" data-editable="true" data-field="ker4Desc">Dry roasted with coconut flakes &amp; spices</span>
         </div>
-
         <div class="menu-item">
           <span class="item-name" data-editable="true" data-field="ker5Name">Alleppey Fish Curry</span>
           <span class="item-price" data-editable="true" data-field="ker5Price">$14.99</span>
@@ -570,43 +500,40 @@
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- Bottom strip: Sides & Breads -->
-    <div class="bottom-panel">
-      <div class="bottom-section">
-        <div class="bottom-title" data-editable="true" data-field="sidesTitle">Sides</div>
-        <div class="bottom-item">
-          <span class="bottom-item-name" data-editable="true" data-field="side1Name">Appam (2 pcs)</span>
-          <span class="bottom-item-price" data-editable="true" data-field="side1Price">$4.99</span>
-        </div>
-        <div class="bottom-item">
-          <span class="bottom-item-name" data-editable="true" data-field="side2Name">Idiappam (3 pcs)</span>
-          <span class="bottom-item-price" data-editable="true" data-field="side2Price">$4.99</span>
-        </div>
-        <div class="bottom-item">
-          <span class="bottom-item-name" data-editable="true" data-field="side3Name">Lemon Rice</span>
-          <span class="bottom-item-price" data-editable="true" data-field="side3Price">$3.99</span>
-        </div>
+  <!-- Bottom strip: Sides & Breads -->
+  <div class="bottom-strip">
+    <div class="bottom-section">
+      <div class="bottom-title" data-editable="true" data-field="sidesTitle">Sides</div>
+      <div class="bottom-row">
+        <span class="bottom-item-name" data-editable="true" data-field="side1Name">Appam (2 pcs)</span>
+        <span class="bottom-item-price" data-editable="true" data-field="side1Price">$4.99</span>
       </div>
-
-      <div class="bottom-section">
-        <div class="bottom-title" data-editable="true" data-field="breadsTitle">Breads</div>
-        <div class="bottom-item">
-          <span class="bottom-item-name" data-editable="true" data-field="bread1Name">Kerala Parotta (2)</span>
-          <span class="bottom-item-price" data-editable="true" data-field="bread1Price">$3.99</span>
-        </div>
-        <div class="bottom-item">
-          <span class="bottom-item-name" data-editable="true" data-field="bread2Name">Malabar Parotta (2)</span>
-          <span class="bottom-item-price" data-editable="true" data-field="bread2Price">$4.49</span>
-        </div>
-        <div class="bottom-item">
-          <span class="bottom-item-name" data-editable="true" data-field="bread3Name">Neer Dosa (3 pcs)</span>
-          <span class="bottom-item-price" data-editable="true" data-field="bread3Price">$4.99</span>
-        </div>
+      <div class="bottom-row">
+        <span class="bottom-item-name" data-editable="true" data-field="side2Name">Idiappam (3 pcs)</span>
+        <span class="bottom-item-price" data-editable="true" data-field="side2Price">$4.99</span>
+      </div>
+      <div class="bottom-row">
+        <span class="bottom-item-name" data-editable="true" data-field="side3Name">Lemon Rice</span>
+        <span class="bottom-item-price" data-editable="true" data-field="side3Price">$3.99</span>
+      </div>
+    </div>
+    <div class="bottom-section">
+      <div class="bottom-title" data-editable="true" data-field="breadsTitle">Breads</div>
+      <div class="bottom-row">
+        <span class="bottom-item-name" data-editable="true" data-field="bread1Name">Kerala Parotta (2)</span>
+        <span class="bottom-item-price" data-editable="true" data-field="bread1Price">$3.99</span>
+      </div>
+      <div class="bottom-row">
+        <span class="bottom-item-name" data-editable="true" data-field="bread2Name">Malabar Parotta (2)</span>
+        <span class="bottom-item-price" data-editable="true" data-field="bread2Price">$4.49</span>
+      </div>
+      <div class="bottom-row">
+        <span class="bottom-item-name" data-editable="true" data-field="bread3Name">Neer Dosa (3 pcs)</span>
+        <span class="bottom-item-price" data-editable="true" data-field="bread3Price">$4.99</span>
       </div>
     </div>
   </div>
-
-  <div class="bottom-strip"></div>
 </body>
 </html>

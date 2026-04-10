@@ -3,677 +3,471 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1920, height=1080">
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@300;400;500;600;700&family=Caveat:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Yatra+One&family=Cormorant+Garamond:wght@400;600;700&family=Tiro+Devanagari+Marathi&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * { margin:0; padding:0; box-sizing:border-box; }
     body {
-      width: 1920px;
-      height: 1080px;
-      overflow: hidden;
-      position: relative;
-      font-family: 'Inter', sans-serif;
+      width:1920px; height:1080px; overflow:hidden; position:relative;
+      font-family:'Poppins', sans-serif; color:#FFF4D6;
       background:
-        /* Saffron thread lines — thin golden diagonals */
-        repeating-linear-gradient(
-          35deg,
-          transparent,
-          transparent 60px,
-          rgba(255,215,0,0.03) 60px,
-          rgba(255,215,0,0.03) 61px
-        ),
-        repeating-linear-gradient(
-          -25deg,
-          transparent,
-          transparent 80px,
-          rgba(255,153,51,0.025) 80px,
-          rgba(255,153,51,0.025) 81px
-        ),
-        /* Mughal jali lattice — rotated square diamond pattern */
-        repeating-linear-gradient(
-          45deg,
-          transparent,
-          transparent 44px,
-          rgba(255,215,0,0.02) 44px,
-          rgba(255,215,0,0.02) 46px
-        ),
-        repeating-linear-gradient(
-          -45deg,
-          transparent,
-          transparent 44px,
-          rgba(255,215,0,0.02) 44px,
-          rgba(255,215,0,0.02) 46px
-        ),
-        /* Deep dark base */
-        linear-gradient(170deg, #0d0805 0%, #140e08 30%, #0d0805 60%, #0a0604 100%);
-      color: #FFFDD0;
+        radial-gradient(ellipse at 50% 30%, rgba(255,153,51,0.25) 0%, transparent 55%),
+        radial-gradient(ellipse at 15% 85%, rgba(196,30,58,0.3) 0%, transparent 50%),
+        radial-gradient(ellipse at 85% 85%, rgba(228,155,15,0.25) 0%, transparent 50%),
+        linear-gradient(160deg, #3a0a0e 0%, #5c0a10 30%, #2a0608 55%, #4d0e14 100%);
     }
-
-    /* Central saffron glow — warm aromatic haze */
+    /* saffron thread pattern */
     body::before {
-      content: '';
-      position: absolute;
-      top: -80px; left: 50%;
-      transform: translateX(-50%);
-      width: 1100px; height: 500px;
-      background: radial-gradient(ellipse, rgba(255,153,51,0.1) 0%, rgba(255,215,0,0.04) 40%, transparent 70%);
-      z-index: 0;
-      pointer-events: none;
-    }
-
-    /* Mughal red glow bottom */
-    body::after {
-      content: '';
-      position: absolute;
-      bottom: -120px; left: 50%;
-      transform: translateX(-50%);
-      width: 1400px; height: 400px;
-      background: radial-gradient(ellipse, rgba(139,0,0,0.06) 0%, transparent 70%);
-      z-index: 0;
-      pointer-events: none;
-    }
-
-    /* Saffron glow — top left */
-    .glow-tl {
-      position: absolute;
-      top: -80px; left: -40px;
-      width: 600px; height: 600px;
-      background: radial-gradient(circle, rgba(255,153,51,0.08) 0%, transparent 60%);
-      border-radius: 50%;
-      z-index: 1; pointer-events: none;
-    }
-
-    /* Gold glow — right side */
-    .glow-r {
-      position: absolute;
-      top: 200px; right: -60px;
-      width: 500px; height: 500px;
-      background: radial-gradient(circle, rgba(255,215,0,0.06) 0%, transparent 60%);
-      border-radius: 50%;
-      z-index: 1; pointer-events: none;
-    }
-
-    /* Mughal red accent glow — bottom left */
-    .glow-bl {
-      position: absolute;
-      bottom: -60px; left: 200px;
-      width: 400px; height: 400px;
-      background: radial-gradient(circle, rgba(139,0,0,0.05) 0%, transparent 60%);
-      border-radius: 50%;
-      z-index: 1; pointer-events: none;
-    }
-
-    /* Jali lattice overlay — diamond star repeating */
-    .jali-overlay {
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
+      content:''; position:absolute; inset:0; z-index:0; opacity:0.08;
       background:
-        /* Star lattice via layered gradients */
-        repeating-conic-gradient(
-          from 0deg at 50% 50%,
-          transparent 0deg,
-          transparent 44deg,
-          rgba(255,215,0,0.012) 44deg,
-          rgba(255,215,0,0.012) 46deg,
-          transparent 46deg,
-          transparent 90deg
-        );
-      background-size: 90px 90px;
-      z-index: 1;
-      pointer-events: none;
-      opacity: 0.7;
+        repeating-linear-gradient(25deg, transparent 0, transparent 80px, rgba(255,153,51,0.3) 80px, rgba(255,153,51,0.3) 81px, transparent 81px, transparent 140px),
+        repeating-linear-gradient(-25deg, transparent 0, transparent 80px, rgba(255,216,107,0.2) 80px, rgba(255,216,107,0.2) 81px, transparent 81px, transparent 140px);
     }
 
-    /* Steam wisps — curved lines with opacity gradient */
-    .steam {
-      position: absolute;
-      z-index: 3;
-      pointer-events: none;
+    /* Ornate royal border */
+    .royal-border {
+      position:absolute; inset:40px;
+      border: 3px double #E8B931;
+      border-radius: 4px;
+      box-shadow:
+        0 0 0 1px rgba(255,216,107,0.3),
+        0 0 0 10px rgba(196,30,58,0.2),
+        0 0 0 11px rgba(232,155,15,0.4),
+        inset 0 0 120px rgba(0,0,0,0.5);
+      z-index:2;
     }
-
-    .container {
-      position: relative;
-      z-index: 2;
-      height: 100%;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      grid-template-rows: auto 1fr auto;
-      padding: 45px 70px 35px 70px;
-      gap: 0 50px;
+    .royal-border::before, .royal-border::after {
+      content:'';
+      position:absolute;
+      left:20px; right:20px; height:1px;
+      background: linear-gradient(90deg, transparent, rgba(255,216,107,0.6), transparent);
     }
+    .royal-border::before { top:16px; }
+    .royal-border::after { bottom:16px; }
 
-    /* Header — spans both columns */
+    /* Corner peacock ornaments */
+    .peacock { position:absolute; z-index:5; opacity:0.5; }
+
+    /* Header */
     .header {
-      grid-column: 1 / -1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 30px;
-      margin-bottom: 25px;
-      padding-bottom: 20px;
-      border-bottom: 2px solid rgba(255,215,0,0.15);
-      position: relative;
+      position:absolute; top: 75px; left:0; right:0; z-index:5;
+      text-align:center;
     }
-
-    /* Ornate gold double border on header */
-    .header::before {
-      content: '';
-      position: absolute;
-      bottom: -8px; left: 10%;
-      width: 80%; height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(255,215,0,0.25), transparent);
+    .crown-svg {
+      display:block;
+      margin: 0 auto 10px;
+      opacity: 0.85;
     }
-
-    .crown-ornament {
-      font-size: 48px;
-      filter: drop-shadow(0 0 20px rgba(255,215,0,0.4));
-      line-height: 1;
-    }
-
-    .emoji-hero {
-      font-size: 150px;
-      line-height: 1;
-      filter: drop-shadow(0 0 40px rgba(255,215,0,0.35)) drop-shadow(0 8px 16px rgba(0,0,0,0.6));
-    }
-
-    .header-text {
-      text-align: center;
-    }
-
     .title {
-      font-family: 'Playfair Display', serif;
-      font-weight: 900;
-      font-size: 74px;
-      color: #FFD700;
-      text-shadow: 0 2px 25px rgba(255,215,0,0.3), 0 0 60px rgba(255,153,51,0.15);
-      letter-spacing: 8px;
-      line-height: 1;
+      font-family:'Yatra One', cursive;
+      font-size: 100px;
+      line-height: 0.9;
+      color: #FFD86B;
+      letter-spacing: 5px;
+      text-shadow:
+        0 0 40px rgba(255,153,51,0.7),
+        0 0 100px rgba(255,50,10,0.4),
+        0 4px 0 #8B4513,
+        0 5px 1px #3a0000;
       margin-bottom: 8px;
     }
-
     .subtitle {
-      font-family: 'Caveat', cursive;
-      font-size: 28px;
-      color: rgba(255,253,208,0.55);
+      font-family:'Cormorant Garamond', serif;
+      font-style: italic;
+      font-size: 26px;
+      color: rgba(255,244,214,0.85);
       letter-spacing: 3px;
     }
-
-    /* Signature dish hero card */
-    .hero-card {
-      grid-column: 1 / -1;
-      background:
-        linear-gradient(135deg, rgba(255,215,0,0.06) 0%, rgba(139,0,0,0.04) 50%, rgba(255,153,51,0.06) 100%);
-      border: 2px solid rgba(255,215,0,0.2);
-      border-radius: 20px;
-      padding: 22px 40px;
-      margin-bottom: 20px;
-      display: flex;
-      align-items: center;
-      gap: 30px;
-      backdrop-filter: blur(12px);
-      box-shadow:
-        0 8px 40px rgba(0,0,0,0.3),
-        inset 0 1px 0 rgba(255,215,0,0.1);
-      position: relative;
-      overflow: hidden;
-    }
-
-    /* Gold shimmer line on hero card */
-    .hero-card::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, #FFD700, #FF9933, #FFD700, transparent);
-    }
-
-    .hero-card::after {
-      content: '';
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, #FFD700, #FF9933, #FFD700, transparent);
-    }
-
-    .hero-star {
-      font-size: 50px;
-      filter: drop-shadow(0 0 15px rgba(255,215,0,0.5));
-    }
-
-    .hero-info { flex: 1; }
-
-    .hero-label {
-      font-family: 'Inter', sans-serif;
-      font-weight: 600;
-      font-size: 13px;
-      color: #FF9933;
-      letter-spacing: 5px;
-      text-transform: uppercase;
-      margin-bottom: 4px;
-    }
-
-    .hero-name {
-      font-family: 'Playfair Display', serif;
-      font-weight: 900;
-      font-size: 38px;
-      color: #FFD700;
-      margin-bottom: 4px;
-    }
-
-    .hero-desc {
-      font-family: 'Caveat', cursive;
+    .subtitle::before, .subtitle::after {
+      content:'\2740';
+      color: #E8B931;
+      margin: 0 18px;
       font-size: 22px;
-      color: rgba(255,253,208,0.5);
     }
 
-    .hero-quote {
-      font-family: 'Caveat', cursive;
+    /* Hero handi (dum pot) SVG - top center behind title */
+    .handi-svg {
+      position:absolute;
+      top: 70px; left: 50%;
+      transform: translateX(-50%);
+      width: 420px; height: 340px;
+      z-index:1;
+      opacity: 0.22;
+      filter: drop-shadow(0 0 60px rgba(255,153,51,0.5));
+    }
+
+    /* Hero card - signature */
+    .hero-card {
+      position:absolute;
+      top: 300px; left: 120px; right: 120px;
+      z-index:4;
+      display:grid;
+      grid-template-columns: 1fr auto;
+      align-items:center;
+      gap: 40px;
+      padding: 30px 50px;
+      background:
+        linear-gradient(90deg, rgba(255,153,51,0.2), rgba(196,30,58,0.2), rgba(255,153,51,0.2));
+      border: 2px solid rgba(255,216,107,0.55);
+      border-radius: 10px;
+      box-shadow:
+        inset 0 1px 0 rgba(255,216,107,0.3),
+        0 15px 50px rgba(0,0,0,0.6),
+        0 0 60px rgba(255,153,51,0.15);
+    }
+    .hero-card::before, .hero-card::after {
+      content:'';
+      position:absolute;
+      top:-8px; bottom:-8px; width: 18px;
+      background: radial-gradient(ellipse at center, #FFD86B, #B87333);
+      border-radius: 50%;
+      box-shadow: 0 0 15px rgba(255,216,107,0.6);
+    }
+    .hero-card::before { left:-9px; }
+    .hero-card::after { right:-9px; }
+
+    .hero-left { flex:1; }
+    .hero-label {
+      font-family:'Cormorant Garamond', serif;
+      font-size: 18px;
+      letter-spacing: 6px;
+      color: #FF9933;
+      text-transform: uppercase;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .hero-name {
+      font-family:'Yatra One', cursive;
+      font-size: 58px;
+      line-height: 1;
+      color: #FFD86B;
+      letter-spacing: 2px;
+      text-shadow: 0 0 30px rgba(255,216,107,0.5), 0 3px 0 #8B4513;
+      margin-bottom: 8px;
+    }
+    .hero-desc {
+      font-family:'Cormorant Garamond', serif;
+      font-style: italic;
       font-size: 20px;
-      color: rgba(255,153,51,0.6);
+      color: rgba(255,244,214,0.8);
+      margin-bottom: 4px;
+    }
+    .hero-quote {
+      font-family:'Cormorant Garamond', serif;
+      font-size: 16px;
+      color: rgba(255,216,107,0.75);
       font-style: italic;
     }
-
     .hero-price {
-      font-family: 'Playfair Display', serif;
-      font-weight: 900;
-      font-size: 44px;
-      color: #FFD700;
-      text-shadow: 0 0 20px rgba(255,215,0,0.3);
+      font-family:'Cormorant Garamond', serif;
+      font-weight: 700;
+      font-size: 80px;
+      color: #FFD86B;
+      text-shadow: 0 0 30px rgba(255,216,107,0.6), 0 4px 0 #8B4513;
+      line-height: 1;
     }
 
-    /* Section headers */
+    /* Two column layout */
+    .columns {
+      position:absolute;
+      top: 490px;
+      bottom: 100px;
+      left: 120px;
+      right: 120px;
+      z-index:4;
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+    }
+
     .section-header {
-      font-family: 'Playfair Display', serif;
-      font-weight: 900;
-      font-size: 28px;
-      color: #FF9933;
+      font-family:'Yatra One', cursive;
+      font-size: 30px;
+      color: #FFD86B;
+      text-align: center;
       letter-spacing: 4px;
-      text-transform: uppercase;
-      margin-bottom: 12px;
-      padding-bottom: 8px;
-      border-bottom: 1px solid rgba(255,215,0,0.15);
-      display: flex;
-      align-items: center;
-      gap: 10px;
+      padding: 8px 0;
+      border-top: 1px solid rgba(255,216,107,0.4);
+      border-bottom: 1px solid rgba(255,216,107,0.4);
+      text-shadow: 0 0 18px rgba(255,153,51,0.5);
+      margin-bottom: 16px;
     }
 
-    .section-header::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: linear-gradient(90deg, rgba(255,215,0,0.2), transparent);
-    }
-
-    /* Menu columns */
-    .menu-left {
-      grid-column: 1;
-      grid-row: 3;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .menu-right {
-      grid-column: 2;
-      grid-row: 3;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .menu-card {
-      background: rgba(255,253,208,0.03);
-      border: 1px solid rgba(255,215,0,0.08);
-      border-radius: 14px;
-      padding: 14px 20px;
-      backdrop-filter: blur(8px);
-      box-shadow:
-        0 4px 20px rgba(0,0,0,0.15),
-        inset 0 1px 0 rgba(255,255,255,0.03);
-      display: grid;
+    .items { display:flex; flex-direction:column; gap: 10px; }
+    .biryani-item {
+      display:grid;
       grid-template-columns: 1fr auto;
       grid-template-rows: auto auto;
-      gap: 0 16px;
-      position: relative;
-      overflow: hidden;
+      gap: 0 12px;
+      padding: 10px 14px 10px 26px;
+      background: linear-gradient(90deg, rgba(255,153,51,0.08), rgba(255,153,51,0.02));
+      border-left: 3px solid #FFD86B;
+      border-radius: 4px;
+      position:relative;
     }
-
-    .menu-card::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0;
-      width: 3px; height: 100%;
-      background: linear-gradient(180deg, #FFD700, #FF9933);
-      border-radius: 3px 0 0 3px;
+    .biryani-item::before {
+      content:'';
+      position:absolute;
+      left: 8px; top: 50%;
+      margin-top: -5px;
+      width: 10px; height: 10px;
+      background: radial-gradient(circle, #FF9933, #C41E3A);
+      transform: rotate(45deg);
+      box-shadow: 0 0 10px rgba(255,216,107,0.6);
     }
-
-    .menu-card:nth-child(even) {
-      background: rgba(255,253,208,0.05);
-    }
-
     .item-name {
-      font-family: 'Playfair Display', serif;
+      font-family:'Cormorant Garamond', serif;
       font-weight: 700;
-      font-size: 23px;
-      color: #FFFDD0;
-      grid-column: 1;
-      grid-row: 1;
-      display: flex;
-      align-items: baseline;
+      font-size: 21px;
+      color: #FFF4D6;
+      grid-column: 1; grid-row: 1;
     }
-
-    .item-name::after {
-      content: '';
-      flex: 1;
-      margin: 0 10px;
-      border-bottom: 2px dotted rgba(255,215,0,0.2);
-      position: relative;
-      top: -3px;
-    }
-
     .item-price {
-      font-family: 'Playfair Display', serif;
+      font-family:'Cormorant Garamond', serif;
       font-weight: 700;
-      font-size: 24px;
-      color: #FFD700;
-      grid-column: 2;
-      grid-row: 1;
-      text-align: right;
-      text-shadow: 0 0 12px rgba(255,215,0,0.25);
+      font-size: 22px;
+      color: #FFD86B;
+      grid-column: 2; grid-row: 1;
+      text-shadow: 0 0 12px rgba(255,216,107,0.5);
     }
-
     .item-desc {
-      font-family: 'Caveat', cursive;
-      font-size: 18px;
-      color: rgba(255,253,208,0.4);
-      grid-column: 1 / -1;
-      grid-row: 2;
+      font-family:'Poppins', sans-serif;
+      font-size: 12px;
+      font-weight: 300;
+      font-style: italic;
+      color: rgba(255,244,214,0.6);
+      grid-column: 1 / -1; grid-row: 2;
       margin-top: 2px;
-      line-height: 1.3;
     }
 
-    /* Platter/accompaniment cards */
-    .platter-section {
-      margin-top: 14px;
+    /* Accompaniments sub-panel */
+    .acc-panel {
+      margin-top: 18px;
+      padding: 16px 20px;
+      background: rgba(196,30,58,0.15);
+      border: 1px solid rgba(255,216,107,0.35);
+      border-radius: 6px;
     }
-
-    .platter-card {
-      background: rgba(139,0,0,0.06);
-      border: 1px solid rgba(255,215,0,0.1);
-      border-radius: 14px;
-      padding: 14px 20px;
-      backdrop-filter: blur(8px);
-      display: grid;
-      grid-template-columns: 1fr auto;
-      grid-template-rows: auto auto;
-      gap: 0 16px;
-      margin-bottom: 6px;
-      position: relative;
-      overflow: hidden;
+    .acc-panel .section-header {
+      font-size: 22px;
+      border: none;
+      padding: 0;
+      margin: 0 0 10px;
     }
-
-    .platter-card::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0;
-      width: 3px; height: 100%;
-      background: linear-gradient(180deg, #8B0000, #FF9933);
-      border-radius: 3px 0 0 3px;
+    .acc-grid {
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 20px;
     }
-
-    .acc-item {
-      display: flex;
+    .acc-row {
+      display:flex;
       justify-content: space-between;
       align-items: baseline;
-      padding: 6px 0;
+      padding: 4px 0;
+      border-bottom: 1px dotted rgba(255,216,107,0.25);
     }
-
     .acc-name {
-      font-family: 'Inter', sans-serif;
-      font-weight: 400;
+      font-family:'Cormorant Garamond', serif;
       font-size: 18px;
-      color: #FFFDD0;
+      color: #FFF4D6;
     }
-
     .acc-price {
-      font-family: 'Playfair Display', serif;
+      font-family:'Cormorant Garamond', serif;
       font-weight: 700;
-      font-size: 20px;
-      color: #FFD700;
-    }
-
-    /* Footer strip */
-    .footer {
-      grid-column: 1 / -1;
-      grid-row: 4;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      margin-top: 16px;
-      padding-top: 12px;
-      border-top: 1px solid rgba(255,215,0,0.1);
-    }
-
-    .footer-line {
-      width: 500px;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, rgba(255,215,0,0.3), rgba(255,153,51,0.3), rgba(255,215,0,0.3), transparent);
-    }
-
-    /* Gold ornate double border frame around entire page */
-    .page-frame {
-      position: absolute;
-      top: 12px; left: 12px; right: 12px; bottom: 12px;
-      border: 1px solid rgba(255,215,0,0.1);
-      border-radius: 8px;
-      z-index: 1;
-      pointer-events: none;
-    }
-
-    .page-frame::before {
-      content: '';
-      position: absolute;
-      top: 6px; left: 6px; right: 6px; bottom: 6px;
-      border: 1px solid rgba(255,215,0,0.06);
-      border-radius: 4px;
-    }
-
-    /* Bottom saffron accent stripe */
-    .saffron-stripe {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 4px;
-      background: linear-gradient(90deg, #8B0000, #FF9933, #FFD700, #FF9933, #8B0000);
-      z-index: 4;
-    }
-
-    /* Top saffron accent stripe */
-    .saffron-stripe-top {
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 3px;
-      background: linear-gradient(90deg, #8B0000, #FF9933, #FFD700, #FF9933, #8B0000);
-      z-index: 4;
+      font-size: 18px;
+      color: #FFD86B;
     }
   </style>
 </head>
 <body>
-  <div class="glow-tl"></div>
-  <div class="glow-r"></div>
-  <div class="glow-bl"></div>
-  <div class="jali-overlay"></div>
-  <div class="page-frame"></div>
-  <div class="saffron-stripe"></div>
-  <div class="saffron-stripe-top"></div>
-
-  <!-- Steam wisps SVG near hero -->
-  <svg class="steam" style="top:30px;left:50%;transform:translateX(-50%);opacity:0.12;" width="200" height="80" viewBox="0 0 200 80" fill="none">
-    <path d="M60 75 Q65 50 55 35 Q50 20 60 5" stroke="#FFD700" stroke-width="1.5" fill="none" opacity="0.6"/>
-    <path d="M90 78 Q95 48 85 30 Q80 12 90 0" stroke="#FFD700" stroke-width="1.5" fill="none" opacity="0.5"/>
-    <path d="M120 75 Q125 50 115 35 Q110 18 120 3" stroke="#FFD700" stroke-width="1.5" fill="none" opacity="0.4"/>
-    <path d="M150 78 Q155 52 145 38 Q140 22 150 8" stroke="#FF9933" stroke-width="1" fill="none" opacity="0.3"/>
-  </svg>
-
-  <!-- Corner ornament SVGs — Mughal arch motifs -->
-  <svg style="position:absolute;top:18px;left:18px;z-index:3;opacity:0.2;" width="90" height="90" viewBox="0 0 90 90" fill="none">
-    <path d="M5 45 Q5 5 45 5" stroke="#FFD700" stroke-width="2" fill="none"/>
-    <path d="M10 35 Q10 10 35 10" stroke="#FF9933" stroke-width="1" fill="none"/>
-    <circle cx="8" cy="8" r="3" fill="#FFD700"/>
-    <circle cx="5" cy="45" r="2" fill="#FF9933"/>
-    <circle cx="45" cy="5" r="2" fill="#FF9933"/>
-  </svg>
-  <svg style="position:absolute;top:18px;right:18px;z-index:3;opacity:0.2;" width="90" height="90" viewBox="0 0 90 90" fill="none">
-    <path d="M85 45 Q85 5 45 5" stroke="#FFD700" stroke-width="2" fill="none"/>
-    <path d="M80 35 Q80 10 55 10" stroke="#FF9933" stroke-width="1" fill="none"/>
-    <circle cx="82" cy="8" r="3" fill="#FFD700"/>
-    <circle cx="85" cy="45" r="2" fill="#FF9933"/>
-    <circle cx="45" cy="5" r="2" fill="#FF9933"/>
-  </svg>
-  <svg style="position:absolute;bottom:18px;left:18px;z-index:3;opacity:0.2;" width="90" height="90" viewBox="0 0 90 90" fill="none">
-    <path d="M5 45 Q5 85 45 85" stroke="#FFD700" stroke-width="2" fill="none"/>
-    <path d="M10 55 Q10 80 35 80" stroke="#FF9933" stroke-width="1" fill="none"/>
-    <circle cx="8" cy="82" r="3" fill="#FFD700"/>
-    <circle cx="5" cy="45" r="2" fill="#FF9933"/>
-    <circle cx="45" cy="85" r="2" fill="#FF9933"/>
-  </svg>
-  <svg style="position:absolute;bottom:18px;right:18px;z-index:3;opacity:0.2;" width="90" height="90" viewBox="0 0 90 90" fill="none">
-    <path d="M85 45 Q85 85 45 85" stroke="#FFD700" stroke-width="2" fill="none"/>
-    <path d="M80 55 Q80 80 55 80" stroke="#FF9933" stroke-width="1" fill="none"/>
-    <circle cx="82" cy="82" r="3" fill="#FFD700"/>
-    <circle cx="85" cy="45" r="2" fill="#FF9933"/>
-    <circle cx="45" cy="85" r="2" fill="#FF9933"/>
-  </svg>
-
-  <!-- Handi pot SVG — decorative, top right area -->
-  <svg style="position:absolute;top:100px;right:80px;z-index:3;opacity:0.08;" width="160" height="180" viewBox="0 0 160 180" fill="none">
+  <!-- Handi (dum pot) SVG hero -->
+  <svg class="handi-svg" viewBox="0 0 420 340">
+    <defs>
+      <radialGradient id="handiBrass" cx="50%" cy="50%">
+        <stop offset="0%" stop-color="#FFD86B"/>
+        <stop offset="60%" stop-color="#E8B931"/>
+        <stop offset="100%" stop-color="#8B4513"/>
+      </radialGradient>
+    </defs>
+    <!-- Steam from lid seal -->
+    <g fill="none" stroke="#FFD86B" stroke-width="2.5" opacity="0.7">
+      <path d="M130 60 Q120 30 135 0 Q150 -30 135 -55"/>
+      <path d="M180 55 Q170 25 185 -5 Q200 -35 185 -60"/>
+      <path d="M230 55 Q220 25 235 -5 Q250 -35 235 -60"/>
+      <path d="M280 60 Q270 30 285 0 Q300 -30 285 -55"/>
+    </g>
+    <!-- Lid top knob -->
+    <circle cx="210" cy="85" r="10" fill="url(#handiBrass)"/>
+    <rect x="205" y="90" width="10" height="15" fill="#B87333"/>
     <!-- Lid -->
-    <ellipse cx="80" cy="20" rx="50" ry="14" stroke="#FFD700" stroke-width="2" fill="none"/>
-    <path d="M75 8 Q80 0 85 8" stroke="#FFD700" stroke-width="1.5" fill="none"/>
-    <circle cx="80" cy="4" r="4" stroke="#FFD700" stroke-width="1.5" fill="none"/>
-    <!-- Pot body -->
-    <path d="M30 20 Q20 60 25 100 Q30 140 80 150 Q130 140 135 100 Q140 60 130 20" stroke="#FFD700" stroke-width="2" fill="none"/>
-    <!-- Decorative band -->
-    <ellipse cx="80" cy="80" rx="55" ry="8" stroke="#FF9933" stroke-width="1" fill="none" opacity="0.5"/>
-    <!-- Base -->
-    <ellipse cx="80" cy="150" rx="35" ry="8" stroke="#FFD700" stroke-width="1.5" fill="none"/>
-    <!-- Steam lines -->
-    <path d="M60 -2 Q62 -14 64 -2" stroke="#FFD700" stroke-width="1" fill="none" opacity="0.4"/>
-    <path d="M80 -5 Q82 -17 84 -5" stroke="#FFD700" stroke-width="1" fill="none" opacity="0.3"/>
-    <path d="M100 -2 Q102 -14 104 -2" stroke="#FFD700" stroke-width="1" fill="none" opacity="0.4"/>
+    <ellipse cx="210" cy="110" rx="110" ry="18" fill="url(#handiBrass)"/>
+    <ellipse cx="210" cy="108" rx="110" ry="14" fill="none" stroke="#8B4513" stroke-width="2"/>
+    <!-- Dough seal strip (atta seal) -->
+    <ellipse cx="210" cy="125" rx="112" ry="10" fill="#E49B0F" opacity="0.5"/>
+    <path d="M98 125 Q98 135 105 135 L315 135 Q322 135 322 125" fill="none" stroke="#FFF4D6" stroke-width="2" stroke-dasharray="4 3" opacity="0.6"/>
+    <!-- Pot body (handi curve) -->
+    <path d="M100 130 Q70 200 100 270 Q140 320 210 320 Q280 320 320 270 Q350 200 320 130 Z"
+          fill="url(#handiBrass)" stroke="#8B4513" stroke-width="3"/>
+    <!-- Handles -->
+    <path d="M95 180 Q60 180 60 210 Q60 230 95 225" fill="none" stroke="#8B4513" stroke-width="4"/>
+    <path d="M325 180 Q360 180 360 210 Q360 230 325 225" fill="none" stroke="#8B4513" stroke-width="4"/>
+    <!-- Engraved horizontal bands -->
+    <g fill="none" stroke="#8B4513" stroke-width="1.5" opacity="0.7">
+      <path d="M90 180 Q210 195 330 180"/>
+      <path d="M85 230 Q210 250 335 230"/>
+      <path d="M95 275 Q210 295 325 275"/>
+    </g>
+    <!-- Decorative motif on belly -->
+    <g fill="none" stroke="#FFD86B" stroke-width="1.5" opacity="0.8">
+      <path d="M210 205 L220 220 L210 235 L200 220 Z"/>
+      <circle cx="180" cy="220" r="6"/>
+      <circle cx="240" cy="220" r="6"/>
+    </g>
   </svg>
 
-  <div class="container">
-    <!-- Header -->
-    <div class="header">
-      <span class="crown-ornament">&#128081;</span>
-      <div class="emoji-hero">&#127834;</div>
-      <div class="header-text">
-        <h1 class="title" data-editable="true" data-field="title">DUM BIRYANI</h1>
-        <p class="subtitle" data-editable="true" data-field="subtitle">Slow Cooked in Sealed Handi &bull; Saffron Infused</p>
-      </div>
-      <div class="emoji-hero" style="font-size:80px;">&#127834;</div>
-      <span class="crown-ornament">&#128081;</span>
-    </div>
+  <!-- Corner peacock ornaments -->
+  <svg class="peacock" style="top:50px; left:50px;" width="100" height="100" viewBox="0 0 100 100">
+    <g fill="none" stroke="#E8B931" stroke-width="1.5">
+      <!-- body -->
+      <path d="M30 70 Q30 50 45 45 Q55 42 58 30 Q60 22 55 18"/>
+      <circle cx="55" cy="15" r="3" fill="#FF9933"/>
+      <!-- crest -->
+      <path d="M55 13 L52 5 M55 13 L58 5 M55 13 L55 3"/>
+      <!-- tail feathers -->
+      <path d="M30 70 Q20 90 10 90"/>
+      <path d="M35 75 Q30 95 20 98"/>
+      <path d="M40 78 Q45 98 55 95"/>
+      <path d="M45 75 Q60 90 75 88"/>
+      <!-- eyes on feathers -->
+      <circle cx="15" cy="88" r="3" fill="#C41E3A"/>
+      <circle cx="28" cy="95" r="3" fill="#C41E3A"/>
+      <circle cx="55" cy="94" r="3" fill="#C41E3A"/>
+      <circle cx="72" cy="86" r="3" fill="#C41E3A"/>
+    </g>
+  </svg>
+  <svg class="peacock" style="top:50px; right:50px; transform: scaleX(-1);" width="100" height="100" viewBox="0 0 100 100">
+    <g fill="none" stroke="#E8B931" stroke-width="1.5">
+      <path d="M30 70 Q30 50 45 45 Q55 42 58 30 Q60 22 55 18"/>
+      <circle cx="55" cy="15" r="3" fill="#FF9933"/>
+      <path d="M55 13 L52 5 M55 13 L58 5 M55 13 L55 3"/>
+      <path d="M30 70 Q20 90 10 90"/>
+      <path d="M35 75 Q30 95 20 98"/>
+      <path d="M40 78 Q45 98 55 95"/>
+      <path d="M45 75 Q60 90 75 88"/>
+      <circle cx="15" cy="88" r="3" fill="#C41E3A"/>
+      <circle cx="28" cy="95" r="3" fill="#C41E3A"/>
+      <circle cx="55" cy="94" r="3" fill="#C41E3A"/>
+      <circle cx="72" cy="86" r="3" fill="#C41E3A"/>
+    </g>
+  </svg>
 
-    <!-- Signature Hero Card -->
-    <div class="hero-card" style="grid-column:1/-1;grid-row:2;">
-      <span class="hero-star">&#11088;</span>
-      <div class="hero-info">
-        <div class="hero-label" data-editable="true" data-field="heroLabel">SIGNATURE HYDERABADI BIRYANI</div>
-        <div class="hero-name" data-editable="true" data-field="heroName">Goat Biryani</div>
-        <div class="hero-desc" data-editable="true" data-field="heroDesc">Tender goat, basmati rice, saffron, fried onions</div>
-        <div class="hero-quote" data-editable="true" data-field="heroQuote">&ldquo;Our award-winning recipe since 2005&rdquo;</div>
-      </div>
-      <div class="hero-price" data-editable="true" data-field="heroPrice">$16.99</div>
-    </div>
+  <div class="royal-border"></div>
 
-    <!-- Left column: Biryani Varieties -->
-    <div class="menu-left">
+  <div class="header">
+    <!-- Crown SVG -->
+    <svg class="crown-svg" width="120" height="50" viewBox="0 0 120 50">
+      <g fill="#FFD86B" stroke="#8B4513" stroke-width="1.5">
+        <path d="M10 45 L10 25 L25 35 L40 15 L55 30 L60 10 L65 30 L80 15 L95 35 L110 25 L110 45 Z"/>
+      </g>
+      <circle cx="60" cy="8" r="3" fill="#C41E3A"/>
+      <circle cx="25" cy="35" r="2" fill="#C41E3A"/>
+      <circle cx="95" cy="35" r="2" fill="#C41E3A"/>
+      <rect x="10" y="42" width="100" height="5" fill="#B87333"/>
+    </svg>
+    <h1 class="title" data-editable="true" data-field="title">DUM BIRYANI</h1>
+    <p class="subtitle" data-editable="true" data-field="subtitle">Slow Cooked in Sealed Handi &bull; Saffron Infused</p>
+  </div>
+
+  <!-- Hero signature card -->
+  <div class="hero-card">
+    <div class="hero-left">
+      <div class="hero-label" data-editable="true" data-field="heroLabel">SIGNATURE HYDERABADI BIRYANI</div>
+      <div class="hero-name" data-editable="true" data-field="heroName">Goat Biryani</div>
+      <div class="hero-desc" data-editable="true" data-field="heroDesc">Tender goat, basmati rice, saffron, fried onions</div>
+      <div class="hero-quote" data-editable="true" data-field="heroQuote">&ldquo;Our award-winning recipe since 2005&rdquo;</div>
+    </div>
+    <div class="hero-price" data-editable="true" data-field="heroPrice">$16.99</div>
+  </div>
+
+  <div class="columns">
+    <!-- Left column -->
+    <div>
       <div class="section-header" data-editable="true" data-field="leftSectionTitle">Biryani Varieties</div>
-
-      <div class="menu-card">
-        <span class="item-name" data-editable="true" data-field="item1Name">Chicken Biryani</span>
-        <span class="item-price" data-editable="true" data-field="item1Price">$13.99</span>
-        <span class="item-desc" data-editable="true" data-field="item1Desc">Classic aromatic chicken biryani</span>
-      </div>
-
-      <div class="menu-card">
-        <span class="item-name" data-editable="true" data-field="item2Name">Mutton Biryani</span>
-        <span class="item-price" data-editable="true" data-field="item2Price">$15.99</span>
-        <span class="item-desc" data-editable="true" data-field="item2Desc">Tender mutton, rich gravy spices</span>
-      </div>
-
-      <div class="menu-card">
-        <span class="item-name" data-editable="true" data-field="item3Name">Egg Biryani</span>
-        <span class="item-price" data-editable="true" data-field="item3Price">$11.99</span>
-        <span class="item-desc" data-editable="true" data-field="item3Desc">Boiled eggs in spiced basmati rice</span>
-      </div>
-
-      <div class="menu-card">
-        <span class="item-name" data-editable="true" data-field="item4Name">Veg Biryani</span>
-        <span class="item-price" data-editable="true" data-field="item4Price">$11.99</span>
-        <span class="item-desc" data-editable="true" data-field="item4Desc">Mixed vegetable dum biryani</span>
-      </div>
-
-      <div class="menu-card">
-        <span class="item-name" data-editable="true" data-field="item5Name">Paneer Biryani</span>
-        <span class="item-price" data-editable="true" data-field="item5Price">$12.99</span>
-        <span class="item-desc" data-editable="true" data-field="item5Desc">Cottage cheese layered biryani</span>
-      </div>
-
-      <div class="menu-card">
-        <span class="item-name" data-editable="true" data-field="item6Name">Prawn Biryani</span>
-        <span class="item-price" data-editable="true" data-field="item6Price">$16.99</span>
-        <span class="item-desc" data-editable="true" data-field="item6Desc">Jumbo prawns dum style biryani</span>
+      <div class="items">
+        <div class="biryani-item">
+          <span class="item-name" data-editable="true" data-field="item1Name">Chicken Biryani</span>
+          <span class="item-price" data-editable="true" data-field="item1Price">$13.99</span>
+          <span class="item-desc" data-editable="true" data-field="item1Desc">Classic aromatic chicken biryani</span>
+        </div>
+        <div class="biryani-item">
+          <span class="item-name" data-editable="true" data-field="item2Name">Mutton Biryani</span>
+          <span class="item-price" data-editable="true" data-field="item2Price">$15.99</span>
+          <span class="item-desc" data-editable="true" data-field="item2Desc">Tender mutton, rich gravy spices</span>
+        </div>
+        <div class="biryani-item">
+          <span class="item-name" data-editable="true" data-field="item3Name">Egg Biryani</span>
+          <span class="item-price" data-editable="true" data-field="item3Price">$11.99</span>
+          <span class="item-desc" data-editable="true" data-field="item3Desc">Boiled eggs in spiced basmati rice</span>
+        </div>
+        <div class="biryani-item">
+          <span class="item-name" data-editable="true" data-field="item4Name">Veg Biryani</span>
+          <span class="item-price" data-editable="true" data-field="item4Price">$11.99</span>
+          <span class="item-desc" data-editable="true" data-field="item4Desc">Mixed vegetable dum biryani</span>
+        </div>
+        <div class="biryani-item">
+          <span class="item-name" data-editable="true" data-field="item5Name">Paneer Biryani</span>
+          <span class="item-price" data-editable="true" data-field="item5Price">$12.99</span>
+          <span class="item-desc" data-editable="true" data-field="item5Desc">Cottage cheese layered biryani</span>
+        </div>
+        <div class="biryani-item">
+          <span class="item-name" data-editable="true" data-field="item6Name">Prawn Biryani</span>
+          <span class="item-price" data-editable="true" data-field="item6Price">$16.99</span>
+          <span class="item-desc" data-editable="true" data-field="item6Desc">Jumbo prawns dum style biryani</span>
+        </div>
       </div>
     </div>
 
-    <!-- Right column: Platters + Accompaniments -->
-    <div class="menu-right">
+    <!-- Right column -->
+    <div>
       <div class="section-header" data-editable="true" data-field="rightSectionTitle">Biryani Platters</div>
-
-      <div class="platter-card">
-        <span class="item-name" data-editable="true" data-field="platter1Name">Family Pack (Serves 4)</span>
-        <span class="item-price" data-editable="true" data-field="platter1Price">$44.99</span>
-        <span class="item-desc" data-editable="true" data-field="platter1Desc">Choice of any biryani variety</span>
+      <div class="items">
+        <div class="biryani-item">
+          <span class="item-name" data-editable="true" data-field="platter1Name">Family Pack (Serves 4)</span>
+          <span class="item-price" data-editable="true" data-field="platter1Price">$44.99</span>
+          <span class="item-desc" data-editable="true" data-field="platter1Desc">Choice of any biryani variety</span>
+        </div>
+        <div class="biryani-item">
+          <span class="item-name" data-editable="true" data-field="platter2Name">Party Pack (Serves 8)</span>
+          <span class="item-price" data-editable="true" data-field="platter2Price">$79.99</span>
+          <span class="item-desc" data-editable="true" data-field="platter2Desc">Choice of 2 biryanis + sides</span>
+        </div>
+        <div class="biryani-item">
+          <span class="item-name" data-editable="true" data-field="platter3Name">Weekend Special</span>
+          <span class="item-price" data-editable="true" data-field="platter3Price">$18.99</span>
+          <span class="item-desc" data-editable="true" data-field="platter3Desc">Biryani + kebab + dessert combo</span>
+        </div>
       </div>
 
-      <div class="platter-card">
-        <span class="item-name" data-editable="true" data-field="platter2Name">Party Pack (Serves 8)</span>
-        <span class="item-price" data-editable="true" data-field="platter2Price">$79.99</span>
-        <span class="item-desc" data-editable="true" data-field="platter2Desc">Choice of 2 biryanis + sides</span>
-      </div>
-
-      <div class="platter-card">
-        <span class="item-name" data-editable="true" data-field="platter3Name">Weekend Special</span>
-        <span class="item-price" data-editable="true" data-field="platter3Price">$18.99</span>
-        <span class="item-desc" data-editable="true" data-field="platter3Desc">Biryani + kebab + dessert combo</span>
-      </div>
-
-      <div class="platter-section">
+      <div class="acc-panel">
         <div class="section-header" data-editable="true" data-field="accSectionTitle">Accompaniments</div>
-
-        <div class="acc-item">
-          <span class="acc-name" data-editable="true" data-field="acc1Name">Raita</span>
-          <span class="acc-price" data-editable="true" data-field="acc1Price">$2.99</span>
-        </div>
-        <div class="acc-item">
-          <span class="acc-name" data-editable="true" data-field="acc2Name">Mirchi Ka Salan</span>
-          <span class="acc-price" data-editable="true" data-field="acc2Price">$3.99</span>
-        </div>
-        <div class="acc-item">
-          <span class="acc-name" data-editable="true" data-field="acc3Name">Boiled Egg (2 pcs)</span>
-          <span class="acc-price" data-editable="true" data-field="acc3Price">$1.99</span>
-        </div>
-        <div class="acc-item">
-          <span class="acc-name" data-editable="true" data-field="acc4Name">Bagara Baingan</span>
-          <span class="acc-price" data-editable="true" data-field="acc4Price">$4.99</span>
+        <div class="acc-grid">
+          <div class="acc-row">
+            <span class="acc-name" data-editable="true" data-field="acc1Name">Raita</span>
+            <span class="acc-price" data-editable="true" data-field="acc1Price">$2.99</span>
+          </div>
+          <div class="acc-row">
+            <span class="acc-name" data-editable="true" data-field="acc2Name">Mirchi Ka Salan</span>
+            <span class="acc-price" data-editable="true" data-field="acc2Price">$3.99</span>
+          </div>
+          <div class="acc-row">
+            <span class="acc-name" data-editable="true" data-field="acc3Name">Boiled Egg (2 pcs)</span>
+            <span class="acc-price" data-editable="true" data-field="acc3Price">$1.99</span>
+          </div>
+          <div class="acc-row">
+            <span class="acc-name" data-editable="true" data-field="acc4Name">Bagara Baingan</span>
+            <span class="acc-price" data-editable="true" data-field="acc4Price">$4.99</span>
+          </div>
         </div>
       </div>
-    </div>
-
-    <!-- Footer -->
-    <div class="footer">
-      <div class="footer-line"></div>
     </div>
   </div>
 </body>

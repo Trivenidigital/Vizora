@@ -3,645 +3,431 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1920, height=1080">
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@300;400;500;600;700&family=Caveat:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Yatra+One&family=Cormorant+Garamond:wght@400;600;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * { margin:0; padding:0; box-sizing:border-box; }
     body {
-      width: 1920px;
-      height: 1080px;
-      overflow: hidden;
-      position: relative;
-      font-family: 'Inter', sans-serif;
+      width:1920px; height:1080px; overflow:hidden; position:relative;
+      font-family:'Poppins', sans-serif; color:#FFF4D6;
       background:
-        /* Charcoal texture — dark noise-like repeating gradients */
-        repeating-linear-gradient(
-          0deg,
-          transparent,
-          transparent 2px,
-          rgba(255,255,255,0.003) 2px,
-          rgba(255,255,255,0.003) 3px
-        ),
-        repeating-linear-gradient(
-          90deg,
-          transparent,
-          transparent 3px,
-          rgba(255,255,255,0.002) 3px,
-          rgba(255,255,255,0.002) 4px
-        ),
-        /* Smoke/dark gradient layers */
-        radial-gradient(ellipse at 50% 110%, rgba(232,93,4,0.14) 0%, rgba(139,0,0,0.06) 30%, transparent 60%),
-        radial-gradient(ellipse at 30% 90%, rgba(232,93,4,0.08) 0%, transparent 40%),
-        radial-gradient(ellipse at 70% 95%, rgba(255,153,51,0.06) 0%, transparent 35%),
-        /* Deep charcoal base */
-        linear-gradient(180deg, #0a0604 0%, #0d0806 30%, #0a0604 50%, #0e0907 70%, #0a0604 100%);
-      color: #FFFDD0;
+        radial-gradient(ellipse at 50% 100%, rgba(255,100,20,0.35) 0%, rgba(255,153,51,0.15) 20%, transparent 50%),
+        radial-gradient(ellipse at 20% 10%, rgba(184,115,51,0.2), transparent 50%),
+        linear-gradient(180deg, #0a0603 0%, #1a0f05 40%, #2a1508 70%, #3d1f0a 100%);
     }
 
-    /* Tandoor fire glow — bottom center */
+    /* Mughal jali lattice texture — 8-point stars & octagons */
     body::before {
-      content: '';
-      position: absolute;
-      bottom: -150px; left: 50%;
-      transform: translateX(-50%);
-      width: 1200px; height: 600px;
-      background: radial-gradient(ellipse at 50% 100%,
-        rgba(232,93,4,0.2) 0%,
-        rgba(232,93,4,0.1) 20%,
-        rgba(139,0,0,0.05) 40%,
-        transparent 65%
-      );
-      z-index: 0;
-      pointer-events: none;
+      content:''; position:absolute; inset:0; z-index:0; opacity:0.08;
+      background-image:
+        radial-gradient(circle at 60px 60px, transparent 20px, #E8B931 20px 21px, transparent 22px),
+        radial-gradient(circle at 0 0, transparent 20px, #E8B931 20px 21px, transparent 22px),
+        radial-gradient(circle at 120px 0, transparent 20px, #E8B931 20px 21px, transparent 22px),
+        radial-gradient(circle at 0 120px, transparent 20px, #E8B931 20px 21px, transparent 22px),
+        radial-gradient(circle at 120px 120px, transparent 20px, #E8B931 20px 21px, transparent 22px);
+      background-size: 120px 120px;
     }
 
-    /* Secondary fire glow — left */
-    body::after {
-      content: '';
-      position: absolute;
-      bottom: -100px; left: 100px;
-      width: 500px; height: 400px;
-      background: radial-gradient(ellipse at 50% 100%,
-        rgba(232,93,4,0.1) 0%,
-        rgba(255,153,51,0.04) 40%,
-        transparent 65%
-      );
-      z-index: 0;
-      pointer-events: none;
+    /* Ember glow at bottom */
+    .ember {
+      position:absolute;
+      bottom:-60px; left:0; right:0; height:300px;
+      background: radial-gradient(ellipse at center bottom, rgba(255,80,10,0.45) 0%, rgba(255,153,51,0.2) 35%, transparent 65%);
+      z-index:1;
+      pointer-events:none;
+      animation: flicker 4s ease-in-out infinite;
+    }
+    @keyframes flicker {
+      0%, 100% { opacity: 0.9; }
+      50% { opacity: 1; }
     }
 
-    /* Third fire glow — right */
-    .fire-glow-right {
-      position: absolute;
-      bottom: -80px; right: 150px;
-      width: 400px; height: 350px;
-      background: radial-gradient(ellipse at 50% 100%,
-        rgba(232,93,4,0.08) 0%,
-        transparent 60%
-      );
-      z-index: 0;
-      pointer-events: none;
+    /* Tandoor clay oven SVG - left side */
+    .tandoor-svg {
+      position:absolute;
+      top: 280px; left: 40px;
+      width: 280px; height: 440px;
+      z-index:2;
+      opacity: 0.22;
+      filter: drop-shadow(0 0 50px rgba(255,80,10,0.4));
     }
 
-    /* Smoke wisps — dark gradient overlays */
-    .smoke-1 {
-      position: absolute;
-      top: 0; left: 200px;
-      width: 400px; height: 500px;
-      background: radial-gradient(ellipse at 50% 0%,
-        rgba(30,20,15,0.6) 0%,
-        transparent 70%
-      );
-      z-index: 0;
-      pointer-events: none;
-    }
-    .smoke-2 {
-      position: absolute;
-      top: 0; right: 300px;
-      width: 500px; height: 400px;
-      background: radial-gradient(ellipse at 50% 0%,
-        rgba(30,20,15,0.4) 0%,
-        transparent 60%
-      );
-      z-index: 0;
-      pointer-events: none;
+    /* Jali lattice SVG - right decorative */
+    .jali-svg {
+      position:absolute;
+      top: 260px; right: 40px;
+      width: 280px; height: 440px;
+      z-index:2;
+      opacity: 0.18;
     }
 
-    /* CSS Flame shapes at bottom */
-    .flames {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 120px;
-      z-index: 1;
-      pointer-events: none;
-      overflow: hidden;
+    .border-frame {
+      position:absolute; inset:40px;
+      border: 2px solid rgba(205,127,50,0.5);
+      border-radius: 6px;
+      box-shadow: 0 0 0 1px rgba(205,127,50,0.2), 0 0 0 8px rgba(139,69,19,0.2), inset 0 0 150px rgba(0,0,0,0.6);
+      z-index:3;
     }
 
-    .flame {
-      position: absolute;
-      bottom: -20px;
-      width: 0; height: 0;
-      border-left: 30px solid transparent;
-      border-right: 30px solid transparent;
-      border-bottom: 80px solid rgba(232,93,4,0.06);
-      filter: blur(8px);
+    .header {
+      position:absolute;
+      top: 75px; left: 0; right: 0;
+      text-align:center; z-index:5;
     }
-    .flame:nth-child(1) { left: 10%; border-bottom-color: rgba(232,93,4,0.08); border-bottom-width: 70px; }
-    .flame:nth-child(2) { left: 25%; border-bottom-color: rgba(255,153,51,0.05); border-bottom-width: 90px; border-left-width: 25px; border-right-width: 25px; }
-    .flame:nth-child(3) { left: 40%; border-bottom-color: rgba(232,93,4,0.07); border-bottom-width: 60px; }
-    .flame:nth-child(4) { left: 55%; border-bottom-color: rgba(255,153,51,0.06); border-bottom-width: 85px; border-left-width: 35px; border-right-width: 35px; }
-    .flame:nth-child(5) { left: 70%; border-bottom-color: rgba(232,93,4,0.08); border-bottom-width: 75px; }
-    .flame:nth-child(6) { left: 85%; border-bottom-color: rgba(255,153,51,0.05); border-bottom-width: 65px; border-left-width: 28px; border-right-width: 28px; }
-
-    /* Main layout */
-    .container {
-      position: relative;
-      z-index: 2;
-      width: 100%;
-      height: 100%;
-      display: grid;
-      grid-template-rows: auto 1fr auto;
-      padding: 30px 60px 30px 60px;
-      gap: 16px;
+    .eyebrow {
+      font-family:'Cormorant Garamond', serif;
+      font-size: 20px;
+      letter-spacing: 12px;
+      color: #CD7F32;
+      text-transform:uppercase;
+      font-weight: 600;
     }
-
-    /* Mughal arch header */
-    .arch-header {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      position: relative;
-      padding: 30px 0 20px 0;
+    .eyebrow::before, .eyebrow::after {
+      content:'\2756';
+      color: #FF9933;
+      margin: 0 20px;
+      font-size: 14px;
     }
-
-    /* Mughal arch SVG frame */
-    .arch-svg {
-      position: absolute;
-      top: 0; left: 50%;
-      transform: translateX(-50%);
-      z-index: 0;
-      pointer-events: none;
-    }
-
-    .fire-emoji-left {
-      position: absolute;
-      left: 120px; top: 10px;
-      font-size: 140px;
-      line-height: 1;
-      filter: drop-shadow(0 0 40px rgba(232,93,4,0.5)) drop-shadow(0 0 80px rgba(232,93,4,0.2));
-      z-index: 1;
-      opacity: 0.6;
-    }
-
-    .fire-emoji-right {
-      position: absolute;
-      right: 120px; top: 10px;
-      font-size: 140px;
-      line-height: 1;
-      filter: drop-shadow(0 0 40px rgba(232,93,4,0.5)) drop-shadow(0 0 80px rgba(232,93,4,0.2));
-      z-index: 1;
-      opacity: 0.6;
-    }
-
-    .arch-content {
-      position: relative;
-      z-index: 2;
-      text-align: center;
-    }
-
     .title {
-      font-family: 'Playfair Display', serif;
-      font-weight: 900;
-      font-size: 78px;
-      color: #FFD700;
-      text-shadow:
-        0 2px 30px rgba(255,215,0,0.35),
-        0 0 80px rgba(255,215,0,0.1),
-        0 0 120px rgba(232,93,4,0.1);
-      letter-spacing: 10px;
+      font-family:'Yatra One', cursive;
+      font-size: 96px;
       line-height: 1;
-    }
-
-    .tagline {
-      font-family: 'Caveat', cursive;
-      font-size: 30px;
-      color: rgba(255,253,208,0.5);
+      color: #FFD86B;
       letter-spacing: 4px;
-      margin-top: 6px;
+      text-shadow:
+        0 0 30px rgba(255,100,20,0.7),
+        0 0 80px rgba(255,50,0,0.4),
+        0 4px 0 #8B4513;
+      margin: 10px 0 8px;
+    }
+    .tagline {
+      font-family:'Cormorant Garamond', serif;
+      font-style:italic;
+      font-size: 26px;
+      color: rgba(255,244,214,0.75);
+      letter-spacing: 2px;
     }
 
-    /* Ornate gold divider under header */
-    .gold-divider {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0;
-      margin-top: 12px;
-      position: relative;
-      z-index: 2;
-    }
-
-    .gold-divider-line {
-      width: 250px; height: 1px;
-      background: linear-gradient(90deg, transparent, #FFD700, transparent);
-    }
-
-    .gold-divider-dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: #FFD700;
-      margin: 0 12px;
-      box-shadow: 0 0 10px rgba(255,215,0,0.4);
-    }
-
-    .gold-divider-dot-sm {
-      width: 4px; height: 4px;
-      border-radius: 50%;
-      background: #FFD700;
-      margin: 0 6px;
-      opacity: 0.5;
-    }
-
-    /* Two-column menu */
-    .menu-grid {
-      display: grid;
+    /* Two column meat panels */
+    .panels {
+      position:absolute;
+      top: 260px;
+      left: 340px;
+      right: 340px;
+      z-index:4;
+      display:grid;
       grid-template-columns: 1fr 1fr;
       gap: 40px;
     }
-
-    .menu-panel {
-      background: rgba(255,253,208,0.03);
-      border: 1px solid rgba(255,215,0,0.1);
-      border-radius: 20px;
-      padding: 28px 32px;
-      backdrop-filter: blur(10px);
+    .panel {
+      background:
+        linear-gradient(180deg, rgba(205,127,50,0.12), rgba(139,69,19,0.08)),
+        radial-gradient(ellipse at 50% 0%, rgba(255,100,20,0.1), transparent 70%);
+      border: 1px solid rgba(205,127,50,0.5);
+      border-radius: 8px;
+      padding: 32px 30px 28px;
+      position:relative;
       box-shadow:
-        0 8px 40px rgba(0,0,0,0.35),
-        inset 0 1px 0 rgba(255,255,255,0.03);
-      position: relative;
-      overflow: hidden;
+        inset 0 1px 0 rgba(255,216,107,0.15),
+        0 10px 40px rgba(0,0,0,0.6);
     }
-
-    /* Gold accent line on left side of panel */
-    .menu-panel::before {
-      content: '';
-      position: absolute;
-      top: 20px; bottom: 20px; left: 0;
-      width: 3px;
-      background: linear-gradient(180deg, transparent, #FFD700, #E85D04, #FFD700, transparent);
-      border-radius: 3px;
+    /* Jali lattice top ornament */
+    .panel::before {
+      content:'';
+      position:absolute;
+      top:-1px; left:50%; transform:translateX(-50%);
+      width: 140px; height: 18px;
+      background:
+        radial-gradient(circle at 14px 18px, transparent 7px, #CD7F32 7px 8px, transparent 9px),
+        radial-gradient(circle at 42px 18px, transparent 7px, #CD7F32 7px 8px, transparent 9px),
+        radial-gradient(circle at 70px 18px, transparent 7px, #CD7F32 7px 8px, transparent 9px),
+        radial-gradient(circle at 98px 18px, transparent 7px, #CD7F32 7px 8px, transparent 9px),
+        radial-gradient(circle at 126px 18px, transparent 7px, #CD7F32 7px 8px, transparent 9px);
     }
-
-    /* Ornate double border effect */
-    .menu-panel::after {
-      content: '';
-      position: absolute;
-      top: 5px; left: 5px; right: 5px; bottom: 5px;
-      border: 1px solid rgba(255,215,0,0.04);
-      border-radius: 16px;
-      pointer-events: none;
-    }
-
     .panel-title {
-      font-family: 'Playfair Display', serif;
-      font-weight: 900;
-      font-size: 30px;
-      color: #FFD700;
-      letter-spacing: 6px;
-      text-transform: uppercase;
-      margin-bottom: 6px;
-      text-align: center;
-      text-shadow: 0 0 20px rgba(255,215,0,0.2);
+      font-family:'Yatra One', cursive;
+      font-size: 34px;
+      text-align:center;
+      letter-spacing: 3px;
+      margin-bottom: 14px;
+      padding: 4px 0 10px;
+      border-bottom: 1px dotted rgba(205,127,50,0.5);
+      color: #FFD86B;
+      text-shadow: 0 0 20px rgba(255,100,20,0.5);
     }
-
-    .panel-divider {
-      width: 100%;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(255,215,0,0.2), transparent);
-      margin-bottom: 16px;
-    }
-
-    .menu-items {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .menu-item {
-      display: grid;
+    .items { display:flex; flex-direction:column; gap:10px; }
+    .tandoor-item {
+      display:grid;
       grid-template-columns: 1fr auto;
       grid-template-rows: auto auto;
-      gap: 0 16px;
-      padding: 10px 0;
-      border-bottom: 1px solid rgba(255,215,0,0.04);
+      gap: 0 12px;
+      padding: 10px 14px 10px 28px;
+      background: rgba(255,244,214,0.03);
+      border-radius: 4px;
+      border-left: 3px solid #CD7F32;
+      position:relative;
     }
-
-    .menu-item:last-child {
-      border-bottom: none;
+    .tandoor-item::before {
+      content:'';
+      position:absolute;
+      left: 10px; top: 50%;
+      width:10px; height:10px;
+      margin-top: -5px;
+      background: radial-gradient(circle, #FF9933, #C41E3A);
+      border-radius: 50%;
+      box-shadow: 0 0 10px rgba(255,100,20,0.8);
     }
-
     .item-name {
-      font-family: 'Playfair Display', serif;
+      font-family:'Cormorant Garamond', serif;
       font-weight: 700;
-      font-size: 24px;
-      color: #FFFDD0;
-      grid-column: 1;
-      grid-row: 1;
-      display: flex;
-      align-items: baseline;
+      font-size: 21px;
+      color: #FFF4D6;
+      grid-column: 1; grid-row:1;
     }
-
-    .item-name::after {
-      content: '';
-      flex: 1;
-      margin: 0 10px;
-      border-bottom: 1px dotted rgba(255,215,0,0.15);
-      position: relative;
-      top: -4px;
-    }
-
     .item-price {
-      font-family: 'Inter', sans-serif;
+      font-family:'Cormorant Garamond', serif;
       font-weight: 700;
-      font-size: 24px;
-      color: #E85D04;
-      grid-column: 2;
-      grid-row: 1;
-      text-align: right;
-      text-shadow: 0 0 15px rgba(232,93,4,0.3);
+      font-size: 21px;
+      color: #FFD86B;
+      grid-column: 2; grid-row:1;
+      text-shadow: 0 0 10px rgba(255,216,107,0.4);
     }
-
     .item-desc {
-      font-family: 'Caveat', cursive;
-      font-size: 20px;
-      color: rgba(255,253,208,0.4);
-      grid-column: 1 / -1;
-      grid-row: 2;
+      font-family:'Poppins', sans-serif;
+      font-size: 12px;
+      font-weight: 300;
+      font-style: italic;
+      color: rgba(255,244,214,0.55);
+      grid-column: 1 / -1; grid-row: 2;
       margin-top: 2px;
-      line-height: 1.2;
     }
 
-    /* Naan/bread footer */
-    .bread-footer {
-      background: rgba(255,253,208,0.03);
-      border: 1px solid rgba(255,215,0,0.1);
-      border-radius: 16px;
-      padding: 18px 40px;
-      backdrop-filter: blur(8px);
-      position: relative;
-      overflow: hidden;
+    /* Breads section bottom */
+    .breads-section {
+      position:absolute;
+      bottom: 80px;
+      left: 120px;
+      right: 120px;
+      z-index:4;
+      background: linear-gradient(180deg, rgba(205,127,50,0.15), rgba(139,69,19,0.08));
+      border: 1px solid rgba(205,127,50,0.5);
+      border-radius: 8px;
+      padding: 22px 40px 28px;
+      box-shadow: inset 0 1px 0 rgba(255,216,107,0.18), 0 8px 30px rgba(0,0,0,0.5);
     }
-
-    .bread-footer::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, #FFD700, #E85D04, #FFD700, transparent);
+    .breads-section::before, .breads-section::after {
+      content:'';
+      position:absolute;
+      top:-10px;
+      width:20px; height:20px;
+      background:#CD7F32;
+      transform: rotate(45deg);
+      box-shadow: 0 0 12px rgba(255,100,20,0.5);
     }
+    .breads-section::before { left:20px; }
+    .breads-section::after { right:20px; }
 
     .bread-title {
-      font-family: 'Playfair Display', serif;
-      font-weight: 900;
-      font-size: 24px;
-      color: #FFD700;
-      letter-spacing: 5px;
-      text-align: center;
-      margin-bottom: 12px;
+      font-family:'Yatra One', cursive;
+      font-size: 30px;
+      text-align:center;
+      letter-spacing: 4px;
+      color: #FFD86B;
+      margin-bottom: 14px;
+      text-shadow: 0 0 18px rgba(255,100,20,0.5);
     }
-
-    .bread-grid {
-      display: grid;
+    .breads-grid {
+      display:grid;
       grid-template-columns: repeat(6, 1fr);
-      gap: 0 20px;
+      gap: 16px;
     }
-
-    .bread-item {
-      text-align: center;
+    .bread {
+      text-align:center;
+      padding: 12px 8px;
+      background: rgba(255,244,214,0.04);
+      border: 1px solid rgba(205,127,50,0.3);
+      border-radius: 6px;
     }
-
     .bread-name {
-      font-family: 'Inter', sans-serif;
-      font-weight: 500;
-      font-size: 19px;
-      color: #FFFDD0;
-    }
-
-    .bread-price {
-      font-family: 'Inter', sans-serif;
+      font-family:'Cormorant Garamond', serif;
       font-weight: 700;
-      font-size: 20px;
-      color: #E85D04;
-      text-shadow: 0 0 10px rgba(232,93,4,0.2);
+      font-size: 18px;
+      color: #FFF4D6;
+      margin-bottom: 4px;
     }
-
-    /* Gold ornate border — double line with dots */
-    .ornate-border {
-      position: absolute;
-      top: 12px; left: 12px; right: 12px; bottom: 12px;
-      border: 1px solid rgba(255,215,0,0.06);
-      border-radius: 8px;
-      z-index: 1;
-      pointer-events: none;
-    }
-
-    .ornate-border::before {
-      content: '';
-      position: absolute;
-      top: 4px; left: 4px; right: 4px; bottom: 4px;
-      border: 1px solid rgba(255,215,0,0.03);
-      border-radius: 4px;
-    }
-
-    /* Dot pattern between double borders */
-    .border-dots-top {
-      position: absolute;
-      top: 15px; left: 80px; right: 80px;
-      height: 4px;
-      background:
-        radial-gradient(circle, rgba(255,215,0,0.15) 1.5px, transparent 1.5px);
-      background-size: 16px 4px;
-      z-index: 1;
-      pointer-events: none;
-    }
-    .border-dots-bottom {
-      position: absolute;
-      bottom: 15px; left: 80px; right: 80px;
-      height: 4px;
-      background:
-        radial-gradient(circle, rgba(255,215,0,0.15) 1.5px, transparent 1.5px);
-      background-size: 16px 4px;
-      z-index: 1;
-      pointer-events: none;
-    }
-
-    /* Mughal red accent at very bottom */
-    .bottom-bar {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 5px;
-      background: linear-gradient(90deg, #8B0000, #E85D04, #FFD700, #E85D04, #8B0000);
-      z-index: 5;
-    }
-
-    /* Corner Mughal arch SVGs */
-    .mughal-corner {
-      position: absolute;
-      z-index: 1;
-      pointer-events: none;
+    .bread-price {
+      font-family:'Cormorant Garamond', serif;
+      font-weight: 700;
+      font-size: 22px;
+      color: #FFD86B;
+      text-shadow: 0 0 10px rgba(255,216,107,0.4);
     }
   </style>
 </head>
 <body>
-  <div class="fire-glow-right"></div>
-  <div class="smoke-1"></div>
-  <div class="smoke-2"></div>
+  <div class="ember"></div>
 
-  <!-- CSS flame shapes at bottom -->
-  <div class="flames">
-    <div class="flame"></div>
-    <div class="flame"></div>
-    <div class="flame"></div>
-    <div class="flame"></div>
-    <div class="flame"></div>
-    <div class="flame"></div>
+  <!-- Tandoor clay oven SVG -->
+  <svg class="tandoor-svg" viewBox="0 0 280 440">
+    <defs>
+      <radialGradient id="tandoorGlow" cx="50%" cy="40%">
+        <stop offset="0%" stop-color="#FFD86B"/>
+        <stop offset="30%" stop-color="#FF9933"/>
+        <stop offset="60%" stop-color="#C41E3A"/>
+        <stop offset="100%" stop-color="#3d0a00"/>
+      </radialGradient>
+      <linearGradient id="clay" x1="0" x2="1">
+        <stop offset="0%" stop-color="#8B4513"/>
+        <stop offset="50%" stop-color="#CD7F32"/>
+        <stop offset="100%" stop-color="#5c2e0a"/>
+      </linearGradient>
+    </defs>
+    <!-- Base platform -->
+    <ellipse cx="140" cy="420" rx="130" ry="14" fill="#3d1f0a" stroke="#CD7F32" stroke-width="2"/>
+    <path d="M30 420 L40 380 L240 380 L250 420 Z" fill="url(#clay)" stroke="#CD7F32" stroke-width="2"/>
+    <!-- Body -->
+    <path d="M45 380 Q35 280 50 180 Q60 120 100 100 L180 100 Q220 120 230 180 Q245 280 235 380 Z"
+          fill="url(#clay)" stroke="#CD7F32" stroke-width="2.5"/>
+    <!-- Mouth opening (circular hot interior) -->
+    <ellipse cx="140" cy="100" rx="60" ry="22" fill="url(#tandoorGlow)"/>
+    <ellipse cx="140" cy="100" rx="48" ry="14" fill="#FFD86B" opacity="0.8"/>
+    <!-- Rim -->
+    <ellipse cx="140" cy="100" rx="62" ry="24" fill="none" stroke="#CD7F32" stroke-width="3"/>
+    <!-- Horizontal clay rings -->
+    <g fill="none" stroke="#8B4513" stroke-width="1.5">
+      <path d="M50 180 Q140 190 230 180" opacity="0.6"/>
+      <path d="M48 240 Q140 250 232 240" opacity="0.6"/>
+      <path d="M46 300 Q140 310 234 300" opacity="0.6"/>
+      <path d="M45 360 Q140 370 235 360" opacity="0.6"/>
+    </g>
+    <!-- Heat rising -->
+    <g fill="none" stroke="#FFD86B" stroke-width="2" opacity="0.7">
+      <path d="M110 85 Q105 60 115 35 Q125 10 115 -10"/>
+      <path d="M140 80 Q135 55 145 30 Q155 5 145 -15"/>
+      <path d="M170 85 Q165 60 175 35 Q185 10 175 -10"/>
+    </g>
+    <!-- Skewer handles -->
+    <line x1="140" y1="80" x2="140" y2="-30" stroke="#CD7F32" stroke-width="3"/>
+    <circle cx="140" cy="-30" r="5" fill="#CD7F32"/>
+  </svg>
+
+  <!-- Mughal jali lattice SVG -->
+  <svg class="jali-svg" viewBox="0 0 280 440">
+    <defs>
+      <pattern id="jali" x="0" y="0" width="80" height="80" patternUnits="userSpaceOnUse">
+        <g fill="none" stroke="#CD7F32" stroke-width="1.5">
+          <!-- 8-point star -->
+          <path d="M40 10 L46 30 L66 24 L54 40 L66 56 L46 50 L40 70 L34 50 L14 56 L26 40 L14 24 L34 30 Z"/>
+          <rect x="10" y="10" width="60" height="60"/>
+        </g>
+        <circle cx="40" cy="40" r="2" fill="#FF9933"/>
+      </pattern>
+    </defs>
+    <rect x="10" y="10" width="260" height="420" fill="url(#jali)"/>
+    <rect x="10" y="10" width="260" height="420" fill="none" stroke="#CD7F32" stroke-width="3"/>
+    <!-- Arched top -->
+    <path d="M10 80 Q10 10 140 10 Q270 10 270 80" fill="none" stroke="#CD7F32" stroke-width="3"/>
+  </svg>
+
+  <div class="border-frame"></div>
+
+  <div class="header">
+    <div class="eyebrow">Mughlai Royal Feast</div>
+    <h1 class="title" data-editable="true" data-field="title">TANDOOR &amp; KEBAB</h1>
+    <p class="tagline" data-editable="true" data-field="tagline">Clay Oven Fired &bull; Charcoal Smoked</p>
   </div>
 
-  <!-- Ornate double border with dots -->
-  <div class="ornate-border"></div>
-  <div class="border-dots-top"></div>
-  <div class="border-dots-bottom"></div>
-
-  <!-- Mughal arch SVG frame at top -->
-  <svg class="mughal-corner" style="top:20px;left:50%;transform:translateX(-50%);" width="800" height="100" viewBox="0 0 800 100" fill="none">
-    <!-- Pointed arch outline -->
-    <path d="M50 95 L50 50 Q50 10 200 5 Q400 -5 400 5 Q400 -5 600 5 Q750 10 750 50 L750 95"
-          stroke="#FFD700" stroke-width="1.5" fill="none" opacity="0.2"/>
-    <!-- Inner arch -->
-    <path d="M80 95 L80 55 Q80 20 220 15 Q400 5 400 15 Q400 5 580 15 Q720 20 720 55 L720 95"
-          stroke="#FFD700" stroke-width="1" fill="none" opacity="0.1"/>
-    <!-- Finial at top -->
-    <circle cx="400" cy="8" r="5" stroke="#FFD700" stroke-width="1" fill="none" opacity="0.2"/>
-    <line x1="400" y1="13" x2="400" y2="25" stroke="#FFD700" stroke-width="1" opacity="0.15"/>
-    <!-- Side ornaments -->
-    <circle cx="100" cy="70" r="3" fill="#FFD700" opacity="0.1"/>
-    <circle cx="700" cy="70" r="3" fill="#FFD700" opacity="0.1"/>
-  </svg>
-
-  <!-- Corner Mughal mini-arches -->
-  <svg class="mughal-corner" style="bottom:20px;left:20px;opacity:0.15;" width="100" height="100" viewBox="0 0 100 100" fill="none">
-    <path d="M5 95 L5 40 Q5 5 50 5 Q95 5 95 40" stroke="#FFD700" stroke-width="1.5" fill="none"/>
-    <circle cx="50" cy="5" r="3" fill="#FFD700" opacity="0.4"/>
-    <path d="M20 95 L20 50 Q20 20 50 20 Q80 20 80 50" stroke="#FFD700" stroke-width="1" fill="none" opacity="0.5"/>
-  </svg>
-  <svg class="mughal-corner" style="bottom:20px;right:20px;opacity:0.15;" width="100" height="100" viewBox="0 0 100 100" fill="none">
-    <path d="M5 95 L5 40 Q5 5 50 5 Q95 5 95 40" stroke="#FFD700" stroke-width="1.5" fill="none"/>
-    <circle cx="50" cy="5" r="3" fill="#FFD700" opacity="0.4"/>
-    <path d="M20 95 L20 50 Q20 20 50 20 Q80 20 80 50" stroke="#FFD700" stroke-width="1" fill="none" opacity="0.5"/>
-  </svg>
-
-  <div class="container">
-    <!-- Arch header -->
-    <div class="arch-header">
-      <div class="fire-emoji-left">&#128293;</div>
-      <div class="fire-emoji-right">&#128293;</div>
-
-      <div class="arch-content">
-        <h1 class="title" data-editable="true" data-field="title">TANDOOR &amp; KEBAB</h1>
-        <p class="tagline" data-editable="true" data-field="tagline">Clay Oven Fired &bull; Charcoal Smoked</p>
-      </div>
-
-      <div class="gold-divider">
-        <div class="gold-divider-dot-sm"></div>
-        <div class="gold-divider-line"></div>
-        <div class="gold-divider-dot-sm"></div>
-        <div class="gold-divider-dot"></div>
-        <div class="gold-divider-dot-sm"></div>
-        <div class="gold-divider-line"></div>
-        <div class="gold-divider-dot-sm"></div>
-      </div>
-    </div>
-
-    <!-- Two-column menu -->
-    <div class="menu-grid">
-      <!-- Veg Tandoor (left) -->
-      <div class="menu-panel">
-        <h2 class="panel-title" data-editable="true" data-field="vegTitle">VEG TANDOOR</h2>
-        <div class="panel-divider"></div>
-        <div class="menu-items">
-          <div class="menu-item">
-            <span class="item-name" data-editable="true" data-field="veg1Name">Paneer Tikka</span>
-            <span class="item-price" data-editable="true" data-field="veg1Price">$11.99</span>
-            <span class="item-desc" data-editable="true" data-field="veg1Desc">Marinated cottage cheese</span>
-          </div>
-          <div class="menu-item">
-            <span class="item-name" data-editable="true" data-field="veg2Name">Mushroom Galouti</span>
-            <span class="item-price" data-editable="true" data-field="veg2Price">$10.99</span>
-            <span class="item-desc" data-editable="true" data-field="veg2Desc">Melt-in-mouth mushroom</span>
-          </div>
-          <div class="menu-item">
-            <span class="item-name" data-editable="true" data-field="veg3Name">Hara Bhara Kebab</span>
-            <span class="item-price" data-editable="true" data-field="veg3Price">$9.99</span>
-            <span class="item-desc" data-editable="true" data-field="veg3Desc">Spinach &amp; green pea patties</span>
-          </div>
-          <div class="menu-item">
-            <span class="item-name" data-editable="true" data-field="veg4Name">Achari Paneer</span>
-            <span class="item-price" data-editable="true" data-field="veg4Price">$11.99</span>
-            <span class="item-desc" data-editable="true" data-field="veg4Desc">Pickled spice cottage cheese</span>
-          </div>
-          <div class="menu-item">
-            <span class="item-name" data-editable="true" data-field="veg5Name">Veg Seekh Kebab</span>
-            <span class="item-price" data-editable="true" data-field="veg5Price">$9.99</span>
-            <span class="item-desc" data-editable="true" data-field="veg5Desc">Mixed vegetable skewers</span>
-          </div>
+  <div class="panels">
+    <div class="panel">
+      <h2 class="panel-title" data-editable="true" data-field="vegTitle">VEG TANDOOR</h2>
+      <div class="items">
+        <div class="tandoor-item">
+          <span class="item-name" data-editable="true" data-field="veg1Name">Paneer Tikka</span>
+          <span class="item-price" data-editable="true" data-field="veg1Price">$11.99</span>
+          <span class="item-desc" data-editable="true" data-field="veg1Desc">Marinated cottage cheese</span>
         </div>
-      </div>
-
-      <!-- Non-Veg Tandoor (right) -->
-      <div class="menu-panel">
-        <h2 class="panel-title" data-editable="true" data-field="nonvegTitle">NON-VEG TANDOOR</h2>
-        <div class="panel-divider"></div>
-        <div class="menu-items">
-          <div class="menu-item">
-            <span class="item-name" data-editable="true" data-field="nv1Name">Tandoori Chicken (Half)</span>
-            <span class="item-price" data-editable="true" data-field="nv1Price">$13.99</span>
-            <span class="item-desc" data-editable="true" data-field="nv1Desc">Classic yogurt-spiced chicken</span>
-          </div>
-          <div class="menu-item">
-            <span class="item-name" data-editable="true" data-field="nv2Name">Seekh Kebab (6 pcs)</span>
-            <span class="item-price" data-editable="true" data-field="nv2Price">$12.99</span>
-            <span class="item-desc" data-editable="true" data-field="nv2Desc">Minced lamb on skewers</span>
-          </div>
-          <div class="menu-item">
-            <span class="item-name" data-editable="true" data-field="nv3Name">Malai Chicken Tikka</span>
-            <span class="item-price" data-editable="true" data-field="nv3Price">$13.99</span>
-            <span class="item-desc" data-editable="true" data-field="nv3Desc">Creamy, mild charred chicken</span>
-          </div>
-          <div class="menu-item">
-            <span class="item-name" data-editable="true" data-field="nv4Name">Lamb Chops (4 pcs)</span>
-            <span class="item-price" data-editable="true" data-field="nv4Price">$18.99</span>
-            <span class="item-desc" data-editable="true" data-field="nv4Desc">Tandoor-fired, spice-rubbed</span>
-          </div>
-          <div class="menu-item">
-            <span class="item-name" data-editable="true" data-field="nv5Name">Fish Tikka</span>
-            <span class="item-price" data-editable="true" data-field="nv5Price">$14.99</span>
-            <span class="item-desc" data-editable="true" data-field="nv5Desc">Charred spiced fish fillets</span>
-          </div>
+        <div class="tandoor-item">
+          <span class="item-name" data-editable="true" data-field="veg2Name">Mushroom Galouti</span>
+          <span class="item-price" data-editable="true" data-field="veg2Price">$10.99</span>
+          <span class="item-desc" data-editable="true" data-field="veg2Desc">Melt-in-mouth mushroom</span>
+        </div>
+        <div class="tandoor-item">
+          <span class="item-name" data-editable="true" data-field="veg3Name">Hara Bhara Kebab</span>
+          <span class="item-price" data-editable="true" data-field="veg3Price">$9.99</span>
+          <span class="item-desc" data-editable="true" data-field="veg3Desc">Spinach &amp; green pea patties</span>
+        </div>
+        <div class="tandoor-item">
+          <span class="item-name" data-editable="true" data-field="veg4Name">Achari Paneer</span>
+          <span class="item-price" data-editable="true" data-field="veg4Price">$11.99</span>
+          <span class="item-desc" data-editable="true" data-field="veg4Desc">Pickled spice cottage cheese</span>
+        </div>
+        <div class="tandoor-item">
+          <span class="item-name" data-editable="true" data-field="veg5Name">Veg Seekh Kebab</span>
+          <span class="item-price" data-editable="true" data-field="veg5Price">$9.99</span>
+          <span class="item-desc" data-editable="true" data-field="veg5Desc">Mixed vegetable skewers</span>
         </div>
       </div>
     </div>
 
-    <!-- Breads footer -->
-    <div class="bread-footer">
-      <h3 class="bread-title" data-editable="true" data-field="breadTitle">BREADS FROM THE TANDOOR</h3>
-      <div class="bread-grid">
-        <div class="bread-item">
-          <div class="bread-name" data-editable="true" data-field="bread1Name">Butter Naan</div>
-          <div class="bread-price" data-editable="true" data-field="bread1Price">$2.99</div>
+    <div class="panel">
+      <h2 class="panel-title" data-editable="true" data-field="nonvegTitle">NON-VEG TANDOOR</h2>
+      <div class="items">
+        <div class="tandoor-item">
+          <span class="item-name" data-editable="true" data-field="nv1Name">Tandoori Chicken (Half)</span>
+          <span class="item-price" data-editable="true" data-field="nv1Price">$13.99</span>
+          <span class="item-desc" data-editable="true" data-field="nv1Desc">Classic yogurt-spiced chicken</span>
         </div>
-        <div class="bread-item">
-          <div class="bread-name" data-editable="true" data-field="bread2Name">Garlic Naan</div>
-          <div class="bread-price" data-editable="true" data-field="bread2Price">$3.49</div>
+        <div class="tandoor-item">
+          <span class="item-name" data-editable="true" data-field="nv2Name">Seekh Kebab (6 pcs)</span>
+          <span class="item-price" data-editable="true" data-field="nv2Price">$12.99</span>
+          <span class="item-desc" data-editable="true" data-field="nv2Desc">Minced lamb on skewers</span>
         </div>
-        <div class="bread-item">
-          <div class="bread-name" data-editable="true" data-field="bread3Name">Cheese Naan</div>
-          <div class="bread-price" data-editable="true" data-field="bread3Price">$3.99</div>
+        <div class="tandoor-item">
+          <span class="item-name" data-editable="true" data-field="nv3Name">Malai Chicken Tikka</span>
+          <span class="item-price" data-editable="true" data-field="nv3Price">$13.99</span>
+          <span class="item-desc" data-editable="true" data-field="nv3Desc">Creamy, mild charred chicken</span>
         </div>
-        <div class="bread-item">
-          <div class="bread-name" data-editable="true" data-field="bread4Name">Roti</div>
-          <div class="bread-price" data-editable="true" data-field="bread4Price">$1.99</div>
+        <div class="tandoor-item">
+          <span class="item-name" data-editable="true" data-field="nv4Name">Lamb Chops (4 pcs)</span>
+          <span class="item-price" data-editable="true" data-field="nv4Price">$18.99</span>
+          <span class="item-desc" data-editable="true" data-field="nv4Desc">Tandoor-fired, spice-rubbed</span>
         </div>
-        <div class="bread-item">
-          <div class="bread-name" data-editable="true" data-field="bread5Name">Laccha Paratha</div>
-          <div class="bread-price" data-editable="true" data-field="bread5Price">$3.49</div>
-        </div>
-        <div class="bread-item">
-          <div class="bread-name" data-editable="true" data-field="bread6Name">Stuffed Kulcha</div>
-          <div class="bread-price" data-editable="true" data-field="bread6Price">$3.99</div>
+        <div class="tandoor-item">
+          <span class="item-name" data-editable="true" data-field="nv5Name">Fish Tikka</span>
+          <span class="item-price" data-editable="true" data-field="nv5Price">$14.99</span>
+          <span class="item-desc" data-editable="true" data-field="nv5Desc">Charred spiced fish fillets</span>
         </div>
       </div>
     </div>
   </div>
 
-  <div class="bottom-bar"></div>
+  <div class="breads-section">
+    <h3 class="bread-title" data-editable="true" data-field="breadTitle">BREADS FROM THE TANDOOR</h3>
+    <div class="breads-grid">
+      <div class="bread">
+        <div class="bread-name" data-editable="true" data-field="bread1Name">Butter Naan</div>
+        <div class="bread-price" data-editable="true" data-field="bread1Price">$2.99</div>
+      </div>
+      <div class="bread">
+        <div class="bread-name" data-editable="true" data-field="bread2Name">Garlic Naan</div>
+        <div class="bread-price" data-editable="true" data-field="bread2Price">$3.49</div>
+      </div>
+      <div class="bread">
+        <div class="bread-name" data-editable="true" data-field="bread3Name">Cheese Naan</div>
+        <div class="bread-price" data-editable="true" data-field="bread3Price">$3.99</div>
+      </div>
+      <div class="bread">
+        <div class="bread-name" data-editable="true" data-field="bread4Name">Roti</div>
+        <div class="bread-price" data-editable="true" data-field="bread4Price">$1.99</div>
+      </div>
+      <div class="bread">
+        <div class="bread-name" data-editable="true" data-field="bread5Name">Laccha Paratha</div>
+        <div class="bread-price" data-editable="true" data-field="bread5Price">$3.49</div>
+      </div>
+      <div class="bread">
+        <div class="bread-name" data-editable="true" data-field="bread6Name">Stuffed Kulcha</div>
+        <div class="bread-price" data-editable="true" data-field="bread6Price">$3.99</div>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1920, height=1080">
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@300;400;500;600;700&family=Caveat:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Yatra+One&family=Cormorant+Garamond:wght@500;600;700&family=Tiro+Devanagari+Marathi&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -11,602 +11,580 @@
       height: 1080px;
       overflow: hidden;
       position: relative;
-      font-family: 'Inter', sans-serif;
+      font-family: 'Poppins', sans-serif;
+      color: #3d1f08;
       background:
-        /* Subtle shimmer pattern — tiny gold dots */
-        radial-gradient(circle, rgba(255,215,0,0.06) 1px, transparent 1px),
-        /* Cross-hatch festive texture */
-        repeating-linear-gradient(
-          45deg,
-          transparent,
-          transparent 30px,
-          rgba(255,153,51,0.02) 30px,
-          rgba(255,153,51,0.02) 31px
-        ),
-        repeating-linear-gradient(
-          -45deg,
-          transparent,
-          transparent 30px,
-          rgba(255,215,0,0.02) 30px,
-          rgba(255,215,0,0.02) 31px
-        ),
-        /* Deep warm base */
-        radial-gradient(ellipse at 30% 20%, rgba(255,153,51,0.12) 0%, transparent 50%),
-        radial-gradient(ellipse at 70% 80%, rgba(233,30,139,0.06) 0%, transparent 40%),
-        linear-gradient(160deg, #1a0a02 0%, #2a1005 25%, #1a0a02 50%, #200d04 75%, #1a0a02 100%);
-      background-size: 24px 24px, auto, auto, auto, auto, auto;
-      color: #FFF8E7;
+        /* Jaggery/caramel warm background */
+        radial-gradient(ellipse at 20% 20%, rgba(255,193,100,0.55) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 20%, rgba(255,215,0,0.35) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 80%, rgba(196,30,58,0.15) 0%, transparent 50%),
+        linear-gradient(160deg, #E8B931 0%, #D97706 25%, #B87333 50%, #D97706 75%, #E8B931 100%);
     }
 
-    /* Saffron glow — top left */
+    /* Jaggery texture overlay */
     body::before {
       content: '';
       position: absolute;
-      top: -120px; left: -80px;
-      width: 700px; height: 700px;
-      background: radial-gradient(circle, rgba(255,153,51,0.18) 0%, rgba(255,215,0,0.06) 40%, transparent 65%);
-      border-radius: 50%;
+      inset: 0;
+      background-image:
+        radial-gradient(circle, rgba(139,90,43,0.15) 1px, transparent 1.5px),
+        radial-gradient(circle, rgba(255,248,231,0.08) 2px, transparent 2.5px);
+      background-size: 40px 40px, 65px 65px;
+      background-position: 0 0, 20px 20px;
+      pointer-events: none;
       z-index: 0;
+    }
+
+    /* Center rangoli SVG */
+    .center-rangoli {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 1;
+      opacity: 0.12;
       pointer-events: none;
     }
 
-    /* Golden glow — bottom right */
-    body::after {
-      content: '';
+    /* Pistachio green accent glow */
+    .glow-pista {
       position: absolute;
-      bottom: -100px; right: -60px;
-      width: 600px; height: 600px;
-      background: radial-gradient(circle, rgba(255,215,0,0.12) 0%, rgba(184,134,11,0.04) 40%, transparent 60%);
-      border-radius: 50%;
-      z-index: 0;
-      pointer-events: none;
-    }
-
-    /* Pink festive glow center-right */
-    .glow-pink {
-      position: absolute;
-      top: 300px; right: 200px;
+      top: 40%; left: 10%;
       width: 500px; height: 500px;
-      background: radial-gradient(circle, rgba(233,30,139,0.06) 0%, transparent 55%);
+      background: radial-gradient(circle, rgba(154,205,50,0.18) 0%, transparent 60%);
       border-radius: 50%;
-      z-index: 0;
-      pointer-events: none;
-    }
-
-    /* CSS Rangoli pattern — concentric rotated squares */
-    .rangoli {
-      position: absolute;
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      width: 1920px; height: 1080px;
-      z-index: 0;
-      pointer-events: none;
-      overflow: hidden;
-    }
-
-    .rangoli-diamond {
-      position: absolute;
-      top: 50%; left: 50%;
-      border: 1px solid rgba(255,215,0,0.04);
-      transform: translate(-50%, -50%) rotate(45deg);
-    }
-    .rangoli-diamond:nth-child(1) { width: 200px; height: 200px; border-color: rgba(255,215,0,0.07); }
-    .rangoli-diamond:nth-child(2) { width: 350px; height: 350px; border-color: rgba(255,153,51,0.05); }
-    .rangoli-diamond:nth-child(3) { width: 500px; height: 500px; border-color: rgba(255,215,0,0.04); }
-    .rangoli-diamond:nth-child(4) { width: 700px; height: 700px; border-color: rgba(233,30,139,0.03); }
-    .rangoli-diamond:nth-child(5) { width: 900px; height: 900px; border-color: rgba(255,215,0,0.03); }
-    .rangoli-diamond:nth-child(6) { width: 1100px; height: 1100px; border-color: rgba(255,153,51,0.02); }
-
-    /* Rangoli center dot cluster */
-    .rangoli-center {
-      position: absolute;
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      width: 40px; height: 40px;
-      background: radial-gradient(circle, rgba(255,215,0,0.12) 0%, transparent 70%);
-      border-radius: 50%;
-    }
-
-    /* Sparkle CSS elements — small gold glow dots */
-    .sparkle {
-      position: absolute;
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(255,215,0,0.8) 0%, rgba(255,215,0,0.2) 40%, transparent 70%);
       z-index: 1;
       pointer-events: none;
     }
-    .sparkle:nth-child(1) { top: 80px; left: 300px; width: 4px; height: 4px; }
-    .sparkle:nth-child(2) { top: 150px; right: 250px; width: 5px; height: 5px; }
-    .sparkle:nth-child(3) { top: 500px; left: 180px; width: 3px; height: 3px; }
-    .sparkle:nth-child(4) { bottom: 200px; right: 400px; width: 6px; height: 6px; }
-    .sparkle:nth-child(5) { top: 350px; left: 700px; width: 4px; height: 4px; }
-    .sparkle:nth-child(6) { bottom: 120px; left: 500px; width: 5px; height: 5px; }
-    .sparkle:nth-child(7) { top: 200px; right: 600px; width: 3px; height: 3px; }
-    .sparkle:nth-child(8) { bottom: 350px; right: 150px; width: 4px; height: 4px; }
-
-    /* Main layout */
-    .container {
-      position: relative;
-      z-index: 2;
-      width: 100%;
-      height: 100%;
-      display: grid;
-      grid-template-rows: auto 1fr auto;
-      padding: 40px 60px 30px 60px;
+    .glow-pista-2 {
+      position: absolute;
+      top: 50%; right: 10%;
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(154,205,50,0.15) 0%, transparent 60%);
+      border-radius: 50%;
+      z-index: 1;
+      pointer-events: none;
     }
 
-    /* Hero / featured section */
-    .hero {
+    /* Silver varak inner frame — like silver leaf on mithai */
+    .varak-frame {
+      position: absolute;
+      inset: 30px;
+      border: 4px double #8B5A2B;
+      border-radius: 20px;
+      background:
+        linear-gradient(160deg, rgba(255,248,231,0.92) 0%, rgba(255,243,200,0.9) 50%, rgba(255,232,170,0.92) 100%);
+      box-shadow:
+        0 0 0 2px #E8B931 inset,
+        0 0 0 8px #B87333,
+        0 25px 80px rgba(61,31,8,0.4),
+        inset 0 0 150px rgba(255,153,51,0.1);
+      z-index: 2;
+    }
+
+    /* Diya lamp corner decorations */
+    .diya {
+      position: absolute;
+      z-index: 4;
+    }
+    .diya-tl { top: 45px; left: 45px; }
+    .diya-tr { top: 45px; right: 45px; transform: scaleX(-1); }
+    .diya-bl { bottom: 45px; left: 45px; transform: scaleY(-1); }
+    .diya-br { bottom: 45px; right: 45px; transform: scale(-1,-1); }
+
+    /* Main container */
+    .container {
+      position: absolute;
+      inset: 60px;
+      z-index: 5;
+      padding: 30px 50px;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 16px;
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+    }
+
+    .header-devanagari {
+      font-family: 'Tiro Devanagari Marathi', serif;
+      font-size: 32px;
+      color: #C41E3A;
+      letter-spacing: 6px;
+      margin-bottom: 2px;
+      text-shadow: 0 1px 0 rgba(255,255,255,0.4);
+    }
+
+    .main-title {
+      font-family: 'Yatra One', cursive;
+      font-size: 72px;
+      color: #8B0000;
+      letter-spacing: 4px;
+      line-height: 1;
+      text-shadow:
+        0 2px 0 #E8B931,
+        0 4px 0 #B87333,
+        0 6px 15px rgba(139,90,43,0.4);
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-size: 26px;
+      color: #5C3317;
+      letter-spacing: 2px;
+    }
+
+    /* Featured hero row */
+    .featured-row {
+      background:
+        linear-gradient(135deg, rgba(196,30,58,0.1) 0%, rgba(228,155,15,0.18) 50%, rgba(196,30,58,0.1) 100%);
+      border: 3px solid #B87333;
+      border-radius: 16px;
+      padding: 18px 32px;
       display: grid;
       grid-template-columns: auto 1fr auto;
       align-items: center;
       gap: 30px;
-      padding: 25px 40px;
-      margin-bottom: 25px;
-      background: rgba(255,215,0,0.04);
-      border: 1px solid rgba(255,215,0,0.12);
-      border-radius: 20px;
-      backdrop-filter: blur(10px);
-      box-shadow:
-        0 8px 40px rgba(0,0,0,0.3),
-        inset 0 1px 0 rgba(255,215,0,0.08);
       position: relative;
-      overflow: hidden;
+      box-shadow: 0 8px 25px rgba(92,51,23,0.3), inset 0 0 30px rgba(255,215,0,0.15);
     }
-
-    /* Gold shimmer line across hero top */
-    .hero::before {
+    .featured-row::before {
       content: '';
       position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 2px;
-      background: linear-gradient(90deg, transparent 0%, #FFD700 20%, #FF9933 50%, #FFD700 80%, transparent 100%);
+      inset: 6px;
+      border: 1px dashed rgba(139,90,43,0.5);
+      border-radius: 10px;
+      pointer-events: none;
     }
 
-    .hero-emoji {
-      font-size: 100px;
-      line-height: 1;
-      filter: drop-shadow(0 0 25px rgba(255,215,0,0.4)) drop-shadow(0 4px 10px rgba(0,0,0,0.5));
+    .featured-illust {
+      width: 120px;
+      height: 120px;
     }
 
-    .hero-content {
-      display: flex;
-      flex-direction: column;
+    .featured-text {
+      flex: 1;
     }
 
-    .hero-label {
-      font-family: 'Caveat', cursive;
-      font-size: 26px;
-      color: #FF9933;
-      letter-spacing: 2px;
-    }
-
-    .title {
-      font-family: 'Playfair Display', serif;
-      font-weight: 900;
-      font-size: 64px;
-      color: #FFD700;
-      text-shadow: 0 2px 20px rgba(255,215,0,0.3), 0 0 60px rgba(255,215,0,0.1);
-      letter-spacing: 6px;
-      line-height: 1;
-      margin-bottom: 6px;
-    }
-
-    .subtitle {
-      font-family: 'Caveat', cursive;
-      font-size: 26px;
-      color: rgba(255,248,231,0.55);
-      letter-spacing: 2px;
-    }
-
-    .special-section {
-      text-align: right;
-      min-width: 350px;
-    }
-
-    .special-badge {
-      display: inline-block;
-      font-family: 'Inter', sans-serif;
-      font-weight: 700;
-      font-size: 14px;
-      color: #1a0a02;
-      background: linear-gradient(135deg, #FFD700 0%, #FF9933 100%);
-      padding: 5px 18px;
-      border-radius: 20px;
+    .featured-label {
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-size: 18px;
+      color: #C41E3A;
       letter-spacing: 3px;
       text-transform: uppercase;
-      margin-bottom: 8px;
     }
 
-    .special-name {
-      font-family: 'Playfair Display', serif;
-      font-weight: 700;
-      font-size: 34px;
-      color: #FFF8E7;
-      line-height: 1.1;
+    .featured-name {
+      font-family: 'Yatra One', cursive;
+      font-size: 44px;
+      color: #5C3317;
+      line-height: 1;
+      margin: 2px 0;
     }
 
-    .special-price {
-      font-family: 'Playfair Display', serif;
-      font-weight: 900;
-      font-size: 40px;
-      color: #FFD700;
-      text-shadow: 0 0 20px rgba(255,215,0,0.3);
+    .featured-desc {
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-size: 20px;
+      color: rgba(92,51,23,0.75);
     }
 
-    .special-desc {
-      font-family: 'Caveat', cursive;
-      font-size: 22px;
-      color: rgba(255,248,231,0.5);
+    .featured-price {
+      font-family: 'Yatra One', cursive;
+      font-size: 56px;
+      color: #8B0000;
+      text-shadow: 0 2px 0 #E8B931, 0 3px 8px rgba(139,0,0,0.3);
+      padding: 10px 28px;
+      background: linear-gradient(135deg, #FFD700, #E8B931);
+      border: 3px solid #8B0000;
+      border-radius: 14px;
     }
 
     /* Sweets grid */
     .sweets-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 20px;
+      grid-template-rows: auto 1fr;
+      gap: 16px 24px;
     }
 
     .category-col {
       display: flex;
       flex-direction: column;
-      gap: 10px;
     }
 
     .category-header {
-      font-family: 'Playfair Display', serif;
-      font-weight: 900;
-      font-size: 26px;
-      color: #FF9933;
+      font-family: 'Yatra One', cursive;
+      font-size: 28px;
+      color: #FFF8E7;
       letter-spacing: 4px;
-      text-transform: uppercase;
-      padding-bottom: 8px;
-      border-bottom: 2px solid rgba(255,153,51,0.3);
       text-align: center;
+      padding: 10px 16px;
+      margin-bottom: 10px;
+      background: linear-gradient(90deg, #8B0000, #C41E3A, #8B0000);
+      border: 2px solid #E8B931;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(139,0,0,0.4);
+      text-shadow: 0 1px 0 #5a0000, 0 2px 6px rgba(0,0,0,0.4);
     }
 
     .sweet-card {
-      background: rgba(255,215,0,0.03);
-      border: 1px solid rgba(255,215,0,0.1);
-      border-radius: 14px;
-      padding: 16px 20px;
-      backdrop-filter: blur(8px);
-      box-shadow:
-        0 4px 16px rgba(0,0,0,0.2),
-        inset 0 1px 0 rgba(255,255,255,0.03);
+      background: linear-gradient(160deg, rgba(255,248,231,0.8) 0%, rgba(255,232,170,0.7) 100%);
+      border: 2px solid #B87333;
+      border-radius: 12px;
+      padding: 10px 14px;
+      margin-bottom: 8px;
       position: relative;
-      overflow: hidden;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 10px;
+      align-items: center;
+      box-shadow: 0 3px 10px rgba(92,51,23,0.2);
     }
-
-    /* Double gold border effect */
     .sweet-card::before {
       content: '';
       position: absolute;
-      top: 3px; left: 3px; right: 3px; bottom: 3px;
-      border: 1px solid rgba(255,215,0,0.06);
-      border-radius: 11px;
+      top: 3px; bottom: 3px; left: 3px; right: 3px;
+      border: 1px dashed rgba(154,205,50,0.4);
+      border-radius: 8px;
       pointer-events: none;
     }
 
-    .sweet-card:nth-child(odd) {
-      background: rgba(255,215,0,0.05);
+    .sweet-icon {
+      width: 42px;
+      height: 42px;
+      flex-shrink: 0;
     }
 
-    .sweet-header {
+    .sweet-info {
       display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      margin-bottom: 4px;
+      flex-direction: column;
     }
 
     .sweet-name {
-      font-family: 'Playfair Display', serif;
-      font-weight: 700;
-      font-size: 22px;
-      color: #FFF8E7;
-    }
-
-    .sweet-name::after {
-      content: '';
-      flex: 1;
-      margin: 0 8px;
-      border-bottom: 1px dotted rgba(184,134,11,0.3);
-    }
-
-    .sweet-price {
-      font-family: 'Inter', sans-serif;
-      font-weight: 700;
-      font-size: 22px;
-      color: #FFD700;
-      white-space: nowrap;
+      font-family: 'Yatra One', cursive;
+      font-size: 20px;
+      color: #5C3317;
+      line-height: 1.1;
     }
 
     .sweet-desc {
-      font-family: 'Caveat', cursive;
-      font-size: 19px;
-      color: rgba(255,248,231,0.45);
-      line-height: 1.2;
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-size: 15px;
+      color: rgba(92,51,23,0.65);
     }
 
-    /* Gift box CTA footer */
+    .sweet-price {
+      font-family: 'Yatra One', cursive;
+      font-size: 20px;
+      color: #8B0000;
+      padding: 2px 10px;
+      background: #FFD700;
+      border: 1px solid #8B5A2B;
+      border-radius: 8px;
+    }
+
+    /* Footer CTA */
     .footer-cta {
-      display: flex;
+      background: linear-gradient(135deg, #8B0000 0%, #C41E3A 50%, #8B0000 100%);
+      border: 3px solid #FFD700;
+      border-radius: 14px;
+      padding: 16px 40px;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
       align-items: center;
-      justify-content: center;
-      gap: 40px;
-      margin-top: 20px;
-      padding: 20px 40px;
-      background: linear-gradient(90deg, rgba(255,215,0,0.03) 0%, rgba(255,215,0,0.08) 50%, rgba(255,215,0,0.03) 100%);
-      border: 1px solid rgba(255,215,0,0.12);
-      border-radius: 16px;
-      backdrop-filter: blur(8px);
+      gap: 30px;
+      box-shadow: 0 8px 25px rgba(139,0,0,0.5), inset 0 0 30px rgba(255,215,0,0.2);
+      position: relative;
     }
-
     .footer-cta::before {
       content: '';
       position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 3px;
-      background: linear-gradient(90deg, transparent, #FFD700, #FF9933, #E91E8B, #FF9933, #FFD700, transparent);
+      inset: 5px;
+      border: 1px dotted rgba(255,215,0,0.6);
+      border-radius: 10px;
+      pointer-events: none;
     }
 
-    .gift-emoji {
-      font-size: 60px;
-      line-height: 1;
-      filter: drop-shadow(0 0 15px rgba(255,215,0,0.3));
-    }
-
-    .gift-content {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+    .gift-illust {
+      width: 80px;
+      height: 80px;
     }
 
     .gift-title {
-      font-family: 'Playfair Display', serif;
-      font-weight: 900;
-      font-size: 30px;
+      font-family: 'Yatra One', cursive;
+      font-size: 34px;
       color: #FFD700;
-      letter-spacing: 6px;
+      letter-spacing: 4px;
+      text-shadow: 0 2px 0 #5a0000, 0 3px 8px rgba(0,0,0,0.4);
     }
 
     .gift-prices {
-      font-family: 'Inter', sans-serif;
+      font-family: 'Poppins', sans-serif;
       font-weight: 600;
       font-size: 22px;
       color: #FFF8E7;
       letter-spacing: 1px;
+      margin-top: 2px;
     }
-
-    .gift-prices .price-highlight {
-      color: #FFD700;
-      font-weight: 700;
-    }
+    .gift-prices .ph { color: #FFD700; font-family: 'Yatra One', cursive; font-size: 26px; }
 
     .gift-note {
-      font-family: 'Caveat', cursive;
-      font-size: 22px;
-      color: rgba(255,248,231,0.5);
-    }
-
-    /* Ornate corner SVG elements */
-    .corner-ornament {
-      position: absolute;
-      z-index: 1;
-      pointer-events: none;
-    }
-    .corner-tl { top: 10px; left: 10px; }
-    .corner-tr { top: 10px; right: 10px; transform: scaleX(-1); }
-    .corner-bl { bottom: 10px; left: 10px; transform: scaleY(-1); }
-    .corner-br { bottom: 10px; right: 10px; transform: scale(-1, -1); }
-
-    /* Lamp emoji accent */
-    .lamp-accent {
-      position: absolute;
-      top: 40px; right: 80px;
-      font-size: 120px;
-      line-height: 1;
-      filter: drop-shadow(0 0 40px rgba(255,215,0,0.25)) drop-shadow(0 8px 16px rgba(0,0,0,0.4));
-      z-index: 1;
-      pointer-events: none;
-      opacity: 0.35;
-    }
-
-    /* Bottom accent bar */
-    .bottom-bar {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 4px;
-      background: linear-gradient(90deg, #FF9933, #FFD700, #E91E8B, #FFD700, #FF9933);
-      z-index: 5;
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-size: 20px;
+      color: #FFD700;
+      text-align: right;
     }
   </style>
 </head>
 <body>
-  <div class="glow-pink"></div>
+  <div class="glow-pista"></div>
+  <div class="glow-pista-2"></div>
 
-  <!-- CSS Rangoli pattern -->
-  <div class="rangoli">
-    <div class="rangoli-diamond"></div>
-    <div class="rangoli-diamond"></div>
-    <div class="rangoli-diamond"></div>
-    <div class="rangoli-diamond"></div>
-    <div class="rangoli-diamond"></div>
-    <div class="rangoli-diamond"></div>
-    <div class="rangoli-center"></div>
-  </div>
-
-  <!-- Sparkle dots -->
-  <div class="sparkle"></div>
-  <div class="sparkle"></div>
-  <div class="sparkle"></div>
-  <div class="sparkle"></div>
-  <div class="sparkle"></div>
-  <div class="sparkle"></div>
-  <div class="sparkle"></div>
-  <div class="sparkle"></div>
-
-  <!-- Ornate paisley-curve corner SVGs -->
-  <svg class="corner-ornament corner-tl" width="120" height="120" viewBox="0 0 120 120" fill="none">
-    <path d="M10 110 Q10 50 40 30 Q60 15 90 10" stroke="#FFD700" stroke-width="1.5" fill="none" opacity="0.25"/>
-    <path d="M10 90 Q15 50 35 35 Q55 20 80 15" stroke="#FF9933" stroke-width="1" fill="none" opacity="0.2"/>
-    <circle cx="15" cy="105" r="4" fill="#FFD700" opacity="0.3"/>
-    <circle cx="95" cy="12" r="3" fill="#FFD700" opacity="0.2"/>
-    <!-- Paisley teardrop -->
-    <path d="M50 60 Q55 40 70 35 Q85 30 80 50 Q75 70 50 60Z" stroke="#FFD700" stroke-width="1" fill="none" opacity="0.12"/>
-    <circle cx="65" cy="48" r="3" fill="#FFD700" opacity="0.1"/>
-  </svg>
-  <svg class="corner-ornament corner-tr" width="120" height="120" viewBox="0 0 120 120" fill="none">
-    <path d="M10 110 Q10 50 40 30 Q60 15 90 10" stroke="#FFD700" stroke-width="1.5" fill="none" opacity="0.25"/>
-    <path d="M10 90 Q15 50 35 35 Q55 20 80 15" stroke="#FF9933" stroke-width="1" fill="none" opacity="0.2"/>
-    <circle cx="15" cy="105" r="4" fill="#FFD700" opacity="0.3"/>
-    <circle cx="95" cy="12" r="3" fill="#FFD700" opacity="0.2"/>
-    <path d="M50 60 Q55 40 70 35 Q85 30 80 50 Q75 70 50 60Z" stroke="#FFD700" stroke-width="1" fill="none" opacity="0.12"/>
-  </svg>
-  <svg class="corner-ornament corner-bl" width="120" height="120" viewBox="0 0 120 120" fill="none">
-    <path d="M10 110 Q10 50 40 30 Q60 15 90 10" stroke="#FFD700" stroke-width="1.5" fill="none" opacity="0.25"/>
-    <path d="M10 90 Q15 50 35 35 Q55 20 80 15" stroke="#FF9933" stroke-width="1" fill="none" opacity="0.2"/>
-    <circle cx="15" cy="105" r="4" fill="#FFD700" opacity="0.3"/>
-  </svg>
-  <svg class="corner-ornament corner-br" width="120" height="120" viewBox="0 0 120 120" fill="none">
-    <path d="M10 110 Q10 50 40 30 Q60 15 90 10" stroke="#FFD700" stroke-width="1.5" fill="none" opacity="0.25"/>
-    <path d="M10 90 Q15 50 35 35 Q55 20 80 15" stroke="#FF9933" stroke-width="1" fill="none" opacity="0.2"/>
-    <circle cx="15" cy="105" r="4" fill="#FFD700" opacity="0.3"/>
+  <!-- Center rangoli background -->
+  <svg class="center-rangoli" width="900" height="900" viewBox="0 0 900 900">
+    <g fill="none" stroke="#8B0000" stroke-width="2">
+      <circle cx="450" cy="450" r="420"/>
+      <circle cx="450" cy="450" r="360"/>
+      <circle cx="450" cy="450" r="300"/>
+      <circle cx="450" cy="450" r="240"/>
+      <circle cx="450" cy="450" r="180"/>
+      <circle cx="450" cy="450" r="120"/>
+      <circle cx="450" cy="450" r="60" fill="#C41E3A"/>
+    </g>
+    <g fill="none" stroke="#8B0000" stroke-width="1.5">
+      <!-- 16 petals -->
+      <g transform="translate(450 450)">
+        <g>
+          <ellipse cx="0" cy="-300" rx="30" ry="80"/>
+          <ellipse cx="0" cy="-300" rx="30" ry="80" transform="rotate(22.5)"/>
+          <ellipse cx="0" cy="-300" rx="30" ry="80" transform="rotate(45)"/>
+          <ellipse cx="0" cy="-300" rx="30" ry="80" transform="rotate(67.5)"/>
+          <ellipse cx="0" cy="-300" rx="30" ry="80" transform="rotate(90)"/>
+          <ellipse cx="0" cy="-300" rx="30" ry="80" transform="rotate(112.5)"/>
+          <ellipse cx="0" cy="-300" rx="30" ry="80" transform="rotate(135)"/>
+          <ellipse cx="0" cy="-300" rx="30" ry="80" transform="rotate(157.5)"/>
+          <ellipse cx="0" cy="-300" rx="30" ry="80" transform="rotate(180)"/>
+          <ellipse cx="0" cy="-300" rx="30" ry="80" transform="rotate(202.5)"/>
+          <ellipse cx="0" cy="-300" rx="30" ry="80" transform="rotate(225)"/>
+          <ellipse cx="0" cy="-300" rx="30" ry="80" transform="rotate(247.5)"/>
+          <ellipse cx="0" cy="-300" rx="30" ry="80" transform="rotate(270)"/>
+          <ellipse cx="0" cy="-300" rx="30" ry="80" transform="rotate(292.5)"/>
+          <ellipse cx="0" cy="-300" rx="30" ry="80" transform="rotate(315)"/>
+          <ellipse cx="0" cy="-300" rx="30" ry="80" transform="rotate(337.5)"/>
+        </g>
+      </g>
+    </g>
   </svg>
 
-  <!-- Lamp emoji accent -->
-  <div class="lamp-accent">&#129684;</div>
+  <div class="varak-frame"></div>
+
+  <!-- Diya corner decorations -->
+  <svg class="diya diya-tl" width="90" height="90" viewBox="0 0 90 90">
+    <g>
+      <ellipse cx="45" cy="60" rx="35" ry="8" fill="#8B5A2B"/>
+      <path d="M15 55 Q45 75 75 55 L70 62 Q45 78 20 62 Z" fill="#B87333" stroke="#5C3317" stroke-width="1"/>
+      <path d="M20 55 L70 55 L72 48 Q45 38 18 48 Z" fill="#E8B931" stroke="#8B5A2B" stroke-width="1.5"/>
+      <ellipse cx="45" cy="48" rx="15" ry="3" fill="#D97706"/>
+      <!-- Flame -->
+      <path d="M45 48 Q40 30 45 15 Q50 30 45 48 Z" fill="#FFD700"/>
+      <path d="M45 48 Q42 35 45 22 Q48 35 45 48 Z" fill="#FF6B35"/>
+      <circle cx="45" cy="20" r="3" fill="#FFF5D4" opacity="0.8"/>
+    </g>
+  </svg>
+  <svg class="diya diya-tr" width="90" height="90" viewBox="0 0 90 90">
+    <g>
+      <ellipse cx="45" cy="60" rx="35" ry="8" fill="#8B5A2B"/>
+      <path d="M15 55 Q45 75 75 55 L70 62 Q45 78 20 62 Z" fill="#B87333" stroke="#5C3317" stroke-width="1"/>
+      <path d="M20 55 L70 55 L72 48 Q45 38 18 48 Z" fill="#E8B931" stroke="#8B5A2B" stroke-width="1.5"/>
+      <path d="M45 48 Q40 30 45 15 Q50 30 45 48 Z" fill="#FFD700"/>
+      <path d="M45 48 Q42 35 45 22 Q48 35 45 48 Z" fill="#FF6B35"/>
+    </g>
+  </svg>
+  <svg class="diya diya-bl" width="90" height="90" viewBox="0 0 90 90">
+    <g>
+      <ellipse cx="45" cy="60" rx="35" ry="8" fill="#8B5A2B"/>
+      <path d="M15 55 Q45 75 75 55 L70 62 Q45 78 20 62 Z" fill="#B87333" stroke="#5C3317" stroke-width="1"/>
+      <path d="M20 55 L70 55 L72 48 Q45 38 18 48 Z" fill="#E8B931" stroke="#8B5A2B" stroke-width="1.5"/>
+      <path d="M45 48 Q40 30 45 15 Q50 30 45 48 Z" fill="#FFD700"/>
+      <path d="M45 48 Q42 35 45 22 Q48 35 45 48 Z" fill="#FF6B35"/>
+    </g>
+  </svg>
+  <svg class="diya diya-br" width="90" height="90" viewBox="0 0 90 90">
+    <g>
+      <ellipse cx="45" cy="60" rx="35" ry="8" fill="#8B5A2B"/>
+      <path d="M15 55 Q45 75 75 55 L70 62 Q45 78 20 62 Z" fill="#B87333" stroke="#5C3317" stroke-width="1"/>
+      <path d="M20 55 L70 55 L72 48 Q45 38 18 48 Z" fill="#E8B931" stroke="#8B5A2B" stroke-width="1.5"/>
+      <path d="M45 48 Q40 30 45 15 Q50 30 45 48 Z" fill="#FFD700"/>
+    </g>
+  </svg>
 
   <div class="container">
-    <!-- Hero / Featured Sweet -->
-    <div class="hero">
-      <div class="hero-emoji">&#10024;</div>
-      <div class="hero-content">
-        <h1 class="title" data-editable="true" data-field="title">SOUTH INDIAN SWEETS</h1>
-        <p class="subtitle" data-editable="true" data-field="subtitle">Made Fresh Daily &bull; Perfect for Celebrations</p>
-      </div>
-      <div class="special-section">
-        <div class="special-badge" data-editable="true" data-field="specialBadge">&#11088; TODAY'S SPECIAL</div>
-        <div class="special-name" data-editable="true" data-field="specialName">Mysore Pak</div>
-        <div class="special-price" data-editable="true" data-field="specialPrice">$6.99/lb</div>
-        <div class="special-desc" data-editable="true" data-field="specialDesc">Melt-in-mouth ghee &amp; gram flour delight</div>
-      </div>
+    <div class="header">
+      <div class="header-devanagari">&#2342;&#2325;&#2381;&#2359;&#2367;&#2339; &#2349;&#2366;&#2352;&#2340; &#2325;&#2375; &#2350;&#2367;&#2336;&#2366;&#2312;</div>
+      <h1 class="main-title" data-editable="true" data-field="title">SOUTH INDIAN SWEETS</h1>
+      <p class="subtitle" data-editable="true" data-field="subtitle">Made Fresh Daily — Perfect for Celebrations</p>
     </div>
 
-    <!-- Sweets grid: 3 columns x 4 rows -->
+    <!-- Featured -->
+    <div class="featured-row">
+      <svg class="featured-illust" viewBox="0 0 120 120">
+        <!-- Silver varak plate with mysore pak -->
+        <ellipse cx="60" cy="90" rx="50" ry="8" fill="rgba(61,31,8,0.3)"/>
+        <ellipse cx="60" cy="80" rx="52" ry="10" fill="#C0C0C0" stroke="#808080" stroke-width="2"/>
+        <ellipse cx="60" cy="77" rx="48" ry="8" fill="#E8E8E8"/>
+        <!-- Mysore pak pieces -->
+        <rect x="25" y="55" width="18" height="18" fill="#D97706" stroke="#8B5A2B" stroke-width="1.5" transform="rotate(-5 34 64)"/>
+        <rect x="48" y="52" width="20" height="20" fill="#E49B0F" stroke="#8B5A2B" stroke-width="1.5"/>
+        <rect x="72" y="56" width="18" height="18" fill="#D97706" stroke="#8B5A2B" stroke-width="1.5" transform="rotate(8 81 65)"/>
+        <rect x="38" y="38" width="18" height="18" fill="#E8B931" stroke="#8B5A2B" stroke-width="1.5"/>
+        <rect x="62" y="35" width="20" height="20" fill="#D97706" stroke="#8B5A2B" stroke-width="1.5" transform="rotate(-4 72 45)"/>
+        <!-- Pistachio dots -->
+        <circle cx="45" cy="45" r="2" fill="#9ACD32"/>
+        <circle cx="75" cy="43" r="2" fill="#9ACD32"/>
+        <circle cx="58" cy="62" r="2" fill="#9ACD32"/>
+        <circle cx="34" cy="62" r="1.5" fill="#9ACD32"/>
+        <circle cx="82" cy="64" r="1.5" fill="#9ACD32"/>
+      </svg>
+      <div class="featured-text">
+        <div class="featured-label" data-editable="true" data-field="specialBadge">★ TODAY'S SPECIAL</div>
+        <div class="featured-name" data-editable="true" data-field="specialName">Mysore Pak</div>
+        <div class="featured-desc" data-editable="true" data-field="specialDesc">Melt-in-mouth ghee &amp; gram flour delight</div>
+      </div>
+      <div class="featured-price" data-editable="true" data-field="specialPrice">$6.99/lb</div>
+    </div>
+
+    <!-- Sweets grid -->
     <div class="sweets-grid">
-      <!-- Column 1: Traditional -->
       <div class="category-col">
         <div class="category-header" data-editable="true" data-field="cat1Title">TRADITIONAL</div>
         <div class="sweet-card">
-          <div class="sweet-header">
-            <span class="sweet-name" data-editable="true" data-field="trad1Name">Kesari Bath</span>
-            <span class="sweet-price" data-editable="true" data-field="trad1Price">$4.99</span>
+          <svg class="sweet-icon" viewBox="0 0 42 42"><circle cx="21" cy="21" r="18" fill="#E49B0F" stroke="#8B5A2B" stroke-width="1.5"/><circle cx="21" cy="21" r="12" fill="#FFD700"/><circle cx="17" cy="18" r="1.5" fill="#9ACD32"/><circle cx="24" cy="20" r="1.5" fill="#9ACD32"/></svg>
+          <div class="sweet-info">
+            <div class="sweet-name" data-editable="true" data-field="trad1Name">Kesari Bath</div>
+            <div class="sweet-desc" data-editable="true" data-field="trad1Desc">Saffron semolina</div>
           </div>
-          <div class="sweet-desc" data-editable="true" data-field="trad1Desc">Saffron semolina</div>
+          <div class="sweet-price" data-editable="true" data-field="trad1Price">$4.99</div>
         </div>
         <div class="sweet-card">
-          <div class="sweet-header">
-            <span class="sweet-name" data-editable="true" data-field="trad2Name">Payasam (Cup)</span>
-            <span class="sweet-price" data-editable="true" data-field="trad2Price">$3.99</span>
+          <svg class="sweet-icon" viewBox="0 0 42 42"><ellipse cx="21" cy="24" rx="16" ry="10" fill="#FFF5D4" stroke="#8B5A2B" stroke-width="1.5"/><ellipse cx="21" cy="23" rx="13" ry="7" fill="#FFFAFA"/><circle cx="16" cy="21" r="1.5" fill="#9ACD32"/><circle cx="26" cy="23" r="1.5" fill="#9ACD32"/></svg>
+          <div class="sweet-info">
+            <div class="sweet-name" data-editable="true" data-field="trad2Name">Payasam (Cup)</div>
+            <div class="sweet-desc" data-editable="true" data-field="trad2Desc">Vermicelli kheer</div>
           </div>
-          <div class="sweet-desc" data-editable="true" data-field="trad2Desc">Vermicelli kheer</div>
+          <div class="sweet-price" data-editable="true" data-field="trad2Price">$3.99</div>
         </div>
         <div class="sweet-card">
-          <div class="sweet-header">
-            <span class="sweet-name" data-editable="true" data-field="trad3Name">Jangiri</span>
-            <span class="sweet-price" data-editable="true" data-field="trad3Price">$1.99/pc</span>
+          <svg class="sweet-icon" viewBox="0 0 42 42"><path d="M10 21 Q10 12 21 12 Q32 12 32 21 Q32 30 21 30 Q10 30 10 21 M15 21 Q15 16 21 16 Q27 16 27 21 Q27 26 21 26 Q15 26 15 21" fill="#E49B0F" stroke="#8B5A2B" stroke-width="1.5"/></svg>
+          <div class="sweet-info">
+            <div class="sweet-name" data-editable="true" data-field="trad3Name">Jangiri</div>
+            <div class="sweet-desc" data-editable="true" data-field="trad3Desc">South Indian jalebi</div>
           </div>
-          <div class="sweet-desc" data-editable="true" data-field="trad3Desc">South Indian jalebi</div>
+          <div class="sweet-price" data-editable="true" data-field="trad3Price">$1.99/pc</div>
         </div>
         <div class="sweet-card">
-          <div class="sweet-header">
-            <span class="sweet-name" data-editable="true" data-field="trad4Name">Ladoo</span>
-            <span class="sweet-price" data-editable="true" data-field="trad4Price">$1.49/pc</span>
+          <svg class="sweet-icon" viewBox="0 0 42 42"><circle cx="21" cy="21" r="15" fill="#E49B0F" stroke="#8B5A2B" stroke-width="1.5"/><circle cx="21" cy="21" r="15" fill="url(#ldg)" opacity="0.4"/><defs><radialGradient id="ldg"><stop offset="0" stop-color="#FFF5D4"/><stop offset="1" stop-color="transparent"/></radialGradient></defs><circle cx="18" cy="18" r="1.5" fill="#8B5A2B"/><circle cx="25" cy="20" r="1.5" fill="#8B5A2B"/></svg>
+          <div class="sweet-info">
+            <div class="sweet-name" data-editable="true" data-field="trad4Name">Ladoo</div>
+            <div class="sweet-desc" data-editable="true" data-field="trad4Desc">Golden gram balls</div>
           </div>
-          <div class="sweet-desc" data-editable="true" data-field="trad4Desc">Golden gram balls</div>
+          <div class="sweet-price" data-editable="true" data-field="trad4Price">$1.49/pc</div>
         </div>
       </div>
 
-      <!-- Column 2: Milk Sweets -->
       <div class="category-col">
         <div class="category-header" data-editable="true" data-field="cat2Title">MILK SWEETS</div>
         <div class="sweet-card">
-          <div class="sweet-header">
-            <span class="sweet-name" data-editable="true" data-field="milk1Name">Badam Halwa</span>
-            <span class="sweet-price" data-editable="true" data-field="milk1Price">$7.99</span>
+          <svg class="sweet-icon" viewBox="0 0 42 42"><rect x="8" y="14" width="26" height="16" fill="#E49B0F" stroke="#8B5A2B" stroke-width="1.5" rx="2"/><rect x="8" y="14" width="26" height="4" fill="#9ACD32"/></svg>
+          <div class="sweet-info">
+            <div class="sweet-name" data-editable="true" data-field="milk1Name">Badam Halwa</div>
+            <div class="sweet-desc" data-editable="true" data-field="milk1Desc">Almond milk fudge</div>
           </div>
-          <div class="sweet-desc" data-editable="true" data-field="milk1Desc">Almond milk fudge</div>
+          <div class="sweet-price" data-editable="true" data-field="milk1Price">$7.99</div>
         </div>
         <div class="sweet-card">
-          <div class="sweet-header">
-            <span class="sweet-name" data-editable="true" data-field="milk2Name">Paal Kozhukattai</span>
-            <span class="sweet-price" data-editable="true" data-field="milk2Price">$5.99</span>
+          <svg class="sweet-icon" viewBox="0 0 42 42"><circle cx="15" cy="23" r="7" fill="#FFFAFA" stroke="#B87333" stroke-width="1.5"/><circle cx="27" cy="23" r="7" fill="#FFFAFA" stroke="#B87333" stroke-width="1.5"/><circle cx="21" cy="18" r="6" fill="#FFF5D4" stroke="#B87333" stroke-width="1.5"/></svg>
+          <div class="sweet-info">
+            <div class="sweet-name" data-editable="true" data-field="milk2Name">Paal Kozhukattai</div>
+            <div class="sweet-desc" data-editable="true" data-field="milk2Desc">Rice milk dumplings</div>
           </div>
-          <div class="sweet-desc" data-editable="true" data-field="milk2Desc">Rice milk dumplings</div>
+          <div class="sweet-price" data-editable="true" data-field="milk2Price">$5.99</div>
         </div>
         <div class="sweet-card">
-          <div class="sweet-header">
-            <span class="sweet-name" data-editable="true" data-field="milk3Name">Thirattipaal</span>
-            <span class="sweet-price" data-editable="true" data-field="milk3Price">$8.99</span>
+          <svg class="sweet-icon" viewBox="0 0 42 42"><rect x="10" y="12" width="22" height="18" fill="#B87333" stroke="#5C3317" stroke-width="1.5" rx="2"/><rect x="12" y="14" width="18" height="14" fill="#D97706"/></svg>
+          <div class="sweet-info">
+            <div class="sweet-name" data-editable="true" data-field="milk3Name">Thirattipaal</div>
+            <div class="sweet-desc" data-editable="true" data-field="milk3Desc">Reduced milk sweet</div>
           </div>
-          <div class="sweet-desc" data-editable="true" data-field="milk3Desc">Reduced milk sweet</div>
+          <div class="sweet-price" data-editable="true" data-field="milk3Price">$8.99</div>
         </div>
         <div class="sweet-card">
-          <div class="sweet-header">
-            <span class="sweet-name" data-editable="true" data-field="milk4Name">Milk Peda</span>
-            <span class="sweet-price" data-editable="true" data-field="milk4Price">$6.99</span>
+          <svg class="sweet-icon" viewBox="0 0 42 42"><circle cx="21" cy="21" r="15" fill="#FFE4C4" stroke="#8B5A2B" stroke-width="1.5"/><circle cx="21" cy="21" r="10" fill="#F5C27A"/><circle cx="21" cy="21" r="2" fill="#046307"/></svg>
+          <div class="sweet-info">
+            <div class="sweet-name" data-editable="true" data-field="milk4Name">Milk Peda</div>
+            <div class="sweet-desc" data-editable="true" data-field="milk4Desc">Cardamom milk fudge</div>
           </div>
-          <div class="sweet-desc" data-editable="true" data-field="milk4Desc">Cardamom milk fudge</div>
+          <div class="sweet-price" data-editable="true" data-field="milk4Price">$6.99</div>
         </div>
       </div>
 
-      <!-- Column 3: Festival Special -->
       <div class="category-col">
         <div class="category-header" data-editable="true" data-field="cat3Title">FESTIVAL SPECIAL</div>
         <div class="sweet-card">
-          <div class="sweet-header">
-            <span class="sweet-name" data-editable="true" data-field="fest1Name">Sweet Pongal</span>
-            <span class="sweet-price" data-editable="true" data-field="fest1Price">$4.99</span>
+          <svg class="sweet-icon" viewBox="0 0 42 42"><ellipse cx="21" cy="26" rx="16" ry="6" fill="#8B5A2B"/><path d="M5 26 Q5 14 21 14 Q37 14 37 26 Z" fill="#D97706" stroke="#5C3317" stroke-width="1.5"/><circle cx="17" cy="20" r="1.5" fill="#FFF5D4"/><circle cx="25" cy="22" r="1.5" fill="#FFF5D4"/></svg>
+          <div class="sweet-info">
+            <div class="sweet-name" data-editable="true" data-field="fest1Name">Sweet Pongal</div>
+            <div class="sweet-desc" data-editable="true" data-field="fest1Desc">Jaggery &amp; rice</div>
           </div>
-          <div class="sweet-desc" data-editable="true" data-field="fest1Desc">Jaggery &amp; rice</div>
+          <div class="sweet-price" data-editable="true" data-field="fest1Price">$4.99</div>
         </div>
         <div class="sweet-card">
-          <div class="sweet-header">
-            <span class="sweet-name" data-editable="true" data-field="fest2Name">Adhirasam</span>
-            <span class="sweet-price" data-editable="true" data-field="fest2Price">$5.99</span>
+          <svg class="sweet-icon" viewBox="0 0 42 42"><circle cx="21" cy="21" r="16" fill="#8B5A2B" stroke="#3d1f08" stroke-width="1.5"/><circle cx="21" cy="21" r="11" fill="#B87333"/><circle cx="21" cy="21" r="6" fill="#D97706"/></svg>
+          <div class="sweet-info">
+            <div class="sweet-name" data-editable="true" data-field="fest2Name">Adhirasam</div>
+            <div class="sweet-desc" data-editable="true" data-field="fest2Desc">Jaggery rice cake</div>
           </div>
-          <div class="sweet-desc" data-editable="true" data-field="fest2Desc">Jaggery rice cake</div>
+          <div class="sweet-price" data-editable="true" data-field="fest2Price">$5.99</div>
         </div>
         <div class="sweet-card">
-          <div class="sweet-header">
-            <span class="sweet-name" data-editable="true" data-field="fest3Name">Kozhukattai</span>
-            <span class="sweet-price" data-editable="true" data-field="fest3Price">$4.99</span>
+          <svg class="sweet-icon" viewBox="0 0 42 42"><path d="M21 5 Q35 15 35 30 Q35 38 21 38 Q7 38 7 30 Q7 15 21 5 Z" fill="#FFFAFA" stroke="#B87333" stroke-width="1.5"/><path d="M21 5 L25 15 M21 5 L17 15 M21 5 L21 15" stroke="#B87333" stroke-width="1"/></svg>
+          <div class="sweet-info">
+            <div class="sweet-name" data-editable="true" data-field="fest3Name">Kozhukattai</div>
+            <div class="sweet-desc" data-editable="true" data-field="fest3Desc">Modak steamed sweet</div>
           </div>
-          <div class="sweet-desc" data-editable="true" data-field="fest3Desc">Modak steamed sweet</div>
+          <div class="sweet-price" data-editable="true" data-field="fest3Price">$4.99</div>
         </div>
         <div class="sweet-card">
-          <div class="sweet-header">
-            <span class="sweet-name" data-editable="true" data-field="fest4Name">Boli / Obbattu</span>
-            <span class="sweet-price" data-editable="true" data-field="fest4Price">$2.99</span>
+          <svg class="sweet-icon" viewBox="0 0 42 42"><circle cx="21" cy="21" r="17" fill="#E8B931" stroke="#8B5A2B" stroke-width="1.5"/><circle cx="21" cy="21" r="10" fill="#D97706"/></svg>
+          <div class="sweet-info">
+            <div class="sweet-name" data-editable="true" data-field="fest4Name">Boli / Obbattu</div>
+            <div class="sweet-desc" data-editable="true" data-field="fest4Desc">Stuffed sweet flatbread</div>
           </div>
-          <div class="sweet-desc" data-editable="true" data-field="fest4Desc">Stuffed sweet flatbread</div>
+          <div class="sweet-price" data-editable="true" data-field="fest4Price">$2.99</div>
         </div>
       </div>
     </div>
 
-    <!-- Gift box CTA strip -->
+    <!-- Gift box CTA -->
     <div class="footer-cta">
-      <div class="gift-emoji">&#127873;</div>
-      <div class="gift-content">
+      <svg class="gift-illust" viewBox="0 0 80 80">
+        <rect x="12" y="30" width="56" height="40" fill="#E8B931" stroke="#FFD700" stroke-width="2"/>
+        <rect x="12" y="28" width="56" height="8" fill="#FFD700"/>
+        <rect x="36" y="28" width="8" height="42" fill="#FFD700"/>
+        <path d="M40 28 Q30 12 20 20 Q22 28 40 28 Q58 28 60 20 Q50 12 40 28" fill="#FFD700" stroke="#8B5A2B" stroke-width="1.5"/>
+      </svg>
+      <div>
         <div class="gift-title" data-editable="true" data-field="giftTitle">GIFT BOXES</div>
-        <div class="gift-prices" data-editable="true" data-field="giftPrices">Small <span class="price-highlight">$14.99</span> &nbsp;|&nbsp; Medium <span class="price-highlight">$24.99</span> &nbsp;|&nbsp; Large <span class="price-highlight">$39.99</span></div>
+        <div class="gift-prices" data-editable="true" data-field="giftPrices">Small <span class="ph">$14.99</span>  |  Medium <span class="ph">$24.99</span>  |  Large <span class="ph">$39.99</span></div>
       </div>
-      <div class="gift-note" data-editable="true" data-field="giftNote">Custom assortment for weddings &amp; festivals</div>
+      <div class="gift-note" data-editable="true" data-field="giftNote">Custom assortment for<br>weddings &amp; festivals</div>
     </div>
   </div>
-
-  <div class="bottom-bar"></div>
 </body>
 </html>
