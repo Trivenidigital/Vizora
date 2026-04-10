@@ -15,7 +15,21 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as Handlebars from 'handlebars';
 
-const SEED_DIR = path.resolve(__dirname);
+// Resolve seed dir: works whether run from templates/seed or middleware package
+function resolveSeedDir(): string {
+  const candidates = [
+    path.resolve(__dirname),
+    path.resolve(__dirname, '..', '..', '..', '..', '..', 'templates', 'seed'),
+    path.resolve(process.cwd(), 'templates', 'seed'),
+    path.resolve(process.cwd(), '..', 'templates', 'seed'),
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(path.join(c, 'restaurant'))) return c;
+  }
+  throw new Error('Could not locate templates/seed directory');
+}
+
+const SEED_DIR = resolveSeedDir();
 const CATEGORIES = ['restaurant', 'retail', 'general', 'corporate', 'education', 'healthcare', 'events', 'indian'];
 
 function renderWithSampleData(templateHtml: string, sampleData: Record<string, unknown>): string {
