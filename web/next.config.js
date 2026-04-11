@@ -18,6 +18,15 @@ const nextConfig = {
     ignoreBuildErrors: false,
   },
   productionBrowserSourceMaps: false,
+  // Allow Server Actions from production and dev origins.
+  // The actual fix for "Failed to find Server Action" errors on rebuild
+  // is the NEXT_SERVER_ACTIONS_ENCRYPTION_KEY env var (read automatically
+  // by Next.js at build time) — set it to a stable value in production .env.
+  experimental: {
+    serverActions: {
+      allowedOrigins: ['vizora.cloud', 'www.vizora.cloud', 'localhost:3001'],
+    },
+  },
   images: {
     remotePatterns: [
       {
