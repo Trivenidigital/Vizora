@@ -121,7 +121,7 @@ const nextConfig = {
         headers: [
           {
             key: 'Content-Security-Policy',
-            value: `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: ${cspBackendUrl} https:; font-src 'self' data:; connect-src 'self' ${cspBackendUrl} ws: wss: https:; media-src 'self' ${cspBackendUrl};`,
+            value: `default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; img-src 'self' data: ${cspBackendUrl} https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' ${cspBackendUrl} https://accounts.google.com ws: wss: https:; frame-src 'self' https://accounts.google.com; media-src 'self' ${cspBackendUrl};`,
           },
           {
             key: 'X-Content-Type-Options',
