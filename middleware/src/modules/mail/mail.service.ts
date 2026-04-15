@@ -47,7 +47,7 @@ export class MailService {
   }
 
   private get appUrl(): string {
-    return process.env.APP_URL || 'http://localhost:3001';
+    return process.env.APP_URL || process.env.FRONTEND_URL || process.env.WEB_URL || 'http://localhost:3001';
   }
 
   private get upgradeUrl(): string {
