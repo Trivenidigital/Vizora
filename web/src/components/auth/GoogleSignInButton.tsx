@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 
 declare global {
   interface Window {
@@ -37,7 +37,15 @@ interface GoogleSignInButtonProps {
 
 export default function GoogleSignInButton({ onSuccess, text = 'signin_with' }: GoogleSignInButtonProps) {
   const buttonRef = useRef<HTMLDivElement>(null);
-  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+  // Read client ID only on the client (after hydration), not during SSR.
+  // Turbopack inlines NEXT_PUBLIC_* into the client bundle at build time,
+  // but process.env is empty during SSR when PM2 doesn't provide the var.
+  const [clientId, setClientId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const id = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || null;
+    setClientId(id);
+  }, []);
 
   // Stabilize callback ref to avoid re-initialization on every render
   const onSuccessRef = useRef(onSuccess);
@@ -78,6 +86,8 @@ export default function GoogleSignInButton({ onSuccess, text = 'signin_with' }: 
     };
   }, [clientId, stableCallback, text]);
 
+  // During SSR and before hydration, render an empty placeholder.
+  // The button renders after the client effect reads the env var.
   if (!clientId) return null;
 
   return (
