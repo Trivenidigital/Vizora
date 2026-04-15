@@ -95,6 +95,19 @@ module.exports = {
       env_production: {
         NODE_ENV: 'production',
         PORT: 3001,
+        // NEXT_PUBLIC_* vars must be available at SSR runtime (not just
+        // build time). The client ID is public (embedded in the browser
+        // anyway), so it's safe to reference here. Load from root .env
+        // or web/.env.local at PM2 startup time.
+        ...(() => {
+          try {
+            const fs = require('fs');
+            const envPath = require('path').resolve(__dirname, 'web', '.env.local');
+            const envContent = fs.readFileSync(envPath, 'utf-8');
+            const match = envContent.match(/NEXT_PUBLIC_GOOGLE_CLIENT_ID=(.+)/);
+            return match ? { NEXT_PUBLIC_GOOGLE_CLIENT_ID: match[1].trim() } : {};
+          } catch { return {}; }
+        })(),
       },
       // Graceful shutdown
       kill_timeout: 10000,
