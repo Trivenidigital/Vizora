@@ -259,6 +259,15 @@ export class AuthService {
       });
 
       user = result;
+
+      // Send welcome email for new Google signups (non-blocking)
+      this.mailService.sendWelcomeEmail(
+        user.email,
+        user.firstName || user.email.split('@')[0],
+        30, // trial days
+      ).catch((err) => {
+        this.logger.warn(`Failed to send welcome email to ${user!.email}: ${err instanceof Error ? err.message : 'Unknown'}`);
+      });
     }
 
     // Update last login
