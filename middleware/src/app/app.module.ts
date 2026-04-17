@@ -30,6 +30,7 @@ import { MetricsModule } from '../modules/metrics/metrics.module';
 import { MailModule } from '../modules/mail/mail.module';
 import { SupportModule } from '../modules/support/support.module';
 import { FleetModule } from '../modules/fleet/fleet.module';
+import { AgentsModule } from '../modules/agents/agents.module';
 
 @Module({
   imports: [
@@ -103,6 +104,7 @@ import { FleetModule } from '../modules/fleet/fleet.module';
     MetricsModule,
     SupportModule,
     FleetModule,
+    AgentsModule,
   ],
   controllers: [AppController],
   providers: [
