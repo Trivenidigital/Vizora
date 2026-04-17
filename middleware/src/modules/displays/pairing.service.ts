@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException, OnModuleDestroy, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DatabaseService } from '../database/database.service';
 import { RedisService } from '../redis/redis.service';
 import { RequestPairingDto } from './dto/request-pairing.dto';
@@ -32,6 +33,7 @@ export class PairingService implements OnModuleDestroy {
     private readonly db: DatabaseService,
     private readonly jwtService: JwtService,
     private readonly redisService: RedisService,
+    private readonly events: EventEmitter2,
   ) {
     // Cleanup interval as safety net — Redis TTL handles most expiration,
     // but this catches edge cases if Redis is temporarily unavailable.
@@ -286,6 +288,10 @@ export class PairingService implements OnModuleDestroy {
     }
 
     this.logger.log(`Device paired successfully: ${display.id} to org ${organizationId}`);
+
+    // Emit domain event for onboarding tracking. Fire-and-forget; listener
+    // (OnboardingService.onDisplayPaired) has its own try/catch.
+    this.events.emit('display.paired', { orgId: organizationId, displayId: display.id });
 
     // Store the plaintext token in the Redis request so checkPairingStatus
     // can return it to the device. The DB only has the hashed token.

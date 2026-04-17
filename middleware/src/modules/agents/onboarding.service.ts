@@ -25,6 +25,19 @@ type MilestoneField =
   | 'firstPlaylistCreatedAt'
   | 'firstScheduleCreatedAt';
 
+// Existing services emit `{ entityId, organizationId }` (validation-monitor
+// convention); newer onboarding-specific emits use `{ orgId, <entity>Id }`.
+// Accept both to avoid touching every publisher.
+type EventPayload = {
+  orgId?: string;
+  organizationId?: string;
+  [k: string]: unknown;
+};
+
+function resolveOrgId(evt: EventPayload): string {
+  return (evt.orgId ?? evt.organizationId ?? '') as string;
+}
+
 @Injectable()
 export class OnboardingService {
   private readonly logger = new Logger(OnboardingService.name);
@@ -32,28 +45,28 @@ export class OnboardingService {
   constructor(private readonly db: DatabaseService) {}
 
   @OnEvent('user.welcomed', { async: true })
-  async onUserWelcomed(evt: { orgId: string; userId: string }): Promise<void> {
-    await this.markMilestone(evt.orgId, 'welcomeEmailSentAt');
+  async onUserWelcomed(evt: EventPayload): Promise<void> {
+    await this.markMilestone(resolveOrgId(evt), 'welcomeEmailSentAt');
   }
 
   @OnEvent('display.paired', { async: true })
-  async onDisplayPaired(evt: { orgId: string; displayId: string }): Promise<void> {
-    await this.markMilestone(evt.orgId, 'firstScreenPairedAt');
+  async onDisplayPaired(evt: EventPayload): Promise<void> {
+    await this.markMilestone(resolveOrgId(evt), 'firstScreenPairedAt');
   }
 
   @OnEvent('content.created', { async: true })
-  async onContentCreated(evt: { orgId: string; contentId: string }): Promise<void> {
-    await this.markMilestone(evt.orgId, 'firstContentUploadedAt');
+  async onContentCreated(evt: EventPayload): Promise<void> {
+    await this.markMilestone(resolveOrgId(evt), 'firstContentUploadedAt');
   }
 
   @OnEvent('playlist.created', { async: true })
-  async onPlaylistCreated(evt: { orgId: string; playlistId: string }): Promise<void> {
-    await this.markMilestone(evt.orgId, 'firstPlaylistCreatedAt');
+  async onPlaylistCreated(evt: EventPayload): Promise<void> {
+    await this.markMilestone(resolveOrgId(evt), 'firstPlaylistCreatedAt');
   }
 
   @OnEvent('schedule.created', { async: true })
-  async onScheduleCreated(evt: { orgId: string; scheduleId: string }): Promise<void> {
-    await this.markMilestone(evt.orgId, 'firstScheduleCreatedAt');
+  async onScheduleCreated(evt: EventPayload): Promise<void> {
+    await this.markMilestone(resolveOrgId(evt), 'firstScheduleCreatedAt');
   }
 
   async markMilestone(orgId: string, field: MilestoneField): Promise<void> {
