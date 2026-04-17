@@ -102,8 +102,69 @@
 - [x] Design spec drafted
 - [x] Round 2 review complete (3 agents)
 - [x] Round 2 feedback folded into spec
-- [ ] Implementation plan
-- [ ] Build phase
-- [ ] Draft PR
-- [ ] Round 3 review (on diff)
+- [x] Implementation plan
+- [x] Build phase
+- [x] Draft PR (#32)
+- [x] Round 3 review (on diff)
+- [x] Round 3 merge-blocker fixes applied
+- [ ] Human approval + merge
+- [ ] Go-live blockers cleared (follow-up PR)
+- [ ] Deploy
 
+## Round 3 review outcome (PR #32 diff)
+
+Three reviewers: `typescript-software-architect-review`, `typescript-security-expert`, `nestjs-code-review-expert`. No critical vulns, no hard merge blockers.
+
+### Fixes applied in this pass (round 3 fold-in)
+
+| ID | Source | Fix |
+|---|---|---|
+| D-R3-1 (was C1) | Arch + Nest | Standardized event payload key to `organizationId` across all publishers. Dropped `resolveOrgId` shim in `OnboardingService`. Single `OnboardingEvent` type — no more dual-shape tolerance. |
+| D-R3-2 (was C2) | Security + Nest BLOCKER | `POST /agents/incidents` now pulls `organizationId` from JWT via `@CurrentUser('organizationId')`. Removed `organizationId` field from `CreateCustomerIncidentDto`. `CustomerIncidentService.create(orgId, dto)` signature updated accordingly. |
+| D-R3-3 (was Nest-B1) | Nest | `@SkipOutputSanitize()` narrowed from class-level to method-level on the two state-read endpoints only. Incident creation now passes through global SanitizeInterceptor. |
+| D-R3-4 (was Nest-B2) | Nest | `AgentStateService` file I/O migrated to `fs/promises`. `aggregateStatus`, `read`, `enqueueManualRun` all async. Controller updated to await. |
+| D-R3-5 (was C3) | Arch + Nest | Stub `OpenAIAgentAI` and `AnthropicAgentAI` method signatures now include full `AgentAI` parameters for refactor safety + editor autocomplete. |
+| D-R3-6 (was C4) | Arch + Nest | `enqueueManualRun` now acquires the `{family}.json.lock` file with the same wait/stale-takeover convention used by cron workers. Degraded-but-alive policy on timeout. |
+| D-R3-7 (collateral) | — | `CreateCustomerIncidentDto.remediation` marked `@IsOptional()` (was required; Nest flagged timing mismatch). |
+| D-R3-8 (collateral) | — | `auth.service.spec.ts` and `pairing.service.spec.ts` updated to inject `EventEmitter2` mock — these mocks were missed when event emission was introduced earlier in the branch. |
+
+Specs updated to match: `agent-state.service.spec.ts`, `onboarding.service.spec.ts`, `customer-incident.service.spec.ts`. All 50 agent-module tests pass; auth + pairing + publisher-service specs also green (262 tests across the affected suites).
+
+## Pending items — deliberately deferred to follow-up PR
+
+### Must clear before `LIFECYCLE_LIVE=true` in production
+
+| ID | Severity | Source | File | Issue | Fix direction |
+|---|---|---|---|---|---|
+| PEND-H1 | HIGH | Security | `scripts/agents/customer-lifecycle.ts:186-190` | Email counter re-read per iteration with gap window — concurrent runs can each send up to 50, doubling the cap | Hold the family state lock across the full send decision, not per-iteration. Atomic increment-and-check. |
+| PEND-H2 | HIGH | Security | `scripts/agents/lib/alerting.ts:23-25` | SHA-256 email hash is unsalted — reversible via dictionary attack if logs exfiltrated | Add `LOG_HASH_SALT` env var; include in hash input. |
+| PEND-M2 | MEDIUM | Security | `scripts/agents/customer-lifecycle.ts:285` | SMTP rejection `.message` commonly contains raw email — leaks to PM2 logs / Loki | Wrap catch to `maskEmail(admin.email)` before logging. |
+| PEND-M4 | MEDIUM | Security | `scripts/agents/support-triage.ts:136` | `RankedTicket.reason` written verbatim to `SupportMessage.content` — prompt-injection bleed-through risk once LLM adapter wired | Add `sanitizeAIOutput(text)` step (control-char strip, length cap, anomaly warn) before `writeAgentMessage`. |
+
+### Should fix before merge-to-main (concerns, not blockers)
+
+| ID | Source | File | Issue | Fix direction |
+|---|---|---|---|---|
+| PEND-A1 | Architect | `packages/database/prisma/schema.prisma:813-834` | `CustomerIncident.severity/status/agent/type` are free-text strings | Migrate to Prisma `enum` declarations for DB-level enforcement. |
+| PEND-A2 | Architect | `packages/database/prisma/schema.prisma:836-854` | `ContentRecommendation.contentId/playlistId` have no FK constraints + no `updatedAt` | Add `@relation(..., onDelete: SetNull)` + `updatedAt @updatedAt`. |
+| PEND-A3 | Architect | `middleware/src/modules/agents/agent-state.service.ts:44` | `stateDir` derived from `__dirname` — couples compiled layout to output convention | Inject via `ConfigService` (new `AGENT_STATE_DIR` env). |
+| PEND-N1 | Nest | — | No controller-level spec for `AgentsController` | Add spec covering 401 (unauthenticated), 400 (unknown agent name), 422 (invalid DTO). |
+| PEND-N2 | Nest | `middleware/src/modules/agents/ai/heuristic-agent-ai.spec.ts` | No tests for `analyzeContent` boundary cases (`completionRate < 0.3`, `peakShare > 0.25`) | Add threshold tests. |
+
+### Nits (low priority, non-blocking)
+
+| ID | Source | File | Issue |
+|---|---|---|---|
+| PEND-L1 | Security | `scripts/agents/lib/state.ts:59` | Lock-timeout silent fallback undocumented; mtime staleness check fragile on Windows (antivirus touch) |
+| PEND-L2 | Security | `scripts/agents/lib/alerting.ts` | FORBIDDEN_KEY_REGEX misses Map/Set/unicode-homoglyph bypasses (low exploitability today — no external-input field names) |
+| PEND-X1 | Arch | both interface files | `AgentAI` interface duplicated in `middleware/.../ai/agent-ai.interface.ts` and `scripts/agents/lib/ai.ts` — signatures can drift silently. Future: extract to `@vizora/shared`. |
+| PEND-X2 | Nest | `agents.controller.ts` | `RUNNABLE` Set reused for both run-allowlist and state-read-allowlist — consider renaming to `KNOWN_AGENTS` or splitting. |
+| PEND-X3 | Nest | `agents.module.ts` factory | Factory fallback-to-heuristic on unknown provider is logger.warn only — not surfaced on `/health`. Add observability when LLM adapters are introduced. |
+
+### Go-live checklist (must complete before flipping `LIFECYCLE_LIVE=true` in prod)
+
+1. PEND-H1, PEND-H2, PEND-M2, PEND-M4 merged.
+2. Staging smoke: `LIFECYCLE_LIVE=true` + `LIFECYCLE_TEST_EMAILS` with dev mailbox; confirm one nudge dispatched, one `OrganizationOnboarding.dayNNudgeSentAt` stamped, no errors in PM2 logs.
+3. Staging smoke: post a real support ticket; within ≤5min confirm `SupportMessage` row with `authorType='agent'` exists, category coercion sensible, no prompt-injected content in message body.
+4. Grafana / dashboard shows 6 new PM2 apps as `online` and the 4 scaffolds logging "disabled via *_ENABLED — exiting" with exit code 0.
+5. Human approval gate — all four staging checks green → flip prod env, narrow-start with `LIFECYCLE_TEST_EMAILS` still set to on-call mailbox, observe 24h before broadening.

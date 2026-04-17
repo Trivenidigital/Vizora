@@ -291,7 +291,7 @@ export class PairingService implements OnModuleDestroy {
 
     // Emit domain event for onboarding tracking. Fire-and-forget; listener
     // (OnboardingService.onDisplayPaired) has its own try/catch.
-    this.events.emit('display.paired', { orgId: organizationId, displayId: display.id });
+    this.events.emit('display.paired', { organizationId, displayId: display.id });
 
     // Store the plaintext token in the Redis request so checkPairingStatus
     // can return it to the device. The DB only has the hashed token.

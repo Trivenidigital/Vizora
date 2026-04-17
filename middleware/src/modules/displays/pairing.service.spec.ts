@@ -89,7 +89,8 @@ describe('PairingService', () => {
       healthCheck: jest.fn().mockResolvedValue({ healthy: true, responseTime: 1 }),
     } as any;
 
-    service = new PairingService(mockDatabaseService, mockJwtService, mockRedisService);
+    const mockEventEmitter = { emit: jest.fn() } as any;
+    service = new PairingService(mockDatabaseService, mockJwtService, mockRedisService, mockEventEmitter);
   });
 
   afterEach(() => {

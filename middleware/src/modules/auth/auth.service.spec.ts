@@ -154,6 +154,8 @@ describe('AuthService', () => {
       isMinioAvailable: jest.fn().mockReturnValue(true),
     };
 
+    const mockEventEmitter = { emit: jest.fn() };
+
     // Directly instantiate the service with mocked dependencies
     service = new AuthService(
       mockDatabaseService as DatabaseService,
@@ -163,6 +165,7 @@ describe('AuthService', () => {
       mockGeoService as GeoService,
       mockBillingService as any,
       mockStorageService as any,
+      mockEventEmitter as any,
     );
     
     // Reset bcrypt mocks

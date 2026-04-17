@@ -7,16 +7,16 @@ import { DatabaseService } from '../database/database.service';
  *
  * Listens to domain events from auth, pairing, content, playlists, and
  * schedules services. Each handler:
- *   - Runs fire-and-forget (D3) — inner try/catch, never throws.
- *     `suppressErrors` is NOT a real @OnEvent option; the try/catch
- *     IS the authoritative guard.
+ *   - Runs fire-and-forget (D3) — each handler has its own top-level
+ *     try/catch, never throws to the publisher.
  *   - Is idempotent — `upsert` with an EMPTY update block means
  *     re-firing the event is a no-op on already-set timestamps
  *     (D-arch-R2-1, D-nestjs-R2-2). Separate `updateMany` fills null
  *     fields on existing rows only.
- *   - Derives orgId from the event payload, which originates from
- *     JWT-derived `user.organizationId` in the publisher (D6).
- *     Publishers MUST NOT accept orgId from request body/params.
+ *   - Reads `organizationId` from the event payload. This is the single
+ *     convention across all publishers — never accept alternate keys.
+ *     Publishers derive organizationId from JWT-derived `user.organizationId`,
+ *     never from request body/params (D6).
  */
 type MilestoneField =
   | 'welcomeEmailSentAt'
@@ -25,18 +25,10 @@ type MilestoneField =
   | 'firstPlaylistCreatedAt'
   | 'firstScheduleCreatedAt';
 
-// Existing services emit `{ entityId, organizationId }` (validation-monitor
-// convention); newer onboarding-specific emits use `{ orgId, <entity>Id }`.
-// Accept both to avoid touching every publisher.
-type EventPayload = {
-  orgId?: string;
+type OnboardingEvent = {
   organizationId?: string;
   [k: string]: unknown;
 };
-
-function resolveOrgId(evt: EventPayload): string {
-  return (evt.orgId ?? evt.organizationId ?? '') as string;
-}
 
 @Injectable()
 export class OnboardingService {
@@ -45,28 +37,40 @@ export class OnboardingService {
   constructor(private readonly db: DatabaseService) {}
 
   @OnEvent('user.welcomed', { async: true })
-  async onUserWelcomed(evt: EventPayload): Promise<void> {
-    await this.markMilestone(resolveOrgId(evt), 'welcomeEmailSentAt');
+  async onUserWelcomed(evt: OnboardingEvent): Promise<void> {
+    await this.handle(evt, 'welcomeEmailSentAt');
   }
 
   @OnEvent('display.paired', { async: true })
-  async onDisplayPaired(evt: EventPayload): Promise<void> {
-    await this.markMilestone(resolveOrgId(evt), 'firstScreenPairedAt');
+  async onDisplayPaired(evt: OnboardingEvent): Promise<void> {
+    await this.handle(evt, 'firstScreenPairedAt');
   }
 
   @OnEvent('content.created', { async: true })
-  async onContentCreated(evt: EventPayload): Promise<void> {
-    await this.markMilestone(resolveOrgId(evt), 'firstContentUploadedAt');
+  async onContentCreated(evt: OnboardingEvent): Promise<void> {
+    await this.handle(evt, 'firstContentUploadedAt');
   }
 
   @OnEvent('playlist.created', { async: true })
-  async onPlaylistCreated(evt: EventPayload): Promise<void> {
-    await this.markMilestone(resolveOrgId(evt), 'firstPlaylistCreatedAt');
+  async onPlaylistCreated(evt: OnboardingEvent): Promise<void> {
+    await this.handle(evt, 'firstPlaylistCreatedAt');
   }
 
   @OnEvent('schedule.created', { async: true })
-  async onScheduleCreated(evt: EventPayload): Promise<void> {
-    await this.markMilestone(resolveOrgId(evt), 'firstScheduleCreatedAt');
+  async onScheduleCreated(evt: OnboardingEvent): Promise<void> {
+    await this.handle(evt, 'firstScheduleCreatedAt');
+  }
+
+  private async handle(evt: OnboardingEvent, field: MilestoneField): Promise<void> {
+    try {
+      await this.markMilestone(evt.organizationId ?? '', field);
+    } catch (err) {
+      // Defense-in-depth: markMilestone already swallows, but belt-and-braces
+      // in case a future change throws before the inner try.
+      this.logger.warn(
+        `onboarding handler failed (field=${field}): ${err instanceof Error ? err.message : err}`,
+      );
+    }
   }
 
   async markMilestone(orgId: string, field: MilestoneField): Promise<void> {

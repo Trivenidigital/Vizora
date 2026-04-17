@@ -29,10 +29,9 @@ describe('CustomerIncidentService', () => {
     service = mod.get(CustomerIncidentService);
   });
 
-  it('create passes organizationId through to the DB write (D8)', async () => {
+  it('create passes organizationId (from caller, not DTO) through to the DB write (D8)', async () => {
     db.customerIncident.create.mockResolvedValue({ id: 'i1' });
-    await service.create({
-      organizationId: 'o1',
+    await service.create('o1', {
       agent: 'customer-lifecycle',
       type: 'stall',
       severity: 'warning',

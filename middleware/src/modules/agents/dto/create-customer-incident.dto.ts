@@ -1,9 +1,12 @@
-import { IsString, IsIn, IsUUID, MaxLength } from 'class-validator';
+import { IsOptional, IsString, IsIn, MaxLength } from 'class-validator';
 
+/**
+ * organizationId is NOT accepted from the request body — it is extracted from
+ * the authenticated caller's JWT by the controller and passed to the service
+ * out-of-band. This prevents a caller from writing incidents attributed to
+ * another org.
+ */
 export class CreateCustomerIncidentDto {
-  @IsUUID()
-  organizationId!: string;
-
   @IsString()
   @MaxLength(64)
   agent!: string;
@@ -27,7 +30,8 @@ export class CreateCustomerIncidentDto {
   @MaxLength(1000)
   message!: string;
 
+  @IsOptional()
   @IsString()
   @MaxLength(1000)
-  remediation!: string;
+  remediation?: string;
 }

@@ -10,10 +10,10 @@ import type { CreateCustomerIncidentDto } from './dto/create-customer-incident.d
 export class CustomerIncidentService {
   constructor(private readonly db: DatabaseService) {}
 
-  async create(dto: CreateCustomerIncidentDto) {
+  async create(organizationId: string, dto: CreateCustomerIncidentDto) {
     return this.db.customerIncident.create({
       data: {
-        organizationId: dto.organizationId,
+        organizationId,
         agent: dto.agent,
         type: dto.type,
         severity: dto.severity,

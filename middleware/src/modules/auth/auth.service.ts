@@ -139,8 +139,8 @@ export class AuthService {
       this.logger.warn(`Failed to send welcome email to ${user.email}: ${err}`);
     });
 
-    // Emit onboarding event. orgId comes from the DB record (authoritative).
-    this.events.emit('user.welcomed', { orgId: organization.id, userId: user.id });
+    // Emit onboarding event. organizationId comes from the DB record (authoritative).
+    this.events.emit('user.welcomed', { organizationId: organization.id, userId: user.id });
 
     return {
       user: this.sanitizeUser(user),
@@ -275,7 +275,7 @@ export class AuthService {
       });
 
       // Emit onboarding event. organizationId is the user's JWT-derived org.
-      this.events.emit('user.welcomed', { orgId: user.organizationId, userId: user.id });
+      this.events.emit('user.welcomed', { organizationId: user.organizationId, userId: user.id });
     }
 
     // Update last login
