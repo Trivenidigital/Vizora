@@ -53,6 +53,9 @@ model Organization {
   promotionRedemptions PromotionRedemption[]
   supportRequests      SupportRequest[]
   supportMessages      SupportMessage[] @relation("OrgSupportMessages")
+  onboarding           OrganizationOnboarding?
+  customerIncidents    CustomerIncident[]
+  contentRecommendations ContentRecommendation[]
 
   @@index([slug])
   @@index([stripeCustomerId])
@@ -766,7 +769,8 @@ model SupportMessage {
   organizationId   String
   userId           String
 
-  role             String    // 'user', 'assistant', 'admin'
+  role             String    // 'user', 'assistant', 'admin' — conversation role
+  authorType       String    @default("user") // 'user' | 'admin' | 'agent' — source (agent = automation)
   content          String
 
   createdAt        DateTime  @default(now())
@@ -776,5 +780,75 @@ model SupportMessage {
 
   @@index([requestId])
   @@index([organizationId])
+  @@index([requestId, authorType])
   @@map("support_messages")
+}
+
+// ============================================================================
+// AGENT SYSTEM (customer-facing automation — 2026-04-17)
+// ============================================================================
+
+model OrganizationOnboarding {
+  id                        String   @id @default(cuid())
+  organizationId            String   @unique
+  organization              Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  welcomeEmailSentAt        DateTime?
+  firstScreenPairedAt       DateTime?
+  firstContentUploadedAt    DateTime?
+  firstPlaylistCreatedAt    DateTime?
+  firstScheduleCreatedAt    DateTime?
+
+  day1NudgeSentAt           DateTime?
+  day3NudgeSentAt           DateTime?
+  day7NudgeSentAt           DateTime?
+
+  completedAt               DateTime?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  @@map("organization_onboarding")
+}
+
+model CustomerIncident {
+  id              String   @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  agent           String   // e.g. 'screen-health-customer', 'billing-revenue'
+  type            String   // e.g. 'cluster-offline', 'failed-payment-retry-exhausted'
+  severity        String   // 'critical' | 'warning' | 'info'
+  target          String
+  targetId        String
+  message         String   @db.Text
+  remediation     String   @db.Text
+
+  status          String   @default("open") // 'open' | 'resolved' | 'escalated'
+  detectedAt      DateTime @default(now())
+  resolvedAt      DateTime?
+  notifiedAt      DateTime?
+
+  @@index([organizationId, status])
+  @@index([agent, type])
+  @@map("customer_incidents")
+}
+
+model ContentRecommendation {
+  id              String   @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  kind            String   // 'time-of-day' | 'underperforming' | 'rotation-frequency'
+  contentId       String?
+  playlistId      String?
+
+  summary         String   @db.Text
+  details         Json
+  confidence      Float
+
+  createdAt       DateTime @default(now())
+  dismissedAt     DateTime?
+
+  @@index([organizationId, createdAt])
+  @@map("content_recommendations")
 }
