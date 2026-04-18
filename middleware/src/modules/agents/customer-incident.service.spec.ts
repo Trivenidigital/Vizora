@@ -9,6 +9,7 @@ describe('CustomerIncidentService', () => {
       create: jest.Mock;
       updateMany: jest.Mock;
       findMany: jest.Mock;
+      count: jest.Mock;
     };
   };
 
@@ -18,6 +19,7 @@ describe('CustomerIncidentService', () => {
         create: jest.fn(),
         updateMany: jest.fn(),
         findMany: jest.fn(),
+        count: jest.fn(),
       },
     };
     const mod = await Test.createTestingModule({
@@ -54,13 +56,32 @@ describe('CustomerIncidentService', () => {
     });
   });
 
-  it('listOpenForOrg filters by organizationId + status=open', async () => {
+  it('listOpenForOrg filters by organizationId + status=open and paginates', async () => {
     db.customerIncident.findMany.mockResolvedValue([]);
-    await service.listOpenForOrg('o1');
+    db.customerIncident.count.mockResolvedValue(0);
+    const result = await service.listOpenForOrg('o1');
     expect(db.customerIncident.findMany).toHaveBeenCalledWith({
       where: { organizationId: 'o1', status: 'open' },
       orderBy: { detectedAt: 'desc' },
-      take: 100,
+      skip: 0,
+      take: 10,
     });
+    expect(db.customerIncident.count).toHaveBeenCalledWith({
+      where: { organizationId: 'o1', status: 'open' },
+    });
+    expect(result).toEqual({ incidents: [], page: 1, limit: 10, total: 0 });
+  });
+
+  it('listOpenForOrg clamps limit to [1, 100] and page to ≥1', async () => {
+    db.customerIncident.findMany.mockResolvedValue([]);
+    db.customerIncident.count.mockResolvedValue(0);
+    await service.listOpenForOrg('o1', 0, 999);
+    expect(db.customerIncident.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: 0, take: 100 }),
+    );
+    await service.listOpenForOrg('o1', 3, 5);
+    expect(db.customerIncident.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({ skip: 10, take: 5 }),
+    );
   });
 });

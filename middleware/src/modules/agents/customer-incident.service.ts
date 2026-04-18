@@ -32,11 +32,20 @@ export class CustomerIncidentService {
     });
   }
 
-  async listOpenForOrg(orgId: string) {
-    return this.db.customerIncident.findMany({
-      where: { organizationId: orgId, status: 'open' },
-      orderBy: { detectedAt: 'desc' },
-      take: 100,
-    });
+  async listOpenForOrg(orgId: string, page = 1, limit = 10) {
+    const safeLimit = Math.max(1, Math.min(100, limit));
+    const safePage = Math.max(1, page);
+    const [incidents, total] = await Promise.all([
+      this.db.customerIncident.findMany({
+        where: { organizationId: orgId, status: 'open' },
+        orderBy: { detectedAt: 'desc' },
+        skip: (safePage - 1) * safeLimit,
+        take: safeLimit,
+      }),
+      this.db.customerIncident.count({
+        where: { organizationId: orgId, status: 'open' },
+      }),
+    ]);
+    return { incidents, page: safePage, limit: safeLimit, total };
   }
 }

@@ -42,6 +42,15 @@ import { AgentsModule } from '../modules/agents/agents.module';
     // R4-MED8: enable verboseMemoryLeak so stale listeners surface in logs;
     // ignoreErrors:false so handler throws propagate to the logger instead of
     // being swallowed silently by EventEmitter2.
+    //
+    // INVARIANT for @OnEvent handlers in this process:
+    //   Any handler declared with { async: true } MUST wrap its body in try/catch
+    //   (or return a promise that cannot reject). With ignoreErrors:false, an
+    //   uncaught rejection in an async handler becomes an unhandledRejection,
+    //   which Node 18+ surfaces as a process-level error — and with PM2, a
+    //   restart storm. The existing OnboardingService handlers satisfy this;
+    //   any new subscriber in this codebase must do the same. Code review
+    //   owns enforcement.
     EventEmitterModule.forRoot({ ignoreErrors: false, verboseMemoryLeak: true }),
     // Rate limiting - RELAXED for development/testing, STRICT for production
     ThrottlerModule.forRoot(

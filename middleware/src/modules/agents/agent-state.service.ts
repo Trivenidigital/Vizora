@@ -1,5 +1,6 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { promises as fs } from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 
 /**
@@ -147,7 +148,7 @@ export class AgentStateService {
     const file = join(this.stateDir, `${family}.json`);
     const lockFile = `${file}.lock`;
 
-    await this.acquireLock(lockFile);
+    const token = await this.acquireLock(lockFile);
     try {
       let current: Record<string, unknown> = {};
       try {
@@ -161,21 +162,43 @@ export class AgentStateService {
       await fs.writeFile(file, JSON.stringify(current, null, 2));
       return { enqueued: name, family };
     } finally {
-      await this.releaseLock(lockFile);
+      await this.releaseLock(lockFile, token);
     }
   }
 
-  private async acquireLock(lockFile: string): Promise<void> {
+  /**
+   * Acquire `<file>.json.lock` via `open(... 'wx')` — atomic on POSIX and NTFS,
+   * so the O_EXCL primitive guarantees single-winner even when two callers
+   * race to take over a stale lock (both may `unlink` the stale file, but only
+   * one's subsequent `open('wx')` will succeed).
+   *
+   * Returns a per-acquisition token that's written into the lock file and
+   * verified on release. This closes a subtler race: if process A gets
+   * descheduled for &gt;30s (GC pause, oversubscribed CPU), process B can
+   * legitimately steal A's stale lock. Without the token check, A's eventual
+   * `releaseLock` would `unlink` B's active lock, letting a third caller C
+   * acquire it concurrently. With the token check, A sees the token has
+   * changed and leaves B's lock alone.
+   */
+  private async acquireLock(lockFile: string): Promise<string> {
+    const token = `${process.pid}-${randomBytes(8).toString('hex')}`;
     const deadline = Date.now() + LOCK_TIMEOUT_MS;
     while (Date.now() < deadline) {
       try {
         const handle = await fs.open(lockFile, 'wx');
-        await handle.close();
-        return;
+        try {
+          await handle.writeFile(token);
+        } finally {
+          await handle.close();
+        }
+        return token;
       } catch {
         try {
           const stat = await fs.stat(lockFile);
           if (Date.now() - stat.mtimeMs > LOCK_STALE_MS) {
+            this.logger.warn(
+              `stale lock detected at ${lockFile} (age=${Date.now() - stat.mtimeMs}ms); taking over`,
+            );
             try { await fs.unlink(lockFile); } catch { /* race */ }
             continue;
           }
@@ -190,7 +213,20 @@ export class AgentStateService {
     );
   }
 
-  private async releaseLock(lockFile: string): Promise<void> {
-    try { await fs.unlink(lockFile); } catch { /* ignore */ }
+  private async releaseLock(lockFile: string, token: string): Promise<void> {
+    try {
+      const contents = await fs.readFile(lockFile, 'utf-8');
+      if (contents !== token) {
+        // Our lock was stolen (stale-takeover by another holder). Do NOT
+        // unlink — we'd be destroying the new holder's active lock.
+        this.logger.warn(
+          `lock ${lockFile} no longer owned (token mismatch); skipping unlink`,
+        );
+        return;
+      }
+      await fs.unlink(lockFile);
+    } catch {
+      // Either the file was already removed or read failed; nothing to do.
+    }
   }
 }

@@ -19,6 +19,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AgentStateService } from './agent-state.service';
 import { CustomerIncidentService } from './customer-incident.service';
 import { AgentStatusQueryDto } from './dto/agent-status-query.dto';
+import { AgentIncidentsQueryDto } from './dto/agent-incidents-query.dto';
 import { CreateCustomerIncidentDto } from './dto/create-customer-incident.dto';
 
 /**
@@ -88,20 +89,40 @@ export class AgentsController {
     if (!organizationId) {
       throw new BadRequestException('missing organization context');
     }
-    return this.incidents.create(organizationId, dto);
+    // Defense in depth: the global ValidationPipe already strips non-whitelisted
+    // fields (main.ts forbidNonWhitelisted:true), so a rogue `organizationId` in
+    // the body is rejected before reaching here. Still explicitly pick only the
+    // DTO-declared fields so unit tests that bypass the pipe can't accidentally
+    // rely on downstream stripping — and future pipe-config changes can't
+    // silently widen the attack surface.
+    const clean: CreateCustomerIncidentDto = {
+      agent: dto.agent,
+      type: dto.type,
+      severity: dto.severity,
+      target: dto.target,
+      targetId: dto.targetId,
+      message: dto.message,
+      remediation: dto.remediation,
+    };
+    return this.incidents.create(organizationId, clean);
   }
 
   /**
    * R4-MED2: read/resolve endpoints so the dashboard can render and close
    * incidents. All queries are org-scoped from JWT (never the path/body).
+   * Paginated (?page, ?limit) so an org with many open incidents doesn't hit
+   * the hard 100-row cap silently.
    */
   @Get('incidents')
-  @ApiOperation({ summary: 'List open customer incidents for the caller organization' })
-  async listIncidents(@CurrentUser('organizationId') organizationId: string) {
+  @ApiOperation({ summary: 'List open customer incidents for the caller organization (paginated)' })
+  async listIncidents(
+    @CurrentUser('organizationId') organizationId: string,
+    @Query() q: AgentIncidentsQueryDto,
+  ) {
     if (!organizationId) {
       throw new BadRequestException('missing organization context');
     }
-    return this.incidents.listOpenForOrg(organizationId);
+    return this.incidents.listOpenForOrg(organizationId, q.page ?? 1, q.limit ?? 10);
   }
 
   @Patch('incidents/:id/resolve')

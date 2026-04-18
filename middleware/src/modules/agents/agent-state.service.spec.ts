@@ -242,6 +242,63 @@ describe('AgentStateService', () => {
       expect(existsSync(join(stateDir, 'customer.json.lock'))).toBe(false);
     });
 
+    // Heavier contention test — scales the race to 10 concurrent writers and
+    // preloads a large (>64KB) existing field so partial-write bugs would
+    // straddle write-buffer boundaries and leave corrupt JSON on disk. With
+    // the lock intact every writer observes a consistent file; without it,
+    // at least one read-modify-write would hit torn state and throw.
+    it('holds under 10-way concurrent contention without torn writes', async () => {
+      const bigPayload = 'x'.repeat(70_000);
+      write('customer', { runCount: 42, bigField: bigPayload });
+      const results = await Promise.all(
+        Array.from({ length: 10 }, () =>
+          service.enqueueManualRun('customer-lifecycle'),
+        ),
+      );
+      // Every call completed (no 503, no JSON parse throws mid-critical-section).
+      expect(results).toHaveLength(10);
+      results.forEach((r) =>
+        expect(r).toEqual({ enqueued: 'customer-lifecycle', family: 'customer' }),
+      );
+      // Post-state: file is parseable, existing fields preserved, flag set.
+      const file = JSON.parse(
+        readFileSync(join(stateDir, 'customer.json'), 'utf-8'),
+      );
+      expect(file.runCount).toBe(42);
+      expect(file.bigField).toBe(bigPayload);
+      expect(file.pendingManualRun).toBe(true);
+      // Exactly one timestamp remains (last writer wins under the lock).
+      expect(typeof file.pendingManualRunRequestedAt).toBe('string');
+      // No orphaned lock.
+      expect(existsSync(join(stateDir, 'customer.json.lock'))).toBe(false);
+    });
+
+    // Release-path invariant: if our lock gets stolen mid-critical-section
+    // (31s+ GC pause simulated by pre-seeding someone else's token), our
+    // release must NOT unlink the new holder's lock. The new holder's token
+    // survives the release call.
+    it('skips unlink when lock token no longer matches (stolen-lock safety)', async () => {
+      const lockPath = join(stateDir, 'customer.json.lock');
+      // Pre-run to get a baseline lock lifecycle (acquire + release).
+      await service.enqueueManualRun('customer-lifecycle');
+      // Now simulate a concurrent holder installing their own token file
+      // BEFORE our next release runs. We fake this by pre-populating the
+      // lock with a foreign token; a subsequent enqueue will see the file
+      // exists, wait it out, and eventually take over if stale. For the
+      // stolen-release path specifically, we need to directly exercise
+      // releaseLock with a non-matching token — reach in via the service.
+      writeFileSync(lockPath, 'foreign-token-from-another-process');
+      const svc = service as unknown as {
+        releaseLock: (lockFile: string, token: string) => Promise<void>;
+      };
+      await svc.releaseLock(lockPath, 'our-stale-token');
+      // Lock file must still be there — we correctly skipped unlink.
+      expect(existsSync(lockPath)).toBe(true);
+      expect(readFileSync(lockPath, 'utf-8')).toBe('foreign-token-from-another-process');
+      // Clean up for subsequent tests in this describe block.
+      rmSync(lockPath, { force: true });
+    });
+
     it('takes over a stale lock whose mtime is older than LOCK_STALE_MS (30s)', async () => {
       const lockPath = join(stateDir, 'customer.json.lock');
       const fd = openSync(lockPath, 'wx');

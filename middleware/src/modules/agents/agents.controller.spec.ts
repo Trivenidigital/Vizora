@@ -78,26 +78,54 @@ describe('AgentsController', () => {
       expect(incidents.create).not.toHaveBeenCalled();
     });
 
-    it('createIncident forwards the caller orgId — NOT any id in the DTO', async () => {
+    it('createIncident strips unknown fields — body organizationId is ignored', async () => {
       incidents.create.mockResolvedValue({ id: 'i1' } as any);
-      // Even if a malicious client slipped organizationId into the body, the
-      // controller must pass the JWT-derived value through untouched.
-      const attackDto = { ...dto, organizationId: 'other-org' } as any;
+      // Even if a malicious client slipped organizationId into the body AND
+      // bypassed the global ValidationPipe (forbidNonWhitelisted:true), the
+      // controller must pick only DTO-declared fields and pass the JWT-derived
+      // org through first-arg. The service must NOT observe the rogue field.
+      const attackDto = {
+        ...dto,
+        organizationId: 'other-org',
+        isAdmin: true,
+      } as any;
       await controller.createIncident('caller-org', attackDto);
-      expect(incidents.create).toHaveBeenCalledWith('caller-org', attackDto);
+      const [orgArg, dtoArg] = incidents.create.mock.calls[0];
+      expect(orgArg).toBe('caller-org');
+      expect(dtoArg).not.toHaveProperty('organizationId');
+      expect(dtoArg).not.toHaveProperty('isAdmin');
+      // ...and the legitimate fields survive unchanged
+      expect(dtoArg).toMatchObject({
+        agent: dto.agent,
+        type: dto.type,
+        severity: dto.severity,
+        target: dto.target,
+        targetId: dto.targetId,
+        message: dto.message,
+      });
     });
 
     it('listIncidents rejects when organizationId is absent', async () => {
-      await expect(controller.listIncidents('')).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        controller.listIncidents('', {} as any),
+      ).rejects.toThrow(BadRequestException);
       expect(incidents.listOpenForOrg).not.toHaveBeenCalled();
     });
 
-    it('listIncidents forwards the caller orgId to the service', async () => {
-      incidents.listOpenForOrg.mockResolvedValue([]);
-      await controller.listIncidents('caller-org');
-      expect(incidents.listOpenForOrg).toHaveBeenCalledWith('caller-org');
+    it('listIncidents forwards caller orgId + pagination to the service', async () => {
+      incidents.listOpenForOrg.mockResolvedValue({
+        incidents: [], page: 2, limit: 5, total: 0,
+      } as any);
+      await controller.listIncidents('caller-org', { page: 2, limit: 5 } as any);
+      expect(incidents.listOpenForOrg).toHaveBeenCalledWith('caller-org', 2, 5);
+    });
+
+    it('listIncidents applies default pagination when query is empty', async () => {
+      incidents.listOpenForOrg.mockResolvedValue({
+        incidents: [], page: 1, limit: 10, total: 0,
+      } as any);
+      await controller.listIncidents('caller-org', {} as any);
+      expect(incidents.listOpenForOrg).toHaveBeenCalledWith('caller-org', 1, 10);
     });
 
     it('resolveIncident rejects when organizationId is absent', async () => {
@@ -114,6 +142,9 @@ describe('AgentsController', () => {
       await expect(
         controller.resolveIncident('caller-org', 'other-orgs-id'),
       ).rejects.toThrow(NotFoundException);
+      // Guard against a regression where the controller short-circuits to 404
+      // before reaching the org-scoped service call.
+      expect(incidents.resolve).toHaveBeenCalledWith('caller-org', 'other-orgs-id');
     });
 
     it('resolveIncident returns the resolved id on success', async () => {
