@@ -18,9 +18,14 @@ import { OpenAIAgentAI } from './ai/openai-agent-ai.stub';
  * listeners fire twice (D-nestjs-R2-1).
  *
  * AGENT_AI_TOKEN uses a custom factory so the provider is swappable via
- * AGENT_AI_PROVIDER env without any wrapper service (D16). Unknown
- * provider logs a warning and falls back to heuristic — a bad env value
- * cannot crash startup (R2 nice-3).
+ * AGENT_AI_PROVIDER env without any wrapper service (D16).
+ *
+ * Behavior on bad config:
+ *   - Unknown provider name: warn + heuristic fallback (typo shouldn't crash).
+ *   - Provider explicitly set to anthropic/openai but init fails:
+ *       dev/test → warn + heuristic fallback (keep iteration loop cheap).
+ *       production → rethrow. Silently degrading a paid provider to heuristic
+ *       in prod hides real outages and misleads operators (R4-MED9).
  */
 @Module({
   imports: [DatabaseModule, ConfigModule],
@@ -33,6 +38,7 @@ import { OpenAIAgentAI } from './ai/openai-agent-ai.stub';
       useFactory: (cfg: ConfigService): AgentAI => {
         const logger = new Logger('AgentAIFactory');
         const provider = cfg.get<string>('AGENT_AI_PROVIDER', 'heuristic');
+        const isProd = cfg.get<string>('NODE_ENV') === 'production';
         try {
           switch (provider) {
             case 'heuristic':
@@ -46,8 +52,18 @@ import { OpenAIAgentAI } from './ai/openai-agent-ai.stub';
               return new HeuristicAgentAI();
           }
         } catch (err) {
+          // Sanitize err.message — provider init errors may contain API keys
+          // (e.g. "invalid key sk-abc..."). Strip sk- / key= style tokens.
+          const raw = err instanceof Error ? err.message : String(err);
+          const safe = raw
+            .replace(/sk-[A-Za-z0-9_-]+/g, 'sk-***')
+            .replace(/(api[_-]?key|token|secret)\s*[:=]\s*\S+/gi, '$1=***');
+          if (isProd && provider !== 'heuristic') {
+            logger.error(`provider '${provider}' init failed in production: ${safe}`);
+            throw err;
+          }
           logger.warn(
-            `provider '${provider}' init failed (${err instanceof Error ? err.message : err}); falling back to heuristic`,
+            `provider '${provider}' init failed (${safe}); falling back to heuristic`,
           );
           return new HeuristicAgentAI();
         }

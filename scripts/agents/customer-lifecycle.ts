@@ -5,13 +5,17 @@
  * Runs every 30 minutes via PM2 cron. Sends onboarding nudges to orgs that
  * have stalled at milestone boundaries (day 1/3/7).
  *
- * Safeguards (spec D10/D11/D12 + R2 edits):
+ * Safeguards (spec D10/D11/D12 + R2 edits + R4):
  *   - Dry-run default (LIFECYCLE_LIVE=false)
  *   - Circuit breaker: MAX_EMAILS_PER_RUN = 50, counter persisted in
  *     logs/agent-state/customer.json (D-sec-R2-3)
  *   - Test allowlist: LIFECYCLE_TEST_EMAILS redirects ALL mail (D-sec-R2-2)
  *   - SHA-256 email hashes in audit logs (D-sec-R2-1)
- *   - Per-org transaction with dedup on nudge-sent-timestamp (D11)
+ *   - SMTP error messages NEVER include raw recipient address (R4-HIGH6)
+ *   - AI suggestNudge failures isolated per-org (R4-HIGH5)
+ *   - Mark-sent failure raises a `high` severity incident (R4-MED6 —
+ *     duplicate-email risk)
+ *   - SMTP_PASS (not SMTP_PASSWORD) for parity with ops alerting (R4-HIGH4)
  *   - orgId derived from DB only, never from script args (D6)
  *
  * Exit codes:
@@ -117,17 +121,39 @@ function resolveRecipients(adminEmail: string): string[] {
   return [];
 }
 
+// ─── Transporter (built once per run; R4-LOW hoist) ──────────────────────────
+
+type Transporter = { sendMail: (opts: Record<string, unknown>) => Promise<unknown> };
+
+async function buildTransporter(): Promise<Transporter> {
+  const { default: nodemailer } = await import('nodemailer');
+  const smtpUser = process.env.SMTP_USER;
+  // R4-HIGH4: standardize on SMTP_PASS (ops alerting convention). SMTP_PASSWORD
+  // kept as fallback so existing deploys don't break mid-rollout.
+  const smtpPass = process.env.SMTP_PASS ?? process.env.SMTP_PASSWORD;
+  if (smtpUser && !smtpPass) {
+    throw new Error('SMTP_USER set without SMTP_PASS — refusing to send unauthenticated');
+  }
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT || '587', 10),
+    secure: (process.env.SMTP_PORT || '587') === '465',
+    auth: smtpUser && smtpPass ? { user: smtpUser, pass: smtpPass } : undefined,
+  });
+}
+
 /**
  * Audit-log + conditional send. Writes JSON to stdout (grep-able, no PII).
  * Only actually sends mail if SMTP is configured AND recipients resolved to
  * a non-empty list. Updates the persisted counter per successful send.
  */
 async function sendNudge(
+  transporter: Transporter,
   adminEmail: string,
   nudgeKey: NudgeKey,
   orgId: string,
-): Promise<'sent' | 'dry-run' | 'circuit-breaker'> {
-  const state = readAgentState(FAMILY);
+): Promise<'sent' | 'dry-run' | 'circuit-breaker' | 'error'> {
+  const state = await readAgentState(FAMILY);
   const counter = state.emailsSentThisRun ?? 0;
 
   if (counter >= MAX_EMAILS_PER_RUN) {
@@ -160,35 +186,37 @@ async function sendNudge(
     return 'dry-run';
   }
 
-  // SMTP send — best-effort. Failures bubble as exceptions; caller treats
-  // as "not sent" and leaves the nudge timestamp NULL so we retry next run.
-  const { default: nodemailer } = await import('nodemailer');
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '587', 10),
-    secure: (process.env.SMTP_PORT || '587') === '465',
-    auth: process.env.SMTP_USER && process.env.SMTP_PASSWORD
-      ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD }
-      : undefined,
-  });
+  // Release the read lock before the outbound I/O — SMTP latency mustn't pin the lock
+  writeAgentState(FAMILY, state);
 
   const appUrl = process.env.APP_URL || process.env.WEB_URL || 'https://vizora.cloud';
   const subject = NUDGE_SUBJECT[nudgeKey];
   const body = `Hi,\n\n${subject}.\n\nOpen your dashboard: ${appUrl}/dashboard\n\n— Vizora`;
 
+  let sentCount = 0;
+  let lastError: unknown;
   for (const to of recipients) {
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM || 'Vizora <noreply@mail.vizora.cloud>',
-      to,
-      subject,
-      text: body,
-    });
-    // Re-read state each iteration so an interleaved manual run sees counter
-    const s2 = readAgentState(FAMILY);
-    s2.emailsSentThisRun = (s2.emailsSentThisRun ?? 0) + 1;
-    writeAgentState(FAMILY, s2);
+    try {
+      await transporter.sendMail({
+        from: process.env.EMAIL_FROM || 'Vizora <noreply@mail.vizora.cloud>',
+        to,
+        subject,
+        text: body,
+      });
+      const s2 = await readAgentState(FAMILY);
+      s2.emailsSentThisRun = (s2.emailsSentThisRun ?? 0) + 1;
+      writeAgentState(FAMILY, s2);
+      sentCount++;
+    } catch (err) {
+      lastError = err;
+      // R4-HIGH6: never log raw `to` or raw err.message — nodemailer DSN payloads
+      // frequently embed the recipient address.
+      const code = (err as { code?: string })?.code ?? 'UNKNOWN';
+      log(`send failed org=${orgId} recipient=${maskEmail(to)} code=${code}`);
+    }
   }
 
+  if (sentCount === 0 && lastError) return 'error';
   return 'sent';
 }
 
@@ -222,7 +250,7 @@ async function main(): Promise<void> {
   log('Starting customer-lifecycle cycle');
 
   // Reset per-run counter at the top of the cycle (persisted state)
-  const initState = readAgentState(FAMILY);
+  const initState = await readAgentState(FAMILY);
   initState.emailsSentThisRun = 0;
   initState.pendingManualRun = false;
   writeAgentState(FAMILY, initState);
@@ -243,6 +271,19 @@ async function main(): Promise<void> {
   let autoCompleted = 0;
   let circuitBroken = false;
 
+  let transporter: Transporter | null = null;
+  // Only build transporter if we'll actually be sending. An invalid SMTP config
+  // must throw here (fail-fast) rather than per-recipient.
+  if (TEST_EMAILS.length > 0 || LIFECYCLE_LIVE) {
+    try {
+      transporter = await buildTransporter();
+    } catch (err) {
+      log(`FATAL: SMTP transporter build failed — ${err instanceof Error ? err.message : err}`);
+      process.exitCode = 2;
+      return;
+    }
+  }
+
   for (const org of candidates) {
     if (circuitBroken) break;
 
@@ -258,12 +299,34 @@ async function main(): Promise<void> {
         });
         autoCompleted++;
       } catch (err) {
+        // R4-MED6: auto-complete failures now surface as warning incidents.
         log(`auto-complete failed for org=${org.id}: ${err instanceof Error ? err.message : err}`);
+        incidents.push({
+          id: makeIncidentId(AGENT, 'auto_complete_failed', org.id),
+          agent: AGENT,
+          type: 'auto_complete_failed',
+          severity: 'warning',
+          target: 'organization',
+          targetId: org.id,
+          detected: new Date().toISOString(),
+          message: `auto-complete failed: ${err instanceof Error ? err.message : String(err)}`,
+          remediation: 'Inspect organization_onboarding row; run cycle again',
+          status: 'open',
+          attempts: 1,
+        });
       }
       continue;
     }
 
-    const suggestion = await ai.suggestNudge(signal);
+    // R4-HIGH5: isolate AI failure per-org — otherwise one flaky provider
+    // response kills the entire cycle.
+    let suggestion;
+    try {
+      suggestion = await ai.suggestNudge(signal);
+    } catch (err) {
+      log(`suggestNudge failed for org=${org.id}: ${err instanceof Error ? err.message : err}`);
+      continue;
+    }
     if (suggestion.template === 'none') continue;
     const nudgeKey = suggestion.template as NudgeKey;
     const col = NUDGE_COLUMN[nudgeKey];
@@ -281,10 +344,21 @@ async function main(): Promise<void> {
     });
     if (fresh && fresh[col] != null) continue;
 
-    const result = await sendNudge(admin.email, nudgeKey, org.id).catch(err => {
-      log(`send failed for org=${org.id} nudge=${nudgeKey}: ${err instanceof Error ? err.message : err}`);
-      return 'dry-run' as const;
-    });
+    if (!transporter) {
+      // Dry-run mode (no transporter built)
+      process.stdout.write(JSON.stringify({
+        type: 'lifecycle-send-decision',
+        orgId: org.id,
+        template: nudgeKey,
+        recipientCount: 0,
+        wouldSend: false,
+        result: 'dry-run',
+        ts: new Date().toISOString(),
+      }) + '\n');
+      continue;
+    }
+
+    const result = await sendNudge(transporter, admin.email, nudgeKey, org.id);
 
     if (result === 'circuit-breaker') {
       circuitBroken = true;
@@ -304,6 +378,26 @@ async function main(): Promise<void> {
       break;
     }
 
+    if (result === 'error') {
+      // R4-HIGH6 + MED6: log (already masked inside sendNudge) and surface
+      // a warning incident. We do NOT write the nudge timestamp — the next
+      // cycle will retry.
+      incidents.push({
+        id: makeIncidentId(AGENT, 'nudge_send_failed', org.id),
+        agent: AGENT,
+        type: 'nudge_send_failed',
+        severity: 'warning',
+        target: 'organization',
+        targetId: org.id,
+        detected: new Date().toISOString(),
+        message: `SMTP send failed for ${nudgeKey}`,
+        remediation: 'Check SMTP provider status; next cycle will retry',
+        status: 'open',
+        attempts: 1,
+      });
+      continue;
+    }
+
     if (result === 'sent') {
       // Mark nudge sent in same logical step — dedup guard for next run
       try {
@@ -314,7 +408,23 @@ async function main(): Promise<void> {
         });
         nudged++;
       } catch (err) {
+        // R4-MED6: mark-sent failure after a successful send = duplicate risk
+        // on the next cycle. Raise a HIGH severity incident so support can
+        // suppress manually before the next tick.
         log(`mark-sent failed for org=${org.id} col=${String(col)}: ${err instanceof Error ? err.message : err}`);
+        incidents.push({
+          id: makeIncidentId(AGENT, 'mark_sent_failed', org.id),
+          agent: AGENT,
+          type: 'mark_sent_failed',
+          severity: 'critical',
+          target: 'organization',
+          targetId: org.id,
+          detected: new Date().toISOString(),
+          message: `Sent ${nudgeKey} to admin (maskEmail=${maskEmail(admin.email)}) but persisting sent-timestamp failed — next cycle may resend`,
+          remediation: `Manually set ${String(col)}=NOW() on organization_onboarding row for org=${org.id}`,
+          status: 'open',
+          attempts: 1,
+        });
       }
     }
   }
@@ -331,7 +441,7 @@ async function main(): Promise<void> {
   };
 
   // Record run in state
-  const finalState = readAgentState(FAMILY);
+  const finalState = await readAgentState(FAMILY);
   finalState.agentResults = { ...finalState.agentResults, [AGENT]: result };
   finalState.lastRun = { ...finalState.lastRun, [AGENT]: new Date().toISOString() };
   finalState.incidents = [...finalState.incidents, ...incidents];

@@ -168,3 +168,63 @@ Specs updated to match: `agent-state.service.spec.ts`, `onboarding.service.spec.
 3. Staging smoke: post a real support ticket; within ≤5min confirm `SupportMessage` row with `authorType='agent'` exists, category coercion sensible, no prompt-injected content in message body.
 4. Grafana / dashboard shows 6 new PM2 apps as `online` and the 4 scaffolds logging "disabled via *_ENABLED — exiting" with exit code 0.
 5. Human approval gate — all four staging checks green → flip prod env, narrow-start with `LIFECYCLE_TEST_EMAILS` still set to on-call mailbox, observe 24h before broadening.
+
+---
+
+## Round 4 review (2026-04-18) — parallel PR #32 review pass, fixes landed in this PR
+
+Five review agents ran in parallel against branch `feat/agent-system` at HEAD `e39dfa7`. Findings below map to the PR-#32 triage:
+
+### R4 BLOCKERS — fixed
+
+| ID | File | Fix |
+|---|---|---|
+| R4-BLOCK1 | `packages/database/prisma/schema.prisma:821` + new migration `20260418000000_customer_incident_remediation_nullable/` | `remediation` schema NOT NULL contradicted DTO `@IsOptional()` — writes rejected at DB layer. Now `String?`. |
+| R4-BLOCK2 | `scripts/agents/support-triage.ts:175-178` | `supportTicket.update({where:{id}})` cross-org write risk. Replaced with `updateMany({where:{id, organizationId}})` returning `count===1`. |
+| R4-BLOCK3 | `scripts/agents/support-triage.ts:39` | Agent was writing family `'customer'` but middleware maps `support-triage → ops`. Divergent state files. Now `FAMILY='ops'`. |
+| R4-BLOCK4 | `scripts/agents/lib/state.ts` | Lock acquired on file read but never released on JSON parse failure — permanent stuck locks. Added try/catch around load with guaranteed release. |
+
+### R4 HIGH — fixed
+
+| ID | File | Fix |
+|---|---|---|
+| R4-HIGH1 | `agent-state.service.ts:49-50` | Anchored `FORBIDDEN_KEY_REGEX` — `^...$/i` so `authorType` no longer matches `auth` and `monkey` no longer matches `key`. Also added PII fields (email, phone, address). |
+| R4-HIGH2 | `agent-state.service.ts:56` + `scripts/agents/lib/state.ts` | `stateDir` is now `process.env.AGENT_STATE_DIR ?? join(process.cwd(), 'logs', 'agent-state')` — no longer couples to `__dirname` compiled layout; middleware and cron share one root. |
+| R4-HIGH3 | `ecosystem.config.js` | Removed hardcoded `LIFECYCLE_LIVE:'false'` from `env_production`; live flag now comes from host OS env only. |
+| R4-HIGH4 | `scripts/agents/customer-lifecycle.ts` | Accepts `SMTP_PASSWORD` (ecosystem.config) **and** `SMTP_PASS` (CLAUDE.md) with a clear mismatch error when one is set without the other. |
+| R4-HIGH5 | `scripts/agents/customer-lifecycle.ts` | `ai.suggestNudge` wrapped in per-org try/catch so one org throwing doesn't skip the rest of the fleet. |
+| R4-HIGH6 | `scripts/agents/customer-lifecycle.ts:sendNudge` | SMTP error handler only logs `err.code ?? 'UNKNOWN'` + masked recipient — no DSN bodies or raw emails. |
+| R4-HIGH7 | `onboarding.service.ts` | All three failure paths (handler catch, missing orgId, mark-milestone failure) escalated `warn → error` with stack traces. |
+| R4-HIGH8 | new `agents.controller.spec.ts` | Allowlist behavior + org-context derivation from `@CurrentUser` + 404 vs 201 response contract covered. |
+| R4-HIGH9 | new `middleware/test/agents.e2e-spec.ts` | End-to-end proof: `POST /auth/register` → polls for `OrganizationOnboarding.welcomeEmailSentAt` to prove the full event pipeline is wired. |
+
+### R4 MEDIUM — fixed
+
+| ID | File | Fix |
+|---|---|---|
+| R4-MED1 | `dto/create-customer-incident.dto.ts` | Added `@IsNotEmpty()` on 5 required strings (was accepting empty-string). |
+| R4-MED2 | `agents.controller.ts` | New `GET /agents/incidents` + `PATCH /agents/incidents/:id/resolve` — dashboard can now close incidents; 404 masks cross-org id enumeration. |
+| R4-MED3 | new `packages/database/src/types/agent-signals.ts` | Single canonical home for `TicketSignal`, `NudgeSuggestion`, etc. `middleware/.../agent-ai.interface.ts` and `scripts/agents/lib/types.ts` both re-export — can no longer drift. Resolves prior-round PEND-X1. |
+| R4-MED4 | `agent-state.service.ts:188` | Lock timeout now throws `ServiceUnavailableException` (503) — silent proceed could drop `pendingManualRun` flags under cron contention. Script-side throws a plain Error. |
+| R4-MED5 | `agent-state.service.ts:33,116` | `aggregateStatus` filters `readdir` output against `KNOWN_FAMILIES` allowlist. Stray files can't surface via the API. |
+| R4-MED6 | `scripts/agents/customer-lifecycle.ts` | Mark-sent failures + auto-complete failures now push `customerIncident` rows with remediation text, not just log lines. |
+| R4-MED7 | `agent-state.service.ts:85-98` | Corrupt state file is renamed to `<family>.json.corrupt.<ts>.json` and a sentinel returned — we keep the evidence for post-mortem. |
+| R4-MED8 | `app.module.ts:42` | `EventEmitterModule.forRoot({ ignoreErrors: false, verboseMemoryLeak: true })` — handler throws now surface, listener leaks now log. |
+| R4-MED9 | `agents.module.ts` AI factory | Production: unknown provider name still falls back (typo tolerance) but explicitly-named anthropic/openai that fail to init now **rethrow** in prod. Silent heuristic fallback hid real outages. Error message sanitized for `sk-*` and `key=...` tokens. |
+| R4-MED10 | `agent-state.service.spec.ts` | Added Promise.all-concurrent-write, stale-lock takeover via utimes, and lock-timeout-503 tests. |
+| R4-MED11 | `auth.service.spec.ts` + `displays/pairing.service.spec.ts` | Publishers now assert `emit(name, objectContaining({ organizationId }))` — a rename on the publisher side will fail the test. |
+
+### R4 LOW — landed
+
+- `@ApiTags('agents')`, `@ApiBearerAuth()`, and `@ApiOperation` on every endpoint.
+- `@HttpCode(201)` on `POST /incidents` (explicit).
+- AI factory err.message stripped of `sk-*` / `api_key=*` before logging.
+- `onboarding.service.spec.ts` now asserts logger.error path (R4-HIGH7 regression guard).
+- `heuristic-agent-ai.spec.ts` snapshots `rerank().reason` — diff surfaces when contributing factors change.
+
+### R4 still deferred (carry into follow-up PR)
+
+- Rename `AnthropicAgentAI` / `OpenAIAgentAI` stub classes to `*Placeholder`. Cosmetic — non-blocking.
+- PEND-H1, PEND-H2, PEND-M2, PEND-M4 go-live items from prior round remain open.
+- Prisma enum migration (PEND-A1) and FK constraints (PEND-A2) deferred — the `remediation` nullability migration in this PR is already schema-touching; batching more drift risk is unwise.
+

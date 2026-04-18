@@ -101,5 +101,22 @@ describe('HeuristicAgentAI', () => {
       const b = await ai.rerank([mkTicket({ id: 'x', priority: 'high', orgTier: 'pro' })]);
       expect(a[0].score).toBe(b[0].score);
     });
+
+    // R4-LOW: the `reason` string surfaces in support dashboards and is user-
+    // facing, so its shape matters. Snapshot a representative case — when the
+    // contributing factors change, the diff makes it visible in review.
+    it('produces a human-readable reason string (snapshot)', async () => {
+      const ranked = await ai.rerank([
+        mkTicket({
+          id: 'snap',
+          priority: 'high',
+          orgTier: 'pro',
+          category: 'billing',
+          hasAttachment: true,
+          ageMinutes: 120,
+        }),
+      ]);
+      expect(ranked[0].reason).toMatchSnapshot();
+    });
   });
 });

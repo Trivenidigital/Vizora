@@ -314,10 +314,13 @@ module.exports = {
         VALIDATOR_BASE_URL: 'http://localhost:3000',
         LIFECYCLE_LIVE: 'false',
       },
+      // R4-HIGH3: LIFECYCLE_LIVE intentionally omitted from env_production.
+      // To arm live sends, set LIFECYCLE_LIVE=true in the host OS environment
+      // (e.g. /etc/systemd/system/pm2-deploy.service). Pinning it here would
+      // override operator intent on every `pm2 reload --env production`.
       env_production: {
         NODE_ENV: 'production',
         VALIDATOR_BASE_URL: 'http://localhost:3000',
-        LIFECYCLE_LIVE: 'false',
       },
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       max_size: '10M',

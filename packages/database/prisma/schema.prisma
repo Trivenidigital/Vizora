@@ -821,7 +821,7 @@ model CustomerIncident {
   target          String
   targetId        String
   message         String   @db.Text
-  remediation     String   @db.Text
+  remediation     String?  @db.Text
 
   status          String   @default("open") // 'open' | 'resolved' | 'escalated'
   detectedAt      DateTime @default(now())

@@ -38,8 +38,11 @@ import { AgentsModule } from '../modules/agents/agents.module';
     ConfigModule,
     // Scheduled tasks for content expiration, etc.
     ScheduleModule.forRoot(),
-    // Event-driven validation monitoring (Tier 2)
-    EventEmitterModule.forRoot(),
+    // Event-driven validation monitoring (Tier 2).
+    // R4-MED8: enable verboseMemoryLeak so stale listeners surface in logs;
+    // ignoreErrors:false so handler throws propagate to the logger instead of
+    // being swallowed silently by EventEmitter2.
+    EventEmitterModule.forRoot({ ignoreErrors: false, verboseMemoryLeak: true }),
     // Rate limiting - RELAXED for development/testing, STRICT for production
     ThrottlerModule.forRoot(
       process.env.NODE_ENV === 'production'

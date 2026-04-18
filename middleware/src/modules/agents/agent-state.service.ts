@@ -1,11 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 
 /**
  * Reads and aggregates per-family agent state files from
- * `logs/agent-state/*.json`. All output passes through recursive
- * forbidden-key redaction before leaving the process (D9).
+ * `<AGENT_STATE_DIR or cwd/logs/agent-state>/*.json`. All output passes through
+ * recursive forbidden-key redaction before leaving the process (D9).
  *
  * Writes are limited to `enqueueManualRun()` — which sets a boolean flag
  * in the target family's state file that the cron script will pick up
@@ -15,7 +15,9 @@ import { join } from 'node:path';
  * status endpoint (D-nest-R3-2). `enqueueManualRun` acquires the same
  * `.lock` file convention used by cron workers so concurrent writes from
  * a manual trigger and an in-flight cron tick cannot corrupt state
- * (D-arch-R3-1).
+ * (D-arch-R3-1). On lock timeout we raise 503 rather than silently
+ * proceed — losing the pendingManualRun flag under contention used to
+ * be invisible (R4-MED4).
  */
 const AGENT_TO_FAMILY: Record<string, string> = {
   'customer-lifecycle': 'customer',
@@ -26,6 +28,10 @@ const AGENT_TO_FAMILY: Record<string, string> = {
   'agent-orchestrator': 'ops',
 };
 
+// R4-MED5: only allow reads from known family files; an attacker or misconfigured
+// agent dropping a file into the state dir cannot surface it via the API.
+const KNOWN_FAMILIES = new Set<string>(['customer', 'content', 'fleet', 'billing', 'ops']);
+
 const LOCK_TIMEOUT_MS = 5_000;
 const LOCK_RETRY_MS = 50;
 const LOCK_STALE_MS = 30_000;
@@ -35,12 +41,20 @@ export class AgentStateService {
   private readonly logger = new Logger(AgentStateService.name);
   private readonly stateDir: string;
 
-  /** Expanded regex — blocks secrets, creds, auth, cookies, sessions (D9 + R2 nice). */
+  /**
+   * R4-HIGH1: anchored regex — redacts exact secret-family keys rather than any
+   * substring match. `authorType` no longer matches `auth`; `monkey` no longer
+   * matches `key`. Also covers PII (email, phone, address, recipient).
+   */
   private static readonly FORBIDDEN_KEY_REGEX =
-    /token|secret|key|password|apiKey|webhook|jwt|credential|auth|cookie|session|private|access/i;
+    /^(token|secret|password|passphrase|apiKey|api_key|webhook|webhookUrl|jwt|credential|cookie|sessionId|session_token|privateKey|private_key|accessToken|access_token|refreshToken|refresh_token|authHeader|authorization|email|emailAddress|recipient|phone|phoneNumber|address|fullName)$/i;
 
   constructor() {
-    this.stateDir = join(__dirname, '..', '..', '..', '..', 'logs', 'agent-state');
+    // R4-HIGH2: env-configurable, cwd-relative default. Matches
+    // scripts/agents/lib/state.ts so middleware and cron read the same files
+    // regardless of whether middleware runs from dist/ or src/.
+    this.stateDir = process.env.AGENT_STATE_DIR
+      ?? join(process.cwd(), 'logs', 'agent-state');
   }
 
   private sanitize(value: unknown): unknown {
@@ -59,15 +73,6 @@ export class AgentStateService {
     return value;
   }
 
-  private async pathExists(p: string): Promise<boolean> {
-    try {
-      await fs.access(p);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
   private async readFamilyFile(family: string): Promise<unknown> {
     const file = join(this.stateDir, `${family}.json`);
     try {
@@ -76,8 +81,23 @@ export class AgentStateService {
     } catch (err: unknown) {
       const code = (err as NodeJS.ErrnoException)?.code;
       if (code === 'ENOENT') return null;
+      // R4-MED7: preserve corrupt file out-of-band; caller sees a sentinel.
+      if (err instanceof SyntaxError) {
+        const backup = `${file}.corrupt.${Date.now()}.json`;
+        try {
+          await fs.rename(file, backup);
+          this.logger.error(
+            `state file '${family}' parse failed; preserved as ${backup}`,
+          );
+        } catch (renameErr) {
+          this.logger.error(
+            `state file '${family}' parse failed and backup failed: ${String(renameErr)}`,
+          );
+        }
+        return { __error: 'state file corrupt', family, preservedAs: backup };
+      }
       this.logger.warn(
-        `failed to parse ${file}: ${err instanceof Error ? err.message : err}`,
+        `state file '${family}' read failed: ${err instanceof Error ? err.message : err}`,
       );
       return null;
     }
@@ -92,11 +112,15 @@ export class AgentStateService {
       if (code === 'ENOENT') return { families: [], page, limit, total: 0 };
       throw err;
     }
+    // R4-MED5: allowlist
+    const allowed = files
+      .map((f) => f.replace(/\.json$/, ''))
+      .filter((family) => KNOWN_FAMILIES.has(family));
     const all = await Promise.all(
-      files.map(async (f) => {
-        const family = f.replace(/\.json$/, '');
-        return { family, state: this.sanitize(await this.readFamilyFile(family)) };
-      }),
+      allowed.map(async (family) => ({
+        family,
+        state: this.sanitize(await this.readFamilyFile(family)),
+      })),
     );
     const start = (page - 1) * limit;
     const slice = all.slice(start, start + limit);
@@ -159,8 +183,11 @@ export class AgentStateService {
         await new Promise((r) => setTimeout(r, LOCK_RETRY_MS + Math.random() * 50));
       }
     }
-    // Proceed without lock on timeout — same degraded-but-alive policy as cron workers
-    this.logger.warn(`lock acquisition timed out for ${lockFile}`);
+    // R4-MED4: escalate lock timeout to 503 rather than silently proceed —
+    // a concurrent cron tick can no longer lose pendingManualRun flags.
+    throw new ServiceUnavailableException(
+      `agent state busy, retry shortly (lock=${lockFile})`,
+    );
   }
 
   private async releaseLock(lockFile: string): Promise<void> {

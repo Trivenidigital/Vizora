@@ -65,18 +65,22 @@ export class OnboardingService {
     try {
       await this.markMilestone(evt.organizationId ?? '', field);
     } catch (err) {
-      // Defense-in-depth: markMilestone already swallows, but belt-and-braces
-      // in case a future change throws before the inner try.
-      this.logger.warn(
-        `onboarding handler failed (field=${field}): ${err instanceof Error ? err.message : err}`,
+      // R4-HIGH7: escalate warn → error with stack. Belt-and-braces: markMilestone
+      // already swallows, but if a future change throws before the inner try we
+      // want a stack trace, not a one-line message.
+      this.logger.error(
+        `onboarding handler failed (field=${field})`,
+        err instanceof Error ? err.stack : String(err),
       );
     }
   }
 
   async markMilestone(orgId: string, field: MilestoneField): Promise<void> {
     if (!orgId) {
-      // Publisher bug — log but don't throw
-      this.logger.warn(`markMilestone called without orgId (field=${field})`);
+      // R4-HIGH7: escalate — a publisher emitting without organizationId is a
+      // real wiring bug that breaks every milestone for the org. This must
+      // page support, not hide behind warn.
+      this.logger.error(`markMilestone called without orgId (field=${field})`);
       return;
     }
     try {
@@ -100,9 +104,11 @@ export class OnboardingService {
         data: { [field]: new Date() },
       });
     } catch (err) {
-      // Fire-and-forget: never propagate failure to the publisher (D3)
-      this.logger.warn(
-        `markMilestone failed for org=${orgId} field=${field}: ${err instanceof Error ? err.message : err}`,
+      // Fire-and-forget: never propagate failure to the publisher (D3).
+      // R4-HIGH7: include stack trace so we can pinpoint Prisma schema drift.
+      this.logger.error(
+        `markMilestone failed for org=${orgId} field=${field}`,
+        err instanceof Error ? err.stack : String(err),
       );
     }
   }

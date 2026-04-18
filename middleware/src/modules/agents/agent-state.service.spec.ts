@@ -1,7 +1,8 @@
 import { AgentStateService } from './agent-state.service';
+import { ServiceUnavailableException } from '@nestjs/common';
 import {
   mkdtempSync, rmSync, writeFileSync, existsSync, readFileSync,
-  openSync, closeSync,
+  openSync, closeSync, utimesSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -24,13 +25,14 @@ describe('AgentStateService', () => {
     writeFileSync(join(stateDir, `${family}.json`), JSON.stringify(data));
   };
 
-  describe('sanitize / FORBIDDEN_KEY_REGEX (D9 + R2)', () => {
+  describe('sanitize / FORBIDDEN_KEY_REGEX (D9 + R2 + R4-HIGH1 anchored)', () => {
+    // R4-HIGH1: the regex is now anchored (`^...$/i`) so only EXACT matches
+    // to the allowlist are redacted. Variants like `apiToken`, `clientSecret`,
+    // or bare `key` are intentionally NOT redacted — they were false-positive
+    // substring matches in the old unanchored regex.
     it.each([
       'token',
-      'apiToken',
       'secret',
-      'clientSecret',
-      'key',
       'apiKey',
       'password',
       'webhook',
@@ -47,6 +49,15 @@ describe('AgentStateService', () => {
       expect(result[key]).toBe('[REDACTED]');
       expect(result.safe).toBe('ok');
     });
+
+    it.each(['apiToken', 'clientSecret', 'key', 'authorType', 'monkey'])(
+      'does NOT redact non-allowlisted key %s (anchored regex)',
+      async (key) => {
+        write('customer', { [key]: 'harmless', safe: 'ok' });
+        const result = (await service.read('customer-lifecycle')) as Record<string, unknown>;
+        expect(result[key]).toBe('harmless');
+      },
+    );
 
     it('redacts recursively inside nested objects', async () => {
       write('customer', {
@@ -88,9 +99,20 @@ describe('AgentStateService', () => {
       await expect(service.read('customer-lifecycle')).resolves.toBeNull();
     });
 
-    it('returns null when the family file is malformed JSON', async () => {
+    it('preserves malformed JSON out-of-band and returns a corruption sentinel (R4-MED7)', async () => {
       writeFileSync(join(stateDir, 'customer.json'), 'not-json{');
-      await expect(service.read('customer-lifecycle')).resolves.toBeNull();
+      const result = (await service.read('customer-lifecycle')) as {
+        __error: string;
+        family: string;
+        preservedAs: string;
+      } | null;
+      expect(result).not.toBeNull();
+      expect(result!.__error).toBe('state file corrupt');
+      expect(result!.family).toBe('customer');
+      // Backup file exists, original is gone.
+      expect(existsSync(join(stateDir, 'customer.json'))).toBe(false);
+      expect(result!.preservedAs).toMatch(/customer\.json\.corrupt\./);
+      expect(existsSync(result!.preservedAs)).toBe(true);
     });
 
     it('maps agent name → family (customer-lifecycle → customer)', async () => {
@@ -199,5 +221,57 @@ describe('AgentStateService', () => {
       await pending;
       expect(existsSync(join(stateDir, 'customer.json'))).toBe(true);
     });
+
+    // R4-MED10: the file lock is the only thing standing between two manual
+    // triggers landing on each other. If Promise.all on two enqueue calls
+    // corrupts the file, we lose the pendingManualRun flag silently.
+    it('serializes concurrent enqueueManualRun calls — no lost writes', async () => {
+      write('customer', { runCount: 5, existingField: 'preserved' });
+      await Promise.all([
+        service.enqueueManualRun('customer-lifecycle'),
+        service.enqueueManualRun('customer-lifecycle'),
+      ]);
+      const file = JSON.parse(
+        readFileSync(join(stateDir, 'customer.json'), 'utf-8'),
+      );
+      // Both writes must have landed cleanly (valid JSON, nothing clobbered).
+      expect(file.runCount).toBe(5);
+      expect(file.existingField).toBe('preserved');
+      expect(file.pendingManualRun).toBe(true);
+      // Lock must have been released — otherwise subsequent calls hit 503.
+      expect(existsSync(join(stateDir, 'customer.json.lock'))).toBe(false);
+    });
+
+    it('takes over a stale lock whose mtime is older than LOCK_STALE_MS (30s)', async () => {
+      const lockPath = join(stateDir, 'customer.json.lock');
+      const fd = openSync(lockPath, 'wx');
+      closeSync(fd);
+      // Backdate mtime by 31s so acquireLock treats the lock as abandoned.
+      const oldTime = new Date(Date.now() - 31_000);
+      utimesSync(lockPath, oldTime, oldTime);
+      await service.enqueueManualRun('customer-lifecycle');
+      expect(existsSync(join(stateDir, 'customer.json'))).toBe(true);
+      expect(existsSync(lockPath)).toBe(false);
+    });
+
+    it(
+      'throws ServiceUnavailableException when the lock is held past the timeout',
+      async () => {
+        // Held, fresh lock (mtime is current so acquireLock can't steal it).
+        // Real timers + an extended test timeout so acquireLock's 5s retry
+        // loop exhausts exactly the same way it would in production.
+        const lockPath = join(stateDir, 'customer.json.lock');
+        const fd = openSync(lockPath, 'wx');
+        closeSync(fd);
+        try {
+          await expect(
+            service.enqueueManualRun('customer-lifecycle'),
+          ).rejects.toThrow(ServiceUnavailableException);
+        } finally {
+          rmSync(lockPath, { force: true });
+        }
+      },
+      10_000,
+    );
   });
 });

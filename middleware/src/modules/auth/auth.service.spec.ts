@@ -292,6 +292,27 @@ describe('AuthService', () => {
         }),
       });
     });
+
+    // R4-MED11: onboarding pipeline consumes `organizationId` by convention.
+    // If this contract ever drifts (e.g. renamed to `orgId`), every milestone
+    // silently stops recording. Pin the shape in a test.
+    it('emits user.welcomed with organizationId key', async () => {
+      mockDatabaseService.user.findUnique.mockResolvedValue(null);
+      mockDatabaseService.organization.findUnique.mockResolvedValue(null);
+      mockDatabaseService.organization.create.mockResolvedValue(mockOrganization);
+      mockDatabaseService.user.create.mockResolvedValue(mockUser);
+      mockDatabaseService.auditLog.create.mockResolvedValue({});
+      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-password');
+
+      const eventEmitter = (service as any).events;
+
+      await service.register(registerDto);
+
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        'user.welcomed',
+        expect.objectContaining({ organizationId: mockOrganization.id }),
+      );
+    });
   });
 
   describe('login', () => {

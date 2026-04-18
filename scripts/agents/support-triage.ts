@@ -36,7 +36,8 @@ import type {
 } from './lib/types.js';
 
 const AGENT = 'support-triage';
-const FAMILY = 'customer' as const;
+// Must match middleware/src/modules/agents/agent-state.service.ts AGENT_TO_FAMILY
+const FAMILY = 'ops' as const;
 const BATCH_LIMIT = 20;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -172,11 +173,11 @@ async function maybeUpdatePriority(
   if (Math.abs(rank(current) - rank(suggested)) < 2) return false;
 
   try {
-    await prisma.supportRequest.update({
-      where: { id: ticket.id },
+    const res = await prisma.supportRequest.updateMany({
+      where: { id: ticket.id, organizationId: ticket.organizationId },
       data: { priority: suggested },
     });
-    return true;
+    return res.count === 1;
   } catch (err) {
     log(`priority update failed for ticket=${ticket.id}: ${err instanceof Error ? err.message : err}`);
     return false;
@@ -214,7 +215,10 @@ async function main(): Promise<void> {
     }
     if (tickets.length === 0) continue;
 
-    const deviceCount = await countDisplaysForOrg(orgId).catch(() => 0);
+    const deviceCount = await countDisplaysForOrg(orgId).catch((err) => {
+      log(`countDisplays failed org=${orgId}: ${err instanceof Error ? err.message : err}`);
+      return 0;
+    });
     const signals = await buildSignals(tickets, deviceCount);
 
     let ranked;
@@ -250,7 +254,7 @@ async function main(): Promise<void> {
     incidents,
   };
 
-  const state = readAgentState(FAMILY);
+  const state = await readAgentState(FAMILY);
   state.agentResults = { ...state.agentResults, [AGENT]: result };
   state.lastRun = { ...state.lastRun, [AGENT]: new Date().toISOString() };
   writeAgentState(FAMILY, state);

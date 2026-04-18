@@ -75,4 +75,36 @@ describe('OnboardingService', () => {
       service.onScheduleCreated({ organizationId: 'o1', scheduleId: 's1' }),
     ).resolves.toBeUndefined();
   });
+
+  // R4-LOW: silent failures used to log at warn with no stack; R4-HIGH7
+  // escalated them to error with stack. Lock the behavior in a test so a
+  // future refactor can't regress it back to warn.
+  it('logs DB errors at logger.error with a stack trace (R4-HIGH7)', async () => {
+    const logger = (service as unknown as { logger: { error: jest.Mock } })
+      .logger;
+    const spy = jest.spyOn(logger, 'error').mockImplementation(() => {});
+    const boom = new Error('boom');
+    db.organizationOnboarding.upsert.mockRejectedValueOnce(boom);
+    await service.onScheduleCreated({ organizationId: 'o1', scheduleId: 's1' });
+    expect(spy).toHaveBeenCalledWith(
+      expect.stringContaining('markMilestone failed'),
+      expect.stringContaining('Error: boom'),
+    );
+    spy.mockRestore();
+  });
+
+  it('logs at error (not warn) when publisher omits organizationId', async () => {
+    const logger = (service as unknown as {
+      logger: { error: jest.Mock; warn: jest.Mock };
+    }).logger;
+    const errorSpy = jest.spyOn(logger, 'error').mockImplementation(() => {});
+    const warnSpy = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+    await service.onUserWelcomed({ organizationId: '', userId: 'u1' });
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('markMilestone called without orgId'),
+    );
+    expect(warnSpy).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
+    warnSpy.mockRestore();
+  });
 });

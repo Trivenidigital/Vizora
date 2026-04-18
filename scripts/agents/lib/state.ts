@@ -6,25 +6,29 @@
  * `customer`, `content`, `fleet`, `billing`, `ops`.
  *
  * Inherits the atomic-lock pattern from scripts/ops/lib/state.ts.
+ *
+ * STATE_DIR resolution:
+ *   Explicit `AGENT_STATE_DIR` env wins; else `<cwd>/logs/agent-state`.
+ *   The middleware AgentStateService uses the same resolution so both
+ *   processes read/write the same files regardless of whether the script
+ *   runs from dist/ or src/ (R4-HIGH2).
  */
 
 import {
   readFileSync, writeFileSync, mkdirSync, existsSync,
-  openSync, closeSync, unlinkSync, statSync,
+  openSync, closeSync, unlinkSync, statSync, renameSync,
 } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join } from 'node:path';
 import type { AgentFamilyState, AgentFamily } from './types.js';
 
 const MAX_INCIDENTS = 200;
 const MAX_REMEDIATIONS = 100;
 const LOCK_TIMEOUT_MS = 5_000;
 const LOCK_RETRY_MS = 50;
+const LOCK_STALE_MS = 30_000;
 
-/** Project-root-relative path. Windows-safe `import.meta.url` parse. */
-const STATE_DIR = join(
-  dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1')),
-  '..', '..', '..', 'logs', 'agent-state',
-);
+const STATE_DIR = process.env.AGENT_STATE_DIR
+  ?? join(process.cwd(), 'logs', 'agent-state');
 
 function stateFileFor(family: AgentFamily): string {
   return join(STATE_DIR, `${family}.json`);
@@ -34,7 +38,11 @@ function lockFileFor(family: AgentFamily): string {
   return stateFileFor(family) + '.lock';
 }
 
-function acquireLock(family: AgentFamily): void {
+async function sleep(ms: number): Promise<void> {
+  await new Promise((r) => setTimeout(r, ms));
+}
+
+async function acquireLock(family: AgentFamily): Promise<void> {
   const lockFile = lockFileFor(family);
   const deadline = Date.now() + LOCK_TIMEOUT_MS;
   while (Date.now() < deadline) {
@@ -46,17 +54,18 @@ function acquireLock(family: AgentFamily): void {
       try {
         if (existsSync(lockFile)) {
           const { mtimeMs } = statSync(lockFile);
-          if (Date.now() - mtimeMs > 30_000) {
+          if (Date.now() - mtimeMs > LOCK_STALE_MS) {
             try { unlinkSync(lockFile); } catch { /* race */ }
             continue;
           }
         }
       } catch { /* gone, retry */ }
-      const waitEnd = Date.now() + LOCK_RETRY_MS + Math.random() * 50;
-      while (Date.now() < waitEnd) { /* spin */ }
+      await sleep(LOCK_RETRY_MS + Math.random() * 50);
     }
   }
-  // Proceed without lock on timeout — better than crashing
+  // R4-MED4: escalate timeout instead of silently proceeding — caller loses data
+  // guarantees if we write without the lock. Cron exits non-zero; operator sees.
+  throw new Error(`acquireLock timeout for ${family} after ${LOCK_TIMEOUT_MS}ms`);
 }
 
 function releaseLock(family: AgentFamily): void {
@@ -76,16 +85,11 @@ function emptyState(): AgentFamilyState {
   };
 }
 
-/**
- * Read-modify-write: acquires the family lock. Caller MUST follow with
- * `writeAgentState(family, state)` to release the lock.
- */
-export function readAgentState(family: AgentFamily): AgentFamilyState {
-  acquireLock(family);
+function loadState(family: AgentFamily): AgentFamilyState {
+  const file = stateFileFor(family);
+  if (!existsSync(file)) return emptyState();
+  const raw = readFileSync(file, 'utf-8');
   try {
-    const file = stateFileFor(family);
-    if (!existsSync(file)) return emptyState();
-    const raw = readFileSync(file, 'utf-8');
     const parsed = JSON.parse(raw) as AgentFamilyState;
     return {
       systemStatus: parsed.systemStatus ?? 'HEALTHY',
@@ -97,8 +101,33 @@ export function readAgentState(family: AgentFamily): AgentFamilyState {
       emailsSentThisRun: parsed.emailsSentThisRun ?? 0,
       pendingManualRun: parsed.pendingManualRun ?? false,
     };
-  } catch {
+  } catch (err) {
+    // R4-MED7: preserve corrupt file instead of silently overwriting
+    const backup = `${file}.corrupt.${Date.now()}.json`;
+    try {
+      renameSync(file, backup);
+      process.stderr.write(
+        `[agent-state] ${family}.json parse failed (${String(err)}); preserved as ${backup}\n`,
+      );
+    } catch { /* best-effort */ }
     return emptyState();
+  }
+}
+
+/**
+ * Read-modify-write: acquires the family lock. Caller MUST follow with
+ * `writeAgentState(family, state)` to release the lock.
+ *
+ * R4-BLOCK4: previously swallowed errors and returned emptyState() while still
+ * holding the lock; a subsequent parse error leaked the lock for 30s.
+ */
+export async function readAgentState(family: AgentFamily): Promise<AgentFamilyState> {
+  await acquireLock(family);
+  try {
+    return loadState(family);
+  } catch (err) {
+    releaseLock(family);
+    throw err;
   }
 }
 
