@@ -10,6 +10,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { OAuth2Client, TokenPayload } from 'google-auth-library';
 import { DatabaseService } from '../database/database.service';
 import { RedisService } from '../redis/redis.service';
@@ -40,6 +41,7 @@ export class AuthService {
     private geoService: GeoService,
     private billingService: BillingService,
     private storageService: StorageService,
+    private events: EventEmitter2,
   ) {}
 
   async register(dto: RegisterDto, clientIp?: string) {
@@ -136,6 +138,9 @@ export class AuthService {
     ).catch((err) => {
       this.logger.warn(`Failed to send welcome email to ${user.email}: ${err}`);
     });
+
+    // Emit onboarding event. organizationId comes from the DB record (authoritative).
+    this.events.emit('user.welcomed', { organizationId: organization.id, userId: user.id });
 
     return {
       user: this.sanitizeUser(user),
@@ -268,6 +273,9 @@ export class AuthService {
       ).catch((err) => {
         this.logger.warn(`Failed to send welcome email to ${user!.email}: ${err instanceof Error ? err.message : 'Unknown'}`);
       });
+
+      // Emit onboarding event. organizationId is the user's JWT-derived org.
+      this.events.emit('user.welcomed', { organizationId: user.organizationId, userId: user.id });
     }
 
     // Update last login

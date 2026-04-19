@@ -89,7 +89,8 @@ describe('PairingService', () => {
       healthCheck: jest.fn().mockResolvedValue({ healthy: true, responseTime: 1 }),
     } as any;
 
-    service = new PairingService(mockDatabaseService, mockJwtService, mockRedisService);
+    const mockEventEmitter = { emit: jest.fn() } as any;
+    service = new PairingService(mockDatabaseService, mockJwtService, mockRedisService, mockEventEmitter);
   });
 
   afterEach(() => {
@@ -525,6 +526,35 @@ describe('PairingService', () => {
       // NOW the code should be cleaned up
       await expect(service.checkPairingStatus(pairingResult.code)).rejects.toThrow(
         NotFoundException,
+      );
+    });
+
+    // R4-MED11: onboarding subscribes to display.paired with `organizationId`.
+    // Guard the payload shape so a publisher-side rename can't silently break
+    // the firstScreenPairedAt milestone.
+    it('emits display.paired with organizationId key', async () => {
+      mockDatabaseService.display.findUnique.mockResolvedValue(null);
+
+      const pairingResult = await service.requestPairingCode({
+        deviceIdentifier: 'event-device',
+        nickname: 'Event Test',
+        metadata: {},
+      });
+
+      mockDatabaseService.display.create.mockResolvedValue({
+        id: 'display-evt',
+        nickname: 'Event Test',
+        deviceIdentifier: 'event-device',
+        status: 'pairing',
+      } as any);
+
+      const eventEmitter = (service as any).events;
+
+      await service.completePairing(organizationId, userId, { code: pairingResult.code });
+
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        'display.paired',
+        expect.objectContaining({ organizationId, displayId: 'display-evt' }),
       );
     });
 

@@ -3,6 +3,23 @@
  * Configures environment and initializes test database
  */
 
+// Globally mock isomorphic-dompurify so no e2e suite transitively loads
+// jsdom. jsdom@28 pulls in several ESM-only deps (@csstools/css-calc,
+// @asamuzakjp/css-color, @exodus/bytes, etc.) that Jest's CJS runtime
+// can't execute without --experimental-vm-modules. The mock preserves
+// the behavior unit-test expectations rely on: strip <script> tags.
+jest.mock('isomorphic-dompurify', () => ({
+  __esModule: true,
+  default: {
+    sanitize: jest.fn((html: string) =>
+      html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+          .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
+          .replace(/\son\w+\s*=\s*["'][^"']*["']/gi, '')
+          .replace(/javascript:[^"'\s>]*/gi, ''),
+    ),
+  },
+}));
+
 // Load test environment variables
 import * as dotenv from 'dotenv';
 import * as path from 'path';

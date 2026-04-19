@@ -68,7 +68,7 @@ describe('Displays (e2e)', () => {
       .post('/api/auth/register')
       .send(testUser);
     
-    authToken = registerRes.body.data.token;
+    authToken = registerRes.body.data.access_token;
     userId = registerRes.body.data.user.id;
     organizationId = registerRes.body.data.user.organizationId;
 
@@ -87,7 +87,7 @@ describe('Displays (e2e)', () => {
       .post('/api/auth/register')
       .send(secondUser);
     
-    secondUserToken = secondRegisterRes.body.data.token;
+    secondUserToken = secondRegisterRes.body.data.access_token;
     secondUserId = secondRegisterRes.body.data.user.id;
     secondOrgId = secondRegisterRes.body.data.user.organizationId;
   });

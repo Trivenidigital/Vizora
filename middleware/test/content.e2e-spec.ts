@@ -8,6 +8,7 @@ jest.mock('isomorphic-dompurify', () => ({
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import request from 'supertest';
 import helmet from 'helmet';
 import { AppModule } from '../src/app/app.module';
@@ -68,7 +69,7 @@ describe('Content (e2e)', () => {
       },
     }));
     
-    app.useGlobalInterceptors(new SanitizeInterceptor());
+    app.useGlobalInterceptors(new SanitizeInterceptor(app.get(Reflector)));
     
     await app.init();
     db = moduleFixture.get<DatabaseService>(DatabaseService);
@@ -78,7 +79,7 @@ describe('Content (e2e)', () => {
       .post('/api/auth/register')
       .send(testUser);
     
-    authToken = registerRes.body.data.token;
+    authToken = registerRes.body.data.access_token;
     userId = registerRes.body.data.user.id;
     organizationId = registerRes.body.data.user.organizationId;
 
@@ -97,7 +98,7 @@ describe('Content (e2e)', () => {
       .post('/api/auth/register')
       .send(secondUser);
     
-    secondUserToken = secondRegisterRes.body.data.token;
+    secondUserToken = secondRegisterRes.body.data.access_token;
     secondUserId = secondRegisterRes.body.data.user.id;
     secondOrgId = secondRegisterRes.body.data.user.organizationId;
   });

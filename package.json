@@ -79,6 +79,7 @@
     "webpack-cli": "^5.1.4"
   },
   "dependencies": {
+    "@vizora/database": "workspace:*",
     "@nestjs/axios": "^4.0.1",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
