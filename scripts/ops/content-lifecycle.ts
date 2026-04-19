@@ -93,7 +93,7 @@ async function checkExpiredContent(
     log(AGENT, `Archiving expired content: ${label} (expired ${item.expiresAt})`);
 
     try {
-      await api.patch(`/content/${item.id}`, { status: 'archived' }, {
+      await api.post(`/content/${item.id}/archive`, {}, {
         target: 'content',
         targetId: item.id,
         action: `Archive expired content "${label}"`,
@@ -195,7 +195,7 @@ async function checkOrphanedContent(
     log(AGENT, `Archiving orphaned content: ${label} (created ${item.createdAt})`);
 
     try {
-      await api.patch(`/content/${item.id}`, { status: 'archived' }, {
+      await api.post(`/content/${item.id}/archive`, {}, {
         target: 'content',
         targetId: item.id,
         action: `Archive orphaned content "${label}"`,

@@ -145,7 +145,17 @@ export class NotificationService implements OnModuleInit, OnModuleDestroy {
             );
           }
         } catch (error) {
-          this.logger.error(`Error processing notification key ${key}:`, error);
+          // Drop the Redis key if the referenced org/device no longer exists.
+          // Prisma FK violations surface as P2003; leaving the key in place
+          // turns this into a 30-second retry loop that fills the error log.
+          if ((error as { code?: string })?.code === 'P2003') {
+            await this.redisService.delete(key);
+            this.logger.warn(
+              `Dropped orphaned notification key ${key} (FK violation — referenced row deleted)`,
+            );
+          } else {
+            this.logger.error(`Error processing notification key ${key}:`, error);
+          }
         }
       }
     } catch (error) {

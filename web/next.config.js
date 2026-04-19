@@ -18,6 +18,7 @@ const nextConfig = {
     ignoreBuildErrors: false,
   },
   productionBrowserSourceMaps: false,
+  poweredByHeader: false,
   // Allow Server Actions from production and dev origins.
   // The actual fix for "Failed to find Server Action" errors on rebuild
   // is the NEXT_SERVER_ACTIONS_ENCRYPTION_KEY env var (read automatically
@@ -57,6 +58,11 @@ const nextConfig = {
     config.devtool = false;
     return config;
   },
+  async redirects() {
+    return [
+      { source: '/pricing', destination: '/#pricing', permanent: false },
+    ];
+  },
   // Proxy API requests through Next.js to the backend.
   // This makes cookies same-origin (both on port 3001) so httpOnly auth
   // cookies set by the backend are visible to Next.js middleware.
@@ -91,54 +97,63 @@ const nextConfig = {
   },
   // Security headers
   async headers() {
-    const cspBackendUrl = process.env.BACKEND_URL || 'http://localhost:3000';
-    const realtimeUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3002';
+    const isProd = process.env.NODE_ENV === 'production';
+    // Browser-visible endpoints. API is always same-origin (Next.js rewrites proxy
+    // to middleware), so only realtime and dev loopbacks need to be listed.
+    const realtimeUrl = process.env.NEXT_PUBLIC_SOCKET_URL || '';
+    const devSources = isProd ? '' : 'http://localhost:3000 http://localhost:3002';
+
+    const commonSecurityHeaders = [
+      { key: 'X-Content-Type-Options', value: 'nosniff' },
+      { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+      { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()' },
+    ];
+    if (isProd) {
+      commonSecurityHeaders.push({
+        key: 'Strict-Transport-Security',
+        value: 'max-age=63072000; includeSubDomains; preload',
+      });
+    }
+
+    const displayCsp = [
+      `default-src 'self'`,
+      `script-src 'self' 'unsafe-inline'`,
+      `style-src 'self' 'unsafe-inline'`,
+      `img-src 'self' data: blob: https: ${devSources}`,
+      `font-src 'self' data:`,
+      `connect-src 'self' ${realtimeUrl} ws: wss: https: ${devSources}`,
+      `media-src 'self' blob: https: ${devSources}`,
+      `frame-src 'self' https:`,
+    ].filter(Boolean).join('; ');
+
+    const dashboardCsp = [
+      `default-src 'self'`,
+      `script-src 'self' 'unsafe-inline' https://accounts.google.com https://apis.google.com`,
+      `style-src 'self' 'unsafe-inline' https://accounts.google.com https://fonts.googleapis.com`,
+      `img-src 'self' data: blob: https: ${devSources}`,
+      `font-src 'self' data: https://fonts.gstatic.com`,
+      `connect-src 'self' ${realtimeUrl} https://accounts.google.com wss: ${devSources}`,
+      `frame-src 'self' https://accounts.google.com`,
+      `media-src 'self' blob: ${devSources}`,
+      `frame-ancestors 'self'`,
+      `base-uri 'self'`,
+      `form-action 'self'`,
+    ].filter(Boolean).join('; ');
+
     return [
-      // Relaxed CSP for /display route — needs iframes, external media, WebSocket
       {
         source: '/display',
         headers: [
-          {
-            key: 'Content-Security-Policy',
-            value: `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: ${cspBackendUrl} https: http:; font-src 'self' data:; connect-src 'self' ${cspBackendUrl} ${realtimeUrl} ws: wss: https: http:; media-src 'self' blob: ${cspBackendUrl} https: http:; frame-src 'self' https: http:;`,
-          },
-          {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff',
-          },
-          {
-            key: 'X-XSS-Protection',
-            value: '1; mode=block',
-          },
-          {
-            key: 'Referrer-Policy',
-            value: 'strict-origin-when-cross-origin',
-          },
+          { key: 'Content-Security-Policy', value: displayCsp },
+          ...commonSecurityHeaders,
         ],
       },
       {
         source: '/((?!display).*)',
         headers: [
-          {
-            key: 'Content-Security-Policy',
-            value: `default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; img-src 'self' data: ${cspBackendUrl} https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' ${cspBackendUrl} https://accounts.google.com ws: wss: https:; frame-src 'self' https://accounts.google.com; media-src 'self' ${cspBackendUrl};`,
-          },
-          {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff',
-          },
-          {
-            key: 'X-Frame-Options',
-            value: 'SAMEORIGIN',
-          },
-          {
-            key: 'X-XSS-Protection',
-            value: '1; mode=block',
-          },
-          {
-            key: 'Referrer-Policy',
-            value: 'strict-origin-when-cross-origin',
-          },
+          { key: 'Content-Security-Policy', value: dashboardCsp },
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          ...commonSecurityHeaders,
         ],
       },
     ];

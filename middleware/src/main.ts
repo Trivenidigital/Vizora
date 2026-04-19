@@ -45,6 +45,11 @@ async function bootstrap() {
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
+  // Trust the first proxy hop (nginx) so req.ip / X-Forwarded-For is honored.
+  // Without this ThrottlerGuard keys every request on 127.0.0.1, sharing one
+  // rate-limit bucket across all users and making per-IP limits meaningless.
+  app.set('trust proxy', 1);
+
   // Serve static files (thumbnails) with cache headers
   app.useStaticAssets(join(process.cwd(), 'static'), {
     prefix: '/static/',
