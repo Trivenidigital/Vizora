@@ -63,7 +63,7 @@ describe('Rate Limiting (e2e)', () => {
       .send(testUser);
 
     if (registerRes.status === 201 && registerRes.body?.data) {
-      authToken = registerRes.body.data.token;
+      authToken = registerRes.body.data.access_token;
       userId = registerRes.body.data.user?.id;
       organizationId = registerRes.body.data.user?.organizationId;
     }

@@ -77,14 +77,14 @@ describe('Auth (e2e)', () => {
         .expect(201)
         .expect((res) => {
           expect(res.body.success).toBe(true);
-          expect(res.body.data).toHaveProperty('token'); // Field is named 'token' not 'access_token'
+          expect(res.body.data).toHaveProperty('access_token');
           expect(res.body.data).toHaveProperty('user');
           expect(res.body.data.user.email).toBe(testUser.email);
           expect(res.body.data.user).not.toHaveProperty('password');
           expect(res.body.data.user).not.toHaveProperty('passwordHash');
-          
+
           // Save for later tests
-          authToken = res.body.data.token; // Correct field name
+          authToken = res.body.data.access_token;
           userId = res.body.data.user.id;
           organizationId = res.body.data.user.organizationId;
         });
@@ -166,7 +166,7 @@ describe('Auth (e2e)', () => {
         .expect(201) // Login returns 201 Created
         .expect((res) => {
           expect(res.body.success).toBe(true);
-          expect(res.body.data).toHaveProperty('token'); // Field is named 'token'
+          expect(res.body.data).toHaveProperty('access_token');
           expect(res.body.data).toHaveProperty('user');
           expect(res.body.data.user.email).toBe(testUser.email);
           expect(res.body.data.user).not.toHaveProperty('password');
