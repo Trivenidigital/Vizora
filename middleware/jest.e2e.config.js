@@ -19,7 +19,45 @@ module.exports = {
   // the unit-test config's anchored pattern silently misses these because
   // unit tests mock @vizora/database and rarely load dompurify for real,
   // but e2e bootstraps the full NestJS app.
+  // Allowlist includes the full jsdom@28 dep tree (from pnpm-lock.yaml)
+  // because isomorphic-dompurify pulls jsdom, and several jsdom transitives
+  // ship ESM-only. Better to transform too many than play whack-a-mole:
+  // each time a new ESM transitive gets added, tests break mysteriously.
   transformIgnorePatterns: [
-    'node_modules/(?!.*(@vizora|isomorphic-dompurify|@exodus|html-encoding-sniffer|jsdom|uuid))',
+    'node_modules/(?!.*(' +
+      [
+        '@vizora',
+        'isomorphic-dompurify',
+        'uuid',
+        // jsdom@28 and its direct + transitive deps
+        'jsdom',
+        '@acemir',
+        '@asamuzakjp',
+        '@bramus',
+        '@csstools',
+        '@exodus',
+        'cssstyle',
+        'css-tree',
+        'data-urls',
+        'decimal.js',
+        'html-encoding-sniffer',
+        'http-proxy-agent',
+        'https-proxy-agent',
+        'agent-base',
+        'lru-cache',
+        'parse5',
+        'rrweb-cssom',
+        'saxes',
+        'symbol-tree',
+        'tough-cookie',
+        'undici',
+        'w3c-xmlserializer',
+        'webidl-conversions',
+        'whatwg-encoding',
+        'whatwg-mimetype',
+        'whatwg-url',
+        'xml-name-validator',
+      ].join('|') +
+    '))',
   ],
 };
