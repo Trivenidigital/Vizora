@@ -155,7 +155,7 @@ jobs:
       # in CI before (the old `middleware-e2e` Nx project didn't exist), so they
       # drifted. Tracked separately; unblocking the agent-system PR here.
       - name: Run middleware E2E tests (agents suite)
-        run: pnpm --filter @vizora/middleware test:e2e -- --testPathPattern=agents
+        run: pnpm --filter @vizora/middleware exec jest --config=jest.e2e.config.js --runInBand --testPathPattern=agents
 
       - name: Run realtime E2E tests
         run: pnpm --filter @vizora/realtime test:e2e
