@@ -43,6 +43,10 @@ async function sleep(ms: number): Promise<void> {
 }
 
 async function acquireLock(family: AgentFamily): Promise<void> {
+  // Ensure STATE_DIR exists before attempting the lock; otherwise openSync throws
+  // ENOENT (not EEXIST), existsSync(lockFile) stays false, and we retry for the
+  // full LOCK_TIMEOUT_MS on every first run where the dir hasn't been created.
+  if (!existsSync(STATE_DIR)) mkdirSync(STATE_DIR, { recursive: true });
   const lockFile = lockFileFor(family);
   const deadline = Date.now() + LOCK_TIMEOUT_MS;
   while (Date.now() < deadline) {
