@@ -1,9 +1,12 @@
 module.exports = {
-  moduleFileExtensions: ['js', 'json', 'ts'],
+  moduleFileExtensions: ['js', 'mjs', 'cjs', 'json', 'ts'],
   rootDir: 'test',
   testRegex: '.*\\.e2e-spec\\.ts$',
   transform: {
-    '^.+\\.(t|j)s$': ['ts-jest', {
+    // Include .mjs so Jest can parse ESM-only deps like @csstools/css-calc
+    // that ship index.mjs; otherwise Node treats them as raw ESM and the
+    // CJS test runtime chokes on `import` syntax.
+    '^.+\\.(t|j|cj|mj)s$': ['ts-jest', {
       tsconfig: '<rootDir>/../tsconfig.spec.json',
       isolatedModules: true,
     }],
