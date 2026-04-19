@@ -8,6 +8,7 @@ jest.mock('isomorphic-dompurify', () => ({
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import request from 'supertest';
 import helmet from 'helmet';
 import { AppModule } from '../src/app/app.module';
@@ -68,7 +69,7 @@ describe('Content (e2e)', () => {
       },
     }));
     
-    app.useGlobalInterceptors(new SanitizeInterceptor());
+    app.useGlobalInterceptors(new SanitizeInterceptor(app.get(Reflector)));
     
     await app.init();
     db = moduleFixture.get<DatabaseService>(DatabaseService);
