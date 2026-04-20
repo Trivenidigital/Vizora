@@ -45,6 +45,19 @@ async function bootstrap() {
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
+  // Trust the first N proxy hops so req.ip / X-Forwarded-For is honored.
+  // Without this ThrottlerGuard keys every request on the nearest proxy IP,
+  // sharing one rate-limit bucket across all users. Default 1 = single nginx
+  // hop. Bump to 2+ for Cloudflare → nginx → app topology.
+  const trustProxyRaw = process.env.TRUST_PROXY_HOPS ?? '1';
+  const trustProxyHops = Number(trustProxyRaw);
+  if (!Number.isInteger(trustProxyHops) || trustProxyHops < 0) {
+    Logger.error(`❌ TRUST_PROXY_HOPS must be a non-negative integer, got: "${trustProxyRaw}"`);
+    process.exit(1);
+  }
+  app.set('trust proxy', trustProxyHops);
+  Logger.log(`trust proxy: ${trustProxyHops} hop(s) — rate-limiting keys on X-Forwarded-For[${trustProxyHops - 1}]`);
+
   // Serve static files (thumbnails) with cache headers
   app.useStaticAssets(join(process.cwd(), 'static'), {
     prefix: '/static/',
@@ -202,9 +215,16 @@ async function bootstrap() {
       }
     }
   } catch (error) {
-    Logger.error(`❌ FATAL: Cannot bind to port ${port}`);
-    Logger.error(`Another process is using port ${port}. Stop it first.`);
-    Logger.error(`Run: netstat -ano | findstr :${port}`);
+    const code = (error as NodeJS.ErrnoException)?.code;
+    Logger.error(`❌ FATAL: Cannot bind to port ${port} (code=${code || 'unknown'})`);
+    if (code === 'EADDRINUSE') {
+      Logger.error(`Another process is using port ${port}. Stop it first.`);
+      Logger.error(`Run: netstat -ano | findstr :${port}`);
+    } else if (code === 'EACCES') {
+      Logger.error(`Permission denied binding to port ${port}. Ports <1024 require elevated privileges.`);
+    } else {
+      Logger.error(`Underlying error: ${(error as Error)?.message || error}`);
+    }
     process.exit(1);
   }
 }
@@ -214,9 +234,20 @@ bootstrap().catch((err) => {
   process.exit(1);
 });
 
-// Catch unhandled rejections — log but don't exit; let PM2 handle restarts if needed
+// Catch unhandled rejections — log, send to Sentry for alerting, but don't
+// exit: PM2 will restart via health checks if the app actually stops serving
+// traffic. Exiting on every rejection would cause cascading restarts.
 process.on('unhandledRejection', (reason, promise) => {
   Logger.error('🚨 Unhandled Rejection at:', promise, 'reason:', reason);
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const Sentry = require('@sentry/nestjs');
+    if (Sentry?.captureException) {
+      Sentry.captureException(reason instanceof Error ? reason : new Error(String(reason)));
+    }
+  } catch {
+    // Sentry not available — fall back to log-only
+  }
 });
 
 // Catch uncaught exceptions
