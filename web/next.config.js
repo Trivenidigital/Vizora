@@ -7,6 +7,39 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
   enabled: process.env.ANALYZE === 'true',
 });
 
+// URL parsing with validation — malformed env values become CSP header-injection
+// vectors if passed through raw. Returns null on empty / invalid.
+function parseOriginSafe(envVar) {
+  const v = process.env[envVar];
+  if (!v) return null;
+  try {
+    return new URL(v).origin;
+  } catch {
+    throw new Error(
+      `Invalid ${envVar}: "${v}" is not a valid URL. Refusing to build (would inject unvalidated text into CSP header).`,
+    );
+  }
+}
+
+const apiOrigin = parseOriginSafe('NEXT_PUBLIC_API_URL');
+const socketOrigin = parseOriginSafe('NEXT_PUBLIC_SOCKET_URL');
+const socketWsOrigin = socketOrigin ? socketOrigin.replace(/^http/, 'ws') : null; // http→ws, https→wss
+
+// Build-time guard: production must have a socket origin. Without it, the CSP
+// connect-src previously fell back to bare scheme wildcards (ws:/wss:/https:)
+// which is effectively `connect-src *` for realtime traffic.
+if (process.env.NODE_ENV === 'production' && !socketOrigin) {
+  throw new Error(
+    'NEXT_PUBLIC_SOCKET_URL must be set in production — refusing to build a permissive CSP.',
+  );
+}
+
+// Staging is production-adjacent: any NODE_ENV value that isn't exactly
+// 'development' should NOT get loopback sources in the CSP. Prevents
+// devSources bleed-through on staging.
+const isDev = process.env.NODE_ENV === 'development';
+const devSources = isDev ? 'http://localhost:3000 http://localhost:3002 ws://localhost:3002' : '';
+
 /**
  * @type {import('@nx/next/plugins/with-nx').WithNxOptions}
  **/
@@ -42,16 +75,23 @@ const nextConfig = {
         port: '3000',
         pathname: '/uploads/**',
       },
-      // Production: parse hostname from NEXT_PUBLIC_API_URL
-      ...(process.env.NEXT_PUBLIC_API_URL ? [{
-        protocol: new URL(process.env.NEXT_PUBLIC_API_URL).protocol.replace(':', ''),
-        hostname: new URL(process.env.NEXT_PUBLIC_API_URL).hostname,
-        pathname: '/static/**',
-      }, {
-        protocol: new URL(process.env.NEXT_PUBLIC_API_URL).protocol.replace(':', ''),
-        hostname: new URL(process.env.NEXT_PUBLIC_API_URL).hostname,
-        pathname: '/api/**',
-      }] : []),
+      // Production: use validated apiOrigin (parseOriginSafe above). If
+      // NEXT_PUBLIC_API_URL is unset or malformed, this simply empties out —
+      // local Next.js rewrites still proxy to the middleware same-origin.
+      ...(apiOrigin
+        ? [
+            {
+              protocol: new URL(apiOrigin).protocol.replace(':', ''),
+              hostname: new URL(apiOrigin).hostname,
+              pathname: '/static/**',
+            },
+            {
+              protocol: new URL(apiOrigin).protocol.replace(':', ''),
+              hostname: new URL(apiOrigin).hostname,
+              pathname: '/api/**',
+            },
+          ]
+        : []),
     ],
   },
   webpack: (config) => {
@@ -98,47 +138,71 @@ const nextConfig = {
   // Security headers
   async headers() {
     const isProd = process.env.NODE_ENV === 'production';
-    // Browser-visible endpoints. API is always same-origin (Next.js rewrites proxy
-    // to middleware), so only realtime and dev loopbacks need to be listed.
-    const realtimeUrl = process.env.NEXT_PUBLIC_SOCKET_URL || '';
-    const devSources = isProd ? '' : 'http://localhost:3000 http://localhost:3002';
 
-    const commonSecurityHeaders = [
+    // Base security headers — applied to all routes. Immutable array: isProd
+    // splice via spread (avoids mutation-of-referenced-array footgun).
+    const baseSecurityHeaders = [
       { key: 'X-Content-Type-Options', value: 'nosniff' },
       { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-      { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()' },
+      {
+        key: 'Permissions-Policy',
+        // Added payment, usb, display-capture for a signage platform —
+        // display clients have no need for any of these, and disabling them
+        // shrinks the surface for compromised content.
+        value:
+          'camera=(), microphone=(), geolocation=(), interest-cohort=(), payment=(), usb=(), display-capture=()',
+      },
     ];
-    if (isProd) {
-      commonSecurityHeaders.push({
-        key: 'Strict-Transport-Security',
-        value: 'max-age=63072000; includeSubDomains; preload',
-      });
-    }
+    const commonSecurityHeaders = isProd
+      ? [
+          ...baseSecurityHeaders,
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=63072000; includeSubDomains; preload',
+          },
+        ]
+      : baseSecurityHeaders;
+
+    // Build connect-src with validated origins only. No bare scheme wildcards
+    // (`ws:`, `wss:`, `https:`) in prod — those defeated the tightening.
+    const connectSrcParts = ['\'self\''];
+    if (socketOrigin) connectSrcParts.push(socketOrigin);
+    if (socketWsOrigin) connectSrcParts.push(socketWsOrigin);
+    if (devSources) connectSrcParts.push(devSources);
 
     const displayCsp = [
       `default-src 'self'`,
-      `script-src 'self' 'unsafe-inline'`,
+      `script-src 'self' 'unsafe-inline'`, // NOTE: unsafe-inline is accepted risk; nonce-based CSP is a follow-up PR
       `style-src 'self' 'unsafe-inline'`,
       `img-src 'self' data: blob: https: ${devSources}`,
       `font-src 'self' data:`,
-      `connect-src 'self' ${realtimeUrl} ws: wss: https: ${devSources}`,
+      `connect-src ${[...connectSrcParts, 'https://accounts.google.com'].join(' ')}`,
       `media-src 'self' blob: https: ${devSources}`,
       `frame-src 'self' https:`,
-    ].filter(Boolean).join('; ');
+      // Display pages run on TV/kiosk screens — they should never be embedded
+      // in another context, have a different base URI, or submit forms.
+      `frame-ancestors 'none'`,
+      `base-uri 'self'`,
+      `form-action 'none'`,
+    ]
+      .filter(Boolean)
+      .join('; ');
 
     const dashboardCsp = [
       `default-src 'self'`,
-      `script-src 'self' 'unsafe-inline' https://accounts.google.com https://apis.google.com`,
+      `script-src 'self' 'unsafe-inline' https://accounts.google.com https://apis.google.com`, // NOTE: unsafe-inline is accepted risk; nonce-based CSP is a follow-up PR
       `style-src 'self' 'unsafe-inline' https://accounts.google.com https://fonts.googleapis.com`,
       `img-src 'self' data: blob: https: ${devSources}`,
       `font-src 'self' data: https://fonts.gstatic.com`,
-      `connect-src 'self' ${realtimeUrl} https://accounts.google.com wss: ${devSources}`,
+      `connect-src ${[...connectSrcParts, 'https://accounts.google.com'].join(' ')}`,
       `frame-src 'self' https://accounts.google.com`,
       `media-src 'self' blob: ${devSources}`,
       `frame-ancestors 'self'`,
       `base-uri 'self'`,
       `form-action 'self'`,
-    ].filter(Boolean).join('; ');
+    ]
+      .filter(Boolean)
+      .join('; ');
 
     return [
       {
