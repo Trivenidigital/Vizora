@@ -111,3 +111,6 @@ vizora/
 .logcat_out.txt
 .ssh_out*.txt
 emulator-*.png
+
+# Transient inventory search output (regenerable via skills-inventory-search.sh)
+skills-inventory-findings.txt
