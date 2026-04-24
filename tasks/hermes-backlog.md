@@ -39,8 +39,8 @@ This file exists because "we'll revisit after 30 days" loses to "we never revisi
 | # | Task | Size | Status |
 |---|------|------|--------|
 | 1 | Apply migration `20260424000000_add_support_request_ai_category` to production | 30 min | TODO — blocks data collection; clock only starts after this |
-| 2 | Build classifier fixture corpus (50–100 synthetic tickets + expected labels) | ~4 hr | TODO — **recommended next** |
-| 3 | Run fixture corpus as a Jest/vitest regression suite in CI | ~1 hr | TODO — follows #2 |
+| 2 | Build classifier fixture corpus (50–100 synthetic tickets + expected labels) | ~4 hr | DONE — 61 fixtures in `packages/database/tests/classify-ticket-v2.test.ts` |
+| 3 | Run fixture corpus as a Jest/vitest regression suite in CI | ~1 hr | DONE — `pnpm --filter @vizora/database test` runs via existing ts-jest config |
 | 4 | Smoke-test classifier against a real ticket in staging after migration | 15 min | TODO — follows #1 |
 
 ## Explicitly deferred (don't pick up until gate clears)
