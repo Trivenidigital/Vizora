@@ -21,7 +21,7 @@
  */
 
 import 'dotenv/config';
-import { prisma } from '@vizora/database';
+import { prisma, classifyCategoryV2 } from '@vizora/database';
 import type { SupportRequest, SupportMessage } from '@vizora/database';
 import { readAgentState, writeAgentState } from './lib/state.js';
 import { log as opsLog } from './lib/alerting.js';
@@ -29,6 +29,7 @@ import { createAgentAI } from './lib/ai.js';
 import type {
   TicketSignal,
   TicketCategory,
+  TicketCategoryV2,
   TicketPriority,
   OrgTier,
   Incident,
@@ -71,6 +72,10 @@ function coerceTier(t: string | null | undefined): OrgTier {
   if (v === 'starter' || v === 'pro' || v === 'enterprise') return v;
   return 'free';
 }
+
+// classifyCategoryV2 lives in @vizora/database (packages/database/src/lib/
+// classify-ticket-v2.ts) so it can be reused by future pre-persistence
+// Path B consumers and exercised by a dedicated Jest fixture corpus.
 
 function minutesSince(d: Date): number {
   return Math.floor((Date.now() - d.getTime()) / 60_000);
@@ -159,6 +164,22 @@ function scoreToPriority(score: number): TicketPriority {
   return 'low';
 }
 
+async function writeAiCategory(
+  ticket: TicketRow,
+  category: TicketCategoryV2,
+): Promise<boolean> {
+  try {
+    const res = await prisma.supportRequest.updateMany({
+      where: { id: ticket.id, organizationId: ticket.organizationId }, // cross-org guard (D8)
+      data: { aiCategory: category },
+    });
+    return res.count === 1;
+  } catch (err) {
+    log(`aiCategory write failed for ticket=${ticket.id}: ${err instanceof Error ? err.message : err}`);
+    return false;
+  }
+}
+
 async function maybeUpdatePriority(
   ticket: TicketRow,
   score: number,
@@ -204,6 +225,7 @@ async function main(): Promise<void> {
   const incidents: Incident[] = [];
   let triaged = 0;
   let priorityChanged = 0;
+  let aiCategorized = 0;
 
   for (const orgId of orgIds) {
     let tickets: TicketRow[];
@@ -240,6 +262,17 @@ async function main(): Promise<void> {
       if (msg) triaged++;
 
       if (await maybeUpdatePriority(ticket, r.score)) priorityChanged++;
+
+      // Idempotency guard: classify each ticket exactly once. D7 reply-loop
+      // prevention already excludes triaged tickets from the fetch, but if
+      // writeAgentMessage fails mid-cycle, this guard keeps aiCategory stable
+      // on retry. Downstream measurement stays a static snapshot, not a
+      // rolling backfill — any future classifier tweak won't silently rewrite
+      // historical rows.
+      if (ticket.aiCategory == null) {
+        const v2 = classifyCategoryV2(ticket.title, ticket.description, ticket.category);
+        if (await writeAiCategory(ticket, v2)) aiCategorized++;
+      }
     }
   }
 
@@ -259,7 +292,7 @@ async function main(): Promise<void> {
   state.lastRun = { ...state.lastRun, [AGENT]: new Date().toISOString() };
   writeAgentState(FAMILY, state);
 
-  log(`Cycle complete in ${durationMs}ms — triaged=${triaged}, priorityChanged=${priorityChanged}`);
+  log(`Cycle complete in ${durationMs}ms — triaged=${triaged}, priorityChanged=${priorityChanged}, aiCategorized=${aiCategorized}`);
   process.exitCode = 0;
 }
 
