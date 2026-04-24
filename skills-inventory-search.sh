@@ -3,6 +3,12 @@
 # One-shot discovery: does a vizora-skills / agency-skills collection actually exist as artifacts?
 # Run from Git Bash, WSL, or any Unix shell. Writes findings to ./skills-inventory-findings.txt
 # and prints a summary. Does NOT classify or rework — just finds and flags.
+#
+# Portability TODO (if rerunning on a different machine):
+#   - SEARCH_ROOTS is hard-coded to Windows /c/ paths + $HOME. Adjust for mac/linux.
+#   - The 1b scan caps at 2000 .md files per root and excludes node_modules/.git.
+#     Raise cap or add more -path excludes if you have exotic content dirs with
+#     thousands of markdown files (large Obsidian vaults, docs sites, etc).
 
 set -u  # no -e; we want the script to finish even if individual checks fail
 
@@ -66,7 +72,13 @@ for root in "${SEARCH_ROOTS[@]}"; do
         echo "  $file" | tee -a "$OUTPUT_FILE"
         FOUND_SKILLS=$((FOUND_SKILLS + 1))
       fi
-    done < <(find "$root" -maxdepth 6 -type f -name "*.md" 2>/dev/null | head -200)
+    done < <(find "$root" -maxdepth 6 -type f -name "*.md" \
+      -not -path "*/node_modules/*" \
+      -not -path "*/.git/*" \
+      -not -path "*/.next/*" \
+      -not -path "*/dist/*" \
+      -not -path "*/.claude/projects/*/memory/*" \
+      2>/dev/null | head -2000)
   fi
 done
 if [ $FOUND_SKILLS -eq 0 ]; then
