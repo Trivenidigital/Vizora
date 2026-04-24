@@ -737,6 +737,7 @@ model SupportRequest {
   description      String
   aiSummary        String?
   aiSuggestedAction String?
+  aiCategory       String?   // TicketCategoryV2 slug — see docs/hermes/ticket-categories-2026-04-24.md
 
   pageUrl          String?   @db.VarChar(500)
   browserInfo      String?   @db.VarChar(255)

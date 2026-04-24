@@ -23,6 +23,7 @@ export type {
 
 export type {
   TicketCategory,
+  TicketCategoryV2,
   TicketPriority,
   OrgTier,
   TicketSignal,

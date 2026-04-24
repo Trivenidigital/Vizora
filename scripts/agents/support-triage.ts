@@ -29,6 +29,7 @@ import { createAgentAI } from './lib/ai.js';
 import type {
   TicketSignal,
   TicketCategory,
+  TicketCategoryV2,
   TicketPriority,
   OrgTier,
   Incident,
@@ -70,6 +71,56 @@ function coerceTier(t: string | null | undefined): OrgTier {
   const v = (t ?? '').toLowerCase();
   if (v === 'starter' || v === 'pro' || v === 'enterprise') return v;
   return 'free';
+}
+
+// Heuristic TicketCategoryV2 classifier — no LLM cost, no PII leak.
+// Taxonomy: docs/hermes/ticket-categories-2026-04-24.md. Order matters —
+// most-specific patterns first so 'device pairing' wins over 'device'.
+// Mis-classifications fall to 'other', which is the signal we want to see
+// during the 30-day measurement gate.
+function classifyCategoryV2(
+  title: string | null,
+  description: string | null,
+  legacyCategory: string | null,
+): TicketCategoryV2 {
+  const text = `${title ?? ''} ${description ?? ''}`.toLowerCase();
+  const cat = (legacyCategory ?? '').toLowerCase();
+
+  // Device family
+  if (/pair(ing)?\s*(code|fail|error|expired|won'?t|not work)/.test(text)) return 'device_pairing_failed';
+  if (/(screen|display|device|tv)[^.]*(offline|disconnect(ed)?|not (connect|reach|online))/.test(text)) return 'device_offline';
+  if (/(wrong|old|stuck on|showing.*instead).*(content|playlist|video|image|ad)/.test(text)) return 'device_wrong_content';
+  if (/(video|audio|playback|mp4|stream)[^.]*(error|fail|broken|black screen|blank|frozen|stutter)/.test(text)) return 'device_playback_error';
+  if (/(resolution|rotation|orientation|portrait|landscape|upside down|timezone|clock)/.test(text)) return 'device_display_config';
+
+  // Content family
+  if (/upload[^.]*(fail|error|stuck|rejected|timeout)|can'?t upload|won'?t upload/.test(text)) return 'content_upload_failed';
+  if (/(not showing|didn'?t show|isn'?t showing|never appeared|missing from)/.test(text) && /(content|image|video|ad|playlist)/.test(text)) return 'content_not_showing';
+  if (/(expir|disappeared|gone missing|ran out|end date)/.test(text) && /(content|ad|image|video)/.test(text)) return 'content_expired';
+  if (/template[^.]*(broken|blank|wrong|render|error|missing|variable)/.test(text)) return 'content_template_broken';
+  if (/(storage|quota|limit|too large|size limit|too big|over.*limit)/.test(text)) return 'content_storage_limit';
+
+  // Schedule family
+  if (/schedul[^.]*(not play|didn'?t play|not trigger|not work|not start|not run)/.test(text)) return 'schedule_not_playing';
+  if (/(timezone|time zone|dst|daylight saving|hours? off|off by.*hour|wrong time)/.test(text)) return 'schedule_timezone_issue';
+  if (/(overlap|conflict|two schedules|both schedules|collision)/.test(text) && text.includes('schedul')) return 'schedule_conflict';
+  if (/(gap|dead air|nothing showing|blank between|coverage)/.test(text) && text.includes('schedul')) return 'schedule_coverage_gap';
+
+  // Analytics family
+  if (/(analytics|metrics|stats|dashboard|report)[^.]*(missing|no data|empty|blank|not showing)/.test(text)) return 'analytics_missing_data';
+  if (/(impression|view count|play count|count)[^.]*(wrong|off|incorrect|doesn'?t match|discrepan)/.test(text)) return 'analytics_wrong_count';
+  if (/export[^.]*(fail|error|blank|empty|corrupt)/.test(text) && /(report|analytics|csv|pdf)/.test(text)) return 'analytics_export_failed';
+
+  // Account / Billing
+  if (/(login|log in|sign in|password|forgot|can'?t access|mfa|2fa|locked out|reset link)/.test(text)) return 'account_access_lost';
+  if (/(permission|role|access denied|not authorized|admin rights|cannot edit|member)/.test(text)) return 'account_permissions';
+  if (/(invoice|billing|refund|charged|charge|subscription|plan change|payment|credit card)/.test(text)) return 'billing_invoice_question';
+
+  // Legacy-category fallbacks when description text is sparse
+  if (cat.includes('bill') || cat.includes('pay')) return 'billing_invoice_question';
+  if (cat.includes('account') || cat.includes('login') || cat.includes('auth')) return 'account_access_lost';
+
+  return 'other';
 }
 
 function minutesSince(d: Date): number {
@@ -159,6 +210,22 @@ function scoreToPriority(score: number): TicketPriority {
   return 'low';
 }
 
+async function writeAiCategory(
+  ticket: TicketRow,
+  category: TicketCategoryV2,
+): Promise<boolean> {
+  try {
+    const res = await prisma.supportRequest.updateMany({
+      where: { id: ticket.id, organizationId: ticket.organizationId }, // cross-org guard (D8)
+      data: { aiCategory: category },
+    });
+    return res.count === 1;
+  } catch (err) {
+    log(`aiCategory write failed for ticket=${ticket.id}: ${err instanceof Error ? err.message : err}`);
+    return false;
+  }
+}
+
 async function maybeUpdatePriority(
   ticket: TicketRow,
   score: number,
@@ -204,6 +271,7 @@ async function main(): Promise<void> {
   const incidents: Incident[] = [];
   let triaged = 0;
   let priorityChanged = 0;
+  let aiCategorized = 0;
 
   for (const orgId of orgIds) {
     let tickets: TicketRow[];
@@ -240,6 +308,9 @@ async function main(): Promise<void> {
       if (msg) triaged++;
 
       if (await maybeUpdatePriority(ticket, r.score)) priorityChanged++;
+
+      const v2 = classifyCategoryV2(ticket.title, ticket.description, ticket.category);
+      if (await writeAiCategory(ticket, v2)) aiCategorized++;
     }
   }
 
@@ -259,7 +330,7 @@ async function main(): Promise<void> {
   state.lastRun = { ...state.lastRun, [AGENT]: new Date().toISOString() };
   writeAgentState(FAMILY, state);
 
-  log(`Cycle complete in ${durationMs}ms — triaged=${triaged}, priorityChanged=${priorityChanged}`);
+  log(`Cycle complete in ${durationMs}ms — triaged=${triaged}, priorityChanged=${priorityChanged}, aiCategorized=${aiCategorized}`);
   process.exitCode = 0;
 }
 
