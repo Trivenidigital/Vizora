@@ -78,25 +78,42 @@ function coerceTier(t: string | null | undefined): OrgTier {
 // most-specific patterns first so 'device pairing' wins over 'device'.
 // Mis-classifications fall to 'other', which is the signal we want to see
 // during the 30-day measurement gate.
+//
+// Input notes:
+//   - Curly apostrophes (U+2019) from Word/macOS autocorrect are normalized
+//     to ASCII up front so patterns like /won'?t/ match both 'won't' and
+//     'won\u2019t'. Without this, a visible-but-different character silently
+//     skips every contraction-based rule.
+//   - 'ad' is word-bounded via \b because unbounded /ad/ matches 'address',
+//     'admin', 'advice', 'added' and pulls unrelated tickets into content/
+//     device buckets.
+//   - 'member' alone is too loose — 'add a team member to my plan' is a
+//     billing concern, not a permissions one. Narrowed to team member /
+//     seat / user access phrasing.
+//   - 'charge'/'charged' alone collides with device-power tickets ('screen
+//     won\u2019t charge'). Removed from the billing trunk regex; strong
+//     billing tokens (invoice/refund/payment/credit card/subscription/
+//     plan change) carry the category on their own.
 function classifyCategoryV2(
   title: string | null,
   description: string | null,
   legacyCategory: string | null,
 ): TicketCategoryV2 {
-  const text = `${title ?? ''} ${description ?? ''}`.toLowerCase();
+  const raw = `${title ?? ''} ${description ?? ''}`.toLowerCase();
+  const text = raw.replace(/[\u2018\u2019]/g, "'");
   const cat = (legacyCategory ?? '').toLowerCase();
 
   // Device family
   if (/pair(ing)?\s*(code|fail|error|expired|won'?t|not work)/.test(text)) return 'device_pairing_failed';
   if (/(screen|display|device|tv)[^.]*(offline|disconnect(ed)?|not (connect|reach|online))/.test(text)) return 'device_offline';
-  if (/(wrong|old|stuck on|showing.*instead).*(content|playlist|video|image|ad)/.test(text)) return 'device_wrong_content';
+  if (/(wrong|old|stuck on|showing.*instead).*(content|playlist|video|image|\b(?:ad|ads|advert)\b)/.test(text)) return 'device_wrong_content';
   if (/(video|audio|playback|mp4|stream)[^.]*(error|fail|broken|black screen|blank|frozen|stutter)/.test(text)) return 'device_playback_error';
   if (/(resolution|rotation|orientation|portrait|landscape|upside down|timezone|clock)/.test(text)) return 'device_display_config';
 
   // Content family
   if (/upload[^.]*(fail|error|stuck|rejected|timeout)|can'?t upload|won'?t upload/.test(text)) return 'content_upload_failed';
-  if (/(not showing|didn'?t show|isn'?t showing|never appeared|missing from)/.test(text) && /(content|image|video|ad|playlist)/.test(text)) return 'content_not_showing';
-  if (/(expir|disappeared|gone missing|ran out|end date)/.test(text) && /(content|ad|image|video)/.test(text)) return 'content_expired';
+  if (/(not showing|didn'?t show|isn'?t showing|never appeared|missing from)/.test(text) && /(content|image|video|\b(?:ad|ads|advert)\b|playlist)/.test(text)) return 'content_not_showing';
+  if (/(expir|disappeared|gone missing|ran out|end date)/.test(text) && /(content|\b(?:ad|ads|advert)\b|image|video)/.test(text)) return 'content_expired';
   if (/template[^.]*(broken|blank|wrong|render|error|missing|variable)/.test(text)) return 'content_template_broken';
   if (/(storage|quota|limit|too large|size limit|too big|over.*limit)/.test(text)) return 'content_storage_limit';
 
@@ -111,10 +128,15 @@ function classifyCategoryV2(
   if (/(impression|view count|play count|count)[^.]*(wrong|off|incorrect|doesn'?t match|discrepan)/.test(text)) return 'analytics_wrong_count';
   if (/export[^.]*(fail|error|blank|empty|corrupt)/.test(text) && /(report|analytics|csv|pdf)/.test(text)) return 'analytics_export_failed';
 
-  // Account / Billing
+  // Account / Billing — seat/member-management verbs checked before the
+  // narrower billing/permissions trunk. Adding a team member changes seat
+  // count → billing is the material decision; the permissions grant is
+  // downstream of the subscription change.
+  if (/\b(add|invite|remove|grant|revoke)\b[^.]{0,40}\b(team member|seat)\b/.test(text)) return 'billing_invoice_question';
+  if (/\b(team member|seat)\b[^.]{0,40}\b(plan|subscription)\b/.test(text)) return 'billing_invoice_question';
+  if (/(invoice|billing|refund|subscription|plan change|payment|credit card)/.test(text)) return 'billing_invoice_question';
   if (/(login|log in|sign in|password|forgot|can'?t access|mfa|2fa|locked out|reset link)/.test(text)) return 'account_access_lost';
-  if (/(permission|role|access denied|not authorized|admin rights|cannot edit|member)/.test(text)) return 'account_permissions';
-  if (/(invoice|billing|refund|charged|charge|subscription|plan change|payment|credit card)/.test(text)) return 'billing_invoice_question';
+  if (/(permission|role|access denied|not authorized|admin rights|cannot edit|\buser access\b)/.test(text)) return 'account_permissions';
 
   // Legacy-category fallbacks when description text is sparse
   if (cat.includes('bill') || cat.includes('pay')) return 'billing_invoice_question';
@@ -309,8 +331,16 @@ async function main(): Promise<void> {
 
       if (await maybeUpdatePriority(ticket, r.score)) priorityChanged++;
 
-      const v2 = classifyCategoryV2(ticket.title, ticket.description, ticket.category);
-      if (await writeAiCategory(ticket, v2)) aiCategorized++;
+      // Idempotency guard: classify each ticket exactly once. D7 reply-loop
+      // prevention already excludes triaged tickets from the fetch, but if
+      // writeAgentMessage fails mid-cycle, this guard keeps aiCategory stable
+      // on retry. Downstream measurement stays a static snapshot, not a
+      // rolling backfill — any future classifier tweak won't silently rewrite
+      // historical rows.
+      if (ticket.aiCategory == null) {
+        const v2 = classifyCategoryV2(ticket.title, ticket.description, ticket.category);
+        if (await writeAiCategory(ticket, v2)) aiCategorized++;
+      }
     }
   }
 

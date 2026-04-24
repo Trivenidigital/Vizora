@@ -121,6 +121,39 @@ The coarse `TicketCategory` remains the input to `buildSignals()` and priority s
 
 ---
 
+## Measurement integrity: classifier is frozen per-ticket
+
+The 30-day histogram is only a credible measurement if each ticket is classified **once** — tweaking the classifier mid-window and silently re-labeling historical rows turns the histogram into a moving target.
+
+Two guards keep this honest:
+
+- **D7 reply-loop prevention** (pre-existing): `fetchTicketsForOrg` filters `messages: { none: { authorType: 'agent' } }`. Once a ticket gets its agent triage message, it drops out of the fetch and is never visited again.
+- **Idempotency check** (added in this commit): the loop calls `classifyCategoryV2` / `writeAiCategory` only when `ticket.aiCategory == null`. This is belt-and-suspenders — if `writeAgentMessage` fails partway through a cycle and the ticket reappears on the next run, its `aiCategory` is already set and won't be overwritten.
+
+If the classifier needs a material change during the window (new category, split category, broadened regex), introduce `aiCategoryVersion Int?` and group histograms by version rather than mutating in place. Noted but **not added now** — YAGNI until we actually need to tweak mid-window.
+
+---
+
+## Read-side contract for downstream consumers
+
+Prisma types `aiCategory` as `string | null`, not `TicketCategoryV2 | null`. When Path B (or any future consumer) reads it, **validate at the boundary** — do not cast. A later classifier version may write a slug this union doesn't know about, and a `as TicketCategoryV2` cast will type-launder it into code paths that rely on exhaustive switch coverage.
+
+Recommended pattern at each read site:
+
+```typescript
+const V2_SLUGS = new Set<TicketCategoryV2>([
+  'device_pairing_failed', 'device_offline', /* … */ 'other',
+]);
+function asV2(s: string | null): TicketCategoryV2 | null {
+  if (s == null) return null;
+  return (V2_SLUGS as Set<string>).has(s) ? (s as TicketCategoryV2) : 'other';
+}
+```
+
+Unknown values fall to `'other'` rather than crashing or silently taking a wrong branch. Consider exporting `V2_SLUGS` from `@vizora/database` when the first consumer lands.
+
+---
+
 ## Open questions flagged for later (do not resolve now)
 
 - Should `device_pairing_failed` split into pre-pairing (code never generated) vs mid-pairing (code expired) once we see real volume?
