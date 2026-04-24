@@ -1,6 +1,7 @@
 # Hermes / Path B Backlog
 
 **Opened:** 2026-04-24
+**Taxonomy-v2 deployed to prod:** 2026-04-24 (migration `20260424000000_add_support_request_ai_category` applied at 17:43 UTC; first cycle with `aiCategorized` field logged at 17:45 UTC)
 **Next decision gate:** 2026-05-24 (30 days after taxonomy-v2 deploy)
 **Owner:** srinivas.yalavarthi@gmail.com
 
@@ -38,10 +39,10 @@ This file exists because "we'll revisit after 30 days" loses to "we never revisi
 
 | # | Task | Size | Status |
 |---|------|------|--------|
-| 1 | Apply migration `20260424000000_add_support_request_ai_category` to production | 30 min | TODO — blocks data collection; clock only starts after this |
+| 1 | Apply migration `20260424000000_add_support_request_ai_category` to production | 30 min | DONE — applied 2026-04-24 17:43 UTC; `aiCategory TEXT` column live on `support_requests` |
 | 2 | Build classifier fixture corpus (50–100 synthetic tickets + expected labels) | ~4 hr | DONE — 61 fixtures in `packages/database/tests/classify-ticket-v2.test.ts` |
 | 3 | Run fixture corpus as a Jest/vitest regression suite in CI | ~1 hr | DONE — `pnpm --filter @vizora/database test` runs via existing ts-jest config |
-| 4 | Smoke-test classifier against a real ticket in staging after migration | 15 min | TODO — follows #1 |
+| 4 | Smoke-test classifier against a real ticket in staging after migration | 15 min | DONE — prod tsx invocation 2026-04-24 confirmed 5/5 sample cases classify correctly via `@vizora/database` import |
 
 ## Explicitly deferred (don't pick up until gate clears)
 
