@@ -133,6 +133,14 @@
 
 ---
 
+## DESIGN EXPLORATIONS (Parked, not for merge/deploy)
+
+| # | Item | Branch | Status | Notes |
+|---|------|--------|--------|-------|
+| D1 | **Atelier homepage redesign** (champagne accent, italic Cormorant, canvas mockup hero, `/` + `/product` two-page split) | `feat/design-explorations` | Parked — needs Sri's approval before merge/deploy | Static previews live at `vizora.cloud:8090–8099`. App-code refactor on branch only. Full write-up in `tasks/feature-backlog.md` → "Atelier Homepage Redesign". **DO NOT MERGE.** |
+
+---
+
 ## KNOWN ISSUES (Non-blocking, track for future)
 
 | # | Issue | Severity | Status | Notes |
