@@ -6,6 +6,58 @@ Not a sprint tracker — see `todo.md` for in-flight work.
 
 ---
 
+## Business-agent scaffolds — 30-day ship-or-kill gate
+
+**Opened:** 2026-05-03
+**Status:** Hard gate — **2026-06-03**
+**Decision needed by:** 2026-06-03 (30 days from open)
+**Owner:** Sri
+
+### What this is
+
+`scripts/agents/` contains 6 business-agent entries registered in `ecosystem.config.js`. Today (2026-05-03), only **2 are real**:
+
+| Agent | Status | File-header marker |
+|---|---|---|
+| `agent-customer-lifecycle` | live | (no SCAFFOLD marker) |
+| `agent-support-triage` | live | taxonomy-v2 work, behind Hermes Path B gate |
+| `agent-orchestrator` | **scaffold** | `Vizora Agent System — Orchestrator SCAFFOLD` |
+| `agent-billing-revenue` | **scaffold** | `Vizora Agent System — Billing & Revenue SCAFFOLD (READ-ONLY)` |
+| `agent-content-intelligence` | **scaffold** | `Vizora Agent System — Content Intelligence SCAFFOLD` |
+| `agent-screen-health-customer` | **scaffold** | `Vizora Agent System — Screen Health (Customer-facing) SCAFFOLD` |
+
+PM2 currently shows all 4 scaffolds in `stopped` state. They consume zero CPU but they are **registered surface area** — visible on the ops dashboard, in deploy scripts, in the mental model of every future agent author. That's the maintenance cost.
+
+### The gate
+
+Each scaffold has one of three resolutions by **2026-06-03**:
+
+| Resolution | What it requires |
+|---|---|
+| **Ship** | A `DESIGN.md` (shift-agent-style — see `docs/agents-architecture.md`) committed to `docs/agent-designs/` AND production logic landed AND removed from this entry |
+| **Park (re-deferred)** | Move the entry to its own dedicated section here with a clear "trigger to revisit" condition. PM2 entry removed. File moved to `scripts/agents/_parked/`. |
+| **Kill** | Delete the file. Remove the PM2 entry from `ecosystem.config.js`. Note in this entry that it was deleted on date X. |
+
+**Default if not addressed by 2026-06-03: kill.** Scaffolds that nobody designed in 30 days are not coming back.
+
+### Why this gate exists
+
+shift-agent (sister project, 15 agents in production via Hermes runtime) does not have scaffolds in production. Each agent there has a complete DESIGN.md, runbook.md, schemas, scripts, templates, and systemd units before it ever ships. Vizora's scaffolds are the opposite pattern — registered before designed. That's the source of the "20 agents to maintain" anxiety: most of them aren't agents, they're empty PM2 entries waving at the future.
+
+### Trigger to revisit if parked
+
+For any of the four, "revisit" means:
+- A real customer-driven need surfaces (e.g., a customer asks for revenue cohort analysis → unparks `agent-billing-revenue`)
+- A `DESIGN.md` is written first
+- A `runbook.md` is written before code
+
+### Companion docs (added on this branch)
+
+- `docs/agents-architecture.md` — extracted discipline from shift-agent's `DESIGN.md`. Read this before designing any new agent.
+- `docs/agents-mcp-server-design.md` — proposed Vizora MCP server module. Unlocks Hermes-side adoption with one stable tool surface.
+
+---
+
 ## Atelier Homepage Redesign
 
 **Opened:** 2026-04-30
