@@ -291,7 +291,7 @@ From shift-agent §12, adapted:
 |---|---|---|
 | `agent-customer-lifecycle` | Live, single .ts file | Needs DESIGN.md, runbook, dispatcher SKILL pattern, audit |
 | `agent-support-triage` | Live, taxonomy-v2, behind 2026-05-24 Hermes Path B gate | Closest to the discipline — extend it as the reference implementation |
-| `agent-orchestrator` | Scaffold | 30-day ship-or-kill gate (see `tasks/feature-backlog.md`) |
+| `agent-orchestrator` | Scaffold | Design before code — see `tasks/feature-backlog.md` for the open evaluation |
 | `agent-billing-revenue` | Scaffold | Same |
 | `agent-content-intelligence` | Scaffold | Same |
 | `agent-screen-health-customer` | Scaffold | Same |
@@ -302,11 +302,13 @@ From shift-agent §12, adapted:
 
 ## Where to go from here
 
-1. **Read this doc** before designing any new agent.
-2. **For the 4 scaffolds**, write a DESIGN.md (or kill them) by 2026-06-03 — see `tasks/feature-backlog.md`.
-3. **For the 2 live business agents** (`customer-lifecycle`, `support-triage`), retrofit the directory shape (`scripts/agents/<name>/{handler.ts, runbook.md, templates/, config.yaml.template}`) opportunistically — don't block on a big-bang migration.
-4. **Build the Vizora MCP server** (`docs/agents-mcp-server-design.md`) — gives any future business agent a stable read surface without per-agent integration code.
-5. **Add the dead-man + watchdog + heartbeat triad** to `scripts/ops/`. ops-reporter is the reporting layer, not the dead-man layer.
+These are recommendations, not mandates. The framework is proven on shift-agent; the open question is fit for Vizora — see `tasks/feature-backlog.md` for the running evaluation.
+
+1. **Reference this doc** when designing or maintaining a Vizora business agent.
+2. **For the 4 scaffolds**, prefer DESIGN.md before production logic (per the dependency principle in §"Build order"). When the scaffold is ready to become a real agent.
+3. **For the 2 live business agents** (`customer-lifecycle`, `support-triage`), retrofit the directory shape (`scripts/agents/<name>/{handler.ts, runbook.md, templates/, config.yaml.template}`) opportunistically — no big-bang migration.
+4. **Consider building the Vizora MCP server** (`docs/agents-mcp-server-design.md`) — gives any future business agent a stable read surface without per-agent integration code. Independently valuable regardless of whether Vizora itself adopts Hermes.
+5. **Consider adding the dead-man + watchdog + heartbeat triad** to `scripts/ops/`. ops-reporter is the reporting layer, not the dead-man layer.
 
 ---
 

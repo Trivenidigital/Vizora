@@ -6,55 +6,54 @@ Not a sprint tracker — see `todo.md` for in-flight work.
 
 ---
 
-## Business-agent scaffolds — 30-day ship-or-kill gate
+## Adopt shift-agent / Hermes patterns for Vizora business agents (evaluation)
 
 **Opened:** 2026-05-03
-**Status:** Hard gate — **2026-06-03**
-**Decision needed by:** 2026-06-03 (30 days from open)
-**Owner:** Sri
+**Status:** Open evaluation — does this fit Vizora?
+**Trigger to revisit:** Whenever the next business-agent design lands, or when scaling pain on the existing ones forces the question.
 
 ### What this is
 
-`scripts/agents/` contains 6 business-agent entries registered in `ecosystem.config.js`. Today (2026-05-03), only **2 are real**:
+`shift-agent` (Sri's sister project, 15 agents in production on Hermes Agent + Kimi K2 via OpenRouter) demonstrates a mature, opinionated multi-agent architecture with strong maintainability properties:
 
-| Agent | Status | File-header marker |
+- Per-agent directory shape (`skills/`, `scripts/`, `templates/`, `runbook.md`, `config.yaml.template`, `systemd/`)
+- Shared platform layer (`safe_io.py`, `schemas.py`, audit helpers, sender-context resolution)
+- Hard rules: dispatcher-first routing, identity-by-metadata, fail-closed, helper-scripts-own-IDs, templates-not-LLM-text, input sanitization, dual-source audit, hardened outbound
+- Required out-of-band alerts (dead-man + watchdog + heartbeat)
+- Disciplined build order (infra-and-safety first, agent logic last)
+- Heavy doc discipline: PLAN.md → DESIGN.md → runbook.md → code
+
+The framework is proven on the shift-agent side. **The open question is fit:** does Vizora's current agent landscape benefit enough from porting these patterns to justify the work?
+
+### What Vizora has today
+
+| Layer | Count | Pattern fit notes |
 |---|---|---|
-| `agent-customer-lifecycle` | live | (no SCAFFOLD marker) |
-| `agent-support-triage` | live | taxonomy-v2 work, behind Hermes Path B gate |
-| `agent-orchestrator` | **scaffold** | `Vizora Agent System — Orchestrator SCAFFOLD` |
-| `agent-billing-revenue` | **scaffold** | `Vizora Agent System — Billing & Revenue SCAFFOLD (READ-ONLY)` |
-| `agent-content-intelligence` | **scaffold** | `Vizora Agent System — Content Intelligence SCAFFOLD` |
-| `agent-screen-health-customer` | **scaffold** | `Vizora Agent System — Screen Health (Customer-facing) SCAFFOLD` |
+| `.claude/agents/*.md` (dev-time Claude Code subagents) | 8 | Already in SKILL.md shape. Match the pattern by accident. **No change needed.** |
+| `scripts/ops/` (PM2 cron, deterministic) | 6 | Predictable cron jobs. Not LLM-shaped. Most discipline rules don't apply, BUT could benefit from `safe_io` patterns + the dead-man + watchdog + heartbeat triad. |
+| `scripts/agents/` (business agents, mixed) | 6 (2 live, 4 scaffolds) | This is where the patterns would land hardest. The 2 live ones (`customer-lifecycle`, `support-triage`) are doing LLM-shaped work. The 4 scaffolds are unwritten. |
 
-PM2 currently shows all 4 scaffolds in `stopped` state. They consume zero CPU but they are **registered surface area** — visible on the ops dashboard, in deploy scripts, in the mental model of every future agent author. That's the maintenance cost.
+### Companion docs (delivered on this branch)
 
-### The gate
+- `docs/agents-architecture.md` — synthesis of shift-agent's `DESIGN.md` (979 lines, v2 post-review). Distills the 8 hard rules, the per-agent file shape, the `safe_io` pattern, required alerts, build order, testing stages, and security posture. Read when designing or maintaining a Vizora business agent.
+- `docs/agents-mcp-server-design.md` — proposed Vizora MCP server module (`middleware/src/modules/mcp/`). Read-only v1 with 13 tools, token-based auth with per-token scope, rate limiting, audit, observability. Estimate: ~6.5 dev-days for the full server + first agent migration. Would unlock Hermes-side adoption with one stable tool surface, regardless of whether Vizora itself migrates to Hermes.
 
-Each scaffold has one of three resolutions by **2026-06-03**:
+### The decision question
 
-| Resolution | What it requires |
-|---|---|
-| **Ship** | A `DESIGN.md` (shift-agent-style — see `docs/agents-architecture.md`) committed to `docs/agent-designs/` AND production logic landed AND removed from this entry |
-| **Park (re-deferred)** | Move the entry to its own dedicated section here with a clear "trigger to revisit" condition. PM2 entry removed. File moved to `scripts/agents/_parked/`. |
-| **Kill** | Delete the file. Remove the PM2 entry from `ecosystem.config.js`. Note in this entry that it was deleted on date X. |
+Two parts, each independently answerable:
 
-**Default if not addressed by 2026-06-03: kill.** Scaffolds that nobody designed in 30 days are not coming back.
+1. **Should the 4 business-agent scaffolds be designed (per the architecture doc) before any production logic lands?** Sri's instinct says yes — they're proven patterns. Confirm or adjust.
+2. **Should Vizora build the MCP server?** It's the highest-leverage move regardless of whether Vizora itself adopts Hermes — it gives any future agent (Vizora-internal, Hermes-sidecar, customer-built) one stable read surface and removes per-agent integration code.
 
-### Why this gate exists
+### Open considerations
 
-shift-agent (sister project, 15 agents in production via Hermes runtime) does not have scaffolds in production. Each agent there has a complete DESIGN.md, runbook.md, schemas, scripts, templates, and systemd units before it ever ships. Vizora's scaffolds are the opposite pattern — registered before designed. That's the source of the "20 agents to maintain" anxiety: most of them aren't agents, they're empty PM2 entries waving at the future.
+- **Cross-language friction.** Hermes is Python; Vizora is TypeScript/NestJS. Full Hermes adoption means a sidecar repo (`vizora-business-agents/` per the architecture doc), with HTTPS as the boundary. shift-agent already proves this works (it talks to QuickBooks the same way). Cost is mostly the second runtime to operate.
+- **Discipline cost vs payoff.** The shift-agent discipline is heavy — per-agent runbooks, PLAN.md / DESIGN.md before code, build order, staged testing. Worth it when you have 15 agents (shift-agent) or 6+ (Vizora business agents). Maybe overkill if Vizora ends up consolidating to 2–3.
+- **Existing investments.** Vizora's `scripts/ops/lib/` already does some of what `safe_io.py` does. The shift-agent patterns are an extension, not a rewrite.
 
-### Trigger to revisit if parked
+### What would unblock action
 
-For any of the four, "revisit" means:
-- A real customer-driven need surfaces (e.g., a customer asks for revenue cohort analysis → unparks `agent-billing-revenue`)
-- A `DESIGN.md` is written first
-- A `runbook.md` is written before code
-
-### Companion docs (added on this branch)
-
-- `docs/agents-architecture.md` — extracted discipline from shift-agent's `DESIGN.md`. Read this before designing any new agent.
-- `docs/agents-mcp-server-design.md` — proposed Vizora MCP server module. Unlocks Hermes-side adoption with one stable tool surface.
+A decision on the MCP server v1 (yes / no / not yet). The agent-discipline patterns can be adopted incrementally per agent; the MCP server is a focused 6.5-day effort that needs an explicit go.
 
 ---
 
