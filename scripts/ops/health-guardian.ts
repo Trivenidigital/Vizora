@@ -30,7 +30,7 @@ import {
   addRemediation,
   makeIncidentId,
 } from './lib/state.js';
-import { log } from './lib/alerting.js';
+import { log, pingHeartbeat } from './lib/alerting.js';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -517,16 +517,26 @@ async function main(): Promise<void> {
 
   log(AGENT, `Cycle complete in ${durationMs}ms — found: ${issuesFound}, fixed: ${issuesFixed}, escalated: ${issuesEscalated}`);
 
-  if (issuesFound > 0 && issuesFixed < issuesFound) {
-    process.exitCode = 1;
-  } else {
-    process.exitCode = 0;
-  }
+  const success = !(issuesFound > 0 && issuesFixed < issuesFound);
+  process.exitCode = success ? 0 : 1;
+
+  // External heartbeat: ping healthchecks.io (or compatible) every cycle.
+  // Success path increments the dead-man counter; unfixed-issues path POSTs
+  // to /fail so the external service can distinguish "ran but issues
+  // remain" from "didn't run at all." If the URL is unset, no-op.
+  await pingHeartbeat(
+    AGENT,
+    process.env.HEALTHCHECKS_HEALTH_GUARDIAN_URL,
+    success ? 'success' : 'fail',
+  );
 }
 
 // ─── Entry Point ─────────────────────────────────────────────────────────────
 
-main().catch(err => {
+main().catch(async err => {
   log(AGENT, `FATAL: ${err instanceof Error ? err.message : err}`);
   process.exitCode = 2;
+  // Best-effort fail ping so external dead-man sees the crash. await is
+  // intentional — we want this to complete before the process exits.
+  await pingHeartbeat(AGENT, process.env.HEALTHCHECKS_HEALTH_GUARDIAN_URL, 'fail');
 });

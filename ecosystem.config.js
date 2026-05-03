@@ -273,6 +273,29 @@ module.exports = {
       merge_logs: true,
     },
     {
+      name: 'ops-watchdog',
+      script: 'npx',
+      args: 'tsx scripts/ops/ops-watchdog.ts',
+      instances: 1,
+      exec_mode: 'fork',
+      cron_restart: '*/15 * * * *', // Run every 15 minutes
+      autorestart: false, // Don't restart on exit — cron handles scheduling
+      watch: false,
+      max_memory_restart: '128M',
+      env: {
+        NODE_ENV: 'development',
+      },
+      env_production: {
+        NODE_ENV: 'production',
+      },
+      // Logging
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      max_size: '10M',
+      error_file: './logs/ops-watchdog-error.log',
+      out_file: './logs/ops-watchdog-out.log',
+      merge_logs: true,
+    },
+    {
       name: 'ops-db-maintainer',
       script: 'npx',
       args: 'tsx scripts/ops/db-maintainer.ts',

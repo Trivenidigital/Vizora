@@ -1,18 +1,27 @@
 /**
  * Vizora Autonomous Operations — Alerting & Notifications
  *
- * Provides logging, Slack alerts, email notifications, and dashboard
- * status updates. All notification channels are optional — they no-op
- * if the required environment variables are missing.
+ * Provides logging, Slack alerts, email notifications, dashboard
+ * status updates, and external heartbeat ping. All notification
+ * channels are optional — they no-op if the required environment
+ * variables are missing.
  *
  * Environment variables:
- *   SLACK_WEBHOOK_URL  — Slack incoming webhook URL
- *   SMTP_HOST          — SMTP server hostname
- *   SMTP_PORT          — SMTP port (default: 587)
- *   SMTP_USER          — SMTP username
- *   SMTP_PASS          — SMTP password
- *   SMTP_FROM          — Sender email address
- *   SMTP_TO            — Recipient email address(es), comma-separated
+ *   SLACK_WEBHOOK_URL                  — Slack incoming webhook URL
+ *   SMTP_HOST                          — SMTP server hostname
+ *   SMTP_PORT                          — SMTP port (default: 587)
+ *   SMTP_USER                          — SMTP username
+ *   SMTP_PASS                          — SMTP password
+ *   SMTP_FROM                          — Sender email address
+ *   SMTP_TO                            — Recipient email address(es), comma-separated
+ *   HEALTHCHECKS_HEALTH_GUARDIAN_URL   — healthchecks.io ping URL for the
+ *                                        health-guardian heartbeat. When set,
+ *                                        a successful health-guardian run POSTs
+ *                                        to this URL. If pings stop arriving,
+ *                                        healthchecks.io alerts independently
+ *                                        — the external dead-man that detects
+ *                                        cron-on-VPS failures the watchdog
+ *                                        cannot.
  */
 
 import type { SystemStatus, Incident, RemediationAction } from './types.js';
@@ -26,6 +35,48 @@ import type { SystemStatus, Incident, RemediationAction } from './types.js';
 export function log(agent: string, msg: string): void {
   const ts = new Date().toISOString();
   process.stdout.write(`[${ts}] [${agent}] ${msg}\n`);
+}
+
+// ─── External heartbeat (healthchecks.io) ───────────────────────────────────
+
+/**
+ * Send an external heartbeat ping. healthchecks.io and compatible services
+ * accept a simple `POST` (or `GET`) to a per-check URL. When the agent stops
+ * pinging, healthchecks.io fires its own alert (Slack/email/SMS configurable
+ * on their side) — this is the external dead-man that survives the entire
+ * VPS being down.
+ *
+ * No-op if `pingUrl` is empty/undefined. Network errors are logged but never
+ * thrown — a missed ping is not worse than a noisy crash.
+ *
+ * @param agent      Agent name for log attribution
+ * @param pingUrl    The healthchecks.io URL (or any compatible HTTP endpoint)
+ * @param status     'success' (default) or 'fail'. Failure pings POST to
+ *                   `${pingUrl}/fail` per healthchecks.io's API; this lets us
+ *                   distinguish "agent ran and said it's broken" from
+ *                   "agent never ran."
+ */
+export async function pingHeartbeat(
+  agent: string,
+  pingUrl: string | undefined,
+  status: 'success' | 'fail' = 'success',
+): Promise<void> {
+  if (!pingUrl) return;
+  const url = status === 'fail' ? `${pingUrl}/fail` : pingUrl;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5_000);
+    const res = await fetch(url, { method: 'POST', signal: controller.signal });
+    clearTimeout(timer);
+    if (!res.ok) {
+      log(agent, `heartbeat ping returned ${res.status} (url=${url.replace(/[^/]+$/, '...')})`);
+    }
+  } catch (err) {
+    log(
+      agent,
+      `heartbeat ping failed: ${err instanceof Error ? err.message : err}`,
+    );
+  }
 }
 
 // ─── Slack ──────────────────────────────────────────────────────────────────
