@@ -6,6 +6,57 @@ Not a sprint tracker — see `todo.md` for in-flight work.
 
 ---
 
+## Adopt shift-agent / Hermes patterns for Vizora business agents (evaluation)
+
+**Opened:** 2026-05-03
+**Status:** Open evaluation — does this fit Vizora?
+**Trigger to revisit:** Whenever the next business-agent design lands, or when scaling pain on the existing ones forces the question.
+
+### What this is
+
+`shift-agent` (Sri's sister project, 15 agents in production on Hermes Agent + Kimi K2 via OpenRouter) demonstrates a mature, opinionated multi-agent architecture with strong maintainability properties:
+
+- Per-agent directory shape (`skills/`, `scripts/`, `templates/`, `runbook.md`, `config.yaml.template`, `systemd/`)
+- Shared platform layer (`safe_io.py`, `schemas.py`, audit helpers, sender-context resolution)
+- Hard rules: dispatcher-first routing, identity-by-metadata, fail-closed, helper-scripts-own-IDs, templates-not-LLM-text, input sanitization, dual-source audit, hardened outbound
+- Required out-of-band alerts (dead-man + watchdog + heartbeat)
+- Disciplined build order (infra-and-safety first, agent logic last)
+- Heavy doc discipline: PLAN.md → DESIGN.md → runbook.md → code
+
+The framework is proven on the shift-agent side. **The open question is fit:** does Vizora's current agent landscape benefit enough from porting these patterns to justify the work?
+
+### What Vizora has today
+
+| Layer | Count | Pattern fit notes |
+|---|---|---|
+| `.claude/agents/*.md` (dev-time Claude Code subagents) | 8 | Already in SKILL.md shape. Match the pattern by accident. **No change needed.** |
+| `scripts/ops/` (PM2 cron, deterministic) | 6 | Predictable cron jobs. Not LLM-shaped. Most discipline rules don't apply, BUT could benefit from `safe_io` patterns + the dead-man + watchdog + heartbeat triad. |
+| `scripts/agents/` (business agents, mixed) | 6 (2 live, 4 scaffolds) | This is where the patterns would land hardest. The 2 live ones (`customer-lifecycle`, `support-triage`) are doing LLM-shaped work. The 4 scaffolds are unwritten. |
+
+### Companion docs (delivered on this branch)
+
+- `docs/agents-architecture.md` — synthesis of shift-agent's `DESIGN.md` (979 lines, v2 post-review). Distills the 8 hard rules, the per-agent file shape, the `safe_io` pattern, required alerts, build order, testing stages, and security posture. Read when designing or maintaining a Vizora business agent.
+- `docs/agents-mcp-server-design.md` — proposed Vizora MCP server module (`middleware/src/modules/mcp/`). Read-only v1 with 13 tools, token-based auth with per-token scope, rate limiting, audit, observability. Estimate: ~6.5 dev-days for the full server + first agent migration. Would unlock Hermes-side adoption with one stable tool surface, regardless of whether Vizora itself migrates to Hermes.
+
+### The decision question
+
+Two parts, each independently answerable:
+
+1. **Should the 4 business-agent scaffolds be designed (per the architecture doc) before any production logic lands?** Sri's instinct says yes — they're proven patterns. Confirm or adjust.
+2. **Should Vizora build the MCP server?** It's the highest-leverage move regardless of whether Vizora itself adopts Hermes — it gives any future agent (Vizora-internal, Hermes-sidecar, customer-built) one stable read surface and removes per-agent integration code.
+
+### Open considerations
+
+- **Cross-language friction.** Hermes is Python; Vizora is TypeScript/NestJS. Full Hermes adoption means a sidecar repo (`vizora-business-agents/` per the architecture doc), with HTTPS as the boundary. shift-agent already proves this works (it talks to QuickBooks the same way). Cost is mostly the second runtime to operate.
+- **Discipline cost vs payoff.** The shift-agent discipline is heavy — per-agent runbooks, PLAN.md / DESIGN.md before code, build order, staged testing. Worth it when you have 15 agents (shift-agent) or 6+ (Vizora business agents). Maybe overkill if Vizora ends up consolidating to 2–3.
+- **Existing investments.** Vizora's `scripts/ops/lib/` already does some of what `safe_io.py` does. The shift-agent patterns are an extension, not a rewrite.
+
+### What would unblock action
+
+A decision on the MCP server v1 (yes / no / not yet). The agent-discipline patterns can be adopted incrementally per agent; the MCP server is a focused 6.5-day effort that needs an explicit go.
+
+---
+
 ## Atelier Homepage Redesign
 
 **Opened:** 2026-04-30
