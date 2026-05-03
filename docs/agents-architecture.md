@@ -92,10 +92,13 @@ Acknowledgements ("Got it, will arrange coverage") can be LLM-shaped. Anything c
 
 Strip these from any text that will be interpolated into a prompt:
 - Lines matching `^(SYSTEM|USER|ASSISTANT):/i`
-- Substrings: `IGNORE PREVIOUS`, `DISREGARD`, `OVERRIDE`, `<`, `>`
+- Substrings (case-insensitive): `IGNORE PREVIOUS`, `DISREGARD INSTRUCTIONS`, `OVERRIDE INSTRUCTIONS`
+- Tag-like patterns: `</?(system|user|assistant|prompt|instruction)>` — match the tag form, not bare `<` or `>`
 - Truncate to 500 chars
 
 Keep raw input for audit; sanitize the prompt copy.
+
+> **Important divergence from shift-agent:** shift-agent strips bare `<` and `>` substrings because its inputs are WhatsApp messages where angle brackets are uncommon. Vizora's business-agent inputs (support tickets, content captions, schedule notes) contain legitimate `<` `>` regularly — URLs, code snippets, math expressions, redirected-to symbols. Stripping bare brackets would corrupt input. Match the tag form instead, or HTML-encode at the prompt boundary.
 
 **Apply to Vizora:** Any free-text customer input that reaches an LLM prompt — support tickets, content captions, schedule notes — runs through a sanitizer first.
 
@@ -154,17 +157,19 @@ shift-agent's `src/platform/`:
 
 | File | Purpose | Vizora equivalent |
 |---|---|---|
-| `safe_io.py` | flock + atomic write + Pydantic validate-on-read | `scripts/ops/lib/state.ts` (partial — has flock, missing schema validation on read) |
-| `schemas.py` | Pydantic models, single source of truth for every state file | Mixed — Prisma covers DB, but state JSON files have ad-hoc TS types |
-| `audit_helpers.py` | NDJSON append helpers | `scripts/ops/lib/state.ts` writes the audit log |
-| `sender_context.py` | Identity resolution | (needed if Vizora business agents take external input) |
-| `qbo_client.py` | External API client (QuickBooks) | `scripts/ops/lib/api-client.ts` (talks to Vizora middleware) |
-| `scripts/validate-sender-block` | Deterministic input validator | (needed) |
-| `scripts/identify-sender` | Identity lookup | (needed) |
-| `scripts/log-decision-direct` | Guaranteed audit write | (needed for business agents) |
+| `safe_io.py` | flock + atomic write + Pydantic validate-on-read | **Largely covered** by `middleware/src/modules/agents/agent-state.service.ts` (PR #32, merged 2026-04-19) — async fs/promises, file-locking with timeout (5 s / 50 ms retry / 30 s stale), known-family path safety, anchored secret/PII redaction. `scripts/ops/lib/state.ts` adds flock for cron-side writes. Schema-validate-on-read at the boundary is the remaining gap. |
+| `schemas.py` | Pydantic models, single source of truth for every state file | Prisma covers DB. State JSON files use ad-hoc TS types — would benefit from Zod schemas at agent-state-service boundaries. |
+| `audit_helpers.py` | NDJSON append helpers | `scripts/ops/lib/state.ts` writes the audit log; `AgentStateService` redacts on read |
+| `sender_context.py` | Identity resolution (WhatsApp phone/LID) | **N/A — different auth model.** Vizora business agents authenticate via JWT (user) or MCP token (agent). No external sender block to parse. |
+| `qbo_client.py` | External API client (QuickBooks) | `scripts/ops/lib/api-client.ts` (talks to Vizora middleware); future Hermes sidecar would use `vizora_mcp_client.py` per the MCP server design |
+| `scripts/validate-sender-block` | Deterministic input validator (WhatsApp sender block) | **N/A** — Vizora's auth surface is JWT / MCP token, validated by NestJS guards. Equivalent role is the existing `JwtAuthGuard` + the proposed `McpAuthGuard`. |
+| `scripts/identify-sender` | Identity lookup (phone / LID → role) | **N/A** — JWT subject claim + Prisma user/org lookup is the existing equivalent |
+| `scripts/log-decision-direct` | Guaranteed audit write (LLM-bypass) | (worth building for Vizora business agents — write input to disk before LLM, independent of handler success) |
 | `scripts/dispatcher-accuracy-report` | Routing-correctness metric | **Missing.** Vizora has no agent-decision-quality metric. |
 
 The `dispatcher-accuracy-report` gap is worth flagging: shift-agent measures whether its dispatcher routes inbound messages to the correct handler. Without an analogous metric, Vizora business agents can quietly drift in quality without anyone noticing.
+
+**The `AgentStateService` correction matters because** it changes the action set: Vizora isn't building agent-state I/O from scratch. The discipline rule for new business agents is *use `AgentStateService` for state reads, extend it (don't reimplement) for new families, and add Zod-schema validation at the boundaries it doesn't currently enforce*.
 
 ---
 
@@ -289,8 +294,8 @@ From shift-agent §12, adapted:
 
 | Agent | Current state | Per shift-agent discipline |
 |---|---|---|
-| `agent-customer-lifecycle` | Live, single .ts file | Needs DESIGN.md, runbook, dispatcher SKILL pattern, audit |
-| `agent-support-triage` | Live, taxonomy-v2, behind 2026-05-24 Hermes Path B gate | Closest to the discipline — extend it as the reference implementation |
+| `agent-customer-lifecycle` | Live, single .ts file. State already routed through `AgentStateService` (family: `customer`). | Needs DESIGN.md, runbook, dispatcher SKILL pattern, audit-before-LLM |
+| `agent-support-triage` | Live, taxonomy-v2, behind Hermes Path B gate (2026-05-24, anchored in `tasks/hermes-backlog.md`). State family: `ops`. | Closest to the discipline — extend it as the reference implementation |
 | `agent-orchestrator` | Scaffold | Design before code — see `tasks/feature-backlog.md` for the open evaluation |
 | `agent-billing-revenue` | Scaffold | Same |
 | `agent-content-intelligence` | Scaffold | Same |

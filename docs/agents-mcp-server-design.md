@@ -51,7 +51,7 @@ It's the same pattern shift-agent uses with `qbo_client.py` for QuickBooks: one 
 ```
 middleware/src/modules/mcp/
 ├── mcp.module.ts                    ← NestJS module wiring
-├── mcp.controller.ts                ← exposes /api/v1/mcp endpoint(s) for transport
+├── mcp.controller.ts                ← exposes /api/v1/mcp endpoint(s); uses @SkipEnvelope() (see "Response shape" below)
 ├── mcp.service.ts                   ← MCP server lifecycle, tool registration
 ├── transports/
 │   ├── http.transport.ts            ← HTTP/SSE transport (preferred for production)
@@ -65,7 +65,7 @@ middleware/src/modules/mcp/
 │   ├── playlists.tools.ts           ← list_playlists, get_playlist
 │   ├── schedules.tools.ts           ← list_schedules, get_schedule
 │   ├── organizations.tools.ts       ← list_organizations, get_org_health
-│   ├── audit.tools.ts               ← list_recent_incidents, get_audit_trail
+│   ├── audit.tools.ts               ← list_recent_incidents (calls existing GET /api/v1/health/ops-status), get_audit_trail
 │   └── tool-registry.ts             ← exports all tools as a Map<name, ToolDef>
 ├── schemas/
 │   ├── tool-inputs.ts               ← Zod schemas for tool parameters
@@ -80,9 +80,31 @@ middleware/src/modules/mcp/
         └── mcp.e2e-spec.ts
 ```
 
-Tool implementations are thin: they call the existing NestJS services (`DisplaysService`, `ContentService`, etc.) and project the result into the Zod-defined output schema. **No new business logic in `mcp/`.**
+Tool implementations are thin: they call the existing NestJS services (`DisplaysService`, `ContentService`, etc.) — **including the existing `AgentStateService` from `middleware/src/modules/agents/` and the existing `GET /api/v1/health/ops-status` endpoint** — and project the result into the Zod-defined output schema. **No new business logic in `mcp/`.** No new state I/O paths — reuse what's already battle-hardened by PR #32 review.
 
 ---
+
+## Response shape — interaction with existing global interceptors
+
+Vizora's `ResponseEnvelopeInterceptor` (global, see `CLAUDE.md`) wraps every response in `{ success, data, meta }`. **MCP responses must NOT be enveloped** — the MCP spec requires a specific JSON-RPC shape on the wire, and double-wrapping (`{success, data: {jsonrpc, result, id}, meta}`) breaks every MCP client.
+
+Required:
+- `mcp.controller.ts` decorates every endpoint with `@SkipEnvelope()` so the global interceptor passes the body through verbatim.
+- `mcp.controller.spec.ts` includes a regression test: response body has top-level `jsonrpc` and `result` (or `error`), NOT a `success` field.
+
+Same constraint applies to error responses — MCP errors live at `error.code` / `error.message` / `error.data`, not under `data`.
+
+## Middleware exemptions
+
+Because MCP traffic comes from server-to-server agents (not browsers), several middlewares behave wrong by default:
+
+| Middleware | Default | MCP requirement |
+|---|---|---|
+| `CSRF` (`middleware/src/modules/common/middleware/csrf.middleware.ts`) | Required for cookie-auth endpoints | **Exempt `/api/v1/mcp/*`** — MCP uses bearer tokens, not cookies; no CSRF surface to protect |
+| `ResponseEnvelopeInterceptor` | Wraps everything | **Skipped per endpoint** via `@SkipEnvelope()` (see above) |
+| `SanitizeInterceptor` (XSS) | Sanitizes all response bodies | **Skipped per endpoint** via `@SkipEnvelope()`-equivalent (or use the existing template-field skip mechanism). MCP responses ferry data agents will parse, not HTML to render. |
+| `ThrottlerGuard` (3-tier) | Per-IP user rate limit | Replaced by per-token MCP rate limiter (see "Rate limiting" below); existing throttler stays as a backstop for unauthenticated traffic to the MCP endpoint |
+| `LoggingInterceptor` | Logs all requests | Keep — but ensure token-id (not raw token) is logged |
 
 ## Auth model
 
@@ -119,6 +141,19 @@ Token storage: new Prisma table `McpToken` with index on `tokenId`. Token *value
 - **Issuance:** admin-only endpoint `POST /api/v1/admin/mcp-tokens` — must specify `organizationId`, `scope`, `agentName`, `expiresAt` (max 90 days)
 - **Rotation:** monthly cron reminder per shift-agent's security posture
 - **Revocation:** admin endpoint or auto-revoke on suspicious activity (configurable threshold of `4xx` per minute)
+
+### Required environment variables
+
+Add to `.env.example` (and the env-var doc table in `CLAUDE.md`):
+
+| Var | Purpose | Constraints |
+|---|---|---|
+| `MCP_TOKEN_SECRET` | HMAC signing key for MCP tokens | Min 32 chars; distinct from `JWT_SECRET` and `DEVICE_JWT_SECRET`; rotate via re-issuing all active tokens |
+| `MCP_RATE_LIMIT_PER_MIN` | Optional override for per-token per-minute cap | Default 60 (see "Rate limiting") |
+| `MCP_RATE_LIMIT_PER_DAY` | Optional override for per-token per-day cap | Default 1000 |
+| `MCP_TOKEN_TTL_DAYS` | Max issuance TTL | Default 90 |
+
+Per CLAUDE.md style, the middleware validates each at startup and exits if `MCP_TOKEN_SECRET` is unset or under length — same pattern as `JWT_SECRET` validation.
 
 ---
 
@@ -215,8 +250,10 @@ The SKILL doesn't need to know the URL, the auth header shape, or the schema. It
 | `list_playlists`, `get_playlist` | `PlaylistsService` | `middleware/src/modules/playlists/playlists.service.ts` |
 | `list_schedules`, `get_schedule` | `SchedulesService` | `middleware/src/modules/schedules/schedules.service.ts` |
 | `list_organizations`, `get_org_health` | `OrganizationsService` + new `OrgHealthAggregator` | new aggregator (small) |
-| `list_recent_incidents` | New `OpsStateReader` that reads `logs/ops-state.json` | new (small) |
-| `get_audit_trail` | New `AuditService` over the existing audit-log surface | new (medium) |
+| `list_recent_incidents` | **Existing** `GET /api/v1/health/ops-status` (Redis-cached, see `middleware/src/modules/health/health.controller.ts:169`). Filter the returned status to the requesting org's incidents. | thin tool wrapper over existing endpoint |
+| `get_audit_trail` | **Existing** `AgentStateService.read(family)` from `middleware/src/modules/agents/` (PR #32) — already does the read with secret/PII redaction. Tool wraps it with cursor pagination + per-resource filtering. | thin tool wrapper |
+
+**Why this matters:** earlier draft proposed reading `logs/ops-state.json` directly. That bypasses the approved Redis-cached path on `health.controller.ts` and reimplements the redaction + path-safety logic that `AgentStateService` already enforces. Reusing existing endpoints means MCP inherits the security posture from PR #32's review — no new attack surface to harden.
 
 **No new business logic.** The MCP layer is a projection over what already exists.
 
@@ -245,7 +282,7 @@ MCP-spec-compliant error responses:
 ```json
 {
   "error": {
-    "code": "TOOL_NOT_FOUND" | "INVALID_INPUT" | "FORBIDDEN" | "INTERNAL" | "RATE_LIMITED",
+    "code": "TOOL_NOT_FOUND" | "INVALID_INPUT" | "NOT_FOUND" | "FORBIDDEN" | "UNAUTHORIZED" | "INTERNAL" | "RATE_LIMITED",
     "message": "Human-readable description",
     "data": { "details": "..." }
   }
@@ -253,10 +290,14 @@ MCP-spec-compliant error responses:
 ```
 
 `error-mapping.ts` maps NestJS exceptions:
-- `NotFoundException` → `INVALID_INPUT` (the resource doesn't exist for this org)
-- `ForbiddenException` → `FORBIDDEN`
-- `BadRequestException` → `INVALID_INPUT`
+- `NotFoundException` → **`NOT_FOUND`** (the resource ID is well-formed but no such resource exists for this org). Distinct from `INVALID_INPUT` because agents should *not* retry a NOT_FOUND with the same args — they should fetch fresh state or give up. Conflating the two encourages retry loops.
+- `BadRequestException` → `INVALID_INPUT` (the params themselves are malformed — agent should fix and retry, or escalate)
+- `UnauthorizedException` → `UNAUTHORIZED` (invalid / expired / revoked token — agent should re-auth, not retry)
+- `ForbiddenException` → `FORBIDDEN` (token is valid but lacks the required scope — agent should escalate, not retry)
+- `ThrottlerException` → `RATE_LIMITED` (carries `Retry-After`)
 - Anything else → `INTERNAL` (with the exception logged but stack trace stripped from the response)
+
+The error code carries semantic meaning agents act on. Misclassifying NOT_FOUND as INVALID_INPUT is the difference between an agent backing off vs hammering an endpoint trying to "fix its inputs."
 
 ---
 
@@ -295,6 +336,8 @@ Add to existing Prometheus + Grafana setup (Vizora already has `vizora-overview.
 | Auth | Forgery / expired / revoked / scope-mismatch — explicit tests for each rejection path. |
 | Rate limit | Burst tests — verify limiter triggers + recovery + headers. |
 | Audit | Verify every successful + failed tool call writes an audit row with `tokenId`, `agentName`, `tool`, `params (redacted)`, `latency_ms`. |
+| Envelope/middleware regression | Response body has top-level `jsonrpc` + `result` / `error` (no `success` field — proves `@SkipEnvelope()` + sanitize-skip work). CSRF middleware doesn't reject MCP POSTs without an X-CSRF token. |
+| Error mapping | Each NestJS exception maps to the documented MCP code (NotFoundException → NOT_FOUND, not INVALID_INPUT — explicit regression test for the retry-loop hazard). |
 
 ---
 
