@@ -34,24 +34,23 @@ export async function listDisplaysTool(
   }
   const input = ListDisplaysInput.parse(rawInput) as ListDisplaysInputT;
 
-  const result = await displaysService.findAll(context.organizationId, {
-    page: input.page,
-    limit: input.limit,
-  });
-
-  // Filter by status client-side — DisplaysService.findAll doesn't
-  // accept a status filter today and we don't want to widen its
-  // signature for an MCP-only concern. At ≤100 rows per page the cost
-  // is negligible.
-  const filtered = (result.data as Array<Record<string, unknown>>).filter(
-    (d) => input.status === 'all' || d.status === input.status,
+  // Push the status filter DB-side so `total` reflects the filtered
+  // result set. The previous client-side filter narrowed the page
+  // but not the count, breaking pagination ratios for any non-'all'
+  // status query.
+  const result = await displaysService.findAll(
+    context.organizationId,
+    { page: input.page, limit: input.limit },
+    input.status === 'all' ? undefined : { status: input.status },
   );
 
+  const rows = result.data as Array<Record<string, unknown>>;
+
   return ListDisplaysOutput.parse({
-    displays: filtered.map(toDisplayShape),
+    displays: rows.map(toDisplayShape),
     page: input.page,
     limit: input.limit,
-    total: result.meta?.total ?? filtered.length,
+    total: result.meta?.total ?? rows.length,
   });
 }
 

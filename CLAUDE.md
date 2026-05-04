@@ -221,7 +221,7 @@ middleware/src/modules/mcp/     # Model Context Protocol server — read-only to
                                 # Server" section below.
 middleware/src/modules/common/  # Shared guards (csrf), interceptors (logging, sanitize, response-envelope), middleware (csrf)
 middleware/test/           # E2E test specs (*.e2e-spec.ts)
-packages/database/prisma/schema.prisma  # Data model: Organization, User, Display, Content, Playlist, Schedule, DisplayGroup, Tag
+packages/database/prisma/schema.prisma  # Data model: Organization, User, Display, Content, Playlist, Schedule, DisplayGroup, Tag, AuditLog, AdminAuditLog, McpToken, McpAuditLog, ContentRecommendation, CustomerIncident, ...
 web/src/app/               # Next.js App Router: (auth)/, dashboard/, api/, product/
 web/src/lib/hooks/          # useSocket, useRealtimeEvents for WebSocket integration
 realtime/src/gateways/     # device.gateway.ts — main WebSocket handler

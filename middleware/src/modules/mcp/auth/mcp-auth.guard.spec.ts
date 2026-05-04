@@ -22,20 +22,27 @@ describe('McpAuthGuard', () => {
     guard = new McpAuthGuard(tokens as never);
   });
 
-  it('rejects when Authorization header is missing', async () => {
+  // The wire-facing message MUST be identical for every failure path
+  // — distinguishing missing-header from invalid-token from expired
+  // is an info-disclosure invitation. The tests below assert a single
+  // generic message; the guard's own logger carries the precise
+  // server-side reason.
+  const REJECTION_MESSAGE = 'Invalid or expired MCP token';
+
+  it('rejects with generic message when Authorization header is missing', async () => {
     const { ctx } = makeCtx({});
-    await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
+    await expect(guard.canActivate(ctx)).rejects.toThrow(REJECTION_MESSAGE);
   });
 
-  it('rejects when Authorization header is not Bearer', async () => {
+  it('rejects with generic message when Authorization header is not Bearer', async () => {
     const { ctx } = makeCtx({ authorization: 'Basic abc' });
-    await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
+    await expect(guard.canActivate(ctx)).rejects.toThrow(REJECTION_MESSAGE);
   });
 
-  it('rejects with the GENERIC message when token validation fails (no info leak)', async () => {
+  it('rejects with the SAME generic message when token validation fails', async () => {
     tokens.validate.mockResolvedValue(null);
     const { ctx } = makeCtx({ authorization: 'Bearer mcp_anything' });
-    await expect(guard.canActivate(ctx)).rejects.toThrow(/Invalid or expired/);
+    await expect(guard.canActivate(ctx)).rejects.toThrow(REJECTION_MESSAGE);
   });
 
   it('attaches mcpContext to the request on success', async () => {

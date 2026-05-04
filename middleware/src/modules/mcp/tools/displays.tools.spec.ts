@@ -59,18 +59,54 @@ describe('listDisplaysTool', () => {
     expect(out.total).toBe(2);
   });
 
-  it('client-side filters by status when not "all"', async () => {
+  it('passes the status filter through to DisplaysService.findAll (DB-side, not client-side)', async () => {
     const displaysSvc = makeDisplays([
       { id: 'd1', status: 'online' },
-      { id: 'd2', status: 'offline' },
-      { id: 'd3', status: 'online' },
+      { id: 'd2', status: 'online' },
     ]);
     const out = await listDisplaysTool(
       { status: 'online' },
       ctx(['displays:read']),
       displaysSvc as never,
     );
-    expect(out.displays.map((d) => d.id)).toEqual(['d1', 'd3']);
+    expect(displaysSvc.findAll).toHaveBeenCalledWith(
+      'org_1',
+      { page: 1, limit: 20 },
+      { status: 'online' },
+    );
+    expect(out.displays.map((d) => d.id)).toEqual(['d1', 'd2']);
+  });
+
+  it("does NOT pass a filter when status='all'", async () => {
+    const displaysSvc = makeDisplays([{ id: 'd1' }]);
+    await listDisplaysTool({}, ctx(['displays:read']), displaysSvc as never);
+    expect(displaysSvc.findAll).toHaveBeenCalledWith(
+      'org_1',
+      { page: 1, limit: 20 },
+      undefined,
+    );
+  });
+
+  it('reports the DB-filtered total — pagination ratios match (REGRESSION: was previously the unfiltered count)', async () => {
+    // Simulate DisplaysService.findAll with status filter applied:
+    // total reflects the FILTERED count, not the org-wide count.
+    const displaysSvc = {
+      findAll: jest.fn().mockResolvedValue({
+        data: [
+          { id: 'd1', organizationId: 'org_1', deviceIdentifier: 'a', nickname: null, location: null, status: 'offline', orientation: 'landscape', resolution: null, lastHeartbeat: null, currentPlaylistId: null, isDisabled: false, createdAt: new Date('2026-05-01T00:00:00Z') },
+          { id: 'd2', organizationId: 'org_1', deviceIdentifier: 'b', nickname: null, location: null, status: 'offline', orientation: 'landscape', resolution: null, lastHeartbeat: null, currentPlaylistId: null, isDisabled: false, createdAt: new Date('2026-05-01T00:00:00Z') },
+        ],
+        // 7 offline displays exist across all pages, 100 total in the org
+        meta: { page: 1, limit: 20, total: 7, totalPages: 1 },
+      }),
+    };
+    const out = await listDisplaysTool(
+      { status: 'offline' },
+      ctx(['displays:read']),
+      displaysSvc as never,
+    );
+    expect(out.total).toBe(7);
+    expect(out.displays).toHaveLength(2);
   });
 
   it('rejects invalid limit via Zod (>100)', async () => {
@@ -86,7 +122,11 @@ describe('listDisplaysTool', () => {
   it('passes the calling token org to DisplaysService.findAll (not user-controlled)', async () => {
     const displaysSvc = makeDisplays([]);
     await listDisplaysTool({}, ctx(['displays:read']), displaysSvc as never);
-    expect(displaysSvc.findAll).toHaveBeenCalledWith('org_1', { page: 1, limit: 20 });
+    expect(displaysSvc.findAll).toHaveBeenCalledWith(
+      'org_1',
+      { page: 1, limit: 20 },
+      undefined,
+    );
   });
 
   it('lastHeartbeat as Date is serialized to ISO string', async () => {

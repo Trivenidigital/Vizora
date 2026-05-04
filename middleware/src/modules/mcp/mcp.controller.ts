@@ -4,18 +4,21 @@ import {
   Post,
   Req,
   Res,
+  UseFilters,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { SkipEnvelope } from '../common/interceptors/response-envelope.interceptor';
+import { SkipInputSanitize } from '../common/interceptors/sanitize.interceptor';
 import { McpAuthGuard } from './auth/mcp-auth.guard';
 import {
   MCP_CONTEXT_KEY,
   type McpRequestContext,
 } from './auth/mcp-context';
 import { McpRateLimitGuard } from './auth/mcp-rate-limit.guard';
+import { McpExceptionFilter } from './mcp-exception.filter';
 import { McpService } from './mcp.service';
 
 /**
@@ -39,6 +42,8 @@ import { McpService } from './mcp.service';
 @ApiTags('mcp')
 @Controller('api/v1/mcp')
 @UseGuards(McpAuthGuard, McpRateLimitGuard)
+@UseFilters(McpExceptionFilter)
+@SkipInputSanitize()
 @ApiBearerAuth()
 export class McpController {
   constructor(private readonly mcp: McpService) {}

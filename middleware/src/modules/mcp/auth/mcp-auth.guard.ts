@@ -30,14 +30,22 @@ export class McpAuthGuard implements CanActivate {
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
     const req = ctx.switchToHttp().getRequest<Request>();
     const auth = req.headers.authorization;
+
+    // Single user-facing message for every failure path — distinguishing
+    // "missing header" from "invalid token" from "expired" is an info-
+    // disclosure invitation. The server-side log carries the precise
+    // reason for ops; the wire response does not.
+    const REJECTION = 'Invalid or expired MCP token';
+
     if (!auth || typeof auth !== 'string' || !auth.startsWith('Bearer ')) {
-      throw new UnauthorizedException('Missing or malformed Authorization header');
+      this.logger.debug('MCP auth rejected: missing or malformed Authorization header');
+      throw new UnauthorizedException(REJECTION);
     }
     const bearer = auth.slice('Bearer '.length).trim();
     const context = await this.tokens.validate(bearer);
     if (!context) {
-      // Generic message — see class docstring
-      throw new UnauthorizedException('Invalid or expired MCP token');
+      this.logger.debug('MCP auth rejected: token validation failed');
+      throw new UnauthorizedException(REJECTION);
     }
     const ctxValue: McpRequestContext = {
       tokenId: context.id,

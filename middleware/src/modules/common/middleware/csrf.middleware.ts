@@ -67,7 +67,13 @@ export class CsrfMiddleware implements NestMiddleware {
     // server-to-server by agents (no browser, no CSRF surface). Exempt
     // the entire /api/v1/mcp tree from CSRF validation. Auth on these
     // routes is enforced by McpAuthGuard.
-    const isMcpRoute = fullPath.includes('/api/v1/mcp');
+    //
+    // Use startsWith — `includes()` would also exempt URLs like
+    // `/api/v1/something?ref=/api/v1/mcp` which is a real bypass.
+    // pathname() strips the query string so a manipulated query
+    // parameter cannot match.
+    const pathname = fullPath.split('?')[0];
+    const isMcpRoute = pathname.startsWith('/api/v1/mcp');
 
     const isExempt = csrfExemptSuffixes.some(suffix => fullPath.endsWith(suffix))
       || fullPath.match(/\/devices\/pairing\/status\/[A-Za-z0-9]+$/)

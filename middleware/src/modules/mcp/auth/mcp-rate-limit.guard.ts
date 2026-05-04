@@ -7,10 +7,23 @@ import {
 } from '@nestjs/common';
 import { ThrottlerException } from '@nestjs/throttler';
 import type { Request } from 'express';
+import { parsePositiveInt } from '../lib/parse-env';
 import { MCP_CONTEXT_KEY, type McpRequestContext } from './mcp-context';
 
-const DEFAULT_PER_MIN = Number(process.env.MCP_RATE_LIMIT_PER_MIN ?? 60);
-const DEFAULT_PER_DAY = Number(process.env.MCP_RATE_LIMIT_PER_DAY ?? 1000);
+// Validated at module load. A typo (e.g. MCP_RATE_LIMIT_PER_MIN=sixty)
+// would silently turn the rate-limit check into a no-op via NaN under
+// the bare-Number() pattern — parsePositiveInt warns and falls back so
+// the guard always has a sane positive integer.
+const DEFAULT_PER_MIN = parsePositiveInt(
+  process.env.MCP_RATE_LIMIT_PER_MIN,
+  60,
+  'MCP_RATE_LIMIT_PER_MIN',
+);
+const DEFAULT_PER_DAY = parsePositiveInt(
+  process.env.MCP_RATE_LIMIT_PER_DAY,
+  1000,
+  'MCP_RATE_LIMIT_PER_DAY',
+);
 
 interface Bucket {
   minuteCount: number;
@@ -100,16 +113,17 @@ export class McpRateLimitGuard implements CanActivate {
   }
 
   /**
-   * Drop buckets whose day window has long passed. O(n) sweep capped
-   * to once per minute so it doesn't dominate hot paths.
+   * Drop buckets whose day window has expired. O(n) sweep capped to
+   * once per minute so it doesn't dominate hot paths. The previous
+   * cutoff was `now - 24h`, which keeps buckets for ~48h after their
+   * day window ended; correct comparison is against `now` directly.
    */
   private maybeSweep(): void {
     const now = Date.now();
     if (now - this.lastSweepAt < 60_000) return;
     this.lastSweepAt = now;
-    const cutoff = now - 24 * 60 * 60 * 1000;
     for (const [tokenId, bucket] of this.buckets) {
-      if (bucket.dayResetAt < cutoff) {
+      if (bucket.dayResetAt < now) {
         this.buckets.delete(tokenId);
       }
     }

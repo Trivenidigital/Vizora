@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { createHash, randomBytes } from 'node:crypto';
 import { DatabaseService } from '../../database/database.service';
+import { parsePositiveInt } from '../lib/parse-env';
 
 /**
  * Issue, validate, and revoke MCP bearer tokens.
@@ -17,8 +18,12 @@ import { DatabaseService } from '../../database/database.service';
 export class McpTokenService {
   private readonly logger = new Logger(McpTokenService.name);
 
-  /** Configurable max issuance TTL (default 90 days). */
-  private readonly maxTtlDays = Number(process.env.MCP_TOKEN_TTL_DAYS ?? 90);
+  /** Configurable max issuance TTL (default 90 days). Validated at startup. */
+  private readonly maxTtlDays = parsePositiveInt(
+    process.env.MCP_TOKEN_TTL_DAYS,
+    90,
+    'MCP_TOKEN_TTL_DAYS',
+  );
 
   constructor(private readonly db: DatabaseService) {}
 
