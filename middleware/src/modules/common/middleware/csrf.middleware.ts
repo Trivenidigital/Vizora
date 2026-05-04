@@ -63,8 +63,15 @@ export class CsrfMiddleware implements NestMiddleware {
       '/webhooks/razorpay',
     ];
 
+    // MCP endpoints use bearer-token auth (not cookies) and are called
+    // server-to-server by agents (no browser, no CSRF surface). Exempt
+    // the entire /api/v1/mcp tree from CSRF validation. Auth on these
+    // routes is enforced by McpAuthGuard.
+    const isMcpRoute = fullPath.includes('/api/v1/mcp');
+
     const isExempt = csrfExemptSuffixes.some(suffix => fullPath.endsWith(suffix))
-      || fullPath.match(/\/devices\/pairing\/status\/[A-Za-z0-9]+$/);
+      || fullPath.match(/\/devices\/pairing\/status\/[A-Za-z0-9]+$/)
+      || isMcpRoute;
 
     if (isExempt) {
       return next();

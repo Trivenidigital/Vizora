@@ -163,6 +163,14 @@ HEALTHCHECKS_HEALTH_GUARDIAN_URL  # External heartbeat for the ops dead-man (see
 EMAIL_FROM              # Default sender for transactional mail
 ```
 
+### MCP Server (see also `docs/agents-mcp-server-design.md`)
+
+```
+MCP_TOKEN_TTL_DAYS                # Max issuance TTL in days. Default 90. Min 1.
+MCP_RATE_LIMIT_PER_MIN            # Per-token per-minute cap. Default 60.
+MCP_RATE_LIMIT_PER_DAY            # Per-token per-day cap. Default 1000.
+```
+
 ### Agent System (business agents — see also `docs/agents-architecture.md`)
 
 ```
@@ -201,12 +209,16 @@ OPENWEATHER_API_KEY     # Optional — OpenWeatherMap API key for weather widget
 middleware/src/modules/    # NestJS modules:
                            #   admin, agents, analytics, api-keys, auth, billing,
                            #   common, config, content, database, display-groups,
-                           #   displays, fleet, folders, health, mail, metrics,
+                           #   displays, fleet, folders, health, mail, mcp, metrics,
                            #   notifications, organizations, playlists, redis,
                            #   schedules, storage, support, template-library, users
 middleware/src/modules/agents/  # Business-agent infrastructure (PR #32, 2026-04-19):
                                 #   AgentStateService, agent-state.schema, controllers
                                 #   for /api/v1/agents/* — see docs/agents-architecture.md
+middleware/src/modules/mcp/     # Model Context Protocol server — read-only tool surface
+                                # for agents (Vizora-internal + future Hermes sidecar).
+                                # See docs/agents-mcp-server-design.md and the "MCP
+                                # Server" section below.
 middleware/src/modules/common/  # Shared guards (csrf), interceptors (logging, sanitize, response-envelope), middleware (csrf)
 middleware/test/           # E2E test specs (*.e2e-spec.ts)
 packages/database/prisma/schema.prisma  # Data model: Organization, User, Display, Content, Playlist, Schedule, DisplayGroup, Tag
@@ -303,6 +315,34 @@ Automated deployment readiness checker. Runs 30 validation rules across content,
 **Dashboard:** `GET /api/v1/health/ops-status` — Redis-cached ops status for web dashboard at `/dashboard/ops`. Prefer this over reading `ops-state.json` directly from new callers.
 
 **Design:** `docs/plans/2026-02-28-autonomous-ops-design.md`
+
+## MCP Server
+
+`middleware/src/modules/mcp/` — Vizora's Model Context Protocol server. Read-only tool surface that agents (Vizora-internal cron, Claude Code subagents, future Hermes sidecar, eventually customer integrations) call instead of hitting per-domain REST endpoints.
+
+**Endpoints:**
+- `POST /api/v1/mcp` — MCP transport (JSON-RPC over HTTP). Bearer-token auth.
+- `GET  /api/v1/mcp` — MCP transport SSE leg.
+- `POST /api/v1/admin/mcp-tokens` — issue token (super-admin only). Returns plaintext bearer ONCE.
+- `GET  /api/v1/admin/mcp-tokens` — list tokens (no plaintext).
+- `DELETE /api/v1/admin/mcp-tokens/:id` — revoke (idempotent).
+
+**Tools today (PR-A — `feat/mcp-server-foundation`):**
+- `list_displays` — paginated, scope `displays:read`, optional status filter.
+
+**Pending PRs:**
+- PR-B — remaining 12 tools (display detail, content, playlists, schedules, organizations, audit).
+- PR-C — Hermes sidecar `vizora_mcp_client.py` + first agent migration (`support-triage`).
+
+**Key behaviors to know:**
+- Bearer tokens are sha256-hashed; plaintext shown once at issuance, never persisted.
+- `@SkipEnvelope()` on every MCP endpoint — global response envelope is bypassed so MCP JSON-RPC reaches the wire unwrapped.
+- CSRF middleware exempts the entire `/api/v1/mcp` tree (bearer auth, no cookie surface).
+- Per-token rate limit (default 60/min, 1000/day). In-memory; ~2× effective limit in PM2 cluster mode (documented in code).
+- Audit row written to `mcp_audit_log` for every tool call (success or error). Inputs redacted via the same anchored regex `AgentStateService` uses.
+- Errors map to MCP-spec codes: `NOT_FOUND` (resource missing), `INVALID_INPUT` (params bad), `UNAUTHORIZED` (token issue), `FORBIDDEN` (scope), `RATE_LIMITED`, `INTERNAL`. **Distinction matters** — `NOT_FOUND` tells agents to back off, `INVALID_INPUT` invites retry.
+
+**Design doc:** `docs/agents-mcp-server-design.md`.
 
 ## Agent Architecture (business agents)
 
