@@ -334,6 +334,42 @@ Automated deployment readiness checker. Runs 30 validation rules across content,
 - `update_support_request_ai_category` — scope `support:write`, sets V2 taxonomy slug. Zod-constrained to the V2 enum.
 - `create_support_message` — scope `support:write`, posts an agent-authored comment. Author identity comes from the bearer-token context, content capped at 2000 chars.
 
+**Hermes Agent runtime (prod VPS):**
+- Installed at `/usr/local/lib/hermes-agent`, command at `/usr/local/bin/hermes`.
+- Config: `/root/.hermes/config.yaml` (mcp_servers.vizora pointing at `https://vizora.cloud/api/v1/mcp`).
+- Secrets: `/root/.hermes/.env` (chmod 600) — `OPENROUTER_API_KEY`, `VIZORA_MCP_TOKEN`, `VIZORA_MCP_BASE_URL`.
+- Gateway: `systemd` unit `hermes-gateway.service` (active) — required for cron jobs to fire.
+- Skills repo: `hermes-skills/<skill-name>/SKILL.md` — git-tracked, scp'd to `/root/.hermes/skills/` on deploy.
+
+**Hermes-driven agents (state):**
+- `vizora-support-triage` — **shadow mode** in cron `*/5 * * * *`. Reads via MCP, scores, appends `/var/log/hermes/vizora-support-triage-shadow.jsonl`. Live-mode skill (`SKILL-live.md`) is built and committed but NOT deployed; cutover is a one-line SCP after the gate below clears.
+
+**Cutover playbook for support-triage (Hermes shadow → live)**
+
+Gate before swapping `SKILL.md`:
+1. ≥ 7 days of shadow data accumulated in the JSONL.
+2. Run `npx tsx scripts/agents/compare-hermes-vs-heuristic.ts` from the VPS. Require:
+   - ≥ 50 tickets scored
+   - ≥ 80% priority agreement vs DB priority
+   - Avg disagreement rank-distance ≤ 1.0
+3. Sign-off from Sri (the Hermes-first rule applies; the cutover decision still goes through him).
+
+Cutover (when gate clears):
+```bash
+# Promote live skill on VPS
+scp hermes-skills/vizora-support-triage/SKILL-live.md \
+    root@vizora.cloud:/root/.hermes/skills/vizora-support-triage/SKILL.md
+# Hermes auto-reloads skill content on each cron firing — no daemon restart needed
+```
+
+Rollback (if anything goes wrong):
+```bash
+scp hermes-skills/vizora-support-triage/SKILL.md \
+    root@vizora.cloud:/root/.hermes/skills/vizora-support-triage/SKILL.md
+```
+
+The PM2 cron `agent-support-triage` continues to run as a safety net throughout — decommission it (`pm2 delete agent-support-triage`) only after Hermes-live has run for ≥ 14 days without incident.
+
 **Pending PRs:**
 - PR-B — remaining 12 tools (display detail, content, playlists, schedules, organizations, audit).
 - PR-C — Hermes sidecar `vizora_mcp_client.py` + first agent migration (`support-triage`).
