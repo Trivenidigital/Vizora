@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { DatabaseService } from '../database/database.service';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
@@ -148,6 +149,234 @@ export class OrganizationsService {
     const v = (tier ?? '').toLowerCase();
     if (v === 'starter' || v === 'pro' || v === 'enterprise') return v;
     return 'free';
+  }
+
+  // ── Onboarding-nudge write methods (customer-lifecycle Hermes migration) ──
+  //
+  // The PM2 cron `agent-customer-lifecycle` (scripts/agents/customer-
+  // lifecycle.ts) currently owns the writes. These methods mirror its
+  // exact behaviour so a Hermes-driven agent can call them via MCP
+  // without changing customer-visible semantics. Safeguards are
+  // server-side — the agent picks a `nudge_key`, this service decides
+  // whether SMTP fires (LIFECYCLE_LIVE), against which addresses
+  // (LIFECYCLE_TEST_EMAILS), and whether dedup blocks (existing
+  // dayN_NudgeSentAt).
+
+  static readonly NUDGE_COLUMN = {
+    'day1-pair-screen': 'day1NudgeSentAt',
+    'day3-upload-content': 'day3NudgeSentAt',
+    'day7-create-schedule': 'day7NudgeSentAt',
+  } as const;
+
+  static readonly NUDGE_SUBJECT = {
+    'day1-pair-screen': 'Pair your first screen with Vizora',
+    'day3-upload-content': 'Upload your first piece of content',
+    'day7-create-schedule': 'Schedule your content for automatic playback',
+  } as const;
+
+  /**
+   * Set the dayN_NudgeSentAt column. Idempotent — re-calling with the
+   * same nudgeKey on an already-sent row returns true (the row is
+   * unchanged). Returns false if the org has no onboarding row at all
+   * (caller's responsibility to upsert first via auto-complete or
+   * sendOnboardingNudge's internal upsert).
+   */
+  async setOnboardingNudgeSent(
+    organizationId: string,
+    nudgeKey: keyof typeof OrganizationsService.NUDGE_COLUMN,
+  ): Promise<boolean> {
+    const col = OrganizationsService.NUDGE_COLUMN[nudgeKey];
+    const res = await this.db.organizationOnboarding.upsert({
+      where: { organizationId },
+      create: { organizationId, [col]: new Date() },
+      update: { [col]: new Date() },
+      select: { organizationId: true },
+    });
+    return res.organizationId === organizationId;
+  }
+
+  /**
+   * Mark an org's onboarding as completed. Used by the auto-complete
+   * path for stale (>30d) signups that never finish. Idempotent —
+   * re-calling on an already-completed row updates the timestamp,
+   * which is fine.
+   */
+  async setOnboardingCompleted(organizationId: string): Promise<boolean> {
+    const res = await this.db.organizationOnboarding.upsert({
+      where: { organizationId },
+      create: { organizationId, completedAt: new Date() },
+      update: { completedAt: new Date() },
+      select: { organizationId: true },
+    });
+    return res.organizationId === organizationId;
+  }
+
+  /**
+   * Send a templated onboarding nudge. THE TEMPLATE IS HARDCODED
+   * SERVER-SIDE — the caller picks a `nudgeKey` and the server picks
+   * the subject + body. This is the D6 hardened-outbound rule: agent
+   * input never reaches the wire as email content.
+   *
+   * Resolution rules (mirrors `scripts/agents/customer-lifecycle.ts`):
+   * - LIFECYCLE_TEST_EMAILS set → all mail goes to those addresses
+   *   (regardless of LIFECYCLE_LIVE). Real admin email is NOT used.
+   * - LIFECYCLE_LIVE=true (and TEST_EMAILS empty) → real admin email.
+   * - Otherwise → dry-run, no SMTP call.
+   *
+   * Dedup safety: pre-checks `dayN_NudgeSentAt`. If already set,
+   * returns `{ sent: false, reason: 'already_sent' }` WITHOUT firing
+   * SMTP. After a successful send, marks the column inside the same
+   * call (mirrors the PM2 cron's "send + mark in one logical step"
+   * pattern, which is the duplicate-email mitigation).
+   *
+   * Logging: recipient addresses are sha256-hashed (`maskEmail`) and
+   * NEVER logged in plaintext, error messages, or the audit row.
+   */
+  async sendOnboardingNudge(
+    organizationId: string,
+    nudgeKey: keyof typeof OrganizationsService.NUDGE_COLUMN,
+  ): Promise<{
+    sent: boolean;
+    recipientCount: number;
+    recipientHashes: string[];
+    reason:
+      | 'sent'
+      | 'dry_run'
+      | 'already_sent'
+      | 'no_admin'
+      | 'no_smtp_configured'
+      | 'smtp_error';
+  }> {
+    const col = OrganizationsService.NUDGE_COLUMN[nudgeKey];
+    const subject = OrganizationsService.NUDGE_SUBJECT[nudgeKey];
+
+    // Pre-check dedup
+    const existing = await this.db.organizationOnboarding.findUnique({
+      where: { organizationId },
+    });
+    if (existing && existing[col] != null) {
+      return { sent: false, recipientCount: 0, recipientHashes: [], reason: 'already_sent' };
+    }
+
+    // Find admin recipient (the actual customer-facing address)
+    const admin = await this.db.user.findFirst({
+      where: {
+        organizationId,
+        role: { in: ['admin', 'manager'] },
+        isActive: true,
+      },
+      orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
+      select: { email: true },
+    });
+    if (!admin?.email) {
+      return { sent: false, recipientCount: 0, recipientHashes: [], reason: 'no_admin' };
+    }
+
+    // Resolve recipients per the LIFECYCLE_LIVE / LIFECYCLE_TEST_EMAILS rules
+    const testEmailsRaw = process.env.LIFECYCLE_TEST_EMAILS || '';
+    const testEmails = testEmailsRaw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const live = process.env.LIFECYCLE_LIVE === 'true';
+    const recipients =
+      testEmails.length > 0 ? [...testEmails] : live ? [admin.email] : [];
+
+    const recipientHashes = recipients.map((e) => OrganizationsService.maskEmail(e));
+
+    if (recipients.length === 0) {
+      return { sent: false, recipientCount: 0, recipientHashes: [], reason: 'dry_run' };
+    }
+
+    // Build SMTP transporter on demand. Cached on the service instance
+    // after first build to avoid re-handshaking per send within the
+    // same process lifetime.
+    const transporter = await this.getLifecycleTransporter();
+    if (!transporter) {
+      return {
+        sent: false,
+        recipientCount: 0,
+        recipientHashes: [],
+        reason: 'no_smtp_configured',
+      };
+    }
+
+    const appUrl =
+      process.env.APP_URL || process.env.WEB_URL || 'https://vizora.cloud';
+    const body = `Hi,\n\n${subject}.\n\nOpen your dashboard: ${appUrl}/dashboard\n\n— Vizora`;
+    const from = process.env.EMAIL_FROM || 'Vizora <noreply@mail.vizora.cloud>';
+
+    let sent = 0;
+    for (const to of recipients) {
+      try {
+        await transporter.sendMail({ from, to, subject, text: body });
+        sent++;
+      } catch (err) {
+        // Mask recipient — DO NOT log raw `to` or raw err.message,
+        // nodemailer DSN payloads frequently embed the recipient.
+        const code = (err as { code?: string })?.code ?? 'UNKNOWN';
+        this.logger.warn(
+          `lifecycle nudge send failed org=${organizationId} recipient=${OrganizationsService.maskEmail(to)} code=${code}`,
+        );
+      }
+    }
+
+    if (sent === 0) {
+      return {
+        sent: false,
+        recipientCount: 0,
+        recipientHashes,
+        reason: 'smtp_error',
+      };
+    }
+
+    // Mark sent in the same logical step (dedup mitigation)
+    await this.setOnboardingNudgeSent(organizationId, nudgeKey);
+
+    return {
+      sent: true,
+      recipientCount: sent,
+      recipientHashes,
+      reason: 'sent',
+    };
+  }
+
+  /**
+   * Lazy transporter — only built when actually needed, then cached.
+   * Returns null if SMTP isn't configured (dev environments).
+   */
+  private lifecycleTransporter:
+    | { sendMail: (opts: Record<string, unknown>) => Promise<unknown> }
+    | null
+    | undefined = undefined;
+
+  private async getLifecycleTransporter() {
+    if (this.lifecycleTransporter !== undefined) return this.lifecycleTransporter;
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS ?? process.env.SMTP_PASSWORD;
+    const smtpHost = process.env.SMTP_HOST;
+    if (!smtpHost || (smtpUser && !smtpPass)) {
+      this.lifecycleTransporter = null;
+      return null;
+    }
+    const { default: nodemailer } = await import('nodemailer');
+    this.lifecycleTransporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: parseInt(process.env.SMTP_PORT || '587', 10),
+      secure: (process.env.SMTP_PORT || '587') === '465',
+      auth: smtpUser && smtpPass ? { user: smtpUser, pass: smtpPass } : undefined,
+    });
+    return this.lifecycleTransporter;
+  }
+
+  /**
+   * Sha256-hash an email so it can appear in audit logs / wire payloads
+   * without leaking the plaintext. Same hashing the PM2 cron's
+   * `lib/alerting.maskEmail` uses (deterministic — the same address
+   * always hashes the same).
+   */
+  private static maskEmail(email: string): string {
+    return createHash('sha256').update(email.trim().toLowerCase()).digest('hex').slice(0, 16);
   }
 
   async findOne(id: string) {

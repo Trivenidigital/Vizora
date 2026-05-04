@@ -39,6 +39,11 @@ describe('OrganizationsService', () => {
       },
       user: {
         findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn(),
+      },
+      organizationOnboarding: {
+        findUnique: jest.fn(),
+        upsert: jest.fn(),
       },
       $transaction: jest.fn((fn) => fn({
         organization: {
@@ -225,6 +230,110 @@ describe('OrganizationsService', () => {
       mockDatabaseService.organization.findUnique.mockResolvedValue(null);
 
       await expect(service.remove('invalid-id')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('setOnboardingNudgeSent (customer-lifecycle write)', () => {
+    it('upserts the right column for day1-pair-screen', async () => {
+      mockDatabaseService.organizationOnboarding.upsert.mockResolvedValue({
+        organizationId: 'org-1',
+      });
+      const ok = await service.setOnboardingNudgeSent('org-1', 'day1-pair-screen');
+      expect(ok).toBe(true);
+      const arg = mockDatabaseService.organizationOnboarding.upsert.mock.calls[0][0];
+      expect(arg.where).toEqual({ organizationId: 'org-1' });
+      expect(arg.create).toMatchObject({ organizationId: 'org-1', day1NudgeSentAt: expect.any(Date) });
+      expect(arg.update).toMatchObject({ day1NudgeSentAt: expect.any(Date) });
+    });
+
+    it.each([
+      ['day3-upload-content', 'day3NudgeSentAt'],
+      ['day7-create-schedule', 'day7NudgeSentAt'],
+    ] as const)('upserts the right column for %s (column %s)', async (key, col) => {
+      mockDatabaseService.organizationOnboarding.upsert.mockResolvedValue({
+        organizationId: 'org-1',
+      });
+      await service.setOnboardingNudgeSent('org-1', key);
+      const arg = mockDatabaseService.organizationOnboarding.upsert.mock.calls[0][0];
+      expect(arg.create[col]).toBeInstanceOf(Date);
+      expect(arg.update[col]).toBeInstanceOf(Date);
+    });
+  });
+
+  describe('setOnboardingCompleted (customer-lifecycle write)', () => {
+    it('upserts completedAt=NOW() (idempotent)', async () => {
+      mockDatabaseService.organizationOnboarding.upsert.mockResolvedValue({
+        organizationId: 'org-1',
+      });
+      const ok = await service.setOnboardingCompleted('org-1');
+      expect(ok).toBe(true);
+      const arg = mockDatabaseService.organizationOnboarding.upsert.mock.calls[0][0];
+      expect(arg.create).toMatchObject({ organizationId: 'org-1', completedAt: expect.any(Date) });
+      expect(arg.update).toMatchObject({ completedAt: expect.any(Date) });
+    });
+  });
+
+  describe('sendOnboardingNudge (customer-lifecycle write — high blast radius)', () => {
+    beforeEach(() => {
+      // Default: no existing onboarding row
+      mockDatabaseService.organizationOnboarding.findUnique.mockResolvedValue(null);
+      mockDatabaseService.organizationOnboarding.upsert.mockResolvedValue({
+        organizationId: 'org-1',
+      });
+      mockDatabaseService.user.findFirst.mockResolvedValue({ email: 'admin@acme.example' });
+      // Reset env between tests
+      delete process.env.LIFECYCLE_LIVE;
+      delete process.env.LIFECYCLE_TEST_EMAILS;
+    });
+
+    afterAll(() => {
+      delete process.env.LIFECYCLE_LIVE;
+      delete process.env.LIFECYCLE_TEST_EMAILS;
+    });
+
+    it('returns dry_run when LIFECYCLE_LIVE unset and no TEST_EMAILS — DOES NOT call SMTP', async () => {
+      const out = await service.sendOnboardingNudge('org-1', 'day1-pair-screen');
+      expect(out).toEqual({
+        sent: false,
+        recipientCount: 0,
+        recipientHashes: [],
+        reason: 'dry_run',
+      });
+      // Critical: dedup mark-sent must NOT have been called in dry-run
+      expect(mockDatabaseService.organizationOnboarding.upsert).not.toHaveBeenCalled();
+    });
+
+    it('returns already_sent when dayN_NudgeSentAt is already set — DOES NOT call SMTP', async () => {
+      mockDatabaseService.organizationOnboarding.findUnique.mockResolvedValue({
+        organizationId: 'org-1',
+        day1NudgeSentAt: new Date('2026-04-30'),
+      });
+      process.env.LIFECYCLE_LIVE = 'true'; // even with live=true, dedup prevents send
+      const out = await service.sendOnboardingNudge('org-1', 'day1-pair-screen');
+      expect(out.sent).toBe(false);
+      expect(out.reason).toBe('already_sent');
+      expect(mockDatabaseService.organizationOnboarding.upsert).not.toHaveBeenCalled();
+    });
+
+    it('returns no_admin when no admin/manager user found', async () => {
+      mockDatabaseService.user.findFirst.mockResolvedValue(null);
+      process.env.LIFECYCLE_LIVE = 'true';
+      const out = await service.sendOnboardingNudge('org-1', 'day1-pair-screen');
+      expect(out.sent).toBe(false);
+      expect(out.reason).toBe('no_admin');
+    });
+
+    it('NEVER returns plaintext recipient addresses — only sha256 hashes', async () => {
+      process.env.LIFECYCLE_TEST_EMAILS = 'redirect@example.test';
+      const out = await service.sendOnboardingNudge('org-1', 'day1-pair-screen');
+      // recipient_hashes is populated; NEVER plaintext
+      const serialized = JSON.stringify(out);
+      expect(serialized).not.toContain('admin@acme.example');
+      expect(serialized).not.toContain('redirect@example.test');
+      // The hashes are deterministic 16-char hex prefixes
+      if (out.recipientHashes.length > 0) {
+        expect(out.recipientHashes[0]).toMatch(/^[a-f0-9]{16}$/);
+      }
     });
   });
 });

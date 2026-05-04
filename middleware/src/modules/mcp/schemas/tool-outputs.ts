@@ -125,3 +125,40 @@ export const ListOnboardingCandidatesOutput = z.object({
 });
 
 export type ListOnboardingCandidatesOutputT = z.infer<typeof ListOnboardingCandidatesOutput>;
+
+// ── Customer-lifecycle write tool outputs ─────────────────────────────────
+
+export const MarkOnboardingNudgeSentResult = z.object({
+  organization_id: z.string(),
+  nudge_key: z.string(),
+  marked: z.boolean(),
+});
+export type MarkOnboardingNudgeSentResultT = z.infer<typeof MarkOnboardingNudgeSentResult>;
+
+export const AutoCompleteOrgOnboardingResult = z.object({
+  organization_id: z.string(),
+  completed: z.boolean(),
+});
+export type AutoCompleteOrgOnboardingResultT = z.infer<typeof AutoCompleteOrgOnboardingResult>;
+
+/**
+ * Result of a `send_lifecycle_nudge_email` call. The recipient address
+ * NEVER appears here in plaintext — only the sha256-hash. The `reason`
+ * lets the agent reason about what happened without seeing the address.
+ */
+export const SendLifecycleNudgeEmailResult = z.object({
+  organization_id: z.string(),
+  nudge_key: z.string(),
+  sent: z.boolean(),
+  recipient_count: z.number().int().nonnegative(),
+  recipient_hashes: z.array(z.string()),
+  reason: z.enum([
+    'sent',
+    'dry_run',
+    'already_sent',
+    'no_admin',
+    'no_smtp_configured',
+    'smtp_error',
+  ]),
+});
+export type SendLifecycleNudgeEmailResultT = z.infer<typeof SendLifecycleNudgeEmailResult>;
