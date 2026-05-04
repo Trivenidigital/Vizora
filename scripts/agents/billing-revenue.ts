@@ -8,6 +8,16 @@
  *   - Never mutates billing state (D1 — read-only)
  *
  * Gated OFF by default. Set BILLING_REVENUE_ENABLED=true to activate.
+ *
+ * **Hermes-first rule (2026-05-04):** when this agent is implemented,
+ * build it as a Hermes skill at
+ * `hermes-skills/vizora-billing-revenue/SKILL.md`, NOT as additional
+ * TypeScript logic in this file. The PM2 cron stays only as a thin
+ * shell scheduling `hermes`; the LLM-driven anomaly reasoning and the
+ * natural-language summary live in the skill prompt. See the
+ * support-triage migration in CLAUDE.md "MCP Server" section as the
+ * reference pattern, and `feedback_hermes_first_for_agents` in user
+ * memory.
  */
 
 import 'dotenv/config';

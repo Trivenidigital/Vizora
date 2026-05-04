@@ -9,6 +9,18 @@
  *     — never mutates another agent's state file
  *
  * Gated OFF by default. Set AGENT_ORCHESTRATOR_ENABLED=true to activate.
+ *
+ * **Hermes-first rule (2026-05-04):** Hermes Agent IS the orchestrator
+ * runtime. When this is implemented, do NOT build a custom orchestration
+ * loop in TypeScript — instead, write a Hermes skill at
+ * `hermes-skills/vizora-orchestrator/SKILL.md` that uses Hermes's
+ * built-in `delegate_task` tool to spawn the per-family skills as
+ * sub-agents (parallel where independent, sequential where one's
+ * output drives the next). The MCP server provides cross-family read
+ * tools (`list_open_customer_incidents`, etc — to be added). See
+ * `feedback_hermes_first_for_agents` in user memory and
+ * docs/agents-architecture.md for the dispatcher-first routing rule
+ * that this orchestrator must follow.
  */
 
 import 'dotenv/config';

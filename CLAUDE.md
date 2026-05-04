@@ -344,6 +344,21 @@ Automated deployment readiness checker. Runs 30 validation rules across content,
 **Hermes-driven agents (state):**
 - `vizora-support-triage` — **shadow mode** in cron `*/5 * * * *`. Reads via MCP, scores, appends `/var/log/hermes/vizora-support-triage-shadow.jsonl`. Live-mode skill (`SKILL-live.md`) is built and committed but NOT deployed; cutover is a one-line SCP after the gate below clears.
 
+**Agent migration roadmap (Hermes-first rule)**
+
+Inventory of `scripts/agents/*.ts` and their migration status:
+
+| Agent | Lines | State | Migration plan |
+|-------|-------|-------|----------------|
+| support-triage | 306 | LIVE (PM2 cron, every 5 min) | **Migrated to Hermes shadow.** Cutover gated on shadow-data review. |
+| customer-lifecycle | 463 | LIVE (PM2 cron, every 30 min). Sends real onboarding emails when `LIFECYCLE_LIVE=true`. | **Designed, not built.** See `tasks/feature-backlog.md` → "customer-lifecycle Hermes migration" for the design sketch + MCP tool list. Not started in this autonomous run because the outbound-email blast radius warrants explicit per-step approval. |
+| billing-revenue | 32 | SCAFFOLD (gated off). | Per Hermes-first rule, when implemented build as `hermes-skills/vizora-billing-revenue/SKILL.md`, not TS. |
+| content-intelligence | 32 | SCAFFOLD (gated off). | Per Hermes-first rule, build as `hermes-skills/vizora-content-intelligence/SKILL.md`. |
+| screen-health-customer | 33 | SCAFFOLD (gated off). | Per Hermes-first rule, build as `hermes-skills/vizora-screen-health/SKILL.md`. The `list_displays` MCP tool already exists; only `create_customer_incident` write tool needed. |
+| agent-orchestrator | 33 | SCAFFOLD (gated off). | Per Hermes-first rule, **Hermes IS the orchestrator runtime** — use its built-in `delegate_task` tool to coordinate per-family skills, don't write a custom loop. |
+
+Each scaffold's file header now carries the Hermes-first comment so future implementers see the rule without having to rediscover it.
+
 **Cutover playbook for support-triage (Hermes shadow → live)**
 
 Gate before swapping `SKILL.md`:
