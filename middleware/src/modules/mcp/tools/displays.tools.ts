@@ -1,6 +1,10 @@
 import { ForbiddenException } from '@nestjs/common';
 import { DisplaysService } from '../../displays/displays.service';
-import { hasScope, type McpRequestContext } from '../auth/mcp-context';
+import {
+  hasScope,
+  requireOrgScope,
+  type McpRequestContext,
+} from '../auth/mcp-context';
 import {
   ListDisplaysInput,
   type ListDisplaysInputT,
@@ -32,6 +36,7 @@ export async function listDisplaysTool(
       "Token lacks scope 'displays:read'",
     );
   }
+  const orgId = requireOrgScope(context);
   const input = ListDisplaysInput.parse(rawInput) as ListDisplaysInputT;
 
   // Push the status filter DB-side so `total` reflects the filtered
@@ -39,7 +44,7 @@ export async function listDisplaysTool(
   // but not the count, breaking pagination ratios for any non-'all'
   // status query.
   const result = await displaysService.findAll(
-    context.organizationId,
+    orgId,
     { page: input.page, limit: input.limit },
     input.status === 'all' ? undefined : { status: input.status },
   );

@@ -3,6 +3,7 @@ import { AdminModule } from '../admin/admin.module';
 import { AuthModule } from '../auth/auth.module';
 import { DatabaseModule } from '../database/database.module';
 import { DisplaysModule } from '../displays/displays.module';
+import { OrganizationsModule } from '../organizations/organizations.module';
 import { SupportModule } from '../support/support.module';
 import { McpAuditService } from './audit/mcp-audit.service';
 import { McpAuthGuard } from './auth/mcp-auth.guard';
@@ -29,7 +30,14 @@ import { McpTokensAdminController } from './admin/mcp-tokens.controller';
  * Companion docs: `docs/agents-mcp-server-design.md`.
  */
 @Module({
-  imports: [DatabaseModule, AuthModule, AdminModule, DisplaysModule, SupportModule],
+  imports: [
+    DatabaseModule,
+    AuthModule,
+    AdminModule,
+    DisplaysModule,
+    OrganizationsModule,
+    SupportModule,
+  ],
   controllers: [McpController, McpTokensAdminController],
   providers: [McpService, McpTokenService, McpAuthGuard, McpRateLimitGuard, McpAuditService],
   exports: [McpService, McpTokenService],

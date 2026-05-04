@@ -867,9 +867,13 @@ model McpToken {
   tokenHash      String       @unique
   // Human-readable label (e.g. "support-triage prod 2026-Q2"). Free-form.
   name           String
-  // Scope: which org's data this token can read.
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  // Scope: which org's data this token can read. NULL = platform-scope
+  // token (cross-org agents like customer-lifecycle, agent-orchestrator).
+  // Per-org tools must reject null-org tokens; platform-only tools must
+  // accept null and operate across all orgs. The Organization relation
+  // is `onDelete: Cascade` so revoking an org cleans up its tokens.
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   // Which agent the token was issued for — used in audit attribution.
   agentName      String
   // Tool-scope strings (e.g. ["displays:read", "content:read"]).
