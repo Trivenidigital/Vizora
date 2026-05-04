@@ -102,6 +102,8 @@ Keep raw input for audit; sanitize the prompt copy.
 
 **Apply to Vizora:** Any free-text customer input that reaches an LLM prompt — support tickets, content captions, schedule notes — runs through a sanitizer first.
 
+> **Status as of 2026-05-03:** Vizora today does not have any LLM-prompt path that sees raw user free-text. The existing pattern (documented as **D13** in `scripts/agents/lib/types.ts`) eliminates the risk by construction: *"everything the AI sees must be structural (counts, flags, enums) to prevent PII leak into LLM prompts."* `AgentAI` input types (`TicketSignal`, `OnboardingSignal`, `ContentPerfSignal`) are all structural. `support-triage` explicitly drops the message body before calling `AgentAI`. The sanitizer above is the right defense IF/WHEN a future agent needs raw text in a prompt — until then, D13 is the stronger control because it removes the source of the risk rather than scrubbing it. Build the sanitizer when the first prompt path actually needs raw text.
+
 ### 7. Dual-source audit (deterministic backup of LLM-enriched logs)
 
 shift-agent runs **two** audit sources:
