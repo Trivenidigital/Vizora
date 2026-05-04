@@ -351,7 +351,7 @@ Automated deployment readiness checker. Runs 30 validation rules across content,
 
 **Hermes-driven agents (state):**
 - `vizora-support-triage` — **shadow mode** in cron `*/5 * * * *`. Reads via MCP, scores, appends `/var/log/hermes/vizora-support-triage-shadow.jsonl`. Live-mode skill (`SKILL-live.md`) is built and committed but NOT deployed; cutover is a one-line SCP after the gate below clears.
-- `vizora-customer-lifecycle` — **shadow mode** in cron `*/30 * * * *`. Calls `list_onboarding_candidates` (platform-scope), picks template per org via heuristic-matching prompt, appends `/var/log/hermes/vizora-customer-lifecycle-shadow.jsonl`. PM2 cron `agent-customer-lifecycle` continues to send all real emails. Live-mode skill is NOT YET BUILT — the live path needs `mark_onboarding_nudge_sent`, `auto_complete_org_onboarding`, and `send_lifecycle_nudge_email` write tools first (see `tasks/feature-backlog.md`).
+- `vizora-customer-lifecycle` — **shadow mode** in cron `*/30 * * * *`. Calls `list_onboarding_candidates` (platform-scope), picks template per org via heuristic-matching prompt, appends `/var/log/hermes/vizora-customer-lifecycle-shadow.jsonl`. PM2 cron `agent-customer-lifecycle` is the source of truth (currently dry-run because `LIFECYCLE_LIVE` is unset on prod). Live-mode skill (`SKILL-live.md`) is built and committed but NOT deployed; cutover is a multi-step procedure documented below.
 
 **Agent migration roadmap (Hermes-first rule)**
 
@@ -360,7 +360,7 @@ Inventory of `scripts/agents/*.ts` and their migration status:
 | Agent | Lines | State | Migration plan |
 |-------|-------|-------|----------------|
 | support-triage | 306 | LIVE (PM2 cron, every 5 min) | **Migrated to Hermes shadow.** Cutover gated on shadow-data review. |
-| customer-lifecycle | 463 | LIVE (PM2 cron, every 30 min). Sends real onboarding emails when `LIFECYCLE_LIVE=true`. | **Migrated to Hermes shadow.** Read path: `list_onboarding_candidates` (platform-scope MCP tool). Skill: `hermes-skills/vizora-customer-lifecycle/SKILL.md`. Cron: `*/30 * * * *`. Comparison: `scripts/agents/compare-lifecycle-hermes-vs-heuristic.ts`. **Live cutover NOT done** — the write tools (`mark_onboarding_nudge_sent`, `auto_complete_org_onboarding`, `send_lifecycle_nudge_email`) are not yet built; the customer-visible email path stays on the PM2 cron. Backlog entry tracks the staged rollout. |
+| customer-lifecycle | 463 | LIVE (PM2 cron, every 30 min). Currently dry-run on prod (`LIFECYCLE_LIVE` unset). | **Migrated to Hermes shadow + write tools shipped.** Read tool: `list_onboarding_candidates`. Write tools: `mark_onboarding_nudge_sent`, `auto_complete_org_onboarding`, `send_lifecycle_nudge_email`. Live skill: `SKILL-live.md` written, NOT deployed. Cutover playbook documented above (multi-step: scp + token-scope + PM2 stop + LIFECYCLE_LIVE flip). |
 | billing-revenue | 32 | SCAFFOLD (gated off). | Per Hermes-first rule, when implemented build as `hermes-skills/vizora-billing-revenue/SKILL.md`, not TS. |
 | content-intelligence | 32 | SCAFFOLD (gated off). | Per Hermes-first rule, build as `hermes-skills/vizora-content-intelligence/SKILL.md`. |
 | screen-health-customer | 33 | SCAFFOLD (gated off). | Per Hermes-first rule, build as `hermes-skills/vizora-screen-health/SKILL.md`. The `list_displays` MCP tool already exists; only `create_customer_incident` write tool needed. |
@@ -393,6 +393,68 @@ scp hermes-skills/vizora-support-triage/SKILL.md \
 ```
 
 The PM2 cron `agent-support-triage` continues to run as a safety net throughout — decommission it (`pm2 delete agent-support-triage`) only after Hermes-live has run for ≥ 14 days without incident.
+
+**Cutover playbook for customer-lifecycle (Hermes shadow → live)**
+
+This cutover is more involved than support-triage because it touches the outbound email path. **Customer-visible.** Don't proceed without explicit Sri sign-off.
+
+Gate before swapping `SKILL.md`:
+1. ≥ 7 days of shadow data accumulated in `vizora-customer-lifecycle-shadow.jsonl`.
+2. Run `npx tsx scripts/agents/compare-lifecycle-hermes-vs-heuristic.ts` from the VPS. Require:
+   - ≥ 50 per-org decisions logged
+   - ≥ 80% template agreement vs PM2 mark-sent records (acknowledging the script's "PM2 mark-sent reflects sent, not suggested" caveat)
+   - Zero malformed JSONL rows
+3. Sri sign-off on the comparison report.
+4. Independent confirmation from the user that prod's SMTP setup (Resend) and `EMAIL_FROM` / `APP_URL` env vars are set correctly — Hermes inherits them via the MCP server side, but a misconfigured From: address will go out to real customers.
+
+Cutover sequence (run AS A SINGLE BLOCK — do not pause between steps):
+
+```bash
+# 1. Promote live skill on VPS
+scp hermes-skills/vizora-customer-lifecycle/SKILL-live.md \
+    root@vizora.cloud:/root/.hermes/skills/vizora-customer-lifecycle/SKILL.md
+
+# 2. Expand the shadow token's scope to include customer:write
+ssh root@vizora.cloud 'docker exec -i vizora-postgres psql -U postgres -d vizora <<SQL
+UPDATE mcp_tokens
+SET scopes = ARRAY[\$\$customer:read\$\$, \$\$customer:write\$\$]
+WHERE name = \$\$hermes-customer-lifecycle-shadow\$\$ AND "revokedAt" IS NULL;
+SQL'
+
+# 3. Stop the PM2 cron (Hermes is now the writer; PM2 staying on would race the dedup)
+ssh root@vizora.cloud 'pm2 stop agent-customer-lifecycle && pm2 save'
+
+# 4. Flip LIFECYCLE_LIVE on (server-side gate that until now kept emails dry-run)
+ssh root@vizora.cloud 'echo "LIFECYCLE_LIVE=true" >> /opt/vizora/app/.env && pm2 reload vizora-middleware --update-env'
+```
+
+After cutover, watch the next 2-3 cron firings closely:
+- `tail -F /var/log/hermes/vizora-customer-lifecycle-live.jsonl` — every entry should have a `tool_result` for nudge/auto-complete actions.
+- `docker exec vizora-postgres psql -U postgres -d vizora -c "SELECT \"agentName\", tool, status, \"errorCode\" FROM mcp_audit_log WHERE \"agentName\" = 'hermes-customer-lifecycle' ORDER BY \"createdAt\" DESC LIMIT 20;"` — `status='success'` for every row.
+- Watch the Resend dashboard for actual delivery — the first hour is when SMTP issues surface.
+
+Rollback (one-line emergency revert if anything goes wrong):
+
+```bash
+# Restore shadow skill — Hermes stops writing immediately on next firing
+scp hermes-skills/vizora-customer-lifecycle/SKILL.md \
+    root@vizora.cloud:/root/.hermes/skills/vizora-customer-lifecycle/SKILL.md
+
+# Stop emails immediately
+ssh root@vizora.cloud 'sed -i "/^LIFECYCLE_LIVE=/d" /opt/vizora/app/.env && pm2 reload vizora-middleware --update-env'
+
+# Re-enable PM2 cron as the safety net
+ssh root@vizora.cloud 'pm2 start ecosystem.config.js --only agent-customer-lifecycle && pm2 save'
+
+# Optionally revoke the customer:write scope
+# (server-side enforcement — even if the SKILL was wrong, this stops writes)
+ssh root@vizora.cloud 'docker exec -i vizora-postgres psql -U postgres -d vizora -c \
+  "UPDATE mcp_tokens SET scopes = ARRAY[\$\$customer:read\$\$] WHERE name = \$\$hermes-customer-lifecycle-shadow\$\$;"'
+```
+
+The MCP server's dedup row prevents the PM2 cron from re-sending nudges Hermes already sent during the live window — no duplicate emails.
+
+Decommission of the PM2 cron (`pm2 delete agent-customer-lifecycle`) only after Hermes-live has run for ≥ 14 days without incident.
 
 **Pending PRs:**
 - PR-B — remaining 12 tools (display detail, content, playlists, schedules, organizations, audit).
