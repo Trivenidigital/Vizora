@@ -97,39 +97,28 @@ export class McpController {
    * for THIS call.
    */
   private async handle(req: Request, res: Response): Promise<void> {
-    const server = this.mcp.buildServer();
+    const context = (req as Request & Record<string, unknown>)[
+      MCP_CONTEXT_KEY
+    ] as McpRequestContext | undefined;
+
+    // The McpServer is built WITH the context — tool handler closures
+    // capture it at build time. We previously tried to plumb context
+    // through the SDK via `transport.handleRequest(..., extra: {
+    // authInfo: { extra: { mcpContext } } })`, but the SDK doesn't
+    // forward `authInfo.extra` to tool handlers in v1.x — handlers
+    // received `undefined` and threw "MCP tool invoked without
+    // context". Closure capture is reliable and SDK-version-agnostic.
+    const server = this.mcp.buildServer(context);
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined, // stateless
     });
     await server.connect(transport);
 
-    const context = (req as Request & Record<string, unknown>)[
-      MCP_CONTEXT_KEY
-    ] as McpRequestContext | undefined;
-
     // Pass NestJS's pre-parsed body straight through. Per the SDK
     // example: `transport.handleRequest(req, res, req.body)`.
-    // The SDK's `MessageExtraInfo.authInfo.extra` is how we ferry
-    // the per-request mcpContext to the tool handler — the registered
-    // tool reads it via `extra.authInfo.extra.mcpContext`.
-    const extra = context
-      ? {
-          authInfo: {
-            // The SDK's AuthInfo type requires a `token`. We don't
-            // re-leak the bearer; pass the token id instead — it's
-            // already in `mcpContext.tokenId`.
-            token: context.tokenId,
-            clientId: context.agentName,
-            scopes: context.scopes,
-            extra: { mcpContext: context },
-          },
-        }
-      : {};
-
-    await transport.handleRequest(req, res, req.body, extra);
+    await transport.handleRequest(req, res, req.body);
 
     // The transport closes itself when the client disconnects; the
-    // McpServer's `connect()` is per-transport so there's nothing to
-    // explicitly tear down here.
+    // McpServer is per-request so it dies with this scope.
   }
 }

@@ -35,21 +35,26 @@ export class McpService implements OnModuleInit {
     // Sanity-check: build a server once at startup so a misconfigured
     // tool-registration crashes the boot rather than the first user
     // request. The instance is then discarded.
-    this.buildServer();
+    this.buildServer(undefined);
     this.logger.log('MCP server factory ready — 1 tool will be registered per request (list_displays)');
   }
 
   /**
-   * Build a fresh MCP server with every tool registered. Called once
-   * per incoming HTTP request by `McpController`. Returning a new
-   * instance each time is what makes the per-request `connect()` safe.
+   * Build a fresh MCP server with every tool registered, bound to a
+   * specific request context. The handler closures capture `context`
+   * at build time — no reliance on the SDK preserving auth-info
+   * fields through `transport.handleRequest`.
+   *
+   * Called once per incoming HTTP request by `McpController`.
+   * `context` may be `undefined` only for the onModuleInit
+   * sanity-build, which never serves a real request.
    */
-  buildServer(): McpServer {
+  buildServer(context: McpRequestContext | undefined): McpServer {
     const server = new McpServer(
       { name: 'vizora-mcp', version: '0.1.0' },
       { capabilities: { tools: { listChanged: false } } },
     );
-    this.registerListDisplays(server);
+    this.registerListDisplays(server, context);
     return server;
   }
 
@@ -57,7 +62,10 @@ export class McpService implements OnModuleInit {
    * Wraps tool registration with a uniform try/catch + audit pattern
    * so each tool file stays focused on the tool itself.
    */
-  private registerListDisplays(server: McpServer): void {
+  private registerListDisplays(
+    server: McpServer,
+    context: McpRequestContext | undefined,
+  ): void {
     const t = LIST_DISPLAYS_TOOL;
     server.registerTool(
       t.name,
@@ -65,10 +73,8 @@ export class McpService implements OnModuleInit {
         description: t.description,
         inputSchema: t.inputSchema.shape,
       },
-      async (input, extra) => {
+      async (input) => {
         const startedAt = Date.now();
-        const mcp = (extra.authInfo?.extra ?? {}) as { mcpContext?: McpRequestContext };
-        const context = mcp.mcpContext;
         if (!context) {
           // Should be impossible — controller always sets it. Fail loud.
           throw new Error('MCP tool invoked without context (controller wiring bug)');
