@@ -26,7 +26,10 @@ import { McpTokenService } from '../auth/mcp-token.service';
  * recoverable. Admin must copy it immediately.
  */
 @ApiTags('admin', 'mcp')
-@Controller('api/v1/admin/mcp-tokens')
+// NB: global prefix `api/v1` is auto-prepended by NestJS. The path
+// here is `admin/mcp-tokens` — NOT `api/v1/admin/mcp-tokens` (which
+// would resolve to /api/v1/api/v1/admin/mcp-tokens).
+@Controller('admin/mcp-tokens')
 @UseGuards(JwtAuthGuard, SuperAdminGuard)
 @ApiBearerAuth()
 export class McpTokensAdminController {
