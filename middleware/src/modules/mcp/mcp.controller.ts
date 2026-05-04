@@ -40,7 +40,10 @@ import { McpService } from './mcp.service';
  * Express-based frameworks.
  */
 @ApiTags('mcp')
-@Controller('api/v1/mcp')
+// NB: NestJS prepends the global prefix (`api/v1`) automatically — the
+// controller path is just `mcp`. Including `api/v1/` here would
+// double-prefix the route to `/api/v1/api/v1/mcp` and silently 404.
+@Controller('mcp')
 @UseGuards(McpAuthGuard, McpRateLimitGuard)
 @UseFilters(McpExceptionFilter)
 @SkipInputSanitize()
