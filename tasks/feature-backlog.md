@@ -248,3 +248,35 @@ Hardware video-wall controllers (Userful, Datapath, Christie Pandoras Box) handl
 ### Why deferred
 
 No customer ask. The bulk of the "vertical screen" market (menu boards, wayfinding, lobby displays) is solved by today's portrait + DisplayGroups + per-screen playlists. Real video-wall sync serves a much smaller slice (stadium displays, broadcast studios, premium retail) and competes against entrenched hardware-layer players. Build only on a concrete pull.
+
+
+## customer-lifecycle Hermes migration
+
+**What**
+
+Migrate `scripts/agents/customer-lifecycle.ts` (463 lines, runs every 30 min, sends day-1/3/7 onboarding nudges) to a Hermes skill following the same shadow-then-cutover pattern as `vizora-support-triage`.
+
+**Design sketch**
+
+New MCP tools required:
+- `list_onboarding_candidates` (scope `customer:read`) — orgs in last 30d window with incomplete onboarding. Returns structural signals only: `org_id`, `tier`, `days_since_signup`, `milestone_flags` (booleans for welcomed/screenPaired/contentUploaded/playlistCreated/scheduleCreated). NEVER returns admin email or org name. (D13.)
+- `find_org_admin_recipient` (scope `customer:read`) — returns `{ recipient_hash: <sha256-of-email> }` ONLY, never the plaintext. The actual SMTP send happens server-side; agent never sees the address.
+- `mark_onboarding_nudge_sent` (scope `customer:write`) — sets the appropriate `dayN_NudgeSentAt` column. Cross-org guard.
+- `auto_complete_org_onboarding` (scope `customer:write`) — for stale (>30d) signups.
+- `send_lifecycle_nudge_email` (scope `customer:write` — **HIGH BLAST RADIUS**) — server-side SMTP send. Hermes passes `{org_id, nudge_template_key}`, server resolves admin email + sends. Server-side enforces `MAX_EMAILS_PER_RUN=50` circuit breaker, `LIFECYCLE_TEST_EMAILS` allowlist, `LIFECYCLE_LIVE=false` dry-run default. The agent NEVER constructs the email body — only chooses one of the three template keys (`day1-pair-screen` / `day3-upload-content` / `day7-create-schedule`).
+
+**Why deferred from the 2026-05-04 autonomous run**
+
+Outbound email = customer-visible action. Unlike support-triage (which writes internal classifications), this agent sends mail customers SEE. The migration MUST be staged per-step rather than blasted through:
+1. Build the read tools first, ship as a PR.
+2. Build the write tools (especially `send_lifecycle_nudge_email`) as a separate PR with extensive tests + per-tool review.
+3. Hermes shadow-mode skill that ONLY writes to JSONL — no email sends.
+4. Compare shadow against the existing PM2 cron's mark-sent records for ≥7 days.
+5. Live cutover with `LIFECYCLE_LIVE=false` first (dry-run + audit), then enable.
+6. Decommission PM2 cron only after ≥14 days clean Hermes-live.
+
+The Hermes-first rule still applies — when this is built, it lands as a Hermes skill, not new TS in the PM2 script. But the staging cannot be autonomous.
+
+**What triggers a revisit**
+
+User explicit "go" on the staged migration plan, OR Hermes shadow comparison for support-triage shows >85% priority-agreement (a strong signal that Hermes can handle this class of agent reliably and we can apply the same pattern with confidence).

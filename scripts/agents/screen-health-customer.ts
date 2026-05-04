@@ -9,6 +9,17 @@
  *
  * Gated OFF by default. Set SCREEN_HEALTH_CUSTOMER_ENABLED=true to activate
  * the (currently no-op) cycle.
+ *
+ * **Hermes-first rule (2026-05-04):** when this agent is implemented,
+ * build it as a Hermes skill at
+ * `hermes-skills/vizora-screen-health/SKILL.md`, NOT as additional
+ * TypeScript logic here. The agent already has `list_displays` (with
+ * a `status=offline` filter) on the MCP server today — only the write
+ * tool `create_customer_incident` is missing. The LLM-driven
+ * cluster-detection ("are these offline displays a real outage or one
+ * misconfigured device?") lives in the skill prompt. See
+ * `feedback_hermes_first_for_agents` and the support-triage
+ * migration in CLAUDE.md as the reference pattern.
  */
 
 import 'dotenv/config';
