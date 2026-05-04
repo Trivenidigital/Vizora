@@ -68,3 +68,24 @@ export const ListOpenSupportRequestsOutput = z.object({
 });
 
 export type ListOpenSupportRequestsOutputT = z.infer<typeof ListOpenSupportRequestsOutput>;
+
+// ── Write tool outputs ─────────────────────────────────────────────────────
+
+/**
+ * Generic OK/skipped result for the priority + ai_category writers.
+ * `updated=false` means the cross-org guard fired (or the row was
+ * deleted) — agents should NOT retry blindly.
+ */
+export const UpdateSupportRequestResult = z.object({
+  request_id: z.string(),
+  updated: z.boolean(),
+});
+export type UpdateSupportRequestResultT = z.infer<typeof UpdateSupportRequestResult>;
+
+export const CreateSupportMessageResult = z.object({
+  request_id: z.string(),
+  message_id: z.string().nullable(),
+  created_at: z.string().datetime().nullable(),
+  created: z.boolean(),
+});
+export type CreateSupportMessageResultT = z.infer<typeof CreateSupportMessageResult>;

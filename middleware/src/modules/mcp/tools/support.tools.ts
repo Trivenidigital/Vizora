@@ -2,12 +2,22 @@ import { ForbiddenException } from '@nestjs/common';
 import { SupportService } from '../../support/support.service';
 import { hasScope, type McpRequestContext } from '../auth/mcp-context';
 import {
+  CreateSupportMessageInput,
+  type CreateSupportMessageInputT,
   ListOpenSupportRequestsInput,
   type ListOpenSupportRequestsInputT,
+  UpdateSupportRequestAiCategoryInput,
+  type UpdateSupportRequestAiCategoryInputT,
+  UpdateSupportRequestPriorityInput,
+  type UpdateSupportRequestPriorityInputT,
 } from '../schemas/tool-inputs';
 import {
+  CreateSupportMessageResult,
+  type CreateSupportMessageResultT,
   ListOpenSupportRequestsOutput,
   type ListOpenSupportRequestsOutputT,
+  UpdateSupportRequestResult,
+  type UpdateSupportRequestResultT,
 } from '../schemas/tool-outputs';
 
 /**
@@ -93,4 +103,133 @@ export const LIST_OPEN_SUPPORT_REQUESTS_TOOL = {
   inputSchema: ListOpenSupportRequestsInput,
   outputSchema: ListOpenSupportRequestsOutput,
   handler: listOpenSupportRequestsTool,
+};
+
+// ── Write tools (require :write scope) ─────────────────────────────────────
+
+/**
+ * MCP tool: `update_support_request_priority`
+ *
+ * Sets the `priority` of one support request. Cross-org guard via the
+ * service's compound where (id + organizationId).
+ *
+ * Scope required: `support:write`. Returns `{ updated: false }` (NOT an
+ * error) when the row doesn't match — agents should treat that as
+ * "stop, the request is gone or not yours" and not retry.
+ */
+export async function updateSupportRequestPriorityTool(
+  rawInput: unknown,
+  context: McpRequestContext,
+  supportService: SupportService,
+): Promise<UpdateSupportRequestResultT> {
+  if (!hasScope(context, 'support:write')) {
+    throw new ForbiddenException("Token lacks scope 'support:write'");
+  }
+  const input = UpdateSupportRequestPriorityInput.parse(
+    rawInput,
+  ) as UpdateSupportRequestPriorityInputT;
+  const updated = await supportService.setRequestPriority(
+    context.organizationId,
+    input.request_id,
+    input.priority,
+  );
+  return UpdateSupportRequestResult.parse({
+    request_id: input.request_id,
+    updated,
+  });
+}
+
+export const UPDATE_SUPPORT_REQUEST_PRIORITY_TOOL = {
+  name: 'update_support_request_priority',
+  description:
+    "Set the priority of one support request belonging to the calling token's organization. Returns { updated: false } if no row matched (cross-org guard or deleted) — DO NOT retry on false. Priority must be one of urgent | high | normal | low.",
+  scope: 'support:write' as const,
+  inputSchema: UpdateSupportRequestPriorityInput,
+  outputSchema: UpdateSupportRequestResult,
+  handler: updateSupportRequestPriorityTool,
+};
+
+/**
+ * MCP tool: `update_support_request_ai_category`
+ *
+ * Sets the V2 taxonomy slug. The Zod input enum constrains to the
+ * known V2 union — unknown slugs are rejected at the wire, never
+ * reaching the DB.
+ */
+export async function updateSupportRequestAiCategoryTool(
+  rawInput: unknown,
+  context: McpRequestContext,
+  supportService: SupportService,
+): Promise<UpdateSupportRequestResultT> {
+  if (!hasScope(context, 'support:write')) {
+    throw new ForbiddenException("Token lacks scope 'support:write'");
+  }
+  const input = UpdateSupportRequestAiCategoryInput.parse(
+    rawInput,
+  ) as UpdateSupportRequestAiCategoryInputT;
+  const updated = await supportService.setRequestAiCategory(
+    context.organizationId,
+    input.request_id,
+    input.ai_category,
+  );
+  return UpdateSupportRequestResult.parse({
+    request_id: input.request_id,
+    updated,
+  });
+}
+
+export const UPDATE_SUPPORT_REQUEST_AI_CATEGORY_TOOL = {
+  name: 'update_support_request_ai_category',
+  description:
+    'Set the V2-taxonomy aiCategory slug on one support request. The slug is constrained to the V2 enum — unknown values are rejected at the wire. Returns { updated: false } if no row matched. Idempotent for the same value.',
+  scope: 'support:write' as const,
+  inputSchema: UpdateSupportRequestAiCategoryInput,
+  outputSchema: UpdateSupportRequestResult,
+  handler: updateSupportRequestAiCategoryTool,
+};
+
+/**
+ * MCP tool: `create_support_message`
+ *
+ * Posts an agent-authored comment to a support thread. The agent name
+ * comes from the bearer-token context (NOT user-controlled), the
+ * authorType is hardcoded `'agent'`, and the userId is the original
+ * submitter (looked up server-side, not trusted from input).
+ *
+ * Per the architecture rules, callers SHOULD send pre-templated
+ * content here — never raw LLM output. The content cap (2000 chars)
+ * is the hard wall; the discipline is on the agent prompt.
+ */
+export async function createSupportMessageTool(
+  rawInput: unknown,
+  context: McpRequestContext,
+  supportService: SupportService,
+): Promise<CreateSupportMessageResultT> {
+  if (!hasScope(context, 'support:write')) {
+    throw new ForbiddenException("Token lacks scope 'support:write'");
+  }
+  const input = CreateSupportMessageInput.parse(
+    rawInput,
+  ) as CreateSupportMessageInputT;
+  const created = await supportService.createAgentMessage(
+    context.organizationId,
+    input.request_id,
+    input.content,
+  );
+  return CreateSupportMessageResult.parse({
+    request_id: input.request_id,
+    message_id: created?.id ?? null,
+    created_at: created ? created.createdAt.toISOString() : null,
+    created: Boolean(created),
+  });
+}
+
+export const CREATE_SUPPORT_MESSAGE_TOOL = {
+  name: 'create_support_message',
+  description:
+    "Append an agent-authored message to one support request's thread. The author identity is taken from the bearer-token context (NOT user-controlled). Returns { created: false } if the request doesn't exist or belongs to another org. Content is capped at 2000 chars; callers SHOULD send pre-templated text, not raw LLM output.",
+  scope: 'support:write' as const,
+  inputSchema: CreateSupportMessageInput,
+  outputSchema: CreateSupportMessageResult,
+  handler: createSupportMessageTool,
 };

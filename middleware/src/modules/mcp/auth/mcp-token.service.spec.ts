@@ -116,13 +116,37 @@ describe('McpTokenService', () => {
       expect(JSON.stringify(stored)).not.toContain(out.bearer);
     });
 
-    it('rejects non-read scopes (v1 is read-only)', async () => {
+    it('accepts :read scopes', async () => {
       await expect(
         svc.issue({
           name: 't', organizationId: 'o', agentName: 'a',
-          scopes: ['displays:write'],
+          scopes: ['displays:read'],
         }),
-      ).rejects.toThrow(/read-only/);
+      ).resolves.toMatchObject({ bearer: expect.stringMatching(/^mcp_/) });
+    });
+
+    it('accepts :write scopes (added when support-triage migration needed write tools)', async () => {
+      await expect(
+        svc.issue({
+          name: 't', organizationId: 'o', agentName: 'a',
+          scopes: ['support:write'],
+        }),
+      ).resolves.toMatchObject({ bearer: expect.stringMatching(/^mcp_/) });
+    });
+
+    it('rejects scopes lacking a :read or :write suffix (typo guard)', async () => {
+      await expect(
+        svc.issue({
+          name: 't', organizationId: 'o', agentName: 'a',
+          scopes: ['displays'],
+        }),
+      ).rejects.toThrow(/:read.*:write/);
+      await expect(
+        svc.issue({
+          name: 't', organizationId: 'o', agentName: 'a',
+          scopes: ['displays:admin'],
+        }),
+      ).rejects.toThrow(/:read.*:write/);
     });
 
     it('rejects empty scope list', async () => {
