@@ -4,7 +4,9 @@ import type { McpRequestContext } from './auth/mcp-context';
 import { McpAuditService } from './audit/mcp-audit.service';
 import { mapExceptionToMcpError } from './lib/error-mapping';
 import { DisplaysService } from '../displays/displays.service';
+import { SupportService } from '../support/support.service';
 import { LIST_DISPLAYS_TOOL } from './tools/displays.tools';
+import { LIST_OPEN_SUPPORT_REQUESTS_TOOL } from './tools/support.tools';
 
 /**
  * Builds a fresh `McpServer` per incoming HTTP request. The SDK's
@@ -28,6 +30,7 @@ export class McpService implements OnModuleInit {
 
   constructor(
     private readonly displays: DisplaysService,
+    private readonly support: SupportService,
     private readonly audit: McpAuditService,
   ) {}
 
@@ -36,7 +39,9 @@ export class McpService implements OnModuleInit {
     // tool-registration crashes the boot rather than the first user
     // request. The instance is then discarded.
     this.buildServer(undefined);
-    this.logger.log('MCP server factory ready — 1 tool will be registered per request (list_displays)');
+    this.logger.log(
+      'MCP server factory ready — 2 tools will be registered per request (list_displays, list_open_support_requests)',
+    );
   }
 
   /**
@@ -55,6 +60,7 @@ export class McpService implements OnModuleInit {
       { capabilities: { tools: { listChanged: false } } },
     );
     this.registerListDisplays(server, context);
+    this.registerListOpenSupportRequests(server, context);
     return server;
   }
 
@@ -110,6 +116,67 @@ export class McpService implements OnModuleInit {
           // thrown exceptions to 'isError: true' content; we follow
           // the convention so agents see the typed error code in
           // structuredContent.
+          return {
+            isError: true,
+            content: [{ type: 'text', text: mapped.message }],
+            structuredContent: { error: mapped },
+          };
+        }
+      },
+    );
+  }
+
+  /**
+   * Twin of `registerListDisplays` for the support-triage read tool.
+   * The audit + error-wrap boilerplate is duplicated rather than
+   * extracted because (a) we have only two tools today, and (b) the
+   * audit row carries the tool name as a literal so any helper would
+   * need to thread it through anyway. When PR-B adds the remaining
+   * tools we'll factor a generic `wrapTool(server, t, exec)` helper.
+   */
+  private registerListOpenSupportRequests(
+    server: McpServer,
+    context: McpRequestContext | undefined,
+  ): void {
+    const t = LIST_OPEN_SUPPORT_REQUESTS_TOOL;
+    server.registerTool(
+      t.name,
+      {
+        description: t.description,
+        inputSchema: t.inputSchema.shape,
+      },
+      async (input) => {
+        const startedAt = Date.now();
+        if (!context) {
+          throw new Error('MCP tool invoked without context (controller wiring bug)');
+        }
+        try {
+          const result = await t.handler(input, context, this.support);
+          await this.audit.record({
+            tokenId: context.tokenId,
+            agentName: context.agentName,
+            organizationId: context.organizationId,
+            tool: t.name,
+            paramsRaw: input,
+            status: 'success',
+            latencyMs: Date.now() - startedAt,
+          });
+          return {
+            content: [{ type: 'text', text: JSON.stringify(result) }],
+            structuredContent: result,
+          };
+        } catch (err) {
+          const mapped = mapExceptionToMcpError(err);
+          await this.audit.record({
+            tokenId: context.tokenId,
+            agentName: context.agentName,
+            organizationId: context.organizationId,
+            tool: t.name,
+            paramsRaw: input,
+            status: 'error',
+            errorCode: mapped.code,
+            latencyMs: Date.now() - startedAt,
+          });
           return {
             isError: true,
             content: [{ type: 'text', text: mapped.message }],

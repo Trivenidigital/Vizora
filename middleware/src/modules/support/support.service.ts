@@ -191,6 +191,97 @@ export class SupportService {
   }
 
   /**
+   * List open support requests as TRIAGE CANDIDATES — returns precomputed
+   * structural signals only (word count, has-attachment, message count,
+   * age, org tier). The description body and any user PII NEVER cross
+   * this method's return boundary, so a downstream LLM-driven agent
+   * (Hermes / MCP tool) can safely consume the output without violating
+   * D13 (no raw user data into LLM prompts — see scripts/agents/lib/
+   * types.ts for the original constraint).
+   *
+   * Different from `findAll`:
+   *  - Always scoped to one orgId (no super-admin escape; MCP tokens are
+   *    per-org-scoped at issuance, this method matches that contract).
+   *  - Default WHERE excludes any request that already has an
+   *    `authorType='agent'` message (D7 reply-loop prevention) — the
+   *    same exclusion the existing `support-triage` cron uses.
+   *  - Returns NO `description`, NO `consoleErrors`, NO user joins.
+   *  - Word count + has_attachment computed server-side.
+   */
+  async listTriageCandidates(
+    organizationId: string,
+    options: {
+      page?: number;
+      limit?: number;
+      includeAlreadyTriaged?: boolean;
+    } = {},
+  ) {
+    const { page = 1, limit = 20, includeAlreadyTriaged = false } = options;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.SupportRequestWhereInput = {
+      organizationId,
+      status: 'open',
+    };
+    if (!includeAlreadyTriaged) {
+      where.messages = { none: { authorType: 'agent' } };
+    }
+
+    const [rows, total] = await Promise.all([
+      this.db.supportRequest.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          organizationId: true,
+          status: true,
+          priority: true,
+          category: true,
+          aiCategory: true,
+          createdAt: true,
+          // Selected purely to compute structural signals server-side —
+          // these fields are stripped before returning.
+          description: true,
+          consoleErrors: true,
+          organization: { select: { subscriptionTier: true } },
+          _count: { select: { messages: true } },
+        },
+      }),
+      this.db.supportRequest.count({ where }),
+    ]);
+
+    const now = Date.now();
+    const data = rows.map((r) => ({
+      id: r.id,
+      organizationId: r.organizationId,
+      status: r.status,
+      priority: r.priority,
+      category: r.category,
+      aiCategory: r.aiCategory,
+      createdAt: r.createdAt,
+      ageMinutes: Math.floor((now - r.createdAt.getTime()) / 60_000),
+      // Structural signals only — body never on the wire.
+      wordCount: (r.description ?? '').trim().split(/\s+/).filter(Boolean)
+        .length,
+      hasAttachment: Boolean(r.consoleErrors && r.consoleErrors.length > 0),
+      messageCount: r._count.messages,
+      orgTier: r.organization?.subscriptionTier ?? 'free',
+    }));
+
+    return {
+      data,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  /**
    * Get a single support request with messages
    */
   async findOne(id: string, user: UserInfo) {

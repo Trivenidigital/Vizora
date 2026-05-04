@@ -757,4 +757,86 @@ describe('SupportService', () => {
       expect(firstCall.where.organizationId).toBeUndefined();
     });
   });
+
+  describe('listTriageCandidates', () => {
+    const triageRow = {
+      id: 'r1',
+      organizationId: orgId,
+      status: 'open',
+      priority: 'high',
+      category: 'bug_report',
+      aiCategory: null,
+      createdAt: new Date(Date.now() - 5 * 60_000), // 5 min old
+      description: 'two   three  four words   here',
+      consoleErrors: 'Error: foo at line 3',
+      organization: { subscriptionTier: 'pro' },
+      _count: { messages: 2 },
+    };
+
+    beforeEach(() => {
+      db.supportRequest.findMany.mockResolvedValue([triageRow]);
+      db.supportRequest.count.mockResolvedValue(1);
+    });
+
+    it('always scopes to the given orgId — does NOT honor a super-admin escape (MCP tokens are per-org)', async () => {
+      await service.listTriageCandidates(orgId);
+
+      const findCall = db.supportRequest.findMany.mock.calls[0][0];
+      const countCall = db.supportRequest.count.mock.calls[0][0];
+      expect(findCall.where.organizationId).toBe(orgId);
+      expect(countCall.where.organizationId).toBe(orgId);
+    });
+
+    it('excludes already-triaged requests by default (D7 reply-loop prevention)', async () => {
+      await service.listTriageCandidates(orgId);
+
+      const findCall = db.supportRequest.findMany.mock.calls[0][0];
+      expect(findCall.where.messages).toEqual({ none: { authorType: 'agent' } });
+    });
+
+    it('omits the messages-none filter when includeAlreadyTriaged=true', async () => {
+      await service.listTriageCandidates(orgId, { includeAlreadyTriaged: true });
+
+      const findCall = db.supportRequest.findMany.mock.calls[0][0];
+      expect(findCall.where.messages).toBeUndefined();
+    });
+
+    it('returns precomputed structural signals — NEVER the description body or consoleErrors (D13)', async () => {
+      const out = await service.listTriageCandidates(orgId);
+      expect(out.data).toHaveLength(1);
+      const row = out.data[0] as Record<string, unknown>;
+      expect(row.id).toBe('r1');
+      expect(row.wordCount).toBe(5); // "two three four words here"
+      expect(row.hasAttachment).toBe(true); // consoleErrors present
+      expect(row.messageCount).toBe(2);
+      expect(row.orgTier).toBe('pro');
+      expect(row.ageMinutes).toBeGreaterThanOrEqual(4);
+      expect(row.ageMinutes).toBeLessThanOrEqual(6);
+      // CRITICAL: body and PII fields MUST NOT be on the wire shape
+      expect(row).not.toHaveProperty('description');
+      expect(row).not.toHaveProperty('consoleErrors');
+      expect(row).not.toHaveProperty('user');
+    });
+
+    it('falls back to "free" tier when organization is missing', async () => {
+      db.supportRequest.findMany.mockResolvedValueOnce([
+        { ...triageRow, organization: null },
+      ]);
+      const out = await service.listTriageCandidates(orgId);
+      expect((out.data[0] as Record<string, unknown>).orgTier).toBe('free');
+    });
+
+    it('returns paginated meta', async () => {
+      db.supportRequest.count.mockResolvedValueOnce(45);
+      const out = await service.listTriageCandidates(orgId, { page: 2, limit: 10 });
+      expect(out.meta).toEqual({ page: 2, limit: 10, total: 45, totalPages: 5 });
+    });
+
+    it('skips correctly for pagination (page 3, limit 10 → skip 20)', async () => {
+      await service.listTriageCandidates(orgId, { page: 3, limit: 10 });
+      const findCall = db.supportRequest.findMany.mock.calls[0][0];
+      expect(findCall.skip).toBe(20);
+      expect(findCall.take).toBe(10);
+    });
+  });
 });
