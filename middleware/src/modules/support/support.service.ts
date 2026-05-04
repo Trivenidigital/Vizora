@@ -282,6 +282,84 @@ export class SupportService {
   }
 
   /**
+   * Set the `priority` of a support request — agent-driven path.
+   *
+   * Used by Hermes (and the legacy PM2 cron) to escalate or de-escalate
+   * tickets after triage scoring. Cross-org guard via `updateMany`'s
+   * compound where (id + organizationId) ensures a token scoped to one
+   * org cannot mutate a request belonging to another org even if it
+   * gets the id wrong.
+   *
+   * Returns true if exactly one row was updated, false if no row
+   * matched (deleted, wrong org, etc).
+   */
+  async setRequestPriority(
+    organizationId: string,
+    requestId: string,
+    priority: 'urgent' | 'high' | 'normal' | 'low',
+  ): Promise<boolean> {
+    const res = await this.db.supportRequest.updateMany({
+      where: { id: requestId, organizationId },
+      data: { priority },
+    });
+    return res.count === 1;
+  }
+
+  /**
+   * Set the `aiCategory` (V2 taxonomy slug) of a support request.
+   * Idempotent for the same value — Prisma treats no-change updates
+   * as 1-row updates. This matches the existing PM2 cron's behavior.
+   */
+  async setRequestAiCategory(
+    organizationId: string,
+    requestId: string,
+    aiCategory: string,
+  ): Promise<boolean> {
+    const res = await this.db.supportRequest.updateMany({
+      where: { id: requestId, organizationId },
+      data: { aiCategory },
+    });
+    return res.count === 1;
+  }
+
+  /**
+   * Append an agent-authored message to a support request's thread.
+   *
+   * `userId` is the original submitter (kept for attribution + access
+   * control on the messages API). The agent identity rides on
+   * `authorType='agent'`. The MCP tool layer passes the agent name
+   * from the bearer-token context for audit purposes; we do NOT
+   * persist that here — the audit trail lives in `mcp_audit_log`.
+   *
+   * Refuses to write if the request doesn't belong to the named org
+   * (cross-org guard).
+   */
+  async createAgentMessage(
+    organizationId: string,
+    requestId: string,
+    content: string,
+  ): Promise<{ id: string; createdAt: Date } | null> {
+    const req = await this.db.supportRequest.findFirst({
+      where: { id: requestId, organizationId },
+      select: { id: true, userId: true },
+    });
+    if (!req) return null;
+
+    const created = await this.db.supportMessage.create({
+      data: {
+        requestId: req.id,
+        organizationId,
+        userId: req.userId,
+        role: 'assistant',
+        authorType: 'agent',
+        content,
+      },
+      select: { id: true, createdAt: true },
+    });
+    return created;
+  }
+
+  /**
    * Get a single support request with messages
    */
   async findOne(id: string, user: UserInfo) {

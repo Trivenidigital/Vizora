@@ -66,11 +66,14 @@ export class McpTokenService {
     if (input.scopes.length === 0) {
       throw new Error('MCP token must have at least one scope');
     }
-    // Reject any non-read scope until v2 (writes) ships.
+    // Allow `<resource>:read` and `<resource>:write` scopes. Anything
+    // else is a typo — fail loud at issuance rather than silently
+    // letting an unrecognized scope ride along (it would never match
+    // a `hasScope` check, but the operator wouldn't know why).
     for (const s of input.scopes) {
-      if (!s.endsWith(':read')) {
+      if (!/:(read|write)$/.test(s)) {
         throw new Error(
-          `MCP v1 issues read-only tokens; rejected scope '${s}'`,
+          `MCP scope must end in ':read' or ':write'; rejected '${s}'`,
         );
       }
     }

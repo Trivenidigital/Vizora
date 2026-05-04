@@ -50,7 +50,9 @@ describe('SupportService', () => {
         create: jest.fn(),
         findMany: jest.fn(),
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
         count: jest.fn(),
       },
       supportMessage: {
@@ -837,6 +839,72 @@ describe('SupportService', () => {
       const findCall = db.supportRequest.findMany.mock.calls[0][0];
       expect(findCall.skip).toBe(20);
       expect(findCall.take).toBe(10);
+    });
+  });
+
+  describe('setRequestPriority (write tool)', () => {
+    it('uses updateMany with compound where (id + organizationId) — cross-org guard', async () => {
+      db.supportRequest.updateMany.mockResolvedValueOnce({ count: 1 });
+      const ok = await service.setRequestPriority(orgId, 'r1', 'high');
+      expect(ok).toBe(true);
+      expect(db.supportRequest.updateMany).toHaveBeenCalledWith({
+        where: { id: 'r1', organizationId: orgId },
+        data: { priority: 'high' },
+      });
+    });
+
+    it('returns false when no row matched (wrong org or deleted)', async () => {
+      db.supportRequest.updateMany.mockResolvedValueOnce({ count: 0 });
+      const ok = await service.setRequestPriority(orgId, 'r-missing', 'high');
+      expect(ok).toBe(false);
+    });
+  });
+
+  describe('setRequestAiCategory (write tool)', () => {
+    it('uses updateMany with cross-org guard', async () => {
+      db.supportRequest.updateMany.mockResolvedValueOnce({ count: 1 });
+      const ok = await service.setRequestAiCategory(orgId, 'r1', 'device_offline');
+      expect(ok).toBe(true);
+      expect(db.supportRequest.updateMany).toHaveBeenCalledWith({
+        where: { id: 'r1', organizationId: orgId },
+        data: { aiCategory: 'device_offline' },
+      });
+    });
+
+    it('returns false when no row matched', async () => {
+      db.supportRequest.updateMany.mockResolvedValueOnce({ count: 0 });
+      const ok = await service.setRequestAiCategory(orgId, 'r-missing', 'other');
+      expect(ok).toBe(false);
+    });
+  });
+
+  describe('createAgentMessage (write tool)', () => {
+    it('looks up the request first to verify org, then creates the message attributing to original submitter', async () => {
+      db.supportRequest.findFirst.mockResolvedValueOnce({ id: 'r1', userId: 'u-original' });
+      db.supportMessage.create.mockResolvedValueOnce({
+        id: 'msg-new',
+        createdAt: new Date('2026-05-04T12:00:00Z'),
+      });
+      const out = await service.createAgentMessage(orgId, 'r1', 'Triage: high urgency');
+      expect(out).toEqual({ id: 'msg-new', createdAt: new Date('2026-05-04T12:00:00Z') });
+      expect(db.supportMessage.create).toHaveBeenCalledWith({
+        data: {
+          requestId: 'r1',
+          organizationId: orgId,
+          userId: 'u-original',
+          role: 'assistant',
+          authorType: 'agent',
+          content: 'Triage: high urgency',
+        },
+        select: { id: true, createdAt: true },
+      });
+    });
+
+    it("returns null without writing when the request doesn't exist or belongs to another org (cross-org guard)", async () => {
+      db.supportRequest.findFirst.mockResolvedValueOnce(null);
+      const out = await service.createAgentMessage(orgId, 'r-missing', 'hello');
+      expect(out).toBeNull();
+      expect(db.supportMessage.create).not.toHaveBeenCalled();
     });
   });
 });

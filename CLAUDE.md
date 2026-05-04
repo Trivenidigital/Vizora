@@ -329,7 +329,10 @@ Automated deployment readiness checker. Runs 30 validation rules across content,
 
 **Tools today:**
 - `list_displays` — paginated, scope `displays:read`, optional status filter. (PR #42)
-- `list_open_support_requests` — paginated, scope `support:read`, returns triage candidates as **structural signals only** (word_count, has_attachment, message_count, age_minutes, priority, category, ai_category, org_tier). Body and PII NEVER cross the wire. Default WHERE excludes already-triaged requests (D7 reply-loop prevention). First step of the support-triage Hermes migration.
+- `list_open_support_requests` — paginated, scope `support:read`, returns triage candidates as **structural signals only** (word_count, has_attachment, message_count, age_minutes, priority, category, ai_category, org_tier). Body and PII NEVER cross the wire. Default WHERE excludes already-triaged requests (D7 reply-loop prevention).
+- `update_support_request_priority` — scope `support:write`, sets priority on one request (cross-org guard via compound where).
+- `update_support_request_ai_category` — scope `support:write`, sets V2 taxonomy slug. Zod-constrained to the V2 enum.
+- `create_support_message` — scope `support:write`, posts an agent-authored comment. Author identity comes from the bearer-token context, content capped at 2000 chars.
 
 **Pending PRs:**
 - PR-B — remaining 12 tools (display detail, content, playlists, schedules, organizations, audit).

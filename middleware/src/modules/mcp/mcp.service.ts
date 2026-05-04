@@ -1,12 +1,18 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer as McpServerCtor } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { McpRequestContext } from './auth/mcp-context';
 import { McpAuditService } from './audit/mcp-audit.service';
 import { mapExceptionToMcpError } from './lib/error-mapping';
 import { DisplaysService } from '../displays/displays.service';
 import { SupportService } from '../support/support.service';
 import { LIST_DISPLAYS_TOOL } from './tools/displays.tools';
-import { LIST_OPEN_SUPPORT_REQUESTS_TOOL } from './tools/support.tools';
+import {
+  CREATE_SUPPORT_MESSAGE_TOOL,
+  LIST_OPEN_SUPPORT_REQUESTS_TOOL,
+  UPDATE_SUPPORT_REQUEST_AI_CATEGORY_TOOL,
+  UPDATE_SUPPORT_REQUEST_PRIORITY_TOOL,
+} from './tools/support.tools';
 
 /**
  * Builds a fresh `McpServer` per incoming HTTP request. The SDK's
@@ -19,10 +25,9 @@ import { LIST_OPEN_SUPPORT_REQUESTS_TOOL } from './tools/support.tools';
  * Cost: object construction + a few `registerTool` calls (no I/O).
  * Negligible vs the actual tool work.
  *
- * Tool handlers receive an `extra` arg from the SDK that carries
- * `authInfo`. We populate `authInfo.extra.mcpContext` from the
- * controller per-request so each tool sees the right
- * organization/agent/scopes for THIS call.
+ * Tool handlers receive their per-request `McpRequestContext` via
+ * closure capture, NOT via SDK auth-info plumbing — see PR #46 for
+ * why (the SDK silently drops `authInfo.extra` on its way to handlers).
  */
 @Injectable()
 export class McpService implements OnModuleInit {
@@ -40,65 +45,93 @@ export class McpService implements OnModuleInit {
     // request. The instance is then discarded.
     this.buildServer(undefined);
     this.logger.log(
-      'MCP server factory ready — 2 tools will be registered per request (list_displays, list_open_support_requests)',
+      'MCP server factory ready — 5 tools registered per request (list_displays, list_open_support_requests, update_support_request_priority, update_support_request_ai_category, create_support_message)',
     );
   }
 
   /**
    * Build a fresh MCP server with every tool registered, bound to a
-   * specific request context. The handler closures capture `context`
-   * at build time — no reliance on the SDK preserving auth-info
-   * fields through `transport.handleRequest`.
+   * specific request context.
    *
-   * Called once per incoming HTTP request by `McpController`.
    * `context` may be `undefined` only for the onModuleInit
    * sanity-build, which never serves a real request.
    */
   buildServer(context: McpRequestContext | undefined): McpServer {
-    const server = new McpServer(
-      { name: 'vizora-mcp', version: '0.1.0' },
+    const server = new McpServerCtor(
+      { name: 'vizora-mcp', version: '0.2.0' },
       { capabilities: { tools: { listChanged: false } } },
     );
-    this.registerListDisplays(server, context);
-    this.registerListOpenSupportRequests(server, context);
+    this.registerTool(server, LIST_DISPLAYS_TOOL, context, this.displays);
+    this.registerTool(server, LIST_OPEN_SUPPORT_REQUESTS_TOOL, context, this.support);
+    this.registerTool(
+      server,
+      UPDATE_SUPPORT_REQUEST_PRIORITY_TOOL,
+      context,
+      this.support,
+    );
+    this.registerTool(
+      server,
+      UPDATE_SUPPORT_REQUEST_AI_CATEGORY_TOOL,
+      context,
+      this.support,
+    );
+    this.registerTool(server, CREATE_SUPPORT_MESSAGE_TOOL, context, this.support);
     return server;
   }
 
   /**
-   * Wraps tool registration with a uniform try/catch + audit pattern
-   * so each tool file stays focused on the tool itself.
+   * Generic registration wrapper: applies the per-tool input schema,
+   * delegates to the tool's handler, records an `mcp_audit_log` row
+   * for both success and failure, and translates thrown exceptions
+   * into the MCP-spec `isError: true` content shape.
+   *
+   * Generic over the tool registry entry's handler signature — the
+   * handler receives the input, the request context, and a typed
+   * service singleton. The third arg is whatever singleton the tool
+   * needs (DisplaysService, SupportService, etc).
    */
-  private registerListDisplays(
+  private registerTool<TIn, TOut, TService>(
     server: McpServer,
+    tool: {
+      name: string;
+      description: string;
+      inputSchema: { shape: Record<string, unknown> };
+      handler: (
+        input: TIn,
+        context: McpRequestContext,
+        service: TService,
+      ) => Promise<TOut>;
+    },
     context: McpRequestContext | undefined,
+    service: TService,
   ): void {
-    const t = LIST_DISPLAYS_TOOL;
     server.registerTool(
-      t.name,
+      tool.name,
       {
-        description: t.description,
-        inputSchema: t.inputSchema.shape,
+        description: tool.description,
+        inputSchema: tool.inputSchema.shape,
       },
-      async (input) => {
+      async (input: unknown) => {
         const startedAt = Date.now();
         if (!context) {
-          // Should be impossible — controller always sets it. Fail loud.
-          throw new Error('MCP tool invoked without context (controller wiring bug)');
+          throw new Error(
+            'MCP tool invoked without context (controller wiring bug)',
+          );
         }
         try {
-          const result = await t.handler(input, context, this.displays);
+          const result = await tool.handler(input as TIn, context, service);
           await this.audit.record({
             tokenId: context.tokenId,
             agentName: context.agentName,
             organizationId: context.organizationId,
-            tool: t.name,
+            tool: tool.name,
             paramsRaw: input,
             status: 'success',
             latencyMs: Date.now() - startedAt,
           });
           return {
             content: [{ type: 'text', text: JSON.stringify(result) }],
-            structuredContent: result,
+            structuredContent: result as Record<string, unknown>,
           };
         } catch (err) {
           const mapped = mapExceptionToMcpError(err);
@@ -106,72 +139,7 @@ export class McpService implements OnModuleInit {
             tokenId: context.tokenId,
             agentName: context.agentName,
             organizationId: context.organizationId,
-            tool: t.name,
-            paramsRaw: input,
-            status: 'error',
-            errorCode: mapped.code,
-            latencyMs: Date.now() - startedAt,
-          });
-          // Surface as an MCP tool-error result. The SDK converts
-          // thrown exceptions to 'isError: true' content; we follow
-          // the convention so agents see the typed error code in
-          // structuredContent.
-          return {
-            isError: true,
-            content: [{ type: 'text', text: mapped.message }],
-            structuredContent: { error: mapped },
-          };
-        }
-      },
-    );
-  }
-
-  /**
-   * Twin of `registerListDisplays` for the support-triage read tool.
-   * The audit + error-wrap boilerplate is duplicated rather than
-   * extracted because (a) we have only two tools today, and (b) the
-   * audit row carries the tool name as a literal so any helper would
-   * need to thread it through anyway. When PR-B adds the remaining
-   * tools we'll factor a generic `wrapTool(server, t, exec)` helper.
-   */
-  private registerListOpenSupportRequests(
-    server: McpServer,
-    context: McpRequestContext | undefined,
-  ): void {
-    const t = LIST_OPEN_SUPPORT_REQUESTS_TOOL;
-    server.registerTool(
-      t.name,
-      {
-        description: t.description,
-        inputSchema: t.inputSchema.shape,
-      },
-      async (input) => {
-        const startedAt = Date.now();
-        if (!context) {
-          throw new Error('MCP tool invoked without context (controller wiring bug)');
-        }
-        try {
-          const result = await t.handler(input, context, this.support);
-          await this.audit.record({
-            tokenId: context.tokenId,
-            agentName: context.agentName,
-            organizationId: context.organizationId,
-            tool: t.name,
-            paramsRaw: input,
-            status: 'success',
-            latencyMs: Date.now() - startedAt,
-          });
-          return {
-            content: [{ type: 'text', text: JSON.stringify(result) }],
-            structuredContent: result,
-          };
-        } catch (err) {
-          const mapped = mapExceptionToMcpError(err);
-          await this.audit.record({
-            tokenId: context.tokenId,
-            agentName: context.agentName,
-            organizationId: context.organizationId,
-            tool: t.name,
+            tool: tool.name,
             paramsRaw: input,
             status: 'error',
             errorCode: mapped.code,

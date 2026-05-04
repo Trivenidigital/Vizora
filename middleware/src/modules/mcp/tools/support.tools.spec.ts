@@ -1,5 +1,10 @@
 import { ForbiddenException } from '@nestjs/common';
-import { listOpenSupportRequestsTool } from './support.tools';
+import {
+  createSupportMessageTool,
+  listOpenSupportRequestsTool,
+  updateSupportRequestAiCategoryTool,
+  updateSupportRequestPriorityTool,
+} from './support.tools';
 import type { McpRequestContext } from '../auth/mcp-context';
 
 function ctx(scopes: string[]): McpRequestContext {
@@ -163,5 +168,176 @@ describe('listOpenSupportRequestsTool', () => {
       makeSupport([{ id: 'r1', createdAt: ts }]) as never,
     );
     expect(out.support_requests[0].created_at).toBe('2026-05-04T12:34:56.000Z');
+  });
+});
+
+describe('updateSupportRequestPriorityTool', () => {
+  it('throws ForbiddenException when support:write scope missing', async () => {
+    const svc = { setRequestPriority: jest.fn() };
+    await expect(
+      updateSupportRequestPriorityTool(
+        { request_id: 'r1', priority: 'high' },
+        ctx(['support:read']), // read-only token cannot write
+        svc as never,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+    expect(svc.setRequestPriority).not.toHaveBeenCalled();
+  });
+
+  it('returns { updated: true } when service confirms the update', async () => {
+    const svc = { setRequestPriority: jest.fn().mockResolvedValue(true) };
+    const out = await updateSupportRequestPriorityTool(
+      { request_id: 'r1', priority: 'urgent' },
+      ctx(['support:write']),
+      svc as never,
+    );
+    expect(out).toEqual({ request_id: 'r1', updated: true });
+    expect(svc.setRequestPriority).toHaveBeenCalledWith('org_1', 'r1', 'urgent');
+  });
+
+  it('returns { updated: false } when no row matched (cross-org guard or deleted)', async () => {
+    const svc = { setRequestPriority: jest.fn().mockResolvedValue(false) };
+    const out = await updateSupportRequestPriorityTool(
+      { request_id: 'r-missing', priority: 'low' },
+      ctx(['support:write']),
+      svc as never,
+    );
+    expect(out).toEqual({ request_id: 'r-missing', updated: false });
+  });
+
+  it('rejects unknown priority values via Zod', async () => {
+    const svc = { setRequestPriority: jest.fn() };
+    await expect(
+      updateSupportRequestPriorityTool(
+        { request_id: 'r1', priority: 'screaming' },
+        ctx(['support:write']),
+        svc as never,
+      ),
+    ).rejects.toThrow();
+    expect(svc.setRequestPriority).not.toHaveBeenCalled();
+  });
+
+  it('passes the calling token org (NOT user-controlled) to the service', async () => {
+    const svc = { setRequestPriority: jest.fn().mockResolvedValue(true) };
+    await updateSupportRequestPriorityTool(
+      { request_id: 'r1', priority: 'high' },
+      ctx(['support:write']),
+      svc as never,
+    );
+    const orgArg = svc.setRequestPriority.mock.calls[0][0];
+    expect(orgArg).toBe('org_1');
+  });
+});
+
+describe('updateSupportRequestAiCategoryTool', () => {
+  it('throws ForbiddenException when support:write scope missing', async () => {
+    const svc = { setRequestAiCategory: jest.fn() };
+    await expect(
+      updateSupportRequestAiCategoryTool(
+        { request_id: 'r1', ai_category: 'device_offline' },
+        ctx(['support:read']),
+        svc as never,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('rejects unknown V2 slugs at the Zod wire layer (does NOT reach the service)', async () => {
+    const svc = { setRequestAiCategory: jest.fn() };
+    await expect(
+      updateSupportRequestAiCategoryTool(
+        { request_id: 'r1', ai_category: 'fictional_category_v3' },
+        ctx(['support:write']),
+        svc as never,
+      ),
+    ).rejects.toThrow();
+    expect(svc.setRequestAiCategory).not.toHaveBeenCalled();
+  });
+
+  it('returns { updated: true } and forwards the org from context', async () => {
+    const svc = { setRequestAiCategory: jest.fn().mockResolvedValue(true) };
+    const out = await updateSupportRequestAiCategoryTool(
+      { request_id: 'r1', ai_category: 'billing_invoice_question' },
+      ctx(['support:write']),
+      svc as never,
+    );
+    expect(out).toEqual({ request_id: 'r1', updated: true });
+    expect(svc.setRequestAiCategory).toHaveBeenCalledWith(
+      'org_1',
+      'r1',
+      'billing_invoice_question',
+    );
+  });
+});
+
+describe('createSupportMessageTool', () => {
+  it('throws ForbiddenException when support:write scope missing', async () => {
+    const svc = { createAgentMessage: jest.fn() };
+    await expect(
+      createSupportMessageTool(
+        { request_id: 'r1', content: 'hi' },
+        ctx(['support:read']),
+        svc as never,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('returns { created: true } and serializes createdAt to ISO when message lands', async () => {
+    const svc = {
+      createAgentMessage: jest.fn().mockResolvedValue({
+        id: 'msg-123',
+        createdAt: new Date('2026-05-04T13:00:00Z'),
+      }),
+    };
+    const out = await createSupportMessageTool(
+      { request_id: 'r1', content: 'Triage: high urgency, escalating to engineering.' },
+      ctx(['support:write']),
+      svc as never,
+    );
+    expect(out).toEqual({
+      request_id: 'r1',
+      message_id: 'msg-123',
+      created_at: '2026-05-04T13:00:00.000Z',
+      created: true,
+    });
+  });
+
+  it('returns { created: false } and null ids when service refuses (cross-org or missing)', async () => {
+    const svc = { createAgentMessage: jest.fn().mockResolvedValue(null) };
+    const out = await createSupportMessageTool(
+      { request_id: 'r-missing', content: 'hello' },
+      ctx(['support:write']),
+      svc as never,
+    );
+    expect(out).toEqual({
+      request_id: 'r-missing',
+      message_id: null,
+      created_at: null,
+      created: false,
+    });
+  });
+
+  it('rejects empty content via Zod min(1)', async () => {
+    const svc = { createAgentMessage: jest.fn() };
+    await expect(
+      createSupportMessageTool(
+        { request_id: 'r1', content: '' },
+        ctx(['support:write']),
+        svc as never,
+      ),
+    ).rejects.toThrow();
+    expect(svc.createAgentMessage).not.toHaveBeenCalled();
+  });
+
+  it('rejects content over 2000 chars via Zod max(2000)', async () => {
+    const svc = { createAgentMessage: jest.fn() };
+    const huge = 'x'.repeat(2001);
+    await expect(
+      createSupportMessageTool(
+        { request_id: 'r1', content: huge },
+        ctx(['support:write']),
+        svc as never,
+      ),
+    ).rejects.toThrow();
+    expect(svc.createAgentMessage).not.toHaveBeenCalled();
   });
 });
