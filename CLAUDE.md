@@ -282,7 +282,7 @@ Automated deployment readiness checker. Runs 30 validation rules across content,
 
 ## Autonomous Operations System
 
-6 PM2 cron-managed agents providing 24/7 monitoring, auto-remediation, and alerting.
+7 PM2 cron-managed agents providing 24/7 monitoring, auto-remediation, alerting, and a dead-man triad.
 
 > **Keep this table aligned with `ecosystem.config.js`** when adding/removing PM2 entries under the `ops-*` namespace.
 
@@ -290,11 +290,12 @@ Automated deployment readiness checker. Runs 30 validation rules across content,
 
 | Agent | Schedule | Responsibility |
 |-------|----------|---------------|
-| health-guardian | Every 5min | Service health, PM2 restarts, memory monitoring |
+| health-guardian | Every 5min | Service health, PM2 restarts, memory monitoring; pings `HEALTHCHECKS_HEALTH_GUARDIAN_URL` on success (external dead-man) |
 | content-lifecycle | Every 15min | Archive expired/orphaned content, storage monitoring |
 | fleet-manager | Every 10min | Offline display detection, ping reconnect, error reset |
 | schedule-doctor | Every 15min | Deactivate broken schedules, coverage gaps |
 | ops-reporter | Every 30min | Aggregate status, Slack/email alerts, dashboard update |
+| ops-watchdog | Every 15min | Detects when other ops agents stop firing past per-agent SLA (3× cron interval). Slack alert on stale. Internal dead-man — catches what `HEALTHCHECKS_HEALTH_GUARDIAN_URL` can't (one-agent-stuck vs whole-VPS-down). |
 | db-maintainer | Daily 3am | PostgreSQL vacuum, Redis cleanup, log rotation |
 
 **State:** `logs/ops-state.json` — shared state file with incidents and remediation audit trail. Read/write through `scripts/ops/lib/state.ts` (file-locked: `readOpsState` acquires, `writeOpsState` releases — every reader MUST pair with a writer).
