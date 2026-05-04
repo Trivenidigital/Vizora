@@ -145,7 +145,42 @@ export class NotificationService implements OnModuleInit, OnModuleDestroy {
             );
           }
         } catch (error) {
-          this.logger.error(`Error processing notification key ${key}:`, error);
+          // Drop the Redis key only if the FK violation is specifically on
+          // organizationId (the org was deleted). Any other P2003 — or other
+          // error code — means a real bug we must NOT paper over by deleting
+          // valid notification state.
+          const err = error as {
+            code?: string;
+            meta?: { field_name?: string; constraint?: string; modelName?: string };
+          };
+          const fieldName = err?.meta?.field_name ?? '';
+          const constraint = err?.meta?.constraint ?? '';
+          const isOrgFkViolation =
+            err?.code === 'P2003' &&
+            (fieldName.toLowerCase().includes('organization') ||
+              constraint.toLowerCase().includes('organization'));
+
+          if (isOrgFkViolation) {
+            try {
+              await this.redisService.delete(key);
+              this.logger.warn(
+                `Dropped orphaned notification key ${key} (P2003 on ${fieldName || constraint || 'organizationId'}; referenced org deleted)`,
+              );
+            } catch (delErr) {
+              // Critical: if DEL fails, we'll retry on the next tick and may
+              // loop. Log as error so it surfaces — the key will eventually
+              // TTL out after 5 min anyway.
+              this.logger.error(
+                `Failed to delete orphan notification key ${key} after P2003 — will retry or TTL out:`,
+                delErr,
+              );
+            }
+          } else {
+            this.logger.error(
+              `Error processing notification key ${key} (code=${err?.code ?? 'none'}, field=${fieldName || 'none'}):`,
+              error,
+            );
+          }
         }
       }
     } catch (error) {
