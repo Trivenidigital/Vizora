@@ -86,13 +86,27 @@ export class DisplaysService {
     this.eventEmitter.emit(`display.${action}`, { action, entityType: 'display', entityId, organizationId });
   }
 
-  async findAll(organizationId: string, pagination: PaginationDto) {
+  /**
+   * @param filters Optional filters applied DB-side. `status` lets MCP
+   *   tools (and future REST callers) filter without bringing the
+   *   filter client-side and breaking pagination totals — the
+   *   reported `total` always matches the filtered result set.
+   */
+  async findAll(
+    organizationId: string,
+    pagination: PaginationDto,
+    filters?: { status?: 'online' | 'offline' | 'pairing' | 'error' },
+  ) {
     const { page = 1, limit = 10 } = pagination;
     const skip = (page - 1) * limit;
+    const where = {
+      organizationId,
+      ...(filters?.status ? { status: filters.status } : {}),
+    };
 
     const [data, total] = await Promise.all([
       this.db.display.findMany({
-        where: { organizationId },
+        where,
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
@@ -104,7 +118,7 @@ export class DisplaysService {
           },
         },
       }),
-      this.db.display.count({ where: { organizationId } }),
+      this.db.display.count({ where }),
     ]);
 
     return new PaginatedResponse(data, total, page, limit);

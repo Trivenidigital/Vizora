@@ -31,6 +31,7 @@ import { MailModule } from '../modules/mail/mail.module';
 import { SupportModule } from '../modules/support/support.module';
 import { FleetModule } from '../modules/fleet/fleet.module';
 import { AgentsModule } from '../modules/agents/agents.module';
+import { McpModule } from '../modules/mcp/mcp.module';
 
 @Module({
   imports: [
@@ -117,6 +118,7 @@ import { AgentsModule } from '../modules/agents/agents.module';
     SupportModule,
     FleetModule,
     AgentsModule,
+    McpModule,
   ],
   controllers: [AppController],
   providers: [

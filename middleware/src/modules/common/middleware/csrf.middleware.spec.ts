@@ -170,6 +170,57 @@ describe('CsrfMiddleware', () => {
     });
   });
 
+  describe('MCP route exemption', () => {
+    it('should skip CSRF for /api/v1/mcp (exact match)', () => {
+      mockRequest.method = 'POST';
+      (mockRequest as Request).originalUrl = '/api/v1/mcp';
+      mockRequest.cookies = {};
+      mockRequest.headers = {};
+
+      middleware.use(mockRequest as Request, mockResponse as Response, mockNext);
+
+      expect(mockNext).toHaveBeenCalled();
+      expect(mockResponse.status).not.toHaveBeenCalled();
+    });
+
+    it('should skip CSRF for /api/v1/mcp/* (subpaths)', () => {
+      mockRequest.method = 'POST';
+      (mockRequest as Request).originalUrl = '/api/v1/mcp/tools/list';
+      mockRequest.cookies = {};
+      mockRequest.headers = {};
+
+      middleware.use(mockRequest as Request, mockResponse as Response, mockNext);
+
+      expect(mockNext).toHaveBeenCalled();
+      expect(mockResponse.status).not.toHaveBeenCalled();
+    });
+
+    it('should NOT skip CSRF for sibling routes that share the /api/v1/mcp prefix (REGRESSION: previously bare startsWith would also exempt /api/v1/mcp-admin etc)', () => {
+      mockRequest.method = 'POST';
+      (mockRequest as Request).originalUrl = '/api/v1/mcp-admin';
+      mockRequest.cookies = {};
+      mockRequest.headers = {};
+
+      middleware.use(mockRequest as Request, mockResponse as Response, mockNext);
+
+      // No CSRF cookie → should be rejected with 403
+      expect(mockNext).not.toHaveBeenCalled();
+      expect(mockResponse.status).toHaveBeenCalledWith(403);
+    });
+
+    it('should ignore query string when matching MCP exemption (a malicious ?path=/api/v1/mcp must not bypass CSRF)', () => {
+      mockRequest.method = 'POST';
+      (mockRequest as Request).originalUrl = '/api/v1/something?path=/api/v1/mcp';
+      mockRequest.cookies = {};
+      mockRequest.headers = {};
+
+      middleware.use(mockRequest as Request, mockResponse as Response, mockNext);
+
+      expect(mockNext).not.toHaveBeenCalled();
+      expect(mockResponse.status).toHaveBeenCalledWith(403);
+    });
+  });
+
   describe('CSRF token validation', () => {
     beforeEach(() => {
       mockRequest.method = 'POST';

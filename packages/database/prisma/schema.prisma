@@ -15,47 +15,48 @@ datasource db {
 // ============================================================================
 
 model Organization {
-  id                     String   @id @default(uuid())
+  id                     String    @id @default(uuid())
   name                   String
-  slug                   String   @unique
+  slug                   String    @unique
   logoUrl                String?
-  subscriptionTier       String   @default("free") // free, basic, pro, enterprise
-  screenQuota            Int      @default(5)
-  stripeCustomerId       String?  @unique
+  subscriptionTier       String    @default("free") // free, basic, pro, enterprise
+  screenQuota            Int       @default(5)
+  stripeCustomerId       String?   @unique
   stripeSubscriptionId   String?
-  razorpayCustomerId     String?  @unique
+  razorpayCustomerId     String?   @unique
   razorpaySubscriptionId String?
-  paymentProvider        String?  // 'stripe' | 'razorpay'
-  country                String?  // ISO 3166-1 alpha-2 (e.g., 'US', 'IN')
-  gstin                  String?  // GST Identification Number (India only)
+  paymentProvider        String? // 'stripe' | 'razorpay'
+  country                String? // ISO 3166-1 alpha-2 (e.g., 'US', 'IN')
+  gstin                  String? // GST Identification Number (India only)
   billingEmail           String?
   trialEndsAt            DateTime?
-  subscriptionStatus     String   @default("trial") // trial, active, past_due, canceled
-  storageUsedBytes       BigInt   @default(0)           // Current storage usage in bytes
-  storageQuotaBytes      BigInt   @default(1073741824)  // 1GB default quota in bytes (trial)
-  settings               Json?    @db.JsonB
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  subscriptionStatus     String    @default("trial") // trial, active, past_due, canceled
+  storageUsedBytes       BigInt    @default(0) // Current storage usage in bytes
+  storageQuotaBytes      BigInt    @default(1073741824) // 1GB default quota in bytes (trial)
+  settings               Json?     @db.JsonB
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
-  users               User[]
-  displays            Display[]
-  content             Content[]
-  playlists           Playlist[]
-  schedules           Schedule[]
-  tags                Tag[]
-  displayGroups       DisplayGroup[]
-  auditLogs           AuditLog[]
-  contentFolders      ContentFolder[]
-  notifications       Notification[]
-  apiKeys             ApiKey[]
-  billingTransactions BillingTransaction[]
-  impressions         ContentImpression[]
-  promotionRedemptions PromotionRedemption[]
-  supportRequests      SupportRequest[]
-  supportMessages      SupportMessage[] @relation("OrgSupportMessages")
-  onboarding           OrganizationOnboarding?
-  customerIncidents    CustomerIncident[]
+  users                  User[]
+  displays               Display[]
+  content                Content[]
+  playlists              Playlist[]
+  schedules              Schedule[]
+  tags                   Tag[]
+  displayGroups          DisplayGroup[]
+  auditLogs              AuditLog[]
+  contentFolders         ContentFolder[]
+  notifications          Notification[]
+  apiKeys                ApiKey[]
+  billingTransactions    BillingTransaction[]
+  impressions            ContentImpression[]
+  promotionRedemptions   PromotionRedemption[]
+  supportRequests        SupportRequest[]
+  supportMessages        SupportMessage[]        @relation("OrgSupportMessages")
+  onboarding             OrganizationOnboarding?
+  customerIncidents      CustomerIncident[]
   contentRecommendations ContentRecommendation[]
+  mcpTokens              McpToken[]
 
   @@index([slug])
   @@index([stripeCustomerId])
@@ -64,29 +65,29 @@ model Organization {
 }
 
 model User {
-  id             String   @id @default(uuid())
-  email          String   @unique
-  passwordHash   String?  // nullable if using Clerk
-  clerkUserId    String?  @unique
-  firstName      String
-  lastName       String
-  role           String   @default("viewer") // admin, manager, viewer
-  avatar         String?
-  isActive       Boolean  @default(true)
-  isSuperAdmin   Boolean  @default(false) // Vizora platform admin (separate from org admin)
-  lastLoginAt    DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String? // nullable if using Clerk
+  clerkUserId  String?   @unique
+  firstName    String
+  lastName     String
+  role         String    @default("viewer") // admin, manager, viewer
+  avatar       String?
+  isActive     Boolean   @default(true)
+  isSuperAdmin Boolean   @default(false) // Vizora platform admin (separate from org admin)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  auditLogs      AuditLog[]
-  notifications  Notification[]
-  apiKeys        ApiKey[]
-  passwordResetTokens PasswordResetToken[]
-  supportRequests          SupportRequest[] @relation("SupportRequestUser")
-  resolvedSupportRequests  SupportRequest[] @relation("SupportRequestResolver")
+  auditLogs               AuditLog[]
+  notifications           Notification[]
+  apiKeys                 ApiKey[]
+  passwordResetTokens     PasswordResetToken[]
+  supportRequests         SupportRequest[]     @relation("SupportRequestUser")
+  resolvedSupportRequests SupportRequest[]     @relation("SupportRequestResolver")
 
   @@index([organizationId])
   @@index([email])
@@ -114,38 +115,38 @@ model PasswordResetToken {
 // ============================================================================
 
 model Display {
-  id                    String   @id @default(uuid())
-  organizationId        String
-  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  deviceIdentifier      String   @unique // MAC address or unique hardware ID
-  nickname              String?
-  description           String?
-  location              String?
-  pairingCode           String?
-  pairingCodeExpiresAt  DateTime?
-  jwtToken              String?  @db.Text
-  socketId              String?
-  status                String   @default("offline") // online, offline, pairing, error
-  orientation           String   @default("landscape") // landscape, portrait
-  resolution            String?  // e.g., "1920x1080"
-  lastHeartbeat         DateTime?
-  metadata              Json?    @db.JsonB // OS, model, version, etc.
-  timezone              String   @default("UTC")
-  lastScreenshot        String?  // URL to last captured screenshot
-  lastScreenshotAt      DateTime? // When screenshot was taken
-  isDisabled            Boolean   @default(false)
-  currentPlaylistId     String?  // Direct playlist assignment for simple cases
-  currentPlaylist       Playlist? @relation("DisplayCurrentPlaylist", fields: [currentPlaylistId], references: [id], onDelete: SetNull)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  pairedAt              DateTime?
-  unpairedAt            DateTime?
+  id                   String       @id @default(uuid())
+  organizationId       String
+  organization         Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  deviceIdentifier     String       @unique // MAC address or unique hardware ID
+  nickname             String?
+  description          String?
+  location             String?
+  pairingCode          String?
+  pairingCodeExpiresAt DateTime?
+  jwtToken             String?      @db.Text
+  socketId             String?
+  status               String       @default("offline") // online, offline, pairing, error
+  orientation          String       @default("landscape") // landscape, portrait
+  resolution           String? // e.g., "1920x1080"
+  lastHeartbeat        DateTime?
+  metadata             Json?        @db.JsonB // OS, model, version, etc.
+  timezone             String       @default("UTC")
+  lastScreenshot       String? // URL to last captured screenshot
+  lastScreenshotAt     DateTime? // When screenshot was taken
+  isDisabled           Boolean      @default(false)
+  currentPlaylistId    String? // Direct playlist assignment for simple cases
+  currentPlaylist      Playlist?    @relation("DisplayCurrentPlaylist", fields: [currentPlaylistId], references: [id], onDelete: SetNull)
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  pairedAt             DateTime?
+  unpairedAt           DateTime?
 
-  schedules             Schedule[]
-  tags                  DisplayTag[]
-  groups                DisplayGroupMember[]
-  auditLogs             AuditLog[]
-  impressions           ContentImpression[]
+  schedules   Schedule[]
+  tags        DisplayTag[]
+  groups      DisplayGroupMember[]
+  auditLogs   AuditLog[]
+  impressions ContentImpression[]
 
   @@index([organizationId])
   @@index([deviceIdentifier])
@@ -165,8 +166,8 @@ model DisplayGroup {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  displays    DisplayGroupMember[]
-  schedules   Schedule[]
+  displays  DisplayGroupMember[]
+  schedules Schedule[]
 
   @@index([organizationId])
 }
@@ -175,8 +176,8 @@ model DisplayGroupMember {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
 
-  displayId      String
-  display        Display @relation(fields: [displayId], references: [id], onDelete: Cascade)
+  displayId String
+  display   Display @relation(fields: [displayId], references: [id], onDelete: Cascade)
 
   displayGroupId String
   displayGroup   DisplayGroup @relation(fields: [displayGroupId], references: [id], onDelete: Cascade)
@@ -191,43 +192,43 @@ model DisplayGroupMember {
 // ============================================================================
 
 model Content {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  type        String   // image, video, url, html
-  url         String   // URL to the content or embed URL
-  thumbnail   String?
-  duration    Int      @default(10) // Duration in seconds
-  fileSize    Int?     // Size in bytes
-  mimeType    String?
-  metadata    Json?    @db.JsonB
-  status      String   @default("active") // active, archived, expired
-  isGlobal    Boolean  @default(false)    // true for template library items (available to all orgs)
-  templateOrientation  String?  // 'landscape' | 'portrait' | 'both' for template filtering
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                  String   @id @default(cuid())
+  name                String
+  description         String?
+  type                String // image, video, url, html
+  url                 String // URL to the content or embed URL
+  thumbnail           String?
+  duration            Int      @default(10) // Duration in seconds
+  fileSize            Int? // Size in bytes
+  mimeType            String?
+  metadata            Json?    @db.JsonB
+  status              String   @default("active") // active, archived, expired
+  isGlobal            Boolean  @default(false) // true for template library items (available to all orgs)
+  templateOrientation String? // 'landscape' | 'portrait' | 'both' for template filtering
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   // Content expiration feature
-  expiresAt            DateTime?  // When this content should expire
-  replacementContentId String?    // Content to replace with when expired
-  replacementContent   Content?   @relation("ContentReplacement", fields: [replacementContentId], references: [id], onDelete: SetNull)
-  replacedBy           Content[]  @relation("ContentReplacement")
+  expiresAt            DateTime? // When this content should expire
+  replacementContentId String? // Content to replace with when expired
+  replacementContent   Content?  @relation("ContentReplacement", fields: [replacementContentId], references: [id], onDelete: SetNull)
+  replacedBy           Content[] @relation("ContentReplacement")
 
   // Version history for file replacement
-  previousVersionId    String?    // Reference to the previous version
-  previousVersion      Content?   @relation("ContentVersions", fields: [previousVersionId], references: [id], onDelete: SetNull)
-  newerVersions        Content[]  @relation("ContentVersions")
-  versionNumber        Int        @default(1)
+  previousVersionId String? // Reference to the previous version
+  previousVersion   Content?  @relation("ContentVersions", fields: [previousVersionId], references: [id], onDelete: SetNull)
+  newerVersions     Content[] @relation("ContentVersions")
+  versionNumber     Int       @default(1)
 
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  folderId       String?
-  folder         ContentFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  folderId String?
+  folder   ContentFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
 
-  playlistItems  PlaylistItem[]
-  tags           ContentTag[]
-  impressions    ContentImpression[]
+  playlistItems PlaylistItem[]
+  tags          ContentTag[]
+  impressions   ContentImpression[]
 
   @@index([organizationId])
   @@index([type])
@@ -249,10 +250,10 @@ model Playlist {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  items              PlaylistItem[]
-  schedules          Schedule[]
-  assignedDisplays   Display[]      @relation("DisplayCurrentPlaylist")
-  impressions        ContentImpression[]
+  items            PlaylistItem[]
+  schedules        Schedule[]
+  assignedDisplays Display[]           @relation("DisplayCurrentPlaylist")
+  impressions      ContentImpression[]
 
   @@index([organizationId])
   @@index([organizationId, updatedAt])
@@ -261,14 +262,14 @@ model Playlist {
 model PlaylistItem {
   id        String   @id @default(cuid())
   order     Int      @default(0)
-  duration  Int?     // Override content duration if needed
+  duration  Int? // Override content duration if needed
   createdAt DateTime @default(now())
 
   playlistId String
   playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
 
-  contentId  String
-  content    Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentId String
+  content   Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
 
   @@unique([playlistId, order])
   @@index([playlistId])
@@ -280,15 +281,15 @@ model PlaylistItem {
 // ============================================================================
 
 model ContentImpression {
-  id                   String    @id @default(cuid())
+  id                   String   @id @default(cuid())
   organizationId       String
   contentId            String
   displayId            String
   playlistId           String?
   duration             Int?
   completionPercentage Int?
-  timestamp            DateTime  @default(now())
-  date                 DateTime  @db.Date
+  timestamp            DateTime @default(now())
+  date                 DateTime @db.Date
   hour                 Int
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -307,18 +308,18 @@ model ContentImpression {
 // ============================================================================
 
 model Schedule {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   name        String
   description String?
   startDate   DateTime
   endDate     DateTime?
-  startTime   Int?     // Minutes from midnight (0-1439)
-  endTime     Int?     // Minutes from midnight (0-1439)
-  daysOfWeek  Int[]    // 0-6 (Sunday-Saturday)
-  priority    Int      @default(0)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  startTime   Int? // Minutes from midnight (0-1439)
+  endTime     Int? // Minutes from midnight (0-1439)
+  daysOfWeek  Int[] // 0-6 (Sunday-Saturday)
+  priority    Int       @default(0)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -326,8 +327,8 @@ model Schedule {
   playlistId String
   playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
 
-  displayId      String?
-  display        Display? @relation(fields: [displayId], references: [id], onDelete: Cascade)
+  displayId String?
+  display   Display? @relation(fields: [displayId], references: [id], onDelete: Cascade)
 
   displayGroupId String?
   displayGroup   DisplayGroup? @relation(fields: [displayGroupId], references: [id], onDelete: Cascade)
@@ -356,8 +357,8 @@ model Tag {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  content   ContentTag[]
-  displays  DisplayTag[]
+  content  ContentTag[]
+  displays DisplayTag[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -370,8 +371,8 @@ model ContentTag {
   contentId String
   content   Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
 
-  tagId     String
-  tag       Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  tagId String
+  tag   Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@unique([contentId, tagId])
   @@index([contentId])
@@ -385,8 +386,8 @@ model DisplayTag {
   displayId String
   display   Display @relation(fields: [displayId], references: [id], onDelete: Cascade)
 
-  tagId     String
-  tag       Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  tagId String
+  tag   Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@unique([displayId, tagId])
   @@index([displayId])
@@ -398,23 +399,23 @@ model DisplayTag {
 // ============================================================================
 
 model AuditLog {
-  id          String   @id @default(cuid())
-  action      String   // create, update, delete, etc.
-  entityType  String   // display, content, schedule, etc.
-  entityId    String
-  changes     Json?    @db.JsonB
-  ipAddress   String?
-  userAgent   String?
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  action     String // create, update, delete, etc.
+  entityType String // display, content, schedule, etc.
+  entityId   String
+  changes    Json?    @db.JsonB
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
 
-  userId         String?
-  user           User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  displayId      String?
-  display        Display? @relation(fields: [displayId], references: [id], onDelete: SetNull)
+  displayId String?
+  display   Display? @relation(fields: [displayId], references: [id], onDelete: SetNull)
 
   @@index([organizationId])
   @@index([userId])
@@ -427,17 +428,17 @@ model AuditLog {
 // ============================================================================
 
 model ContentFolder {
-  id             String   @id @default(cuid())
+  id             String          @id @default(cuid())
   name           String
   parentId       String?
   parent         ContentFolder?  @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
   children       ContentFolder[] @relation("FolderHierarchy")
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
-  content        Content[]
+  content Content[]
 
   @@unique([organizationId, name, parentId])
   @@index([organizationId])
@@ -450,20 +451,20 @@ model ContentFolder {
 // ============================================================================
 
 model Notification {
-  id             String    @id @default(cuid())
-  type           String    // device_offline, device_online, content_expired, system
+  id             String       @id @default(cuid())
+  type           String // device_offline, device_online, content_expired, system
   title          String
   message        String
-  severity       String    @default("info") // info, warning, critical
-  read           Boolean   @default(false)
+  severity       String       @default("info") // info, warning, critical
+  read           Boolean      @default(false)
   dismissedAt    DateTime?
-  metadata       Json?     @db.JsonB
+  metadata       Json?        @db.JsonB
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   userId         String?
-  user           User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   @@index([organizationId, read])
   @@index([organizationId, createdAt])
@@ -476,21 +477,21 @@ model Notification {
 // ============================================================================
 
 model ApiKey {
-  id             String    @id @default(cuid())
-  name           String    // User-friendly name
-  prefix         String    // First 8 chars for identification (e.g., "vz_live_")
-  hashedKey      String    @unique // SHA-256 hash of full key
-  lastUsedAt     DateTime?
-  expiresAt      DateTime?
-  revokedAt      DateTime?
-  scopes         String[]  // ['read:content', 'write:playlists', etc.]
-  createdAt      DateTime  @default(now())
+  id         String    @id @default(cuid())
+  name       String // User-friendly name
+  prefix     String // First 8 chars for identification (e.g., "vz_live_")
+  hashedKey  String    @unique // SHA-256 hash of full key
+  lastUsedAt DateTime?
+  expiresAt  DateTime?
+  revokedAt  DateTime?
+  scopes     String[] // ['read:content', 'write:playlists', etc.]
+  createdAt  DateTime  @default(now())
 
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  createdById    String?
-  createdBy      User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdById String?
+  createdBy   User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([organizationId])
   @@index([prefix])
@@ -503,19 +504,19 @@ model ApiKey {
 // ============================================================================
 
 model BillingTransaction {
-  id                    String   @id @default(cuid())
+  id                    String       @id @default(cuid())
   organizationId        String
   organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  provider              String   // 'stripe' | 'razorpay'
+  provider              String // 'stripe' | 'razorpay'
   providerTransactionId String
-  type                  String   // 'subscription', 'one_time', 'refund'
-  status                String   // 'pending', 'succeeded', 'failed'
-  amount                Int      // cents/paise
-  currency              String   // 'usd', 'inr'
+  type                  String // 'subscription', 'one_time', 'refund'
+  status                String // 'pending', 'succeeded', 'failed'
+  amount                Int // cents/paise
+  currency              String // 'usd', 'inr'
   description           String?
-  metadata              Json?    @db.JsonB
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  metadata              Json?        @db.JsonB
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
 
   @@unique([provider, providerTransactionId])
   @@index([organizationId])
@@ -528,42 +529,42 @@ model BillingTransaction {
 // ============================================================================
 
 model Plan {
-  id                     String   @id @default(cuid())
-  slug                   String   @unique  // 'free', 'basic', 'pro', 'enterprise'
-  name                   String
-  description            String?
+  id          String  @id @default(cuid())
+  slug        String  @unique // 'free', 'basic', 'pro', 'enterprise'
+  name        String
+  description String?
 
   // Quotas
-  screenQuota            Int      // -1 for unlimited
-  storageQuotaMb         Int      @default(5000)  // Storage limit in MB
-  apiRateLimit           Int      @default(1000)  // Requests per hour
+  screenQuota    Int // -1 for unlimited
+  storageQuotaMb Int @default(5000) // Storage limit in MB
+  apiRateLimit   Int @default(1000) // Requests per hour
 
   // Pricing (cents/paise, -1 for custom)
-  priceUsdMonthly        Int
-  priceUsdYearly         Int
-  priceInrMonthly        Int
-  priceInrYearly         Int
+  priceUsdMonthly Int
+  priceUsdYearly  Int
+  priceInrMonthly Int
+  priceInrYearly  Int
 
   // Payment provider IDs
-  stripePriceIdMonthly   String?
-  stripePriceIdYearly    String?
-  razorpayPlanIdMonthly  String?
-  razorpayPlanIdYearly   String?
+  stripePriceIdMonthly  String?
+  stripePriceIdYearly   String?
+  razorpayPlanIdMonthly String?
+  razorpayPlanIdYearly  String?
 
   // Features
-  features               String[]  // ['analytics', 'api_access', 'priority_support']
-  featureFlags           Json?     @db.JsonB  // Detailed feature config
+  features     String[] // ['analytics', 'api_access', 'priority_support']
+  featureFlags Json?    @db.JsonB // Detailed feature config
 
   // Display
-  isActive               Boolean   @default(true)
-  isPublic               Boolean   @default(true)  // Show on pricing page
-  sortOrder              Int       @default(0)
-  highlightText          String?   // "Most Popular", "Best Value"
+  isActive      Boolean @default(true)
+  isPublic      Boolean @default(true) // Show on pricing page
+  sortOrder     Int     @default(0)
+  highlightText String? // "Most Popular", "Best Value"
 
-  createdAt              DateTime  @default(now())
-  updatedAt              DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  promotions             PlanPromotion[]
+  promotions PlanPromotion[]
 
   @@index([isActive, isPublic])
   @@index([slug])
@@ -575,36 +576,36 @@ model Plan {
 // ============================================================================
 
 model Promotion {
-  id                   String    @id @default(cuid())
-  code                 String    @unique  // 'LAUNCH50', 'DIWALI2026'
-  name                 String
-  description          String?
+  id          String  @id @default(cuid())
+  code        String  @unique // 'LAUNCH50', 'DIWALI2026'
+  name        String
+  description String?
 
   // Discount configuration
-  discountType         String    // 'percentage' | 'fixed_amount' | 'free_months'
-  discountValue        Int       // 50 for 50%, or cents/paise, or months
-  currency             String?   // null for percentage, 'usd'/'inr' for fixed
+  discountType  String // 'percentage' | 'fixed_amount' | 'free_months'
+  discountValue Int // 50 for 50%, or cents/paise, or months
+  currency      String? // null for percentage, 'usd'/'inr' for fixed
 
   // Limits
-  maxRedemptions       Int?      // null for unlimited
-  maxPerCustomer       Int       @default(1)
-  currentRedemptions   Int       @default(0)
-  minPurchaseAmount    Int?      // Minimum cart value
+  maxRedemptions     Int? // null for unlimited
+  maxPerCustomer     Int  @default(1)
+  currentRedemptions Int  @default(0)
+  minPurchaseAmount  Int? // Minimum cart value
 
   // Validity
-  startsAt             DateTime
-  expiresAt            DateTime?
-  isActive             Boolean   @default(true)
+  startsAt  DateTime
+  expiresAt DateTime?
+  isActive  Boolean   @default(true)
 
   // Tracking
-  createdBy            String?   // Admin user ID
-  metadata             Json?     @db.JsonB  // Campaign tracking, UTM, etc.
+  createdBy String? // Admin user ID
+  metadata  Json?   @db.JsonB // Campaign tracking, UTM, etc.
 
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  applicablePlans      PlanPromotion[]
-  redemptions          PromotionRedemption[]
+  applicablePlans PlanPromotion[]
+  redemptions     PromotionRedemption[]
 
   @@index([code])
   @@index([isActive, startsAt, expiresAt])
@@ -612,24 +613,24 @@ model Promotion {
 }
 
 model PlanPromotion {
-  id           String    @id @default(cuid())
-  planId       String
-  plan         Plan      @relation(fields: [planId], references: [id], onDelete: Cascade)
-  promotionId  String
-  promotion    Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  id          String    @id @default(cuid())
+  planId      String
+  plan        Plan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+  promotionId String
+  promotion   Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
 
   @@unique([planId, promotionId])
   @@map("plan_promotions")
 }
 
 model PromotionRedemption {
-  id              String    @id @default(cuid())
+  id              String       @id @default(cuid())
   promotionId     String
-  promotion       Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  promotion       Promotion    @relation(fields: [promotionId], references: [id], onDelete: Cascade)
   organizationId  String
   organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  discountApplied Int       // Actual discount in cents/paise
-  redeemedAt      DateTime  @default(now())
+  discountApplied Int // Actual discount in cents/paise
+  redeemedAt      DateTime     @default(now())
 
   @@index([promotionId])
   @@index([organizationId])
@@ -644,12 +645,12 @@ model SystemConfig {
   id          String   @id @default(cuid())
   key         String   @unique
   value       Json     @db.JsonB
-  dataType    String   @default("string")  // string, number, boolean, json
+  dataType    String   @default("string") // string, number, boolean, json
   category    String   @default("general") // general, security, limits, features
   description String?
-  isSecret    Boolean  @default(false)  // Hide value in UI
+  isSecret    Boolean  @default(false) // Hide value in UI
   updatedAt   DateTime @updatedAt
-  updatedBy   String?  // Admin user ID
+  updatedBy   String? // Admin user ID
 
   @@index([category])
   @@map("system_configs")
@@ -660,15 +661,15 @@ model SystemConfig {
 // ============================================================================
 
 model AdminAuditLog {
-  id             String   @id @default(cuid())
-  adminUserId    String
-  action         String   // 'plan.create', 'org.suspend', 'user.impersonate'
-  targetType     String?  // 'organization', 'user', 'plan', 'promotion'
-  targetId       String?
-  details        Json?    @db.JsonB  // Action-specific details
-  ipAddress      String?
-  userAgent      String?
-  createdAt      DateTime @default(now())
+  id          String   @id @default(cuid())
+  adminUserId String
+  action      String // 'plan.create', 'org.suspend', 'user.impersonate'
+  targetType  String? // 'organization', 'user', 'plan', 'promotion'
+  targetId    String?
+  details     Json?    @db.JsonB // Action-specific details
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
 
   @@index([adminUserId])
   @@index([action])
@@ -685,9 +686,9 @@ model SystemAnnouncement {
   id             String    @id @default(cuid())
   title          String
   message        String    @db.Text
-  type           String    @default("info")  // info, warning, critical, maintenance
-  targetAudience String    @default("all")   // all, admins, specific_plans
-  targetPlans    String[]  // If targetAudience is specific_plans
+  type           String    @default("info") // info, warning, critical, maintenance
+  targetAudience String    @default("all") // all, admins, specific_plans
+  targetPlans    String[] // If targetAudience is specific_plans
   startsAt       DateTime
   expiresAt      DateTime?
   isActive       Boolean   @default(true)
@@ -707,13 +708,13 @@ model SystemAnnouncement {
 // ============================================================================
 
 model IpBlocklist {
-  id          String    @id @default(cuid())
-  ipAddress   String    // Can be single IP or CIDR range
-  reason      String?
-  blockedBy   String?   // Admin user ID
-  expiresAt   DateTime?
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
+  id        String    @id @default(cuid())
+  ipAddress String // Can be single IP or CIDR range
+  reason    String?
+  blockedBy String? // Admin user ID
+  expiresAt DateTime?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
 
   @@unique([ipAddress])
   @@index([isActive])
@@ -725,35 +726,35 @@ model IpBlocklist {
 // ============================================================================
 
 model SupportRequest {
-  id               String    @id @default(uuid())
-  organizationId   String
-  userId           String
+  id             String @id @default(uuid())
+  organizationId String
+  userId         String
 
-  category         String    // bug_report, feature_request, help_question, template_request, feedback, urgent_issue, account_issue
-  priority         String    @default("medium") // critical, high, medium, low
-  status           String    @default("open")   // open, in_progress, resolved, closed, wont_fix
+  category String // bug_report, feature_request, help_question, template_request, feedback, urgent_issue, account_issue
+  priority String @default("medium") // critical, high, medium, low
+  status   String @default("open") // open, in_progress, resolved, closed, wont_fix
 
-  title            String?   @db.VarChar(255)
-  description      String
-  aiSummary        String?
+  title             String? @db.VarChar(255)
+  description       String
+  aiSummary         String?
   aiSuggestedAction String?
-  aiCategory       String?   // TicketCategoryV2 slug — see docs/hermes/ticket-categories-2026-04-24.md
+  aiCategory        String? // TicketCategoryV2 slug — see docs/hermes/ticket-categories-2026-04-24.md
 
-  pageUrl          String?   @db.VarChar(500)
-  browserInfo      String?   @db.VarChar(255)
-  consoleErrors    String?
+  pageUrl       String? @db.VarChar(500)
+  browserInfo   String? @db.VarChar(255)
+  consoleErrors String?
 
-  resolutionNotes  String?
-  resolvedById     String?
-  resolvedAt       DateTime?
+  resolutionNotes String?
+  resolvedById    String?
+  resolvedAt      DateTime?
 
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user             User         @relation("SupportRequestUser", fields: [userId], references: [id], onDelete: Cascade)
-  resolvedBy       User?        @relation("SupportRequestResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
-  messages         SupportMessage[]
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User             @relation("SupportRequestUser", fields: [userId], references: [id], onDelete: Cascade)
+  resolvedBy   User?            @relation("SupportRequestResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  messages     SupportMessage[]
 
   @@index([organizationId])
   @@index([status])
@@ -765,19 +766,19 @@ model SupportRequest {
 }
 
 model SupportMessage {
-  id               String    @id @default(uuid())
-  requestId        String
-  organizationId   String
-  userId           String
+  id             String @id @default(uuid())
+  requestId      String
+  organizationId String
+  userId         String
 
-  role             String    // 'user', 'assistant', 'admin' — conversation role
-  authorType       String    @default("user") // 'user' | 'admin' | 'agent' — source (agent = automation)
-  content          String
+  role       String // 'user', 'assistant', 'admin' — conversation role
+  authorType String @default("user") // 'user' | 'admin' | 'agent' — source (agent = automation)
+  content    String
 
-  createdAt        DateTime  @default(now())
+  createdAt DateTime @default(now())
 
-  request          SupportRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  organization     Organization   @relation("OrgSupportMessages", fields: [organizationId], references: [id], onDelete: Cascade)
+  request      SupportRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  organization Organization   @relation("OrgSupportMessages", fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([requestId])
   @@index([organizationId])
@@ -790,44 +791,44 @@ model SupportMessage {
 // ============================================================================
 
 model OrganizationOnboarding {
-  id                        String   @id @default(cuid())
-  organizationId            String   @unique
-  organization              Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  welcomeEmailSentAt        DateTime?
-  firstScreenPairedAt       DateTime?
-  firstContentUploadedAt    DateTime?
-  firstPlaylistCreatedAt    DateTime?
-  firstScheduleCreatedAt    DateTime?
+  welcomeEmailSentAt     DateTime?
+  firstScreenPairedAt    DateTime?
+  firstContentUploadedAt DateTime?
+  firstPlaylistCreatedAt DateTime?
+  firstScheduleCreatedAt DateTime?
 
-  day1NudgeSentAt           DateTime?
-  day3NudgeSentAt           DateTime?
-  day7NudgeSentAt           DateTime?
+  day1NudgeSentAt DateTime?
+  day3NudgeSentAt DateTime?
+  day7NudgeSentAt DateTime?
 
-  completedAt               DateTime?
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @updatedAt
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@map("organization_onboarding")
 }
 
 model CustomerIncident {
-  id              String   @id @default(cuid())
-  organizationId  String
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  agent           String   // e.g. 'screen-health-customer', 'billing-revenue'
-  type            String   // e.g. 'cluster-offline', 'failed-payment-retry-exhausted'
-  severity        String   // 'critical' | 'warning' | 'info'
-  target          String
-  targetId        String
-  message         String   @db.Text
-  remediation     String?  @db.Text
+  agent       String // e.g. 'screen-health-customer', 'billing-revenue'
+  type        String // e.g. 'cluster-offline', 'failed-payment-retry-exhausted'
+  severity    String // 'critical' | 'warning' | 'info'
+  target      String
+  targetId    String
+  message     String  @db.Text
+  remediation String? @db.Text
 
-  status          String   @default("open") // 'open' | 'resolved' | 'escalated'
-  detectedAt      DateTime @default(now())
-  resolvedAt      DateTime?
-  notifiedAt      DateTime?
+  status     String    @default("open") // 'open' | 'resolved' | 'escalated'
+  detectedAt DateTime  @default(now())
+  resolvedAt DateTime?
+  notifiedAt DateTime?
 
   @@index([organizationId, status])
   @@index([agent, type])
@@ -835,21 +836,82 @@ model CustomerIncident {
 }
 
 model ContentRecommendation {
-  id              String   @id @default(cuid())
-  organizationId  String
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  kind            String   // 'time-of-day' | 'underperforming' | 'rotation-frequency'
-  contentId       String?
-  playlistId      String?
+  kind       String // 'time-of-day' | 'underperforming' | 'rotation-frequency'
+  contentId  String?
+  playlistId String?
 
-  summary         String   @db.Text
-  details         Json
-  confidence      Float
+  summary    String @db.Text
+  details    Json
+  confidence Float
 
-  createdAt       DateTime @default(now())
-  dismissedAt     DateTime?
+  createdAt   DateTime  @default(now())
+  dismissedAt DateTime?
 
   @@index([organizationId, createdAt])
   @@map("content_recommendations")
+}
+
+// ============================================================================
+// MCP Server (Model Context Protocol) — read-only tool surface for agents
+// ============================================================================
+
+model McpToken {
+  id             String       @id @default(cuid())
+  // SHA-256 hex of the bearer token. Plaintext is shown to admin once at
+  // issuance and never persisted. Lookup compares hashes — never compare
+  // plaintext to plaintext.
+  tokenHash      String       @unique
+  // Human-readable label (e.g. "support-triage prod 2026-Q2"). Free-form.
+  name           String
+  // Scope: which org's data this token can read.
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  // Which agent the token was issued for — used in audit attribution.
+  agentName      String
+  // Tool-scope strings (e.g. ["displays:read", "content:read"]).
+  scopes         String[]
+  createdAt      DateTime     @default(now())
+  // Nullable = no expiry. Recommend setting one (max 90d) for admin-issued tokens.
+  expiresAt      DateTime?
+  // Set when revoked. Null = active.
+  revokedAt      DateTime?
+  // Updated each successful auth. Useful for "when did this token last work."
+  lastUsedAt     DateTime?
+
+  auditEntries McpAuditLog[]
+
+  @@index([organizationId])
+  @@index([agentName])
+  @@map("mcp_tokens")
+}
+
+model McpAuditLog {
+  id             String    @id @default(cuid())
+  // FK to the token used. Null if the call failed auth (no valid token).
+  tokenId        String?
+  token          McpToken? @relation(fields: [tokenId], references: [id], onDelete: SetNull)
+  // Denormalized for queryability when the token is later deleted.
+  agentName      String
+  organizationId String?
+  // Tool name (e.g. "list_displays"). Null if request failed before tool dispatch.
+  tool           String?
+  // Redacted input arguments (secrets stripped per AgentStateService's
+  // FORBIDDEN_KEY_REGEX precedent). JSON for queryability.
+  paramsRedacted Json?     @db.JsonB
+  // 'success' | 'error'
+  status         String
+  // Wire-level MCP error code if status='error'. e.g. NOT_FOUND, INVALID_INPUT.
+  errorCode      String?
+  // Time spent inside the tool handler.
+  latencyMs      Int
+  createdAt      DateTime  @default(now())
+
+  @@index([tokenId, createdAt])
+  @@index([agentName, createdAt])
+  @@index([organizationId, createdAt])
+  @@map("mcp_audit_log")
 }
