@@ -30,13 +30,22 @@ The framework is proven on the shift-agent side. **The open question is fit:** d
 | Layer | Count | Pattern fit notes |
 |---|---|---|
 | `.claude/agents/*.md` (dev-time Claude Code subagents) | 8 | Already in SKILL.md shape. Match the pattern by accident. **No change needed.** |
-| `scripts/ops/` (PM2 cron, deterministic) | 6 | Predictable cron jobs. Not LLM-shaped. Most discipline rules don't apply, BUT could benefit from `safe_io` patterns + the dead-man + watchdog + heartbeat triad. |
-| `scripts/agents/` (business agents, mixed) | 6 (2 live, 4 scaffolds) | This is where the patterns would land hardest. The 2 live ones (`customer-lifecycle`, `support-triage`) are doing LLM-shaped work. The 4 scaffolds are unwritten. |
+| `scripts/ops/` (PM2 cron, deterministic) | 7 | Predictable cron jobs. Not LLM-shaped. Most discipline rules don't apply. Dead-man + watchdog parts of the triad now landed (PR #38: heartbeat in `health-guardian` + new `ops-watchdog`). External healthchecks.io leg pending env-var configuration on prod (see "Enable external healthchecks.io heartbeat" entry below). |
+| `scripts/agents/` (business agents, mixed) | 6 (2 live, 4 scaffolds) | The 2 live ones (`customer-lifecycle`, `support-triage`) are doing LLM-shaped work. The 4 scaffolds are unwritten. Zod schema validation at the `AgentStateService` boundary now active (PR #38). |
 
-### Companion docs (delivered on this branch)
+### Companion docs (landed via PR #37)
 
 - `docs/agents-architecture.md` — synthesis of shift-agent's `DESIGN.md` (979 lines, v2 post-review). Distills the 8 hard rules, the per-agent file shape, the `safe_io` pattern, required alerts, build order, testing stages, and security posture. Read when designing or maintaining a Vizora business agent.
-- `docs/agents-mcp-server-design.md` — proposed Vizora MCP server module (`middleware/src/modules/mcp/`). Read-only v1 with 13 tools, token-based auth with per-token scope, rate limiting, audit, observability. Estimate: ~6.5 dev-days for the full server + first agent migration. Would unlock Hermes-side adoption with one stable tool surface, regardless of whether Vizora itself migrates to Hermes.
+- `docs/agents-mcp-server-design.md` — proposed Vizora MCP server module (`middleware/src/modules/mcp/`). Read-only v1 with 13 tools, token-based auth with per-token scope, rate limiting, audit, observability. Estimate: ~6.5 dev-days for the full server + first agent migration. **Design only — implementation gated on a real consumer.** Would unlock Hermes-side adoption with one stable tool surface.
+
+### What's already landed from this evaluation
+
+- **PR #37 (merged 2026-05-03):** Architecture and MCP design docs above; backlog evaluation entry.
+- **PR #38 (merged 2026-05-04):** Two of three "immediate wins" from the architecture review:
+  - Win 1 — Zod schema validation at `AgentStateService` boundaries (fail-soft on schema mismatch, sentinel passthrough preserved, 86/86 agents tests green).
+  - Win 2 — Dead-man + watchdog + heartbeat triad: `pingHeartbeat()` in `alerting.ts`, integrated into `health-guardian`'s success path; new `ops-watchdog` (15-min cron, per-agent SLA, Slack alert on stale, self-records to `ops-state.json`).
+  - Win 3 — Prompt sanitizer documented as N/A (D13 pattern eliminates the risk by construction; sanitizer becomes worth building when first agent path needs raw text in a prompt).
+- **PR #39 + #40 (merged 2026-05-04):** CLAUDE.md hygiene sweep + ops-watchdog row.
 
 ### The decision question
 
@@ -54,6 +63,79 @@ Two parts, each independently answerable:
 ### What would unblock action
 
 A decision on the MCP server v1 (yes / no / not yet). The agent-discipline patterns can be adopted incrementally per agent; the MCP server is a focused 6.5-day effort that needs an explicit go.
+
+---
+
+## Enable external healthchecks.io heartbeat on prod
+
+**Opened:** 2026-05-04
+**Status:** Operational follow-up — code shipped, env var not set
+**Trigger to revisit:** Whenever the dead-man triad needs its third (external) leg active. Realistic deadline: before any whole-VPS-down outage where you'd have wanted external alerting.
+
+### What this is
+
+PR #38 added `pingHeartbeat()` to `health-guardian`'s success path. When `HEALTHCHECKS_HEALTH_GUARDIAN_URL` is set, every successful `health-guardian` cycle POSTs to that URL. If the pings stop arriving, healthchecks.io alerts independently — the external dead-man that survives the entire VPS being dead.
+
+**Today the env var is unset on prod**, so this leg is no-op. The in-VPS `ops-watchdog` (the second leg) is active and verified. The first leg (`health-guardian` itself) has been running for months.
+
+### To activate
+
+1. Create a check at https://healthchecks.io with a 5-minute schedule and a 10-minute grace period (matches our 5-min cron + tolerance for one missed cycle)
+2. Configure the alert channel on the healthchecks.io side (Slack / email / SMS — owner's choice)
+3. Paste the ping URL into `/opt/vizora/app/.env` as `HEALTHCHECKS_HEALTH_GUARDIAN_URL=https://hc-ping.com/...`
+4. `pm2 reload ops-health-guardian` to pick up the env var
+5. Verify: a successful `health-guardian` run within 5 min should show as a successful ping in the healthchecks.io UI
+
+### Why deferred
+
+Operational, not technical. Required: a healthchecks.io account / project decision and an alert channel configuration on their side. ~10 minutes once you sit down to do it.
+
+---
+
+## PR #38 deferred review polish
+
+**Opened:** 2026-05-04
+**Status:** Low-priority cleanup
+**Trigger to revisit:** Bundle with the next ops-related touch-up, OR when a reviewer flags the same items again.
+
+### What this is
+
+The PR #38 multi-agent review surfaced a few items that scored below the 80-confidence auto-post threshold. Real but not load-bearing:
+
+| Score | Item | Disposition |
+|---|---|---|
+| 73 | `.env.example` and JSDoc for `pingHeartbeat` don't explicitly document the `/fail` URL variant | Worth a one-line clarification in the JSDoc + `.env.example` comment when convenient |
+| 62 | `slaOverride` NaN diagnostic gap in `ops-watchdog.ts` — invalid values fall through to `slaDefault` silently | Today this is intended behavior (log + ignore). Revisit only if alert fatigue from misconfigured envs becomes a real problem |
+
+### Why deferred
+
+Sub-80 score by an automated review rig with the explicit framing "keep this commit scoped to bug-fixes." No production impact; both are clarity / DX nits.
+
+---
+
+## Add per-agent decision-quality metric (dispatcher accuracy)
+
+**Opened:** 2026-05-04
+**Status:** Gap noted in `docs/agents-architecture.md` — no metric exists today
+**Trigger to revisit:** First time a business agent's classification quality is questioned in production (e.g. support-triage ticket-category drift, customer-lifecycle nudge mistargeting), OR when adding the second LLM-driven business agent (signal that quality variance across agents needs comparable measurement).
+
+### What this is
+
+shift-agent ships `dispatcher-accuracy-report` (10 KB script in `src/platform/scripts/`) that measures whether its dispatcher routes inbound messages to the correct handler. Vizora has no analogous metric for any of its business agents. Today, `support-triage` (the only live LLM-shaped one) classifies tickets into the v2 taxonomy with no ongoing measurement of whether the classifications are right — drift would be invisible until a customer escalation surfaced it.
+
+### Why this matters
+
+Agent quality silently degrades as the world drifts (new ticket categories appear, prompt template assumptions go stale, model-side behavior changes). Without a measurement, you find out about it from a customer complaint instead of a metric.
+
+### Possible shapes
+
+- **Daily sample audit** — randomly sample N classifications/day, write to a file, label by hand once a week. Cheap, manual.
+- **Hold-out fixture** — maintain a fixed set of ~50-100 known-correct classifications (`packages/database/__tests__/fixtures/`); run them through the live agent every night; alert if accuracy drops below threshold.
+- **Production echo** — for every classification, do a second classification via a different model (heuristic vs LLM, or two LLMs); flag disagreements for review.
+
+### Why deferred
+
+The taxonomy-v2 work has its own measurement gate at **2026-05-24** (`tasks/hermes-backlog.md`). That gate is the natural moment to decide whether ongoing-accuracy measurement is in scope.
 
 ---
 
