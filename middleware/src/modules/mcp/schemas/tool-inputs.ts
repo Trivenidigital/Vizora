@@ -110,3 +110,30 @@ export const ListOnboardingCandidatesInput = z.object({
     ),
 });
 export type ListOnboardingCandidatesInputT = z.infer<typeof ListOnboardingCandidatesInput>;
+
+// ── Customer-lifecycle write tools (platform-scope, customer:write) ────────
+
+const NUDGE_KEY = z.enum([
+  'day1-pair-screen',
+  'day3-upload-content',
+  'day7-create-schedule',
+]);
+
+export const MarkOnboardingNudgeSentInput = z.object({
+  organization_id: z.string().min(1),
+  nudge_key: NUDGE_KEY,
+});
+export type MarkOnboardingNudgeSentInputT = z.infer<typeof MarkOnboardingNudgeSentInput>;
+
+export const AutoCompleteOrgOnboardingInput = z.object({
+  organization_id: z.string().min(1),
+});
+export type AutoCompleteOrgOnboardingInputT = z.infer<typeof AutoCompleteOrgOnboardingInput>;
+
+export const SendLifecycleNudgeEmailInput = z.object({
+  organization_id: z.string().min(1),
+  nudge_key: NUDGE_KEY.describe(
+    'Template selector — server-side picks the actual subject and body from a hardcoded table. The agent does NOT supply email content.',
+  ),
+});
+export type SendLifecycleNudgeEmailInputT = z.infer<typeof SendLifecycleNudgeEmailInput>;

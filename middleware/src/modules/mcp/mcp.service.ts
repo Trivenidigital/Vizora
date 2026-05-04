@@ -8,7 +8,12 @@ import { DisplaysService } from '../displays/displays.service';
 import { OrganizationsService } from '../organizations/organizations.service';
 import { SupportService } from '../support/support.service';
 import { LIST_DISPLAYS_TOOL } from './tools/displays.tools';
-import { LIST_ONBOARDING_CANDIDATES_TOOL } from './tools/organizations.tools';
+import {
+  AUTO_COMPLETE_ORG_ONBOARDING_TOOL,
+  LIST_ONBOARDING_CANDIDATES_TOOL,
+  MARK_ONBOARDING_NUDGE_SENT_TOOL,
+  SEND_LIFECYCLE_NUDGE_EMAIL_TOOL,
+} from './tools/organizations.tools';
 import {
   CREATE_SUPPORT_MESSAGE_TOOL,
   LIST_OPEN_SUPPORT_REQUESTS_TOOL,
@@ -48,7 +53,7 @@ export class McpService implements OnModuleInit {
     // request. The instance is then discarded.
     this.buildServer(undefined);
     this.logger.log(
-      'MCP server factory ready — 6 tools registered per request (list_displays, list_open_support_requests, update_support_request_priority, update_support_request_ai_category, create_support_message, list_onboarding_candidates)',
+      'MCP server factory ready — 9 tools registered per request (list_displays, list_open_support_requests, update_support_request_priority, update_support_request_ai_category, create_support_message, list_onboarding_candidates, mark_onboarding_nudge_sent, auto_complete_org_onboarding, send_lifecycle_nudge_email)',
     );
   }
 
@@ -82,6 +87,24 @@ export class McpService implements OnModuleInit {
     this.registerTool(
       server,
       LIST_ONBOARDING_CANDIDATES_TOOL,
+      context,
+      this.organizations,
+    );
+    this.registerTool(
+      server,
+      MARK_ONBOARDING_NUDGE_SENT_TOOL,
+      context,
+      this.organizations,
+    );
+    this.registerTool(
+      server,
+      AUTO_COMPLETE_ORG_ONBOARDING_TOOL,
+      context,
+      this.organizations,
+    );
+    this.registerTool(
+      server,
+      SEND_LIFECYCLE_NUDGE_EMAIL_TOOL,
       context,
       this.organizations,
     );
