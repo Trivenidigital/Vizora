@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **Keep this file current.** When you add a new module, env var, agent, or PM2 process — update the corresponding section here in the same PR. The file is read into every Claude Code session and stale entries get treated as ground truth.
+
 ## Overview
 
 Vizora is a digital signage management platform. Businesses manage and distribute content to display screens across locations via an admin dashboard, with real-time updates over WebSocket.
@@ -92,33 +94,132 @@ Playwright runs sequentially (1 worker) to avoid DB race conditions. Retries: 2 
 
 ## Environment Variables
 
+> Source of truth for every supported var is `.env.example`. The list below is the curated subset that matters for understanding the system. **When adding a new env var: add it to `.env.example`, the relevant section here, AND any docstring/JSDoc that consumes it.**
+
+### Core
+
 ```
 DATABASE_URL            # PostgreSQL connection string
-JWT_SECRET              # User auth JWT secret (min 32 chars)
-DEVICE_JWT_SECRET       # Device auth JWT secret (min 32 chars)
 REDIS_URL               # Redis connection URL
+NODE_ENV                # development | production
+PORT, MIDDLEWARE_PORT, WEB_PORT, REALTIME_PORT  # Service ports (3000 / 3001 / 3002 / 3002)
+CORS_ORIGIN             # Comma-separated allowed origins
+```
+
+### Auth
+
+```
+JWT_SECRET              # User auth JWT secret (min 32 chars)
+JWT_EXPIRES_IN          # Token lifetime, default 7d
+DEVICE_JWT_SECRET       # Device auth JWT secret (min 32 chars; separate from JWT_SECRET)
+INTERNAL_API_SECRET     # Required in prod — service-to-service auth (middleware ↔ realtime)
+BCRYPT_ROUNDS           # Password hashing rounds (10-15, default 12)
+GOOGLE_CLIENT_ID        # Optional — Google OAuth client ID
+NEXT_PUBLIC_GOOGLE_CLIENT_ID  # Same value, exposed to frontend for GSI button (rebuild web on change)
+NEXT_SERVER_ACTIONS_ENCRYPTION_KEY  # Stable Next.js Server-Action key — KEEP CONSTANT across deploys
+```
+
+### Web frontend (NEXT_PUBLIC_*)
+
+```
 NEXT_PUBLIC_API_URL     # Backend API URL for web frontend
 NEXT_PUBLIC_SOCKET_URL  # Realtime gateway URL for web frontend
-BCRYPT_ROUNDS           # Password hashing rounds (10-15, default 12)
-GRAFANA_ADMIN_USER      # Required — Grafana admin username (no insecure default)
-GRAFANA_ADMIN_PASSWORD  # Required — Grafana admin password (no insecure default)
+BACKEND_URL             # Server-side API URL (used by next.config proxy)
+```
+
+### Storage / S3 / MinIO
+
+```
+MINIO_ENDPOINT, MINIO_PORT, MINIO_BUCKET, MINIO_USE_SSL
+MINIO_ACCESS_KEY, MINIO_SECRET_KEY
+AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY  # Used by S3 SDK paths (e.g. backup S3)
 BACKUP_S3_BUCKET        # Optional — S3 bucket for off-site DB backups
+BACKUP_DIR              # Local backup dir (default /var/backups/vizora)
+BACKUP_RETENTION_DAYS   # Daily backup retention (default 7)
+```
+
+### Billing
+
+```
+RAZORPAY_KEY_ID, RAZORPAY_BASIC_PLAN_ID, RAZORPAY_PRO_PLAN_ID
+```
+
+### Observability
+
+```
+SENTRY_DSN              # Sentry error tracking (optional)
+SENTRY_RELEASE          # Release tag for Sentry
+GRAFANA_ADMIN_USER      # Required — Grafana admin username (no insecure default)
+GRAFANA_ADMIN_PASSWORD  # Required — Grafana admin password
+METRICS_TOKEN           # Optional — Bearer token for /internal/metrics from non-localhost
+```
+
+### Email + alerts
+
+```
+SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM, SMTP_TO
+SLACK_WEBHOOK_URL       # Slack incoming webhook for ops status changes
+HEALTHCHECKS_HEALTH_GUARDIAN_URL  # External heartbeat for the ops dead-man (see "Autonomous Operations")
+EMAIL_FROM              # Default sender for transactional mail
+```
+
+### Agent System (business agents — see also `docs/agents-architecture.md`)
+
+```
+AGENT_STATE_DIR         # Override state-file directory (default: <cwd>/logs/agent-state)
+AGENT_AI_PROVIDER       # heuristic | openai | anthropic (heuristic is default + always available)
+AGENT_ORCHESTRATOR_ENABLED        # Feature flag — orchestrator agent
+BILLING_REVENUE_ENABLED           # Feature flag — billing-revenue agent
+CONTENT_INTELLIGENCE_ENABLED      # Feature flag — content-intelligence agent
+SCREEN_HEALTH_CUSTOMER_ENABLED    # Feature flag — screen-health agent
+LIFECYCLE_LIVE          # Customer-lifecycle: actually send emails (default false)
+LIFECYCLE_TEST_EMAILS   # Comma-separated allowlist of email recipients in test mode
+OPENAI_API_KEY          # Required when AGENT_AI_PROVIDER=openai
+ANTHROPIC_API_KEY       # Required when AGENT_AI_PROVIDER=anthropic
+```
+
+### Operations (PM2 cron-managed agents)
+
+```
+OPS_EMAIL, OPS_PASSWORD # Service-account credentials used by ops scripts
+OPS_ALERT_EMAIL         # Alert recipient email (optional; SMTP_TO is the actual envelope target)
+REALTIME_URL            # Realtime gateway base URL (default http://localhost:3002)
+WEB_URL                 # Web frontend base URL (default http://localhost:3001)
+VALIDATOR_BASE_URL      # Middleware base URL for ops scripts (default http://localhost:3000)
+RETENTION_DAYS          # Audit/log retention used by db-maintainer
+```
+
+### Third-party
+
+```
 OPENWEATHER_API_KEY     # Optional — OpenWeatherMap API key for weather widget
-GOOGLE_CLIENT_ID        # Optional — Google OAuth client ID (enables Google Sign-In)
-NEXT_PUBLIC_GOOGLE_CLIENT_ID  # Optional — Same value, exposed to frontend for GSI button
 ```
 
 ## Project Structure Highlights
 
 ```
-middleware/src/modules/    # NestJS modules: auth, content, displays, playlists, schedules, organizations, health, users, redis, database, config, common, billing, metrics, template-library
+middleware/src/modules/    # NestJS modules:
+                           #   admin, agents, analytics, api-keys, auth, billing,
+                           #   common, config, content, database, display-groups,
+                           #   displays, fleet, folders, health, mail, metrics,
+                           #   notifications, organizations, playlists, redis,
+                           #   schedules, storage, support, template-library, users
+middleware/src/modules/agents/  # Business-agent infrastructure (PR #32, 2026-04-19):
+                                #   AgentStateService, agent-state.schema, controllers
+                                #   for /api/v1/agents/* — see docs/agents-architecture.md
 middleware/src/modules/common/  # Shared guards (csrf), interceptors (logging, sanitize, response-envelope), middleware (csrf)
 middleware/test/           # E2E test specs (*.e2e-spec.ts)
 packages/database/prisma/schema.prisma  # Data model: Organization, User, Display, Content, Playlist, Schedule, DisplayGroup, Tag
-web/src/app/               # Next.js App Router: (auth)/, dashboard/, api/
+web/src/app/               # Next.js App Router: (auth)/, dashboard/, api/, product/
 web/src/lib/hooks/          # useSocket, useRealtimeEvents for WebSocket integration
 realtime/src/gateways/     # device.gateway.ts — main WebSocket handler
+scripts/agents/            # Business agents (cron + on-demand): customer-lifecycle, support-triage, etc.
+scripts/ops/               # Autonomous ops agents (PM2 cron) — see "Autonomous Operations"
 e2e-tests/                 # 15 Playwright spec files (01-auth through 15-comprehensive-integration)
+docs/agents-architecture.md          # Discipline patterns extracted from shift-agent
+docs/agents-mcp-server-design.md     # MCP server module sketch (read-only v1)
+tasks/feature-backlog.md   # Long-lived parking lot for evaluated/deferred ideas
+backlog.md                 # P0-P4 active backlog with status + effort estimates
 ```
 
 ## Display Clients
@@ -139,11 +240,13 @@ Available at `http://localhost:3000/api/v1/docs` in development mode only.
 
 ## Known Test State
 
-- **Middleware**: ~1460 tests pass. 3 pre-existing failures (auth.controller, pairing.service) — not regressions
-- **Realtime**: 28 tests pass. 1 suite fails (Prisma generate issue in test env)
-- **Web**: 40+ suites pass. 2 admin test suites fail (async Client Component in jsdom — tied to RSC migration deferral)
-- **Display**: No test coverage yet
-- **Builds**: All 3 services compile via `npx nx build @vizora/{middleware,web,realtime}`
+> Numbers below are approximate; the codebase is actively gaining tests. **Verify with a fresh run before relying on a specific number.** Current spec-file counts (a rough proxy for test count): middleware ≈ 106, realtime ≈ 10, web ≈ 78. Per-test counts run several multiples of those.
+
+- **Middleware**: 1700+ tests pass at last full run. Historical pre-existing failures (auth.controller, pairing.service) — verify locally if you see a fail; not all are regressions.
+- **Realtime**: ~28 tests pass. 1 suite has historically failed on a Prisma generate issue in the test env.
+- **Web**: 40+ suites pass. 2 admin test suites have historically failed (async Client Component in jsdom — tied to deferred RSC migration).
+- **Display**: No test coverage yet.
+- **Builds**: All 3 services compile via `npx nx build @vizora/{middleware,web,realtime}`. `web` may need `NODE_OPTIONS="--max-old-space-size=4096"` on memory-constrained dev machines.
 
 ## Support Agent System
 
@@ -181,7 +284,9 @@ Automated deployment readiness checker. Runs 30 validation rules across content,
 
 6 PM2 cron-managed agents providing 24/7 monitoring, auto-remediation, and alerting.
 
-**Scripts:** `scripts/ops/` — 6 agent scripts + shared library in `scripts/ops/lib/`
+> **Keep this table aligned with `ecosystem.config.js`** when adding/removing PM2 entries under the `ops-*` namespace.
+
+**Scripts:** `scripts/ops/` — agent scripts + shared library in `scripts/ops/lib/` (state, alerting, types, api-client)
 
 | Agent | Schedule | Responsibility |
 |-------|----------|---------------|
@@ -192,16 +297,23 @@ Automated deployment readiness checker. Runs 30 validation rules across content,
 | ops-reporter | Every 30min | Aggregate status, Slack/email alerts, dashboard update |
 | db-maintainer | Daily 3am | PostgreSQL vacuum, Redis cleanup, log rotation |
 
-**State:** `logs/ops-state.json` — shared state file with incidents and remediation audit trail
+**State:** `logs/ops-state.json` — shared state file with incidents and remediation audit trail. Read/write through `scripts/ops/lib/state.ts` (file-locked: `readOpsState` acquires, `writeOpsState` releases — every reader MUST pair with a writer).
 
-**Dashboard:** `GET /api/v1/health/ops-status` — Redis-cached ops status for web dashboard at `/dashboard/ops`
-
-**New environment variables:**
-```
-SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS  # Email alerts (optional)
-OPS_ALERT_EMAIL                               # Alert recipient email (optional)
-REALTIME_URL                                  # Realtime gateway (default: http://localhost:3002)
-WEB_URL                                       # Web dashboard (default: http://localhost:3001)
-```
+**Dashboard:** `GET /api/v1/health/ops-status` — Redis-cached ops status for web dashboard at `/dashboard/ops`. Prefer this over reading `ops-state.json` directly from new callers.
 
 **Design:** `docs/plans/2026-02-28-autonomous-ops-design.md`
+
+## Agent Architecture (business agents)
+
+Reference docs added 2026-05-03 from a review of the sister project `shift-agent` (Hermes Agent runtime, 15 agents in production). Read these before designing or maintaining a Vizora business agent:
+
+- **`docs/agents-architecture.md`** — discipline patterns: the 8 hard rules (dispatcher-first routing, identity-by-metadata, fail-closed, helper-scripts-own-IDs, templates-not-LLM-text, input sanitization, dual-source audit, hardened outbound), per-agent file shape, `safe_io` pattern, required out-of-band alerts, build order, testing stages, security posture.
+- **`docs/agents-mcp-server-design.md`** — proposed Vizora MCP server module (`middleware/src/modules/mcp/`). Read-only v1 with 13 tools, token-based auth, rate limiting, audit, observability. Design only — implementation gated on a real consumer (see `tasks/feature-backlog.md`).
+
+**Existing agent state code:** `middleware/src/modules/agents/agent-state.service.ts` (PR #32, merged 2026-04-19) — anchored secret/PII redaction, file-locking with timeout, known-family path safety, async fs/promises, manual-run enqueue. Use this for new agent state I/O — don't reimplement.
+
+## Backlog locations
+
+- **`backlog.md`** (root) — active P0–P4 backlog with status, effort estimates, and roadmap
+- **`tasks/feature-backlog.md`** — long-lived parking lot for evaluated/deferred ideas (each with **what / why deferred / trigger to revisit**)
+- **`tasks/hermes-backlog.md`** — Hermes/Path B taxonomy-v2 backlog with the 2026-05-24 measurement gate
