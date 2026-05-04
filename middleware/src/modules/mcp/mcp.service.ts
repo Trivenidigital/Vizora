@@ -5,8 +5,10 @@ import type { McpRequestContext } from './auth/mcp-context';
 import { McpAuditService } from './audit/mcp-audit.service';
 import { mapExceptionToMcpError } from './lib/error-mapping';
 import { DisplaysService } from '../displays/displays.service';
+import { OrganizationsService } from '../organizations/organizations.service';
 import { SupportService } from '../support/support.service';
 import { LIST_DISPLAYS_TOOL } from './tools/displays.tools';
+import { LIST_ONBOARDING_CANDIDATES_TOOL } from './tools/organizations.tools';
 import {
   CREATE_SUPPORT_MESSAGE_TOOL,
   LIST_OPEN_SUPPORT_REQUESTS_TOOL,
@@ -36,6 +38,7 @@ export class McpService implements OnModuleInit {
   constructor(
     private readonly displays: DisplaysService,
     private readonly support: SupportService,
+    private readonly organizations: OrganizationsService,
     private readonly audit: McpAuditService,
   ) {}
 
@@ -45,7 +48,7 @@ export class McpService implements OnModuleInit {
     // request. The instance is then discarded.
     this.buildServer(undefined);
     this.logger.log(
-      'MCP server factory ready — 5 tools registered per request (list_displays, list_open_support_requests, update_support_request_priority, update_support_request_ai_category, create_support_message)',
+      'MCP server factory ready — 6 tools registered per request (list_displays, list_open_support_requests, update_support_request_priority, update_support_request_ai_category, create_support_message, list_onboarding_candidates)',
     );
   }
 
@@ -76,6 +79,12 @@ export class McpService implements OnModuleInit {
       this.support,
     );
     this.registerTool(server, CREATE_SUPPORT_MESSAGE_TOOL, context, this.support);
+    this.registerTool(
+      server,
+      LIST_ONBOARDING_CANDIDATES_TOOL,
+      context,
+      this.organizations,
+    );
     return server;
   }
 

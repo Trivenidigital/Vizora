@@ -84,3 +84,29 @@ export const CreateSupportMessageInput = z.object({
     .describe('Message body. Templates only — never raw LLM output. Max 2000 chars.'),
 });
 export type CreateSupportMessageInputT = z.infer<typeof CreateSupportMessageInput>;
+
+// ── Customer-lifecycle (platform-scope read tool) ──────────────────────────
+
+export const ListOnboardingCandidatesInput = z.object({
+  lookback_days: z
+    .number()
+    .int()
+    .min(1)
+    .max(90)
+    .optional()
+    .default(30)
+    .describe(
+      'Window for "recently created" orgs whose onboarding may still be in progress. Default 30, matches the existing PM2 cron.',
+    ),
+  limit: z
+    .number()
+    .int()
+    .min(1)
+    .max(500)
+    .optional()
+    .default(200)
+    .describe(
+      'Max candidates returned. Default 200, matches the existing PM2 cron CANDIDATE_LIMIT.',
+    ),
+});
+export type ListOnboardingCandidatesInputT = z.infer<typeof ListOnboardingCandidatesInput>;

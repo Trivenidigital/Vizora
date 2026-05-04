@@ -89,3 +89,39 @@ export const CreateSupportMessageResult = z.object({
   created: z.boolean(),
 });
 export type CreateSupportMessageResultT = z.infer<typeof CreateSupportMessageResult>;
+
+// ── Customer-lifecycle (platform-scope read tool) ──────────────────────────
+
+/**
+ * Onboarding-candidate shape for the customer-lifecycle Hermes skill.
+ *
+ * **Hard contract**: this shape carries NO org name, NO admin email,
+ * NO billing detail. Just structural signals (tier, age, milestone
+ * flags, nudge-sent flags). Adding any free-text field or any
+ * email/name/billing field is a security-sensitive change — call it
+ * out in review.
+ */
+export const OnboardingCandidateShape = z.object({
+  organization_id: z.string(),
+  tier: z.enum(['free', 'starter', 'pro', 'enterprise']),
+  days_since_signup: z.number().int().nonnegative(),
+  milestone_flags: z.object({
+    welcomed: z.boolean(),
+    screen_paired: z.boolean(),
+    content_uploaded: z.boolean(),
+    playlist_created: z.boolean(),
+    schedule_created: z.boolean(),
+  }),
+  nudges_sent: z.object({
+    day1: z.boolean(),
+    day3: z.boolean(),
+    day7: z.boolean(),
+  }),
+});
+
+export const ListOnboardingCandidatesOutput = z.object({
+  candidates: z.array(OnboardingCandidateShape),
+  total: z.number().int().nonnegative(),
+});
+
+export type ListOnboardingCandidatesOutputT = z.infer<typeof ListOnboardingCandidatesOutput>;

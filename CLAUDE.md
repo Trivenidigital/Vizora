@@ -333,6 +333,11 @@ Automated deployment readiness checker. Runs 30 validation rules across content,
 - `update_support_request_priority` — scope `support:write`, sets priority on one request (cross-org guard via compound where).
 - `update_support_request_ai_category` — scope `support:write`, sets V2 taxonomy slug. Zod-constrained to the V2 enum.
 - `create_support_message` — scope `support:write`, posts an agent-authored comment. Author identity comes from the bearer-token context, content capped at 2000 chars.
+- `list_onboarding_candidates` — **platform-scope** read tool, scope `customer:read`. Returns onboarding candidates across ALL orgs as structural signals only (tier, days_since_signup, milestone_flags, nudges_sent). NEVER returns org name, admin email, or billing detail. Requires a platform-scope token (`organizationId IS NULL` in `mcp_tokens`); per-org tokens are rejected with INVALID_INPUT. Used by the customer-lifecycle Hermes shadow skill.
+
+**Token shapes:**
+- **Per-org token** (`organizationId` is a real org id) — for agents that operate on one org's data. Used by all the `displays:*` and `support:*` tools. The data-access methods compound their WHERE clauses with the token's org id, so the token can never see other orgs' data.
+- **Platform-scope token** (`organizationId IS NULL`) — for cross-org agents like customer-lifecycle and the future agent-orchestrator. Per-org tools reject these with INVALID_INPUT (`requireOrgScope` helper). Platform-scope tools require these (the inverse check in the tool handler). Issued via `McpTokenService.issue({ organizationId: null, ... })`.
 
 **Hermes Agent runtime (prod VPS):**
 - Installed at `/usr/local/lib/hermes-agent`, command at `/usr/local/bin/hermes`.
@@ -343,6 +348,7 @@ Automated deployment readiness checker. Runs 30 validation rules across content,
 
 **Hermes-driven agents (state):**
 - `vizora-support-triage` — **shadow mode** in cron `*/5 * * * *`. Reads via MCP, scores, appends `/var/log/hermes/vizora-support-triage-shadow.jsonl`. Live-mode skill (`SKILL-live.md`) is built and committed but NOT deployed; cutover is a one-line SCP after the gate below clears.
+- `vizora-customer-lifecycle` — **shadow mode** in cron `*/30 * * * *`. Calls `list_onboarding_candidates` (platform-scope), picks template per org via heuristic-matching prompt, appends `/var/log/hermes/vizora-customer-lifecycle-shadow.jsonl`. PM2 cron `agent-customer-lifecycle` continues to send all real emails. Live-mode skill is NOT YET BUILT — the live path needs `mark_onboarding_nudge_sent`, `auto_complete_org_onboarding`, and `send_lifecycle_nudge_email` write tools first (see `tasks/feature-backlog.md`).
 
 **Agent migration roadmap (Hermes-first rule)**
 
@@ -351,7 +357,7 @@ Inventory of `scripts/agents/*.ts` and their migration status:
 | Agent | Lines | State | Migration plan |
 |-------|-------|-------|----------------|
 | support-triage | 306 | LIVE (PM2 cron, every 5 min) | **Migrated to Hermes shadow.** Cutover gated on shadow-data review. |
-| customer-lifecycle | 463 | LIVE (PM2 cron, every 30 min). Sends real onboarding emails when `LIFECYCLE_LIVE=true`. | **Designed, not built.** See `tasks/feature-backlog.md` → "customer-lifecycle Hermes migration" for the design sketch + MCP tool list. Not started in this autonomous run because the outbound-email blast radius warrants explicit per-step approval. |
+| customer-lifecycle | 463 | LIVE (PM2 cron, every 30 min). Sends real onboarding emails when `LIFECYCLE_LIVE=true`. | **Migrated to Hermes shadow.** Read path: `list_onboarding_candidates` (platform-scope MCP tool). Skill: `hermes-skills/vizora-customer-lifecycle/SKILL.md`. Cron: `*/30 * * * *`. Comparison: `scripts/agents/compare-lifecycle-hermes-vs-heuristic.ts`. **Live cutover NOT done** — the write tools (`mark_onboarding_nudge_sent`, `auto_complete_org_onboarding`, `send_lifecycle_nudge_email`) are not yet built; the customer-visible email path stays on the PM2 cron. Backlog entry tracks the staged rollout. |
 | billing-revenue | 32 | SCAFFOLD (gated off). | Per Hermes-first rule, when implemented build as `hermes-skills/vizora-billing-revenue/SKILL.md`, not TS. |
 | content-intelligence | 32 | SCAFFOLD (gated off). | Per Hermes-first rule, build as `hermes-skills/vizora-content-intelligence/SKILL.md`. |
 | screen-health-customer | 33 | SCAFFOLD (gated off). | Per Hermes-first rule, build as `hermes-skills/vizora-screen-health/SKILL.md`. The `list_displays` MCP tool already exists; only `create_customer_incident` write tool needed. |

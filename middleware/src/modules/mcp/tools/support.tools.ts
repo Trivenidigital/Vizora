@@ -1,6 +1,10 @@
 import { ForbiddenException } from '@nestjs/common';
 import { SupportService } from '../../support/support.service';
-import { hasScope, type McpRequestContext } from '../auth/mcp-context';
+import {
+  hasScope,
+  requireOrgScope,
+  type McpRequestContext,
+} from '../auth/mcp-context';
 import {
   CreateSupportMessageInput,
   type CreateSupportMessageInputT,
@@ -44,12 +48,13 @@ export async function listOpenSupportRequestsTool(
   if (!hasScope(context, 'support:read')) {
     throw new ForbiddenException("Token lacks scope 'support:read'");
   }
+  const orgId = requireOrgScope(context);
   const input = ListOpenSupportRequestsInput.parse(
     rawInput,
   ) as ListOpenSupportRequestsInputT;
 
   const result = await supportService.listTriageCandidates(
-    context.organizationId,
+    orgId,
     {
       page: input.page,
       limit: input.limit,
@@ -125,11 +130,12 @@ export async function updateSupportRequestPriorityTool(
   if (!hasScope(context, 'support:write')) {
     throw new ForbiddenException("Token lacks scope 'support:write'");
   }
+  const orgId = requireOrgScope(context);
   const input = UpdateSupportRequestPriorityInput.parse(
     rawInput,
   ) as UpdateSupportRequestPriorityInputT;
   const updated = await supportService.setRequestPriority(
-    context.organizationId,
+    orgId,
     input.request_id,
     input.priority,
   );
@@ -164,11 +170,12 @@ export async function updateSupportRequestAiCategoryTool(
   if (!hasScope(context, 'support:write')) {
     throw new ForbiddenException("Token lacks scope 'support:write'");
   }
+  const orgId = requireOrgScope(context);
   const input = UpdateSupportRequestAiCategoryInput.parse(
     rawInput,
   ) as UpdateSupportRequestAiCategoryInputT;
   const updated = await supportService.setRequestAiCategory(
-    context.organizationId,
+    orgId,
     input.request_id,
     input.ai_category,
   );
@@ -208,11 +215,12 @@ export async function createSupportMessageTool(
   if (!hasScope(context, 'support:write')) {
     throw new ForbiddenException("Token lacks scope 'support:write'");
   }
+  const orgId = requireOrgScope(context);
   const input = CreateSupportMessageInput.parse(
     rawInput,
   ) as CreateSupportMessageInputT;
   const created = await supportService.createAgentMessage(
-    context.organizationId,
+    orgId,
     input.request_id,
     input.content,
   );

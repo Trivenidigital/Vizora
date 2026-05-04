@@ -62,6 +62,94 @@ export class OrganizationsService {
     return new PaginatedResponse(data.map(org => this.sanitizeOrg(org)), total, page, limit);
   }
 
+  /**
+   * List onboarding candidates for the customer-lifecycle agent — orgs
+   * created within the last `lookbackDays` whose onboarding hasn't
+   * completed yet.
+   *
+   * Returns precomputed STRUCTURAL SIGNALS ONLY: org id, tier, days
+   * since signup, and a milestone-flags map (booleans for welcomed /
+   * screenPaired / contentUploaded / playlistCreated / scheduleCreated).
+   * NO org name, NO admin email, NO billing detail. The structural-only
+   * contract is enforced here so an LLM-driven downstream agent (Hermes
+   * customer-lifecycle skill) can safely consume the output without
+   * violating D13 (no raw user data into LLM prompts).
+   *
+   * Cross-org by design — this method takes no org filter. The MCP tool
+   * layer guards this with a platform-scope-only token check.
+   */
+  async listOnboardingCandidates(
+    options: { lookbackDays?: number; limit?: number } = {},
+  ) {
+    const { lookbackDays = 30, limit = 200 } = options;
+    const since = new Date();
+    since.setDate(since.getDate() - lookbackDays);
+
+    const rows = await this.db.organization.findMany({
+      where: {
+        createdAt: { gte: since },
+        OR: [
+          { onboarding: null },
+          { onboarding: { completedAt: null } },
+        ],
+      },
+      orderBy: { createdAt: 'asc' },
+      take: limit,
+      select: {
+        id: true,
+        subscriptionTier: true,
+        createdAt: true,
+        onboarding: {
+          select: {
+            welcomeEmailSentAt: true,
+            firstScreenPairedAt: true,
+            firstContentUploadedAt: true,
+            firstPlaylistCreatedAt: true,
+            firstScheduleCreatedAt: true,
+            day1NudgeSentAt: true,
+            day3NudgeSentAt: true,
+            day7NudgeSentAt: true,
+            completedAt: true,
+          },
+        },
+      },
+    });
+
+    const now = Date.now();
+    return rows.map((org) => {
+      const ob = org.onboarding;
+      return {
+        organizationId: org.id,
+        tier: this.coerceTier(org.subscriptionTier),
+        daysSinceSignup: Math.floor(
+          (now - org.createdAt.getTime()) / (24 * 60 * 60 * 1000),
+        ),
+        milestoneFlags: {
+          welcomed: ob?.welcomeEmailSentAt != null,
+          screenPaired: ob?.firstScreenPairedAt != null,
+          contentUploaded: ob?.firstContentUploadedAt != null,
+          playlistCreated: ob?.firstPlaylistCreatedAt != null,
+          scheduleCreated: ob?.firstScheduleCreatedAt != null,
+        },
+        nudgesSent: {
+          day1: ob?.day1NudgeSentAt != null,
+          day3: ob?.day3NudgeSentAt != null,
+          day7: ob?.day7NudgeSentAt != null,
+        },
+      };
+    });
+  }
+
+  /**
+   * Same coercion the customer-lifecycle PM2 cron uses. Kept inline so
+   * this service doesn't depend on agent-side types.
+   */
+  private coerceTier(tier: string | null | undefined): 'free' | 'starter' | 'pro' | 'enterprise' {
+    const v = (tier ?? '').toLowerCase();
+    if (v === 'starter' || v === 'pro' || v === 'enterprise') return v;
+    return 'free';
+  }
+
   async findOne(id: string) {
     const organization = await this.db.organization.findUnique({
       where: { id },

@@ -40,7 +40,13 @@ export class McpTokenService {
    */
   async issue(input: {
     name: string;
-    organizationId: string;
+    /**
+     * Org scope. `null` = platform-scope token (cross-org agents like
+     * customer-lifecycle, agent-orchestrator). Per-org tools reject
+     * platform tokens; platform tools reject per-org tokens. The
+     * MCP-side `requireOrgScope`/inverse checks enforce this at runtime.
+     */
+    organizationId: string | null;
     agentName: string;
     scopes: string[];
     expiresInDays?: number;
@@ -49,7 +55,7 @@ export class McpTokenService {
     record: {
       id: string;
       name: string;
-      organizationId: string;
+      organizationId: string | null;
       agentName: string;
       scopes: string[];
       createdAt: Date;
@@ -104,7 +110,7 @@ export class McpTokenService {
     });
 
     this.logger.log(
-      `Issued MCP token id=${created.id} agent=${input.agentName} org=${input.organizationId} scopes=${input.scopes.join(',')} expiresAt=${expiresAt.toISOString()}`,
+      `Issued MCP token id=${created.id} agent=${input.agentName} org=${input.organizationId ?? '<platform>'} scopes=${input.scopes.join(',')} expiresAt=${expiresAt.toISOString()}`,
     );
 
     return { bearer, record: created };
@@ -118,7 +124,7 @@ export class McpTokenService {
    */
   async validate(bearer: string): Promise<{
     id: string;
-    organizationId: string;
+    organizationId: string | null;
     agentName: string;
     scopes: string[];
   } | null> {
