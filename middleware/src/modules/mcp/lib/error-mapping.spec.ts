@@ -37,11 +37,17 @@ describe('mapExceptionToMcpError', () => {
     expect(r.code).toBe('RATE_LIMITED');
   });
 
-  it('maps unknown 4xx HttpException → INVALID_INPUT', () => {
+  it('maps unknown 4xx HttpException → INVALID_INPUT with GENERIC message (does NOT leak internal detail like SQL errors or record IDs that controllers may have placed in the message)', () => {
     const r = mapExceptionToMcpError(
-      new HttpException('teapot', HttpStatus.I_AM_A_TEAPOT),
+      new HttpException(
+        'duplicate key violates unique constraint pg_unique_42 on table users',
+        HttpStatus.CONFLICT,
+      ),
     );
     expect(r.code).toBe('INVALID_INPUT');
+    expect(r.message).toBe('Invalid request');
+    expect(r.message).not.toContain('pg_unique_42');
+    expect(r.message).not.toContain('users');
   });
 
   it('maps 5xx HttpException → INTERNAL with generic message (no leak)', () => {

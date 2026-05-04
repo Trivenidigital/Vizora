@@ -46,7 +46,15 @@ export class McpExceptionFilter implements ExceptionFilter {
     );
 
     if (mapped.code === 'RATE_LIMITED') {
-      res.setHeader('Retry-After', '60');
+      // The throttler may have already set Retry-After to the actual
+      // bucket-reset TTL (in seconds). Honour that if present —
+      // overwriting it with a hardcoded 60 makes clients back off for
+      // longer than they need to. Only fall back to 60 when no upstream
+      // value exists.
+      const existing = res.getHeader('Retry-After');
+      if (existing === undefined || existing === null || existing === '') {
+        res.setHeader('Retry-After', '60');
+      }
     }
 
     res.status(status).json({ error: mapped });

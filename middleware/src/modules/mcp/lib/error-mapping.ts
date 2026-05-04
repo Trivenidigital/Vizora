@@ -69,10 +69,16 @@ export function mapExceptionToMcpError(err: unknown): McpErrorPayload {
     };
   }
   if (err instanceof HttpException) {
-    // Other HTTP exceptions land in INVALID_INPUT (4xx) or INTERNAL (5xx)
+    // Other HTTP exception subtypes (Conflict, Gone, Teapot, Payload-
+    // Too-Large, etc) land here. We map 4xx → INVALID_INPUT but DO NOT
+    // pass the exception's own message through — controllers may have
+    // attached internal detail (record IDs, SQL error text, hostnames)
+    // expecting NestJS's default envelope to wrap it. The MCP wire is
+    // an external surface; treat anything we haven't whitelisted above
+    // as opaque.
     const status = err.getStatus();
     if (status >= 400 && status < 500) {
-      return { code: 'INVALID_INPUT', message: err.message };
+      return { code: 'INVALID_INPUT', message: 'Invalid request' };
     }
   }
   // Anything else → INTERNAL with the message stripped
