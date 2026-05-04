@@ -12,6 +12,7 @@ import type { Request, Response } from 'express';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { SkipEnvelope } from '../common/interceptors/response-envelope.interceptor';
 import { SkipInputSanitize } from '../common/interceptors/sanitize.interceptor';
+import { Public } from '../auth/decorators/public.decorator';
 import { McpAuthGuard } from './auth/mcp-auth.guard';
 import {
   MCP_CONTEXT_KEY,
@@ -44,6 +45,15 @@ import { McpService } from './mcp.service';
 // controller path is just `mcp`. Including `api/v1/` here would
 // double-prefix the route to `/api/v1/api/v1/mcp` and silently 404.
 @Controller('mcp')
+// `@Public()` opts the controller out of the GLOBAL JwtAuthGuard
+// (auth.module.ts registers it as APP_GUARD). MCP uses bearer-token
+// auth via `mcp_<token>` — NOT user-session JWTs. Without this, the
+// global guard intercepts first, fails to validate the MCP bearer as
+// a JWT, and throws a generic UnauthorizedException — McpAuthGuard
+// never runs and the wire message reads "Unauthorized" instead of
+// the MCP-specific "Invalid or expired MCP token". Auth is still
+// enforced — McpAuthGuard runs at the controller level below.
+@Public()
 @UseGuards(McpAuthGuard, McpRateLimitGuard)
 @UseFilters(McpExceptionFilter)
 @SkipInputSanitize()
