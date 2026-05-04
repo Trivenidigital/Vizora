@@ -85,15 +85,23 @@ export class McpController {
   }
 
   /**
-   * Per-request transport (stateless mode). The auth-info object
-   * carries the per-request `mcpContext` into the SDK so tool
-   * handlers receive the right org / agent / scopes for THIS call.
+   * Per-request transport AND per-request McpServer (stateless mode).
+   * The SDK's `Server.connect()` is single-shot — reusing one server
+   * across requests throws "Already connected to a transport" on the
+   * second call (caught in prod by Hermes hitting `tools/list` after
+   * PR #42 went live). Building both fresh per request pairs their
+   * lifetimes 1:1 and lets GC clean up after `handleRequest` returns.
+   *
+   * The auth-info object carries the per-request `mcpContext` into
+   * the SDK so tool handlers receive the right org / agent / scopes
+   * for THIS call.
    */
   private async handle(req: Request, res: Response): Promise<void> {
+    const server = this.mcp.buildServer();
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined, // stateless
     });
-    await this.mcp.server.connect(transport);
+    await server.connect(transport);
 
     const context = (req as Request & Record<string, unknown>)[
       MCP_CONTEXT_KEY

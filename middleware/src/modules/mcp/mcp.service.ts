@@ -7,10 +7,15 @@ import { DisplaysService } from '../displays/displays.service';
 import { LIST_DISPLAYS_TOOL } from './tools/displays.tools';
 
 /**
- * Holds a single `McpServer` instance and registers every tool
- * exactly once at startup. The transport is created per-request by
- * `McpController` (stateless mode — no server-side session state) and
- * `connect`-ed against this server.
+ * Builds a fresh `McpServer` per incoming HTTP request. The SDK's
+ * `Server.connect(transport)` is single-shot — calling it twice on the
+ * same instance throws "Already connected to a transport" (we hit this
+ * exact failure in prod after PR #42 / #43 / #44 went live, on the
+ * second authenticated request). The fix is to pair each `transport`
+ * with a fresh `McpServer`; both die together when the request ends.
+ *
+ * Cost: object construction + a few `registerTool` calls (no I/O).
+ * Negligible vs the actual tool work.
  *
  * Tool handlers receive an `extra` arg from the SDK that carries
  * `authInfo`. We populate `authInfo.extra.mcpContext` from the
@@ -21,29 +26,40 @@ import { LIST_DISPLAYS_TOOL } from './tools/displays.tools';
 export class McpService implements OnModuleInit {
   private readonly logger = new Logger(McpService.name);
 
-  /** Singleton MCP server. Tools are registered once at module init. */
-  readonly server = new McpServer(
-    { name: 'vizora-mcp', version: '0.1.0' },
-    { capabilities: { tools: { listChanged: false } } },
-  );
-
   constructor(
     private readonly displays: DisplaysService,
     private readonly audit: McpAuditService,
   ) {}
 
   onModuleInit(): void {
-    this.registerListDisplays();
-    this.logger.log('MCP server initialized — 1 tool registered (list_displays)');
+    // Sanity-check: build a server once at startup so a misconfigured
+    // tool-registration crashes the boot rather than the first user
+    // request. The instance is then discarded.
+    this.buildServer();
+    this.logger.log('MCP server factory ready — 1 tool will be registered per request (list_displays)');
+  }
+
+  /**
+   * Build a fresh MCP server with every tool registered. Called once
+   * per incoming HTTP request by `McpController`. Returning a new
+   * instance each time is what makes the per-request `connect()` safe.
+   */
+  buildServer(): McpServer {
+    const server = new McpServer(
+      { name: 'vizora-mcp', version: '0.1.0' },
+      { capabilities: { tools: { listChanged: false } } },
+    );
+    this.registerListDisplays(server);
+    return server;
   }
 
   /**
    * Wraps tool registration with a uniform try/catch + audit pattern
    * so each tool file stays focused on the tool itself.
    */
-  private registerListDisplays(): void {
+  private registerListDisplays(server: McpServer): void {
     const t = LIST_DISPLAYS_TOOL;
-    this.server.registerTool(
+    server.registerTool(
       t.name,
       {
         description: t.description,
