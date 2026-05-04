@@ -63,11 +63,15 @@ export async function pingHeartbeat(
 ): Promise<void> {
   if (!pingUrl) return;
   const url = status === 'fail' ? `${pingUrl}/fail` : pingUrl;
+  const controller = new AbortController();
+  // clearTimeout MUST happen on every exit path, including thrown fetches
+  // (DNS failures, ECONNREFUSED, etc.) — otherwise a pending 5 s timer keeps
+  // Node's event loop alive past the script's intended exit, drifting cron
+  // by ~5 s per failed ping. The previous `clearTimeout(timer)` inside the
+  // try-block only ran on the success path.
+  const timer = setTimeout(() => controller.abort(), 5_000);
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5_000);
     const res = await fetch(url, { method: 'POST', signal: controller.signal });
-    clearTimeout(timer);
     if (!res.ok) {
       log(agent, `heartbeat ping returned ${res.status} (url=${url.replace(/[^/]+$/, '...')})`);
     }
@@ -76,6 +80,8 @@ export async function pingHeartbeat(
       agent,
       `heartbeat ping failed: ${err instanceof Error ? err.message : err}`,
     );
+  } finally {
+    clearTimeout(timer);
   }
 }
 
