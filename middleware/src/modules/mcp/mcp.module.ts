@@ -3,6 +3,7 @@ import { AdminModule } from '../admin/admin.module';
 import { AuthModule } from '../auth/auth.module';
 import { DatabaseModule } from '../database/database.module';
 import { DisplaysModule } from '../displays/displays.module';
+import { SupportModule } from '../support/support.module';
 import { McpAuditService } from './audit/mcp-audit.service';
 import { McpAuthGuard } from './auth/mcp-auth.guard';
 import { McpRateLimitGuard } from './auth/mcp-rate-limit.guard';
@@ -21,12 +22,14 @@ import { McpTokensAdminController } from './admin/mcp-tokens.controller';
  *   - GET  /api/v1/admin/mcp-tokens        (list)
  *   - DELETE /api/v1/admin/mcp-tokens/:id  (revoke)
  *
- * Tools registered: `list_displays` (read-only, scope `displays:read`)
+ * Tools registered:
+ *   - `list_displays`                 (scope `displays:read`)
+ *   - `list_open_support_requests`    (scope `support:read`, structural-only)
  *
  * Companion docs: `docs/agents-mcp-server-design.md`.
  */
 @Module({
-  imports: [DatabaseModule, AuthModule, AdminModule, DisplaysModule],
+  imports: [DatabaseModule, AuthModule, AdminModule, DisplaysModule, SupportModule],
   controllers: [McpController, McpTokensAdminController],
   providers: [McpService, McpTokenService, McpAuthGuard, McpRateLimitGuard, McpAuditService],
   exports: [McpService, McpTokenService],

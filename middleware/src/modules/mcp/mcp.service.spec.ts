@@ -14,12 +14,13 @@ import { McpService } from './mcp.service';
 describe('McpService.buildServer', () => {
   // Lightweight stubs — the factory itself doesn't call into them; it
   // only registers the handler closures. Tool execution is covered by
-  // tools/displays.tools.spec.ts.
+  // tools/displays.tools.spec.ts and tools/support.tools.spec.ts.
   const displays = {} as never;
+  const support = {} as never;
   const audit = {} as never;
 
   it('returns a NEW McpServer instance on every call (REGRESSION: singleton caused "Already connected to a transport" in prod)', () => {
-    const svc = new McpService(displays, audit);
+    const svc = new McpService(displays, support, audit);
     const a = svc.buildServer(undefined);
     const b = svc.buildServer(undefined);
     expect(a).toBeDefined();
@@ -36,7 +37,8 @@ describe('McpService.buildServer', () => {
       }),
     } as never;
     const fakeAudit = { record: jest.fn(async (row) => { captured.push(row); }) } as never;
-    const svc = new McpService(fakeDisplays, fakeAudit);
+    const fakeSupport = {} as never;
+    const svc = new McpService(fakeDisplays, fakeSupport, fakeAudit);
     const ctx = {
       tokenId: 'tok_test',
       organizationId: 'org_test',
@@ -62,7 +64,7 @@ describe('McpService.buildServer', () => {
   });
 
   it('still has list_displays registered on every fresh build', () => {
-    const svc = new McpService(displays, audit);
+    const svc = new McpService(displays, support, audit);
     const server = svc.buildServer(undefined);
     // McpServer.server is the underlying Server instance from the SDK.
     // Tools live in its `_registeredTools` map (private but stable

@@ -327,8 +327,9 @@ Automated deployment readiness checker. Runs 30 validation rules across content,
 - `GET  /api/v1/admin/mcp-tokens` — list tokens (no plaintext).
 - `DELETE /api/v1/admin/mcp-tokens/:id` — revoke (idempotent).
 
-**Tools today (PR-A — `feat/mcp-server-foundation`):**
-- `list_displays` — paginated, scope `displays:read`, optional status filter.
+**Tools today:**
+- `list_displays` — paginated, scope `displays:read`, optional status filter. (PR #42)
+- `list_open_support_requests` — paginated, scope `support:read`, returns triage candidates as **structural signals only** (word_count, has_attachment, message_count, age_minutes, priority, category, ai_category, org_tier). Body and PII NEVER cross the wire. Default WHERE excludes already-triaged requests (D7 reply-loop prevention). First step of the support-triage Hermes migration.
 
 **Pending PRs:**
 - PR-B — remaining 12 tools (display detail, content, playlists, schedules, organizations, audit).

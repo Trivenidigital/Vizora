@@ -34,3 +34,37 @@ export const ListDisplaysOutput = z.object({
 });
 
 export type ListDisplaysOutputT = z.infer<typeof ListDisplaysOutput>;
+
+/**
+ * Triage-candidate shape — the output of `list_open_support_requests`.
+ *
+ * **Hard contract**: this shape NEVER carries `description`,
+ * `consoleErrors`, or any user-PII (name/email). It is structural
+ * signals only, computed server-side, so an LLM-driven agent can
+ * safely consume it without violating D13 (no raw user data in LLM
+ * prompts). Adding any free-text body field here is a security-sensitive
+ * change — call it out in review.
+ */
+export const TriageCandidateShape = z.object({
+  id: z.string(),
+  organization_id: z.string(),
+  status: z.string(),
+  priority: z.string().nullable(),
+  category: z.string().nullable(),
+  ai_category: z.string().nullable(),
+  created_at: z.string().datetime(),
+  age_minutes: z.number().int().nonnegative(),
+  word_count: z.number().int().nonnegative(),
+  has_attachment: z.boolean(),
+  message_count: z.number().int().nonnegative(),
+  org_tier: z.string(),
+});
+
+export const ListOpenSupportRequestsOutput = z.object({
+  support_requests: z.array(TriageCandidateShape),
+  page: z.number().int(),
+  limit: z.number().int(),
+  total: z.number().int(),
+});
+
+export type ListOpenSupportRequestsOutputT = z.infer<typeof ListOpenSupportRequestsOutput>;
