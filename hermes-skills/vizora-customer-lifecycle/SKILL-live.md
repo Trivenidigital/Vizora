@@ -15,7 +15,7 @@ This file is named `SKILL-live.md` in the repo. The cutover is performed by scp'
 2. **Structural signals only for scoring.** The MCP read tool already strips org name, admin email, and billing detail. You receive only `tier`, `days_since_signup`, `milestone_flags`, `nudges_sent`. Do NOT fabricate or infer email content.
 3. **One MCP read call per cron firing.** Call `list_onboarding_candidates` exactly once. Don't paginate.
 4. **One write per ticket per cron firing.** For each candidate, you make at most ONE of: `send_lifecycle_nudge_email`, OR `auto_complete_org_onboarding`, OR no write (template = `none`). Do NOT call both for the same org in the same firing.
-5. **Audit: log via the `log_shadow_row` MCP tool.** Every decision (including `none` and dry-run results) gets one row written via `log_shadow_row({ log_name: "vizora-customer-lifecycle-live", fields: {...} })`. Server prepends `timestamp` + `run_id`. The mcp_audit_log is the server-side trail; the JSONL the tool writes is the agent-side trail.
+5. **Audit: invoke the `log_shadow_row` MCP tool per decision.** Every decision (including `none` and dry-run results) gets one tool invocation: pass `log_name: "vizora-customer-lifecycle-live"` and a `fields` object with the decision details. Tool invocation only — do NOT echo or shell-redirect. Server prepends `timestamp` + `run_id`. The mcp_audit_log is the server-side trail; the JSONL the tool writes is the agent-side trail.
 6. **Trust the server's `LIFECYCLE_LIVE` gate.** If the server returns `reason: "dry_run"`, that means `LIFECYCLE_LIVE` is unset on the server — emails were intentionally NOT sent. Log it and move on. Do not retry.
 7. **Trust the server's dedup.** If the server returns `reason: "already_sent"`, the dayN_NudgeSentAt column was already set. Don't try to re-send via a different tool.
 
@@ -29,7 +29,7 @@ Use the `vizora-platform` MCP server (NOT the `vizora` server — that one carri
 list_onboarding_candidates({ "lookback_days": 30, "limit": 200 })
 ```
 
-If the response is empty, log a heartbeat row via `log_shadow_row({ log_name: "vizora-customer-lifecycle-live", fields: { "organization_id": null, "action": "none", "hermes_reasoning": "heartbeat: 0 candidates" } })` and stop. Do NOT call any write tool.
+If the response is empty, **invoke the `log_shadow_row` MCP tool** with `log_name: "vizora-customer-lifecycle-live"` and `fields: { "organization_id": null, "action": "none", "hermes_reasoning": "heartbeat: 0 candidates" }`, then stop. Do NOT call any other write tool. Tool invocation only, no shell redirect.
 
 ### 2. For each candidate, decide the action
 
@@ -78,12 +78,12 @@ No tool call other than the audit log (next step).
 
 ### 4. Log a JSONL audit row per candidate via the MCP tool
 
-For every candidate (including `action == 'none'`), call:
+For every candidate (including `action == 'none'`), **invoke the `log_shadow_row` MCP tool** with these arguments:
 
-```
-log_shadow_row({
-  "log_name": "vizora-customer-lifecycle-live",
-  "fields": {
+- `log_name`: `"vizora-customer-lifecycle-live"` (NOT `-shadow` — this is the live skill)
+- `fields`: a JSON object with the per-org result:
+  ```json
+  {
     "organization_id": "<id>",
     "tier": "pro",
     "days_since_signup": 4,
@@ -92,10 +92,9 @@ log_shadow_row({
     "tool_result": { "sent": true, "reason": "sent", "recipient_count": 1, "recipient_hashes": ["abcd1234..."] },
     "hermes_reasoning": "<≤120 chars>"
   }
-})
-```
+  ```
 
-Server prepends `timestamp` + `run_id`. log_name MUST be `vizora-customer-lifecycle-live` (not `-shadow`) for the live skill.
+This is a tool INVOCATION — call the function via the MCP transport. Do NOT use `echo`, `tee`, or any shell redirect. Server prepends `timestamp` + `run_id`.
 
 For `action == 'none'`: `tool_result: null`, reasoning explains why (e.g., `"day=15 stalled at content-upload but day3 nudge already sent"`).
 

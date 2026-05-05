@@ -24,16 +24,12 @@ Use the `vizora-platform` MCP server (NOT the `vizora` server — that one carri
 list_onboarding_candidates({ "lookback_days": 30, "limit": 200 })
 ```
 
-Expect `{ candidates: [...], total: N }`. If empty, log a heartbeat row via the MCP tool and stop:
+Expect `{ candidates: [...], total: N }`. If empty, **invoke the `log_shadow_row` MCP tool** (provided by the `vizora-platform` server) with these arguments, then stop:
 
-```
-log_shadow_row({
-  "log_name": "vizora-customer-lifecycle-shadow",
-  "fields": { "organization_id": null, "hermes_template": null, "hermes_reasoning": "heartbeat: 0 candidates", "input_signals": null }
-})
-```
+- `log_name`: `"vizora-customer-lifecycle-shadow"`
+- `fields`: `{ "organization_id": null, "hermes_template": null, "hermes_reasoning": "heartbeat: 0 candidates", "input_signals": null }`
 
-The server prepends `timestamp` and `run_id` automatically — don't include them in `fields`.
+This is a tool INVOCATION — call the function via the MCP transport, do NOT echo the JSON to a file. The server prepends `timestamp` and `run_id` automatically — don't include them in `fields`. The tool returns `{ written, line_count, timestamp, run_id }`; use the response to confirm the write.
 
 ### 2. Decide template per org
 
@@ -48,12 +44,12 @@ You may use the LLM's reasoning where the heuristic is ambiguous (e.g., to weigh
 
 ### 3. Log a JSONL row per candidate via the MCP tool
 
-For each org, call:
+For each org, **invoke the `log_shadow_row` MCP tool** (provided by the `vizora-platform` server) with these arguments:
 
-```
-log_shadow_row({
-  "log_name": "vizora-customer-lifecycle-shadow",
-  "fields": {
+- `log_name`: `"vizora-customer-lifecycle-shadow"`
+- `fields`: a JSON object with the per-org decision details:
+  ```json
+  {
     "organization_id": "<id>",
     "tier": "pro",
     "days_since_signup": 4,
@@ -61,8 +57,9 @@ log_shadow_row({
     "hermes_reasoning": "<≤120 chars — which signals drove the decision>",
     "input_signals": { "milestone_flags": {...}, "nudges_sent": {...} }
   }
-})
-```
+  ```
+
+This is a tool INVOCATION — call the function via the MCP transport. Do NOT use `echo`, `tee`, or any shell redirect. There is no fallback path; the tool is the only way to write the row.
 
 **Server-side guarantees** — these are the reason this tool exists, you don't need to manage them:
 - `timestamp` (ISO-8601 UTC) and `run_id` (epoch-seconds) are prepended by the server. Do NOT supply them in `fields`.
