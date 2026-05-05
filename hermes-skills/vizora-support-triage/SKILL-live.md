@@ -92,12 +92,14 @@ create_support_message({
 
 ### 4. Log a JSONL audit row per ticket via the MCP tool
 
-Even though the support-write calls themselves are tracked in `mcp_audit_log` (server-side), keep a local JSONL trail for ops review:
+Even though the support-write calls themselves are tracked in `mcp_audit_log` (server-side), keep a local JSONL trail for ops review.
 
-```
-log_shadow_row({
-  "log_name": "vizora-support-triage-live",
-  "fields": {
+For each ticket, **invoke the `log_shadow_row` MCP tool** with these arguments:
+
+- `log_name`: `"vizora-support-triage-live"` (NOT `-shadow` — this is the live skill)
+- `fields`: a JSON object with the per-ticket result:
+  ```json
+  {
     "ticket_id": "<id>",
     "organization_id": "<org>",
     "hermes_score": 0.72,
@@ -107,10 +109,9 @@ log_shadow_row({
     "message_posted": true,
     "input_signals": { /* same shape as shadow */ }
   }
-})
-```
+  ```
 
-Server prepends `timestamp` + `run_id`. log_name MUST be `vizora-support-triage-live` (not `-shadow`) for the live skill.
+This is a tool INVOCATION — call the function via the MCP transport. Do NOT use `echo`, `tee`, or any shell redirect. Server prepends `timestamp` + `run_id`.
 
 ## What NOT to do
 

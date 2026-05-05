@@ -50,12 +50,12 @@ Match the existing `scoreToPriority` rule in `scripts/agents/support-triage.ts`:
 
 ### 4. Log a JSONL row per ticket via the MCP tool
 
-For each ticket, call:
+For each ticket, **invoke the `log_shadow_row` MCP tool** (provided by the `vizora` server) with these arguments:
 
-```
-log_shadow_row({
-  "log_name": "vizora-support-triage-shadow",
-  "fields": {
+- `log_name`: `"vizora-support-triage-shadow"`
+- `fields`: a JSON object with the per-ticket score:
+  ```json
+  {
     "ticket_id": "<id>",
     "organization_id": "<org>",
     "hermes_score": 0.72,
@@ -67,8 +67,9 @@ log_shadow_row({
       "message_count": 2, "org_tier": "pro"
     }
   }
-})
-```
+  ```
+
+This is a tool INVOCATION — call the function via the MCP transport. Do NOT use `echo`, `tee`, or any shell redirect. There is no fallback; the tool is the only way to write the row.
 
 **Server-side guarantees** — these are why the tool exists:
 - `timestamp` (ISO-8601 UTC) and `run_id` (epoch-seconds) are prepended by the server. Do NOT supply them in `fields`.
@@ -78,16 +79,12 @@ log_shadow_row({
 
 `hermes_reasoning`: a terse human-readable phrase noting which signals dominated. Example: `"enterprise tier + 3h stale + device_offline category"`. Don't quote any ticket content.
 
-If the response had **zero** tickets, log a single heartbeat row instead:
+If the response had **zero** tickets, invoke `log_shadow_row` once with `fields` set to the heartbeat shape:
 
-```
-log_shadow_row({
-  "log_name": "vizora-support-triage-shadow",
-  "fields": { "ticket_id": null, "organization_id": null, "hermes_score": null, "hermes_priority": null, "hermes_reasoning": "heartbeat: 0 open requests", "input_signals": null }
-})
-```
+- `log_name`: `"vizora-support-triage-shadow"`
+- `fields`: `{ "ticket_id": null, "organization_id": null, "hermes_score": null, "hermes_priority": null, "hermes_reasoning": "heartbeat: 0 open requests", "input_signals": null }`
 
-One MCP call per ticket. Don't accumulate and call once at the end.
+One MCP invocation per ticket. Don't accumulate and call once at the end.
 
 ## What NOT to do
 
