@@ -27,7 +27,20 @@ list_onboarding_candidates({ "lookback_days": 30, "limit": 200 })
 Expect `{ candidates: [...], total: N }`. If empty, **invoke the `log_shadow_row` MCP tool** (provided by the `vizora-platform` server) with these arguments, then stop:
 
 - `log_name`: `"vizora-customer-lifecycle-shadow"`
-- `fields`: `{ "organization_id": null, "hermes_template": null, "hermes_reasoning": "heartbeat: 0 candidates", "input_signals": null }`
+- `fields`: a JSON object with EXACTLY these keys (the heartbeat-row schema is the same shape as the per-org schema, just with nulls):
+
+  ```json
+  {
+    "organization_id": null,
+    "tier": null,
+    "days_since_signup": null,
+    "hermes_template": null,
+    "hermes_reasoning": "heartbeat: 0 candidates",
+    "input_signals": null
+  }
+  ```
+
+  Do NOT use a `status` or `message` field. Do NOT collapse this to a smaller object. The 6 keys above are mandatory; nulls are valid values.
 
 This is a tool INVOCATION — call the function via the MCP transport, do NOT echo the JSON to a file. The server prepends `timestamp` and `run_id` automatically — don't include them in `fields`. The tool returns `{ written, line_count, timestamp, run_id }`; use the response to confirm the write.
 
@@ -47,17 +60,18 @@ You may use the LLM's reasoning where the heuristic is ambiguous (e.g., to weigh
 For each org, **invoke the `log_shadow_row` MCP tool** (provided by the `vizora-platform` server) with these arguments:
 
 - `log_name`: `"vizora-customer-lifecycle-shadow"`
-- `fields`: a JSON object with the per-org decision details:
-  ```json
-  {
-    "organization_id": "<id>",
-    "tier": "pro",
-    "days_since_signup": 4,
-    "hermes_template": "day3-upload-content",
-    "hermes_reasoning": "<≤120 chars — which signals drove the decision>",
-    "input_signals": { "milestone_flags": {...}, "nudges_sent": {...} }
-  }
-  ```
+- `fields`: a JSON object with these EXACT keys (no others, no synonyms — the comparison script reads these names verbatim):
+
+  | key | type | example |
+  |---|---|---|
+  | `organization_id` | string | `"d6d40186-..."` |
+  | `tier` | enum: free / starter / pro / enterprise | `"pro"` |
+  | `days_since_signup` | int | `4` |
+  | `hermes_template` | enum: day1-pair-screen / day3-upload-content / day7-create-schedule / none | `"day3-upload-content"` |
+  | `hermes_reasoning` | string ≤120 chars | `"day3 — screen paired, no content uploaded, day_3 nudge not yet sent, age=4d"` |
+  | `input_signals` | object: `{ milestone_flags: {...}, nudges_sent: {...} }` | (echo back what the read tool returned) |
+
+  Do NOT rename any key. Do NOT add a `status` or `message` or `summary` field — those are not part of the schema. Do NOT abbreviate any field. The 6 keys above are the ENTIRE list.
 
 This is a tool INVOCATION — call the function via the MCP transport. Do NOT use `echo`, `tee`, or any shell redirect. There is no fallback path; the tool is the only way to write the row.
 
