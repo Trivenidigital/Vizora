@@ -53,21 +53,18 @@ Match the existing `scoreToPriority` rule in `scripts/agents/support-triage.ts`:
 For each ticket, **invoke the `log_shadow_row` MCP tool** (provided by the `vizora` server) with these arguments:
 
 - `log_name`: `"vizora-support-triage-shadow"`
-- `fields`: a JSON object with the per-ticket score:
-  ```json
-  {
-    "ticket_id": "<id>",
-    "organization_id": "<org>",
-    "hermes_score": 0.72,
-    "hermes_priority": "high",
-    "hermes_reasoning": "<≤120 chars — which signals drove the score>",
-    "input_signals": {
-      "priority": "normal", "category": "bug_report", "ai_category": "device_offline",
-      "age_minutes": 127, "word_count": 42, "has_attachment": true,
-      "message_count": 2, "org_tier": "pro"
-    }
-  }
-  ```
+- `fields`: a JSON object with these EXACT keys (no others, no synonyms — the comparison script reads these names verbatim):
+
+  | key | type | example |
+  |---|---|---|
+  | `ticket_id` | string | `"r1abc"` |
+  | `organization_id` | string | `"org_..."` |
+  | `hermes_score` | number, 0.0-1.0 | `0.72` |
+  | `hermes_priority` | enum: urgent / high / normal / low | `"high"` |
+  | `hermes_reasoning` | string ≤120 chars | `"enterprise tier + 3h stale + device_offline category"` |
+  | `input_signals` | object: `{ priority, category, ai_category, age_minutes, word_count, has_attachment, message_count, org_tier }` | (echo back what the read tool returned) |
+
+  Do NOT rename any key. Do NOT add a `status`, `message`, or `summary` field — those are not part of the schema. Do NOT abbreviate any field. The 6 keys above are the ENTIRE list.
 
 This is a tool INVOCATION — call the function via the MCP transport. Do NOT use `echo`, `tee`, or any shell redirect. There is no fallback; the tool is the only way to write the row.
 
@@ -79,7 +76,7 @@ This is a tool INVOCATION — call the function via the MCP transport. Do NOT us
 
 `hermes_reasoning`: a terse human-readable phrase noting which signals dominated. Example: `"enterprise tier + 3h stale + device_offline category"`. Don't quote any ticket content.
 
-If the response had **zero** tickets, invoke `log_shadow_row` once with `fields` set to the heartbeat shape:
+If the response had **zero** tickets, invoke `log_shadow_row` once with `fields` set to the heartbeat shape (same 6 keys as the per-ticket schema, just with nulls):
 
 - `log_name`: `"vizora-support-triage-shadow"`
 - `fields`: `{ "ticket_id": null, "organization_id": null, "hermes_score": null, "hermes_priority": null, "hermes_reasoning": "heartbeat: 0 open requests", "input_signals": null }`
