@@ -1,6 +1,15 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { McpServer as McpServerCtor } from '@modelcontextprotocol/sdk/server/mcp.js';
+import {
+  ErrorCode,
+  GetPromptRequestSchema,
+  ListPromptsRequestSchema,
+  ListResourceTemplatesRequestSchema,
+  ListResourcesRequestSchema,
+  McpError,
+  ReadResourceRequestSchema,
+} from '@modelcontextprotocol/sdk/types.js';
 import type { McpRequestContext } from './auth/mcp-context';
 import { McpAuditService } from './audit/mcp-audit.service';
 import { ShadowLogService } from './audit/shadow-log.service';
@@ -69,9 +78,26 @@ export class McpService implements OnModuleInit {
    */
   buildServer(context: McpRequestContext | undefined): McpServer {
     const server = new McpServerCtor(
-      { name: 'vizora-mcp', version: '0.2.0' },
-      { capabilities: { tools: { listChanged: false } } },
+      { name: 'vizora-mcp', version: '0.3.0' },
+      {
+        capabilities: {
+          tools: { listChanged: false },
+          // Declare resources + prompts capabilities even though we
+          // expose zero of each. Hermes auto-wraps the spec methods
+          // (resources/list, resources/read, resources/templates/list,
+          // prompts/list, prompts/get) into agent-callable tools and
+          // probes them when an LLM is uncertain about which tool to
+          // use. Without these handlers the server returns "Method not
+          // found" — which gpt-4o-mini-class models handled by
+          // retrying in a loop until max-turns. Empty handlers + a
+          // proper "not found" on read/get gives clients a clean
+          // signal to stop probing.
+          resources: { listChanged: false },
+          prompts: { listChanged: false },
+        },
+      },
     );
+    this.registerSpecMethodStubs(server);
     this.registerTool(server, LIST_DISPLAYS_TOOL, context, this.displays);
     this.registerTool(server, LIST_OPEN_SUPPORT_REQUESTS_TOOL, context, this.support);
     this.registerTool(
@@ -113,6 +139,54 @@ export class McpService implements OnModuleInit {
     );
     this.registerTool(server, LOG_SHADOW_ROW_TOOL, context, this.shadowLog);
     return server;
+  }
+
+  /**
+   * Register empty handlers for the MCP-spec resources/prompts methods.
+   *
+   * Why: Hermes (and any spec-compliant MCP client) auto-discovers
+   * available tools by calling these methods at session start, and
+   * smaller LLMs reach for them again whenever they're uncertain
+   * which tool to use. Returning "Method not found" causes retry
+   * loops and ate gpt-4o-mini's full 60-turn budget on the
+   * customer-lifecycle cron. Empty arrays + spec-compliant
+   * "no such resource" errors stop the loops.
+   *
+   * Invariant: this server exposes ZERO resources, ZERO resource
+   * templates, ZERO prompts. The capability declaration in
+   * `buildServer()` advertises the surface; these handlers honor it
+   * with empty bodies. If we ever expose actual resources/prompts,
+   * THIS is the place to add them — not via a parallel handler.
+   */
+  private registerSpecMethodStubs(server: McpServer): void {
+    server.server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+      resources: [],
+    }));
+    server.server.setRequestHandler(
+      ListResourceTemplatesRequestSchema,
+      async () => ({ resourceTemplates: [] }),
+    );
+    server.server.setRequestHandler(ListPromptsRequestSchema, async () => ({
+      prompts: [],
+    }));
+    server.server.setRequestHandler(
+      ReadResourceRequestSchema,
+      async (req) => {
+        // Spec-compliant "no such resource" — InvalidParams (-32602)
+        // tells the client "your URI is wrong/unknown", which is
+        // unambiguous (NOT "method not found") and stops the loop.
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          `No resource at uri '${req.params.uri}'. This server exposes zero resources; use the registered tools instead.`,
+        );
+      },
+    );
+    server.server.setRequestHandler(GetPromptRequestSchema, async (req) => {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        `No prompt named '${req.params.name}'. This server exposes zero prompts; use the registered tools instead.`,
+      );
+    });
   }
 
   /**

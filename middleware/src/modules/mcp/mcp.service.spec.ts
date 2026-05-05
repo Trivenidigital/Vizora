@@ -85,4 +85,70 @@ describe('McpService.buildServer', () => {
       ),
     ).toBe(true);
   });
+
+  describe('MCP-spec method stubs (resources/prompts) — REGRESSION: Hermes auto-probed these and looped on Method-not-found responses, exhausting gpt-4o-mini\'s 60-turn budget on the customer-lifecycle cron', () => {
+    function build() {
+      const svc = new McpService(displays, support, organizations, audit, shadowLog);
+      const server = svc.buildServer(undefined);
+      // The underlying low-level Server stores method handlers in
+      // `_requestHandlers`. Stable across SDK 1.x; verified by
+      // grepping node_modules.
+      const handlers = (server.server as unknown as {
+        _requestHandlers: Map<string, (req: unknown, extra: unknown) => unknown>;
+      })._requestHandlers;
+      return handlers;
+    }
+
+    it('declares resources + prompts capabilities (so clients know to call list_*)', () => {
+      const svc = new McpService(displays, support, organizations, audit, shadowLog);
+      const server = svc.buildServer(undefined);
+      // Server exposes its capabilities via the underlying low-level
+      // Server's _capabilities private field.
+      const caps = (server.server as unknown as {
+        _capabilities: { tools?: object; resources?: object; prompts?: object };
+      })._capabilities;
+      expect(caps.tools).toBeDefined();
+      expect(caps.resources).toBeDefined();
+      expect(caps.prompts).toBeDefined();
+    });
+
+    it('returns empty arrays for resources/list, resources/templates/list, prompts/list (NOT Method-not-found — that\'s what caused the loop)', async () => {
+      const handlers = build();
+      const listResources = handlers.get('resources/list');
+      const listResourceTemplates = handlers.get('resources/templates/list');
+      const listPrompts = handlers.get('prompts/list');
+      expect(listResources).toBeDefined();
+      expect(listResourceTemplates).toBeDefined();
+      expect(listPrompts).toBeDefined();
+      const r = await listResources!({ params: {}, method: 'resources/list' }, {});
+      const rt = await listResourceTemplates!(
+        { params: {}, method: 'resources/templates/list' },
+        {},
+      );
+      const p = await listPrompts!({ params: {}, method: 'prompts/list' }, {});
+      expect(r).toEqual({ resources: [] });
+      expect(rt).toEqual({ resourceTemplates: [] });
+      expect(p).toEqual({ prompts: [] });
+    });
+
+    it('throws spec-compliant InvalidParams for resources/read and prompts/get (NOT Method-not-found — gives client clean signal "your URI is wrong" so it stops retrying)', async () => {
+      const handlers = build();
+      const readResource = handlers.get('resources/read');
+      const getPrompt = handlers.get('prompts/get');
+      expect(readResource).toBeDefined();
+      expect(getPrompt).toBeDefined();
+      await expect(
+        readResource!(
+          { params: { uri: 'file:///nope' }, method: 'resources/read' },
+          {},
+        ),
+      ).rejects.toMatchObject({ code: -32602 }); // InvalidParams
+      await expect(
+        getPrompt!(
+          { params: { name: 'nope' }, method: 'prompts/get' },
+          {},
+        ),
+      ).rejects.toMatchObject({ code: -32602 });
+    });
+  });
 });
