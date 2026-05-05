@@ -375,6 +375,64 @@ module.exports = {
       out_file: './logs/agent-support-triage-out.log',
       merge_logs: true,
     },
+    // -------- Hermes-driven shadow agents --------
+    // PM2 fires the runner script which invokes `hermes -z` with an explicit
+    // action prompt. We previously used `hermes cron` directly but the model
+    // produced different (worse) behavior in cron-firing context vs `-z`
+    // invocation: probe loops on get_prompt/read_resource and chat-text
+    // outputs instead of MCP tool calls. The runner+`-z` path
+    // demonstrably works end-to-end (audit log + JSONL both populate).
+    //
+    // The corresponding `hermes cron` jobs MUST be removed at deploy time
+    // to prevent duplicate firings:
+    //   ssh root@vizora.cloud 'hermes cron list | grep -B1 vizora-* | head'
+    //   hermes cron remove <id-customer-lifecycle>
+    //   hermes cron remove <id-support-triage>
+    {
+      name: 'hermes-vizora-customer-lifecycle',
+      script: 'bash',
+      args: [
+        '/opt/vizora/app/scripts/agents/hermes/run-hermes-skill.sh',
+        'vizora-customer-lifecycle',
+        // The exact prompt that worked end-to-end via `hermes -z`. Keeping
+        // it here (vs in the SKILL) is intentional — the SKILL is the
+        // SYSTEM-prompt-equivalent, this is the USER-prompt-equivalent
+        // that actually triggers execution. Leaving it null produces
+        // "discuss the task" behavior in cron context.
+        'Run the vizora-customer-lifecycle skill end-to-end now. Follow every step in SKILL.md exactly. Step 1: invoke list_onboarding_candidates on the vizora-platform MCP server. Step 2: for each candidate, invoke log_shadow_row on the vizora-platform server with the per-org decision (or one heartbeat invocation if zero candidates). End silently — no chat output.',
+      ],
+      instances: 1,
+      exec_mode: 'fork',
+      cron_restart: '*/30 * * * *',
+      autorestart: false,
+      watch: false,
+      max_memory_restart: '256M',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      max_size: '10M',
+      error_file: './logs/hermes-vizora-customer-lifecycle-error.log',
+      out_file: './logs/hermes-vizora-customer-lifecycle-out.log',
+      merge_logs: true,
+    },
+    {
+      name: 'hermes-vizora-support-triage',
+      script: 'bash',
+      args: [
+        '/opt/vizora/app/scripts/agents/hermes/run-hermes-skill.sh',
+        'vizora-support-triage',
+        'Run the vizora-support-triage skill end-to-end now. Follow every step in SKILL.md exactly. Step 1: invoke list_open_support_requests on the vizora MCP server. Step 4: for each ticket, invoke log_shadow_row on the vizora server with the per-ticket score (or one heartbeat invocation if zero tickets). End silently — no chat output.',
+      ],
+      instances: 1,
+      exec_mode: 'fork',
+      cron_restart: '*/5 * * * *',
+      autorestart: false,
+      watch: false,
+      max_memory_restart: '256M',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      max_size: '10M',
+      error_file: './logs/hermes-vizora-support-triage-error.log',
+      out_file: './logs/hermes-vizora-support-triage-out.log',
+      merge_logs: true,
+    },
     // Scaffold agents below — gated OFF by default. Flip the corresponding
     // *_ENABLED env var to true to activate once implementation lands.
     {
