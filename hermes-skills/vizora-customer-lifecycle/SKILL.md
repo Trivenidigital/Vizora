@@ -19,6 +19,8 @@ You are running as a scheduled Vizora customer-lifecycle agent in **shadow mode*
 
 ### 1. Pull onboarding candidates
 
+Use the `vizora-platform` MCP server (NOT the `vizora` server — that one carries a per-org token and `list_onboarding_candidates` will reject it with INVALID_INPUT).
+
 ```
 list_onboarding_candidates({ "lookback_days": 30, "limit": 200 })
 ```
@@ -31,14 +33,14 @@ Expect `{ candidates: [...], total: N }`. If empty, write a heartbeat and stop:
 
 ### 2. Decide template per org
 
-For each candidate, pick exactly one of `day1-pair-screen`, `day3-upload-content`, `day7-create-schedule`, or `none`. Match the existing PM2 cron's heuristic (`scripts/agents/lib/ai.ts` → `heuristic-agent-ai.ts`):
+For each candidate, pick exactly one of `day1-pair-screen`, `day3-upload-content`, `day7-create-schedule`, or `none`. **The windows are BOUNDED** — match the existing PM2 cron's `suggestNudge` (`scripts/agents/lib/ai.ts`) exactly. An org that has missed all three windows (e.g., 25 days old, never paired a screen) gets `none` — we do NOT retroactively send a day1 nudge to a long-stalled org. The PM2 cron's auto-complete branch closes the loop on those.
 
-- **`days_since_signup < 1`** → `none` (too early; welcome window).
-- **NOT `screen_paired`** AND `days_since_signup >= 1` AND NOT `nudges_sent.day1` → `day1-pair-screen`.
-- **`screen_paired`** AND NOT `content_uploaded` AND `days_since_signup >= 3` AND NOT `nudges_sent.day3` → `day3-upload-content`.
-- **`content_uploaded`** AND NOT `schedule_created` AND `days_since_signup >= 7` AND NOT `nudges_sent.day7` → `day7-create-schedule`.
-- **`days_since_signup >= 30`** → `none` (will be auto-completed by the PM2 cron; you don't act).
-- Otherwise → `none`.
+- **`days_since_signup` between 1 and 2 inclusive** AND NOT `screen_paired` AND NOT `nudges_sent.day1` → `day1-pair-screen`.
+- **`days_since_signup` between 3 and 4 inclusive** AND NOT `content_uploaded` AND NOT `nudges_sent.day3` → `day3-upload-content`.
+- **`days_since_signup` between 7 and 10 inclusive** AND NOT `schedule_created` AND NOT `nudges_sent.day7` → `day7-create-schedule`.
+- Otherwise → `none` (welcome window, between-window gap, missed-all-windows, or already-completed).
+
+You may use the LLM's reasoning where the heuristic is ambiguous (e.g., to weigh a pro-tier org vs a free-tier org if both fall on the same boundary day). But the output template MUST be one of the four exact strings above. No paraphrasing.
 
 You may use the LLM's reasoning where the heuristic is ambiguous (e.g., to weigh a pro-tier early-stalled org against a free-tier later-stalled one). But the output template MUST be one of the four exact strings above. No paraphrasing.
 

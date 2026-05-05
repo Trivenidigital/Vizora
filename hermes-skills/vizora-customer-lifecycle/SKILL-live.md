@@ -33,14 +33,13 @@ If the response is empty, write a heartbeat to `/var/log/hermes/vizora-customer-
 
 ### 2. For each candidate, decide the action
 
-Score by the same rules as `SKILL.md` (shadow). The decision tree:
+Score by the same rules as `SKILL.md` (shadow). **The nudge windows are BOUNDED** — match the existing PM2 cron's `suggestNudge` (`scripts/agents/lib/ai.ts`) exactly. An org that has missed all three windows (e.g., 25 days old, never paired a screen) does NOT get a retroactive day1 nudge — it gets `none`, and once it crosses 30 days it gets `auto_complete`.
 
-- **`days_since_signup >= 30`** (stale signup, won't complete) → action = `auto_complete`. The PM2 cron's heuristic does this for any org past the lookback window — match it exactly.
-- **`days_since_signup < 1`** → action = `none` (welcome window).
-- **NOT `screen_paired`** AND `days >= 1` AND NOT `nudges_sent.day1` → action = `send_nudge`, key = `day1-pair-screen`.
-- **`screen_paired`** AND NOT `content_uploaded` AND `days >= 3` AND NOT `nudges_sent.day3` → action = `send_nudge`, key = `day3-upload-content`.
-- **`content_uploaded`** AND NOT `schedule_created` AND `days >= 7` AND NOT `nudges_sent.day7` → action = `send_nudge`, key = `day7-create-schedule`.
-- Otherwise → action = `none`.
+- **`days_since_signup >= 30`** → action = `auto_complete` (stale signup; matches the PM2 cron's auto-complete branch).
+- **`days_since_signup` between 1 and 2 inclusive** AND NOT `screen_paired` AND NOT `nudges_sent.day1` → action = `send_nudge`, key = `day1-pair-screen`.
+- **`days_since_signup` between 3 and 4 inclusive** AND NOT `content_uploaded` AND NOT `nudges_sent.day3` → action = `send_nudge`, key = `day3-upload-content`.
+- **`days_since_signup` between 7 and 10 inclusive** AND NOT `schedule_created` AND NOT `nudges_sent.day7` → action = `send_nudge`, key = `day7-create-schedule`.
+- Otherwise → action = `none` (welcome window <1d, between-window gap, missed-all-windows but <30d, or already-completed).
 
 ### 3. Execute the action via MCP
 
