@@ -6,6 +6,7 @@ import { DisplaysModule } from '../displays/displays.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
 import { SupportModule } from '../support/support.module';
 import { McpAuditService } from './audit/mcp-audit.service';
+import { ShadowLogService } from './audit/shadow-log.service';
 import { McpAuthGuard } from './auth/mcp-auth.guard';
 import { McpRateLimitGuard } from './auth/mcp-rate-limit.guard';
 import { McpTokenService } from './auth/mcp-token.service';
@@ -39,7 +40,7 @@ import { McpTokensAdminController } from './admin/mcp-tokens.controller';
     SupportModule,
   ],
   controllers: [McpController, McpTokensAdminController],
-  providers: [McpService, McpTokenService, McpAuthGuard, McpRateLimitGuard, McpAuditService],
+  providers: [McpService, McpTokenService, McpAuthGuard, McpRateLimitGuard, McpAuditService, ShadowLogService],
   exports: [McpService, McpTokenService],
 })
 export class McpModule {}

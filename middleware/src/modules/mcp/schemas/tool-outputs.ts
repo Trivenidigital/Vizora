@@ -162,3 +162,16 @@ export const SendLifecycleNudgeEmailResult = z.object({
   ]),
 });
 export type SendLifecycleNudgeEmailResultT = z.infer<typeof SendLifecycleNudgeEmailResult>;
+
+// ── Shadow log writer ─────────────────────────────────────────────────────
+
+export const LogShadowRowResult = z.object({
+  log_name: z.string(),
+  written: z.boolean(),
+  line_count: z.number().int(),
+  /** Echoed-back server-generated values so the agent can include them
+   * in any subsequent reasoning / chained writes if useful. */
+  timestamp: z.string().datetime(),
+  run_id: z.string(),
+});
+export type LogShadowRowResultT = z.infer<typeof LogShadowRowResult>;

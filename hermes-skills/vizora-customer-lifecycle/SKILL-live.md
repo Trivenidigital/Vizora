@@ -15,7 +15,7 @@ This file is named `SKILL-live.md` in the repo. The cutover is performed by scp'
 2. **Structural signals only for scoring.** The MCP read tool already strips org name, admin email, and billing detail. You receive only `tier`, `days_since_signup`, `milestone_flags`, `nudges_sent`. Do NOT fabricate or infer email content.
 3. **One MCP read call per cron firing.** Call `list_onboarding_candidates` exactly once. Don't paginate.
 4. **One write per ticket per cron firing.** For each candidate, you make at most ONE of: `send_lifecycle_nudge_email`, OR `auto_complete_org_onboarding`, OR no write (template = `none`). Do NOT call both for the same org in the same firing.
-5. **Audit: append JSONL.** Every decision (including `none` and dry-run results) gets one line in `/var/log/hermes/vizora-customer-lifecycle-live.jsonl`. The mcp_audit_log is the server-side trail; this is the agent-side trail.
+5. **Audit: log via the `log_shadow_row` MCP tool.** Every decision (including `none` and dry-run results) gets one row written via `log_shadow_row({ log_name: "vizora-customer-lifecycle-live", fields: {...} })`. Server prepends `timestamp` + `run_id`. The mcp_audit_log is the server-side trail; the JSONL the tool writes is the agent-side trail.
 6. **Trust the server's `LIFECYCLE_LIVE` gate.** If the server returns `reason: "dry_run"`, that means `LIFECYCLE_LIVE` is unset on the server — emails were intentionally NOT sent. Log it and move on. Do not retry.
 7. **Trust the server's dedup.** If the server returns `reason: "already_sent"`, the dayN_NudgeSentAt column was already set. Don't try to re-send via a different tool.
 
@@ -29,7 +29,7 @@ Use the `vizora-platform` MCP server (NOT the `vizora` server — that one carri
 list_onboarding_candidates({ "lookback_days": 30, "limit": 200 })
 ```
 
-If the response is empty, write a heartbeat to `/var/log/hermes/vizora-customer-lifecycle-live.jsonl` and stop. Do NOT call any write tool.
+If the response is empty, log a heartbeat row via `log_shadow_row({ log_name: "vizora-customer-lifecycle-live", fields: { "organization_id": null, "action": "none", "hermes_reasoning": "heartbeat: 0 candidates" } })` and stop. Do NOT call any write tool.
 
 ### 2. For each candidate, decide the action
 
@@ -74,19 +74,32 @@ Idempotent. The org will stop showing up in `list_onboarding_candidates` after t
 
 **For `action == 'none'`:**
 
-No tool call. Just write the JSONL row.
+No tool call other than the audit log (next step).
 
-### 4. Append a JSONL audit row per candidate
+### 4. Log a JSONL audit row per candidate via the MCP tool
 
-For every candidate (including `action == 'none'`):
+For every candidate (including `action == 'none'`), call:
 
-```json
-{"timestamp":"<ISO8601>","run_id":"<epoch-seconds>","organization_id":"<id>","tier":"pro","days_since_signup":4,"action":"send_nudge","nudge_key":"day3-upload-content","tool_result":{"sent":true,"reason":"sent","recipient_count":1,"recipient_hashes":["abcd1234..."]},"hermes_reasoning":"<<=120 chars>>"}
+```
+log_shadow_row({
+  "log_name": "vizora-customer-lifecycle-live",
+  "fields": {
+    "organization_id": "<id>",
+    "tier": "pro",
+    "days_since_signup": 4,
+    "action": "send_nudge",
+    "nudge_key": "day3-upload-content",
+    "tool_result": { "sent": true, "reason": "sent", "recipient_count": 1, "recipient_hashes": ["abcd1234..."] },
+    "hermes_reasoning": "<≤120 chars>"
+  }
+})
 ```
 
-For `action == 'none'`: `"tool_result": null`, reasoning explains why (e.g., `"day=15 stalled at content-upload but day3 nudge already sent"`).
+Server prepends `timestamp` + `run_id`. log_name MUST be `vizora-customer-lifecycle-live` (not `-shadow`) for the live skill.
 
-For `action == 'auto_complete'`: `"tool_result": {"completed": true}`, reasoning notes age (e.g., `"age=42d, no completion — auto-closing"`).
+For `action == 'none'`: `tool_result: null`, reasoning explains why (e.g., `"day=15 stalled at content-upload but day3 nudge already sent"`).
+
+For `action == 'auto_complete'`: `tool_result: { "completed": true }`, reasoning notes age (e.g., `"age=42d, no completion — auto-closing"`).
 
 `hermes_reasoning`: ≤120 chars, terse, no org names or email content.
 

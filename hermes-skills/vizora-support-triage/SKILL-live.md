@@ -25,7 +25,7 @@ This file is named `SKILL-live.md` in the repo. The cutover is performed by scp'
 list_open_support_requests({ "limit": 50 })
 ```
 
-If the response is empty (`total: 0`), write a heartbeat line to `/var/log/hermes/vizora-support-triage-live.jsonl` and stop. Do NOT call any write tool.
+If the response is empty (`total: 0`), log a heartbeat row via `log_shadow_row` (with `log_name: "vizora-support-triage-live"` and `fields: { "ticket_id": null, "hermes_reasoning": "heartbeat: 0 open requests" }`) and stop. Do NOT call any other write tool.
 
 ### 2. Score each ticket (same formula as shadow)
 
@@ -90,15 +90,27 @@ create_support_message({
 - `normal` priority: `"Triage: this request is in the queue. Expected response within 24 business hours. Reply if anything changes."`
 - `low` priority: `"Triage: this request is logged and will be addressed in standard order. Reply if the situation becomes time-sensitive."`
 
-### 4. Append a JSONL audit row per ticket
+### 4. Log a JSONL audit row per ticket via the MCP tool
 
-Even though the writes themselves are tracked in `mcp_audit_log` (server-side), keep a local JSONL trail for ops review at `/var/log/hermes/vizora-support-triage-live.jsonl`:
+Even though the support-write calls themselves are tracked in `mcp_audit_log` (server-side), keep a local JSONL trail for ops review:
 
-```json
-{"timestamp":"<ISO8601>","run_id":"<short>","ticket_id":"<id>","organization_id":"<org>","hermes_score":0.72,"hermes_priority":"high","priority_changed":true,"ai_category_set":true,"message_posted":true,"input_signals":{...same as shadow...}}
+```
+log_shadow_row({
+  "log_name": "vizora-support-triage-live",
+  "fields": {
+    "ticket_id": "<id>",
+    "organization_id": "<org>",
+    "hermes_score": 0.72,
+    "hermes_priority": "high",
+    "priority_changed": true,
+    "ai_category_set": true,
+    "message_posted": true,
+    "input_signals": { /* same shape as shadow */ }
+  }
+})
 ```
 
-Use `echo '<line>' >> /var/log/hermes/vizora-support-triage-live.jsonl`. Append only.
+Server prepends `timestamp` + `run_id`. log_name MUST be `vizora-support-triage-live` (not `-shadow`) for the live skill.
 
 ## What NOT to do
 
