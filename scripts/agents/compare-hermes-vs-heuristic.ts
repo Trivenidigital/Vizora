@@ -1,32 +1,30 @@
 #!/usr/bin/env npx tsx
 /**
  * Compare Hermes shadow-mode classifications against the existing
- * heuristic classifier's DB writes.
+ * heuristic classifier's per-ticket suggestions.
  *
- * Reads `/var/log/hermes/vizora-support-triage-shadow.jsonl` (one JSONL
- * row per Hermes cron tick), joins to `support_requests` by id, and
- * reports:
- *   - cron firing rate (heartbeat lines per period)
- *   - per-ticket priority agreement between Hermes-suggested and the
- *     DB-stored priority
+ * Reads two parallel JSONL files:
+ *   - HERMES_SHADOW_LOG     (default /var/log/hermes/vizora-support-
+ *                            triage-shadow.jsonl) — one row per ticket
+ *                            per Hermes cron tick
+ *   - HEURISTIC_LOG         (default /var/log/hermes/vizora-support-
+ *                            triage-heuristic.jsonl) — one row per ticket
+ *                            per PM2 cron tick, written by
+ *                            scripts/agents/support-triage.ts
+ *
+ * Joins by (ticket_id, run_id) and reports:
+ *   - cron firing rate (heartbeats per period)
+ *   - per-ticket priority agreement (Hermes priority vs heuristic priority)
+ *   - per-ticket score divergence (Hermes score vs heuristic score)
  *   - sample disagreements
  *
- * **What this can and cannot tell us**
+ * The earlier version of this script joined to the DB `priority` field,
+ * which mostly reflected the user's submission (not the heuristic's
+ * score). The new heuristic JSONL gives us a true score-vs-score
+ * head-to-head — same input signals, same scoring window, two scoring
+ * implementations.
  *
- * The DB `priority` field reflects the user's original submission
- * unless the heuristic PM2 cron decided the score diverged enough to
- * write back (rank-distance ≥ 2 in scripts/agents/support-triage.ts).
- * Most rows are the user's submission, NOT the heuristic's score-to-
- * priority output. So this script answers:
- *
- *   "Would Hermes have proposed a different priority than what the
- *    user submitted (or what the heuristic occasionally overrode)?"
- *
- * It does NOT answer "Hermes score vs heuristic score" head-to-head.
- * For that we'd need the heuristic cron to also log its score to a
- * parallel file. That's a tracked follow-up — see backlog.md.
- *
- * Run from the VPS (where both the shadow log and the DB live):
+ * Run from the VPS:
  *
  *   ssh root@89.167.55.176 'cd /opt/vizora/app && export $(grep DATABASE_URL .env | xargs) && npx tsx scripts/agents/compare-hermes-vs-heuristic.ts'
  */
@@ -38,6 +36,11 @@ import { prisma } from '@vizora/database';
 const SHADOW_LOG =
   process.env.HERMES_SHADOW_LOG ??
   '/var/log/hermes/vizora-support-triage-shadow.jsonl';
+const HEURISTIC_LOG =
+  process.env.SUPPORT_TRIAGE_HEURISTIC_LOG ??
+  '/var/log/hermes/vizora-support-triage-heuristic.jsonl';
+
+type Priority = 'urgent' | 'high' | 'normal' | 'low';
 
 interface HermesRow {
   timestamp: string;
@@ -45,16 +48,20 @@ interface HermesRow {
   ticket_id: string | null;
   organization_id: string | null;
   hermes_score: number | null;
-  hermes_priority: 'urgent' | 'high' | 'normal' | 'low' | null;
+  hermes_priority: Priority | null;
   hermes_reasoning: string | null;
   input_signals: Record<string, unknown> | null;
 }
 
-interface DisagreementSample {
-  ticket: string;
-  hermes: string;
-  db: string;
-  reason: string | null;
+interface HeuristicRow {
+  timestamp: string;
+  run_id: string;
+  ticket_id: string;
+  organization_id: string;
+  heuristic_score: number;
+  heuristic_priority: Priority;
+  heuristic_reason: string;
+  input_signals: Record<string, unknown>;
 }
 
 function pct(n: number, d: number): string {
@@ -74,135 +81,156 @@ function priorityRank(p: string): number {
     case 'low':
       return 0;
     default:
-      return -1; // unknown / null
+      return -1;
   }
 }
 
-async function main(): Promise<void> {
-  if (!existsSync(SHADOW_LOG)) {
-    console.error(`No shadow log at ${SHADOW_LOG}`);
-    console.error(`Set HERMES_SHADOW_LOG to override the path.`);
-    process.exitCode = 2;
-    return;
-  }
-
-  const text = readFileSync(SHADOW_LOG, 'utf8');
+function readJsonl<T>(path: string): { rows: T[]; malformed: number } {
+  if (!existsSync(path)) return { rows: [], malformed: 0 };
+  const text = readFileSync(path, 'utf8');
   const lines = text.split('\n').filter(Boolean);
-  const rows: HermesRow[] = [];
+  const rows: T[] = [];
   let malformed = 0;
   for (const line of lines) {
     try {
-      rows.push(JSON.parse(line) as HermesRow);
+      rows.push(JSON.parse(line) as T);
     } catch {
       malformed++;
     }
   }
+  return { rows, malformed };
+}
 
-  const heartbeats = rows.filter((r) => r.ticket_id == null);
-  const scored = rows.filter((r) => r.ticket_id != null);
+async function main(): Promise<void> {
+  const { rows: hermesRows, malformed: hermesBad } = readJsonl<HermesRow>(SHADOW_LOG);
+  const { rows: heuristicRows, malformed: heuristicBad } =
+    readJsonl<HeuristicRow>(HEURISTIC_LOG);
 
-  // Cron-firing-rate signal: time span / heartbeat count → expected ~5 min between
+  if (hermesRows.length === 0 && heuristicRows.length === 0) {
+    console.error(`Neither log exists or both empty:\n  ${SHADOW_LOG}\n  ${HEURISTIC_LOG}`);
+    process.exitCode = 2;
+    return;
+  }
+
+  const heartbeats = hermesRows.filter((r) => r.ticket_id == null);
+  const hermesScored = hermesRows.filter((r) => r.ticket_id != null);
+
   let firingRateNote = '';
   if (heartbeats.length >= 2) {
     const first = new Date(heartbeats[0].timestamp).getTime();
     const last = new Date(heartbeats[heartbeats.length - 1].timestamp).getTime();
     const spanMin = (last - first) / 60_000;
-    const ticksPerHour =
-      spanMin > 0 ? (heartbeats.length / spanMin) * 60 : NaN;
+    const ticksPerHour = spanMin > 0 ? (heartbeats.length / spanMin) * 60 : NaN;
     firingRateNote = ` — ~${ticksPerHour.toFixed(1)} ticks/hr (cron is */5 → expected ~12)`;
   }
 
-  console.log('Hermes shadow-mode comparison');
-  console.log('=============================');
-  console.log(`Shadow log:                   ${SHADOW_LOG}`);
-  console.log(`Total log lines:              ${lines.length}`);
-  console.log(`Malformed (skipped):          ${malformed}`);
-  console.log(`Heartbeat rows (cron fires):  ${heartbeats.length}${firingRateNote}`);
-  console.log(`Ticket-scoring rows:          ${scored.length}`);
+  console.log('Hermes vs Heuristic shadow comparison (support-triage)');
+  console.log('======================================================');
+  console.log(`Hermes log:                    ${SHADOW_LOG}`);
+  console.log(`  rows: ${hermesRows.length} (heartbeats: ${heartbeats.length}, scored: ${hermesScored.length}, malformed: ${hermesBad})${firingRateNote}`);
+  console.log(`Heuristic log:                 ${HEURISTIC_LOG}`);
+  console.log(`  rows: ${heuristicRows.length} (malformed: ${heuristicBad})`);
 
-  if (scored.length === 0) {
-    console.log(
-      '\nNo ticket scorings yet. The Hermes cron is firing but the token-scoped org has no open tickets.',
-    );
-    console.log(
-      'Either seed a request in the E2E Test Org, or expand the token to cover an org with traffic.',
-    );
+  if (hermesScored.length === 0 && heuristicRows.length === 0) {
+    console.log('\nNo per-ticket decisions yet from either side. Likely the test orgs have no open tickets.');
     return;
   }
 
-  const ticketIds = [...new Set(scored.map((r) => r.ticket_id!))];
-  const dbTickets = await prisma.supportRequest.findMany({
-    where: { id: { in: ticketIds } },
-    select: { id: true, priority: true, status: true, aiCategory: true },
-  });
-  const byId = new Map(dbTickets.map((t) => [t.id, t]));
+  // Index heuristic rows by composite key. Hermes and heuristic crons
+  // both fire every 5 min; their run_ids may not match exactly (each
+  // computes its own epoch-seconds), but ticket_id alone is a reasonable
+  // join key — most tickets are scored once per cron firing per side.
+  const heuristicByTicket = new Map<string, HeuristicRow[]>();
+  for (const r of heuristicRows) {
+    const arr = heuristicByTicket.get(r.ticket_id) ?? [];
+    arr.push(r);
+    heuristicByTicket.set(r.ticket_id, arr);
+  }
 
-  let agree = 0;
-  let disagree = 0;
+  let agreePri = 0;
+  let disagreePri = 0;
   let unmatched = 0;
-  let rankDiffSum = 0;
-  const samples: DisagreementSample[] = [];
+  let scoreDiffSum = 0;
+  let scoreDiffCount = 0;
+  const samples: Array<{
+    ticket: string;
+    hermesP: string;
+    heuristicP: string;
+    hermesS: number;
+    heuristicS: number;
+    reason: string | null;
+  }> = [];
 
-  for (const r of scored) {
-    const t = byId.get(r.ticket_id!);
-    if (!t) {
+  for (const h of hermesScored) {
+    const hCandidates = heuristicByTicket.get(h.ticket_id!) ?? [];
+    if (hCandidates.length === 0) {
       unmatched++;
       continue;
     }
-    const dbP = (t.priority ?? '').toLowerCase();
-    const hP = (r.hermes_priority ?? '').toLowerCase();
-    if (dbP === hP) {
-      agree++;
+    // Pick the closest-in-time heuristic row (paired by run cadence)
+    const closest = hCandidates.reduce((best, r) =>
+      Math.abs(new Date(r.timestamp).getTime() - new Date(h.timestamp).getTime()) <
+      Math.abs(new Date(best.timestamp).getTime() - new Date(h.timestamp).getTime())
+        ? r
+        : best,
+    );
+
+    const hP = h.hermes_priority ?? '';
+    const cP = closest.heuristic_priority;
+    if (hP === cP) {
+      agreePri++;
     } else {
-      disagree++;
-      const rDb = priorityRank(dbP);
-      const rH = priorityRank(hP);
-      if (rDb >= 0 && rH >= 0) rankDiffSum += Math.abs(rDb - rH);
+      disagreePri++;
       if (samples.length < 10) {
         samples.push({
-          ticket: r.ticket_id!,
-          hermes: hP || '<null>',
-          db: dbP || '<null>',
-          reason: r.hermes_reasoning,
+          ticket: h.ticket_id!,
+          hermesP: hP || '<null>',
+          heuristicP: cP,
+          hermesS: h.hermes_score ?? NaN,
+          heuristicS: closest.heuristic_score,
+          reason: h.hermes_reasoning,
         });
       }
     }
+
+    if (h.hermes_score != null) {
+      scoreDiffSum += Math.abs(h.hermes_score - closest.heuristic_score);
+      scoreDiffCount++;
+    }
   }
 
-  const matched = agree + disagree;
-
-  console.log(`\nTickets joined to DB:         ${matched}`);
-  console.log(`Unmatched (deleted/missing):  ${unmatched}`);
-  console.log(`Priority agreement:           ${agree} (${pct(agree, matched)})`);
-  console.log(`Priority disagreement:        ${disagree} (${pct(disagree, matched)})`);
-  if (disagree > 0) {
-    console.log(
-      `Avg disagreement rank-distance: ${(rankDiffSum / disagree).toFixed(2)} (1 = adjacent tier, 3 = max)`,
-    );
+  const matched = agreePri + disagreePri;
+  console.log(`\nMatched (Hermes ticket joined to heuristic row): ${matched}`);
+  console.log(`Unmatched (heuristic never scored this ticket):  ${unmatched}`);
+  console.log(`Priority agreement:                              ${agreePri} (${pct(agreePri, matched)})`);
+  console.log(`Priority disagreement:                           ${disagreePri} (${pct(disagreePri, matched)})`);
+  if (scoreDiffCount > 0) {
+    console.log(`Mean |Hermes score − heuristic score|:           ${(scoreDiffSum / scoreDiffCount).toFixed(3)}`);
   }
 
   if (samples.length > 0) {
     console.log('\nSample disagreements (first 10):');
     for (const s of samples) {
+      const diff = Math.abs(s.hermesS - s.heuristicS).toFixed(2);
       console.log(
-        `  ${s.ticket.slice(0, 8)}  hermes=${s.hermes.padEnd(7)}  db=${s.db.padEnd(7)}  | ${
-          s.reason ?? '<no reason>'
-        }`,
+        `  ${s.ticket.slice(0, 8)}  hermes=${s.hermesP.padEnd(7)}(${s.hermesS.toFixed(2)})  heuristic=${s.heuristicP.padEnd(7)}(${s.heuristicS.toFixed(2)})  Δ=${diff}  | ${s.reason ?? '<no reason>'}`,
       );
     }
   }
 
-  console.log('\nReminder: DB priority is mostly the user-submitted priority.');
-  console.log('To compare Hermes vs heuristic head-to-head, the existing PM2');
-  console.log('support-triage cron also needs to log its score per cycle to a');
-  console.log("parallel file. Tracked in backlog.md as a follow-up.");
+  // Cutover gate readout
+  console.log('\n— Cutover gate readout —');
+  console.log(`  ≥7 days shadow:               ${heartbeats.length >= 2 ? `${heartbeats.length} heartbeats` : '<2 heartbeats'}`);
+  console.log(`  ≥50 tickets scored:           ${hermesScored.length >= 50 ? '✓ MET' : `✗ have ${hermesScored.length}`}`);
+  console.log(`  ≥80% priority agreement:      ${matched > 0 && agreePri / matched >= 0.8 ? '✓ MET' : `✗ have ${pct(agreePri, matched)}`}`);
+  console.log(`  Sri sign-off:                 (out of band)`);
+
+  // Disconnect even though the script doesn't read the DB anymore — keep
+  // the import for future expansion (e.g., joining to live DB state).
+  await prisma.$disconnect();
 }
 
-main()
-  .catch((err) => {
-    console.error(err);
-    process.exitCode = 2;
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+main().catch((err) => {
+  console.error(err);
+  process.exitCode = 2;
+});

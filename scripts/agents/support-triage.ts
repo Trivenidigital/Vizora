@@ -21,6 +21,8 @@
  */
 
 import 'dotenv/config';
+import { appendFileSync, mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { prisma, classifyCategoryV2 } from '@vizora/database';
 import type { SupportRequest, SupportMessage } from '@vizora/database';
 import { readAgentState, writeAgentState } from './lib/state.js';
@@ -37,6 +39,14 @@ import type {
 } from './lib/types.js';
 
 const AGENT = 'support-triage';
+// Parallel JSONL for shadow comparison against the Hermes-driven
+// vizora-support-triage skill. Sibling file to
+// /var/log/hermes/vizora-support-triage-shadow.jsonl so
+// scripts/agents/compare-hermes-vs-heuristic.ts can join by
+// (ticket_id, run_id) for true score-vs-score head-to-head.
+const HEURISTIC_LOG_PATH =
+  process.env.SUPPORT_TRIAGE_HEURISTIC_LOG ??
+  '/var/log/hermes/vizora-support-triage-heuristic.jsonl';
 // Must match middleware/src/modules/agents/agent-state.service.ts AGENT_TO_FAMILY
 const FAMILY = 'ops' as const;
 const BATCH_LIMIT = 20;
@@ -164,6 +174,49 @@ function scoreToPriority(score: number): TicketPriority {
   return 'low';
 }
 
+/**
+ * Append one JSONL row per ticket reflecting what the heuristic
+ * classifier suggested THIS cycle. Sibling to the Hermes shadow log so
+ * `compare-hermes-vs-heuristic.ts` can join by (ticket_id, run_id) for
+ * a true score-vs-score comparison.
+ *
+ * Failures here are non-fatal — the cron's primary job is the DB
+ * mutation, not the comparison log.
+ */
+function logHeuristicSuggestion(
+  runId: string,
+  ticket: TicketRow,
+  score: number,
+  reason: string,
+  signal: TicketSignal,
+): void {
+  try {
+    mkdirSync(dirname(HEURISTIC_LOG_PATH), { recursive: true });
+    const row = {
+      timestamp: new Date().toISOString(),
+      run_id: runId,
+      ticket_id: ticket.id,
+      organization_id: ticket.organizationId,
+      heuristic_score: Number(score.toFixed(4)),
+      heuristic_priority: scoreToPriority(score),
+      heuristic_reason: reason,
+      input_signals: {
+        priority: signal.priority,
+        category: signal.category,
+        ai_category: ticket.aiCategory ?? null,
+        age_minutes: signal.ageMinutes,
+        word_count: signal.wordCount,
+        has_attachment: signal.hasAttachment,
+        message_count: ticket._count.messages,
+        org_tier: signal.orgTier,
+      },
+    };
+    appendFileSync(HEURISTIC_LOG_PATH, JSON.stringify(row) + '\n');
+  } catch (err) {
+    log(`heuristic log append failed for ticket=${ticket.id}: ${err instanceof Error ? err.message : err}`);
+  }
+}
+
 async function writeAiCategory(
   ticket: TicketRow,
   category: TicketCategoryV2,
@@ -209,6 +262,10 @@ async function maybeUpdatePriority(
 
 async function main(): Promise<void> {
   const started = Date.now();
+  // run_id matches the Hermes shadow's epoch-seconds shape so the
+  // comparison script can join rows that were emitted by the same
+  // cron cadence (Hermes also fires every 5 min via hermes cron).
+  const runId = String(Math.floor(started / 1000));
   log('Starting support-triage cycle');
 
   let orgIds: string[];
@@ -251,12 +308,23 @@ async function main(): Promise<void> {
       continue;
     }
 
-    // Index tickets by id for quick lookup
+    // Index tickets and signals by id for quick lookup
     const byId = new Map(tickets.map(t => [t.id, t]));
+    const signalById = new Map(signals.map(s => [s.id, s]));
 
     for (const r of ranked) {
       const ticket = byId.get(r.id);
       if (!ticket) continue;
+      const signal = signalById.get(r.id);
+
+      // Log the heuristic's suggestion BEFORE we mutate. Captures one
+      // JSONL row per ticket per cron firing, regardless of whether
+      // the subsequent writes succeed — keeps the comparison dataset
+      // complete even if writeAgentMessage / maybeUpdatePriority race
+      // with another writer.
+      if (signal) {
+        logHeuristicSuggestion(runId, ticket, r.score, r.reason, signal);
+      }
 
       const msg = await writeAgentMessage(ticket, r.score, r.reason);
       if (msg) triaged++;

@@ -25,6 +25,8 @@
  */
 
 import 'dotenv/config';
+import { appendFileSync, mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { prisma } from '@vizora/database';
 import type { Organization, OrganizationOnboarding, User } from '@vizora/database';
 import {
@@ -43,6 +45,14 @@ import type {
 
 const AGENT = 'customer-lifecycle';
 const FAMILY = 'customer' as const;
+// Parallel JSONL for shadow comparison against the Hermes-driven
+// vizora-customer-lifecycle skill. Sibling to
+// /var/log/hermes/vizora-customer-lifecycle-shadow.jsonl so
+// scripts/agents/compare-lifecycle-hermes-vs-heuristic.ts can join
+// per-org for true template-vs-template head-to-head.
+const HEURISTIC_LOG_PATH =
+  process.env.CUSTOMER_LIFECYCLE_HEURISTIC_LOG ??
+  '/var/log/hermes/vizora-customer-lifecycle-heuristic.jsonl';
 
 const MAX_EMAILS_PER_RUN = 50;
 const CANDIDATE_LIMIT = 200;
@@ -75,6 +85,53 @@ const NUDGE_SUBJECT: Record<NudgeKey, string> = {
 
 function log(msg: string): void {
   opsLog(AGENT, msg);
+}
+
+/**
+ * Append one JSONL row per org reflecting what the heuristic suggested
+ * THIS cycle. Sibling to the Hermes shadow log so
+ * `compare-lifecycle-hermes-vs-heuristic.ts` can join per-org for
+ * template-vs-template head-to-head.
+ *
+ * Logs every candidate (including 'none' suggestions and stale-org
+ * auto-complete decisions) so the comparison dataset is complete.
+ *
+ * Failures here are non-fatal — the cron's primary job is the email
+ * decision pipeline, not the comparison log.
+ */
+function logHeuristicSuggestion(
+  runId: string,
+  orgId: string,
+  signal: OnboardingSignal,
+  template: string,
+  action: 'send_nudge' | 'auto_complete' | 'none',
+  reason: string,
+): void {
+  try {
+    mkdirSync(dirname(HEURISTIC_LOG_PATH), { recursive: true });
+    const row = {
+      timestamp: new Date().toISOString(),
+      run_id: runId,
+      organization_id: orgId,
+      tier: signal.tier,
+      days_since_signup: signal.daysSinceSignup,
+      heuristic_template: template,
+      heuristic_action: action,
+      heuristic_reason: reason,
+      input_signals: {
+        milestone_flags: {
+          welcomed: signal.milestoneFlags.welcomed,
+          screen_paired: signal.milestoneFlags.screenPaired,
+          content_uploaded: signal.milestoneFlags.contentUploaded,
+          playlist_created: signal.milestoneFlags.playlistCreated,
+          schedule_created: signal.milestoneFlags.scheduleCreated,
+        },
+      },
+    };
+    appendFileSync(HEURISTIC_LOG_PATH, JSON.stringify(row) + '\n');
+  } catch (err) {
+    log(`heuristic log append failed for org=${orgId}: ${err instanceof Error ? err.message : err}`);
+  }
 }
 
 function daysBetween(from: Date, to: Date): number {
@@ -247,6 +304,8 @@ async function fetchCandidates(): Promise<Array<Organization & {
 
 async function main(): Promise<void> {
   const startTime = Date.now();
+  // run_id matches the Hermes shadow's epoch-seconds shape.
+  const runId = String(Math.floor(startTime / 1000));
   log('Starting customer-lifecycle cycle');
 
   // Reset per-run counter at the top of the cycle (persisted state)
@@ -291,6 +350,14 @@ async function main(): Promise<void> {
 
     // Auto-complete stale onboardings (>30d — outside nudge window)
     if (signal.daysSinceSignup >= AUTO_COMPLETE_DAYS) {
+      logHeuristicSuggestion(
+        runId,
+        org.id,
+        signal,
+        'none',
+        'auto_complete',
+        `age=${signal.daysSinceSignup}d >= ${AUTO_COMPLETE_DAYS}d, auto-closing`,
+      );
       try {
         await prisma.organizationOnboarding.upsert({
           where: { organizationId: org.id },
@@ -327,10 +394,38 @@ async function main(): Promise<void> {
       log(`suggestNudge failed for org=${org.id}: ${err instanceof Error ? err.message : err}`);
       continue;
     }
-    if (suggestion.template === 'none') continue;
+    if (suggestion.template === 'none') {
+      logHeuristicSuggestion(
+        runId,
+        org.id,
+        signal,
+        'none',
+        'none',
+        `suggestNudge returned 'none' (age=${signal.daysSinceSignup}d, milestones=${JSON.stringify(signal.milestoneFlags)})`,
+      );
+      continue;
+    }
     const nudgeKey = suggestion.template as NudgeKey;
     const col = NUDGE_COLUMN[nudgeKey];
-    if (!col) continue;
+    if (!col) {
+      logHeuristicSuggestion(
+        runId,
+        org.id,
+        signal,
+        suggestion.template,
+        'none',
+        `unknown nudge key: ${suggestion.template}`,
+      );
+      continue;
+    }
+    logHeuristicSuggestion(
+      runId,
+      org.id,
+      signal,
+      nudgeKey,
+      'send_nudge',
+      `suggestNudge picked ${nudgeKey} (age=${signal.daysSinceSignup}d)`,
+    );
 
     const admin = await findOrgAdmin(org.id);
     if (!admin?.email) {
