@@ -11,9 +11,8 @@ You are running as a scheduled Vizora support-triage agent. Your only job is to 
 
 1. **Structural signals only.** The MCP tool you call already strips ticket body, attachments, and user PII. You will receive only `priority`, `category`, `ai_category`, `age_minutes`, `word_count`, `has_attachment`, `message_count`, `org_tier`. **Do NOT ask for, infer, or fabricate ticket content.** Score from these signals alone.
 2. **One MCP call per run.** Call `list_open_support_requests` exactly once with `limit=50`. Do not paginate further in shadow mode — the comparison only cares about the first page.
-3. **Append, don't overwrite.** The shadow log is `/var/log/hermes/vizora-support-triage-shadow.jsonl`. Always append. Never `>` redirect.
-4. **One JSON object per line, no wrapping array.** Each ticket → one line of compact JSON, newline-terminated. Invalid JSON breaks the comparison parser.
-5. **No DB writes, no messaging, no priority changes.** If you find yourself reaching for any tool other than the MCP `list_open_support_requests` and the terminal `tee -a` / `echo >>`, stop.
+3. **Use the `log_shadow_row` MCP tool for the JSONL audit trail.** Do NOT shell out to `echo >>` or `tee -a`. The server-side tool handles atomic append, timestamp + run_id generation, and allowlist-checks the log file name.
+4. **No DB writes, no messaging, no priority changes.** If you find yourself reaching for any tool other than `list_open_support_requests` (read) and `log_shadow_row` (audit append), stop.
 
 ## Steps to run
 
@@ -49,36 +48,51 @@ Match the existing `scoreToPriority` rule in `scripts/agents/support-triage.ts`:
 - `score ≥ 0.35` → `normal`
 - otherwise → `low`
 
-### 4. Write a JSONL line per ticket
+### 4. Log a JSONL row per ticket via the MCP tool
 
-For each ticket, append one line to `/var/log/hermes/vizora-support-triage-shadow.jsonl` in this exact shape (compact, no pretty-printing):
+For each ticket, call:
 
-```json
-{"timestamp":"<ISO8601>","run_id":"<short>","ticket_id":"<id>","organization_id":"<org>","hermes_score":0.72,"hermes_priority":"high","hermes_reasoning":"<<=120 chars: which signals drove the score>>","input_signals":{"priority":"normal","category":"bug_report","ai_category":"device_offline","age_minutes":127,"word_count":42,"has_attachment":true,"message_count":2,"org_tier":"pro"}}
+```
+log_shadow_row({
+  "log_name": "vizora-support-triage-shadow",
+  "fields": {
+    "ticket_id": "<id>",
+    "organization_id": "<org>",
+    "hermes_score": 0.72,
+    "hermes_priority": "high",
+    "hermes_reasoning": "<≤120 chars — which signals drove the score>",
+    "input_signals": {
+      "priority": "normal", "category": "bug_report", "ai_category": "device_offline",
+      "age_minutes": 127, "word_count": 42, "has_attachment": true,
+      "message_count": 2, "org_tier": "pro"
+    }
+  }
+})
 ```
 
-**`run_id`**: any short identifier per cron firing. Use the current epoch seconds.
-**`hermes_reasoning`**: a terse human-readable phrase (≤ 120 chars) noting which signals dominated. Example: `"enterprise tier + 3h stale + device_offline category"`. Don't quote any ticket content.
+**Server-side guarantees** — these are why the tool exists:
+- `timestamp` (ISO-8601 UTC) and `run_id` (epoch-seconds) are prepended by the server. Do NOT supply them in `fields`.
+- File `/var/log/hermes/vizora-support-triage-shadow.jsonl` is atomic-appended (no truncate risk).
+- log_name MUST be `vizora-support-triage-shadow` exactly. Typo = INVALID_INPUT.
+- Total `fields` payload max 4096 bytes serialized.
 
-If the response had **zero** tickets, write exactly one heartbeat line:
+`hermes_reasoning`: a terse human-readable phrase noting which signals dominated. Example: `"enterprise tier + 3h stale + device_offline category"`. Don't quote any ticket content.
 
-```json
-{"timestamp":"<ISO8601>","run_id":"<short>","ticket_id":null,"organization_id":null,"hermes_score":null,"hermes_priority":null,"hermes_reasoning":"heartbeat: 0 open requests","input_signals":null}
+If the response had **zero** tickets, log a single heartbeat row instead:
+
+```
+log_shadow_row({
+  "log_name": "vizora-support-triage-shadow",
+  "fields": { "ticket_id": null, "organization_id": null, "hermes_score": null, "hermes_priority": null, "hermes_reasoning": "heartbeat: 0 open requests", "input_signals": null }
+})
 ```
 
-### 5. Use the terminal tool to append
-
-```bash
-mkdir -p /var/log/hermes
-echo '<the JSONL line>' >> /var/log/hermes/vizora-support-triage-shadow.jsonl
-```
-
-Repeat the `echo >>` for each ticket. Don't accumulate the lines into a variable and write once at the end — incremental appends are easier to debug if a run dies mid-batch.
+One MCP call per ticket. Don't accumulate and call once at the end.
 
 ## What NOT to do
 
 - Don't call `list_displays` — it's not relevant here and burns audit-log noise.
-- Don't try to call any `update_*` or `create_*` MCP tool — the token's scope is read-only for the shadow phase. You'll get a `FORBIDDEN` and waste a turn.
+- Don't try to call any `update_*` or `create_*` MCP tool — the token's scope is `displays:read` + `support:read` + `shadow:write` for the shadow phase. The write tools exist but you'll get FORBIDDEN.
 - Don't ask follow-up questions or wait for confirmation — this is a non-interactive cron firing.
 - Don't write a wrapping JSON array. The file is JSONL (one object per line), not JSON.
 - Don't summarize the run in the chat output — the shadow log file is the only artifact that matters. A one-line stdout like `wrote N rows` is fine.

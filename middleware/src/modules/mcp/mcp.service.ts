@@ -3,6 +3,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { McpServer as McpServerCtor } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { McpRequestContext } from './auth/mcp-context';
 import { McpAuditService } from './audit/mcp-audit.service';
+import { ShadowLogService } from './audit/shadow-log.service';
 import { mapExceptionToMcpError } from './lib/error-mapping';
 import { DisplaysService } from '../displays/displays.service';
 import { OrganizationsService } from '../organizations/organizations.service';
@@ -14,6 +15,7 @@ import {
   MARK_ONBOARDING_NUDGE_SENT_TOOL,
   SEND_LIFECYCLE_NUDGE_EMAIL_TOOL,
 } from './tools/organizations.tools';
+import { LOG_SHADOW_ROW_TOOL } from './tools/shadow-log.tools';
 import {
   CREATE_SUPPORT_MESSAGE_TOOL,
   LIST_OPEN_SUPPORT_REQUESTS_TOOL,
@@ -45,6 +47,7 @@ export class McpService implements OnModuleInit {
     private readonly support: SupportService,
     private readonly organizations: OrganizationsService,
     private readonly audit: McpAuditService,
+    private readonly shadowLog: ShadowLogService,
   ) {}
 
   onModuleInit(): void {
@@ -53,7 +56,7 @@ export class McpService implements OnModuleInit {
     // request. The instance is then discarded.
     this.buildServer(undefined);
     this.logger.log(
-      'MCP server factory ready — 9 tools registered per request (list_displays, list_open_support_requests, update_support_request_priority, update_support_request_ai_category, create_support_message, list_onboarding_candidates, mark_onboarding_nudge_sent, auto_complete_org_onboarding, send_lifecycle_nudge_email)',
+      'MCP server factory ready — 10 tools registered per request (list_displays, list_open_support_requests, update_support_request_priority, update_support_request_ai_category, create_support_message, list_onboarding_candidates, mark_onboarding_nudge_sent, auto_complete_org_onboarding, send_lifecycle_nudge_email, log_shadow_row)',
     );
   }
 
@@ -108,6 +111,7 @@ export class McpService implements OnModuleInit {
       context,
       this.organizations,
     );
+    this.registerTool(server, LOG_SHADOW_ROW_TOOL, context, this.shadowLog);
     return server;
   }
 

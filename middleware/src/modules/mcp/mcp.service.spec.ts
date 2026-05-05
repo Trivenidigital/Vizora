@@ -19,9 +19,10 @@ describe('McpService.buildServer', () => {
   const support = {} as never;
   const organizations = {} as never;
   const audit = {} as never;
+  const shadowLog = {} as never;
 
   it('returns a NEW McpServer instance on every call (REGRESSION: singleton caused "Already connected to a transport" in prod)', () => {
-    const svc = new McpService(displays, support, organizations, audit);
+    const svc = new McpService(displays, support, organizations, audit, shadowLog);
     const a = svc.buildServer(undefined);
     const b = svc.buildServer(undefined);
     expect(a).toBeDefined();
@@ -40,7 +41,8 @@ describe('McpService.buildServer', () => {
     const fakeAudit = { record: jest.fn(async (row) => { captured.push(row); }) } as never;
     const fakeSupport = {} as never;
     const fakeOrganizations = {} as never;
-    const svc = new McpService(fakeDisplays, fakeSupport, fakeOrganizations, fakeAudit);
+    const fakeShadowLog = {} as never;
+    const svc = new McpService(fakeDisplays, fakeSupport, fakeOrganizations, fakeAudit, fakeShadowLog);
     const ctx = {
       tokenId: 'tok_test',
       organizationId: 'org_test',
@@ -66,7 +68,7 @@ describe('McpService.buildServer', () => {
   });
 
   it('still has list_displays registered on every fresh build', () => {
-    const svc = new McpService(displays, support, organizations, audit);
+    const svc = new McpService(displays, support, organizations, audit, shadowLog);
     const server = svc.buildServer(undefined);
     // McpServer.server is the underlying Server instance from the SDK.
     // Tools live in its `_registeredTools` map (private but stable

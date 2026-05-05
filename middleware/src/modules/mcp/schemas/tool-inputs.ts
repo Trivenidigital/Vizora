@@ -137,3 +137,24 @@ export const SendLifecycleNudgeEmailInput = z.object({
   ),
 });
 export type SendLifecycleNudgeEmailInputT = z.infer<typeof SendLifecycleNudgeEmailInput>;
+
+// ── Shadow log writer (platform-scope, shadow:write) ──────────────────────
+
+export const LogShadowRowInput = z.object({
+  log_name: z
+    .enum([
+      'vizora-support-triage-shadow',
+      'vizora-support-triage-live',
+      'vizora-customer-lifecycle-shadow',
+      'vizora-customer-lifecycle-live',
+    ])
+    .describe(
+      'Allowlisted shadow-log file name (no path, no .jsonl extension). Server resolves to /var/log/hermes/<name>.jsonl.',
+    ),
+  fields: z
+    .record(z.unknown())
+    .describe(
+      "JSON object of fields to log. Server prepends `timestamp` (ISO-8601 UTC) and `run_id` (epoch-seconds) — DO NOT supply these; server overrides them. Total row size capped at 4096 bytes (PIPE_BUF, atomic-append guarantee).",
+    ),
+});
+export type LogShadowRowInputT = z.infer<typeof LogShadowRowInput>;

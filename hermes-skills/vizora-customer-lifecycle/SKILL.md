@@ -25,11 +25,16 @@ Use the `vizora-platform` MCP server (NOT the `vizora` server — that one carri
 list_onboarding_candidates({ "lookback_days": 30, "limit": 200 })
 ```
 
-Expect `{ candidates: [...], total: N }`. If empty, write a heartbeat and stop:
+Expect `{ candidates: [...], total: N }`. If empty, log a heartbeat row via the MCP tool and stop:
 
-```json
-{"timestamp":"<ISO8601>","run_id":"<short>","organization_id":null,"hermes_template":null,"hermes_reasoning":"heartbeat: 0 candidates","input_signals":null}
 ```
+log_shadow_row({
+  "log_name": "vizora-customer-lifecycle-shadow",
+  "fields": { "organization_id": null, "hermes_template": null, "hermes_reasoning": "heartbeat: 0 candidates", "input_signals": null }
+})
+```
+
+The server prepends `timestamp` and `run_id` automatically — don't include them in `fields`.
 
 ### 2. Decide template per org
 
@@ -44,15 +49,31 @@ You may use the LLM's reasoning where the heuristic is ambiguous (e.g., to weigh
 
 You may use the LLM's reasoning where the heuristic is ambiguous (e.g., to weigh a pro-tier early-stalled org against a free-tier later-stalled one). But the output template MUST be one of the four exact strings above. No paraphrasing.
 
-### 3. Append a JSONL row per candidate
+### 3. Log a JSONL row per candidate via the MCP tool
 
-For each org, append:
+For each org, call:
 
-```json
-{"timestamp":"<ISO8601>","run_id":"<epoch-seconds>","organization_id":"<id>","tier":"pro","days_since_signup":4,"hermes_template":"day3-upload-content","hermes_reasoning":"<<=120 chars: which signals drove the decision>>","input_signals":{"milestone_flags":{...},"nudges_sent":{...}}}
+```
+log_shadow_row({
+  "log_name": "vizora-customer-lifecycle-shadow",
+  "fields": {
+    "organization_id": "<id>",
+    "tier": "pro",
+    "days_since_signup": 4,
+    "hermes_template": "day3-upload-content",
+    "hermes_reasoning": "<≤120 chars — which signals drove the decision>",
+    "input_signals": { "milestone_flags": {...}, "nudges_sent": {...} }
+  }
+})
 ```
 
-Use `echo '<line>' >> /var/log/hermes/vizora-customer-lifecycle-shadow.jsonl`. One append per org. Don't accumulate and write once at the end.
+**Server-side guarantees** — these are the reason this tool exists, you don't need to manage them:
+- `timestamp` (ISO-8601 UTC) and `run_id` (epoch-seconds) are prepended by the server. Do NOT supply them in `fields`.
+- File is atomic-appended (no truncate risk). Each row is one JSON object on its own line.
+- log_name is constrained to an enum — typo = INVALID_INPUT, immediately visible.
+- Total `fields` payload max 4096 bytes serialized. Trim `hermes_reasoning` if you need headroom.
+
+One call per candidate. Don't accumulate and write once at the end (each call is the audit unit).
 
 `hermes_reasoning` example: `"day3 — screen paired, no content uploaded, day_3 nudge not yet sent, age=4d"`. Don't quote any org name or admin email (you don't have either).
 
@@ -63,7 +84,7 @@ After all candidates are processed, exit. A short stdout summary like `wrote N r
 ## What NOT to do
 
 - Don't call `list_displays`, `list_open_support_requests`, or any other tool — they're irrelevant here.
-- Don't try to call any `update_*`, `mark_*`, `send_*`, or `create_*` tool. The token's scope is read-only and the relevant write tools don't exist yet anyway.
+- Don't try to call any `update_*`, `mark_*`, `send_*`, or `create_*` tool. The token's scope (`customer:read` + `shadow:write`) does not include `customer:write` for the shadow skill. The write tools exist but you'll get FORBIDDEN.
 - Don't summarize the run by quoting org IDs back to chat. The JSONL is the artifact.
 - Don't fabricate signals. If `nudges_sent.day1` is `true`, the day1 nudge is already done — don't suggest it again.
 
