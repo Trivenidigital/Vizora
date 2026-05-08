@@ -400,6 +400,18 @@ module.exports = {
         // that actually triggers execution. Leaving it null produces
         // "discuss the task" behavior in cron context.
         'Run the vizora-customer-lifecycle skill end-to-end now. Follow every step in SKILL.md exactly. Step 1: invoke list_onboarding_candidates on the vizora-platform MCP server. Step 2: for each candidate, invoke log_shadow_row on the vizora-platform server with the per-org decision (or one heartbeat invocation if zero candidates). End silently — no chat output.',
+        // P1.2 (2026-05-08): toolset filter — currently empty (no -t flag).
+        // The runner supports passing this through; the right value depends
+        // on Hermes' actual `-t TOOLSETS` semantics (category names like
+        // 'mcp' / individual tool ids / preset names — not yet verified
+        // post-credit-add). P1.3 smoke-test should attempt:
+        //   1. -t mcp (most likely correct — restricts to MCP toolset only)
+        //   2. -t mcp_vizora_list_onboarding_candidates,mcp_vizora_log_shadow_row,...
+        //      (per-tool filter; may or may not be supported)
+        // Until verified, model-side filtering is best-effort. The MCP
+        // server's token-scope check (P1.1) is the load-bearing backstop —
+        // FORBIDDEN responses prevent any unauthorized tool execution.
+        '',
       ],
       instances: 1,
       exec_mode: 'fork',
@@ -420,6 +432,9 @@ module.exports = {
         '/opt/vizora/app/scripts/agents/hermes/run-hermes-skill.sh',
         'vizora-support-triage',
         'Run the vizora-support-triage skill end-to-end now. Follow every step in SKILL.md exactly. Step 1: invoke list_open_support_requests on the vizora MCP server. Step 4: for each ticket, invoke log_shadow_row on the vizora server with the per-ticket score (or one heartbeat invocation if zero tickets). End silently — no chat output.',
+        // P1.2 (2026-05-08): toolset filter — see customer-lifecycle entry above
+        // for the smoke-test plan. Empty for now; runner handles it as a no-op.
+        '',
       ],
       instances: 1,
       exec_mode: 'fork',
