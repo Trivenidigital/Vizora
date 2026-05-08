@@ -448,6 +448,32 @@ module.exports = {
       out_file: './logs/hermes-vizora-support-triage-out.log',
       merge_logs: true,
     },
+    // ---------------------------------------------------------------------
+    // Hermes insights-poller sidecar (P0.5 — agent-platform-redesign).
+    //
+    // Polls `hermes insights --days 1 --source cli` every 5 min and
+    // back-fills cost / token data onto agent_runs rows. Also sweeps
+    // orphan rows and refines outcomes via mcp_audit_log join on
+    // agentRunId. See: docs/plans/2026-05-08-agent-platform-redesign-design.md
+    //
+    // Runs even when no Hermes agents are firing — handles the
+    // "no rows to enrich" path cleanly with zero cost.
+    {
+      name: 'hermes-insights-poller',
+      script: 'npx',
+      args: 'tsx scripts/agents/hermes/poll-insights.ts',
+      instances: 1,
+      exec_mode: 'fork',
+      cron_restart: '*/5 * * * *',
+      autorestart: false,
+      watch: false,
+      max_memory_restart: '256M',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      max_size: '10M',
+      error_file: './logs/hermes-insights-poller-error.log',
+      out_file: './logs/hermes-insights-poller-out.log',
+      merge_logs: true,
+    },
     // Scaffold agents below — gated OFF by default. Flip the corresponding
     // *_ENABLED env var to true to activate once implementation lands.
     {
