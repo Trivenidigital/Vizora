@@ -423,7 +423,7 @@ module.exports = {
       ],
       instances: 1,
       exec_mode: 'fork',
-      cron_restart: '*/5 * * * *',
+      cron_restart: '*/15 * * * *',
       autorestart: false,
       watch: false,
       max_memory_restart: '256M',
