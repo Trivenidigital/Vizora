@@ -45,6 +45,29 @@
 
 set -uo pipefail
 
+# Load Vizora app env (INTERNAL_API_SECRET, MIDDLEWARE_URL, HERMES_VERSION,
+# MIN_BALANCE_USD, DAILY_BUDGET_USD, INTERNAL_API_LOOPBACK_ONLY).
+# PM2 doesn't auto-source .env files; without this the runner POSTs end up
+# unauthenticated → no agent_runs row written.
+#
+# Cannot `source /opt/vizora/app/.env` directly — some values contain shell-
+# special chars (e.g. `EMAIL_FROM=Vizora <noreply@...>` where `<` is a
+# redirect operator) and bash will fail to parse the line.
+#
+# Selective per-key load: only the vars THIS script needs; ignore everything
+# else. Whitespace-trimmed, quote-stripped.
+_load_env_var() {
+  local key="$1" val
+  val=$(grep "^${key}=" /opt/vizora/app/.env 2>/dev/null | head -1 | cut -d= -f2-)
+  # Strip surrounding quotes if present.
+  val="${val%\"}"; val="${val#\"}"
+  val="${val%\'}"; val="${val#\'}"
+  [[ -n "$val" ]] && export "$key=$val"
+}
+for k in INTERNAL_API_SECRET MIDDLEWARE_URL HERMES_VERSION MIN_BALANCE_USD DAILY_BUDGET_USD INTERNAL_API_LOOPBACK_ONLY; do
+  _load_env_var "$k"
+done
+
 SKILL="${1:-}"
 PROMPT="${2:-}"
 TOOLSETS="${3:-}"
@@ -211,12 +234,19 @@ END=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
 # Classify outcome from RC + stdout markers ONLY (Reviewer A I2 +
 # design ADL-3). FORBIDDEN/INVALID_INPUT live in mcp_audit_log, not
 # Hermes stdout — sidecar refines later.
+#
+# IMPORTANT: scope the grep to the CURRENT firing's portion of the log.
+# Earlier draft scanned the whole file — false-positive on stale HTTP 402
+# entries from the May 6 incident (every firing classified as api_error).
+# The current firing's portion is the lines after our START marker.
+CURRENT_FIRING=$(awk -v marker="start skill=$SKILL pid=$$" 'index($0, marker){found=1} found' "$LOG")
+
 OUTCOME="success"
 if [[ $RC -eq 124 ]]; then
   OUTCOME="timeout"
 elif [[ $RC -ne 0 ]]; then
   OUTCOME="api_error"
-elif grep -qE "(API call failed.*HTTP 4|API call failed.*HTTP 5|HTTP 402|HTTP 429)" "$LOG"; then
+elif printf '%s\n' "$CURRENT_FIRING" | grep -qE "(API call failed.*HTTP 4|API call failed.*HTTP 5|HTTP 402|HTTP 429)"; then
   OUTCOME="api_error"
 fi
 
@@ -225,10 +255,11 @@ fi
 # Body is constructed via python3 json.dumps to escape any special chars
 # in $SKILL or log excerpts (PR-review R2 C6).
 
-# Capture last 1024 chars of log for errorExcerpt on failure outcomes.
+# Capture last 1024 chars of THIS FIRING's log for errorExcerpt on failure
+# outcomes (not the whole file — same scoping fix as the classifier above).
 EXCERPT_ARG=""
 if [[ "$OUTCOME" != "success" ]]; then
-  EXCERPT_ARG="errorExcerpt=$(tail -c 1024 "$LOG" 2>/dev/null || echo "")"
+  EXCERPT_ARG="errorExcerpt=$(printf '%s' "$CURRENT_FIRING" | tail -c 1024)"
 fi
 
 POST_BODY="$(build_run_body \
