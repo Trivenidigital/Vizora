@@ -981,6 +981,16 @@ model AgentRun {
   // OpenRouter `/v1/credits` returns 8 fractional digits — match exactly.
   preflightBalanceUsd    Decimal?      @db.Decimal(12, 8)
   preflightTodaySpendUsd Decimal?      @db.Decimal(12, 8)
+  // Caller identification from the runner POST. Persisted for forensic
+  // attribution if the shared INTERNAL_API_SECRET ever leaks.
+  // Values: 'runner' | 'sidecar' | 'ops'.
+  // (PR-review R2 I5: was stamped on req but never persisted; now is.)
+  callerType             String?
+  // Set by the sidecar on first PATCH. Used as the idempotency marker
+  // (PR-review R1 I3): predicate `WHERE enrichedAt IS NULL` closes the
+  // gap where outcome-only refinements with no token data would otherwise
+  // re-pass the previous `tokensIn IS NULL` predicate.
+  enrichedAt             DateTime?
   createdAt              DateTime      @default(now())
 
   auditLogs McpAuditLog[]

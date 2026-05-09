@@ -12,15 +12,23 @@
 # the original hermes-cron cadence per agent), and it shells out to
 # `hermes -z` with the explicit action prompt that demonstrably works.
 #
-# Behavior added 2026-05-08 (P0.4 — agent-platform-redesign):
+# Behavior added 2026-05-08/09 (P0.4 — agent-platform-redesign):
 #   1. Pre-flight check on OpenRouter credits (refuse < MIN_BALANCE_USD).
 #   2. Pre-flight check on today's app-level spend
 #      (refuse if >= DAILY_BUDGET_USD).
-#   3. ALWAYS pass --max-tokens 4096 to clamp per-call output
-#      (Reviewer 2 phantom-lever finding — config-only setting was not
-#      actually clamping the OpenRouter request param).
+#   3. Pre-flight check on Hermes version (refuse if HERMES_VERSION env
+#      is set and `hermes --version` returns a different value).
 #   4. Optional per-skill toolset filter via -t (P1.2).
 #   5. Post-flight POST /internal/agent-runs with run metadata.
+#
+# NOTE on max_tokens (PR-review R3 C1):
+#   `--max-tokens` is NOT a Hermes 0.12.0 CLI flag — argparse interprets
+#   the integer as the positional `command` slot. The real Layer-3 cost
+#   defense is the Hermes config setting `model.max_tokens=4096` in
+#   /root/.hermes/config.yaml (set 2026-05-08). Whether THAT setting
+#   actually clamps the OpenRouter request param is verified post-hoc
+#   by P0.0a (smoke-test once credits are added). If it doesn't clamp,
+#   the OpenRouter dashboard's per-key cap remains the hard backstop.
 #
 # Every run logs to /var/log/hermes/runner/<skill>.log (timestamped
 # start + Hermes stdout/stderr + end). On non-zero exit from hermes
@@ -68,57 +76,111 @@ SCRIPT_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/openrouter-balance.sh"
 
+# Helper: post a JSON body to the agent-runs endpoint. Builds JSON via
+# python3 json.dumps so embedded special chars in $SKILL etc. cannot
+# break out of string context (PR-review R2 C6: removes JSON injection).
+# Sends the api-key via the @-stdin pattern to keep it out of /proc/$pid/cmdline
+# (PR-review R2 I6).
+post_agent_run() {
+  local body_json
+  body_json="$1"
+  printf '%s\n' "x-internal-api-key: $INTERNAL_SECRET" \
+    | curl -fsS --max-time 3 -X POST \
+        -H "@-" \
+        -H "Content-Type: application/json" \
+        -H "x-internal-caller: runner" \
+        -d "$body_json" \
+        "$MIDDLEWARE_URL/api/v1/internal/agent-runs" 2>/dev/null
+}
+
+# Helper: build a JSON body from named fields safely via python3.
+# Validates that numeric values are actually numeric (PR-review R2 I7).
+build_run_body() {
+  python3 -c '
+import json, sys, re
+fields = {}
+for arg in sys.argv[1:]:
+    if "=" not in arg: continue
+    k, v = arg.split("=", 1)
+    if v == "": continue
+    # Numeric coercion for known number fields. Validate strictly so a
+    # tampered env var cannot inject non-numeric content.
+    if k in ("exitCode", "pid"):
+        try:
+            fields[k] = int(v)
+        except ValueError:
+            sys.exit(1)
+    elif k in ("preflightBalanceUsd", "preflightTodaySpendUsd"):
+        if not re.fullmatch(r"-?\d+(\.\d+)?", v):
+            sys.exit(1)
+        fields[k] = float(v)
+    else:
+        fields[k] = v
+print(json.dumps(fields))
+' "$@"
+}
+
 PREFLIGHT_BALANCE="$(openrouter_balance_usd 2>/dev/null || echo "")"
-if [[ -n "$PREFLIGHT_BALANCE" ]] && (( $(echo "$PREFLIGHT_BALANCE < $MIN_BALANCE_USD" | bc -l) )); then
+# Validate the balance string is a plain decimal before passing to bc.
+if [[ -n "$PREFLIGHT_BALANCE" ]] && [[ "$PREFLIGHT_BALANCE" =~ ^-?[0-9]+(\.[0-9]+)?$ ]] \
+    && (( $(echo "$PREFLIGHT_BALANCE < $MIN_BALANCE_USD" | bc -l) )); then
   END=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
   {
     echo "[$END] ABORT skill=$SKILL reason=balance_too_low balance=$PREFLIGHT_BALANCE min=$MIN_BALANCE_USD"
   } >> "$LOG"
-  curl -fsS --max-time 3 -X POST \
-    -H "Content-Type: application/json" \
-    -H "x-internal-api-key: $INTERNAL_SECRET" \
-    -H "x-internal-caller: runner" \
-    -d "{\"skillName\":\"$SKILL\",\"startedAt\":\"$START\",\"finishedAt\":\"$END\",\"exitCode\":0,\"outcome\":\"budget_aborted\",\"preflightBalanceUsd\":$PREFLIGHT_BALANCE}" \
-    "$MIDDLEWARE_URL/api/v1/internal/agent-runs" > /dev/null 2>&1 || true
+  body="$(build_run_body \
+    "skillName=$SKILL" \
+    "startedAt=$START" \
+    "finishedAt=$END" \
+    "exitCode=0" \
+    "outcome=budget_aborted" \
+    "preflightBalanceUsd=$PREFLIGHT_BALANCE")"
+  post_agent_run "$body" > /dev/null || true
   exit 0
 fi
 
 # ---------------------------------------------------------------------------
 # Pre-flight #2: today's app-level spend.
 # ---------------------------------------------------------------------------
-PREFLIGHT_TODAY_SPEND="$(curl -fsS --max-time 3 \
-  -H "x-internal-api-key: $INTERNAL_SECRET" \
-  -H "x-internal-caller: runner" \
-  "$MIDDLEWARE_URL/api/v1/internal/agent-runs/today-spend" 2>/dev/null \
+PREFLIGHT_TODAY_SPEND="$(printf '%s\n' "x-internal-api-key: $INTERNAL_SECRET" \
+  | curl -fsS --max-time 3 \
+      -H "@-" \
+      -H "x-internal-caller: runner" \
+      "$MIDDLEWARE_URL/api/v1/internal/agent-runs/today-spend" 2>/dev/null \
   | python3 -c 'import json,sys; print(json.load(sys.stdin).get("usd", 0))' 2>/dev/null \
   || echo "0")"
 
-if (( $(echo "$PREFLIGHT_TODAY_SPEND >= $DAILY_BUDGET_USD" | bc -l) )); then
+# Validate today-spend is a plain decimal before passing to bc.
+if [[ "$PREFLIGHT_TODAY_SPEND" =~ ^-?[0-9]+(\.[0-9]+)?$ ]] \
+    && (( $(echo "$PREFLIGHT_TODAY_SPEND >= $DAILY_BUDGET_USD" | bc -l) )); then
   END=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
   {
     echo "[$END] ABORT skill=$SKILL reason=daily_budget_exceeded today_spend=$PREFLIGHT_TODAY_SPEND budget=$DAILY_BUDGET_USD"
   } >> "$LOG"
-  BAL_FIELD=""
-  if [[ -n "$PREFLIGHT_BALANCE" ]]; then
-    BAL_FIELD=",\"preflightBalanceUsd\":$PREFLIGHT_BALANCE"
-  fi
-  curl -fsS --max-time 3 -X POST \
-    -H "Content-Type: application/json" \
-    -H "x-internal-api-key: $INTERNAL_SECRET" \
-    -H "x-internal-caller: runner" \
-    -d "{\"skillName\":\"$SKILL\",\"startedAt\":\"$START\",\"finishedAt\":\"$END\",\"exitCode\":0,\"outcome\":\"budget_aborted\",\"preflightTodaySpendUsd\":$PREFLIGHT_TODAY_SPEND${BAL_FIELD}}" \
-    "$MIDDLEWARE_URL/api/v1/internal/agent-runs" > /dev/null 2>&1 || true
+  body="$(build_run_body \
+    "skillName=$SKILL" \
+    "startedAt=$START" \
+    "finishedAt=$END" \
+    "exitCode=0" \
+    "outcome=budget_aborted" \
+    "preflightTodaySpendUsd=$PREFLIGHT_TODAY_SPEND" \
+    "preflightBalanceUsd=$PREFLIGHT_BALANCE")"
+  post_agent_run "$body" > /dev/null || true
   exit 0
 fi
 
 # ---------------------------------------------------------------------------
 # Pre-flight #3: Hermes version pin (fail closed on drift).
-# Pinned version lives in /opt/vizora/app/.env as HERMES_VERSION.
-# Fail-closed: a Hermes upgrade can silently invalidate the `-t` flag,
-# `insights` parser, MCP tool naming. Block until ops confirms.
+# Pinned version lives in /opt/vizora/app/.env as HERMES_VERSION (e.g.
+# "v0.12.0"). Fail-closed: a Hermes upgrade can silently invalidate the
+# `-t` flag, `insights` parser, MCP tool naming. Block until ops confirms.
+#
+# `hermes --version` output format (verified live): `Hermes Agent v0.12.0 (2026.4.30)`
+# We extract field 3 (the version tag), NOT $NF which gives the date suffix.
+# (PR-review R3 C2 fix.)
 # ---------------------------------------------------------------------------
 if [[ -n "${HERMES_VERSION:-}" ]]; then
-  RUNNING_VERSION="$(/usr/local/bin/hermes --version 2>/dev/null | awk '{print $NF}' || echo "")"
+  RUNNING_VERSION="$(/usr/local/bin/hermes --version 2>/dev/null | awk '{print $3}' || echo "")"
   if [[ -n "$RUNNING_VERSION" && "$RUNNING_VERSION" != "$HERMES_VERSION" ]]; then
     {
       echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] ABORT skill=$SKILL reason=version_skew running=$RUNNING_VERSION pinned=$HERMES_VERSION"
@@ -130,13 +192,11 @@ if [[ -n "${HERMES_VERSION:-}" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Invocation: ALWAYS pass --max-tokens 4096 explicitly.
-# This is the phantom-lever fix (Reviewer 2 finding): the Hermes config
-# `model.max_tokens` setting may not propagate to the OpenRouter request
-# param. The CLI flag is belt-and-braces. P0.0a verifies clamping arrives
-# at the OpenRouter layer.
+# Invocation: build Hermes args. NO --max-tokens flag — see header note.
+# Per-call output cap is enforced by /root/.hermes/config.yaml's
+# `model.max_tokens=4096` setting (verified by P0.0a once credits added).
 # ---------------------------------------------------------------------------
-HERMES_ARGS=(--skills "$SKILL" --max-tokens 4096 -z "$PROMPT")
+HERMES_ARGS=(--skills "$SKILL" -z "$PROMPT")
 if [[ -n "$TOOLSETS" ]]; then
   HERMES_ARGS+=(-t "$TOOLSETS")
 fi
@@ -162,30 +222,27 @@ fi
 
 # Best-effort POST of run metadata. Failure is silent; alerting is on
 # rate, not count. The runner ALWAYS exits 0 regardless of POST result.
-BAL_FIELD=""
-if [[ -n "$PREFLIGHT_BALANCE" ]]; then
-  BAL_FIELD=",\"preflightBalanceUsd\":$PREFLIGHT_BALANCE"
-fi
-SPEND_FIELD=""
-if [[ -n "$PREFLIGHT_TODAY_SPEND" ]]; then
-  SPEND_FIELD=",\"preflightTodaySpendUsd\":$PREFLIGHT_TODAY_SPEND"
-fi
+# Body is constructed via python3 json.dumps to escape any special chars
+# in $SKILL or log excerpts (PR-review R2 C6).
 
 # Capture last 1024 chars of log for errorExcerpt on failure outcomes.
-ERROR_FIELD=""
+EXCERPT_ARG=""
 if [[ "$OUTCOME" != "success" ]]; then
-  EXCERPT="$(tail -c 1024 "$LOG" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))' 2>/dev/null || echo "\"\"")"
-  ERROR_FIELD=",\"errorExcerpt\":$EXCERPT"
+  EXCERPT_ARG="errorExcerpt=$(tail -c 1024 "$LOG" 2>/dev/null || echo "")"
 fi
 
-POST_BODY="{\"skillName\":\"$SKILL\",\"pid\":$$,\"startedAt\":\"$START\",\"finishedAt\":\"$END\",\"exitCode\":$RC,\"outcome\":\"$OUTCOME\"${BAL_FIELD}${SPEND_FIELD}${ERROR_FIELD}}"
+POST_BODY="$(build_run_body \
+  "skillName=$SKILL" \
+  "pid=$$" \
+  "startedAt=$START" \
+  "finishedAt=$END" \
+  "exitCode=$RC" \
+  "outcome=$OUTCOME" \
+  "preflightBalanceUsd=$PREFLIGHT_BALANCE" \
+  "preflightTodaySpendUsd=$PREFLIGHT_TODAY_SPEND" \
+  "$EXCERPT_ARG")"
 
-RUN_ID="$(curl -fsS --max-time 3 -X POST \
-  -H "Content-Type: application/json" \
-  -H "x-internal-api-key: $INTERNAL_SECRET" \
-  -H "x-internal-caller: runner" \
-  -d "$POST_BODY" \
-  "$MIDDLEWARE_URL/api/v1/internal/agent-runs" 2>/dev/null \
+RUN_ID="$(post_agent_run "$POST_BODY" \
   | python3 -c 'import json,sys; print(json.load(sys.stdin).get("id",""))' 2>/dev/null \
   || echo "")"
 

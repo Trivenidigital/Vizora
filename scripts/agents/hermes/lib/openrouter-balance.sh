@@ -18,11 +18,14 @@
 #
 
 openrouter_balance_usd() {
+  # Hide the API key from /proc/$pid/cmdline by passing it via the @-stdin
+  # pattern instead of as a -H argument (PR-review R2 I6).
   local response
-  response=$(curl -fsS \
-    --max-time 5 \
-    -H "Authorization: Bearer ${OPENROUTER_API_KEY}" \
-    https://openrouter.ai/api/v1/credits 2>/dev/null) || return 1
+  response=$(printf '%s\n' "Authorization: Bearer ${OPENROUTER_API_KEY}" \
+    | curl -fsS \
+        --max-time 5 \
+        -H "@-" \
+        https://openrouter.ai/api/v1/credits 2>/dev/null) || return 1
   echo "$response" | python3 -c '
 import json, sys
 try:

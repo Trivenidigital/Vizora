@@ -138,7 +138,10 @@ export const SendLifecycleNudgeEmailInput = z.object({
 });
 export type SendLifecycleNudgeEmailInputT = z.infer<typeof SendLifecycleNudgeEmailInput>;
 
-// ── Shadow log writer (platform-scope, shadow:write) ──────────────────────
+// ── Shadow log writer (any-scope, shadow:write) ───────────────────────────
+// P1.1 (2026-05-08) opened this tool to per-org tokens. Per-org tokens
+// get organization_id auto-tagged into the row; platform-scope tokens
+// write without the tag. See shadow-log.tools.ts for cross-tenant defense.
 
 export const LogShadowRowInput = z.object({
   log_name: z

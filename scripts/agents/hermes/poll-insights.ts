@@ -31,22 +31,14 @@
 import { execFileSync } from 'node:child_process';
 import { PrismaClient } from '@vizora/database';
 import { parseHermesInsightsTable, type InsightsRow } from './insights-parser';
+// Single source of truth for model rates (PR-review R1 I2: was duplicated).
+// The sidecar imports from middleware's schemas module by relative path —
+// tsx resolves it via the standard node module algorithm at runtime.
+import { MODEL_RATES } from '../../../middleware/src/modules/agents/agent-runs.schemas';
 
 const PRISMA = new PrismaClient();
 const MIDDLEWARE_URL = process.env.MIDDLEWARE_URL ?? 'http://localhost:3000';
 const INTERNAL_API_KEY = process.env.INTERNAL_API_SECRET ?? '';
-
-interface ModelRate {
-  inUsdPerMt: number;
-  outUsdPerMt: number;
-}
-const MODEL_RATES: Record<string, ModelRate> = {
-  'openai/gpt-4o-mini': { inUsdPerMt: 0.15, outUsdPerMt: 0.6 },
-  'openai/gpt-4o-mini-2024-07-18': { inUsdPerMt: 0.15, outUsdPerMt: 0.6 },
-  'openai/gpt-4o': { inUsdPerMt: 2.5, outUsdPerMt: 10.0 },
-  'anthropic/claude-3.5-sonnet': { inUsdPerMt: 3.0, outUsdPerMt: 15.0 },
-  'anthropic/claude-3.5-haiku': { inUsdPerMt: 0.8, outUsdPerMt: 4.0 },
-};
 
 async function main(): Promise<void> {
   const insightsOutput = runHermesInsights();
@@ -195,22 +187,44 @@ async function patchRun(id: string, body: Record<string, unknown>): Promise<bool
 
 /**
  * Marks rows older than 10 minutes with no enrichment as runner_crash.
- * Calls the same logic as AgentRunsService.sweepOrphans but via SQL.
+ *
+ * PR-review R1 I2 fix: previously duplicated AgentRunsService.sweepOrphans
+ * logic byte-for-byte. Now POSTs to the middleware's sweep endpoint —
+ * single source of truth for the cutoff window + outcome semantics.
+ *
+ * (The middleware endpoint is added in this PR review pass — see
+ * agent-runs.controller.ts.)
  */
 async function sweepOrphans(): Promise<number> {
-  const cutoff = new Date(Date.now() - 10 * 60 * 1000);
-  const result = await PRISMA.agentRun.updateMany({
-    where: {
-      tokensIn: null,
-      createdAt: { lt: cutoff },
-      outcome: { notIn: ['runner_crash', 'budget_aborted'] },
-    },
-    data: {
-      outcome: 'runner_crash',
-      errorExcerpt: 'orphan row — runner crashed before final write',
-    },
-  });
-  return result.count;
+  try {
+    const res = await fetch(`${MIDDLEWARE_URL}/api/v1/internal/agent-runs/sweep-orphans`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-api-key': INTERNAL_API_KEY,
+        'x-internal-caller': 'sidecar',
+      },
+    });
+    if (!res.ok) {
+      console.error(JSON.stringify({
+        ts: new Date().toISOString(),
+        level: 'error',
+        message: 'sweep-orphans HTTP failed',
+        status: res.status,
+      }));
+      return 0;
+    }
+    const body = (await res.json()) as { marked: number };
+    return body.marked ?? 0;
+  } catch (err) {
+    console.error(JSON.stringify({
+      ts: new Date().toISOString(),
+      level: 'error',
+      message: 'sweep-orphans exception',
+      error: err instanceof Error ? err.message : String(err),
+    }));
+    return 0;
+  }
 }
 
 /**

@@ -7,8 +7,10 @@ import {
   Param,
   Patch,
   Post,
+  Req,
   UseGuards,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { InternalSecretGuard } from '../common/guards/internal-secret.guard';
 import { AgentRunsService } from './agent-runs.service';
 import {
@@ -41,9 +43,14 @@ export class AgentRunsController {
 
   @Post()
   @HttpCode(201)
-  async record(@Body() body: unknown): Promise<{ id: string }> {
+  async record(
+    @Body() body: unknown,
+    @Req() req: Request & { internalCaller?: string },
+  ): Promise<{ id: string }> {
     const parsed = this.parseOrBadRequest(RecordRunInput, body, 'RecordRunInput');
-    return this.service.recordRun(parsed);
+    // The InternalSecretGuard validates and stamps `internalCaller` onto
+    // the request. Persist it on the row for forensic attribution.
+    return this.service.recordRun(parsed, req.internalCaller);
   }
 
   @Patch(':id')
@@ -67,6 +74,20 @@ export class AgentRunsController {
   async todaySpend(): Promise<{ usd: number }> {
     const usd = await this.service.getTodaySpendUsd();
     return { usd };
+  }
+
+  /**
+   * Marks rows that haven't been enriched within 10 minutes as runner_crash.
+   * Called by the insights-poller sidecar at the end of each tick.
+   *
+   * PR-review R1 I2 — eliminates a duplicated implementation that previously
+   * lived in poll-insights.ts. Single source of truth for orphan-sweep
+   * semantics is the AgentRunsService.
+   */
+  @Post('sweep-orphans')
+  @HttpCode(200)
+  async sweepOrphans(): Promise<{ marked: number }> {
+    return this.service.sweepOrphans();
   }
 
   private parseOrBadRequest<T>(

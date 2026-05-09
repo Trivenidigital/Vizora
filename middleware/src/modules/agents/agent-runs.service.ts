@@ -39,8 +39,12 @@ export class AgentRunsService {
   /**
    * Synchronous write from runner. Returns the new row's id so the
    * runner can correlate later enrichment via mcp_audit_log.agentRunId.
+   *
+   * `callerType` is captured from the InternalSecretGuard's stamped
+   * x-internal-caller header (PR-review R2 I5: previously stamped on
+   * req but never persisted; now durable for forensic attribution).
    */
-  async recordRun(input: RecordRunInputT): Promise<{ id: string }> {
+  async recordRun(input: RecordRunInputT, callerType?: string): Promise<{ id: string }> {
     const startedAt = new Date(input.startedAt);
     const finishedAt = new Date(input.finishedAt);
     const durationMs = finishedAt.getTime() - startedAt.getTime();
@@ -57,6 +61,7 @@ export class AgentRunsService {
         errorExcerpt: input.errorExcerpt?.slice(0, 1024) ?? null,
         preflightBalanceUsd: input.preflightBalanceUsd ?? null,
         preflightTodaySpendUsd: input.preflightTodaySpendUsd ?? null,
+        callerType: callerType ?? null,
       },
       select: { id: true },
     });
@@ -74,10 +79,10 @@ export class AgentRunsService {
    */
   async enrichRun(id: string, input: EnrichRunInputT): Promise<{ id: string; enriched: boolean }> {
     // Surface NotFound separately from "frozen" so callers can distinguish
-    // a sidecar bug from a benign late-tick (Reviewer A+B).
+    // a sidecar bug from a benign late-tick (Reviewer A+B design review).
     const existing = await this.db.agentRun.findUnique({
       where: { id },
-      select: { id: true, finishedAt: true, tokensIn: true },
+      select: { id: true, finishedAt: true, enrichedAt: true },
     });
     if (!existing) {
       throw new NotFoundException(`agent_runs row '${id}' not found`);
@@ -104,20 +109,30 @@ export class AgentRunsService {
       rateOut,
     );
 
-    // Idempotent UPDATE: only writes if tokensIn is still NULL. The
-    // RETURNING-equivalent (updateMany returns count) lets us detect the
-    // "another sidecar got it first" race and treat as benign.
+    // Idempotent UPDATE: only writes if enrichedAt is still NULL.
+    // PR-review R1 I3 fix: previous predicate was `tokensIn IS NULL`
+    // which failed for outcome-only refinements (no token data → tokensIn
+    // stayed null → re-passed the predicate on every subsequent call).
+    // `enrichedAt` is set by THIS update; subsequent sidecar runs find it
+    // non-null and the predicate fails — count=0 → returned as benign no-op.
+    //
+    // Use conditional spread for outcome (PR-review R1 I6) — explicit is
+    // safer than relying on Prisma's "undefined key omits field" behavior.
+    const data: Record<string, unknown> = {
+      tokensIn: input.tokensIn ?? null,
+      tokensOut: input.tokensOut ?? null,
+      costMicrodollars,
+      rateInUsdPerMt: rateIn ?? null,
+      rateOutUsdPerMt: rateOut ?? null,
+      model: input.model ?? null,
+      enrichedAt: new Date(),
+    };
+    if (input.outcomeRefinement != null) {
+      data.outcome = input.outcomeRefinement;
+    }
     const result = await this.db.agentRun.updateMany({
-      where: { id, tokensIn: null },
-      data: {
-        tokensIn: input.tokensIn ?? null,
-        tokensOut: input.tokensOut ?? null,
-        costMicrodollars,
-        rateInUsdPerMt: rateIn ?? null,
-        rateOutUsdPerMt: rateOut ?? null,
-        model: input.model ?? null,
-        outcome: input.outcomeRefinement ?? undefined,
-      },
+      where: { id, enrichedAt: null },
+      data,
     });
     if (result.count === 0) {
       // Either already enriched (race with another sidecar) or row doesn't
@@ -153,13 +168,15 @@ export class AgentRunsService {
     const cutoff = new Date(Date.now() - 10 * 60 * 1000);
     const result = await this.db.agentRun.updateMany({
       where: {
-        tokensIn: null,
+        enrichedAt: null,
         createdAt: { lt: cutoff },
         outcome: { notIn: ['runner_crash', 'budget_aborted'] satisfies RunOutcomeT[] },
       },
       data: {
         outcome: 'runner_crash' satisfies RunOutcomeT,
         errorExcerpt: 'orphan row — runner crashed before final write',
+        // Mark enrichedAt to prevent re-orphan-sweeping on subsequent ticks.
+        enrichedAt: new Date(),
       },
     });
     return { marked: result.count };

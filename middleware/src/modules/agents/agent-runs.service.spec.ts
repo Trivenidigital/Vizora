@@ -135,7 +135,7 @@ describe('AgentRunsService', () => {
       db.agentRun.findUnique.mockResolvedValue({
         id: 'r1',
         finishedAt: sixMinAgo,
-        tokensIn: null,
+        enrichedAt: null,
       });
       await expect(
         service.enrichRun('r1', { tokensIn: 100, tokensOut: 50, model: 'openai/gpt-4o-mini' }),
@@ -143,9 +143,9 @@ describe('AgentRunsService', () => {
       expect(db.agentRun.updateMany).not.toHaveBeenCalled();
     });
 
-    it('writes cost + rate snapshot when model is in MODEL_RATES', async () => {
+    it('writes cost + rate snapshot + enrichedAt when model is in MODEL_RATES', async () => {
       const recent = new Date(Date.now() - 30 * 1000);
-      db.agentRun.findUnique.mockResolvedValue({ id: 'r2', finishedAt: recent, tokensIn: null });
+      db.agentRun.findUnique.mockResolvedValue({ id: 'r2', finishedAt: recent, enrichedAt: null });
       db.agentRun.updateMany.mockResolvedValue({ count: 1 });
       const out = await service.enrichRun('r2', {
         tokensIn: 5000,
@@ -154,7 +154,7 @@ describe('AgentRunsService', () => {
       });
       expect(out).toEqual({ id: 'r2', enriched: true });
       expect(db.agentRun.updateMany).toHaveBeenCalledWith({
-        where: { id: 'r2', tokensIn: null },
+        where: { id: 'r2', enrichedAt: null },
         data: expect.objectContaining({
           tokensIn: 5000,
           tokensOut: 800,
@@ -162,13 +162,14 @@ describe('AgentRunsService', () => {
           rateInUsdPerMt: 0.15,
           rateOutUsdPerMt: 0.6,
           costMicrodollars: 1230,
+          enrichedAt: expect.any(Date),
         }),
       });
     });
 
     it('returns enriched=false when MVCC race loses (count=0)', async () => {
       const recent = new Date(Date.now() - 30 * 1000);
-      db.agentRun.findUnique.mockResolvedValue({ id: 'r3', finishedAt: recent, tokensIn: null });
+      db.agentRun.findUnique.mockResolvedValue({ id: 'r3', finishedAt: recent, enrichedAt: null });
       db.agentRun.updateMany.mockResolvedValue({ count: 0 });
       const out = await service.enrichRun('r3', {
         tokensIn: 100,
@@ -180,7 +181,7 @@ describe('AgentRunsService', () => {
 
     it('writes null cost when model is unknown (rate not in table)', async () => {
       const recent = new Date(Date.now() - 30 * 1000);
-      db.agentRun.findUnique.mockResolvedValue({ id: 'r4', finishedAt: recent, tokensIn: null });
+      db.agentRun.findUnique.mockResolvedValue({ id: 'r4', finishedAt: recent, enrichedAt: null });
       db.agentRun.updateMany.mockResolvedValue({ count: 1 });
       await service.enrichRun('r4', {
         tokensIn: 100,
@@ -188,7 +189,7 @@ describe('AgentRunsService', () => {
         model: 'mystery/model-future',
       });
       expect(db.agentRun.updateMany).toHaveBeenCalledWith({
-        where: { id: 'r4', tokensIn: null },
+        where: { id: 'r4', enrichedAt: null },
         data: expect.objectContaining({
           model: 'mystery/model-future',
           rateInUsdPerMt: null,
@@ -202,7 +203,7 @@ describe('AgentRunsService', () => {
       // The sidecar may pass explicit rates from `hermes insights` (which
       // already accounts for prompt caching, etc.) — those win over MODEL_RATES.
       const recent = new Date(Date.now() - 30 * 1000);
-      db.agentRun.findUnique.mockResolvedValue({ id: 'r5', finishedAt: recent, tokensIn: null });
+      db.agentRun.findUnique.mockResolvedValue({ id: 'r5', finishedAt: recent, enrichedAt: null });
       db.agentRun.updateMany.mockResolvedValue({ count: 1 });
       await service.enrichRun('r5', {
         tokensIn: 1000,
@@ -212,7 +213,7 @@ describe('AgentRunsService', () => {
         rateOutUsdPerMt: 0.6,
       });
       expect(db.agentRun.updateMany).toHaveBeenCalledWith({
-        where: { id: 'r5', tokensIn: null },
+        where: { id: 'r5', enrichedAt: null },
         data: expect.objectContaining({
           rateInUsdPerMt: 0.075,
           rateOutUsdPerMt: 0.6,
@@ -223,7 +224,7 @@ describe('AgentRunsService', () => {
 
     it('applies outcomeRefinement when sidecar downgrades success → tool_error', async () => {
       const recent = new Date(Date.now() - 30 * 1000);
-      db.agentRun.findUnique.mockResolvedValue({ id: 'r6', finishedAt: recent, tokensIn: null });
+      db.agentRun.findUnique.mockResolvedValue({ id: 'r6', finishedAt: recent, enrichedAt: null });
       db.agentRun.updateMany.mockResolvedValue({ count: 1 });
       await service.enrichRun('r6', {
         tokensIn: 100,
@@ -232,9 +233,42 @@ describe('AgentRunsService', () => {
         outcomeRefinement: 'tool_error',
       });
       expect(db.agentRun.updateMany).toHaveBeenCalledWith({
-        where: { id: 'r6', tokensIn: null },
+        where: { id: 'r6', enrichedAt: null },
         data: expect.objectContaining({ outcome: 'tool_error' }),
       });
+    });
+
+    it('REGRESSION (PR-review R1 I3): outcome-only refinement with no token data sets enrichedAt and is idempotent', async () => {
+      // Bug: previous predicate `tokensIn IS NULL` failed for outcome-only
+      // PATCHes — they wrote tokensIn: null again, leaving the predicate true.
+      // Fix: enrichedAt set on first PATCH; subsequent PATCHes find it non-null
+      // and the predicate fails (count=0, treated as benign no-op).
+      const recent = new Date(Date.now() - 30 * 1000);
+      db.agentRun.findUnique.mockResolvedValue({ id: 'r7', finishedAt: recent, enrichedAt: null });
+      db.agentRun.updateMany.mockResolvedValue({ count: 1 });
+      // First call: outcome refinement only, no token data.
+      await service.enrichRun('r7', { outcomeRefinement: 'no_work' });
+      expect(db.agentRun.updateMany).toHaveBeenCalledWith({
+        where: { id: 'r7', enrichedAt: null },
+        data: expect.objectContaining({
+          outcome: 'no_work',
+          enrichedAt: expect.any(Date),
+          tokensIn: null,
+          tokensOut: null,
+        }),
+      });
+    });
+
+    it('REGRESSION (PR-review R1 I6): omitted outcomeRefinement does NOT include outcome key in update data', async () => {
+      // Bug: relying on Prisma's "undefined key omits field" was implicit.
+      // Fix: conditional spread — outcome is only in data if outcomeRefinement
+      // is non-null.
+      const recent = new Date(Date.now() - 30 * 1000);
+      db.agentRun.findUnique.mockResolvedValue({ id: 'r8', finishedAt: recent, enrichedAt: null });
+      db.agentRun.updateMany.mockResolvedValue({ count: 1 });
+      await service.enrichRun('r8', { tokensIn: 100, tokensOut: 50 });
+      const dataArg = db.agentRun.updateMany.mock.calls[0][0].data;
+      expect('outcome' in dataArg).toBe(false);
     });
   });
 
@@ -262,14 +296,14 @@ describe('AgentRunsService', () => {
   });
 
   describe('sweepOrphans', () => {
-    it('marks rows older than 10 minutes as runner_crash', async () => {
+    it('marks rows older than 10 minutes as runner_crash and sets enrichedAt', async () => {
       db.agentRun.updateMany.mockResolvedValue({ count: 3 });
       const result = await service.sweepOrphans();
       expect(result.marked).toBe(3);
       const args = db.agentRun.updateMany.mock.calls[0][0];
       expect(args.where).toEqual(
         expect.objectContaining({
-          tokensIn: null,
+          enrichedAt: null,
           createdAt: { lt: expect.any(Date) },
           outcome: { notIn: ['runner_crash', 'budget_aborted'] },
         }),
@@ -278,6 +312,8 @@ describe('AgentRunsService', () => {
         expect.objectContaining({
           outcome: 'runner_crash',
           errorExcerpt: expect.stringContaining('orphan'),
+          // Sweep also marks enrichedAt to prevent re-orphan-sweeping.
+          enrichedAt: expect.any(Date),
         }),
       );
       // Cutoff should be ~10 min in the past.
@@ -290,6 +326,41 @@ describe('AgentRunsService', () => {
     it('returns 0 when no orphans found', async () => {
       db.agentRun.updateMany.mockResolvedValue({ count: 0 });
       expect((await service.sweepOrphans()).marked).toBe(0);
+    });
+  });
+
+  describe('recordRun + callerType (PR-review R2 I5)', () => {
+    it('persists callerType when provided by guard', async () => {
+      db.agentRun.create.mockResolvedValue({ id: 'cuid_r9' });
+      await service.recordRun(
+        {
+          skillName: 'vizora-test',
+          startedAt: new Date().toISOString(),
+          finishedAt: new Date().toISOString(),
+          exitCode: 0,
+          outcome: 'success',
+        },
+        'sidecar',
+      );
+      expect(db.agentRun.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ callerType: 'sidecar' }),
+        select: { id: true },
+      });
+    });
+
+    it('persists callerType=null when omitted (no guard, e.g., older callers)', async () => {
+      db.agentRun.create.mockResolvedValue({ id: 'cuid_r10' });
+      await service.recordRun({
+        skillName: 'vizora-test',
+        startedAt: new Date().toISOString(),
+        finishedAt: new Date().toISOString(),
+        exitCode: 0,
+        outcome: 'success',
+      });
+      expect(db.agentRun.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ callerType: null }),
+        select: { id: true },
+      });
     });
   });
 });
