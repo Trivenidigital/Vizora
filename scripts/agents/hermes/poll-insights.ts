@@ -28,6 +28,10 @@
  * rolling our own cost-tracker — Hermes already does the math.
  */
 
+// Loads /opt/vizora/app/.env so DATABASE_URL + INTERNAL_API_SECRET +
+// MIDDLEWARE_URL are available to the PM2-spawned process (matches the
+// pattern used by scripts/ops/*.ts).
+import 'dotenv/config';
 import { execFileSync } from 'node:child_process';
 import { PrismaClient } from '@vizora/database';
 import { parseHermesInsightsTable, type InsightsRow } from './insights-parser';
