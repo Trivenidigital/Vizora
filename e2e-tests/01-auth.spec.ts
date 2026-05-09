@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Authentication Flow', () => {
   test('should display login page', async ({ page }) => {
     await page.goto('/login');
-    await expect(page.locator('h1')).toContainText(/sign in|login/i);
+    await expect(page.locator('h1')).toContainText(/log in|login|sign in/i);
   });
 
   test('should register new user and redirect to dashboard', async ({ page }) => {
@@ -15,7 +15,7 @@ test.describe('Authentication Flow', () => {
     await page.goto('/register');
 
     // Wait for form to be visible
-    await expect(page.locator('h1')).toContainText(/create account/i);
+    await expect(page.locator('h1')).toContainText(/create (your )?account/i);
 
     // Wait for form inputs to be ready (React controlled components need this)
     const firstNameInput = page.locator('#firstName');
@@ -70,7 +70,7 @@ test.describe('Authentication Flow', () => {
     const email = `test-${timestamp}@vizora.test`;
     const password = 'Test123!@#';
 
-    const response = await page.request.post('http://localhost:3000/api/auth/register', {
+    const response = await page.request.post('http://localhost:3000/api/v1/auth/register', {
       data: {
         email,
         password,
@@ -87,7 +87,7 @@ test.describe('Authentication Flow', () => {
     await page.goto('/login');
 
     // Wait for login form to be visible - accept either "login" or "sign in"
-    await expect(page.locator('h1')).toContainText(/login|sign in/i);
+    await expect(page.locator('h1')).toContainText(/log in|login|sign in/i);
 
     await page.fill('input[type="email"]', email);
     await page.fill('input[type="password"]', password);
@@ -101,7 +101,7 @@ test.describe('Authentication Flow', () => {
     await page.goto('/login');
     
     // Wait for form to be ready
-    await expect(page.locator('h1')).toContainText(/login/i);
+    await expect(page.locator('h1')).toContainText(/log in|login/i);
     
     // Fill invalid email (triggers Zod validation)
     await page.fill('input[type="email"]', 'invalid');
@@ -124,7 +124,7 @@ test.describe('Authentication Flow', () => {
     const email = `test-${timestamp}@vizora.test`;
     const password = 'Test123!@#';
 
-    const res = await page.request.post('http://localhost:3000/api/auth/register', {
+    const res = await page.request.post('http://localhost:3000/api/v1/auth/register', {
       data: {
         email,
         password,

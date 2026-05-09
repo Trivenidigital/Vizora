@@ -8,7 +8,7 @@ const test = base.extend<{ adminPage: Page }>({
     const password = 'Test123!@#';
 
     // Register via API
-    const registerRes = await page.request.post('http://localhost:3000/api/auth/register', {
+    const registerRes = await page.request.post('http://localhost:3000/api/v1/auth/register', {
       data: {
         email,
         password,
@@ -149,13 +149,13 @@ test.describe('Admin API Endpoints', () => {
   test('should protect admin endpoints with authentication', async ({ page }) => {
     // Try to access admin endpoints without auth
     const endpoints = [
-      '/api/admin/plans',
-      '/api/admin/promotions',
-      '/api/admin/organizations',
-      '/api/admin/users',
-      '/api/admin/health',
-      '/api/admin/config',
-      '/api/admin/stats/overview',
+      '/api/v1/admin/plans',
+      '/api/v1/admin/promotions',
+      '/api/v1/admin/organizations',
+      '/api/v1/admin/users',
+      '/api/v1/admin/health',
+      '/api/v1/admin/config',
+      '/api/v1/admin/stats/overview',
     ];
 
     for (const endpoint of endpoints) {
@@ -168,7 +168,7 @@ test.describe('Admin API Endpoints', () => {
   test('should protect admin endpoints from non-admin users', async ({ page }) => {
     // Register a regular user
     const timestamp = Date.now();
-    const registerRes = await page.request.post('http://localhost:3000/api/auth/register', {
+    const registerRes = await page.request.post('http://localhost:3000/api/v1/auth/register', {
       data: {
         email: `regular-${timestamp}@vizora.test`,
         password: 'Test123!@#',
@@ -193,7 +193,7 @@ test.describe('Admin API Endpoints', () => {
     }
 
     // Try admin endpoints with regular user token
-    const response = await page.request.get('http://localhost:3000/api/admin/plans', {
+    const response = await page.request.get('http://localhost:3000/api/v1/admin/plans', {
       headers: {
         Cookie: `vizora_auth_token=${token}`,
       },

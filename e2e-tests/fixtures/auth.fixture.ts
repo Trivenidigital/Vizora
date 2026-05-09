@@ -15,7 +15,7 @@ export const test = base.extend<AuthenticatedPage>({
     const password = 'Test123!@#';
 
     // Register via API - the backend sets vizora_auth_token as httpOnly cookie
-    const registerRes = await page.request.post('http://localhost:3000/api/auth/register', {
+    const registerRes = await page.request.post('http://localhost:3000/api/v1/auth/register', {
       data: {
         email,
         password,

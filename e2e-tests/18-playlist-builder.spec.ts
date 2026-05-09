@@ -69,7 +69,7 @@ test.describe('Playlist Builder (Wave 5)', () => {
       const authCookie = cookies.find(c => c.name === 'vizora_auth_token');
       const token = authCookie?.value || '';
 
-      const response = await authenticatedPage.request.post('http://localhost:3000/api/playlists', {
+      const response = await authenticatedPage.request.post('http://localhost:3000/api/v1/playlists', {
         headers: { Cookie: `vizora_auth_token=${token}` },
         data: { name: `Builder Test ${timestamp}` },
       });

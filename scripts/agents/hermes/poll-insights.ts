@@ -62,20 +62,31 @@ async function main(): Promise<void> {
 }
 
 function runHermesInsights(): string {
+  // Investigation 2026-05-09 (`docs/plans/2026-05-09-hermes-insights-investigation.md`):
+  // `hermes -z` does NOT write to the SQLite session store. `hermes insights`
+  // returns empty for our `cli` source AND for `cron` source (cron source only
+  // had data from the deprecated `hermes cron` mechanism removed in PR #60).
+  //
+  // The sidecar's intended flow (parse insights → enrich agent_runs with cost)
+  // is therefore dormant. We keep the call so when Hermes adds session
+  // persistence to `-z` mode (or we wire a different insights source), this
+  // path lights up automatically.
+  //
+  // For now: the empty result is EXPECTED, not an error.
   try {
-    return execFileSync(
+    const out = execFileSync(
       '/usr/local/bin/hermes',
       ['insights', '--days', '1', '--source', 'cli'],
       { encoding: 'utf8', timeout: 15_000 },
     );
+    return out;
   } catch (err) {
-    // Empty case ("No sessions found...") and parser failures both arrive
-    // here for hermes process errors. Return empty string; parser handles.
-    console.error(
+    // Genuinely unexpected: the hermes process itself errored.
+    console.log(
       JSON.stringify({
         ts: new Date().toISOString(),
-        level: 'error',
-        message: 'hermes insights invocation failed',
+        level: 'info',
+        message: 'hermes insights returned non-zero — likely empty session store for -z mode',
         error: err instanceof Error ? err.message : String(err),
       }),
     );
