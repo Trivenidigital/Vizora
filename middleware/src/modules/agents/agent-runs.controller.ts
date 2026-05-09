@@ -11,6 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { Request } from 'express';
+import { Public } from '../auth/decorators/public.decorator';
 import { InternalSecretGuard } from '../common/guards/internal-secret.guard';
 import { AgentRunsService } from './agent-runs.service';
 import {
@@ -37,6 +38,13 @@ import {
  * See: docs/plans/2026-05-08-agent-platform-redesign-design.md §3.2
  */
 @Controller('internal/agent-runs')
+// @Public() bypasses the global JwtAuthGuard (registered as APP_GUARD in
+// auth.module.ts). Without this, JwtAuthGuard runs first and returns 401
+// because no JWT cookie exists on server-to-server runner/sidecar calls.
+// InternalSecretGuard then becomes the SOLE auth layer for these routes
+// — exactly the design intent (x-internal-api-key + x-internal-caller +
+// loopback-only check).
+@Public()
 @UseGuards(InternalSecretGuard)
 export class AgentRunsController {
   constructor(private readonly service: AgentRunsService) {}
