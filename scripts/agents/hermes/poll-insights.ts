@@ -152,6 +152,8 @@ async function patchRun(id: string, body: Record<string, unknown>): Promise<bool
       },
       body: JSON.stringify(body),
     });
+    // Middleware wraps responses in {success, data, meta}. PATCH returns
+    // 200 + envelope on success. We only need the status code here.
     if (res.status === 200) return true;
     if (res.status === 409) {
       // Frozen-row — expected for late ticks. INFO-level, not an error.
@@ -218,8 +220,9 @@ async function sweepOrphans(): Promise<number> {
       }));
       return 0;
     }
-    const body = (await res.json()) as { marked: number };
-    return body.marked ?? 0;
+    // Response envelope: {success, data: {marked: N}, meta}
+    const json = (await res.json()) as { data?: { marked?: number }; marked?: number };
+    return json.data?.marked ?? json.marked ?? 0;
   } catch (err) {
     console.error(JSON.stringify({
       ts: new Date().toISOString(),

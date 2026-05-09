@@ -170,7 +170,7 @@ PREFLIGHT_TODAY_SPEND="$(printf '%s\n' "x-internal-api-key: $INTERNAL_SECRET" \
       -H "@-" \
       -H "x-internal-caller: runner" \
       "$MIDDLEWARE_URL/api/v1/internal/agent-runs/today-spend" 2>/dev/null \
-  | python3 -c 'import json,sys; print(json.load(sys.stdin).get("usd", 0))' 2>/dev/null \
+  | python3 -c 'import json,sys; d=json.load(sys.stdin); print((d.get("data") or d).get("usd", 0))' 2>/dev/null \
   || echo "0")"
 
 # Validate today-spend is a plain decimal before passing to bc.
@@ -274,7 +274,7 @@ POST_BODY="$(build_run_body \
   "$EXCERPT_ARG")"
 
 RUN_ID="$(post_agent_run "$POST_BODY" \
-  | python3 -c 'import json,sys; print(json.load(sys.stdin).get("id",""))' 2>/dev/null \
+  | python3 -c 'import json,sys; d=json.load(sys.stdin); print((d.get("data") or d).get("id",""))' 2>/dev/null \
   || echo "")"
 
 {
