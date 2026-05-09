@@ -25,9 +25,13 @@ import {
  * skill prompt only has to pick the right log_name and compose the
  * fields, with no string-formatting discipline required.
  *
- * **Token shape**: platform-scope token required. Per-org tokens are
- * rejected with INVALID_INPUT — shadow logs are agent-side
- * audit trails, not org-scoped data.
+ * **Token shape**: any valid token with `shadow:write` scope. Per-org
+ * tokens get tagged with `organization_id` in the appended row;
+ * platform-scope tokens write without the tag. Agent-supplied
+ * `organization_id` in fields is REJECTED for per-org tokens if it
+ * doesn't match the token's organizationId — this closes a cross-tenant
+ * write surface where org A could stamp organization_id=B in the JSONL
+ * (Reviewer A design D2).
  *
  * Scope required: `shadow:write`.
  */
@@ -39,19 +43,35 @@ export async function logShadowRowTool(
   if (!hasScope(context, 'shadow:write')) {
     throw new ForbiddenException("Token lacks scope 'shadow:write'");
   }
-  if (context.organizationId != null) {
-    throw new BadRequestException(
-      'log_shadow_row requires a platform-scope token (organizationId=null). Per-org tokens are rejected.',
-    );
-  }
   const input = LogShadowRowInput.parse(rawInput) as LogShadowRowInputT;
+
+  // Cross-tenant write defense (Reviewer A D2): if the token is per-org,
+  // force `organization_id` in the row to the token's value. If the
+  // agent supplied a different `organization_id`, reject INVALID_INPUT —
+  // the token's org is the cryptographic source of truth.
+  const inputFields = input.fields as Record<string, unknown>;
+  let fieldsWithContext: Record<string, unknown>;
+  if (context.organizationId != null) {
+    const supplied = inputFields.organization_id;
+    if (supplied != null && supplied !== context.organizationId) {
+      throw new BadRequestException(
+        `organization_id mismatch with token scope (supplied=${String(supplied)}, token=${context.organizationId})`,
+      );
+    }
+    // Force the token's value (whether agent supplied none or matching).
+    fieldsWithContext = { ...inputFields, organization_id: context.organizationId };
+  } else {
+    // Platform-scope token: write fields as-is. Agent may supply any
+    // organization_id (or none) — they have authority across orgs.
+    fieldsWithContext = inputFields;
+  }
 
   // The service throws on allowlist failure / oversize / invalid fields —
   // those map to INVALID_INPUT through the global error mapper since the
   // service raises BadRequestException-shaped errors.
   let result;
   try {
-    result = shadowLog.appendRow(input.log_name, input.fields as Record<string, unknown>);
+    result = shadowLog.appendRow(input.log_name, fieldsWithContext);
   } catch (err) {
     throw new BadRequestException(
       err instanceof Error ? err.message : String(err),
@@ -74,7 +94,7 @@ export async function logShadowRowTool(
 export const LOG_SHADOW_ROW_TOOL = {
   name: 'log_shadow_row',
   description:
-    "Append one JSONL row to a Hermes shadow-agent audit log. Server enriches the row with `timestamp` (ISO-8601 UTC) and `run_id` (epoch-seconds), validates against the allowlist of known log names, and atomic-appends. Agent supplies `log_name` (enum: vizora-support-triage-shadow | vizora-support-triage-live | vizora-customer-lifecycle-shadow | vizora-customer-lifecycle-live) and `fields` (JSON object, max 4096 bytes serialized). Platform-scope token required.",
+    "Append one JSONL row to a Hermes shadow-agent audit log. Server enriches the row with `timestamp` (ISO-8601 UTC) and `run_id` (epoch-seconds), validates against the allowlist of known log names, and atomic-appends. Agent supplies `log_name` (enum: vizora-support-triage-shadow | vizora-support-triage-live | vizora-customer-lifecycle-shadow | vizora-customer-lifecycle-live) and `fields` (JSON object, max 4096 bytes serialized). Requires `shadow:write` scope; per-org tokens are tagged with org context, platform-scope tokens are not.",
   scope: 'shadow:write' as const,
   inputSchema: LogShadowRowInput,
   outputSchema: LogShadowRowResult,

@@ -41,16 +41,87 @@ describe('logShadowRowTool', () => {
     expect(svc.appendRow).not.toHaveBeenCalled();
   });
 
-  it('REJECTS per-org tokens with BadRequest — shadow logs are platform-scope artifacts', async () => {
+  it('ACCEPTS per-org tokens and tags the appended row with the token org context', async () => {
+    // P1.1 (2026-05-08): support-triage's token is per-org but it must call
+    // log_shadow_row to write its audit JSONL. Removing the platform-scope
+    // requirement closes the structural contradiction.
+    const svc = makeShadowLog({});
+    const out = await logShadowRowTool(
+      { log_name: 'vizora-customer-lifecycle-shadow', fields: { tier: 'pro' } },
+      ctx({ scopes: ['shadow:write'], organizationId: 'org_abc' }),
+      svc as never,
+    );
+    expect(svc.appendRow).toHaveBeenCalledWith(
+      'vizora-customer-lifecycle-shadow',
+      expect.objectContaining({ tier: 'pro', organization_id: 'org_abc' }),
+    );
+    expect(out.written).toBe(true);
+  });
+
+  it('does NOT inject organization_id when the token is platform-scope', async () => {
+    const svc = makeShadowLog({});
+    await logShadowRowTool(
+      { log_name: 'vizora-customer-lifecycle-shadow', fields: { tier: 'pro' } },
+      ctx({ scopes: ['shadow:write'], organizationId: null }),
+      svc as never,
+    );
+    expect(svc.appendRow).toHaveBeenCalledWith(
+      'vizora-customer-lifecycle-shadow',
+      expect.not.objectContaining({ organization_id: expect.anything() }),
+    );
+  });
+
+  it('REJECTS per-org token with mismatched agent-supplied organization_id (cross-tenant defense)', async () => {
+    // Reviewer A D2: a per-org token for org A could stamp organization_id=B
+    // and mislead downstream JSONL readers. Server-side enforcement: token's
+    // org is the source of truth; mismatched agent-supplied value is INVALID_INPUT.
     const svc = makeShadowLog({});
     await expect(
       logShadowRowTool(
-        { log_name: 'vizora-customer-lifecycle-shadow', fields: { a: 1 } },
-        ctx({ scopes: ['shadow:write'], organizationId: 'org_1' }),
+        {
+          log_name: 'vizora-customer-lifecycle-shadow',
+          fields: { organization_id: 'org_OTHER', tier: 'pro' },
+        },
+        ctx({ scopes: ['shadow:write'], organizationId: 'org_abc' }),
         svc as never,
       ),
     ).rejects.toThrow(BadRequestException);
     expect(svc.appendRow).not.toHaveBeenCalled();
+  });
+
+  it('accepts per-org token when agent-supplied organization_id MATCHES the token', async () => {
+    // Idempotent: agent passing the same value as the token isn't a violation.
+    const svc = makeShadowLog({});
+    await logShadowRowTool(
+      {
+        log_name: 'vizora-customer-lifecycle-shadow',
+        fields: { organization_id: 'org_abc', tier: 'pro' },
+      },
+      ctx({ scopes: ['shadow:write'], organizationId: 'org_abc' }),
+      svc as never,
+    );
+    expect(svc.appendRow).toHaveBeenCalledWith(
+      'vizora-customer-lifecycle-shadow',
+      expect.objectContaining({ organization_id: 'org_abc', tier: 'pro' }),
+    );
+  });
+
+  it('platform-scope token MAY supply any organization_id (cross-org agents have authority)', async () => {
+    // The customer-lifecycle skill iterates over orgs and writes per-org
+    // shadow rows from a platform-scope token. Allowed and expected.
+    const svc = makeShadowLog({});
+    await logShadowRowTool(
+      {
+        log_name: 'vizora-customer-lifecycle-shadow',
+        fields: { organization_id: 'org_xyz', heuristic_action: 'send_nudge' },
+      },
+      ctx({ scopes: ['shadow:write'], organizationId: null }),
+      svc as never,
+    );
+    expect(svc.appendRow).toHaveBeenCalledWith(
+      'vizora-customer-lifecycle-shadow',
+      expect.objectContaining({ organization_id: 'org_xyz' }),
+    );
   });
 
   it('forwards log_name + fields to the service when scope + token shape are correct', async () => {

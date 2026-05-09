@@ -76,9 +76,18 @@ export class CsrfMiddleware implements NestMiddleware {
     const isMcpRoute =
       pathname === '/api/v1/mcp' || pathname.startsWith('/api/v1/mcp/');
 
+    // /api/v1/internal/* endpoints (PR-review R2 C7): server-to-server
+    // calls from the runner script, sidecar, and ops scripts. Auth is
+    // enforced by InternalSecretGuard (x-internal-api-key + caller +
+    // loopback-only). No browser, no cookies, no CSRF surface.
+    // Same exact-match-or-prefix-with-slash discipline as MCP above.
+    const isInternalRoute =
+      pathname === '/api/v1/internal' || pathname.startsWith('/api/v1/internal/');
+
     const isExempt = csrfExemptSuffixes.some(suffix => fullPath.endsWith(suffix))
       || fullPath.match(/\/devices\/pairing\/status\/[A-Za-z0-9]+$/)
-      || isMcpRoute;
+      || isMcpRoute
+      || isInternalRoute;
 
     if (isExempt) {
       return next();

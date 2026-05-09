@@ -57,6 +57,7 @@ model Organization {
   customerIncidents      CustomerIncident[]
   contentRecommendations ContentRecommendation[]
   mcpTokens              McpToken[]
+  agentRuns              AgentRun[]
 
   @@index([slug])
   @@index([stripeCustomerId])
@@ -860,11 +861,11 @@ model ContentRecommendation {
 // ============================================================================
 
 model McpToken {
-  id             String       @id @default(cuid())
+  id             String        @id @default(cuid())
   // SHA-256 hex of the bearer token. Plaintext is shown to admin once at
   // issuance and never persisted. Lookup compares hashes — never compare
   // plaintext to plaintext.
-  tokenHash      String       @unique
+  tokenHash      String        @unique
   // Human-readable label (e.g. "support-triage prod 2026-Q2"). Free-form.
   name           String
   // Scope: which org's data this token can read. NULL = platform-scope
@@ -878,7 +879,7 @@ model McpToken {
   agentName      String
   // Tool-scope strings (e.g. ["displays:read", "content:read"]).
   scopes         String[]
-  createdAt      DateTime     @default(now())
+  createdAt      DateTime      @default(now())
   // Nullable = no expiry. Recommend setting one (max 90d) for admin-issued tokens.
   expiresAt      DateTime?
   // Set when revoked. Null = active.
@@ -912,10 +913,92 @@ model McpAuditLog {
   errorCode      String?
   // Time spent inside the tool handler.
   latencyMs      Int
+  // FK to the agent firing that triggered this tool call. Set when the
+  // runner script propagates the agent_runs.id via Hermes header into
+  // the MCP request context. Nullable for: (a) backward-compat with
+  // pre-2026-05 audit rows, (b) calls from non-runner contexts (admin
+  // tooling, dashboard introspection).
+  agentRunId     String?
+  agentRun       AgentRun? @relation(fields: [agentRunId], references: [id], onDelete: SetNull)
   createdAt      DateTime  @default(now())
 
   @@index([tokenId, createdAt])
   @@index([agentName, createdAt])
   @@index([organizationId, createdAt])
+  @@index([agentRunId])
   @@map("mcp_audit_log")
+}
+
+/// Per-firing record for Hermes-driven agent invocations. Written in
+/// two stages: the runner script POSTs metadata synchronously on firing
+/// exit; the insights-poller sidecar PATCHes cost/token data ~5 min
+/// later by joining `hermes insights` output back to the row.
+///
+/// Cost columns are FROZEN at write — see ADL-7 in the design doc.
+/// `rateInUsdPerMt` and `rateOutUsdPerMt` capture the model rate USED
+/// at the moment of enrichment so historical queries stay accurate
+/// when MODEL_RATES changes.
+///
+/// Retention: 90 days (enforced by db-maintainer cron).
+model AgentRun {
+  id                     String        @id @default(cuid())
+  // Hermes skill name — e.g. "vizora-customer-lifecycle".
+  skillName              String
+  // For per-org skills only; null for platform-scope skills. Enables
+  // per-tenant cost attribution.
+  organizationId         String?
+  organization           Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  // PM2 worker PID — useful for cross-referencing with PM2 logs.
+  pid                    Int?
+  // Wall-clock window. startedAt is at runner pre-flight start (UTC);
+  // finishedAt is null only for orphan rows (sidecar fills in via the
+  // 10-minute orphan-sweep policy in §4.3 of the design doc).
+  startedAt              DateTime
+  finishedAt             DateTime?
+  durationMs             Int?
+  // Hermes process exit code; 124 = timeout(1); null = budget_aborted
+  // (Hermes never invoked).
+  exitCode               Int?
+  // Token usage from `hermes insights`. Null until sidecar enriches.
+  tokensIn               Int?
+  tokensOut              Int?
+  // Cost in microdollars (USD * 1e6) for integer arithmetic. Computed
+  // ONCE at enrichment time; never recomputed (ADL-7).
+  costMicrodollars       Int?
+  // Rate used at enrichment time. Snapshotting these keeps historical
+  // analyses correct when OpenRouter rates change.
+  rateInUsdPerMt         Decimal?      @db.Decimal(8, 4)
+  rateOutUsdPerMt        Decimal?      @db.Decimal(8, 4)
+  // Versioned model id from `hermes insights` (e.g. "openai/gpt-4o-mini-2024-07-18").
+  model                  String?
+  // One of: success | no_work | partial | tool_error | api_error |
+  // timeout | budget_aborted | runner_crash. Validated by Zod at the
+  // controller boundary; stored as String for forward-compatibility
+  // (avoids native enum migration friction when adding new outcomes).
+  outcome                String
+  // Tail of runner log on error (max 1024 chars).
+  errorExcerpt           String?       @db.VarChar(1024)
+  // OpenRouter `/v1/credits` returns 8 fractional digits — match exactly.
+  preflightBalanceUsd    Decimal?      @db.Decimal(12, 8)
+  preflightTodaySpendUsd Decimal?      @db.Decimal(12, 8)
+  // Caller identification from the runner POST. Persisted for forensic
+  // attribution if the shared INTERNAL_API_SECRET ever leaks.
+  // Values: 'runner' | 'sidecar' | 'ops'.
+  // (PR-review R2 I5: was stamped on req but never persisted; now is.)
+  callerType             String?
+  // Set by the sidecar on first PATCH. Used as the idempotency marker
+  // (PR-review R1 I3): predicate `WHERE enrichedAt IS NULL` closes the
+  // gap where outcome-only refinements with no token data would otherwise
+  // re-pass the previous `tokensIn IS NULL` predicate.
+  enrichedAt             DateTime?
+  createdAt              DateTime      @default(now())
+
+  auditLogs McpAuditLog[]
+
+  @@index([skillName, startedAt])
+  @@index([outcome, startedAt])
+  @@index([model, startedAt])
+  @@index([createdAt])
+  @@index([organizationId, startedAt])
+  @@map("agent_runs")
 }

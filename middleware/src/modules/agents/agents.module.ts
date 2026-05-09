@@ -2,9 +2,12 @@ import { Module, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { DatabaseModule } from '../database/database.module';
 import { AgentsController } from './agents.controller';
+import { AgentRunsController } from './agent-runs.controller';
 import { AgentStateService } from './agent-state.service';
+import { AgentRunsService } from './agent-runs.service';
 import { CustomerIncidentService } from './customer-incident.service';
 import { OnboardingService } from './onboarding.service';
+import { InternalSecretGuard } from '../common/guards/internal-secret.guard';
 import { AGENT_AI_TOKEN, type AgentAI } from './ai/agent-ai.interface';
 import { HeuristicAgentAI } from './ai/heuristic-agent-ai';
 import { AnthropicAgentAI } from './ai/anthropic-agent-ai.stub';
@@ -52,8 +55,10 @@ class FailedAgentAI implements AgentAI {
   imports: [DatabaseModule, ConfigModule],
   providers: [
     AgentStateService,
+    AgentRunsService,
     OnboardingService,
     CustomerIncidentService,
+    InternalSecretGuard,
     {
       provide: AGENT_AI_TOKEN,
       useFactory: (cfg: ConfigService): AgentAI => {
@@ -98,7 +103,7 @@ class FailedAgentAI implements AgentAI {
       inject: [ConfigService],
     },
   ],
-  controllers: [AgentsController],
-  exports: [OnboardingService, CustomerIncidentService, AGENT_AI_TOKEN],
+  controllers: [AgentsController, AgentRunsController],
+  exports: [OnboardingService, CustomerIncidentService, AgentRunsService, AGENT_AI_TOKEN],
 })
 export class AgentsModule {}
