@@ -53,6 +53,16 @@ export const envSchema = z.object({
   
   // Logging
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+
+  // Internal service-to-service auth (runner script, sidecar, ops scripts).
+  // Required in production for the agent-platform-redesign /api/v1/internal/*
+  // endpoints. Without this, ConfigService.get('INTERNAL_API_SECRET') returns
+  // undefined (Zod strips unknown keys) → InternalSecretGuard fails closed
+  // → every internal call returns 401.
+  INTERNAL_API_SECRET: z.string().min(32, {
+    message: 'INTERNAL_API_SECRET must be at least 32 characters for security',
+  }).optional(),
+  INTERNAL_API_LOOPBACK_ONLY: z.string().default('true'),
 }).superRefine((data, ctx) => {
   // In production, MinIO credentials must be set and not be the default 'minioadmin'
   if (data.NODE_ENV === 'production') {
