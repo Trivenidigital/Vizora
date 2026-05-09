@@ -252,13 +252,18 @@ Available at `http://localhost:3000/api/v1/docs` in development mode only.
 
 ## Known Test State
 
-> Numbers below are approximate; the codebase is actively gaining tests. **Verify with a fresh run before relying on a specific number.** Current spec-file counts (a rough proxy for test count): middleware ≈ 106, realtime ≈ 10, web ≈ 78. Per-test counts run several multiples of those.
+> Numbers below were validated 2026-05-09 by a full autonomous test pass. **Verify with a fresh run before relying on a specific number** — the codebase is actively gaining tests. See `docs/plans/2026-05-09-test-results.md` for the full report.
 
-- **Middleware**: 1700+ tests pass at last full run. Historical pre-existing failures (auth.controller, pairing.service) — verify locally if you see a fail; not all are regressions.
-- **Realtime**: ~28 tests pass. 1 suite has historically failed on a Prisma generate issue in the test env.
-- **Web**: 40+ suites pass. 2 admin test suites have historically failed (async Client Component in jsdom — tied to deferred RSC migration).
-- **Display**: No test coverage yet.
+- **Middleware**: **2335 / 2367 tests pass** across **121 / 124 suites** (32 skipped, 0 fail). 124 spec files. Historical pre-existing failures (auth.controller, pairing.service) NO LONGER REPRODUCE.
+- **Realtime**: **212 / 212 tests pass** across **10 / 10 suites**. 10 spec files. The historical Prisma-generate-in-test-env issue NO LONGER REPRODUCES.
+- **Web**: **864 / 864 tests pass** across **79 / 79 suites**. 79 test files. The 2 admin RSC failures were resolved in `b712211` and remain green.
+- **Aggregate**: 3411 unit/integration tests passing, **ZERO failures** across all 3 services.
+- **TypeScript**: middleware `tsc --noEmit` exit 0; realtime + web pass via ts-jest (no separate type-check needed).
+- **Playwright (E2E)**: 24 spec files in `e2e-tests/`. Post-2026-05-09 fix (mass `/api/` → `/api/v1/` + h1 copy regex updates), estimated >90% pass rate. ~26 remaining failures concentrated in 9 specs (heaviest: 16-billing); see `docs/plans/2026-05-09-playwright-results.md`. Critical-path flows verified.
+- **Display**: No test coverage yet (Electron testing framework not wired). Rely on real-device walkthrough per release.
 - **Builds**: All 3 services compile via `npx nx build @vizora/{middleware,web,realtime}`. `web` may need `NODE_OPTIONS="--max-old-space-size=4096"` on memory-constrained dev machines.
+
+**API smoke test**: `bash scripts/smoke/api-critical-path.sh` probes 12 critical endpoints in <30 seconds; verified 12/12 pass against local stack 2026-05-09.
 
 ## Support Agent System
 
@@ -479,6 +484,36 @@ Reference docs added 2026-05-03 from a review of the sister project `shift-agent
 - **`docs/agents-mcp-server-design.md`** — proposed Vizora MCP server module (`middleware/src/modules/mcp/`). Read-only v1 with 13 tools, token-based auth, rate limiting, audit, observability. Design only — implementation gated on a real consumer (see `tasks/feature-backlog.md`).
 
 **Existing agent state code:** `middleware/src/modules/agents/agent-state.service.ts` (PR #32, merged 2026-04-19) — anchored secret/PII redaction, file-locking with timeout, known-family path safety, async fs/promises, manual-run enqueue. Use this for new agent state I/O — don't reimplement.
+
+## Review Discipline
+
+Vizora's pre-proposal sequence (drift-check + Hermes-first) is in this
+CLAUDE.md under "Agent Architecture (business agents)" and "MCP Server"
+— and the consolidated cross-project statement is in global
+`~/.claude/CLAUDE.md §7`. For post-proposal review + ship stages, see
+global §8-9.
+
+**Vizora-specific instantiations** when global §8-9 fire:
+
+### §8 vectors that matter
+- **Hermes runtime behavior** — live skill invocation matches the
+  documented contract (e.g. shadow-mode SKILL vs SKILL-live.md on the
+  prod VPS at `/root/.hermes/skills/`).
+- **MCP token scope** — per-org vs platform-scope. A scope inversion
+  leaks cross-tenant data; verify `requireOrgScope` / platform-only
+  guards on every new tool.
+- **Prisma migration state** — `prisma migrate status` on prod, pending
+  migrations, schema.prisma drift between branch and `main`.
+- **Razorpay config** — live vs test key id, webhook subscription state
+  in `mcp_audit_log` + Razorpay dashboard.
+- **Email path** — SMTP / Resend sender verification, `EMAIL_FROM`
+  matches verified domain, `LIFECYCLE_LIVE` gate state on prod.
+
+### §9 runtime-state assumptions cluster around
+Hermes skill files on `/root/.hermes/skills/`, MCP-token scope rows in
+`mcp_tokens`, PM2 process state for `hermes-vizora-*` and ops agents,
+prod `.env` values for `LIFECYCLE_LIVE` / `INTERNAL_API_SECRET` /
+SMTP creds, Redis-cached pairing codes (5-min TTL).
 
 ## Backlog locations
 
