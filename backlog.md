@@ -1,12 +1,69 @@
 # Vizora Backlog
 
-**Last updated:** 2026-03-18
-**Production readiness:** ~85% (up from 78% at start of week)
-**Tests:** 93 suites, 1,917 tests — ALL PASSING
+**Last updated:** 2026-05-11
+**Production readiness:** ~75% — three operator-driven launch blockers open (see P0 below); technical foundation strongest on record
+**Tests:** 124 middleware suites / 2335 tests, 10 realtime suites / 212 tests, 79 web suites / 864 tests — ALL PASSING (zero failures). Playwright 24 specs at >90% pass post-2026-05-09 refresh. Verified by autonomous pass `docs/plans/2026-05-09-test-results.md`.
+**Customer-1 launch target:** 2026-05-13 (T-2 from today) — **status unconfirmed**; operator must confirm before T-2 prep work continues.
 
 ---
 
-## COMPLETED (This Sprint)
+## COMPLETED (Since Last Backlog Update — 2026-03-18 → 2026-05-11)
+
+### Agent Platform Redesign (2026-05-08 → 2026-05-09)
+Triggered by 2026-05-06 OpenRouter credit drain. PR #62 (merged `801b517` on 2026-05-09) + 5 hotfix commits on main bring cost defense to 4 layers (provider cap → app daily cap → per-firing Hermes hard-stop → cross-firing breaker designed for P4).
+
+| # | Item | Commits | Date |
+|---|------|---------|------|
+| A1 | Plan + design + 2 parallel review passes | `f6c9798`, `7adcf5b` | 2026-05-08 |
+| A2 | Schema migration (`AgentRun` model + `agentRunId` FK on `mcp_audit_log`) | `423597e` | 2026-05-08 |
+| A3 | `AgentRunsService` + Zod schemas (18 tests) | `2291ea6` | 2026-05-08 |
+| A4 | `InternalSecretGuard` + `AgentRunsController` + module wiring (9 tests) | `9901814` | 2026-05-08 |
+| A5 | Pre-flight checks + phantom-lever fix in runner script | `88a0140` | 2026-05-08 |
+| A6 | `log_shadow_row` cross-tenant defense (P1.1) — accepts per-org tokens, server forces token's org_id | `2538933` | 2026-05-08 |
+| A7 | Hermes per-skill tool allowlist via `-t` flag (P1.2) + ecosystem-cron lock test | `1c87576` | 2026-05-08 |
+| A8 | insights-poller sidecar + hermes-table parser (P0.5) | `efc9e69` | 2026-05-08 |
+| A9 | Grafana dashboard + insights-poller PM2 entry (P0.6) | `05da274` | 2026-05-08 |
+| A10 | PR review fixes — 7 critical + 9 important (3-agent parallel review) | `8d60bd1` | 2026-05-08 |
+| A11 | Deploy hotfixes — load .env in sidecar; INTERNAL_API_SECRET env-schema; `@Public()` on controller; runner env-load + scoped outcome classifier; response-envelope unwrap | `2e61e51` → `2d6e93f` | 2026-05-09 |
+
+### Production Readiness Pass (2026-05-09 — autonomous)
+
+| # | Item | Output | Date |
+|---|------|--------|------|
+| R1 | Test inventory (727 lines) — 27 middleware modules + features + risk map | `docs/plans/2026-05-09-test-inventory.md` | 2026-05-09 |
+| R2 | Test results — 3411/3443 unit/integration tests pass (zero failures); type-check clean | `docs/plans/2026-05-09-test-results.md` | 2026-05-09 |
+| R3 | Playwright Run-1: 0/332 pass — bit-rot diagnosed (stale h1 copy + stale `/api/` paths) | `docs/plans/2026-05-09-playwright-results.md` | 2026-05-09 |
+| R4 | Playwright Run-2: ~90%+ pass post-mechanical-fix (`f23ae65`) — ~26 remaining failures (heaviest: 16-billing×10) | same doc + commit | 2026-05-09 |
+| R5 | Production readiness report — verdict CONDITIONAL GO for 2026-05-13 | `docs/plans/2026-05-09-production-readiness-report.md` | 2026-05-09 |
+| R6 | API smoke test (12 endpoints, <30s) — `bash scripts/smoke/api-critical-path.sh` | `scripts/smoke/api-critical-path.sh` (12/12 pass verified) | 2026-05-09 |
+| R7 | First-customer onboarding runbook (T-3 → T-0 → day-7) | `docs/runbooks/first-customer-onboarding.md` | 2026-05-09 |
+| R8 | Monitoring playbook (Grafana panels + thresholds + drilldowns) | `docs/runbooks/monitoring-playbook.md` | 2026-05-09 |
+| R9 | Hermes-insights empty-output investigation — root cause: `hermes -z` does NOT persist sessions; sidecar dormant by design | `docs/plans/2026-05-09-hermes-insights-investigation.md` | 2026-05-09 |
+| R10 | agentRunId propagation investigation — Hermes config supports static headers only, no `--header` flag in 0.12.0 | `docs/plans/2026-05-09-agent-run-id-propagation-investigation.md` | 2026-05-09 |
+| R11 | support-triage cross-tenant token design call — recommended kept-disabled for customer-1, Option 2 (platform-scope `support:*` tools) for week-2 | `docs/plans/2026-05-09-support-triage-cross-tenant-design.md` | 2026-05-09 |
+| R12 | CLAUDE.md test baseline refreshed (1700+ → 2335; carve-outs resolved) | `e80939d` | 2026-05-09 |
+
+### Earlier (carried over from prior backlog state)
+
+| # | Item | Branch | Commits | Date |
+|---|------|--------|---------|------|
+| 1 | Fix 4 broken API endpoints (content, widgets, layouts, notifications) | `fix/day5-6-api-deletion-consent` | `03af03f` | 2026-03-09 |
+| 2 | Account deletion with full cascade (GDPR compliance) | `fix/day5-6-api-deletion-consent` | `f3d08f3` | 2026-03-09 |
+| 3 | Cookie consent banner | `fix/day5-6-api-deletion-consent` | `12eb382` | 2026-03-09 |
+| 4 | Fix template thumbnails / seed on production | `feat/week1-unblocked-tasks` | — | 2026-03-09 |
+| 5 | Fix trial banner text clipping | `feat/week1-unblocked-tasks` | — | 2026-03-09 |
+| 6 | Fix AI Designer modal Escape key | `feat/week1-unblocked-tasks` | — | 2026-03-09 |
+| 7 | Wire playlist loop toggle end-to-end | `feat/week1-unblocked-tasks` | — | 2026-03-09 |
+| 8 | Profile name editing | `feat/week1-unblocked-tasks` | — | 2026-03-09 |
+| 9 | Quick wins sweep (console errors, loading states) | `feat/week1-unblocked-tasks` | — | 2026-03-09 |
+| 10 | Startup self-test (8 subsystem checks) | `feat/health-infrastructure` | — | 2026-03-10 |
+| 11 | Deploy verification script (25+ checks) | `feat/health-infrastructure` | — | 2026-03-10 |
+| 12 | Regression guard tests (25 static analysis) | `feat/health-infrastructure` | — | 2026-03-10 |
+| 13 | Continuous health monitor (6 checks every 5min) | `feat/health-infrastructure` | — | 2026-03-10 |
+| 14 | Admin system health dashboard with sparklines | `feat/health-infrastructure` | — | 2026-03-10 |
+| 15 | Fix ParseUUIDPipe / CUID mismatch across codebase | — | — | 2026-03-10 |
+| 16 | Night 1: Backend hardening (14 critical + 20 med/high fixed) | — | — | 2026-03-08 |
+| 17 | Night 2: UI hardening (15 areas polished) | — | — | 2026-03-09 |
 
 | # | Item | Branch | Commits | Date |
 |---|------|--------|---------|------|
@@ -30,31 +87,42 @@
 
 ---
 
-## P0 — LAUNCH BLOCKERS (Cannot accept paying customers)
+## P0 — LAUNCH BLOCKERS for customer-1 (2026-05-13 target)
+
+Per 2026-05-09 readiness pass: the three operator-driven items below are the GO/NO-GO gates. Technical foundation is sound — these are unblockable by code.
+
+| # | Item | Owner | Effort | Status | Notes |
+|---|------|-------|--------|--------|-------|
+| **C1** | **SMTP / Resend on prod — domain `mail.vizora.cloud` verified (DKIM/SPF/DMARC), `SMTP_*`/`EMAIL_FROM` env set, test send works end-to-end** | Sri | 2h | TODO | Without this, customer registration emails + password resets don't send |
+| **C2** | **Customer-1 organization provisioned on prod** (skeleton, admin user invite, plan, quota) | Sri | 1h | TODO | Skip if customer self-registers |
+| **C3** | **Real-device walkthrough on customer hardware** (pair, push playlist, reboot, network-flap) | Sri + customer IT | 2h | TODO | Electron has 0% functional test coverage; this IS the test |
+| **C4** | B16 60-step go-live smoke test on prod | Claude Code (driven by Sri) | 3h | BLOCKED on C1-C3 | Operator-driven; document in `docs/runbooks/customer-1-go-live-smoke-{DATE}.md` |
+
+**Stripe/Razorpay live keys (formerly B8-B15):** DEFERRED past customer-1. Customer-1 launches on free tier. Backlog items kept open for the first paid customer:
 
 | # | Item | Owner | Effort | Status | Dependencies |
 |---|------|-------|--------|--------|-------------|
-| B1 | **Configure SMTP on production (SendGrid)** | YOU | 2h | TODO | SendGrid account, DNS access |
-| B2 | Set SPF/DKIM/DMARC DNS records for vizora.cloud | YOU | 1h | TODO | DNS access |
-| B3 | Set SMTP env vars on production server | YOU | 30m | TODO | B1 complete |
-| B4 | Test all 8 existing email types end-to-end | Claude Code | 2h | TODO | B3 complete |
-| B5 | **Build email verification flow** (token, endpoint, template, soft enforcement) | Claude Code | 4h | TODO | B3 complete |
-| B6 | Wire team invite email to mail service | Claude Code | 1h | TODO | B3 complete |
-| B7 | Add unsubscribe link to non-transactional emails | Claude Code | 1h | TODO | B3 complete |
-| B8 | **Create Stripe account + products + prices** (4 tiers x 2 intervals) | YOU | 2h | TODO | Business bank account |
-| B9 | **Create Razorpay account + plans** (4 tiers x 2 intervals, INR) | YOU | 2h | TODO | Indian business entity or partner |
-| B10 | Configure Stripe webhook endpoint | YOU | 30m | TODO | B8 complete |
-| B11 | Configure Razorpay webhook endpoint | YOU | 30m | TODO | B9 complete |
-| B12 | Set billing env vars on production | YOU | 30m | TODO | B8 + B9 complete |
-| B13 | Update plans.ts with real Stripe/Razorpay price IDs | Claude Code | 1h | TODO | B8 + B9 complete |
-| B14 | **End-to-end billing test** (register -> checkout -> subscription -> invoice) | Claude Code | 4h | TODO | B12 + B13 complete |
-| B15 | Test billing failure scenarios (declined card, cancel, webhook retry) | Claude Code | 2h | TODO | B14 complete |
-| B16 | **Full go-live smoke test** (60-step user journey) | Claude Code | 3h | TODO | All above complete |
+| B8 | Create Stripe account + products + prices (4 tiers x 2 intervals) | Sri | 2h | DEFERRED | Business bank account |
+| B9 | Create Razorpay account + plans (4 tiers x 2 intervals, INR) | Sri | 2h | DEFERRED | Indian business entity or partner |
+| B10-B15 | Stripe/Razorpay webhook setup, env vars, plans.ts, billing E2E tests | mixed | ~10h | DEFERRED | B8 + B9 |
 
-**Prompt files ready:**
-- `week1-day1-2-email-task.md` -> covers B4-B7
-- `week1-day3-4-billing-task.md` -> covers B13-B15
-- `week1-day7-8-smoke-test-task.md` -> covers B16
+**Original B-series items (B1-B7) — partial status:**
+- B1/B2/B3 (SMTP setup, DNS, env vars): SUBSUMED into **C1**
+- B4 (test 8 email types end-to-end): BLOCKED on C1
+- B5 (email verification flow), B6 (team invite email wiring), B7 (unsubscribe link): UNTOUCHED; defer to week-1 post-launch if not on customer-1's path
+
+---
+
+## Tech-debt from 2026-05-09 readiness pass (post-launch sprint)
+
+These are documented + non-blocking for customer-1. Investigations done; implementations deferred.
+
+| # | Item | Effort | Pointer | Why deferred |
+|---|------|--------|---------|--------------|
+| T1 | Playwright suite refresh — close remaining ~26 failures (heaviest: 16-billing×10) | 6-8h | `docs/plans/2026-05-09-playwright-results.md` | Critical-path flows verified (8/10); 16-billing is OUT of customer-1 scope |
+| T2 | Per-firing cost attribution (Path A: balance-delta pre/post each firing) | ~1h | `docs/plans/2026-05-09-hermes-insights-investigation.md` | Cost defense intact (4 layers); attribution is monitoring-quality |
+| T3 | agentRunId propagation runner→Hermes→MCP — Hermes 0.12.0 has no `--header` flag; needs upstream patch OR env-var config interpolation experiment | 2h-2d | `docs/plans/2026-05-09-agent-run-id-propagation-investigation.md` | Sidecar's audit-row join falls back to time-range; minor refinement degradation |
+| T4 | support-triage cross-tenant token redesign — Option 2 (relax `support:*` tools to accept platform-scope) | 4-6h | `docs/plans/2026-05-09-support-triage-cross-tenant-design.md` | support-triage NOT enabled; operator handles tickets directly |
 
 ---
 
