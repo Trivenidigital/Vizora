@@ -207,10 +207,18 @@ Apply the approved "Operational Simplicity with Premium Confidence" direction ac
 - [x] Replace hardcoded legacy colors across components.
 - [x] Clean auth/shared copy and old marketing remnants.
 - [x] Verify with tests/build/screenshots.
-- [ ] Deploy to VPS after verification.
+- [x] Deploy to VPS after verification.
 
 ### Verification Review (2026-05-14)
 
 - Passed focused tests: `pnpm --filter @vizora/web test -- --runTestsByPath "src/app/__tests__/homepage.test.tsx" "src/app/(auth)/__tests__/login-page.test.tsx" "src/app/(auth)/__tests__/register-page.test.tsx" "src/components/__tests__/ViewToggle.test.tsx" "src/components/__tests__/Button.test.tsx"`.
 - Passed production build with `NEXT_TURBOPACK_EXPERIMENTAL_USE_SYSTEM_TLS_CERTS=1 pnpm --filter @vizora/web build`.
 - Visual checked homepage plus login/register auth surfaces locally. Dashboard/admin routes redirect to auth locally without backend auth, but their shared shells and components now inherit the updated tokens and hardcoded blue/neutral palette.
+
+### Deployment Review (2026-05-14, Sitewide Pass)
+
+- Pushed `feat/vizora-frontend-redesign` commit `2b71f87` and cherry-picked it onto the VPS deployment worktree as `32b9436`, preserving unrelated local VPS edits.
+- Built `@vizora/web` on the VPS with `NEXT_TURBOPACK_EXPERIMENTAL_USE_SYSTEM_TLS_CERTS=1 pnpm --filter @vizora/web build`.
+- Restarted and saved PM2 process `vizora-web`.
+- Verified `https://vizora.cloud/` returns the new homepage copy and does not return old AI/command-center homepage copy.
+- Captured deployed auth screenshots: `deployed-sitewide-login.png` and `deployed-sitewide-register.png`.
