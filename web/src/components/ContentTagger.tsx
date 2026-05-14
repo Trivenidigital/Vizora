@@ -18,7 +18,7 @@ interface ContentTaggerProps {
 }
 
 const TAG_COLORS = [
-  { name: 'blue', bg: 'bg-[#00B4D8]/10', text: 'text-[#00B4D8]', border: 'border-[#00B4D8]/30' },
+  { name: 'blue', bg: 'bg-[#1E3A8A]/10', text: 'text-[#1E3A8A]', border: 'border-[#1E3A8A]/30' },
   { name: 'red', bg: 'bg-red-100 dark:bg-red-900', text: 'text-red-800 dark:text-red-200', border: 'border-red-300 dark:border-red-700' },
   { name: 'green', bg: 'bg-green-100 dark:bg-green-900', text: 'text-green-800 dark:text-green-200', border: 'border-green-300 dark:border-green-700' },
   { name: 'purple', bg: 'bg-purple-100 dark:bg-purple-900', text: 'text-purple-800 dark:text-purple-200', border: 'border-purple-300 dark:border-purple-700' },
@@ -90,7 +90,7 @@ export default function ContentTagger({
           {!isCreating ? (
             <button
               onClick={() => setIsCreating(true)}
-              className="px-3 py-1.5 rounded-full text-xs font-medium border-2 border-dashed border-[var(--border)] text-[var(--foreground-secondary)] hover:border-[#00E5A0] hover:text-[#00E5A0] transition"
+              className="px-3 py-1.5 rounded-full text-xs font-medium border-2 border-dashed border-[var(--border)] text-[var(--foreground-secondary)] hover:border-[#2563EB] hover:text-[#2563EB] transition"
             >
               + Add Tag
             </button>
@@ -101,7 +101,7 @@ export default function ContentTagger({
                 value={newTagName}
                 onChange={e => setNewTagName(e.target.value)}
                 placeholder="Tag name (e.g., Holiday, Promotion, Q4)"
-                className="w-full px-3 py-1.5 text-sm border border-[var(--border)] rounded bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0]"
+                className="w-full px-3 py-1.5 text-sm border border-[var(--border)] rounded bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB]"
                 autoFocus
               />
 
@@ -126,7 +126,7 @@ export default function ContentTagger({
                 <button
                   onClick={handleCreateTag}
                   disabled={!newTagName.trim()}
-                  className="flex-1 px-3 py-1.5 text-sm bg-[#00E5A0] text-[#061A21] rounded hover:bg-[#00CC8E] disabled:opacity-50 transition"
+                  className="flex-1 px-3 py-1.5 text-sm bg-[#2563EB] text-white rounded hover:bg-[#1D4ED8] disabled:opacity-50 transition"
                 >
                   Create
                 </button>

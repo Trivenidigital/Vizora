@@ -119,9 +119,9 @@ export default function FeatureFlagsPage() {
                 aria-checked={flags[key] !== false}
                 disabled={!isAdmin}
                 onClick={() => handleToggle(key)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#00E5A0] focus:ring-offset-2 disabled:opacity-50 ${
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:ring-offset-2 disabled:opacity-50 ${
                   flags[key] !== false
-                    ? 'bg-[#00E5A0]'
+                    ? 'bg-[#2563EB]'
                     : 'bg-gray-300 dark:bg-gray-600'
                 }`}
               >

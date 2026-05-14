@@ -361,7 +361,7 @@ export default function BacklogClient() {
               <div className="text-xs text-[var(--foreground-tertiary)]">{m.label}</div>
               <div className="text-lg font-bold text-[var(--foreground)] mt-0.5">{m.current}</div>
               <div className="text-xs text-[var(--foreground-tertiary)] mt-0.5">
-                {m.start} &rarr; <span className="text-[#00E5A0]">{m.target}</span>
+                {m.start} &rarr; <span className="text-[#2563EB]">{m.target}</span>
               </div>
             </div>
           ))}

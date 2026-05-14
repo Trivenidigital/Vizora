@@ -18,7 +18,7 @@ const mockBrandConfig = {
   logoAlt: 'Test Logo',
   primaryColor: '#0284c7',
   secondaryColor: '#38bdf8',
-  accentColor: '#00E5A0',
+  accentColor: '#2563EB',
   fontFamily: 'sans',
   showPoweredBy: true,
   customDomain: '',

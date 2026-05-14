@@ -43,7 +43,7 @@ export default function EmptyState({
 
   return (
     <div className="eh-empty-state eh-dash-card py-16 px-6 animate-[fadeIn_0.3s_ease-out]">
-      <div className="w-14 h-14 bg-[rgba(0,229,160,0.08)] rounded-2xl flex items-center justify-center mb-5">
+      <div className="w-14 h-14 bg-[rgba(37, 99, 235,0.08)] rounded-2xl flex items-center justify-center mb-5">
         <Icon name={icon} size="2xl" className="text-[var(--primary)]" />
       </div>
       <h3 className="eh-dash-subtitle text-lg mb-2">{title}</h3>

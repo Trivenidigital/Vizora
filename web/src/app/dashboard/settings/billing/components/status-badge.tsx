@@ -6,7 +6,7 @@ interface StatusBadgeProps {
 
 const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
   active: { bg: 'bg-green-500/10', text: 'text-green-500', label: 'Active' },
-  trialing: { bg: 'bg-[#00B4D8]/10', text: 'text-[#00B4D8]', label: 'Trial' },
+  trialing: { bg: 'bg-[#1E3A8A]/10', text: 'text-[#1E3A8A]', label: 'Trial' },
   past_due: { bg: 'bg-yellow-500/10', text: 'text-yellow-500', label: 'Past Due' },
   canceled: { bg: 'bg-[var(--surface-hover)]', text: 'text-[var(--foreground-tertiary)]', label: 'Canceled' },
   unpaid: { bg: 'bg-red-500/10', text: 'text-red-500', label: 'Unpaid' },

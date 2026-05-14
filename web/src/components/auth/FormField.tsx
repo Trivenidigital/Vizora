@@ -86,7 +86,7 @@ export default function FormField({
           value={value}
           onChange={handleChange}
           onBlur={handleBlur}
-          className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 bg-[var(--background)] text-[var(--foreground)] transition-colors duration-200 ${
+          className={`w-full px-4 py-3 border rounded-lg bg-white text-[#111827] shadow-sm focus:outline-none focus:ring-2 transition-colors duration-200 ${
             error
               ? 'border-[var(--error)] focus:ring-[var(--error)]'
               : isValid

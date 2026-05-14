@@ -8,15 +8,15 @@ const INDUSTRIES = [
     icon: ShoppingBag,
     title: 'Retail & Stores',
     desc: 'AI-driven promotions based on foot traffic patterns. Dynamic product showcases and seasonal campaigns that update across all locations simultaneously.',
-    color: '#00E5A0',
-    bg: 'rgba(0,229,160,0.03)',
+    color: '#2563EB',
+    bg: 'rgba(37, 99, 235,0.03)',
   },
   {
     icon: Building2,
     title: 'Corporate Offices',
     desc: 'Intelligent content rotation powered by audience data. Welcome screens, meeting room displays, KPI dashboards, and employee communications at scale.',
-    color: '#00B4D8',
-    bg: 'rgba(0,180,216,0.03)',
+    color: '#1E3A8A',
+    bg: 'rgba(30, 58, 138,0.03)',
   },
   {
     icon: Stethoscope,
@@ -41,13 +41,13 @@ export default function SolutionsSection() {
         <Reveal>
           <div className="text-center mb-14">
             <span className="inline-block text-xs font-bold uppercase tracking-[0.15em] mb-4 px-3 py-1 rounded-full"
-              style={{ color: '#00B4D8', background: 'rgba(0,180,216,0.08)', border: '1px solid rgba(0,180,216,0.15)' }}>
+              style={{ color: '#1E3A8A', background: 'rgba(30, 58, 138,0.08)', border: '1px solid rgba(30, 58, 138,0.15)' }}>
               Solutions
             </span>
             <h2 className="eh-heading text-3xl sm:text-4xl font-bold mb-4">
               Built for <span className="eh-gradient">your industry</span>
             </h2>
-            <p style={{ color: '#9A958E' }} className="max-w-lg mx-auto">
+            <p style={{ color: '#6B7280' }} className="max-w-lg mx-auto">
               From retail storefronts to hospital lobbies, Vizora adapts to your use case.
             </p>
           </div>
@@ -67,7 +67,7 @@ export default function SolutionsSection() {
                   <industry.icon size={20} style={{ color: industry.color }} />
                 </div>
                 <h3 className="eh-heading text-[0.95rem] font-semibold mb-2">{industry.title}</h3>
-                <p className="text-[0.85rem] leading-relaxed" style={{ color: '#9A958E' }}>{industry.desc}</p>
+                <p className="text-[0.85rem] leading-relaxed" style={{ color: '#6B7280' }}>{industry.desc}</p>
               </div>
             </Reveal>
           ))}
@@ -75,7 +75,7 @@ export default function SolutionsSection() {
 
         <Reveal>
           <p className="text-center text-sm" style={{ color: '#6B655D' }}>
-            Also used in <span style={{ color: '#9A958E' }}>Education, Manufacturing, Hospitality, Transportation,</span> and <span style={{ color: '#9A958E' }}>Government</span>
+            Also used in <span style={{ color: '#6B7280' }}>Education, Manufacturing, Hospitality, Transportation,</span> and <span style={{ color: '#6B7280' }}>Government</span>
           </p>
         </Reveal>
       </div>

@@ -9,7 +9,7 @@ export default function SupportChatButton() {
   return (
     <button
       onClick={toggleChat}
-      className={`fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-[#00E5A0] text-[#0A0F1C] shadow-lg hover:brightness-110 flex items-center justify-center transition-all duration-200 active:scale-95 ${
+      className={`fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-[#2563EB] text-[#0A0F1C] shadow-lg hover:brightness-110 flex items-center justify-center transition-all duration-200 active:scale-95 ${
         unreadCount > 0 && !isOpen ? 'animate-pulse' : ''
       }`}
       aria-label={isOpen ? 'Close support chat' : 'Open support chat'}

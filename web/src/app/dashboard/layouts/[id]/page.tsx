@@ -93,15 +93,15 @@ function getGridStyle(layoutType: string): React.CSSProperties {
 }
 
 const zoneColors = [
-  'border-[#00E5A0] bg-[#00E5A0]/5',
-  'border-[#00B4D8] bg-[#00B4D8]/5',
+  'border-[#2563EB] bg-[#2563EB]/5',
+  'border-[#1E3A8A] bg-[#1E3A8A]/5',
   'border-purple-400 bg-purple-400/5',
   'border-orange-400 bg-orange-400/5',
 ];
 
 const zoneHeaderColors = [
-  'bg-[#00E5A0]/20 text-[#00E5A0]',
-  'bg-[#00B4D8]/20 text-[#00B4D8]',
+  'bg-[#2563EB]/20 text-[#2563EB]',
+  'bg-[#1E3A8A]/20 text-[#1E3A8A]',
   'bg-purple-400/20 text-purple-400',
   'bg-orange-400/20 text-orange-400',
 ];
@@ -222,7 +222,7 @@ export default function LayoutEditorPage({ params }: { params: Promise<{ id: str
         <p className="text-[var(--foreground-secondary)]">Layout not found.</p>
         <button
           onClick={() => router.push('/dashboard/layouts')}
-          className="mt-4 px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition"
+          className="mt-4 px-4 py-2 bg-[#2563EB] text-white rounded-lg hover:bg-[#1D4ED8] transition"
         >
           Back to Layouts
         </button>
@@ -256,7 +256,7 @@ export default function LayoutEditorPage({ params }: { params: Promise<{ id: str
             onClick={() => setIsPreviewMode(!isPreviewMode)}
             className={`px-4 py-2 text-sm font-medium rounded-lg border transition flex items-center gap-2 ${
               isPreviewMode
-                ? 'bg-[#00E5A0]/10 border-[#00E5A0] text-[#00E5A0]'
+                ? 'bg-[#2563EB]/10 border-[#2563EB] text-[#2563EB]'
                 : 'border-[var(--border)] text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
             }`}
           >
@@ -266,7 +266,7 @@ export default function LayoutEditorPage({ params }: { params: Promise<{ id: str
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-6 py-2 text-sm font-semibold bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
+            className="px-6 py-2 text-sm font-semibold bg-[#2563EB] text-white rounded-lg hover:bg-[#1D4ED8] transition disabled:opacity-50 flex items-center gap-2"
           >
             {saving && <LoadingSpinner size="sm" />}
             Save Layout
@@ -295,10 +295,10 @@ export default function LayoutEditorPage({ params }: { params: Promise<{ id: str
                     key={zone.id}
                     className={`rounded-lg border-2 transition-all cursor-pointer ${
                       isSelected
-                        ? 'border-[#00E5A0] bg-[#00E5A0]/10 ring-2 ring-[#00E5A0]/30'
+                        ? 'border-[#2563EB] bg-[#2563EB]/10 ring-2 ring-[#2563EB]/30'
                         : hasContent
                         ? zoneColors[idx % zoneColors.length]
-                        : 'border-dashed border-[var(--border)] bg-[var(--surface)] hover:border-[#00E5A0]/50'
+                        : 'border-dashed border-[var(--border)] bg-[var(--surface)] hover:border-[#2563EB]/50'
                     }`}
                     style={{ gridArea: zone.gridArea }}
                     onClick={() => setSelectedZone(isSelected ? null : zone.id)}
@@ -398,7 +398,7 @@ export default function LayoutEditorPage({ params }: { params: Promise<{ id: str
                         onChange={(e) =>
                           handleZoneAssignment(zone.id, 'contentId', e.target.value || null)
                         }
-                        className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-sm text-[var(--foreground)] bg-[var(--surface)]"
+                        className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-sm text-[var(--foreground)] bg-[var(--surface)]"
                       >
                         <option value="">-- No content --</option>
                         {contentItems.map((item) => (
@@ -425,7 +425,7 @@ export default function LayoutEditorPage({ params }: { params: Promise<{ id: str
                         onChange={(e) =>
                           handleZoneAssignment(zone.id, 'playlistId', e.target.value || null)
                         }
-                        className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-sm text-[var(--foreground)] bg-[var(--surface)]"
+                        className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-sm text-[var(--foreground)] bg-[var(--surface)]"
                       >
                         <option value="">-- No playlist --</option>
                         {playlists.map((pl) => (
@@ -476,13 +476,13 @@ export default function LayoutEditorPage({ params }: { params: Promise<{ id: str
                     onClick={() => setSelectedZone(zone.id)}
                     className={`w-full flex items-center gap-3 p-2 rounded-lg text-left transition text-sm ${
                       selectedZone === zone.id
-                        ? 'bg-[#00E5A0]/10 border border-[#00E5A0]/30'
+                        ? 'bg-[#2563EB]/10 border border-[#2563EB]/30'
                         : 'hover:bg-[var(--surface-hover)] border border-transparent'
                     }`}
                   >
                     <div
                       className={`w-3 h-3 rounded-full ${
-                        zone.contentId || zone.playlistId ? 'bg-[#00E5A0]' : 'bg-[var(--border)]'
+                        zone.contentId || zone.playlistId ? 'bg-[#2563EB]' : 'bg-[var(--border)]'
                       }`}
                     />
                     <div className="flex-1 min-w-0">

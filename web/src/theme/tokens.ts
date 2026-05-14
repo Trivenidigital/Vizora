@@ -1,5 +1,5 @@
 /**
- * Design Tokens for Vizora — Electric Horizon
+ * Design Tokens for Vizora - Operational Simplicity
  * Centralized design system values for consistent UI/UX
  */
 
@@ -209,11 +209,11 @@ export const tokens = {
     100: '1',
   } as const,
 
-  // Focus ring styles — EH neon green
+  // Focus ring styles - operational blue
   focus: {
     ring: '2px',
     ringOffset: '2px',
-    ringColor: '#00E5A0',
+    ringColor: '#2563EB',
   } as const,
 
   // Container widths

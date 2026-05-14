@@ -127,7 +127,7 @@ export default function AuditLogClient() {
 
  const getActionBadgeColor = (action: string) => {
  if (action.includes('create') || action.includes('invited')) return 'bg-green-500/10 text-green-700 dark:text-green-300';
- if (action.includes('update')) return 'bg-[#00E5A0]/10 text-[#00E5A0]';
+ if (action.includes('update')) return 'bg-[#2563EB]/10 text-[#2563EB]';
  if (action.includes('delete') || action.includes('deactivat')) return 'bg-red-500/10 text-red-700 dark:text-red-300';
  if (action.includes('login') || action.includes('logout')) return 'bg-purple-500/10 text-purple-700 dark:text-purple-300';
  return 'bg-[var(--background-secondary)] text-[var(--foreground)]';
@@ -222,7 +222,7 @@ export default function AuditLogClient() {
  <select
  value={actionFilter}
  onChange={(e) => setActionFilter(e.target.value)}
- className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-sm text-[var(--foreground)]"
+ className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-sm text-[var(--foreground)]"
  >
  {ACTION_OPTIONS.map((opt) => (
  <option key={opt.value} value={opt.value}>
@@ -238,7 +238,7 @@ export default function AuditLogClient() {
  <select
  value={entityTypeFilter}
  onChange={(e) => setEntityTypeFilter(e.target.value)}
- className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-sm text-[var(--foreground)]"
+ className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-sm text-[var(--foreground)]"
  >
  {ENTITY_TYPE_OPTIONS.map((opt) => (
  <option key={opt.value} value={opt.value}>
@@ -254,7 +254,7 @@ export default function AuditLogClient() {
  <select
  value={userIdFilter}
  onChange={(e) => setUserIdFilter(e.target.value)}
- className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-sm text-[var(--foreground)]"
+ className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-sm text-[var(--foreground)]"
  >
  <option value="">All Users</option>
  {filterUsers.map((user) => (
@@ -272,7 +272,7 @@ export default function AuditLogClient() {
  type="date"
  value={startDate}
  onChange={(e) => setStartDate(e.target.value)}
- className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-sm text-[var(--foreground)]"
+ className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-sm text-[var(--foreground)]"
  />
  </div>
  <div>
@@ -283,7 +283,7 @@ export default function AuditLogClient() {
  type="date"
  value={endDate}
  onChange={(e) => setEndDate(e.target.value)}
- className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-sm text-[var(--foreground)]"
+ className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-sm text-[var(--foreground)]"
  />
  </div>
  </div>
@@ -291,7 +291,7 @@ export default function AuditLogClient() {
  <div className="mt-3 flex items-center gap-2">
  <button
  onClick={clearFilters}
- className="text-sm text-[#00E5A0] hover:text-[#00E5A0] underline"
+ className="text-sm text-[#2563EB] hover:text-[#2563EB] underline"
  >
  Clear all filters
  </button>
@@ -370,7 +370,7 @@ export default function AuditLogClient() {
  {log.changes ? (
  <button
  onClick={() => toggleRow(log.id)}
- className="text-[#00E5A0] hover:text-[#00E5A0] text-xs flex items-center gap-1"
+ className="text-[#2563EB] hover:text-[#2563EB] text-xs flex items-center gap-1"
  >
  <Icon
  name={expandedRows.has(log.id) ? 'chevronUp' : 'chevronDown'}

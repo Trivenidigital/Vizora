@@ -22,7 +22,7 @@ export function StatusBar({ status }: StatusBarProps) {
   if (!visible) return null;
 
   const colors: Record<string, string> = {
-    connected: '#00E5A0',
+    connected: '#2563EB',
     connecting: '#FFB800',
     disconnected: '#888',
     error: '#ff6b6b',

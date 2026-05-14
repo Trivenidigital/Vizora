@@ -14,7 +14,7 @@ describe('StatusBadge', () => {
   it('renders trialing status correctly', () => {
     render(<StatusBadge status="trialing" />);
     expect(screen.getByText('Trial')).toBeInTheDocument();
-    expect(screen.getByText('Trial')).toHaveClass('bg-[#00B4D8]/10');
+    expect(screen.getByText('Trial')).toHaveClass('bg-[#1E3A8A]/10');
   });
 
   it('renders past_due status correctly', () => {
@@ -75,7 +75,7 @@ describe('QuotaBar', () => {
 
   it('shows green color for normal usage', () => {
     const { container } = render(<QuotaBar used={10} total={25} />);
-    const progressBar = container.querySelector('.bg-\\[\\#00E5A0\\]');
+    const progressBar = container.querySelector('.bg-\\[\\#2563EB\\]');
     expect(progressBar).toBeInTheDocument();
   });
 

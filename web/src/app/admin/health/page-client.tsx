@@ -260,7 +260,7 @@ export default function AdminHealthClient({ initialHealth }: AdminHealthClientPr
             <div className="p-4 rounded-lg bg-[var(--background)]">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <Database className="w-5 h-5 text-[#00E5A0]" />
+                  <Database className="w-5 h-5 text-[#2563EB]" />
                   <span className="font-medium text-[var(--foreground)]">PostgreSQL</span>
                 </div>
                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(healthData.database.status)}`}>
@@ -273,7 +273,7 @@ export default function AdminHealthClient({ initialHealth }: AdminHealthClientPr
               </div>
               <div className="mt-2 h-2 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-[#00E5A0] rounded-full transition-all"
+                  className="h-full bg-[#2563EB] rounded-full transition-all"
                   style={{ width: `${(healthData.database.connections / healthData.database.maxConnections) * 100}%` }}
                 />
               </div>

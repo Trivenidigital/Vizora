@@ -43,9 +43,9 @@ const EDITOR_RUNTIME_CODE = `(function () {
   var SELECT_COLOR = '#3B82F6';
   var SELECT_STYLE = '2px solid ' + SELECT_COLOR;
   var SELECT_OFFSET = '2px';
-  var HOVER_COLOR = 'rgba(0, 229, 160, 0.5)';
+  var HOVER_COLOR = 'rgba(37, 99, 235, 0.5)';
   var HOVER_STYLE = '2px dashed ' + HOVER_COLOR;
-  var EDIT_COLOR = '#00E5A0';
+  var EDIT_COLOR = '#2563EB';
   var EDIT_STYLE = '2px solid ' + EDIT_COLOR;
 
   var TEXT_TAGS = [

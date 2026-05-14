@@ -87,7 +87,7 @@ function SortablePlaylistItem({ item, idx, onRemove, onDurationChange }: {
  }
  }}
  onClick={(e) => e.stopPropagation()}
- className="w-20 px-2 py-1 text-xs border border-[var(--border)] rounded focus:ring-1 focus:ring-[#00E5A0] focus:border-[#00E5A0]"
+ className="w-20 px-2 py-1 text-xs border border-[var(--border)] rounded focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
  />
  <span>s</span>
  </div>
@@ -384,8 +384,8 @@ export default function PlaylistsClient() {
  ) : (
  <>
  {debouncedSearch && (
- <div className="bg-[#00E5A0]/5 border border-[#00E5A0]/30 rounded-lg p-3">
- <p className="text-sm text-[#00E5A0]">
+ <div className="bg-[#2563EB]/5 border border-[#2563EB]/30 rounded-lg p-3">
+ <p className="text-sm text-[#2563EB]">
  {playlists.filter(p => p.name.toLowerCase().includes(debouncedSearch.toLowerCase())).length}{' '}
  {playlists.filter(p => p.name.toLowerCase().includes(debouncedSearch.toLowerCase())).length === 1 ? 'result' : 'results'} found
  </p>
@@ -460,8 +460,8 @@ export default function PlaylistsClient() {
  </span>
  )}
  {getDeviceCount(playlist.id) > 0 && (
- <span className="px-3 py-1 text-xs font-semibold rounded-full bg-[#00E5A0]/10 text-[#00E5A0] flex items-center gap-1">
- <Icon name="devices" size="sm" className="text-[#00E5A0]" />
+ <span className="px-3 py-1 text-xs font-semibold rounded-full bg-[#2563EB]/10 text-[#2563EB] flex items-center gap-1">
+ <Icon name="devices" size="sm" className="text-[#2563EB]" />
  <span>{getDeviceCount(playlist.id)} {getDeviceCount(playlist.id) === 1 ? 'device' : 'devices'}</span>
  </span>
  )}
@@ -503,9 +503,9 @@ export default function PlaylistsClient() {
  </button>
  <button
  onClick={() => handleEdit(playlist)}
- className="flex-1 px-4 py-2 text-sm bg-[#00E5A0]/5 text-[#00E5A0] rounded-lg hover:bg-[#00E5A0]/10 transition font-medium flex items-center justify-center gap-1"
+ className="flex-1 px-4 py-2 text-sm bg-[#2563EB]/5 text-[#2563EB] rounded-lg hover:bg-[#2563EB]/10 transition font-medium flex items-center justify-center gap-1"
  >
- <Icon name="edit" size="sm" className="text-[#00E5A0]" />
+ <Icon name="edit" size="sm" className="text-[#2563EB]" />
  Edit
  </button>
  <button
@@ -559,7 +559,7 @@ export default function PlaylistsClient() {
  type="text"
  value={createForm.name}
  onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
- className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
  placeholder="e.g., Morning Promotions"
  />
  </div>
@@ -570,7 +570,7 @@ export default function PlaylistsClient() {
  <textarea
  value={createForm.description}
  onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
- className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
  placeholder="Brief description of this playlist"
  rows={3}
  />
@@ -641,7 +641,7 @@ export default function PlaylistsClient() {
  <div className="text-xs text-[var(--foreground-tertiary)]">{item.type}</div>
  </div>
  </div>
- <button className="px-3 py-1 text-xs bg-[#00E5A0] text-[#061A21] rounded hover:bg-[#00CC8E]">
+ <button className="px-3 py-1 text-xs bg-[#2563EB] text-white rounded hover:bg-[#1D4ED8]">
  Add →
  </button>
  </div>

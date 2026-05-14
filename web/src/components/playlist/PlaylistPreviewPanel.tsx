@@ -95,7 +95,7 @@ export default function PlaylistPreviewPanel({ items }: PlaylistPreviewPanelProp
       <div className="flex-1 flex flex-col p-4">
         <div className="relative bg-black rounded-lg overflow-hidden aspect-video mb-4">
           {/* Content Display */}
-          <div className="absolute inset-0 flex items-center justify-center bg-[#061A21]">
+          <div className="absolute inset-0 flex items-center justify-center bg-[#111827]">
             {currentItem?.content?.thumbnailUrl ? (
               <img
                 src={currentItem.content.thumbnailUrl}
@@ -116,7 +116,7 @@ export default function PlaylistPreviewPanel({ items }: PlaylistPreviewPanelProp
                 <p className="text-base font-medium">
                   {currentItem?.content?.title || `Item ${currentIndex + 1}`}
                 </p>
-                <p className="text-xs text-[#8A8278] mt-1 capitalize">
+                <p className="text-xs text-[#4B5563] mt-1 capitalize">
                   {currentItem?.content?.type || 'content'}
                 </p>
               </div>
@@ -124,9 +124,9 @@ export default function PlaylistPreviewPanel({ items }: PlaylistPreviewPanelProp
           </div>
 
           {/* Current Item Progress */}
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#1B3D47]">
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#E5E7EB]">
             <div
-              className="h-full bg-[#00E5A0] transition-all duration-1000 ease-linear"
+              className="h-full bg-[#2563EB] transition-all duration-1000 ease-linear"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
@@ -154,7 +154,7 @@ export default function PlaylistPreviewPanel({ items }: PlaylistPreviewPanelProp
             </div>
             <div className="h-2 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
               <div
-                className="h-full bg-[#00E5A0] transition-all duration-300"
+                className="h-full bg-[#2563EB] transition-all duration-300"
                 style={{ width: `${totalProgressPercent}%` }}
               />
             </div>
@@ -173,13 +173,13 @@ export default function PlaylistPreviewPanel({ items }: PlaylistPreviewPanelProp
 
             <button
               onClick={togglePlayPause}
-              className="p-3 bg-[#00E5A0] hover:bg-[#00CC8E] text-[#061A21] rounded-lg transition"
+              className="p-3 bg-[#2563EB] hover:bg-[#1D4ED8] text-white rounded-lg transition"
               title={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? (
-                <Icon name="clock" size="md" className="text-[#061A21]" />
+                <Icon name="clock" size="md" className="text-white" />
               ) : (
-                <Icon name="power" size="md" className="text-[#061A21]" />
+                <Icon name="power" size="md" className="text-white" />
               )}
             </button>
 

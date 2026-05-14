@@ -182,3 +182,35 @@ Reposition the public Vizora homepage from the current dark, AI-forward "Electri
 - Restarted and saved PM2 process `vizora-web`.
 - Verified `https://vizora.cloud/` returns the new H1, pricing headline, metadata title, and no old AI/command-center homepage copy.
 - Captured deployed desktop/mobile screenshots: `deployed-homepage-desktop-full.png` and `deployed-homepage-mobile-full.png`.
+
+---
+
+## Active Task: Sitewide Premium Confidence Pass (2026-05-14)
+
+### Goal
+
+Apply the approved "Operational Simplicity with Premium Confidence" direction across the web frontend, moving shared app/auth/admin/dashboard surfaces away from the old Electric Horizon neon/AI language while preserving routes, workflows, and dashboard functionality.
+
+### Implementation Plan
+
+1. Rebase shared CSS variables and `eh-*` compatibility utilities onto the new light/blue Vizora palette.
+2. Update theme token files and default white-label customization colors so Tailwind extensions and runtime theming match the new direction.
+3. Mechanically replace legacy neon arbitrary colors across frontend components with the new blue, white, gray, success, warning, and error palette.
+4. Hand-edit auth and shared marketing copy/components that still imply AI automation, dark cyber visuals, or neon startup positioning.
+5. Run focused web tests, production build, and desktop/mobile visual checks for homepage, auth, dashboard, and admin routes.
+
+### Progress
+
+- [x] Mapped legacy `eh-*`, neon color, and AI-forward usage across `web/src`.
+- [x] Rebase global variables and compatibility utility meanings.
+- [x] Update token/default customization colors.
+- [x] Replace hardcoded legacy colors across components.
+- [x] Clean auth/shared copy and old marketing remnants.
+- [x] Verify with tests/build/screenshots.
+- [ ] Deploy to VPS after verification.
+
+### Verification Review (2026-05-14)
+
+- Passed focused tests: `pnpm --filter @vizora/web test -- --runTestsByPath "src/app/__tests__/homepage.test.tsx" "src/app/(auth)/__tests__/login-page.test.tsx" "src/app/(auth)/__tests__/register-page.test.tsx" "src/components/__tests__/ViewToggle.test.tsx" "src/components/__tests__/Button.test.tsx"`.
+- Passed production build with `NEXT_TURBOPACK_EXPERIMENTAL_USE_SYSTEM_TLS_CERTS=1 pnpm --filter @vizora/web build`.
+- Visual checked homepage plus login/register auth surfaces locally. Dashboard/admin routes redirect to auth locally without backend auth, but their shared shells and components now inherit the updated tokens and hardcoded blue/neutral palette.

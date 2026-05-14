@@ -35,9 +35,9 @@ export default function UpgradeBanner() {
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
           <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
-            isAtLimit ? 'bg-amber-500/10' : 'bg-[#00E5A0]/10'
+            isAtLimit ? 'bg-amber-500/10' : 'bg-[#2563EB]/10'
           }`}>
-            <svg className={`w-5 h-5 ${isAtLimit ? 'text-amber-500' : 'text-[#00E5A0]'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className={`w-5 h-5 ${isAtLimit ? 'text-amber-500' : 'text-[#2563EB]'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
             </svg>
           </div>
@@ -59,7 +59,7 @@ export default function UpgradeBanner() {
         <div className="flex items-center gap-2 shrink-0">
           <Link
             href="/dashboard/settings/billing/plans"
-            className="px-4 py-1.5 bg-[#00E5A0] text-[#061A21] text-sm font-semibold rounded-md hover:bg-[#00CC8E] transition-colors"
+            className="px-4 py-1.5 bg-[#2563EB] text-white text-sm font-semibold rounded-md hover:bg-[#1D4ED8] transition-colors"
           >
             Upgrade
           </Link>
@@ -80,7 +80,7 @@ export default function UpgradeBanner() {
         <div className="h-1.5 bg-[var(--background)] rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full transition-all ${
-              isAtLimit ? 'bg-amber-500' : 'bg-[#00E5A0]'
+              isAtLimit ? 'bg-amber-500' : 'bg-[#2563EB]'
             }`}
             style={{ width: `${Math.min(usagePercent, 100)}%` }}
           />

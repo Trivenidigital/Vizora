@@ -319,7 +319,7 @@ export default function TemplateLibraryPage() {
               <button
                 onClick={() => { setViewMode('home'); setPage(1); }}
                 className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
-                  viewMode === 'home' ? 'bg-[#00E5A0]/10 text-[#00E5A0] border-[#00E5A0]/20' : 'text-[var(--foreground-secondary)] border-[var(--border)]'
+                  viewMode === 'home' ? 'bg-[#2563EB]/10 text-[#2563EB] border-[#2563EB]/20' : 'text-[var(--foreground-secondary)] border-[var(--border)]'
                 }`}
               >
                 Library
@@ -327,14 +327,14 @@ export default function TemplateLibraryPage() {
               <button
                 onClick={() => { setViewMode('your-templates'); setPage(1); }}
                 className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
-                  viewMode === 'your-templates' ? 'bg-[#00E5A0]/10 text-[#00E5A0] border-[#00E5A0]/20' : 'text-[var(--foreground-secondary)] border-[var(--border)]'
+                  viewMode === 'your-templates' ? 'bg-[#2563EB]/10 text-[#2563EB] border-[#2563EB]/20' : 'text-[var(--foreground-secondary)] border-[var(--border)]'
                 }`}
               >
                 Your Templates
               </button>
               <button
                 onClick={() => setShowAIDesigner(true)}
-                className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium text-[#00E5A0] border border-[#00E5A0]/20 hover:bg-[#00E5A0]/5 transition-all"
+                className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium text-[#2563EB] border border-[#2563EB]/20 hover:bg-[#2563EB]/5 transition-all"
               >
                 AI Designer
               </button>
@@ -370,30 +370,30 @@ export default function TemplateLibraryPage() {
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs text-[var(--foreground-tertiary)]">Filters:</span>
               {debouncedSearch && (
-                <span className="inline-flex items-center gap-1 px-2 py-1 bg-[#00E5A0]/10 text-[#00E5A0] rounded-md text-xs">
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-[#2563EB]/10 text-[#2563EB] rounded-md text-xs">
                   &ldquo;{debouncedSearch}&rdquo;
                   <button onClick={() => setSearchQuery('')} className="hover:text-white ml-0.5">&times;</button>
                 </span>
               )}
               {selectedCategory && (
-                <span className="inline-flex items-center gap-1 px-2 py-1 bg-[#00E5A0]/10 text-[#00E5A0] rounded-md text-xs capitalize">
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-[#2563EB]/10 text-[#2563EB] rounded-md text-xs capitalize">
                   {selectedCategory}
                   <button onClick={() => setSelectedCategory('')} className="hover:text-white ml-0.5">&times;</button>
                 </span>
               )}
               {selectedDifficulty && (
-                <span className="inline-flex items-center gap-1 px-2 py-1 bg-[#00E5A0]/10 text-[#00E5A0] rounded-md text-xs capitalize">
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-[#2563EB]/10 text-[#2563EB] rounded-md text-xs capitalize">
                   {selectedDifficulty}
                   <button onClick={() => setSelectedDifficulty('')} className="hover:text-white ml-0.5">&times;</button>
                 </span>
               )}
               {selectedOrientation && (
-                <span className="inline-flex items-center gap-1 px-2 py-1 bg-[#00E5A0]/10 text-[#00E5A0] rounded-md text-xs capitalize">
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-[#2563EB]/10 text-[#2563EB] rounded-md text-xs capitalize">
                   {selectedOrientation}
                   <button onClick={() => setSelectedOrientation('')} className="hover:text-white ml-0.5">&times;</button>
                 </span>
               )}
-              <button onClick={clearFilters} className="text-xs text-[var(--foreground-tertiary)] hover:text-[#00E5A0] transition-colors ml-auto">
+              <button onClick={clearFilters} className="text-xs text-[var(--foreground-tertiary)] hover:text-[#2563EB] transition-colors ml-auto">
                 Clear all
               </button>
             </div>
@@ -540,7 +540,7 @@ export default function TemplateLibraryPage() {
                       </button>
                       <button
                         onClick={() => setShowAIDesigner(true)}
-                        className="px-4 py-2 rounded-lg border border-[#00E5A0]/20 text-[#00E5A0] font-medium text-sm hover:bg-[#00E5A0]/5 transition-all"
+                        className="px-4 py-2 rounded-lg border border-[#2563EB]/20 text-[#2563EB] font-medium text-sm hover:bg-[#2563EB]/5 transition-all"
                       >
                         Try AI Designer
                       </button>
@@ -608,7 +608,7 @@ export default function TemplateLibraryPage() {
                             onClick={() => setPage(item as number)}
                             className={`w-9 h-9 rounded-lg text-sm font-medium transition-all ${
                               page === item
-                                ? 'bg-[var(--primary)] text-[#061A21]'
+                                ? 'bg-[var(--primary)] text-white'
                                 : 'text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]'
                             }`}
                           >
@@ -680,7 +680,7 @@ export default function TemplateLibraryPage() {
               >
                 {cloning ? (
                   <>
-                    <div className="w-3.5 h-3.5 border-2 border-[#061A21]/30 border-t-[#061A21] rounded-full animate-spin" />
+                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     Cloning...
                   </>
                 ) : (

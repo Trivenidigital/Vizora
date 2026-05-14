@@ -53,7 +53,7 @@ export default function PreviewModal({ isOpen, onClose, content }: PreviewModalP
               href={content.url} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="text-[#00E5A0] hover:underline break-all"
+              className="text-[#2563EB] hover:underline break-all"
             >
               {content.url}
             </a>

@@ -27,7 +27,7 @@ export function ViewToggle({ view, onChange, storageKey = 'vizora-content-view' 
         onClick={() => onChange('grid')}
         className={`px-3.5 py-2 text-sm font-medium transition-all duration-150 flex items-center gap-2 ${
           view === 'grid'
-            ? 'bg-[var(--primary)] text-[#061A21]'
+            ? 'bg-[var(--primary)] text-white'
             : 'text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
         }`}
         aria-label="Grid view"
@@ -39,7 +39,7 @@ export function ViewToggle({ view, onChange, storageKey = 'vizora-content-view' 
         onClick={() => onChange('list')}
         className={`px-3.5 py-2 text-sm font-medium transition-all duration-150 flex items-center gap-2 ${
           view === 'list'
-            ? 'bg-[var(--primary)] text-[#061A21]'
+            ? 'bg-[var(--primary)] text-white'
             : 'text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
         }`}
         aria-label="List view"

@@ -162,7 +162,7 @@ export default function DevicePreviewModal({ device, isOpen, onClose }: DevicePr
           <button
             onClick={handleRefresh}
             disabled={refreshing || device.status !== 'online'}
-            className="flex items-center gap-2 px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] disabled:opacity-50 disabled:cursor-not-allowed transition font-medium"
+            className="flex items-center gap-2 px-4 py-2 bg-[#2563EB] text-white rounded-lg hover:bg-[#1D4ED8] disabled:opacity-50 disabled:cursor-not-allowed transition font-medium"
           >
             {refreshing ? (
               <>
@@ -171,7 +171,7 @@ export default function DevicePreviewModal({ device, isOpen, onClose }: DevicePr
               </>
             ) : (
               <>
-                <Icon name="refresh" size="lg" className="text-[#061A21]" />
+                <Icon name="refresh" size="lg" className="text-white" />
                 <span>Refresh Screenshot</span>
               </>
             )}
@@ -192,7 +192,7 @@ export default function DevicePreviewModal({ device, isOpen, onClose }: DevicePr
               </p>
               <button
                 onClick={loadScreenshot}
-                className="text-[#00E5A0] hover:text-[#00CC8E] text-sm font-medium"
+                className="text-[#2563EB] hover:text-[#1D4ED8] text-sm font-medium"
               >
                 Try Again
               </button>
@@ -226,7 +226,7 @@ export default function DevicePreviewModal({ device, isOpen, onClose }: DevicePr
               <button
                 onClick={handleRefresh}
                 disabled={device.status !== 'online'}
-                className="text-[#00E5A0] hover:text-[#00CC8E] text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="text-[#2563EB] hover:text-[#1D4ED8] text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {device.status === 'online' ? 'Capture Screenshot' : 'Device is offline'}
               </button>

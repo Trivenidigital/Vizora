@@ -107,13 +107,13 @@ export default function AdminOrganizationsClient({ initialOrganizations, initial
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
             placeholder="Search organizations..."
-            className="w-full pl-10 pr-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
           />
         </div>
         <select
           value={statusFilter}
           onChange={(e) => handleStatusFilterChange(e.target.value)}
-          className="px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+          className="px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
         >
           <option value="">All Statuses</option>
           <option value="active">Active</option>
@@ -149,8 +149,8 @@ export default function AdminOrganizationsClient({ initialOrganizations, initial
                   <tr key={org.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-hover)] transition">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] flex items-center justify-center">
-                          <Building2 className="w-5 h-5 text-[#061A21]" />
+                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#2563EB] to-[#1E3A8A] flex items-center justify-center">
+                          <Building2 className="w-5 h-5 text-white" />
                         </div>
                         <div>
                           <p className="font-medium text-[var(--foreground)]">{org.name}</p>
@@ -218,7 +218,7 @@ export default function AdminOrganizationsClient({ initialOrganizations, initial
                               {org.subscriptionStatus === 'trialing' && (
                                 <button
                                   onClick={() => { setActionOrg(org); setActionType('extend'); setMenuOpen(null); }}
-                                  className="w-full text-left px-4 py-2 text-sm text-[#00E5A0] hover:bg-[#00E5A0]/5 flex items-center gap-2"
+                                  className="w-full text-left px-4 py-2 text-sm text-[#2563EB] hover:bg-[#2563EB]/5 flex items-center gap-2"
                                 >
                                   <Clock className="w-4 h-4" />
                                   Extend Trial
@@ -287,7 +287,7 @@ export default function AdminOrganizationsClient({ initialOrganizations, initial
                 onChange={(e) => setExtendDays(parseInt(e.target.value) || 0)}
                 min={1}
                 max={365}
-                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
               />
             </div>
             <div className="flex items-center justify-end gap-3">
@@ -299,7 +299,7 @@ export default function AdminOrganizationsClient({ initialOrganizations, initial
               </button>
               <button
                 onClick={handleAction}
-                className="px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition"
+                className="px-4 py-2 bg-[#2563EB] text-white rounded-lg hover:bg-[#1D4ED8] transition"
               >
                 Extend Trial
               </button>

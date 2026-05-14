@@ -9,7 +9,7 @@ export default function GlobalError({
 }) {
   return (
     <html lang="en">
-      <body style={{ margin: 0, fontFamily: 'system-ui, -apple-system, sans-serif', backgroundColor: '#061A21', color: '#E8F0F2' }}>
+      <body style={{ margin: 0, fontFamily: 'system-ui, -apple-system, sans-serif', backgroundColor: '#111827', color: '#E8F0F2' }}>
         <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ maxWidth: '28rem', width: '100%', padding: '2rem', textAlign: 'center', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.75rem' }}>
             <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>&#x26A0;</div>
@@ -22,8 +22,8 @@ export default function GlobalError({
             <button
               onClick={reset}
               style={{
-                backgroundColor: '#00E5A0',
-                color: '#061A21',
+                backgroundColor: '#2563EB',
+                color: '#111827',
                 padding: '0.5rem 1.5rem',
                 borderRadius: '0.5rem',
                 border: 'none',

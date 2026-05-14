@@ -101,7 +101,7 @@ export function SupportDashboardClient() {
       {/* Header */}
       <div>
         <div className="flex items-center gap-3 mb-1">
-          <MessageSquare className="w-8 h-8 text-[#00E5A0]" />
+          <MessageSquare className="w-8 h-8 text-[#2563EB]" />
           <h1 className="text-3xl font-bold text-[var(--foreground)]">Support Dashboard</h1>
         </div>
         <p className="mt-1 text-[var(--foreground-secondary)]">

@@ -94,7 +94,7 @@ export default function AIDesignerModal({ onClose, onTemplateGenerated }: AIDesi
       {/* Modal */}
       <div className="relative bg-[var(--surface)] rounded-2xl border border-[var(--border)] w-full max-w-2xl mx-4 shadow-2xl overflow-hidden animate-[fadeIn_0.2s_ease-out]">
         {/* Top gradient bar */}
-        <div className="h-1 bg-gradient-to-r from-[#00E5A0] via-[#00B4D8] to-[#00E5A0]" />
+        <div className="h-1 bg-gradient-to-r from-[#2563EB] via-[#1E3A8A] to-[#2563EB]" />
 
         {/* Close button */}
         <button
@@ -109,8 +109,8 @@ export default function AIDesignerModal({ onClose, onTemplateGenerated }: AIDesi
           <div className="p-6 sm:p-8">
             {/* Header */}
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#00E5A0]/20 to-[#00B4D8]/20 border border-[#00E5A0]/20 flex items-center justify-center">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-[#00E5A0]">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2563EB]/20 to-[#1E3A8A]/20 border border-[#2563EB]/20 flex items-center justify-center">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-[#2563EB]">
                   <path d="M12 2L14.09 8.26L20 9.27L15.55 13.97L16.91 20L12 16.9L7.09 20L8.45 13.97L4 9.27L9.91 8.26L12 2Z" fill="currentColor" />
                 </svg>
               </div>
@@ -130,7 +130,7 @@ export default function AIDesignerModal({ onClose, onTemplateGenerated }: AIDesi
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder="Describe your ideal display template...&#10;&#10;e.g., A modern coffee shop menu board with warm earth tones, featuring daily specials and prices in a clean grid layout"
-                className="w-full h-32 px-4 py-3 rounded-xl bg-[var(--background)] border border-[var(--border)] text-[var(--foreground)] placeholder-[var(--foreground-tertiary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#00E5A0]/30 focus:border-[#00E5A0]/30 resize-none transition-all"
+                className="w-full h-32 px-4 py-3 rounded-xl bg-[var(--background)] border border-[var(--border)] text-[var(--foreground)] placeholder-[var(--foreground-tertiary)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]/30 focus:border-[#2563EB]/30 resize-none transition-all"
               />
             </div>
 
@@ -143,7 +143,7 @@ export default function AIDesignerModal({ onClose, onTemplateGenerated }: AIDesi
                 <select
                   value={selectedIndustry}
                   onChange={(e) => setSelectedIndustry(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)] text-[var(--foreground)] text-sm focus:outline-none focus:ring-2 focus:ring-[#00E5A0]/30"
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)] text-[var(--foreground)] text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]/30"
                 >
                   {INDUSTRY_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -159,7 +159,7 @@ export default function AIDesignerModal({ onClose, onTemplateGenerated }: AIDesi
                     onClick={() => setSelectedOrientation('landscape')}
                     className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all border ${
                       selectedOrientation === 'landscape'
-                        ? 'bg-[#00E5A0]/10 text-[#00E5A0] border-[#00E5A0]/20'
+                        ? 'bg-[#2563EB]/10 text-[#2563EB] border-[#2563EB]/20'
                         : 'bg-[var(--background)] text-[var(--foreground-tertiary)] border-[var(--border)] hover:text-[var(--foreground-secondary)]'
                     }`}
                   >
@@ -170,7 +170,7 @@ export default function AIDesignerModal({ onClose, onTemplateGenerated }: AIDesi
                     onClick={() => setSelectedOrientation('portrait')}
                     className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all border ${
                       selectedOrientation === 'portrait'
-                        ? 'bg-[#00E5A0]/10 text-[#00E5A0] border-[#00E5A0]/20'
+                        ? 'bg-[#2563EB]/10 text-[#2563EB] border-[#2563EB]/20'
                         : 'bg-[var(--background)] text-[var(--foreground-tertiary)] border-[var(--border)] hover:text-[var(--foreground-secondary)]'
                     }`}
                   >
@@ -193,7 +193,7 @@ export default function AIDesignerModal({ onClose, onTemplateGenerated }: AIDesi
                     onClick={() => setSelectedStyle(selectedStyle === style ? '' : style)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
                       selectedStyle === style
-                        ? 'bg-[#00E5A0]/10 text-[#00E5A0] border-[#00E5A0]/20'
+                        ? 'bg-[#2563EB]/10 text-[#2563EB] border-[#2563EB]/20'
                         : 'text-[var(--foreground-tertiary)] border-[var(--border)] hover:text-[var(--foreground-secondary)] hover:border-[var(--border-dark)]'
                     }`}
                   >
@@ -207,9 +207,9 @@ export default function AIDesignerModal({ onClose, onTemplateGenerated }: AIDesi
             <button
               onClick={handleGenerate}
               disabled={!prompt.trim()}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-[#00E5A0] to-[#00CC8E] text-[#061A21] font-bold text-sm hover:shadow-[0_0_30px_rgba(0,229,160,0.3)] transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:shadow-none flex items-center justify-center gap-2"
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] text-white font-bold text-sm hover:shadow-[0_0_30px_rgba(37, 99, 235,0.3)] transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:shadow-none flex items-center justify-center gap-2"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-[#061A21]">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-white">
                 <path d="M12 2L14.09 8.26L20 9.27L15.55 13.97L16.91 20L12 16.9L7.09 20L8.45 13.97L4 9.27L9.91 8.26L12 2Z" fill="currentColor" />
               </svg>
               Generate Template
@@ -226,9 +226,9 @@ export default function AIDesignerModal({ onClose, onTemplateGenerated }: AIDesi
           <div className="p-8 sm:p-12 flex flex-col items-center justify-center min-h-[400px]">
             {/* Animated gradient orb */}
             <div className="relative w-24 h-24 mb-8">
-              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] opacity-20 animate-ping" />
-              <div className="absolute inset-2 rounded-full bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] opacity-30 animate-pulse" />
-              <div className="absolute inset-4 rounded-full bg-gradient-to-br from-[#00E5A0]/60 to-[#00B4D8]/60 flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-[#2563EB] to-[#1E3A8A] opacity-20 animate-ping" />
+              <div className="absolute inset-2 rounded-full bg-gradient-to-br from-[#2563EB] to-[#1E3A8A] opacity-30 animate-pulse" />
+              <div className="absolute inset-4 rounded-full bg-gradient-to-br from-[#2563EB]/60 to-[#1E3A8A]/60 flex items-center justify-center">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" className="text-white animate-spin" style={{ animationDuration: '3s' }}>
                   <path d="M12 2L14.09 8.26L20 9.27L15.55 13.97L16.91 20L12 16.9L7.09 20L8.45 13.97L4 9.27L9.91 8.26L12 2Z" fill="currentColor" />
                 </svg>
@@ -249,9 +249,9 @@ export default function AIDesignerModal({ onClose, onTemplateGenerated }: AIDesi
                   }`}
                 >
                   {i < generationStep ? (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00E5A0" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
                   ) : i === generationStep ? (
-                    <div className="w-3.5 h-3.5 border-2 border-[#00E5A0]/30 border-t-[#00E5A0] rounded-full animate-spin" />
+                    <div className="w-3.5 h-3.5 border-2 border-[#2563EB]/30 border-t-[#2563EB] rounded-full animate-spin" />
                   ) : (
                     <div className="w-3.5 h-3.5 rounded-full border border-[var(--border)]" />
                   )}
@@ -268,8 +268,8 @@ export default function AIDesignerModal({ onClose, onTemplateGenerated }: AIDesi
         {step === 'coming-soon' && (
           <div className="p-8 sm:p-12 flex flex-col items-center justify-center min-h-[400px] text-center">
             {/* Gradient icon */}
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#00E5A0]/10 to-[#00B4D8]/10 border border-[#00E5A0]/15 flex items-center justify-center mb-6">
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" className="text-[#00E5A0]">
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#2563EB]/10 to-[#1E3A8A]/10 border border-[#2563EB]/15 flex items-center justify-center mb-6">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" className="text-[#2563EB]">
                 <path d="M12 2L14.09 8.26L20 9.27L15.55 13.97L16.91 20L12 16.9L7.09 20L8.45 13.97L4 9.27L9.91 8.26L12 2Z" fill="currentColor" opacity="0.8" />
                 <path d="M19 2L19.5 3.5L21 4L19.5 4.5L19 6L18.5 4.5L17 4L18.5 3.5L19 2Z" fill="currentColor" opacity="0.5" />
                 <path d="M5 18L5.5 19.5L7 20L5.5 20.5L5 22L4.5 20.5L3 20L4.5 19.5L5 18Z" fill="currentColor" opacity="0.5" />
@@ -281,13 +281,13 @@ export default function AIDesignerModal({ onClose, onTemplateGenerated }: AIDesi
             </h3>
             <p className="text-[var(--foreground-secondary)] text-sm max-w-sm mb-8">
               We&apos;re training our AI to create stunning display templates.
-              Be among the first to experience AI-powered design.
+              Be among the first to try assisted template design.
             </p>
 
             <div className="flex gap-3">
               <button
                 onClick={onClose}
-                className="px-5 py-2.5 rounded-lg bg-[#00E5A0] text-[#061A21] font-semibold text-sm hover:bg-[#00CC8E] transition-all"
+                className="px-5 py-2.5 rounded-lg bg-[#2563EB] text-white font-semibold text-sm hover:bg-[#1D4ED8] transition-all"
               >
                 Browse Templates
               </button>

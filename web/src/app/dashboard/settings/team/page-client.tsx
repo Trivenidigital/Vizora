@@ -138,7 +138,7 @@ export default function TeamClient() {
  case 'admin':
  return 'bg-purple-500/10 text-purple-700 dark:text-purple-300';
  case 'manager':
- return 'bg-[#00E5A0]/10 text-[#00E5A0]';
+ return 'bg-[#2563EB]/10 text-[#2563EB]';
  case 'viewer':
  return 'bg-[var(--background-secondary)] text-[var(--foreground)]';
  default:
@@ -176,7 +176,7 @@ export default function TeamClient() {
  </div>
  <button
  onClick={() => setIsInviteModalOpen(true)}
- className="bg-[#00E5A0] text-[#061A21] px-6 py-3 rounded-lg hover:bg-[#00CC8E] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
+ className="bg-[#2563EB] text-white px-6 py-3 rounded-lg hover:bg-[#1D4ED8] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
  >
  <Icon name="add" size="lg" className="text-white" />
  <span>Invite User</span>
@@ -265,7 +265,7 @@ export default function TeamClient() {
  <tr key={user.id} className="hover:bg-[var(--surface-hover)] transition">
  <td className="px-4 py-3 whitespace-nowrap">
  <div className="flex items-center gap-3">
- <div className="w-8 h-8 bg-[#00E5A0]/10 rounded-full flex items-center justify-center text-[#00E5A0] font-semibold text-sm">
+ <div className="w-8 h-8 bg-[#2563EB]/10 rounded-full flex items-center justify-center text-[#2563EB] font-semibold text-sm">
  {user.firstName.charAt(0)}{user.lastName.charAt(0)}
  </div>
  <span className="text-sm font-medium text-[var(--foreground)]">
@@ -293,7 +293,7 @@ export default function TeamClient() {
  <div className="flex justify-end gap-2">
  <button
  onClick={() => handleEditRole(user)}
- className="text-[#00E5A0] hover:text-[#00E5A0] hover:bg-[#00E5A0]/5 px-2 py-1 rounded transition"
+ className="text-[#2563EB] hover:text-[#2563EB] hover:bg-[#2563EB]/5 px-2 py-1 rounded transition"
  title="Edit role"
  >
  <Icon name="edit" size="md" />
@@ -355,7 +355,7 @@ export default function TeamClient() {
  type="email"
  value={inviteForm.email}
  onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
- className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)]"
+ className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-[var(--foreground)]"
  placeholder="user@company.com"
  autoComplete="off"
  />
@@ -369,7 +369,7 @@ export default function TeamClient() {
  type="text"
  value={inviteForm.firstName}
  onChange={(e) => setInviteForm({ ...inviteForm, firstName: e.target.value })}
- className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)]"
+ className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-[var(--foreground)]"
  placeholder="John"
  autoComplete="off"
  />
@@ -382,7 +382,7 @@ export default function TeamClient() {
  type="text"
  value={inviteForm.lastName}
  onChange={(e) => setInviteForm({ ...inviteForm, lastName: e.target.value })}
- className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)]"
+ className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-[var(--foreground)]"
  placeholder="Doe"
  autoComplete="off"
  />
@@ -395,7 +395,7 @@ export default function TeamClient() {
  <select
  value={inviteForm.role}
  onChange={(e) => setInviteForm({ ...inviteForm, role: e.target.value })}
- className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)]"
+ className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-[var(--foreground)]"
  >
  <option value="viewer">Viewer - Can view content and displays</option>
  <option value="manager">Manager - Can manage content and displays</option>
@@ -412,7 +412,7 @@ export default function TeamClient() {
  <button
  onClick={handleInvite}
  disabled={actionLoading || !inviteForm.email || !inviteForm.firstName || !inviteForm.lastName}
- className="px-4 py-2 text-sm font-medium text-white bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium text-white bg-[#2563EB] text-white rounded-lg hover:bg-[#1D4ED8] transition disabled:opacity-50 flex items-center gap-2"
  >
  {actionLoading && <LoadingSpinner size="sm" />}
  Send Invite
@@ -445,7 +445,7 @@ export default function TeamClient() {
  <select
  value={editRole}
  onChange={(e) => setEditRole(e.target.value)}
- className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)]"
+ className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-[var(--foreground)]"
  >
  <option value="viewer">Viewer - Can view content and displays</option>
  <option value="manager">Manager - Can manage content and displays</option>
@@ -465,7 +465,7 @@ export default function TeamClient() {
  <button
  onClick={handleSaveRole}
  disabled={actionLoading || editRole === selectedUser.role}
- className="px-4 py-2 text-sm font-medium text-white bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium text-white bg-[#2563EB] text-white rounded-lg hover:bg-[#1D4ED8] transition disabled:opacity-50 flex items-center gap-2"
  >
  {actionLoading && <LoadingSpinner size="sm" />}
  Save Changes

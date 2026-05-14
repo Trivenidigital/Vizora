@@ -841,7 +841,7 @@ export default function ContentClient() {
  onClick={() => setIsUploadModalOpen(true)}
  className="eh-btn-neon px-6 py-3 rounded-xl flex items-center gap-2"
  >
- <Icon name="add" size="lg" className="text-[#061A21]" />
+ <Icon name="add" size="lg" className="text-white" />
  <span>Upload Content</span>
  </button>
  </div>
@@ -1056,7 +1056,7 @@ export default function ContentClient() {
  </td>
  <td className="eh-td">
  <div className="flex items-center gap-3 cursor-pointer" onClick={() => handlePreview(item)}>
- <div className="w-12 h-12 bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] rounded flex items-center justify-center flex-shrink-0 overflow-hidden">
+ <div className="w-12 h-12 bg-gradient-to-br from-[#2563EB] to-[#1E3A8A] rounded flex items-center justify-center flex-shrink-0 overflow-hidden">
  {item.thumbnailUrl ? (
  <img src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
  ) : (
@@ -1145,10 +1145,10 @@ export default function ContentClient() {
  {filteredContent.map((item) => (
  <div
  key={item.id}
- className="eh-dash-card overflow-hidden hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300"
+ className="eh-dash-card overflow-hidden hover:-translate-y-[2px] hover:border-[rgba(37, 99, 235,0.2)] hover:shadow-md transition-all duration-300"
  >
  <div
- className="aspect-video bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] flex items-center justify-center relative overflow-hidden cursor-pointer"
+ className="aspect-video bg-gradient-to-br from-[#2563EB] to-[#1E3A8A] flex items-center justify-center relative overflow-hidden cursor-pointer"
  onClick={() => handlePreview(item)}
  title="Click to preview"
  >
@@ -1286,7 +1286,7 @@ export default function ContentClient() {
  setFormErrors({ ...formErrors, title: errors.title });
  }
  }}
- className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] ${
+ className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-[var(--foreground)] ${
  formErrors.title ? 'border-red-500' : 'border-[var(--border)]'
  }`}
  placeholder="e.g., Summer Sale Banner"
@@ -1305,7 +1305,7 @@ export default function ContentClient() {
  onChange={(e) =>
  setUploadForm({ ...uploadForm, type: e.target.value as any })
  }
- className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)]"
+ className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-[var(--foreground)]"
  >
  <option value="image">Image</option>
  <option value="video">Video</option>
@@ -1324,8 +1324,8 @@ export default function ContentClient() {
  {...getRootProps()}
  className={`border-2 border-dashed rounded-lg p-6 text-center transition-all cursor-pointer ${
  isDragActive
- ? 'border-[#00E5A0] bg-[#00E5A0]/5'
- : 'border-[var(--border)] hover:border-[#00E5A0] hover:bg-[var(--surface-hover)]'
+ ? 'border-[#2563EB] bg-[#2563EB]/5'
+ : 'border-[var(--border)] hover:border-[#2563EB] hover:bg-[var(--surface-hover)]'
  }`}
  >
  <input {...getInputProps()} />
@@ -1343,12 +1343,12 @@ export default function ContentClient() {
  />
  </svg>
  {isDragActive ? (
- <p className="text-sm font-medium text-[#00E5A0]">
+ <p className="text-sm font-medium text-[#2563EB]">
  Drop the file here...
  </p>
  ) : (
  <>
- <p className="text-sm font-medium text-[#00E5A0] hover:text-[#00E5A0] mb-1">
+ <p className="text-sm font-medium text-[#2563EB] hover:text-[#2563EB] mb-1">
  Drag & drop file here, or click to browse
  </p>
  <p className="text-xs text-[var(--foreground-tertiary)]">
@@ -1437,7 +1437,7 @@ export default function ContentClient() {
  setFormErrors({ ...formErrors, url: errors.url });
  }
  }}
- className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] ${
+ className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-[var(--foreground)] ${
  formErrors.url ? 'border-red-500' : 'border-[var(--border)]'
  }`}
  placeholder="https://example.com/page"
@@ -1454,11 +1454,11 @@ export default function ContentClient() {
  <div className="space-y-2">
  <div className="flex justify-between text-sm">
  <span className="text-[var(--foreground-secondary)]">Uploading...</span>
- <span className="font-medium text-[#00E5A0]">{uploadProgress}%</span>
+ <span className="font-medium text-[#2563EB]">{uploadProgress}%</span>
  </div>
  <div className="w-full bg-[var(--border)] rounded-full h-2.5 overflow-hidden">
  <div
- className="bg-[#00E5A0] h-2.5 rounded-full transition-all duration-300 ease-out"
+ className="bg-[#2563EB] h-2.5 rounded-full transition-all duration-300 ease-out"
  style={{ width: `${uploadProgress}%` }}
  />
  </div>
@@ -1483,7 +1483,7 @@ export default function ContentClient() {
  </button>
  <button
  onClick={handleUpload}
- className="px-4 py-2 text-sm font-medium bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium bg-[#2563EB] text-white rounded-lg hover:bg-[#1D4ED8] transition disabled:opacity-50 flex items-center gap-2"
  disabled={actionLoading || (uploadQueue.length === 0 && (!uploadForm.title || !uploadForm.url))}
  >
  {actionLoading && <LoadingSpinner size="sm" />}
@@ -1525,7 +1525,7 @@ export default function ContentClient() {
  setFormErrors({ ...formErrors, title: errors.title });
  }
  }}
- className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] ${
+ className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-[var(--foreground)] ${
  formErrors.title ? 'border-red-500' : 'border-[var(--border)]'
  }`}
  placeholder="e.g., Summer Sale Banner"
@@ -1557,7 +1557,7 @@ export default function ContentClient() {
  </button>
  <button
  onClick={handleSaveEdit}
- className="px-4 py-2 text-sm font-medium bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium bg-[#2563EB] text-white rounded-lg hover:bg-[#1D4ED8] transition disabled:opacity-50 flex items-center gap-2"
  disabled={actionLoading || !uploadForm.title}
  >
  {actionLoading && <LoadingSpinner size="sm" />}
@@ -1590,7 +1590,7 @@ export default function ContentClient() {
  max={60}
  value={pushDuration}
  onChange={(e) => setPushDuration(Math.max(1, Math.min(60, parseInt(e.target.value) || 5)))}
- className="w-24 px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="w-24 px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
  />
  <div className="flex gap-1">
  {[1, 5, 15, 30].map((min) => (
@@ -1599,7 +1599,7 @@ export default function ContentClient() {
  onClick={() => setPushDuration(min)}
  className={`px-2 py-1 text-xs rounded ${
  pushDuration === min
- ? 'bg-[#00E5A0] text-[#061A21]'
+ ? 'bg-[#2563EB] text-white'
  : 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
  }`}
  >
@@ -1641,7 +1641,7 @@ export default function ContentClient() {
  setSelectedDevices(selectedDevices.filter((id) => id !== device.id));
  }
  }}
- className="mr-3 h-4 w-4 rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]"
+ className="mr-3 h-4 w-4 rounded border-[var(--border)] text-[#2563EB] focus:ring-[#2563EB]"
  />
  <div className="flex-1">
  <div className="font-medium text-[var(--foreground)]">{device.nickname}</div>
@@ -1671,11 +1671,11 @@ export default function ContentClient() {
  </button>
  <button
  onClick={confirmPush}
- className="px-4 py-2 text-sm font-medium bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium bg-[#2563EB] text-white rounded-lg hover:bg-[#1D4ED8] transition disabled:opacity-50 flex items-center gap-2"
  disabled={actionLoading || selectedDevices.length === 0}
  >
  {actionLoading && <LoadingSpinner size="sm" />}
- <Icon name="push" size="md" className="text-[#061A21]" />
+ <Icon name="push" size="md" className="text-white" />
  Push to {selectedDevices.length} Device{selectedDevices.length !== 1 ? 's' : ''}
  </button>
  </div>
@@ -1695,7 +1695,7 @@ export default function ContentClient() {
  <select
  value={selectedPlaylist}
  onChange={(e) => setSelectedPlaylist(e.target.value)}
- className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
  >
  <option value="">Select a playlist</option>
  {playlists.map((playlist) => (
@@ -1759,7 +1759,7 @@ export default function ContentClient() {
  type="text"
  value={newFolderName}
  onChange={(e) => setNewFolderName(e.target.value)}
- className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)]"
+ className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-[var(--foreground)]"
  placeholder="e.g., Marketing Materials"
  autoComplete="off"
  />
@@ -1771,7 +1771,7 @@ export default function ContentClient() {
  <select
  value={newFolderParentId || ''}
  onChange={(e) => setNewFolderParentId(e.target.value || null)}
- className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)]"
+ className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-[var(--foreground)]"
  >
  <option value="">Root (No Parent)</option>
  {folders.map((folder) => (
@@ -1795,7 +1795,7 @@ export default function ContentClient() {
  <button
  onClick={handleCreateFolder}
  disabled={actionLoading || !newFolderName.trim()}
- className="px-4 py-2 text-sm font-medium bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium bg-[#2563EB] text-white rounded-lg hover:bg-[#1D4ED8] transition disabled:opacity-50 flex items-center gap-2"
  >
  {actionLoading && <LoadingSpinner size="sm" />}
  Create Folder
@@ -1824,7 +1824,7 @@ export default function ContentClient() {
  <textarea
  value={flagReason}
  onChange={(e) => setFlagReason(e.target.value)}
- className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
+ className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
  placeholder="Why are you flagging this content?"
  rows={3}
  maxLength={500}
@@ -1887,7 +1887,7 @@ export default function ContentClient() {
  <textarea
  value={reviewReason}
  onChange={(e) => setReviewReason(e.target.value)}
- className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
+ className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
  placeholder="Add a note for the review decision..."
  rows={3}
  maxLength={500}
@@ -1945,7 +1945,7 @@ export default function ContentClient() {
  <select
  value={targetFolderId || ''}
  onChange={(e) => setTargetFolderId(e.target.value || null)}
- className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)]"
+ className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-[var(--foreground)]"
  >
  <option value="">Select a folder...</option>
  {folders.map((folder) => (

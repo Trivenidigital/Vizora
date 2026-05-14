@@ -146,8 +146,8 @@ export default function DashboardLayout({
                 {brandLogo ? (
                   <img src={brandLogo} alt={brandName} className="w-8 h-8 rounded-lg object-contain" />
                 ) : (
-                  <div className="w-8 h-8 bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] rounded-lg flex items-center justify-center">
-                    <span className="text-[#061A21] font-bold text-lg">{brandInitial}</span>
+                  <div className="w-8 h-8 bg-gradient-to-br from-[#2563EB] to-[#1E3A8A] rounded-lg flex items-center justify-center">
+                    <span className="text-white font-bold text-lg">{brandInitial}</span>
                   </div>
                 )}
                 <h1 className="text-2xl font-bold eh-gradient eh-heading">
@@ -172,10 +172,10 @@ export default function DashboardLayout({
                       />
                     ) : (
                       <div
-                        className="w-8 h-8 bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] rounded-full flex items-center justify-center"
+                        className="w-8 h-8 bg-gradient-to-br from-[#2563EB] to-[#1E3A8A] rounded-full flex items-center justify-center"
                         aria-label={`${user.email} avatar`}
                       >
-                        <span className="text-[#061A21] text-sm font-semibold">{getUserInitials()}</span>
+                        <span className="text-white text-sm font-semibold">{getUserInitials()}</span>
                       </div>
                     )}
                     <div className="hidden md:block text-left">

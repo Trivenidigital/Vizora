@@ -72,19 +72,19 @@ export default function TemplateCard({
   return (
     <div
       onClick={() => onClick(id)}
-      className={`group relative bg-[var(--surface)] rounded-xl border border-[var(--border)] overflow-hidden cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgba(0,0,0,0.3)] hover:border-[#00E5A0]/20 ${
+      className={`group relative bg-[var(--surface)] rounded-xl border border-[var(--border)] overflow-hidden cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgba(0,0,0,0.3)] hover:border-[#2563EB]/20 ${
         isFeaturedVariant ? 'flex-shrink-0 w-72' : ''
       }`}
     >
       {/* Thumbnail area */}
       <div className={`relative overflow-hidden ${isFeaturedVariant ? 'h-40' : 'h-44'}`}>
         {/* Gradient background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[#0A2A33] to-[#061A21]" />
+        <div className="absolute inset-0 bg-gradient-to-br from-[#0A2A33] to-[#111827]" />
         <div
           className="absolute inset-0 opacity-30"
           style={{
-            backgroundImage: `radial-gradient(circle at 30% 40%, rgba(0,229,160,0.15), transparent 60%),
-                             radial-gradient(circle at 70% 60%, rgba(0,180,216,0.1), transparent 50%)`,
+            backgroundImage: `radial-gradient(circle at 30% 40%, rgba(37, 99, 235,0.15), transparent 60%),
+                             radial-gradient(circle at 70% 60%, rgba(30, 58, 138,0.1), transparent 50%)`,
           }}
         />
 
@@ -124,7 +124,7 @@ export default function TemplateCard({
               e.stopPropagation();
               onUseTemplate?.(id);
             }}
-            className="opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300 px-5 py-2 rounded-lg bg-[#00E5A0] text-[#061A21] font-semibold text-sm hover:bg-[#00CC8E] shadow-lg"
+            className="opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300 px-5 py-2 rounded-lg bg-[#2563EB] text-white font-semibold text-sm hover:bg-[#1D4ED8] shadow-lg"
           >
             Use Template
           </button>
@@ -133,7 +133,7 @@ export default function TemplateCard({
         {/* Badges */}
         <div className="absolute top-2.5 left-2.5 flex gap-1.5">
           {isFeatured && (
-            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-[#00E5A0] text-[#061A21] rounded-md">
+            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-[#2563EB] text-white rounded-md">
               Featured
             </span>
           )}
@@ -150,7 +150,7 @@ export default function TemplateCard({
             {onEdit && (
               <button
                 onClick={(e) => { e.stopPropagation(); onEdit(id); }}
-                className="p-1.5 rounded-md bg-black/50 backdrop-blur-sm text-white/80 hover:bg-black/70 hover:text-[#00E5A0] transition-all"
+                className="p-1.5 rounded-md bg-black/50 backdrop-blur-sm text-white/80 hover:bg-black/70 hover:text-[#2563EB] transition-all"
                 title="Edit"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
@@ -171,7 +171,7 @@ export default function TemplateCard({
 
       {/* Info */}
       <div className="p-4">
-        <h3 className="font-semibold text-[var(--foreground)] text-sm mb-1 truncate group-hover:text-[#00E5A0] transition-colors duration-300">
+        <h3 className="font-semibold text-[var(--foreground)] text-sm mb-1 truncate group-hover:text-[#2563EB] transition-colors duration-300">
           {name}
         </h3>
         <p className="text-xs text-[var(--foreground-tertiary)] mb-3 line-clamp-2 min-h-[2rem]">

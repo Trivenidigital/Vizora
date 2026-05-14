@@ -16,9 +16,9 @@ interface StatCardProps {
 
 const colorStyles = {
   blue: {
-    bg: 'bg-[#00E5A0]/5',
-    icon: 'bg-[#00E5A0]/10 text-[#00E5A0]',
-    border: 'border-[#00E5A0]/20',
+    bg: 'bg-[#2563EB]/5',
+    icon: 'bg-[#2563EB]/10 text-[#2563EB]',
+    border: 'border-[#2563EB]/20',
   },
   green: {
     bg: 'bg-green-50 dark:bg-green-900/20',

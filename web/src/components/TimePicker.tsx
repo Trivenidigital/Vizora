@@ -90,7 +90,7 @@ export default function TimePicker({
                     }}
                     className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
                       value === preset.value
-                        ? 'bg-[#00E5A0]/10 text-[#00E5A0] font-semibold'
+                        ? 'bg-[#2563EB]/10 text-[#2563EB] font-semibold'
                         : 'text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
                     }`}
                   >
@@ -110,7 +110,7 @@ export default function TimePicker({
                     }}
                     className={`w-full text-left px-4 py-2 text-sm transition-colors ${
                       value === option.value
-                        ? 'bg-[#00E5A0] text-[#061A21] font-semibold'
+                        ? 'bg-[#2563EB] text-white font-semibold'
                         : 'text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
                     }`}
                   >

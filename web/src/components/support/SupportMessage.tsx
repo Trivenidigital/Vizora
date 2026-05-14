@@ -85,7 +85,7 @@ function renderMessageContent(text: string): React.ReactNode[] {
             href={linkMatch[2]}
             target="_blank"
             rel="noopener noreferrer"
-            className="underline text-[#00E5A0] hover:text-[#00CC8E]"
+            className="underline text-[#2563EB] hover:text-[#1D4ED8]"
           >
             {linkMatch[1]}
           </a>
@@ -120,7 +120,7 @@ export default function SupportMessage({ role, content, createdAt }: SupportMess
         <div
           className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
             isUser
-              ? 'bg-[#00E5A0]/15 text-[#d1fae5] rounded-br-md'
+              ? 'bg-[#2563EB]/15 text-[#d1fae5] rounded-br-md'
               : 'bg-[#1F2937] text-gray-200 rounded-bl-md'
           }`}
         >

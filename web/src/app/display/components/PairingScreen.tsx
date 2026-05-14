@@ -28,7 +28,7 @@ export function PairingScreen({ code, qrCode, error, isPairing, onRequestCode }:
       <div style={styles.card}>
         <div style={styles.logo}>
           <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-            <rect width="48" height="48" rx="12" fill="#00E5A0" />
+            <rect width="48" height="48" rx="12" fill="#2563EB" />
             <path d="M14 24L22 32L34 16" stroke="white" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
           <h1 style={styles.title}>Vizora Display</h1>
@@ -95,7 +95,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: '100vh',
-    background: 'linear-gradient(135deg, #061A21 0%, #0a2a35 50%, #061A21 100%)',
+    background: 'linear-gradient(135deg, #111827 0%, #0a2a35 50%, #111827 100%)',
     padding: '2rem',
   },
   card: {
@@ -139,10 +139,10 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     width: '56px',
     height: '68px',
-    background: 'rgba(0,229,160,0.15)',
-    border: '2px solid #00E5A0',
+    background: 'rgba(37, 99, 235,0.15)',
+    border: '2px solid #2563EB',
     borderRadius: '12px',
-    color: '#00E5A0',
+    color: '#2563EB',
     fontSize: '2rem',
     fontWeight: 700,
     fontFamily: 'monospace',
@@ -180,8 +180,8 @@ const styles: Record<string, React.CSSProperties> = {
   retryBtn: {
     marginTop: '0.5rem',
     padding: '0.5rem 1.5rem',
-    background: '#00E5A0',
-    color: '#061A21',
+    background: '#2563EB',
+    color: '#111827',
     border: 'none',
     borderRadius: '8px',
     cursor: 'pointer',
@@ -198,8 +198,8 @@ const styles: Record<string, React.CSSProperties> = {
   spinner: {
     width: '40px',
     height: '40px',
-    border: '3px solid rgba(0,229,160,0.2)',
-    borderTopColor: '#00E5A0',
+    border: '3px solid rgba(37, 99, 235,0.2)',
+    borderTopColor: '#2563EB',
     borderRadius: '50%',
     animation: 'spin 1s linear infinite',
   },

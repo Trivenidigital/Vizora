@@ -81,14 +81,14 @@ export default function HealthMonitoringClient() {
 
  const getHealthStatusColor = (score: number) => {
  if (score >= 90) return 'bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-700';
- if (score >= 70) return 'bg-[#00E5A0]/5 dark:bg-[#00E5A0]/10 border-[#00E5A0]/30 dark:border-[#00E5A0]/30';
+ if (score >= 70) return 'bg-[#2563EB]/5 dark:bg-[#2563EB]/10 border-[#2563EB]/30 dark:border-[#2563EB]/30';
  if (score >= 50) return 'bg-yellow-50 dark:bg-yellow-900 border-yellow-200 dark:border-yellow-700';
  return 'bg-red-50 dark:bg-red-900 border-red-200 dark:border-red-700';
  };
 
  const getHealthStatusLabel = (score: number) => {
  if (score >= 90) return { label: 'Excellent', color: 'text-green-700 dark:text-green-300' };
- if (score >= 70) return { label: 'Good', color: 'text-[#00E5A0] dark:text-[#00E5A0]' };
+ if (score >= 70) return { label: 'Good', color: 'text-[#2563EB] dark:text-[#2563EB]' };
  if (score >= 50) return { label: 'Fair', color: 'text-yellow-700 dark:text-yellow-300' };
  return { label: 'Poor', color: 'text-red-700 dark:text-red-300' };
  };
@@ -162,7 +162,7 @@ export default function HealthMonitoringClient() {
  </div>
  <button
  onClick={loadDevicesAndHealth}
- className="bg-[#00E5A0] text-[#061A21] px-6 py-3 rounded-lg hover:bg-[#00CC8E] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
+ className="bg-[#2563EB] text-white px-6 py-3 rounded-lg hover:bg-[#1D4ED8] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
  >
  <Icon name="download" size="lg" className="text-white" />
  <span>Refresh</span>
@@ -171,7 +171,7 @@ export default function HealthMonitoringClient() {
 
  {/* Health Statistics Cards */}
  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
- <div className="bg-[var(--surface)] rounded-lg shadow p-6 border-t-4 border-[#00E5A0]">
+ <div className="bg-[var(--surface)] rounded-lg shadow p-6 border-t-4 border-[#2563EB]">
  <div className="flex items-center justify-between">
  <div>
  <p className="text-sm font-medium text-[var(--foreground-secondary)]">Total Devices</p>
@@ -179,7 +179,7 @@ export default function HealthMonitoringClient() {
  {stats.totalDevices}
  </p>
  </div>
- <Icon name="devices" size="3xl" className="text-[#00E5A0] opacity-20" />
+ <Icon name="devices" size="3xl" className="text-[#2563EB] opacity-20" />
  </div>
  </div>
 
@@ -233,7 +233,7 @@ export default function HealthMonitoringClient() {
  <select
  value={sortBy}
  onChange={(e) => setSortBy(e.target.value as any)}
- className="px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0]"
+ className="px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB]"
  >
  <option value="health">Sort by Health</option>
  <option value="name">Sort by Name</option>
@@ -334,7 +334,7 @@ export default function HealthMonitoringClient() {
  ? 'bg-red-100 dark:bg-red-900 border-red-300 dark:border-red-700'
  : activeAlerts[device.id].severity === 'warning'
  ? 'bg-yellow-100 dark:bg-yellow-900 border-yellow-300 dark:border-yellow-700'
- : 'bg-[#00E5A0]/10 dark:bg-[#00E5A0]/10 border-[#00E5A0]/30'
+ : 'bg-[#2563EB]/10 dark:bg-[#2563EB]/10 border-[#2563EB]/30'
  }`}
  >
  <p
@@ -343,7 +343,7 @@ export default function HealthMonitoringClient() {
  ? 'text-red-800 dark:text-red-200'
  : activeAlerts[device.id].severity === 'warning'
  ? 'text-yellow-800 dark:text-yellow-200'
- : 'text-[#00E5A0] dark:text-[#00E5A0]'
+ : 'text-[#2563EB] dark:text-[#2563EB]'
  }`}
  >
  🔴 {activeAlerts[device.id].message}

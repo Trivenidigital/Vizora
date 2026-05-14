@@ -66,7 +66,7 @@ export function ContentGrid({
           className="bg-[var(--surface)] rounded-lg shadow overflow-hidden hover:shadow-xl transition-all transform hover:-translate-y-1"
         >
           <div
-            className="h-48 bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] flex items-center justify-center relative overflow-hidden cursor-pointer"
+            className="h-48 bg-gradient-to-br from-[#2563EB] to-[#1E3A8A] flex items-center justify-center relative overflow-hidden cursor-pointer"
             onClick={() => onPreview(item)}
             title="Click to preview"
           >
@@ -95,7 +95,7 @@ export function ContentGrid({
                 checked={selectedItems.has(item.id)}
                 onChange={() => onToggleSelect(item.id)}
                 onClick={(e) => e.stopPropagation()}
-                className="w-5 h-5 rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0] bg-[var(--surface)] shadow-sm"
+                className="w-5 h-5 rounded border-[var(--border)] text-[#2563EB] focus:ring-[#2563EB] bg-[var(--surface)] shadow-sm"
               />
             </div>
             <span
@@ -139,7 +139,7 @@ export function ContentGrid({
               </button>
               <button
                 onClick={() => onEdit(item)}
-                className="text-sm bg-[#00E5A0]/5 text-[#00E5A0] py-2 rounded hover:bg-[#00E5A0]/10 transition font-medium flex items-center justify-center gap-1"
+                className="text-sm bg-[#2563EB]/5 text-[#2563EB] py-2 rounded hover:bg-[#2563EB]/10 transition font-medium flex items-center justify-center gap-1"
               >
                 <Icon name="edit" size="sm" />
                 Edit

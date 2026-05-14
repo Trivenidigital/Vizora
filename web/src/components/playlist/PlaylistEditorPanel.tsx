@@ -118,7 +118,7 @@ function SortablePlaylistItem({
             }
           }}
           onClick={(e) => e.stopPropagation()}
-          className="w-16 px-2 py-1 text-sm border border-[var(--border)] rounded focus:ring-1 focus:ring-[#00E5A0] focus:border-[#00E5A0]"
+          className="w-16 px-2 py-1 text-sm border border-[var(--border)] rounded focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
         />
         <span className="text-sm text-[var(--foreground-tertiary)]">s</span>
       </div>
@@ -169,7 +169,7 @@ export default function PlaylistEditorPanel({
         ref={setNodeRef}
         className={`
           flex-1 overflow-y-auto p-4 space-y-2
-          ${isOver ? 'bg-[#00E5A0]/5 border-2 border-[#00E5A0] border-dashed' : ''}
+          ${isOver ? 'bg-[#2563EB]/5 border-2 border-[#2563EB] border-dashed' : ''}
         `}
       >
         {items.length === 0 ? (

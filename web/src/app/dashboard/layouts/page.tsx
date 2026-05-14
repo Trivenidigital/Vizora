@@ -43,8 +43,8 @@ function LayoutPreviewGrid({ type }: { type: string }) {
   };
 
   const zoneColors = [
-    'bg-[#00E5A0]/40',
-    'bg-[#00B4D8]/40',
+    'bg-[#2563EB]/40',
+    'bg-[#1E3A8A]/40',
     'bg-purple-400/40',
     'bg-orange-400/40',
   ];
@@ -295,7 +295,7 @@ export default function LayoutsPage() {
                 {layouts.map((layout) => (
                   <div
                     key={layout.id}
-                    className="eh-dash-card rounded-lg shadow border border-[var(--border)] overflow-hidden hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300"
+                    className="eh-dash-card rounded-lg shadow border border-[var(--border)] overflow-hidden hover:-translate-y-[2px] hover:border-[rgba(37, 99, 235,0.2)] hover:shadow-md transition-all duration-300"
                   >
                     <div className="p-5">
                       <LayoutPreviewGrid type={layout.layoutType} />
@@ -316,7 +316,7 @@ export default function LayoutsPage() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => router.push(`/dashboard/layouts/${layout.id}`)}
-                          className="flex-1 text-sm py-2 rounded-lg bg-[#00E5A0]/10 text-[#00E5A0] hover:bg-[#00E5A0]/20 transition font-medium flex items-center justify-center gap-1"
+                          className="flex-1 text-sm py-2 rounded-lg bg-[#2563EB]/10 text-[#2563EB] hover:bg-[#2563EB]/20 transition font-medium flex items-center justify-center gap-1"
                         >
                           <Icon name="edit" size="sm" />
                           Edit Zones
@@ -348,7 +348,7 @@ export default function LayoutsPage() {
               {presets.map((preset) => (
                 <div
                   key={preset.type}
-                  className="eh-dash-card rounded-lg border border-[var(--border)] p-5 hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300 cursor-pointer group"
+                  className="eh-dash-card rounded-lg border border-[var(--border)] p-5 hover:-translate-y-[2px] hover:border-[rgba(37, 99, 235,0.2)] hover:shadow-md transition-all duration-300 cursor-pointer group"
                   onClick={() => {
                     setSelectedPreset(preset);
                     setLayoutName('');
@@ -407,7 +407,7 @@ export default function LayoutsPage() {
                 <button
                   key={preset.type}
                   onClick={() => setSelectedPreset(preset)}
-                  className="w-full flex items-center gap-4 p-3 rounded-lg border border-[var(--border)] hover:border-[#00E5A0] hover:bg-[#00E5A0]/5 transition text-left"
+                  className="w-full flex items-center gap-4 p-3 rounded-lg border border-[var(--border)] hover:border-[#2563EB] hover:bg-[#2563EB]/5 transition text-left"
                 >
                   <div className="w-24 flex-shrink-0">
                     <LayoutPreviewGrid type={preset.type} />
@@ -434,7 +434,7 @@ export default function LayoutsPage() {
                 </div>
                 <button
                   onClick={() => setSelectedPreset(null)}
-                  className="ml-auto text-xs text-[#00E5A0] hover:underline"
+                  className="ml-auto text-xs text-[#2563EB] hover:underline"
                 >
                   Change
                 </button>
@@ -450,7 +450,7 @@ export default function LayoutsPage() {
                   value={layoutName}
                   onChange={(e) => setLayoutName(e.target.value)}
                   placeholder="e.g., Lobby Main Display"
-                  className="eh-input w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
+                  className="eh-input w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
                   autoFocus
                 />
               </div>
@@ -465,7 +465,7 @@ export default function LayoutsPage() {
                   value={layoutDescription}
                   onChange={(e) => setLayoutDescription(e.target.value)}
                   placeholder="A brief description of this layout..."
-                  className="eh-input w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
+                  className="eh-input w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
                 />
               </div>
 

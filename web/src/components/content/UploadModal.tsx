@@ -97,7 +97,7 @@ export function UploadModal({ isOpen, onClose, onUpload }: UploadModalProps) {
             type="text"
             value={uploadForm.title}
             onChange={(e) => setUploadForm({ ...uploadForm, title: e.target.value })}
-            className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)]"
+            className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-[var(--foreground)]"
             placeholder="e.g., Summer Sale Banner"
             autoComplete="off"
           />
@@ -112,7 +112,7 @@ export function UploadModal({ isOpen, onClose, onUpload }: UploadModalProps) {
             onChange={(e) =>
               setUploadForm({ ...uploadForm, type: e.target.value as any })
             }
-            className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)]"
+            className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-[var(--foreground)]"
           >
             <option value="image">Image</option>
             <option value="video">Video</option>
@@ -130,8 +130,8 @@ export function UploadModal({ isOpen, onClose, onUpload }: UploadModalProps) {
               {...getRootProps()}
               className={`border-2 border-dashed rounded-lg p-6 text-center transition-all cursor-pointer ${
                 isDragActive
-                  ? 'border-[#00E5A0] bg-[#00E5A0]/5'
-                  : 'border-[var(--border)] hover:border-[#00E5A0] hover:bg-[var(--surface-hover)]'
+                  ? 'border-[#2563EB] bg-[#2563EB]/5'
+                  : 'border-[var(--border)] hover:border-[#2563EB] hover:bg-[var(--surface-hover)]'
               }`}
             >
               <input {...getInputProps()} />
@@ -149,12 +149,12 @@ export function UploadModal({ isOpen, onClose, onUpload }: UploadModalProps) {
                 />
               </svg>
               {isDragActive ? (
-                <p className="text-sm font-medium text-[#00E5A0]">
+                <p className="text-sm font-medium text-[#2563EB]">
                   Drop the file here...
                 </p>
               ) : (
                 <>
-                  <p className="text-sm font-medium text-[#00E5A0] hover:text-[#00CC8E] mb-1">
+                  <p className="text-sm font-medium text-[#2563EB] hover:text-[#1D4ED8] mb-1">
                     Drag & drop file here, or click to browse
                   </p>
                   <p className="text-xs text-[var(--foreground-tertiary)]">
@@ -233,7 +233,7 @@ export function UploadModal({ isOpen, onClose, onUpload }: UploadModalProps) {
               type="url"
               value={uploadForm.url}
               onChange={(e) => setUploadForm({ ...uploadForm, url: e.target.value })}
-              className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)]"
+              className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-[var(--foreground)]"
               placeholder="https://example.com/page"
               autoComplete="off"
             />
@@ -249,7 +249,7 @@ export function UploadModal({ isOpen, onClose, onUpload }: UploadModalProps) {
           </button>
           <button
             onClick={handleSubmit}
-            className="px-4 py-2 text-sm font-medium text-[#061A21] bg-[#00E5A0] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
+            className="px-4 py-2 text-sm font-medium text-white bg-[#2563EB] rounded-lg hover:bg-[#1D4ED8] transition disabled:opacity-50 flex items-center gap-2"
             disabled={
               actionLoading ||
               (uploadQueue.length === 0 && (!uploadForm.title || !uploadForm.url))

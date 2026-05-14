@@ -87,7 +87,7 @@ export default function DashboardSectionError({
       <div role="alert" className="flex items-center justify-center min-h-[60vh]">
         <div className="max-w-md w-full bg-[var(--surface)] rounded-lg border border-[var(--border)] p-8 text-center">
           <div className="mb-4 flex justify-center">
-            <div className="animate-spin w-8 h-8 border-4 border-[var(--border)] border-t-[#00E5A0] rounded-full" />
+            <div className="animate-spin w-8 h-8 border-4 border-[var(--border)] border-t-[#2563EB] rounded-full" />
           </div>
           <h2 className="text-xl font-bold text-[var(--foreground)] mb-2">
             Loading the latest version…
@@ -98,7 +98,7 @@ export default function DashboardSectionError({
           <button
             onClick={handleHardReload}
             disabled={isReloading}
-            className="bg-[#00E5A0] text-[#061A21] px-6 py-2 rounded-lg hover:bg-[#00CC8E] transition font-semibold text-sm disabled:opacity-50"
+            className="bg-[#2563EB] text-white px-6 py-2 rounded-lg hover:bg-[#1D4ED8] transition font-semibold text-sm disabled:opacity-50"
           >
             {isReloading ? 'Refreshing…' : 'Refresh Now'}
           </button>
@@ -120,7 +120,7 @@ export default function DashboardSectionError({
           </p>
           <button
             onClick={reset}
-            className="bg-[#00E5A0] text-[#061A21] px-6 py-2 rounded-lg hover:bg-[#00CC8E] transition font-semibold text-sm"
+            className="bg-[#2563EB] text-white px-6 py-2 rounded-lg hover:bg-[#1D4ED8] transition font-semibold text-sm"
           >
             Try Again
           </button>
@@ -147,7 +147,7 @@ export default function DashboardSectionError({
         <div className="flex gap-3 justify-center">
           <button
             onClick={reset}
-            className="bg-[#00E5A0] text-[#061A21] px-6 py-2 rounded-lg hover:bg-[#00CC8E] transition font-semibold text-sm"
+            className="bg-[#2563EB] text-white px-6 py-2 rounded-lg hover:bg-[#1D4ED8] transition font-semibold text-sm"
           >
             Try Again
           </button>

@@ -67,8 +67,8 @@ export function ContentScreen({
     <div style={styles.waiting}>
       <div style={styles.waitingContent}>
         <svg width="64" height="64" viewBox="0 0 48 48" fill="none">
-          <rect width="48" height="48" rx="12" fill="rgba(0,229,160,0.15)" />
-          <path d="M14 24L22 32L34 16" stroke="#00E5A0" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+          <rect width="48" height="48" rx="12" fill="rgba(37, 99, 235,0.15)" />
+          <path d="M14 24L22 32L34 16" stroke="#2563EB" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
         <h2 style={styles.waitingTitle}>Display Connected</h2>
         <p style={styles.waitingText}>
@@ -93,7 +93,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     width: '100vw',
     height: '100vh',
-    background: 'linear-gradient(135deg, #061A21 0%, #0a2a35 50%, #061A21 100%)',
+    background: 'linear-gradient(135deg, #111827 0%, #0a2a35 50%, #111827 100%)',
   },
   waitingContent: {
     textAlign: 'center' as const,

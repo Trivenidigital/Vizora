@@ -71,7 +71,7 @@ export default function DeviceDetailPage() {
           <p className="text-[var(--foreground-secondary)] mb-6">{error}</p>
           <button
             onClick={() => router.push('/dashboard/devices')}
-            className="px-6 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition font-medium"
+            className="px-6 py-2 bg-[#2563EB] text-white rounded-lg hover:bg-[#1D4ED8] transition font-medium"
           >
             Return to Devices
           </button>
@@ -161,7 +161,7 @@ export default function DeviceDetailPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="p-3 bg-[var(--background-secondary)] rounded-lg">
-            <Icon name="devices" size="2xl" className="text-[#00E5A0]" />
+            <Icon name="devices" size="2xl" className="text-[#2563EB]" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-[var(--foreground)]">{device.nickname || 'Unnamed Device'}</h1>
@@ -227,7 +227,7 @@ export default function DeviceDetailPage() {
           <div className="px-6 py-4">
             <Link
               href={`/dashboard/playlists/${device.currentPlaylistId}`}
-              className="inline-flex items-center gap-2 text-[#00E5A0] hover:text-[#00CC8E] transition font-medium"
+              className="inline-flex items-center gap-2 text-[#2563EB] hover:text-[#1D4ED8] transition font-medium"
             >
               <Icon name="playlists" size="md" />
               View Assigned Playlist

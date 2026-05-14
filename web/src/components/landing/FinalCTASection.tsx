@@ -16,34 +16,34 @@ export default function FinalCTASection({ finalCtaRef }: FinalCTASectionProps) {
         <div
           className="max-w-4xl mx-auto rounded-2xl p-10 sm:p-16 text-center relative overflow-hidden eh-grain"
           style={{
-            background: 'linear-gradient(135deg, rgba(0,229,160,0.08) 0%, rgba(0,180,216,0.05) 100%)',
-            border: '1px solid rgba(0,229,160,0.18)',
+            background: 'linear-gradient(135deg, rgba(37, 99, 235,0.08) 0%, rgba(30, 58, 138,0.05) 100%)',
+            border: '1px solid rgba(37, 99, 235,0.18)',
           }}
         >
           <div
             className="absolute top-[-50%] left-[50%] -translate-x-1/2 w-[500px] h-[500px] rounded-full pointer-events-none"
-            style={{ background: 'radial-gradient(circle, rgba(0,229,160,0.1) 0%, transparent 70%)' }}
+            style={{ background: 'radial-gradient(circle, rgba(37, 99, 235,0.1) 0%, transparent 70%)' }}
           />
 
           {/* Avatar row */}
           <div className="relative flex items-center justify-center mb-6">
             <div className="flex -space-x-2">
               {[
-                { initials: 'SC', gradient: 'linear-gradient(135deg, #00E5A0, #00B4D8)' },
-                { initials: 'MW', gradient: 'linear-gradient(135deg, #00B4D8, #8B5CF6)' },
-                { initials: 'JP', gradient: 'linear-gradient(135deg, #8B5CF6, #00E5A0)' },
-                { initials: 'LT', gradient: 'linear-gradient(135deg, #F59E0B, #00E5A0)' },
+                { initials: 'SC', gradient: 'linear-gradient(135deg, #2563EB, #1E3A8A)' },
+                { initials: 'MW', gradient: 'linear-gradient(135deg, #1E3A8A, #8B5CF6)' },
+                { initials: 'JP', gradient: 'linear-gradient(135deg, #8B5CF6, #2563EB)' },
+                { initials: 'LT', gradient: 'linear-gradient(135deg, #F59E0B, #2563EB)' },
               ].map((avatar) => (
                 <div
                   key={avatar.initials}
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-[0.6rem] font-bold ring-2 ring-[#0A222E]"
-                  style={{ background: avatar.gradient, color: '#061A21' }}
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-[0.6rem] font-bold ring-2 ring-[#111827]"
+                  style={{ background: avatar.gradient, color: '#111827' }}
                 >
                   {avatar.initials}
                 </div>
               ))}
             </div>
-            <span className="ml-3 text-sm font-medium" style={{ color: '#9A958E' }}>
+            <span className="ml-3 text-sm font-medium" style={{ color: '#6B7280' }}>
               +2,500 organizations
             </span>
           </div>
@@ -51,7 +51,7 @@ export default function FinalCTASection({ finalCtaRef }: FinalCTASectionProps) {
           <h2 className="relative eh-heading text-2xl sm:text-3xl font-bold mb-4">
             Your screens are waiting
           </h2>
-          <p className="relative mb-8 max-w-md mx-auto" style={{ color: '#9A958E' }}>
+          <p className="relative mb-8 max-w-md mx-auto" style={{ color: '#6B7280' }}>
             Join thousands of organizations using Vizora to power their digital signage.
             Deploy your first screen in under 5 minutes.
           </p>
@@ -59,22 +59,22 @@ export default function FinalCTASection({ finalCtaRef }: FinalCTASectionProps) {
             <Link
               href="/register"
               className="eh-btn-neon inline-flex items-center gap-2 px-10 py-3.5 rounded-lg text-base font-semibold"
-              style={{ boxShadow: '0 0 30px rgba(0,229,160,0.2), 0 0 60px rgba(0,229,160,0.08)' }}
+              style={{ boxShadow: '0 0 30px rgba(37, 99, 235,0.2), 0 0 60px rgba(37, 99, 235,0.08)' }}
             >
               Get Started Free <ArrowRight size={16} />
             </Link>
           </div>
           <div className="relative flex items-center justify-center gap-6 text-xs mt-6" style={{ color: '#6B655D' }}>
             <span className="flex items-center gap-1.5">
-              <Check size={13} style={{ color: '#00E5A0' }} />
+              <Check size={13} style={{ color: '#2563EB' }} />
               30-day free trial
             </span>
             <span className="flex items-center gap-1.5">
-              <Check size={13} style={{ color: '#00E5A0' }} />
+              <Check size={13} style={{ color: '#2563EB' }} />
               5-minute setup
             </span>
             <span className="hidden sm:flex items-center gap-1.5">
-              <Check size={13} style={{ color: '#00E5A0' }} />
+              <Check size={13} style={{ color: '#2563EB' }} />
               No credit card
             </span>
           </div>

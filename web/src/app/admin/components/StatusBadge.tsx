@@ -38,9 +38,9 @@ const statusStyles: Record<string, { bg: string; text: string; dot: string }> = 
     dot: 'bg-red-500',
   },
   trialing: {
-    bg: 'bg-[#00E5A0]/10',
-    text: 'text-[#00E5A0]',
-    dot: 'bg-[#00E5A0]',
+    bg: 'bg-[#2563EB]/10',
+    text: 'text-[#2563EB]',
+    dot: 'bg-[#2563EB]',
   },
   canceled: {
     bg: 'bg-yellow-100 dark:bg-yellow-900/30',
@@ -73,9 +73,9 @@ const statusStyles: Record<string, { bg: string; text: string; dot: string }> = 
     dot: 'bg-red-500',
   },
   info: {
-    bg: 'bg-[#00E5A0]/10',
-    text: 'text-[#00E5A0]',
-    dot: 'bg-[#00E5A0]',
+    bg: 'bg-[#2563EB]/10',
+    text: 'text-[#2563EB]',
+    dot: 'bg-[#2563EB]',
   },
   maintenance: {
     bg: 'bg-purple-100 dark:bg-purple-900/30',

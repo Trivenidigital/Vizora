@@ -77,14 +77,14 @@ describe('FolderTree', () => {
     render(<FolderTree {...defaultProps} selectedFolderId="folder-1" />);
 
     const marketingFolder = screen.getByText('Marketing').closest('div');
-    expect(marketingFolder).toHaveClass('bg-[#00E5A0]/10');
+    expect(marketingFolder).toHaveClass('bg-[#2563EB]/10');
   });
 
   it('should highlight "All Content" when no folder is selected', () => {
     render(<FolderTree {...defaultProps} selectedFolderId={null} />);
 
     const allContent = screen.getByText('All Content').closest('div');
-    expect(allContent).toHaveClass('bg-[#00E5A0]/10');
+    expect(allContent).toHaveClass('bg-[#2563EB]/10');
   });
 
   it('should call onSelectFolder when clicking a folder', () => {

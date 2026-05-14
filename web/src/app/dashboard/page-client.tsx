@@ -222,7 +222,7 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  {/* Stats Grid */}
  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
  <div
- className="eh-dash-card p-6 hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300 cursor-pointer animate-[fadeIn_0.3s_ease-out]"
+ className="eh-dash-card p-6 hover:-translate-y-[2px] hover:border-[rgba(37, 99, 235,0.2)] hover:shadow-md transition-all duration-300 cursor-pointer animate-[fadeIn_0.3s_ease-out]"
  onClick={() => router.push('/dashboard/devices')}
  >
  <div className="flex items-center justify-between mb-4">
@@ -239,7 +239,7 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  </div>
 
  <div
- className="eh-dash-card p-6 hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300 cursor-pointer animate-[fadeIn_0.4s_ease-out]"
+ className="eh-dash-card p-6 hover:-translate-y-[2px] hover:border-[rgba(37, 99, 235,0.2)] hover:shadow-md transition-all duration-300 cursor-pointer animate-[fadeIn_0.4s_ease-out]"
  onClick={() => router.push('/dashboard/content')}
  >
  <div className="flex items-center justify-between mb-4">
@@ -255,7 +255,7 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  </div>
 
  <div
- className="eh-dash-card p-6 hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300 cursor-pointer animate-[fadeIn_0.5s_ease-out]"
+ className="eh-dash-card p-6 hover:-translate-y-[2px] hover:border-[rgba(37, 99, 235,0.2)] hover:shadow-md transition-all duration-300 cursor-pointer animate-[fadeIn_0.5s_ease-out]"
  onClick={() => router.push('/dashboard/playlists')}
  >
  <div className="flex items-center justify-between mb-4">
@@ -268,7 +268,7 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  </p>
  </div>
 
- <div className="bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] p-6 rounded-lg border border-[var(--border)] hover:-translate-y-[2px] hover:shadow-md transition-all duration-300 text-white animate-[fadeIn_0.6s_ease-out]">
+ <div className="bg-gradient-to-br from-[#2563EB] to-[#1E3A8A] p-6 rounded-lg border border-[var(--border)] hover:-translate-y-[2px] hover:shadow-md transition-all duration-300 text-white animate-[fadeIn_0.6s_ease-out]">
  <div className="flex items-center justify-between mb-4">
  <p className="text-sm font-medium text-primary-100">System Status</p>
  <Icon name="power" size="2xl" className="text-primary-200" />
@@ -292,7 +292,7 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  onClick={() => router.push('/dashboard/devices/pair')}
  className="eh-dash-card eh-dash-card-interactive p-5 flex items-center gap-3 transition-all transform hover:scale-105"
  >
- <Icon name="add" size="2xl" className="text-[#00E5A0]" />
+ <Icon name="add" size="2xl" className="text-[#2563EB]" />
  <div className="text-left">
  <div className="font-semibold text-[var(--foreground)]">Pair Device</div>
  <div className="text-xs text-[var(--foreground-secondary)]">Add new display</div>
@@ -303,7 +303,7 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  onClick={() => router.push('/dashboard/content')}
  className="eh-dash-card eh-dash-card-interactive p-5 flex items-center gap-3 transition-all transform hover:scale-105"
  >
- <Icon name="upload" size="2xl" className="text-[#00E5A0]" />
+ <Icon name="upload" size="2xl" className="text-[#2563EB]" />
  <div className="text-left">
  <div className="font-semibold text-[var(--foreground)]">Upload Content</div>
  <div className="text-xs text-[var(--foreground-secondary)]">Add new media</div>
@@ -314,7 +314,7 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  onClick={() => router.push('/dashboard/playlists')}
  className="eh-dash-card eh-dash-card-interactive p-5 flex items-center gap-3 transition-all transform hover:scale-105"
  >
- <Icon name="playlists" size="2xl" className="text-[#00E5A0]" />
+ <Icon name="playlists" size="2xl" className="text-[#2563EB]" />
  <div className="text-left">
  <div className="font-semibold text-[var(--foreground)]">Create Playlist</div>
  <div className="text-xs text-[var(--foreground-secondary)]">Organize content</div>
@@ -325,7 +325,7 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  onClick={() => router.push('/dashboard/schedules')}
  className="eh-dash-card eh-dash-card-interactive p-5 flex items-center gap-3 transition-all transform hover:scale-105"
  >
- <Icon name="schedules" size="2xl" className="text-[#00E5A0]" />
+ <Icon name="schedules" size="2xl" className="text-[#2563EB]" />
  <div className="text-left">
  <div className="font-semibold text-[var(--foreground)]">Schedule</div>
  <div className="text-xs text-[var(--foreground-secondary)]">Set up timing</div>
@@ -405,7 +405,7 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
 
  {/* Getting Started Guide */}
  {stats.devices.total === 0 && (
- <div className="bg-gradient-to-r from-[#00E5A0] to-[#00B4D8] rounded-lg shadow-lg p-8 text-white">
+ <div className="bg-gradient-to-r from-[#2563EB] to-[#1E3A8A] rounded-lg shadow-lg p-8 text-white">
  <h3 className="eh-dash-subtitle text-2xl font-bold mb-4 flex items-center gap-2"><Icon name="power" size="xl" className="text-white" /> Getting Started</h3>
  <p className="mb-6 text-primary-100">
  Welcome to Vizora! Follow these steps to get your digital signage system up and running:

@@ -21,9 +21,9 @@ export interface BrandConfig {
 const defaultBrandConfig: BrandConfig = {
   id: 'default',
   name: 'Vizora',
-  primaryColor: '#00E5A0',
-  secondaryColor: '#00B4D8',
-  accentColor: '#00CC8E',
+  primaryColor: '#2563EB',
+  secondaryColor: '#1E3A8A',
+  accentColor: '#1D4ED8',
   fontFamily: 'sans',
   showPoweredBy: true,
 };

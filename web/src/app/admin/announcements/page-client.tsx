@@ -111,7 +111,7 @@ export default function AdminAnnouncementsClient({ initialAnnouncements }: Admin
   const getTypeStyles = (type: SystemAnnouncement['type']) => {
     switch (type) {
       case 'info':
-        return 'bg-[#00E5A0]/10 text-[#00E5A0] border-[#00E5A0]/20';
+        return 'bg-[#2563EB]/10 text-[#2563EB] border-[#2563EB]/20';
       case 'warning':
         return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800';
       case 'critical':
@@ -160,7 +160,7 @@ export default function AdminAnnouncementsClient({ initialAnnouncements }: Admin
         </div>
         <button
           onClick={handleCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition"
+          className="flex items-center gap-2 px-4 py-2 bg-[#2563EB] text-white rounded-lg hover:bg-[#1D4ED8] transition"
         >
           <Plus className="w-5 h-5" />
           Create Announcement
@@ -196,7 +196,7 @@ export default function AdminAnnouncementsClient({ initialAnnouncements }: Admin
                         {announcement.title}
                       </h3>
                       {isScheduled(announcement) && (
-                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-[#00E5A0]/10 text-[#00E5A0]">
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-[#2563EB]/10 text-[#2563EB]">
                           Scheduled
                         </span>
                       )}
@@ -269,7 +269,7 @@ export default function AdminAnnouncementsClient({ initialAnnouncements }: Admin
           </p>
           <button
             onClick={handleCreate}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-[#2563EB] text-white rounded-lg hover:bg-[#1D4ED8] transition"
           >
             <Plus className="w-5 h-5" />
             Create Announcement

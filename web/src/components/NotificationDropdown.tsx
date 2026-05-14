@@ -63,8 +63,8 @@ function SeverityIcon({ severity }: { severity: 'info' | 'warning' | 'critical' 
     case 'info':
     default:
       return (
-        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#00E5A0]/10 flex items-center justify-center">
-          <svg className="w-4 h-4 text-[#00E5A0]" fill="currentColor" viewBox="0 0 20 20">
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#2563EB]/10 flex items-center justify-center">
+          <svg className="w-4 h-4 text-[#2563EB]" fill="currentColor" viewBox="0 0 20 20">
             <path
               fillRule="evenodd"
               d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
@@ -132,7 +132,7 @@ export default function NotificationDropdown({
         {hasUnread && (
           <button
             onClick={handleMarkAllAsRead}
-            className="text-xs text-[#00E5A0] hover:text-[#00CC8E] font-medium transition-colors"
+            className="text-xs text-[#2563EB] hover:text-[#1D4ED8] font-medium transition-colors"
           >
             Mark all as read
           </button>
@@ -167,7 +167,7 @@ export default function NotificationDropdown({
                   className={`flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors ${
                     notification.read
                       ? 'bg-[var(--surface)] hover:bg-[var(--surface-hover)]'
-                      : 'bg-[#00E5A0]/10 hover:bg-[#00E5A0]/20'
+                      : 'bg-[#2563EB]/10 hover:bg-[#2563EB]/20'
                   }`}
                   onClick={() => handleNotificationClick(notification)}
                   role="menuitem"
@@ -183,7 +183,7 @@ export default function NotificationDropdown({
                         {notification.title}
                       </p>
                       {!notification.read && (
-                        <span className="flex-shrink-0 w-2 h-2 mt-1.5 bg-[#00E5A0] rounded-full" />
+                        <span className="flex-shrink-0 w-2 h-2 mt-1.5 bg-[#2563EB] rounded-full" />
                       )}
                     </div>
                     <p className="text-sm text-[var(--foreground-secondary)] line-clamp-2 mt-0.5">

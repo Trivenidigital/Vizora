@@ -121,7 +121,7 @@ export default function CustomizationPage() {
  name="name"
  value={formData.name}
  onChange={handleInputChange}
- className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
  placeholder="Your Brand Name"
  />
  </div>
@@ -160,7 +160,7 @@ export default function CustomizationPage() {
  name="logo"
  value={formData.logo || ''}
  onChange={handleInputChange}
- className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
  placeholder="https://example.com/logo.png"
  />
  </div>
@@ -174,7 +174,7 @@ export default function CustomizationPage() {
  name="logoAlt"
  value={formData.logoAlt || ''}
  onChange={handleInputChange}
- className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
  placeholder="Logo description for accessibility"
  />
  </div>
@@ -273,7 +273,7 @@ export default function CustomizationPage() {
  name="fontFamily"
  value={formData.fontFamily || 'sans'}
  onChange={handleInputChange}
- className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
  >
  <option value="sans">Sans Serif (Default)</option>
  <option value="serif">Serif</option>
@@ -288,7 +288,7 @@ export default function CustomizationPage() {
  name="showPoweredBy"
  checked={formData.showPoweredBy}
  onChange={handleInputChange}
- className="w-4 h-4 rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0] cursor-pointer"
+ className="w-4 h-4 rounded border-[var(--border)] text-[#2563EB] focus:ring-[#2563EB] cursor-pointer"
  />
  <label
  htmlFor="showPoweredBy"
@@ -317,7 +317,7 @@ export default function CustomizationPage() {
  name="customDomain"
  value={formData.customDomain || ''}
  onChange={handleInputChange}
- className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
  placeholder="example.com"
  />
  <p className="text-xs text-[var(--foreground-secondary)] mt-2">
@@ -344,7 +344,7 @@ export default function CustomizationPage() {
  value={formData.customCSS || ''}
  onChange={handleInputChange}
  rows={6}
- className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] font-mono text-sm focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] font-mono text-sm focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
  placeholder=".navbar { background-color: #custom; }"
  />
  <p className="text-xs text-[var(--foreground-secondary)] mt-2">

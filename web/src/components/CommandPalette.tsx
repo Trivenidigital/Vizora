@@ -171,7 +171,7 @@ export default function CommandPalette({ commands, open: controlledOpen, onOpenC
                           }}
                           className={`w-full px-4 py-3 text-left flex items-center gap-3 transition-colors ${
                             isSelected
-                              ? 'bg-[#00E5A0] text-[#061A21]'
+                              ? 'bg-[#2563EB] text-white'
                               : 'text-[var(--foreground)] hover:bg-[var(--surface-hover)]'
                           }`}
                         >

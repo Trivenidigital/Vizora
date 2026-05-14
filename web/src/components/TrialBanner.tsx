@@ -48,7 +48,7 @@ export default function TrialBanner() {
           </div>
           <Link
             href="/dashboard/settings/billing/plans"
-            className="shrink-0 px-4 py-1.5 bg-[#00E5A0] text-[#061A21] text-sm font-semibold rounded-md hover:bg-[#00CC8E] transition-colors"
+            className="shrink-0 px-4 py-1.5 bg-[#2563EB] text-white text-sm font-semibold rounded-md hover:bg-[#1D4ED8] transition-colors"
           >
             Upgrade Now
           </Link>
@@ -71,7 +71,7 @@ export default function TrialBanner() {
           <div className="flex items-center gap-2 shrink-0">
             <Link
               href="/dashboard/settings/billing/plans"
-              className="px-4 py-1.5 bg-[#00E5A0] text-[#061A21] text-sm font-semibold rounded-md hover:bg-[#00CC8E] transition-colors"
+              className="px-4 py-1.5 bg-[#2563EB] text-white text-sm font-semibold rounded-md hover:bg-[#1D4ED8] transition-colors"
             >
               Upgrade
             </Link>
@@ -92,11 +92,11 @@ export default function TrialBanner() {
 
   // Normal trial state (> 5 days left)
   return (
-    <div className="bg-gradient-to-r from-[#061A21] to-[#0a2a35] border-b border-[#00E5A0]/20">
+    <div className="bg-gradient-to-r from-[#111827] to-[#0a2a35] border-b border-[#2563EB]/20">
       <div className="px-4 sm:px-6 lg:px-8 py-2 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-2 h-2 bg-[#00E5A0] rounded-full shrink-0" />
-          <p className="text-sm text-[#00E5A0]/90 truncate sm:whitespace-normal sm:overflow-visible">
+          <div className="w-2 h-2 bg-[#2563EB] rounded-full shrink-0" />
+          <p className="text-sm text-[#2563EB]/90 truncate sm:whitespace-normal sm:overflow-visible">
             <span className="font-semibold">Free Trial</span>
             {' '}&mdash; {daysRemaining} days remaining
           </p>
@@ -104,13 +104,13 @@ export default function TrialBanner() {
         <div className="flex items-center gap-2 shrink-0">
           <Link
             href="/dashboard/settings/billing/plans"
-            className="px-3 py-1 text-sm text-[#00E5A0] border border-[#00E5A0]/30 rounded-md hover:bg-[#00E5A0]/10 transition-colors font-medium"
+            className="px-3 py-1 text-sm text-[#2563EB] border border-[#2563EB]/30 rounded-md hover:bg-[#2563EB]/10 transition-colors font-medium"
           >
             View Plans
           </Link>
           <button
             onClick={() => setDismissed(true)}
-            className="p-1.5 text-[#00E5A0]/30 hover:text-[#00E5A0]/60 transition-colors"
+            className="p-1.5 text-[#2563EB]/30 hover:text-[#2563EB]/60 transition-colors"
             aria-label="Dismiss"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

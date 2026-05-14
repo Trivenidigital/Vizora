@@ -87,7 +87,7 @@ export function ConfigEditor({ config, onSave, isLoading = false }: ConfigEditor
         <select
           value={value}
           onChange={(e) => handleChange(e.target.value)}
-          className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+          className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
         >
           <option value="true">True</option>
           <option value="false">False</option>
@@ -101,7 +101,7 @@ export function ConfigEditor({ config, onSave, isLoading = false }: ConfigEditor
           value={value}
           onChange={(e) => handleChange(e.target.value)}
           rows={4}
-          className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent font-mono text-sm"
+          className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent font-mono text-sm"
         />
       );
     }
@@ -112,7 +112,7 @@ export function ConfigEditor({ config, onSave, isLoading = false }: ConfigEditor
           type={config.dataType === 'number' ? 'number' : 'text'}
           value={value}
           onChange={(e) => handleChange(e.target.value)}
-          className="flex-1 px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+          className="flex-1 px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
         />
         {config.isSecret && (
           <button
@@ -150,7 +150,7 @@ export function ConfigEditor({ config, onSave, isLoading = false }: ConfigEditor
           <button
             onClick={handleSave}
             disabled={isLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] disabled:opacity-50 transition"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[#2563EB] text-white rounded-lg hover:bg-[#1D4ED8] disabled:opacity-50 transition"
           >
             <Save className="w-4 h-4" />
             Save

@@ -11,7 +11,7 @@ interface FooterSectionProps {
 
 export default function FooterSection({ footerRef }: FooterSectionProps) {
   return (
-    <footer ref={footerRef} className="pt-12 pb-8 px-6" style={{ borderTop: '1px solid #1B3D47' }}>
+    <footer ref={footerRef} className="pt-12 pb-8 px-6" style={{ borderTop: '1px solid #E5E7EB' }}>
       <div className="max-w-6xl mx-auto">
         <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-10 mb-12">
           {/* Brand */}
@@ -20,18 +20,18 @@ export default function FooterSection({ footerRef }: FooterSectionProps) {
               <div
                 className="w-6 h-6 rounded flex items-center justify-center"
                 style={{
-                  background: 'linear-gradient(135deg, rgba(0,229,160,0.2), rgba(0,180,216,0.15))',
-                  border: '1px solid rgba(0,229,160,0.25)',
+                  background: 'linear-gradient(135deg, rgba(37, 99, 235,0.2), rgba(30, 58, 138,0.15))',
+                  border: '1px solid rgba(37, 99, 235,0.25)',
                 }}
               >
-                <Monitor size={12} style={{ color: '#00E5A0' }} />
+                <Monitor size={12} style={{ color: '#2563EB' }} />
               </div>
               <span className="text-lg font-bold tracking-[-0.03em] eh-gradient" style={{ fontFamily: 'var(--font-sora), sans-serif' }}>
                 VIZORA
               </span>
             </Link>
             <p className="text-sm leading-relaxed mb-4" style={{ color: '#6B655D' }}>
-              AI-powered digital signage platform.
+              Simple professional digital signage platform.
               Intelligent control for every screen.
             </p>
             <div className="flex items-center gap-4">
@@ -41,7 +41,7 @@ export default function FooterSection({ footerRef }: FooterSectionProps) {
                 { label: '256-bit', icon: Lock },
               ].map((badge) => (
                 <div key={badge.label} className="flex items-center gap-1.5 text-[0.7rem]" style={{ color: '#6B655D' }}>
-                  <badge.icon size={12} style={{ color: '#00E5A0' }} />
+                  <badge.icon size={12} style={{ color: '#2563EB' }} />
                   {badge.label}
                 </div>
               ))}
@@ -50,7 +50,7 @@ export default function FooterSection({ footerRef }: FooterSectionProps) {
 
           {/* Product */}
           <div>
-            <h4 className="text-xs font-bold uppercase tracking-[0.1em] mb-4" style={{ color: '#9A958E' }}>Product</h4>
+            <h4 className="text-xs font-bold uppercase tracking-[0.1em] mb-4" style={{ color: '#6B7280' }}>Product</h4>
             <ul className="space-y-2.5">
               {[
                 { label: 'Features', action: () => scrollTo('features') },
@@ -61,7 +61,7 @@ export default function FooterSection({ footerRef }: FooterSectionProps) {
                 <li key={item.label}>
                   <button
                     onClick={item.action}
-                    className="text-sm transition-colors hover:text-[#F0ECE8]"
+                    className="text-sm transition-colors hover:text-[#F9FAFB]"
                     style={{ color: '#6B655D' }}
                   >
                     {item.label}
@@ -73,7 +73,7 @@ export default function FooterSection({ footerRef }: FooterSectionProps) {
 
           {/* Resources */}
           <div>
-            <h4 className="text-xs font-bold uppercase tracking-[0.1em] mb-4" style={{ color: '#9A958E' }}>Resources</h4>
+            <h4 className="text-xs font-bold uppercase tracking-[0.1em] mb-4" style={{ color: '#6B7280' }}>Resources</h4>
             <ul className="space-y-2.5">
               {[
                 { href: '/login', label: 'Login' },
@@ -81,7 +81,7 @@ export default function FooterSection({ footerRef }: FooterSectionProps) {
                 { href: '/dashboard', label: 'Dashboard' },
               ].map((l) => (
                 <li key={l.href}>
-                  <Link href={l.href} className="text-sm transition-colors hover:text-[#F0ECE8]" style={{ color: '#6B655D' }}>
+                  <Link href={l.href} className="text-sm transition-colors hover:text-[#F9FAFB]" style={{ color: '#6B655D' }}>
                     {l.label}
                   </Link>
                 </li>
@@ -91,7 +91,7 @@ export default function FooterSection({ footerRef }: FooterSectionProps) {
 
           {/* Legal */}
           <div>
-            <h4 className="text-xs font-bold uppercase tracking-[0.1em] mb-4" style={{ color: '#9A958E' }}>Legal</h4>
+            <h4 className="text-xs font-bold uppercase tracking-[0.1em] mb-4" style={{ color: '#6B7280' }}>Legal</h4>
             <ul className="space-y-2.5">
               {[
                 { href: '/privacy', label: 'Privacy Policy' },
@@ -100,7 +100,7 @@ export default function FooterSection({ footerRef }: FooterSectionProps) {
                 { href: '/sla', label: 'SLA' },
               ].map((l) => (
                 <li key={l.href}>
-                  <Link href={l.href} className="text-sm transition-colors hover:text-[#F0ECE8]" style={{ color: '#6B655D' }}>
+                  <Link href={l.href} className="text-sm transition-colors hover:text-[#F9FAFB]" style={{ color: '#6B655D' }}>
                     {l.label}
                   </Link>
                 </li>
@@ -110,7 +110,7 @@ export default function FooterSection({ footerRef }: FooterSectionProps) {
         </div>
 
         {/* Bottom bar */}
-        <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs" style={{ color: '#6B655D', borderTop: '1px solid #1B3D47' }}>
+        <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs" style={{ color: '#6B655D', borderTop: '1px solid #E5E7EB' }}>
           <span>&copy; {new Date().getFullYear()} Vizora. All rights reserved.</span>
         </div>
       </div>

@@ -90,12 +90,12 @@ export default function TemplateDetailModal({
 
         {loading ? (
           <div className="flex items-center justify-center py-32">
-            <div className="w-8 h-8 border-2 border-[#00E5A0]/20 border-t-[#00E5A0] rounded-full animate-spin" />
+            <div className="w-8 h-8 border-2 border-[#2563EB]/20 border-t-[#2563EB] rounded-full animate-spin" />
           </div>
         ) : template ? (
           <>
             {/* Preview area */}
-            <div className="relative h-80 sm:h-96 bg-gradient-to-br from-[#0A2A33] to-[#061A21] rounded-t-2xl overflow-hidden">
+            <div className="relative h-80 sm:h-96 bg-gradient-to-br from-[#0A2A33] to-[#111827] rounded-t-2xl overflow-hidden">
               {previewHtml ? (
                 <iframe
                   srcDoc={previewHtml}
@@ -132,7 +132,7 @@ export default function TemplateDetailModal({
                       onClose();
                       router.push(`/dashboard/templates/${template.id}/edit`);
                     }}
-                    className="px-5 py-2.5 rounded-lg bg-[#00E5A0] text-[#061A21] font-semibold text-sm hover:bg-[#00CC8E] transition-all hover:shadow-[0_0_20px_rgba(0,229,160,0.3)]"
+                    className="px-5 py-2.5 rounded-lg bg-[#2563EB] text-white font-semibold text-sm hover:bg-[#1D4ED8] transition-all hover:shadow-[0_0_20px_rgba(37, 99, 235,0.3)]"
                   >
                     Edit Visually
                   </button>
@@ -205,15 +205,15 @@ export default function TemplateDetailModal({
                             window.dispatchEvent(event);
                           }, 100);
                         }}
-                        className="bg-[var(--background)] rounded-lg border border-[var(--border)] overflow-hidden hover:border-[#00E5A0]/20 transition-all group/similar"
+                        className="bg-[var(--background)] rounded-lg border border-[var(--border)] overflow-hidden hover:border-[#2563EB]/20 transition-all group/similar"
                       >
-                        <div className="h-20 bg-gradient-to-br from-[#0A2A33] to-[#061A21] flex items-center justify-center">
+                        <div className="h-20 bg-gradient-to-br from-[#0A2A33] to-[#111827] flex items-center justify-center">
                           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="text-[var(--foreground-tertiary)] opacity-30">
                             <rect x="3" y="3" width="18" height="18" rx="2" />
                           </svg>
                         </div>
                         <div className="p-2">
-                          <p className="text-xs font-medium text-[var(--foreground)] truncate group-hover/similar:text-[#00E5A0] transition-colors">
+                          <p className="text-xs font-medium text-[var(--foreground)] truncate group-hover/similar:text-[#2563EB] transition-colors">
                             {t.name}
                           </p>
                         </div>

@@ -120,7 +120,7 @@ export default function AdminPlansClient({ initialPlans }: AdminPlansClientProps
         </div>
         <button
           onClick={handleCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition"
+          className="flex items-center gap-2 px-4 py-2 bg-[#2563EB] text-white rounded-lg hover:bg-[#1D4ED8] transition"
         >
           <Plus className="w-5 h-5" />
           Create Plan
@@ -134,12 +134,12 @@ export default function AdminPlansClient({ initialPlans }: AdminPlansClientProps
             key={plan.id}
             className={`bg-[var(--surface)] rounded-xl border-2 ${
               plan.highlightText
-                ? 'border-[#00E5A0]'
+                ? 'border-[#2563EB]'
                 : 'border-[var(--border)]'
             } overflow-hidden relative`}
           >
             {plan.highlightText && (
-              <div className="absolute top-0 left-0 right-0 bg-[#00E5A0] text-[#061A21] text-center text-sm font-medium py-1">
+              <div className="absolute top-0 left-0 right-0 bg-[#2563EB] text-white text-center text-sm font-medium py-1">
                 {plan.highlightText}
               </div>
             )}
@@ -249,7 +249,7 @@ export default function AdminPlansClient({ initialPlans }: AdminPlansClientProps
           </p>
           <button
             onClick={handleCreate}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-[#2563EB] text-white rounded-lg hover:bg-[#1D4ED8] transition"
           >
             <Plus className="w-5 h-5" />
             Create Plan

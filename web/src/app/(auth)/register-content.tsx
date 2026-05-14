@@ -161,14 +161,14 @@ export default function RegisterContent() {
         {/* Mobile-only compact trust banner */}
         <div className="md:hidden mb-8">
           <div className="flex items-center gap-2.5 mb-4">
-            <div className="w-7 h-7 rounded-lg bg-[#00E5A0]/10 border border-[#00E5A0]/20 flex items-center justify-center">
-              <span className="text-[#00E5A0] font-bold text-xs font-mono">V</span>
+            <div className="w-7 h-7 rounded-lg bg-[#2563EB]/10 border border-[#2563EB]/20 flex items-center justify-center">
+              <span className="text-[#2563EB] font-bold text-xs font-mono">V</span>
             </div>
             <span className="text-[var(--foreground)] font-semibold text-sm">Vizora</span>
           </div>
           <p className="text-[var(--foreground-tertiary)] text-sm">
             Join 2,500+ organizations managing their displays.{' '}
-            <span className="text-[#00E5A0] font-medium">Free for 30 days.</span>
+            <span className="text-[#2563EB] font-medium">Free for 30 days.</span>
           </p>
         </div>
 
@@ -397,7 +397,7 @@ export default function RegisterContent() {
                   setAgreeTerms(e.target.checked);
                   if (errors.agreeTerms) setErrors((prev) => ({ ...prev, agreeTerms: '' }));
                 }}
-                className="w-4 h-4 mt-0.5 rounded border-[var(--border)] bg-[var(--background)] text-[var(--primary)] focus:ring-[var(--primary)] focus:ring-2 accent-[#00E5A0] cursor-pointer"
+                className="w-4 h-4 mt-0.5 rounded border-[var(--border)] bg-[var(--background)] text-[var(--primary)] focus:ring-[var(--primary)] focus:ring-2 accent-[#2563EB] cursor-pointer"
               />
               <label htmlFor="agreeTerms" className="text-xs text-[var(--foreground-tertiary)] cursor-pointer select-none leading-relaxed">
                 I agree to the{' '}

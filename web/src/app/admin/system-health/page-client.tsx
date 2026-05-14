@@ -79,7 +79,7 @@ interface SparklinePoint {
 // Sparkline component (pure CSS, no chart library needed)
 // ---------------------------------------------------------------------------
 
-function Sparkline({ data, color = '#00E5A0', height = 32 }: {
+function Sparkline({ data, color = '#2563EB', height = 32 }: {
   data: number[];
   color?: string;
   height?: number;
@@ -276,20 +276,20 @@ export default function SystemHealthClient() {
             value={`${metrics.avg_latency_ms}ms`}
             icon={<Zap className="w-5 h-5" />}
             sparkData={history.map((h) => h.l)}
-            color={metrics.avg_latency_ms < 200 ? '#00E5A0' : metrics.avg_latency_ms < 500 ? '#EAB308' : '#EF4444'}
+            color={metrics.avg_latency_ms < 200 ? '#2563EB' : metrics.avg_latency_ms < 500 ? '#EAB308' : '#EF4444'}
           />
           <MetricCard
             title="5xx Errors"
             value={String(metrics.error_rate_5xx)}
             icon={<AlertTriangle className="w-5 h-5" />}
             sparkData={history.map((h) => h.e)}
-            color={metrics.error_rate_5xx === 0 ? '#00E5A0' : '#EF4444'}
+            color={metrics.error_rate_5xx === 0 ? '#2563EB' : '#EF4444'}
           />
           <MetricCard
             title="Uptime"
             value={`${metrics.uptime_pct}%`}
             icon={<Activity className="w-5 h-5" />}
-            color="#00E5A0"
+            color="#2563EB"
           />
           <MetricCard
             title="DB Latency"
@@ -411,7 +411,7 @@ function MetricCard({
   value,
   icon,
   sparkData,
-  color = '#00E5A0',
+  color = '#2563EB',
 }: {
   title: string;
   value: string;

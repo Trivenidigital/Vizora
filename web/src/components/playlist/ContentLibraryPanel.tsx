@@ -65,7 +65,7 @@ export default function ContentLibraryPanel({ organizationId }: ContentLibraryPa
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search content..."
-            className="w-full pl-9 pr-3 py-2 text-sm border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+            className="w-full pl-9 pr-3 py-2 text-sm border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
           />
         </div>
 
@@ -78,7 +78,7 @@ export default function ContentLibraryPanel({ organizationId }: ContentLibraryPa
               className={`
                 px-3 py-1 text-xs font-medium rounded-full transition
                 ${typeFilter === type
-                  ? 'bg-[#00E5A0] text-[#061A21]'
+                  ? 'bg-[#2563EB] text-white'
                   : 'bg-[var(--background-tertiary)] text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
                 }
               `}
@@ -106,7 +106,7 @@ export default function ContentLibraryPanel({ organizationId }: ContentLibraryPa
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="text-xs text-[#00E5A0] hover:text-[#00CC8E] mt-2"
+                className="text-xs text-[#2563EB] hover:text-[#1D4ED8] mt-2"
               >
                 Clear search
               </button>

@@ -37,7 +37,7 @@ function FolderNode({
       <div
         className={`flex items-center py-2 px-2 rounded-md cursor-pointer transition-colors ${
           isSelected
-            ? 'bg-[#00E5A0]/10 text-[#00E5A0]'
+            ? 'bg-[#2563EB]/10 text-[#2563EB]'
             : 'hover:bg-[var(--surface-hover)] text-[var(--foreground-secondary)]'
         }`}
         style={{ paddingLeft: `${level * 16 + 8}px` }}
@@ -70,7 +70,7 @@ function FolderNode({
         <Icon
           name={isExpanded ? 'folder' : 'folder'}
           size="md"
-          className={`mr-2 ${isSelected ? 'text-[#00E5A0]' : 'text-yellow-500'}`}
+          className={`mr-2 ${isSelected ? 'text-[#2563EB]' : 'text-yellow-500'}`}
         />
 
         {/* Folder Name */}
@@ -132,7 +132,7 @@ export default function FolderTree({
         {onCreateFolder && (
           <button
             onClick={onCreateFolder}
-            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-[#00E5A0] bg-[#00E5A0]/10 rounded-md hover:bg-[#00E5A0]/20 transition"
+            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-[#2563EB] bg-[#2563EB]/10 rounded-md hover:bg-[#2563EB]/20 transition"
           >
             <Icon name="add" size="sm" />
             New Folder
@@ -146,7 +146,7 @@ export default function FolderTree({
         <div
           className={`flex items-center py-2 px-3 rounded-md cursor-pointer transition-colors ${
             selectedFolderId === null
-              ? 'bg-[#00E5A0]/10 text-[#00E5A0]'
+              ? 'bg-[#2563EB]/10 text-[#2563EB]'
               : 'hover:bg-[var(--surface-hover)] text-[var(--foreground-secondary)]'
           }`}
           onClick={() => onSelectFolder(null)}

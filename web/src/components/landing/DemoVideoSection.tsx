@@ -9,7 +9,7 @@ export default function DemoVideoSection() {
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: 'radial-gradient(ellipse at 50% 0%, rgba(0,229,160,0.06) 0%, transparent 60%)',
+          background: 'radial-gradient(ellipse at 50% 0%, rgba(37, 99, 235,0.06) 0%, transparent 60%)',
         }}
       />
       <div className="max-w-4xl mx-auto relative z-10">
@@ -18,16 +18,16 @@ export default function DemoVideoSection() {
             <span
               className="inline-block px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase mb-5"
               style={{
-                background: 'rgba(0,229,160,0.08)',
-                color: '#00E5A0',
-                border: '1px solid rgba(0,229,160,0.2)',
+                background: 'rgba(37, 99, 235,0.08)',
+                color: '#2563EB',
+                border: '1px solid rgba(37, 99, 235,0.2)',
               }}
             >
               Product Demo
             </span>
             <h2
               className="text-3xl sm:text-4xl font-bold mb-4"
-              style={{ color: '#F0ECE8' }}
+              style={{ color: '#F9FAFB' }}
             >
               See Vizora In Action
             </h2>
@@ -40,8 +40,8 @@ export default function DemoVideoSection() {
           <div
             className="relative rounded-2xl overflow-hidden group"
             style={{
-              border: '1px solid rgba(0,229,160,0.15)',
-              boxShadow: '0 0 60px rgba(0,229,160,0.08), 0 20px 60px rgba(0,0,0,0.4)',
+              border: '1px solid rgba(37, 99, 235,0.15)',
+              boxShadow: '0 0 60px rgba(37, 99, 235,0.08), 0 20px 60px rgba(0,0,0,0.4)',
             }}
           >
             <video

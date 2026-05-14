@@ -20,7 +20,7 @@ export default function FeatureShowcasesSection({ activeFeatureTab }: FeatureSho
         <Reveal>
           <div className="text-center mb-12">
             <span className="inline-block text-xs font-bold uppercase tracking-[0.15em] mb-4 px-3 py-1 rounded-full"
-              style={{ color: '#00E5A0', background: 'rgba(0,229,160,0.08)', border: '1px solid rgba(0,229,160,0.15)' }}>
+              style={{ color: '#2563EB', background: 'rgba(37, 99, 235,0.08)', border: '1px solid rgba(37, 99, 235,0.15)' }}>
               Platform
             </span>
             <h2 className="eh-heading text-3xl sm:text-4xl font-bold mb-4">
@@ -28,7 +28,7 @@ export default function FeatureShowcasesSection({ activeFeatureTab }: FeatureSho
               <br />
               <span className="eh-gradient">every screen</span>
             </h2>
-            <p style={{ color: '#9A958E' }} className="max-w-lg mx-auto">
+            <p style={{ color: '#6B7280' }} className="max-w-lg mx-auto">
               From content creation to fleet monitoring, Vizora gives you full
               command of every display in your organization.
             </p>
@@ -53,13 +53,13 @@ export default function FeatureShowcasesSection({ activeFeatureTab }: FeatureSho
                 onClick={() => scrollTo(`feature-${tab.id}`)}
                 className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200"
                 style={activeFeatureTab === tab.id ? {
-                  background: 'rgba(0,229,160,0.12)',
-                  color: '#00E5A0',
-                  border: '1px solid rgba(0,229,160,0.25)',
-                  boxShadow: '0 0 12px rgba(0,229,160,0.06)',
+                  background: 'rgba(37, 99, 235,0.12)',
+                  color: '#2563EB',
+                  border: '1px solid rgba(37, 99, 235,0.25)',
+                  boxShadow: '0 0 12px rgba(37, 99, 235,0.06)',
                 } : {
                   background: 'transparent',
-                  color: '#9A958E',
+                  color: '#6B7280',
                   border: '1px solid transparent',
                 }}
               >
@@ -76,15 +76,15 @@ export default function FeatureShowcasesSection({ activeFeatureTab }: FeatureSho
           <Reveal>
             <div>
               <div className="inline-flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(0,229,160,0.1)' }}>
-                  <Radio size={16} style={{ color: '#00E5A0' }} />
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(37, 99, 235,0.1)' }}>
+                  <Radio size={16} style={{ color: '#2563EB' }} />
                 </div>
-                <span className="text-xs font-bold uppercase tracking-[0.1em]" style={{ color: '#00E5A0' }}>Real-time Control</span>
+                <span className="text-xs font-bold uppercase tracking-[0.1em]" style={{ color: '#2563EB' }}>Real-time Control</span>
               </div>
               <h3 className="eh-heading text-2xl sm:text-3xl font-bold mb-4">
-                Live fleet command center
+                Live screen operations
               </h3>
-              <p className="text-[0.95rem] leading-relaxed mb-6" style={{ color: '#9A958E' }}>
+              <p className="text-[0.95rem] leading-relaxed mb-6" style={{ color: '#6B7280' }}>
                 See every screen&apos;s status the instant it changes. Push content, reboot
                 devices, and respond to issues in real-time through persistent WebSocket
                 connections &mdash; not polling.
@@ -96,10 +96,10 @@ export default function FeatureShowcasesSection({ activeFeatureTab }: FeatureSho
                   'Automatic offline alerts and recovery',
                   'Live content preview across all screens',
                   'Predictive fleet monitoring — AI detects issues early',
-                  'AI-powered auto-recovery for self-healing networks',
+                  'Reliable recovery tools for screen networks',
                 ].map((item) => (
-                  <li key={item} className="flex items-start gap-2.5 text-sm" style={{ color: '#9A958E' }}>
-                    <Check size={16} className="mt-0.5 shrink-0" style={{ color: '#00E5A0' }} />
+                  <li key={item} className="flex items-start gap-2.5 text-sm" style={{ color: '#6B7280' }}>
+                    <Check size={16} className="mt-0.5 shrink-0" style={{ color: '#2563EB' }} />
                     {item}
                   </li>
                 ))}
@@ -108,7 +108,7 @@ export default function FeatureShowcasesSection({ activeFeatureTab }: FeatureSho
               <div className="flex flex-wrap gap-2">
                 {['Display Groups', 'Device Preview', 'Multi-Platform'].map((tag) => (
                   <span key={tag} className="text-[0.7rem] font-medium px-2.5 py-1 rounded-full"
-                    style={{ color: '#9A958E', background: 'rgba(0,229,160,0.06)', border: '1px solid rgba(0,229,160,0.1)' }}>
+                    style={{ color: '#6B7280', background: 'rgba(37, 99, 235,0.06)', border: '1px solid rgba(37, 99, 235,0.1)' }}>
                     {tag}
                   </span>
                 ))}
@@ -119,7 +119,7 @@ export default function FeatureShowcasesSection({ activeFeatureTab }: FeatureSho
             <div className="eh-card rounded-xl p-5 relative overflow-hidden">
               <div className="flex items-center justify-between mb-4">
                 <span className="text-sm font-semibold" style={{ fontFamily: 'var(--font-sora), sans-serif' }}>Fleet Status</span>
-                <span className="text-[0.65rem] px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,229,160,0.1)', color: '#00E5A0' }}>
+                <span className="text-[0.65rem] px-2 py-0.5 rounded-full" style={{ background: 'rgba(37, 99, 235,0.1)', color: '#2563EB' }}>
                   Live
                 </span>
               </div>
@@ -135,20 +135,20 @@ export default function FeatureShowcasesSection({ activeFeatureTab }: FeatureSho
                     key={device.name}
                     className="flex items-center gap-3 p-2.5 rounded-lg"
                     style={{
-                      background: '#061A21',
-                      border: '1px solid #1B3D47',
+                      background: '#111827',
+                      border: '1px solid #E5E7EB',
                       animation: device.status === 'updating' ? 'eh-status-cycle 4s ease-in-out infinite' : undefined,
                     }}
                   >
                     <span
                       className="w-2 h-2 rounded-full shrink-0"
                       style={device.status === 'online' ? {
-                        background: '#00E5A0',
-                        boxShadow: '0 0 6px rgba(0,229,160,0.3)',
+                        background: '#2563EB',
+                        boxShadow: '0 0 6px rgba(37, 99, 235,0.3)',
                         animation: 'eh-neon-pulse 2s ease-in-out infinite',
                       } : device.status === 'updating' ? {
-                        background: '#00B4D8',
-                        boxShadow: '0 0 6px rgba(0,180,216,0.3)',
+                        background: '#1E3A8A',
+                        boxShadow: '0 0 6px rgba(30, 58, 138,0.3)',
                         animation: 'eh-neon-pulse 1s ease-in-out infinite',
                       } : { background: '#FF4D6A' }}
                     />
@@ -159,7 +159,7 @@ export default function FeatureShowcasesSection({ activeFeatureTab }: FeatureSho
                       </div>
                     </div>
                     <div className="text-[0.6rem] font-medium" style={{
-                      color: device.status === 'online' ? '#00E5A0' : device.status === 'updating' ? '#00B4D8' : '#FF4D6A',
+                      color: device.status === 'online' ? '#2563EB' : device.status === 'updating' ? '#1E3A8A' : '#FF4D6A',
                       fontFamily: 'var(--font-mono), monospace',
                     }}>
                       {device.latency}
@@ -183,11 +183,11 @@ export default function FeatureShowcasesSection({ activeFeatureTab }: FeatureSho
               </div>
               <div className="grid grid-cols-3 gap-2 mb-3">
                 {[
-                  { label: 'Images', count: '186', color: '#00E5A0' },
-                  { label: 'Videos', count: '89', color: '#00B4D8' },
+                  { label: 'Images', count: '186', color: '#2563EB' },
+                  { label: 'Videos', count: '89', color: '#1E3A8A' },
                   { label: 'HTML', count: '49', color: '#8B5CF6' },
                 ].map((type) => (
-                  <div key={type.label} className="rounded-lg p-2.5 text-center" style={{ background: '#061A21', border: '1px solid #1B3D47' }}>
+                  <div key={type.label} className="rounded-lg p-2.5 text-center" style={{ background: '#111827', border: '1px solid #E5E7EB' }}>
                     <div className="text-lg font-bold" style={{ color: type.color, fontFamily: 'var(--font-mono), monospace' }}>{type.count}</div>
                     <div className="text-[0.6rem]" style={{ color: '#6B655D' }}>{type.label}</div>
                   </div>
@@ -200,11 +200,11 @@ export default function FeatureShowcasesSection({ activeFeatureTab }: FeatureSho
                   { name: 'live-dashboard.html', size: '12 KB', type: 'html', verified: true },
                   { name: 'menu-board-template.html', size: '8.4 KB', type: 'html', verified: true },
                 ].map((file) => (
-                  <div key={file.name} className="flex items-center gap-2.5 p-2 rounded" style={{ background: '#061A21' }}>
+                  <div key={file.name} className="flex items-center gap-2.5 p-2 rounded" style={{ background: '#111827' }}>
                     <div className="w-7 h-7 rounded flex items-center justify-center text-[0.55rem] font-bold"
                       style={{
-                        background: file.type === 'video' ? 'rgba(0,180,216,0.12)' : file.type === 'html' ? 'rgba(139,92,246,0.12)' : 'rgba(0,229,160,0.12)',
-                        color: file.type === 'video' ? '#00B4D8' : file.type === 'html' ? '#8B5CF6' : '#00E5A0',
+                        background: file.type === 'video' ? 'rgba(30, 58, 138,0.12)' : file.type === 'html' ? 'rgba(139,92,246,0.12)' : 'rgba(37, 99, 235,0.12)',
+                        color: file.type === 'video' ? '#1E3A8A' : file.type === 'html' ? '#8B5CF6' : '#2563EB',
                       }}
                     >
                       {file.type === 'video' ? 'MP4' : file.type === 'html' ? 'HTM' : 'PNG'}
@@ -214,23 +214,23 @@ export default function FeatureShowcasesSection({ activeFeatureTab }: FeatureSho
                       <div className="text-[0.55rem]" style={{ color: '#6B655D' }}>{file.size}</div>
                     </div>
                     {file.verified && (
-                      <FileCheck size={13} style={{ color: '#00E5A0', opacity: 0.6 }} />
+                      <FileCheck size={13} style={{ color: '#2563EB', opacity: 0.6 }} />
                     )}
                   </div>
                 ))}
               </div>
               {/* Upload progress bar animation */}
-              <div className="mt-3 p-2 rounded" style={{ background: '#061A21', border: '1px solid #1B3D47' }}>
+              <div className="mt-3 p-2 rounded" style={{ background: '#111827', border: '1px solid #E5E7EB' }}>
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[0.6rem] font-medium" style={{ color: '#9A958E' }}>Uploading promo-reel-q4.mp4</span>
-                  <span className="text-[0.55rem]" style={{ color: '#00B4D8', fontFamily: 'var(--font-mono), monospace' }}>67%</span>
+                  <span className="text-[0.6rem] font-medium" style={{ color: '#6B7280' }}>Uploading promo-reel-q4.mp4</span>
+                  <span className="text-[0.55rem]" style={{ color: '#1E3A8A', fontFamily: 'var(--font-mono), monospace' }}>67%</span>
                 </div>
-                <div className="h-1 rounded-full overflow-hidden" style={{ background: '#1B3D47' }}>
+                <div className="h-1 rounded-full overflow-hidden" style={{ background: '#E5E7EB' }}>
                   <div
                     className="h-full rounded-full"
                     style={{
                       width: '67%',
-                      background: 'linear-gradient(90deg, #00B4D8, #00E5A0)',
+                      background: 'linear-gradient(90deg, #1E3A8A, #2563EB)',
                       animation: 'eh-subtle-pulse 2s ease-in-out infinite',
                     }}
                   />
@@ -241,15 +241,15 @@ export default function FeatureShowcasesSection({ activeFeatureTab }: FeatureSho
           <Reveal className="order-1 lg:order-2">
             <div>
               <div className="inline-flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(0,180,216,0.1)' }}>
-                  <FolderOpen size={16} style={{ color: '#00B4D8' }} />
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(30, 58, 138,0.1)' }}>
+                  <FolderOpen size={16} style={{ color: '#1E3A8A' }} />
                 </div>
-                <span className="text-xs font-bold uppercase tracking-[0.1em]" style={{ color: '#00B4D8' }}>Content</span>
+                <span className="text-xs font-bold uppercase tracking-[0.1em]" style={{ color: '#1E3A8A' }}>Content</span>
               </div>
               <h3 className="eh-heading text-2xl sm:text-3xl font-bold mb-4">
                 Smart content management
               </h3>
-              <p className="text-[0.95rem] leading-relaxed mb-6" style={{ color: '#9A958E' }}>
+              <p className="text-[0.95rem] leading-relaxed mb-6" style={{ color: '#6B7280' }}>
                 Upload any media type &mdash; images, videos, URLs, or interactive HTML.
                 Vizora validates every file at the binary level to prevent
                 MIME spoofing and ensure only safe content reaches your screens.
@@ -263,8 +263,8 @@ export default function FeatureShowcasesSection({ activeFeatureTab }: FeatureSho
                   'AI content generation from text prompts',
                   'Intelligent format optimization for any screen',
                 ].map((item) => (
-                  <li key={item} className="flex items-start gap-2.5 text-sm" style={{ color: '#9A958E' }}>
-                    <Check size={16} className="mt-0.5 shrink-0" style={{ color: '#00B4D8' }} />
+                  <li key={item} className="flex items-start gap-2.5 text-sm" style={{ color: '#6B7280' }}>
+                    <Check size={16} className="mt-0.5 shrink-0" style={{ color: '#1E3A8A' }} />
                     {item}
                   </li>
                 ))}
@@ -272,7 +272,7 @@ export default function FeatureShowcasesSection({ activeFeatureTab }: FeatureSho
               <div className="flex flex-wrap gap-2">
                 {['Playlist Builder', 'API & Webhooks'].map((tag) => (
                   <span key={tag} className="text-[0.7rem] font-medium px-2.5 py-1 rounded-full"
-                    style={{ color: '#9A958E', background: 'rgba(0,180,216,0.06)', border: '1px solid rgba(0,180,216,0.1)' }}>
+                    style={{ color: '#6B7280', background: 'rgba(30, 58, 138,0.06)', border: '1px solid rgba(30, 58, 138,0.1)' }}>
                     {tag}
                   </span>
                 ))}
@@ -294,7 +294,7 @@ export default function FeatureShowcasesSection({ activeFeatureTab }: FeatureSho
               <h3 className="eh-heading text-2xl sm:text-3xl font-bold mb-4">
                 Schedule with precision
               </h3>
-              <p className="text-[0.95rem] leading-relaxed mb-6" style={{ color: '#9A958E' }}>
+              <p className="text-[0.95rem] leading-relaxed mb-6" style={{ color: '#6B7280' }}>
                 Build playlists, set timezone-aware schedules, and target specific
                 devices or groups. Preview the next 10 occurrences before
                 committing. Content always plays where and when it should.
@@ -308,7 +308,7 @@ export default function FeatureShowcasesSection({ activeFeatureTab }: FeatureSho
                   'AI-optimized time slot suggestions',
                   'Performance-driven auto-scheduling',
                 ].map((item) => (
-                  <li key={item} className="flex items-start gap-2.5 text-sm" style={{ color: '#9A958E' }}>
+                  <li key={item} className="flex items-start gap-2.5 text-sm" style={{ color: '#6B7280' }}>
                     <Check size={16} className="mt-0.5 shrink-0" style={{ color: '#8B5CF6' }} />
                     {item}
                   </li>
@@ -317,7 +317,7 @@ export default function FeatureShowcasesSection({ activeFeatureTab }: FeatureSho
               <div className="flex flex-wrap gap-2">
                 {['Analytics', 'CSV Export'].map((tag) => (
                   <span key={tag} className="text-[0.7rem] font-medium px-2.5 py-1 rounded-full"
-                    style={{ color: '#9A958E', background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.1)' }}>
+                    style={{ color: '#6B7280', background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.1)' }}>
                     {tag}
                   </span>
                 ))}
@@ -337,8 +337,8 @@ export default function FeatureShowcasesSection({ activeFeatureTab }: FeatureSho
                   <div key={day} className="text-center">
                     <div className="text-[0.55rem] font-medium mb-1.5" style={{ color: '#6B655D' }}>{day}</div>
                     <div className="space-y-1">
-                      <div className="h-3 rounded-sm" style={{ background: 'rgba(0,229,160,0.2)', border: '1px solid rgba(0,229,160,0.15)' }} />
-                      {i < 5 && <div className="h-3 rounded-sm" style={{ background: 'rgba(0,180,216,0.2)', border: '1px solid rgba(0,180,216,0.15)' }} />}
+                      <div className="h-3 rounded-sm" style={{ background: 'rgba(37, 99, 235,0.2)', border: '1px solid rgba(37, 99, 235,0.15)' }} />
+                      {i < 5 && <div className="h-3 rounded-sm" style={{ background: 'rgba(30, 58, 138,0.2)', border: '1px solid rgba(30, 58, 138,0.15)' }} />}
                       {(i === 5 || i === 6) && <div className="h-3 rounded-sm" style={{ background: 'rgba(139,92,246,0.2)', border: '1px solid rgba(139,92,246,0.15)' }} />}
                     </div>
                   </div>
@@ -346,11 +346,11 @@ export default function FeatureShowcasesSection({ activeFeatureTab }: FeatureSho
               </div>
               <div className="space-y-2">
                 {[
-                  { name: 'Morning Greetings', time: '06:00 – 10:00', color: '#00E5A0', devices: '12 screens' },
-                  { name: 'Product Showcase', time: '10:00 – 18:00', color: '#00B4D8', devices: '24 screens' },
+                  { name: 'Morning Greetings', time: '06:00 – 10:00', color: '#2563EB', devices: '12 screens' },
+                  { name: 'Product Showcase', time: '10:00 – 18:00', color: '#1E3A8A', devices: '24 screens' },
                   { name: 'Weekend Special', time: 'Sat–Sun all day', color: '#8B5CF6', devices: '8 screens' },
                 ].map((playlist) => (
-                  <div key={playlist.name} className="flex items-center gap-3 p-2.5 rounded-lg" style={{ background: '#061A21', border: '1px solid #1B3D47' }}>
+                  <div key={playlist.name} className="flex items-center gap-3 p-2.5 rounded-lg" style={{ background: '#111827', border: '1px solid #E5E7EB' }}>
                     <div className="w-1 h-8 rounded-full" style={{ background: playlist.color }} />
                     <div className="flex-1">
                       <div className="text-[0.75rem] font-medium">{playlist.name}</div>

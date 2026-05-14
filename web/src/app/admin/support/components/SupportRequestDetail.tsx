@@ -217,7 +217,7 @@ export function SupportRequestDetail({
                     <div
                       className={`max-w-[80%] rounded-lg p-3 text-sm ${
                         isUser
-                          ? 'bg-[#00E5A0]/20 text-[#00E5A0]'
+                          ? 'bg-[#2563EB]/20 text-[#2563EB]'
                           : isAdmin
                           ? 'bg-[#1F2937] text-[var(--foreground-secondary)] border border-purple-500/30'
                           : 'bg-[#1F2937] text-[var(--foreground-secondary)]'
@@ -252,14 +252,14 @@ export function SupportRequestDetail({
               onChange={(e) => setReplyContent(e.target.value)}
               placeholder="Type your reply..."
               rows={3}
-              className="flex-1 bg-[#1F2937] border border-[var(--border)] rounded-lg text-white text-sm p-3 focus:outline-none focus:ring-2 focus:ring-[#00E5A0]/50 placeholder-[var(--foreground-tertiary)] resize-none"
+              className="flex-1 bg-[#1F2937] border border-[var(--border)] rounded-lg text-white text-sm p-3 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/50 placeholder-[var(--foreground-tertiary)] resize-none"
             />
           </div>
           <div className="flex justify-end">
             <button
               onClick={handleReply}
               disabled={!replyContent.trim() || replying}
-              className="flex items-center gap-2 px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+              className="flex items-center gap-2 px-4 py-2 bg-[#2563EB] text-white rounded-lg hover:bg-[#1D4ED8] transition disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
             >
               <Send className="w-4 h-4" />
               {replying ? 'Sending...' : 'Send Reply'}
@@ -276,7 +276,7 @@ export function SupportRequestDetail({
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="bg-[#1F2937] border border-[var(--border)] rounded-lg text-white text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#00E5A0]/50"
+                className="bg-[#1F2937] border border-[var(--border)] rounded-lg text-white text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/50"
               >
                 <option value="open">Open</option>
                 <option value="in_progress">In Progress</option>
@@ -291,7 +291,7 @@ export function SupportRequestDetail({
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value)}
-                className="bg-[#1F2937] border border-[var(--border)] rounded-lg text-white text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#00E5A0]/50"
+                className="bg-[#1F2937] border border-[var(--border)] rounded-lg text-white text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/50"
               >
                 <option value="critical">Critical</option>
                 <option value="high">High</option>
@@ -309,7 +309,7 @@ export function SupportRequestDetail({
                 onChange={(e) => setResolutionNotes(e.target.value)}
                 placeholder="Describe the resolution..."
                 rows={2}
-                className="w-full bg-[#1F2937] border border-[var(--border)] rounded-lg text-white text-sm p-3 focus:outline-none focus:ring-2 focus:ring-[#00E5A0]/50 placeholder-[var(--foreground-tertiary)] resize-none"
+                className="w-full bg-[#1F2937] border border-[var(--border)] rounded-lg text-white text-sm p-3 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/50 placeholder-[var(--foreground-tertiary)] resize-none"
               />
             </div>
           )}
@@ -319,7 +319,7 @@ export function SupportRequestDetail({
               <button
                 onClick={handleSaveChanges}
                 disabled={saving}
-                className="px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                className="px-4 py-2 bg-[#2563EB] text-white rounded-lg hover:bg-[#1D4ED8] transition disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
               >
                 {saving ? 'Saving...' : 'Save Changes'}
               </button>

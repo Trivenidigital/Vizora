@@ -78,7 +78,7 @@ export default function TemplateSidebar({
               onClick={() => onViewModeChange('home')}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                 viewMode === 'home'
-                  ? 'bg-[#00E5A0]/10 text-[#00E5A0]'
+                  ? 'bg-[#2563EB]/10 text-[#2563EB]'
                   : 'text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]'
               }`}
             >
@@ -91,7 +91,7 @@ export default function TemplateSidebar({
               onClick={() => onViewModeChange('your-templates')}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                 viewMode === 'your-templates'
-                  ? 'bg-[#00E5A0]/10 text-[#00E5A0]'
+                  ? 'bg-[#2563EB]/10 text-[#2563EB]'
                   : 'text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]'
               }`}
             >
@@ -119,13 +119,13 @@ export default function TemplateSidebar({
 
             <button
               onClick={onAIDesignerClick}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-[#00E5A0]/80 hover:bg-[#00E5A0]/5 hover:text-[#00E5A0] transition-all"
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-[#2563EB]/80 hover:bg-[#2563EB]/5 hover:text-[#2563EB] transition-all"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 2L14.09 8.26L20 9.27L15.55 13.97L16.91 20L12 16.9L7.09 20L8.45 13.97L4 9.27L9.91 8.26L12 2Z" />
               </svg>
               AI Designer
-              <span className="ml-auto text-[10px] font-semibold bg-[#00E5A0]/15 text-[#00E5A0] px-1.5 py-0.5 rounded-full">NEW</span>
+              <span className="ml-auto text-[10px] font-semibold bg-[#2563EB]/15 text-[#2563EB] px-1.5 py-0.5 rounded-full">NEW</span>
             </button>
           </nav>
         </div>
@@ -143,7 +143,7 @@ export default function TemplateSidebar({
                   onClick={() => onCategoryChange('')}
                   className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-sm transition-all ${
                     !selectedCategory
-                      ? 'bg-[#00E5A0]/10 text-[#00E5A0] font-medium'
+                      ? 'bg-[#2563EB]/10 text-[#2563EB] font-medium'
                       : 'text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]'
                   }`}
                 >
@@ -156,7 +156,7 @@ export default function TemplateSidebar({
                     onClick={() => onCategoryChange(cat.name)}
                     className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-sm transition-all ${
                       selectedCategory === cat.name
-                        ? 'bg-[#00E5A0]/10 text-[#00E5A0] font-medium'
+                        ? 'bg-[#2563EB]/10 text-[#2563EB] font-medium'
                         : 'text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]'
                     }`}
                   >
@@ -179,7 +179,7 @@ export default function TemplateSidebar({
                     onClick={() => onOrientationChange(opt.value)}
                     className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${
                       selectedOrientation === opt.value
-                        ? 'bg-[#00E5A0]/10 text-[#00E5A0] border border-[#00E5A0]/20'
+                        ? 'bg-[#2563EB]/10 text-[#2563EB] border border-[#2563EB]/20'
                         : 'text-[var(--foreground-tertiary)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground-secondary)] border border-transparent'
                     }`}
                     title={opt.label}
@@ -203,7 +203,7 @@ export default function TemplateSidebar({
                     onClick={() => onDifficultyChange(opt.value)}
                     className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition-all ${
                       selectedDifficulty === opt.value
-                        ? 'bg-[#00E5A0]/10 text-[#00E5A0] font-medium'
+                        ? 'bg-[#2563EB]/10 text-[#2563EB] font-medium'
                         : `text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]`
                     }`}
                   >

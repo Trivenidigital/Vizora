@@ -35,7 +35,7 @@ export const Tabs: React.FC<TabsProps> = ({
   };
 
   const baseTabClass =
-    'relative px-4 py-2 font-medium text-sm transition-colors whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00E5A0]';
+    'relative px-4 py-2 font-medium text-sm transition-colors whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]';
   const inactiveClass =
     'text-[var(--foreground-secondary)] hover:text-[var(--foreground)]';
   const activeClass =

@@ -73,7 +73,7 @@ export default function ClockWidget({
     : 'linear-gradient(135deg, #f0f0f8 0%, #dde4ee 50%, #c8d4e4 100%)';
   const textColor = isDark ? '#ffffff' : '#1a1a2e';
   const mutedColor = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(26,26,46,0.55)';
-  const accentColor = isDark ? '#00E5A0' : '#0f3460';
+  const accentColor = isDark ? '#2563EB' : '#0f3460';
   const cardBg = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
 
   const monoFont = "var(--font-mono, 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace)";

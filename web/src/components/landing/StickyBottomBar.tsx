@@ -16,16 +16,16 @@ export default function StickyBottomBar({ showStickyBar }: StickyBottomBarProps)
         background: 'rgba(6, 26, 33, 0.95)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
-        borderTop: '1px solid #1B3D47',
+        borderTop: '1px solid #E5E7EB',
         boxShadow: '0 -4px 20px rgba(0,0,0,0.3)',
       }}
     >
       <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between gap-4">
-        <span className="hidden sm:block text-xs" style={{ color: '#9A958E' }}>
+        <span className="hidden sm:block text-xs" style={{ color: '#6B7280' }}>
           30-day free trial &middot; No credit card required
         </span>
         <div className="flex items-center gap-3 ml-auto">
-          <span className="sm:hidden text-[0.7rem]" style={{ color: '#9A958E' }}>
+          <span className="sm:hidden text-[0.7rem]" style={{ color: '#6B7280' }}>
             Start free, no card
           </span>
           <Link

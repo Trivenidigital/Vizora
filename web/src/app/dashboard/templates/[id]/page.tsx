@@ -232,7 +232,7 @@ export default function TemplateDetailPage() {
       <div className="space-y-6">
         <Link
           href="/dashboard/templates"
-          className="inline-flex items-center gap-2 text-sm text-[var(--foreground-secondary)] hover:text-[#00E5A0] transition"
+          className="inline-flex items-center gap-2 text-sm text-[var(--foreground-secondary)] hover:text-[#2563EB] transition"
         >
           <Icon name="chevronLeft" size="sm" />
           Back to Template Library
@@ -242,7 +242,7 @@ export default function TemplateDetailPage() {
           <p className="text-[var(--foreground-secondary)]">{error || 'Template not found'}</p>
           <button
             onClick={loadTemplate}
-            className="mt-4 px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition font-medium text-sm"
+            className="mt-4 px-4 py-2 bg-[#2563EB] text-white rounded-lg hover:bg-[#1D4ED8] transition font-medium text-sm"
           >
             Try Again
           </button>
@@ -256,7 +256,7 @@ export default function TemplateDetailPage() {
       {/* Back link */}
       <Link
         href="/dashboard/templates"
-        className="inline-flex items-center gap-2 text-sm text-[var(--foreground-secondary)] hover:text-[#00E5A0] transition"
+        className="inline-flex items-center gap-2 text-sm text-[var(--foreground-secondary)] hover:text-[#2563EB] transition"
       >
         <Icon name="chevronLeft" size="sm" />
         Back to Template Library
@@ -268,7 +268,7 @@ export default function TemplateDetailPage() {
           <div className="flex items-center gap-3 mb-2">
             <h2 className="text-3xl font-bold text-[var(--foreground)]">{template.name}</h2>
             {template.isFeatured && (
-              <span className="px-3 py-1 text-xs font-semibold bg-[#00E5A0] text-[#061A21] rounded-full">
+              <span className="px-3 py-1 text-xs font-semibold bg-[#2563EB] text-white rounded-full">
                 Featured
               </span>
             )}
@@ -321,7 +321,7 @@ export default function TemplateDetailPage() {
               onClick={enterEditMode}
               className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition text-[var(--foreground)]"
             >
-              <Icon name="edit" size="sm" className="text-[#00E5A0]" />
+              <Icon name="edit" size="sm" className="text-[#2563EB]" />
               Edit Template
             </button>
           )}
@@ -343,7 +343,7 @@ export default function TemplateDetailPage() {
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold bg-[#2563EB] text-white rounded-lg hover:bg-[#1D4ED8] transition disabled:opacity-50"
               >
                 {saving ? <><LoadingSpinner size="sm" /> Saving...</> : 'Save Changes'}
               </button>
@@ -359,7 +359,7 @@ export default function TemplateDetailPage() {
               </Link>
               <button
                 onClick={() => setShowCloneModal(true)}
-                className="px-6 py-3 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
+                className="px-6 py-3 bg-[#2563EB] text-white rounded-lg hover:bg-[#1D4ED8] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
               >
                 <Icon name="copy" size="md" />
                 Clone to My Content
@@ -384,7 +384,7 @@ export default function TemplateDetailPage() {
                   type="text"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--background)]"
+                  className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-[var(--foreground)] bg-[var(--background)]"
                 />
               </div>
               <div>
@@ -393,7 +393,7 @@ export default function TemplateDetailPage() {
                   value={editDescription}
                   onChange={(e) => setEditDescription(e.target.value)}
                   rows={3}
-                  className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--background)]"
+                  className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-[var(--foreground)] bg-[var(--background)]"
                 />
               </div>
               <TemplateEditor
@@ -410,12 +410,12 @@ export default function TemplateDetailPage() {
             <div className="bg-[var(--surface)] rounded-lg shadow overflow-hidden">
               <div className="px-4 py-3 border-b border-[var(--border)] flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
-                  <Icon name="preview" size="md" className="text-[#00E5A0]" />
+                  <Icon name="preview" size="md" className="text-[#2563EB]" />
                   Template Preview
                 </h3>
                 <button
                   onClick={loadPreview}
-                  className="text-sm text-[var(--foreground-secondary)] hover:text-[#00E5A0] transition flex items-center gap-1"
+                  className="text-sm text-[var(--foreground-secondary)] hover:text-[#2563EB] transition flex items-center gap-1"
                 >
                   <Icon name="refresh" size="sm" />
                   Refresh
@@ -465,7 +465,7 @@ export default function TemplateDetailPage() {
                 <select
                   value={editCategory}
                   onChange={(e) => setEditCategory(e.target.value)}
-                  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm bg-[var(--background)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm bg-[var(--background)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
                 >
                   {CATEGORIES.map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
                 </select>
@@ -475,7 +475,7 @@ export default function TemplateDetailPage() {
                 <select
                   value={editDifficulty}
                   onChange={(e) => setEditDifficulty(e.target.value)}
-                  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm bg-[var(--background)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm bg-[var(--background)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
                 >
                   {DIFFICULTIES.map(d => <option key={d} value={d}>{d.charAt(0).toUpperCase() + d.slice(1)}</option>)}
                 </select>
@@ -485,7 +485,7 @@ export default function TemplateDetailPage() {
                 <select
                   value={editOrientation}
                   onChange={(e) => setEditOrientation(e.target.value)}
-                  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm bg-[var(--background)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm bg-[var(--background)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
                 >
                   {ORIENTATIONS.map(o => <option key={o} value={o}>{o.charAt(0).toUpperCase() + o.slice(1)}</option>)}
                 </select>
@@ -496,7 +496,7 @@ export default function TemplateDetailPage() {
                   type="text"
                   value={editTags}
                   onChange={(e) => setEditTags(e.target.value)}
-                  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm bg-[var(--background)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm bg-[var(--background)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
                   placeholder="sale, promotion"
                 />
               </div>
@@ -506,7 +506,7 @@ export default function TemplateDetailPage() {
                   type="text"
                   value={editThumbnailUrl}
                   onChange={(e) => setEditThumbnailUrl(e.target.value)}
-                  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm bg-[var(--background)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm bg-[var(--background)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
                   placeholder="https://..."
                 />
               </div>
@@ -596,7 +596,7 @@ export default function TemplateDetailPage() {
               )}
 
               {/* Clone CTA (repeated for visibility) */}
-              <div className="bg-gradient-to-br from-[#00E5A0]/10 to-[#00B4D8]/10 rounded-lg p-5 border border-[#00E5A0]/20">
+              <div className="bg-gradient-to-br from-[#2563EB]/10 to-[#1E3A8A]/10 rounded-lg p-5 border border-[#2563EB]/20">
                 <h3 className="text-sm font-semibold text-[var(--foreground)] mb-2">
                   Use this template
                 </h3>
@@ -605,7 +605,7 @@ export default function TemplateDetailPage() {
                 </p>
                 <button
                   onClick={() => setShowCloneModal(true)}
-                  className="w-full px-4 py-2.5 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition font-semibold text-sm flex items-center justify-center gap-2"
+                  className="w-full px-4 py-2.5 bg-[#2563EB] text-white rounded-lg hover:bg-[#1D4ED8] transition font-semibold text-sm flex items-center justify-center gap-2"
                 >
                   <Icon name="copy" size="sm" />
                   Clone Template
@@ -639,7 +639,7 @@ export default function TemplateDetailPage() {
 
             {cloneSuccess ? (
               <div className="text-center py-6">
-                <Icon name="success" size="xl" className="text-[#00E5A0] mx-auto mb-3" />
+                <Icon name="success" size="xl" className="text-[#2563EB] mx-auto mb-3" />
                 <p className="text-[var(--foreground)] font-medium">Template cloned successfully!</p>
                 <p className="text-sm text-[var(--foreground-secondary)] mt-1">Redirecting to your content library...</p>
               </div>
@@ -657,7 +657,7 @@ export default function TemplateDetailPage() {
                     type="text"
                     value={cloneName}
                     onChange={(e) => setCloneName(e.target.value)}
-                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--background)]"
+                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-[var(--foreground)] bg-[var(--background)]"
                     placeholder="Enter a name for the cloned content"
                     autoComplete="off"
                   />
@@ -671,7 +671,7 @@ export default function TemplateDetailPage() {
                     value={cloneDescription}
                     onChange={(e) => setCloneDescription(e.target.value)}
                     rows={3}
-                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--background)] resize-none"
+                    className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-[var(--foreground)] bg-[var(--background)] resize-none"
                     placeholder="Describe how you plan to use this template"
                   />
                 </div>
@@ -693,7 +693,7 @@ export default function TemplateDetailPage() {
                   <button
                     onClick={handleClone}
                     disabled={cloning}
-                    className="px-4 py-2 text-sm font-medium bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
+                    className="px-4 py-2 text-sm font-medium bg-[#2563EB] text-white rounded-lg hover:bg-[#1D4ED8] transition disabled:opacity-50 flex items-center gap-2"
                   >
                     {cloning ? (
                       <>

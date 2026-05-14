@@ -477,11 +477,11 @@ export default function SchedulesClient() {
  {schedules.map(schedule => (
  <div
  key={schedule.id}
- className="eh-dash-card border-l-4 border-l-[#00E5A0] p-6"
+ className="eh-dash-card border-l-4 border-l-[#2563EB] p-6"
  >
  <div className="flex items-start justify-between">
  <div className="flex items-start gap-4 flex-1">
- <Icon name="schedules" size="2xl" className="text-[#00E5A0] dark:text-[#00E5A0]" />
+ <Icon name="schedules" size="2xl" className="text-[#2563EB] dark:text-[#2563EB]" />
  <div className="flex-1 min-w-0">
  <div className="flex items-center gap-3 mb-3">
  <h3 className="text-xl font-semibold text-[var(--foreground)] truncate">
@@ -518,7 +518,7 @@ export default function SchedulesClient() {
  <div className="flex gap-2 mt-4 pt-4 border-t border-[var(--border)]">
  <button
  onClick={() => openEditModal(schedule)}
- className="px-4 py-2 text-sm bg-[#00E5A0]/5 dark:bg-[#00E5A0]/10 text-[#00E5A0] dark:text-[#00E5A0] rounded-lg hover:bg-[#00E5A0]/10 dark:hover:bg-[#00E5A0]/10 transition font-medium active:scale-95"
+ className="px-4 py-2 text-sm bg-[#2563EB]/5 dark:bg-[#2563EB]/10 text-[#2563EB] dark:text-[#2563EB] rounded-lg hover:bg-[#2563EB]/10 dark:hover:bg-[#2563EB]/10 transition font-medium active:scale-95"
  >
  Edit
  </button>
@@ -555,12 +555,12 @@ export default function SchedulesClient() {
 
  {/* Tips Section */}
  {schedules.length > 0 && (
- <div className="bg-[#00E5A0]/5 dark:bg-[#00E5A0]/10 border border-[#00E5A0]/30 dark:border-[#00E5A0] rounded-lg p-6">
- <h4 className="eh-dash-subtitle text-[#00E5A0] dark:text-[#00E5A0] mb-3 flex items-center gap-2">
- <Icon name="info" size="md" className="text-[#00E5A0] dark:text-[#00E5A0]" />
+ <div className="bg-[#2563EB]/5 dark:bg-[#2563EB]/10 border border-[#2563EB]/30 dark:border-[#2563EB] rounded-lg p-6">
+ <h4 className="eh-dash-subtitle text-[#2563EB] dark:text-[#2563EB] mb-3 flex items-center gap-2">
+ <Icon name="info" size="md" className="text-[#2563EB] dark:text-[#2563EB]" />
  Tips for Using Schedules
  </h4>
- <ul className="text-sm text-[#00E5A0] dark:text-[#00E5A0] space-y-2">
+ <ul className="text-sm text-[#2563EB] dark:text-[#2563EB] space-y-2">
  <li>• Schedules automatically control which playlist plays at specific times</li>
  <li>• You can overlap schedules - the most recently created one takes precedence</li>
  <li>• Devices will sync schedule changes automatically</li>
@@ -595,7 +595,7 @@ export default function SchedulesClient() {
  if (formErrors.name) setFormErrors({ ...formErrors, name: '' });
  }}
  placeholder="e.g., Morning Content, Holiday Special"
- className={`eh-input w-full px-4 py-2 border rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] transition ${
+ className={`eh-input w-full px-4 py-2 border rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] transition ${
  formErrors.name ? 'border-red-500' : 'border-[var(--border)]'
  }`}
  />
@@ -629,7 +629,7 @@ export default function SchedulesClient() {
  }}
  min="1"
  max="1440"
- className={`eh-input w-full px-4 py-2 border rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] transition ${
+ className={`eh-input w-full px-4 py-2 border rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] transition ${
  formErrors.duration ? 'border-red-500' : 'border-[var(--border)]'
  }`}
  />
@@ -645,7 +645,7 @@ export default function SchedulesClient() {
  <select
  value={formData.timezone}
  onChange={e => setFormData({ ...formData, timezone: e.target.value })}
- className="eh-select w-full px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] transition"
+ className="eh-select w-full px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] transition"
  >
  <option value="America/New_York">Eastern (America/New_York)</option>
  <option value="America/Chicago">Central (America/Chicago)</option>
@@ -691,7 +691,7 @@ export default function SchedulesClient() {
  setFormData({ ...formData, playlistId: e.target.value });
  if (formErrors.playlistId) setFormErrors({ ...formErrors, playlistId: '' });
  }}
- className={`eh-select w-full px-4 py-2 border rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] transition ${
+ className={`eh-select w-full px-4 py-2 border rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] transition ${
  formErrors.playlistId ? 'border-red-500' : 'border-[var(--border)]'
  }`}
  >
@@ -716,7 +716,7 @@ export default function SchedulesClient() {
  onClick={() => setTargetType('device')}
  className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition ${
  targetType === 'device'
- ? 'bg-[#00E5A0] text-[#061A21]'
+ ? 'bg-[#2563EB] text-white'
  : 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
  }`}
  >
@@ -727,7 +727,7 @@ export default function SchedulesClient() {
  onClick={() => setTargetType('group')}
  className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition ${
  targetType === 'group'
- ? 'bg-[#00E5A0] text-[#061A21]'
+ ? 'bg-[#2563EB] text-white'
  : 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
  }`}
  >
@@ -748,7 +748,7 @@ export default function SchedulesClient() {
  setFormData({ ...formData, deviceIds: e.target.value ? [e.target.value] : [] });
  if (formErrors.deviceIds) setFormErrors({ ...formErrors, deviceIds: '' });
  }}
- className="eh-select w-full px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] transition"
+ className="eh-select w-full px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] transition"
  >
  <option value="">Select a group...</option>
  {displayGroups.map((g: any) => (
@@ -780,7 +780,7 @@ export default function SchedulesClient() {
  setFormData({ ...formData, deviceIds: newDeviceIds });
  if (formErrors.deviceIds) setFormErrors({ ...formErrors, deviceIds: '' });
  }}
- className="rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]"
+ className="rounded border-[var(--border)] text-[#2563EB] focus:ring-[#2563EB]"
  />
  <span className="text-sm text-[var(--foreground-secondary)]">{device.nickname}</span>
  </label>

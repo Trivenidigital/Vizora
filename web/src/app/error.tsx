@@ -55,7 +55,7 @@ export default function Error({
       <div role="alert" className="min-h-screen flex items-center justify-center bg-[var(--background)]">
         <div className="max-w-md w-full bg-[var(--surface)] rounded-lg shadow-lg border border-[var(--border)] p-8 text-center">
           <div className="mb-4 flex justify-center">
-            <div className="animate-spin w-10 h-10 border-4 border-[var(--border)] border-t-[#00E5A0] rounded-full" />
+            <div className="animate-spin w-10 h-10 border-4 border-[var(--border)] border-t-[#2563EB] rounded-full" />
           </div>
           <h2 className="text-2xl font-bold text-[var(--foreground)] mb-4">
             Loading the latest version…

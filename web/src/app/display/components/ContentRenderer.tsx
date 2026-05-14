@@ -94,7 +94,7 @@ export function ContentRenderer({ type, url, name, metadata, onEnded, onError }:
       if (!blobUrl) {
         return (
           <div style={{ ...styles.image, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ width: '40px', height: '40px', border: '3px solid rgba(0,229,160,0.2)', borderTopColor: '#00E5A0', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+            <div style={{ width: '40px', height: '40px', border: '3px solid rgba(37, 99, 235,0.2)', borderTopColor: '#2563EB', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
           </div>
         );
       }

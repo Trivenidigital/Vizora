@@ -4,79 +4,79 @@
 
 @layer base {
   :root {
-    /* Light Mode — Electric Horizon (warm cream) */
-    --background: #F0ECE8;
-    --background-secondary: #E8E3DD;
-    --background-tertiary: #DDD7D0;
-    --foreground: #1A1A1A;
-    --foreground-secondary: #3D3632;
-    --foreground-tertiary: #5A5248;
+    /* Light Mode - Operational Simplicity */
+    --background: #F7F8FA;
+    --background-secondary: #FFFFFF;
+    --background-tertiary: #F3F4F6;
+    --foreground: #111827;
+    --foreground-secondary: #4B5563;
+    --foreground-tertiary: #6B7280;
 
     /* Surface and Cards */
     --surface: #FFFFFF;
-    --surface-secondary: #F5F2EE;
-    --surface-hover: #E8E3DD;
+    --surface-secondary: #F9FAFB;
+    --surface-hover: #F3F4F6;
 
     /* Borders */
-    --border: #D1CBC5;
-    --border-light: #E8E3DD;
-    --border-dark: #B5AEA6;
+    --border: #E5E7EB;
+    --border-light: #F3F4F6;
+    --border-dark: #D1D5DB;
 
     /* Semantic Colors - Light Mode */
-    --primary: #00CC8E;
-    --primary-light: #00E5A0;
-    --primary-lighter: #A7F3D0;
-    --primary-lightest: #ECFDF5;
+    --primary: #2563EB;
+    --primary-light: #3B82F6;
+    --primary-lighter: #BFDBFE;
+    --primary-lightest: #EFF6FF;
 
-    --success: #16a34a;
-    --success-light: #22c55e;
-    --success-lighter: #bbf7d0;
-    --success-lightest: #f0fdf4;
+    --success: #16A34A;
+    --success-light: #22C55E;
+    --success-lighter: #BBF7D0;
+    --success-lightest: #F0FDF4;
 
-    --warning: #d97706;
-    --warning-light: #fbbf24;
-    --warning-lighter: #fde68a;
-    --warning-lightest: #fffbeb;
+    --warning: #D97706;
+    --warning-light: #F59E0B;
+    --warning-lighter: #FDE68A;
+    --warning-lightest: #FFFBEB;
 
-    --error: #dc2626;
-    --error-light: #ef4444;
-    --error-lighter: #fecaca;
-    --error-lightest: #fef2f2;
+    --error: #DC2626;
+    --error-light: #EF4444;
+    --error-lighter: #FECACA;
+    --error-lightest: #FEF2F2;
 
-    --info: #0097B8;
-    --info-light: #00B4D8;
-    --info-lighter: #A5F3FC;
-    --info-lightest: #ECFEFF;
+    --info: #1E3A8A;
+    --info-light: #2563EB;
+    --info-lighter: #BFDBFE;
+    --info-lightest: #EFF6FF;
 
     /* Accent Colors */
-    --accent-warm: #F59E0B;
-    --accent-warm-light: #FBBF24;
+    --accent-warm: #D97706;
+    --accent-warm-light: #F59E0B;
 
     /* Utility Colors */
-    --gray-50: #F0ECE8;
-    --gray-100: #E8E3DD;
-    --gray-200: #D1CBC5;
-    --gray-300: #B5AEA6;
-    --gray-400: #9A958E;
-    --gray-500: #6B655D;
-    --gray-600: #3D3632;
-    --gray-700: #1B3D47;
-    --gray-800: #122D35;
-    --gray-900: #0A222E;
-    --gray-950: #061A21;
+    --gray-50: #F9FAFB;
+    --gray-100: #F3F4F6;
+    --gray-200: #E5E7EB;
+    --gray-300: #D1D5DB;
+    --gray-400: #9CA3AF;
+    --gray-500: #6B7280;
+    --gray-600: #4B5563;
+    --gray-700: #374151;
+    --gray-800: #1F2937;
+    --gray-900: #111827;
+    --gray-950: #030712;
 
     /* Shadows */
-    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
-    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
-    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
-    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05);
-    --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.1), 0 10px 10px rgba(0, 0, 0, 0.04);
-    --shadow-2xl: 0 25px 50px rgba(0, 0, 0, 0.1);
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 10px 30px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 18px 42px rgba(17, 24, 39, 0.08);
+    --shadow-xl: 0 24px 60px rgba(17, 24, 39, 0.10);
+    --shadow-2xl: 0 30px 80px rgba(17, 24, 39, 0.12);
 
     /* Transitions */
     --transition-fast: 150ms ease-in-out;
-    --transition-normal: 300ms ease-in-out;
-    --transition-slow: 500ms ease-in-out;
+    --transition-normal: 250ms ease-in-out;
+    --transition-slow: 450ms ease-in-out;
 
     /* Focus state */
     --focus-ring-width: 2px;
@@ -84,75 +84,75 @@
     --focus-ring-color: var(--primary);
   }
 
-  /* Dark Mode — Electric Horizon (deep teal) */
+  /* Dark Mode - calm charcoal, no neon */
   .dark {
-    --background: #061A21;
-    --background-secondary: #081E28;
-    --background-tertiary: #0A222E;
-    --foreground: #F0ECE8;
-    --foreground-secondary: #B5AEA6;
-    --foreground-tertiary: #9A958E;
+    --background: #111827;
+    --background-secondary: #1F2937;
+    --background-tertiary: #374151;
+    --foreground: #F9FAFB;
+    --foreground-secondary: #D1D5DB;
+    --foreground-tertiary: #9CA3AF;
 
     /* Surface and Cards */
-    --surface: #0C2229;
-    --surface-secondary: #122D35;
-    --surface-hover: #1B3D47;
+    --surface: #1F2937;
+    --surface-secondary: #273244;
+    --surface-hover: #374151;
 
     /* Borders */
-    --border: #1B3D47;
-    --border-light: #122D35;
-    --border-dark: #264A55;
+    --border: #374151;
+    --border-light: #4B5563;
+    --border-dark: #1F2937;
 
     /* Semantic Colors - Dark Mode */
-    --primary: #00E5A0;
-    --primary-light: #34D399;
-    --primary-lighter: #6EE7B7;
-    --primary-lightest: #D1FAE5;
+    --primary: #3B82F6;
+    --primary-light: #60A5FA;
+    --primary-lighter: #93C5FD;
+    --primary-lightest: #DBEAFE;
 
-    --success: #22c55e;
-    --success-light: #4ade80;
-    --success-lighter: #86efac;
-    --success-lightest: #dcfce7;
+    --success: #22C55E;
+    --success-light: #4ADE80;
+    --success-lighter: #86EFAC;
+    --success-lightest: #DCFCE7;
 
-    --warning: #fbbf24;
-    --warning-light: #fcd34d;
-    --warning-lighter: #fde68a;
-    --warning-lightest: #fef3c7;
+    --warning: #F59E0B;
+    --warning-light: #FBBF24;
+    --warning-lighter: #FDE68A;
+    --warning-lightest: #FEF3C7;
 
-    --error: #ef4444;
-    --error-light: #f87171;
-    --error-lighter: #fca5a5;
-    --error-lightest: #fee2e2;
+    --error: #EF4444;
+    --error-light: #F87171;
+    --error-lighter: #FCA5A5;
+    --error-lightest: #FEE2E2;
 
-    --info: #00B4D8;
-    --info-light: #22D3EE;
-    --info-lighter: #67E8F9;
-    --info-lightest: #CFFAFE;
+    --info: #60A5FA;
+    --info-light: #93C5FD;
+    --info-lighter: #BFDBFE;
+    --info-lightest: #DBEAFE;
 
     /* Accent Colors */
     --accent-warm: #F59E0B;
     --accent-warm-light: #FBBF24;
 
     /* Utility Colors - Dark */
-    --gray-50: #F0ECE8;
-    --gray-100: #E8E3DD;
-    --gray-200: #D1CBC5;
-    --gray-300: #B5AEA6;
-    --gray-400: #9A958E;
-    --gray-500: #6B655D;
-    --gray-600: #3D3632;
-    --gray-700: #1B3D47;
-    --gray-800: #122D35;
-    --gray-900: #0A222E;
-    --gray-950: #061A21;
+    --gray-50: #F9FAFB;
+    --gray-100: #F3F4F6;
+    --gray-200: #E5E7EB;
+    --gray-300: #D1D5DB;
+    --gray-400: #9CA3AF;
+    --gray-500: #6B7280;
+    --gray-600: #4B5563;
+    --gray-700: #374151;
+    --gray-800: #1F2937;
+    --gray-900: #111827;
+    --gray-950: #030712;
 
-    /* Shadows - Dark mode uses neon-tinted opacity */
+    /* Shadows */
     --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3);
-    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.4), 0 4px 6px rgba(0, 0, 0, 0.3);
-    --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.4), 0 10px 10px rgba(0, 0, 0, 0.3);
-    --shadow-2xl: 0 25px 50px rgba(0, 0, 0, 0.5);
+    --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.25);
+    --shadow-md: 0 10px 30px rgba(0, 0, 0, 0.28);
+    --shadow-lg: 0 18px 42px rgba(0, 0, 0, 0.32);
+    --shadow-xl: 0 24px 60px rgba(0, 0, 0, 0.36);
+    --shadow-2xl: 0 30px 80px rgba(0, 0, 0, 0.42);
   }
 }
 
@@ -176,7 +176,7 @@ body {
   outline-offset: var(--focus-ring-offset);
 }
 
-/* ── Electric Horizon Global Utilities ── */
+/* Vizora Global Utilities - compatibility names, premium confidence styling */
 
 .eh-reveal {
   opacity: 0;
@@ -191,7 +191,7 @@ body {
 }
 
 .eh-gradient {
-  background: linear-gradient(135deg, #00E5A0, #00B4D8);
+  background: linear-gradient(135deg, #2563EB, #1E3A8A);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -199,19 +199,19 @@ body {
 
 .eh-heading {
   font-family: var(--font-sora), sans-serif;
-  letter-spacing: -0.04em;
+  letter-spacing: 0;
   line-height: 1.05;
 }
 
 .eh-btn-neon {
-  background: #00E5A0;
-  color: #061A21;
+  background: #2563EB;
+  color: #FFFFFF;
   font-weight: 600;
   transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 .eh-btn-neon:hover {
-  background: #00CC8E;
-  box-shadow: 0 0 28px rgba(0, 229, 160, 0.3);
+  background: #1D4ED8;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.16);
   transform: translateY(-1px);
 }
 .eh-btn-neon:active {
@@ -219,26 +219,27 @@ body {
 }
 
 .eh-btn-ghost {
-  border: 1px solid #1B3D47;
-  color: #9A958E;
+  border: 1px solid #E5E7EB;
+  color: #6B7280;
   transition: all 0.2s ease;
 }
 .eh-btn-ghost:hover {
-  color: #00E5A0;
-  border-color: rgba(0, 229, 160, 0.3);
-  background: rgba(0, 229, 160, 0.04);
+  color: #2563EB;
+  border-color: rgba(37, 99, 235, 0.3);
+  background: rgba(37, 99, 235, 0.04);
 }
 
 .eh-card {
-  background: rgba(12, 34, 41, 0.6);
-  border: 1px solid #1B3D47;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 16px;
   transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
     border-color 0.3s ease, box-shadow 0.3s ease !important;
 }
 .eh-card:hover {
   transform: translateY(-3px);
-  border-color: rgba(0, 229, 160, 0.2);
-  box-shadow: 0 12px 40px rgba(0, 229, 160, 0.06);
+  border-color: rgba(37, 99, 235, 0.2);
+  box-shadow: 0 12px 40px rgba(37, 99, 235, 0.06);
 }
 
 .eh-nav-link {
@@ -252,7 +253,7 @@ body {
   left: 0;
   width: 0;
   height: 1.5px;
-  background: #00E5A0;
+  background: #2563EB;
   transition: width 0.25s ease;
 }
 .eh-nav-link:hover::after {
@@ -273,8 +274,8 @@ body {
 
 /* Animations */
 @keyframes eh-neon-pulse {
-  0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(0,229,160,0.25); }
-  50% { opacity: 0.4; box-shadow: 0 0 4px rgba(0,229,160,0.15); }
+  0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(37, 99, 235,0.25); }
+  50% { opacity: 0.4; box-shadow: 0 0 4px rgba(37, 99, 235,0.15); }
 }
 @keyframes eh-glow-breathe {
   0%, 100% { opacity: 0.4; }
@@ -315,7 +316,7 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* ─── AI Section: Neural Grid Background ─── */
+/* Legacy section effects, softened for operational UI */
 
 @keyframes eh-node-drift {
   0%, 100% { transform: translate(0, 0); }
@@ -339,11 +340,11 @@ body {
   position: absolute;
   inset: 0;
   background-image:
-    radial-gradient(circle at 20% 30%, rgba(0,229,160,0.06) 1px, transparent 1px),
-    radial-gradient(circle at 60% 20%, rgba(0,180,216,0.05) 1px, transparent 1px),
-    radial-gradient(circle at 80% 60%, rgba(0,229,160,0.04) 1px, transparent 1px),
-    radial-gradient(circle at 35% 75%, rgba(0,180,216,0.05) 1px, transparent 1px),
-    radial-gradient(circle at 90% 85%, rgba(0,229,160,0.03) 1px, transparent 1px),
+    radial-gradient(circle at 20% 30%, rgba(37, 99, 235,0.06) 1px, transparent 1px),
+    radial-gradient(circle at 60% 20%, rgba(30, 58, 138,0.05) 1px, transparent 1px),
+    radial-gradient(circle at 80% 60%, rgba(37, 99, 235,0.04) 1px, transparent 1px),
+    radial-gradient(circle at 35% 75%, rgba(30, 58, 138,0.05) 1px, transparent 1px),
+    radial-gradient(circle at 90% 85%, rgba(37, 99, 235,0.03) 1px, transparent 1px),
     radial-gradient(circle at 10% 90%, rgba(139,92,246,0.04) 1px, transparent 1px);
   background-size: 100% 100%;
   animation: eh-node-drift 20s ease-in-out infinite;
@@ -356,19 +357,16 @@ body {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(135deg, transparent 40%, rgba(0,229,160,0.03) 50%, transparent 60%),
-    linear-gradient(45deg, transparent 40%, rgba(0,180,216,0.02) 50%, transparent 60%);
+    linear-gradient(135deg, transparent 40%, rgba(37, 99, 235,0.03) 50%, transparent 60%),
+    linear-gradient(45deg, transparent 40%, rgba(30, 58, 138,0.02) 50%, transparent 60%);
   animation: eh-line-pulse 8s ease-in-out infinite;
   pointer-events: none;
   z-index: 0;
 }
 
-/* AI feature card glassmorphism */
 .eh-ai-card {
-  background: rgba(12, 34, 41, 0.4);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid #1B3D47;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
   border-radius: 12px;
   padding: 24px;
   transition: all 0.3s ease;
@@ -377,19 +375,18 @@ body {
 }
 
 .eh-ai-card:hover {
-  border-color: rgba(0, 229, 160, 0.3);
-  box-shadow: 0 0 20px rgba(0, 229, 160, 0.08), 0 8px 32px rgba(0, 0, 0, 0.2);
+  border-color: rgba(37, 99, 235, 0.3);
+  box-shadow: 0 0 20px rgba(37, 99, 235, 0.08), 0 8px 32px rgba(0, 0, 0, 0.2);
   transform: translateY(-3px);
 }
 
 .eh-ai-card:hover .eh-ai-icon {
-  box-shadow: 0 0 12px rgba(0, 229, 160, 0.2);
+  box-shadow: 0 0 12px rgba(37, 99, 235, 0.2);
 }
 
-/* Powered by AI badge pulse */
 @keyframes eh-ai-badge-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 229, 160, 0.15); }
-  50% { box-shadow: 0 0 0 6px rgba(0, 229, 160, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.15); }
+  50% { box-shadow: 0 0 0 6px rgba(37, 99, 235, 0); }
 }
 
 .eh-ai-badge {
@@ -421,7 +418,7 @@ body {
 .auth-field-enter-7 { animation-delay: 0.35s; }
 .auth-field-enter-8 { animation-delay: 0.4s; }
 
-/* ── Dashboard Extensions to Electric Horizon ── */
+/* Dashboard Extensions - operational UI */
 
 /* Dashboard card — extends .eh-card with subtler hover for app context */
 .eh-dash-card {
@@ -434,11 +431,11 @@ body {
 }
 .eh-dash-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(0, 229, 160, 0.15);
-  box-shadow: 0 8px 24px rgba(0, 229, 160, 0.04);
+  border-color: rgba(37, 99, 235, 0.15);
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.04);
 }
 .dark .eh-dash-card {
-  background: rgba(12, 34, 41, 0.7);
+  background: var(--surface);
 }
 
 /* Interactive card variant — for clickable cards (stat cards, quick actions) */
@@ -447,8 +444,8 @@ body {
 }
 .eh-dash-card-interactive:hover {
   transform: translateY(-2px);
-  border-color: rgba(0, 229, 160, 0.2);
-  box-shadow: 0 8px 32px rgba(0, 229, 160, 0.06);
+  border-color: rgba(37, 99, 235, 0.2);
+  box-shadow: 0 8px 32px rgba(37, 99, 235, 0.06);
 }
 .eh-dash-card-interactive:active {
   transform: translateY(0);
@@ -458,7 +455,7 @@ body {
 .eh-dash-title {
   font-family: var(--font-sora), sans-serif;
   font-weight: 700;
-  letter-spacing: -0.03em;
+  letter-spacing: 0;
   line-height: 1.2;
   color: var(--foreground);
 }
@@ -467,7 +464,7 @@ body {
 .eh-dash-subtitle {
   font-family: var(--font-sora), sans-serif;
   font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   line-height: 1.3;
   color: var(--foreground);
 }
@@ -489,7 +486,7 @@ body {
 .eh-input:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(0, 229, 160, 0.15);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
 /* Standardized select styling */
@@ -511,10 +508,10 @@ body {
 .eh-select:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(0, 229, 160, 0.15);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
-/* Neon button size variants */
+/* Primary button size variants */
 .eh-btn-neon.eh-btn-sm {
   padding: 8px 16px;
   font-size: 13px;
@@ -588,7 +585,7 @@ body {
   line-height: 1;
 }
 .eh-badge-success {
-  background: rgba(0, 229, 160, 0.1);
+  background: rgba(37, 99, 235, 0.1);
   color: var(--primary);
 }
 .eh-badge-warning {
@@ -600,7 +597,7 @@ body {
   color: var(--error);
 }
 .eh-badge-info {
-  background: rgba(0, 180, 216, 0.1);
+  background: rgba(30, 58, 138, 0.1);
   color: var(--info);
 }
 .eh-badge-neutral {
@@ -658,12 +655,12 @@ body {
 }
 .eh-filter-pill-active {
   background: var(--primary);
-  color: #061A21;
+  color: #111827;
   font-weight: 600;
 }
 .eh-filter-pill-active:hover {
-  background: #00CC8E;
-  color: #061A21;
+  background: #1D4ED8;
+  color: #111827;
 }
 
 /* Active filter chip — removable tag */
@@ -672,7 +669,7 @@ body {
   align-items: center;
   gap: 4px;
   padding: 3px 10px;
-  background: rgba(0, 229, 160, 0.1);
+  background: rgba(37, 99, 235, 0.1);
   color: var(--primary);
   border-radius: 6px;
   font-size: 12px;
@@ -723,8 +720,8 @@ body {
   justify-content: space-between;
   gap: 12px;
   padding: 10px 20px;
-  background: rgba(0, 229, 160, 0.06);
-  border: 1px solid rgba(0, 229, 160, 0.2);
+  background: rgba(37, 99, 235, 0.06);
+  border: 1px solid rgba(37, 99, 235, 0.2);
   border-radius: 12px;
   backdrop-filter: blur(8px);
 }

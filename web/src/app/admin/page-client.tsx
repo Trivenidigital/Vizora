@@ -97,10 +97,10 @@ export default function AdminDashboardClient({ initialStats }: AdminDashboardCli
             <Link
               key={action.name}
               href={action.href}
-              className="group bg-[var(--surface)] rounded-xl border border-[var(--border)] p-4 hover:shadow-md hover:border-[#00E5A0] transition-all"
+              className="group bg-[var(--surface)] rounded-xl border border-[var(--border)] p-4 hover:shadow-md hover:border-[#2563EB] transition-all"
             >
               <action.icon className={`w-8 h-8 text-${action.color}-500 mb-3`} />
-              <p className="font-medium text-[var(--foreground)] group-hover:text-[#00E5A0] transition">
+              <p className="font-medium text-[var(--foreground)] group-hover:text-[#2563EB] transition">
                 {action.name}
               </p>
             </Link>
@@ -116,7 +116,7 @@ export default function AdminDashboardClient({ initialStats }: AdminDashboardCli
             <h3 className="font-semibold text-[var(--foreground)]">Screen Status</h3>
             <Link
               href="/admin/health"
-              className="text-sm text-[#00E5A0] hover:underline flex items-center gap-1"
+              className="text-sm text-[#2563EB] hover:underline flex items-center gap-1"
             >
               View Details
               <ArrowRight className="w-4 h-4" />
@@ -161,7 +161,7 @@ export default function AdminDashboardClient({ initialStats }: AdminDashboardCli
             <h3 className="font-semibold text-[var(--foreground)]">Revenue Summary</h3>
             <Link
               href="/admin/analytics"
-              className="text-sm text-[#00E5A0] hover:underline flex items-center gap-1"
+              className="text-sm text-[#2563EB] hover:underline flex items-center gap-1"
             >
               View Analytics
               <ArrowRight className="w-4 h-4" />

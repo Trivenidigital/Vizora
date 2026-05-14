@@ -45,7 +45,7 @@ export function AnnouncementForm({ announcement, onSubmit, onCancel, isLoading =
   };
 
   const typeColors = {
-    info: 'bg-[#00E5A0]/10 text-[#00E5A0]',
+    info: 'bg-[#2563EB]/10 text-[#2563EB]',
     warning: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
     critical: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
     maintenance: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
@@ -75,7 +75,7 @@ export function AnnouncementForm({ announcement, onSubmit, onCancel, isLoading =
               type="text"
               value={formData.title}
               onChange={(e) => setFormData((p) => ({ ...p, title: e.target.value }))}
-              className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+              className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
               placeholder="Scheduled Maintenance"
               required
             />
@@ -89,7 +89,7 @@ export function AnnouncementForm({ announcement, onSubmit, onCancel, isLoading =
               value={formData.message}
               onChange={(e) => setFormData((p) => ({ ...p, message: e.target.value }))}
               rows={3}
-              className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+              className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
               required
             />
           </div>
@@ -125,7 +125,7 @@ export function AnnouncementForm({ announcement, onSubmit, onCancel, isLoading =
                 type="datetime-local"
                 value={formData.startsAt ? String(formData.startsAt).slice(0, 16) : ''}
                 onChange={(e) => setFormData((p) => ({ ...p, startsAt: e.target.value }))}
-                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
                 required
               />
             </div>
@@ -137,7 +137,7 @@ export function AnnouncementForm({ announcement, onSubmit, onCancel, isLoading =
                 type="datetime-local"
                 value={formData.expiresAt ? String(formData.expiresAt).slice(0, 16) : ''}
                 onChange={(e) => setFormData((p) => ({ ...p, expiresAt: e.target.value || null }))}
-                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
               />
             </div>
           </div>
@@ -147,7 +147,7 @@ export function AnnouncementForm({ announcement, onSubmit, onCancel, isLoading =
               type="checkbox"
               checked={formData.isActive}
               onChange={(e) => setFormData((p) => ({ ...p, isActive: e.target.checked }))}
-              className="w-4 h-4 rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]"
+              className="w-4 h-4 rounded border-[var(--border)] text-[#2563EB] focus:ring-[#2563EB]"
             />
             <span className="text-sm text-[var(--foreground-secondary)]">Active</span>
           </label>
@@ -178,11 +178,11 @@ export function AnnouncementForm({ announcement, onSubmit, onCancel, isLoading =
             <button
               type="submit"
               disabled={isLoading}
-              className="px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
+              className="px-4 py-2 bg-[#2563EB] text-white rounded-lg hover:bg-[#1D4ED8] disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
             >
               {isLoading ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-[#061A21]/30 border-t-[#061A21] rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   Saving...
                 </>
               ) : (

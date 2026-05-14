@@ -100,7 +100,7 @@ export default function AdminSecurityPage() {
     if (action.includes('create') || action.includes('enable') || action.includes('unblock')) {
       return 'text-green-600 dark:text-green-400';
     }
-    return 'text-[#00E5A0]';
+    return 'text-[#2563EB]';
   };
 
   if (loading) {
@@ -130,7 +130,7 @@ export default function AdminSecurityPage() {
             onClick={() => setActiveTab('audit')}
             className={`py-3 px-1 border-b-2 font-medium text-sm transition ${
               activeTab === 'audit'
-                ? 'border-[#00E5A0] text-[#00E5A0]'
+                ? 'border-[#2563EB] text-[#2563EB]'
                 : 'border-transparent text-[var(--foreground-tertiary)] hover:text-[var(--foreground-secondary)]'
             }`}
           >
@@ -146,7 +146,7 @@ export default function AdminSecurityPage() {
             onClick={() => setActiveTab('blocklist')}
             className={`py-3 px-1 border-b-2 font-medium text-sm transition ${
               activeTab === 'blocklist'
-                ? 'border-[#00E5A0] text-[#00E5A0]'
+                ? 'border-[#2563EB] text-[#2563EB]'
                 : 'border-transparent text-[var(--foreground-tertiary)] hover:text-[var(--foreground-secondary)]'
             }`}
           >
@@ -377,7 +377,7 @@ export default function AdminSecurityPage() {
                   value={blockIp}
                   onChange={(e) => setBlockIp(e.target.value)}
                   placeholder="192.168.1.1"
-                  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent font-mono"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent font-mono"
                 />
               </div>
 
@@ -390,7 +390,7 @@ export default function AdminSecurityPage() {
                   onChange={(e) => setBlockReason(e.target.value)}
                   placeholder="Why is this IP being blocked?"
                   rows={3}
-                  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
                 />
               </div>
             </div>

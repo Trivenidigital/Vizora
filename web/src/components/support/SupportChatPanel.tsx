@@ -109,7 +109,7 @@ export default function SupportChatPanel() {
       }`}
     >
       {/* Green accent bar */}
-      <div className="h-0.5 bg-gradient-to-r from-[#00E5A0] to-[#00B4D8] flex-shrink-0" />
+      <div className="h-0.5 bg-gradient-to-r from-[#2563EB] to-[#1E3A8A] flex-shrink-0" />
 
       {/* Header */}
       <div className="flex items-center justify-between px-4 h-12 border-b border-white/10 flex-shrink-0">
@@ -151,8 +151,8 @@ export default function SupportChatPanel() {
         <div className="flex-1 overflow-y-auto">
           {conversations.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-              <div className="w-12 h-12 rounded-full bg-[#00E5A0]/10 flex items-center justify-center mb-3">
-                <svg className="w-6 h-6 text-[#00E5A0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-12 h-12 rounded-full bg-[#2563EB]/10 flex items-center justify-center mb-3">
+                <svg className="w-6 h-6 text-[#2563EB]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
               </div>
@@ -225,13 +225,13 @@ export default function SupportChatPanel() {
               onKeyDown={handleKeyDown}
               placeholder="Type a message..."
               rows={1}
-              className="flex-1 bg-[#1F2937] text-sm text-gray-200 placeholder-gray-500 px-3 py-2 rounded-xl resize-none outline-none focus:ring-1 focus:ring-[#00E5A0]/50 transition-all max-sm:py-3"
+              className="flex-1 bg-[#1F2937] text-sm text-gray-200 placeholder-gray-500 px-3 py-2 rounded-xl resize-none outline-none focus:ring-1 focus:ring-[#2563EB]/50 transition-all max-sm:py-3"
               style={{ maxHeight: '72px' }}
             />
             <button
               onClick={handleSend}
               disabled={!inputText.trim() || isLoading}
-              className="flex-shrink-0 w-9 h-9 max-sm:w-10 max-sm:h-10 flex items-center justify-center rounded-xl bg-[#00E5A0] text-[#0A0F1C] hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200"
+              className="flex-shrink-0 w-9 h-9 max-sm:w-10 max-sm:h-10 flex items-center justify-center rounded-xl bg-[#2563EB] text-[#0A0F1C] hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200"
               aria-label="Send message"
             >
               <Send className="w-4 h-4" />

@@ -52,15 +52,15 @@ export function CookieConsent() {
       aria-hidden={!visible}
     >
       <div className="mx-auto max-w-4xl px-4 pb-4 sm:px-6">
-        <div className="rounded-xl border border-[#1B3D47] bg-[#0A222E] px-6 py-5 shadow-2xl">
+        <div className="rounded-xl border border-[#E5E7EB] bg-white px-6 py-5 shadow-2xl">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             {/* Text */}
-            <div className="flex-1 text-sm leading-relaxed text-gray-300">
+            <div className="flex-1 text-sm leading-relaxed text-[#4B5563]">
               <p>
                 We use cookies to improve your experience and analyze site usage.{' '}
                 <Link
                   href="/privacy"
-                  className="font-medium text-[#00E5A0] underline decoration-[#00E5A0]/30 underline-offset-2 transition-colors hover:text-[#00CC8E] hover:decoration-[#00CC8E]/50"
+                  className="font-medium text-[#2563EB] underline decoration-[#2563EB]/30 underline-offset-2 transition-colors hover:text-[#1D4ED8] hover:decoration-[#1D4ED8]/50"
                 >
                   Privacy Policy
                 </Link>
@@ -71,13 +71,13 @@ export function CookieConsent() {
             <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
               <button
                 onClick={() => handleConsent('essential')}
-                className="rounded-lg border border-[#1B3D47] px-4 py-2 text-sm font-medium text-gray-300 transition-colors hover:border-gray-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-[#00E5A0] focus:ring-offset-2 focus:ring-offset-[#0A222E]"
+                className="rounded-lg border border-[#E5E7EB] px-4 py-2 text-sm font-medium text-[#4B5563] transition-colors hover:border-[#D1D5DB] hover:text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:ring-offset-2 focus:ring-offset-white"
               >
                 Essential Only
               </button>
               <button
                 onClick={() => handleConsent('all')}
-                className="rounded-lg bg-[#00E5A0] px-4 py-2 text-sm font-semibold text-[#061A21] transition-colors hover:bg-[#00CC8E] focus:outline-none focus:ring-2 focus:ring-[#00E5A0] focus:ring-offset-2 focus:ring-offset-[#0A222E]"
+                className="rounded-lg bg-[#2563EB] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#1D4ED8] focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:ring-offset-2 focus:ring-offset-white"
               >
                 Accept All
               </button>

@@ -186,7 +186,7 @@ export default function WidgetsPage() {
       countdown: 'from-red-400 to-red-600',
       sheets: 'from-green-400 to-emerald-600',
     };
-    return mapping[type] || 'from-[#00E5A0] to-[#00B4D8]';
+    return mapping[type] || 'from-[#2563EB] to-[#1E3A8A]';
   };
 
   const openWizard = (type: WidgetType) => {
@@ -293,7 +293,7 @@ export default function WidgetsPage() {
             placeholder={schema.placeholder || ''}
             rows={4}
             onChange={(e) => onChange(key, e.target.value)}
-            className="eh-input w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)] resize-y"
+            className="eh-input w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)] resize-y"
           />
         </div>
       );
@@ -306,7 +306,7 @@ export default function WidgetsPage() {
             type="checkbox"
             checked={!!value}
             onChange={(e) => onChange(key, e.target.checked)}
-            className="w-4 h-4 rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]"
+            className="w-4 h-4 rounded border-[var(--border)] text-[#2563EB] focus:ring-[#2563EB]"
           />
           <span className="text-sm font-medium text-[var(--foreground)]">{schema.label || key}</span>
         </label>
@@ -323,7 +323,7 @@ export default function WidgetsPage() {
           <select
             value={value || ''}
             onChange={(e) => onChange(key, e.target.value)}
-            className="eh-select w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
+            className="eh-select w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
           >
             <option value="">Select...</option>
             {(schema.options || []).map((opt: string) => (
@@ -348,7 +348,7 @@ export default function WidgetsPage() {
             min={schema.min}
             max={schema.max}
             onChange={(e) => onChange(key, parseInt(e.target.value) || 0)}
-            className="eh-input w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
+            className="eh-input w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
           />
         </div>
       );
@@ -366,7 +366,7 @@ export default function WidgetsPage() {
           value={value || ''}
           placeholder={schema.placeholder || ''}
           onChange={(e) => onChange(key, e.target.value)}
-          className="eh-input w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
+          className="eh-input w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
         />
       </div>
     );
@@ -441,7 +441,7 @@ export default function WidgetsPage() {
                 {myWidgets.map((widget) => (
                   <div
                     key={widget.id}
-                    className="eh-dash-card rounded-lg shadow border border-[var(--border)] overflow-hidden hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300"
+                    className="eh-dash-card rounded-lg shadow border border-[var(--border)] overflow-hidden hover:-translate-y-[2px] hover:border-[rgba(37, 99, 235,0.2)] hover:shadow-md transition-all duration-300"
                   >
                     <div className={`h-2 bg-gradient-to-r ${getColorForType(widget.widgetType)}`} />
                     <div className="p-5">
@@ -467,7 +467,7 @@ export default function WidgetsPage() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => openEditModal(widget)}
-                          className="flex-1 text-sm py-2 rounded-lg bg-[#00E5A0]/10 text-[#00E5A0] hover:bg-[#00E5A0]/20 transition font-medium flex items-center justify-center gap-1"
+                          className="flex-1 text-sm py-2 rounded-lg bg-[#2563EB]/10 text-[#2563EB] hover:bg-[#2563EB]/20 transition font-medium flex items-center justify-center gap-1"
                         >
                           <Icon name="edit" size="sm" />
                           Edit
@@ -496,7 +496,7 @@ export default function WidgetsPage() {
               {widgetTypes.map((wType) => (
                 <div
                   key={wType.type}
-                  className="eh-dash-card rounded-lg shadow overflow-hidden hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300 border border-[var(--border)] cursor-pointer group"
+                  className="eh-dash-card rounded-lg shadow overflow-hidden hover:-translate-y-[2px] hover:border-[rgba(37, 99, 235,0.2)] hover:shadow-md transition-all duration-300 border border-[var(--border)] cursor-pointer group"
                   onClick={() => openWizard(wType)}
                 >
                   <div className={`h-32 bg-gradient-to-br ${getColorForType(wType.type)} flex items-center justify-center relative`}>
@@ -511,7 +511,7 @@ export default function WidgetsPage() {
                         e.stopPropagation();
                         openWizard(wType);
                       }}
-                      className="w-full py-2 text-sm font-medium rounded-lg border border-[#00E5A0] text-[#00E5A0] hover:bg-[#00E5A0] hover:text-[#061A21] transition flex items-center justify-center gap-2"
+                      className="w-full py-2 text-sm font-medium rounded-lg border border-[#2563EB] text-[#2563EB] hover:bg-[#2563EB] hover:text-white transition flex items-center justify-center gap-2"
                     >
                       <Icon name="add" size="sm" />
                       Create {wType.name} Widget
@@ -557,7 +557,7 @@ export default function WidgetsPage() {
                 <button
                   key={wType.type}
                   onClick={() => openWizard(wType)}
-                  className="flex items-center gap-3 p-4 rounded-lg border border-[var(--border)] hover:border-[#00E5A0] hover:bg-[#00E5A0]/5 transition text-left"
+                  className="flex items-center gap-3 p-4 rounded-lg border border-[var(--border)] hover:border-[#2563EB] hover:bg-[#2563EB]/5 transition text-left"
                 >
                   <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${getColorForType(wType.type)} flex items-center justify-center flex-shrink-0`}>
                     <Icon name={getIconForType(wType.type)} size="lg" className="text-white" />
@@ -584,7 +584,7 @@ export default function WidgetsPage() {
                 value={widgetName}
                 onChange={(e) => setWidgetName(e.target.value)}
                 placeholder={`My ${selectedType.name} Widget`}
-                className="eh-input w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
+                className="eh-input w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
               />
             </div>
 
@@ -598,7 +598,7 @@ export default function WidgetsPage() {
                 value={widgetDescription}
                 onChange={(e) => setWidgetDescription(e.target.value)}
                 placeholder="A brief description..."
-                className="eh-input w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
+                className="eh-input w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
               />
             </div>
 

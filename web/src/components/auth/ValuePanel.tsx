@@ -43,7 +43,7 @@ const benefits = [
         <path d="M2 12l10 5 10-5" />
       </svg>
     ),
-    text: 'AI-powered content & scheduling',
+    text: 'Simple content and scheduling workflows',
   },
   {
     icon: (
@@ -51,7 +51,7 @@ const benefits = [
         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
       </svg>
     ),
-    text: '99.9% uptime, enterprise security',
+    text: 'Reliable playback and secure access',
   },
 ];
 
@@ -59,20 +59,19 @@ export default function ValuePanel({ variant }: ValuePanelProps) {
   const { headline, subtext } = content[variant];
 
   return (
-    <div className="relative hidden md:flex flex-col p-10 lg:p-12 bg-[#061A21] overflow-hidden">
-      {/* Atmospheric background */}
+    <div className="relative hidden md:flex flex-col p-10 lg:p-12 border-l border-[#E5E7EB] bg-[#F7F8FA] overflow-hidden">
       <div className="absolute inset-0 eh-grain" />
       <div
-        className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full opacity-30"
+        className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full opacity-20"
         style={{
-          background: 'radial-gradient(circle, rgba(0,229,160,0.15) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, rgba(37, 99, 235,0.10) 0%, transparent 70%)',
           animation: 'eh-glow-breathe 6s ease-in-out infinite',
         }}
       />
       <div
-        className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full opacity-20"
+        className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full opacity-10"
         style={{
-          background: 'radial-gradient(circle, rgba(0,180,216,0.15) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, rgba(30, 58, 138,0.10) 0%, transparent 70%)',
           animation: 'eh-glow-breathe 8s ease-in-out infinite',
         }}
       />
@@ -81,8 +80,8 @@ export default function ValuePanel({ variant }: ValuePanelProps) {
       <div className="relative z-10 space-y-8">
         {/* Logo */}
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-[#00E5A0]/10 border border-[#00E5A0]/20 flex items-center justify-center">
-            <span className="text-[#00E5A0] font-bold text-sm font-mono">V</span>
+          <div className="w-8 h-8 rounded-lg bg-[#2563EB]/10 border border-[#2563EB]/20 flex items-center justify-center">
+            <span className="text-[#2563EB] font-bold text-sm font-mono">V</span>
           </div>
           <span className="text-[var(--foreground)] font-semibold tracking-tight">Vizora</span>
         </div>
@@ -101,7 +100,7 @@ export default function ValuePanel({ variant }: ValuePanelProps) {
         <div className="space-y-4">
           {benefits.map((b) => (
             <div key={b.text} className="flex items-center gap-3">
-              <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-[#00E5A0]/8 border border-[#00E5A0]/15 flex items-center justify-center text-[#00E5A0]">
+              <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-[#2563EB]/8 border border-[#2563EB]/15 flex items-center justify-center text-[#2563EB]">
                 {b.icon}
               </div>
               <span className="text-sm text-[var(--foreground-secondary)]">{b.text}</span>
@@ -119,9 +118,9 @@ export default function ValuePanel({ variant }: ValuePanelProps) {
         )}
 
         {variant === 'login' && (
-          <div className="rounded-xl border border-[#1B3D47] bg-[#0C2229]/60 p-5">
+          <div className="rounded-xl border border-[#E5E7EB] bg-white p-5 shadow-[0_4px_12px_rgba(0,0,0,0.04)]">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-2.5 h-2.5 rounded-full bg-[#00E5A0] animate-pulse" />
+              <div className="w-2.5 h-2.5 rounded-full bg-[#2563EB] animate-pulse" />
               <span className="text-xs font-medium text-[var(--foreground)]">Your fleet is online</span>
             </div>
             <div className="grid grid-cols-3 gap-3 text-center">
@@ -131,7 +130,7 @@ export default function ValuePanel({ variant }: ValuePanelProps) {
                 { value: '99.9%', label: 'Uptime' },
               ].map((s) => (
                 <div key={s.label}>
-                  <p className="text-lg font-bold font-mono text-[#00E5A0]">{s.value}</p>
+                  <p className="text-lg font-bold font-mono text-[#2563EB]">{s.value}</p>
                   <p className="text-[10px] text-[var(--foreground-tertiary)]">{s.label}</p>
                 </div>
               ))}
@@ -140,14 +139,14 @@ export default function ValuePanel({ variant }: ValuePanelProps) {
         )}
 
         {variant === 'forgot-password' && (
-          <div className="rounded-xl border border-[#1B3D47] bg-[#0C2229]/60 p-6">
+          <div className="rounded-xl border border-[#E5E7EB] bg-white p-6 shadow-[0_4px_12px_rgba(0,0,0,0.04)]">
             <div className="flex items-center justify-center">
               <div className="relative">
                 {/* Glow effect behind key */}
                 <div
                   className="absolute inset-0 rounded-full opacity-40"
                   style={{
-                    background: 'radial-gradient(circle, rgba(0,229,160,0.25) 0%, transparent 70%)',
+                    background: 'radial-gradient(circle, rgba(37, 99, 235,0.25) 0%, transparent 70%)',
                     animation: 'eh-glow-breathe 4s ease-in-out infinite',
                     transform: 'scale(2)',
                   }}
@@ -160,13 +159,13 @@ export default function ValuePanel({ variant }: ValuePanelProps) {
                   className="relative z-10"
                 >
                   {/* Key body */}
-                  <circle cx="22" cy="24" r="10" stroke="#00E5A0" strokeWidth="2" fill="none" opacity="0.9" />
-                  <circle cx="22" cy="24" r="4" fill="#00E5A0" opacity="0.2" />
-                  <line x1="32" y1="24" x2="52" y2="24" stroke="#00E5A0" strokeWidth="2" strokeLinecap="round" opacity="0.9" />
-                  <line x1="48" y1="24" x2="48" y2="32" stroke="#00E5A0" strokeWidth="2" strokeLinecap="round" opacity="0.7" />
-                  <line x1="42" y1="24" x2="42" y2="30" stroke="#00E5A0" strokeWidth="2" strokeLinecap="round" opacity="0.7" />
+                  <circle cx="22" cy="24" r="10" stroke="#2563EB" strokeWidth="2" fill="none" opacity="0.9" />
+                  <circle cx="22" cy="24" r="4" fill="#2563EB" opacity="0.2" />
+                  <line x1="32" y1="24" x2="52" y2="24" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" opacity="0.9" />
+                  <line x1="48" y1="24" x2="48" y2="32" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" opacity="0.7" />
+                  <line x1="42" y1="24" x2="42" y2="30" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" opacity="0.7" />
                   {/* Decorative dots */}
-                  <circle cx="22" cy="24" r="1.5" fill="#00E5A0" opacity="0.6" />
+                  <circle cx="22" cy="24" r="1.5" fill="#2563EB" opacity="0.6" />
                 </svg>
               </div>
             </div>
@@ -177,14 +176,14 @@ export default function ValuePanel({ variant }: ValuePanelProps) {
         )}
 
         {variant === 'reset-password' && (
-          <div className="rounded-xl border border-[#1B3D47] bg-[#0C2229]/60 p-6">
+          <div className="rounded-xl border border-[#E5E7EB] bg-white p-6 shadow-[0_4px_12px_rgba(0,0,0,0.04)]">
             <div className="flex items-center justify-center">
               <div className="relative">
                 {/* Glow effect behind shield */}
                 <div
                   className="absolute inset-0 rounded-full opacity-40"
                   style={{
-                    background: 'radial-gradient(circle, rgba(0,229,160,0.25) 0%, transparent 70%)',
+                    background: 'radial-gradient(circle, rgba(37, 99, 235,0.25) 0%, transparent 70%)',
                     animation: 'eh-glow-breathe 4s ease-in-out infinite',
                     transform: 'scale(2)',
                   }}
@@ -199,15 +198,15 @@ export default function ValuePanel({ variant }: ValuePanelProps) {
                   {/* Shield */}
                   <path
                     d="M32 8L12 18v14c0 12.4 8.5 24 20 28 11.5-4 20-15.6 20-28V18L32 8z"
-                    stroke="#00E5A0"
+                    stroke="#2563EB"
                     strokeWidth="2"
-                    fill="rgba(0,229,160,0.06)"
+                    fill="rgba(37, 99, 235,0.06)"
                     strokeLinejoin="round"
                   />
                   {/* Checkmark inside shield */}
                   <polyline
                     points="22,32 29,39 42,26"
-                    stroke="#00E5A0"
+                    stroke="#2563EB"
                     strokeWidth="2.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"

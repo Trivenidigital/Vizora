@@ -519,7 +519,7 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  )}
  {selectedDeviceIds.size > 0 && (
  <div className="eh-bulk-bar flex items-center justify-between">
- <span className="text-sm font-medium text-[#00E5A0] dark:text-[#00E5A0]">
+ <span className="text-sm font-medium text-[#2563EB] dark:text-[#2563EB]">
  {selectedDeviceIds.size} device{selectedDeviceIds.size !== 1 ? 's' : ''} selected
  </span>
  <div className="flex gap-4 items-center">
@@ -535,7 +535,7 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  <thead className="bg-[var(--background)]">
  <tr>
  <th className="px-4 py-3 text-left">
- <input type="checkbox" checked={selectedDeviceIds.size === displayDevices.length && displayDevices.length > 0} onChange={toggleSelectAll} className="rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]" />
+ <input type="checkbox" checked={selectedDeviceIds.size === displayDevices.length && displayDevices.length > 0} onChange={toggleSelectAll} className="rounded border-[var(--border)] text-[#2563EB] focus:ring-[#2563EB]" />
  </th>
  <th className="eh-th cursor-pointer hover:bg-[var(--surface-hover)] select-none" onClick={() => handleSort('nickname')}>Device{getSortIcon('nickname')}</th>
  <th className="eh-th cursor-pointer hover:bg-[var(--surface-hover)] select-none" onClick={() => handleSort('status')}>Status{getSortIcon('status')}</th>
@@ -548,7 +548,7 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  <tbody className="bg-[var(--surface)] divide-y divide-[var(--border)]">
  {displayDevices.map((device) => (
  <tr key={device.id} className="eh-tr-hover">
- <td className="eh-td"><input type="checkbox" checked={selectedDeviceIds.has(device.id)} onChange={() => toggleDeviceSelection(device.id)} className="rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]" /></td>
+ <td className="eh-td"><input type="checkbox" checked={selectedDeviceIds.has(device.id)} onChange={() => toggleDeviceSelection(device.id)} className="rounded border-[var(--border)] text-[#2563EB] focus:ring-[#2563EB]" /></td>
  <td className="eh-td">
  <div className="flex items-center">
  <Icon name="devices" size="xl" className="mr-3 text-[var(--foreground-secondary)]" />
@@ -604,7 +604,7 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  else if (currentPage >= totalPages - 2) { pageNum = totalPages - 4 + i; }
  else { pageNum = currentPage - 2 + i; }
  return (
- <button key={pageNum} onClick={() => setCurrentPage(pageNum)} className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${currentPage === pageNum ? 'z-10 bg-[#00E5A0]/5 border-[#00E5A0] text-[#00E5A0]' : 'bg-[var(--surface)] border-[var(--border)] text-[var(--foreground-tertiary)] hover:bg-[var(--surface-hover)]'}`}>{pageNum}</button>
+ <button key={pageNum} onClick={() => setCurrentPage(pageNum)} className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${currentPage === pageNum ? 'z-10 bg-[#2563EB]/5 border-[#2563EB] text-[#2563EB]' : 'bg-[var(--surface)] border-[var(--border)] text-[var(--foreground-tertiary)] hover:bg-[var(--surface-hover)]'}`}>{pageNum}</button>
  );
  })}
  <button onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages} className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-[var(--border)] bg-[var(--surface)] text-sm font-medium text-[var(--foreground-tertiary)] hover:bg-[var(--surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed">Next {'\u2192'}</button>
@@ -620,11 +620,11 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  <div className="space-y-5">
  <div>
  <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">Device Nickname</label>
- <input type="text" value={editForm.nickname} onChange={(e) => setEditForm({ ...editForm, nickname: e.target.value })} className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent" placeholder="e.g., Store Front Display" />
+ <input type="text" value={editForm.nickname} onChange={(e) => setEditForm({ ...editForm, nickname: e.target.value })} className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent" placeholder="e.g., Store Front Display" />
  </div>
  <div>
  <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">Location (Optional)</label>
- <input type="text" value={editForm.location} onChange={(e) => setEditForm({ ...editForm, location: e.target.value })} className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent" placeholder="e.g., Main Entrance" />
+ <input type="text" value={editForm.location} onChange={(e) => setEditForm({ ...editForm, location: e.target.value })} className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent" placeholder="e.g., Main Entrance" />
  </div>
  <div className="flex justify-end gap-3 pt-4">
  <button onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 text-sm font-medium text-[var(--foreground-secondary)] bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition" disabled={actionLoading}>Cancel</button>
@@ -637,7 +637,7 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  <div className="text-center space-y-5">
  <p className="text-[var(--foreground-secondary)]">Enter this code on your display device to pair it:</p>
  <div className="bg-[var(--background-secondary)] rounded-lg p-6">
- <div className="text-4xl font-bold font-mono text-[#00E5A0] tracking-widest">{pairingCode}</div>
+ <div className="text-4xl font-bold font-mono text-[#2563EB] tracking-widest">{pairingCode}</div>
  </div>
  <p className="text-sm text-[var(--foreground-tertiary)]">This code will expire in 5 minutes</p>
  <button onClick={() => setIsPairingModalOpen(false)} className="eh-btn-neon rounded-xl w-full px-4 py-2 text-sm font-medium">Done</button>

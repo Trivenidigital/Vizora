@@ -42,7 +42,7 @@ export function FilterPanel({
               onClick={() => onFilterTypeChange(type)}
               className={`px-4 py-2 rounded-md text-sm font-medium transition ${
                 filterType === type
-                  ? 'bg-[#00E5A0] text-[#061A21]'
+                  ? 'bg-[#2563EB] text-white'
                   : 'text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
               }`}
             >
@@ -55,7 +55,7 @@ export function FilterPanel({
           {hasActiveFilters && (
             <button
               onClick={onClearAllFilters}
-              className="text-sm text-[#00E5A0] hover:text-[#00CC8E] underline"
+              className="text-sm text-[#2563EB] hover:text-[#1D4ED8] underline"
             >
               Clear all
             </button>
@@ -93,7 +93,7 @@ export function FilterPanel({
             <select
               value={filterStatus}
               onChange={(e) => onFilterStatusChange(e.target.value)}
-              className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-sm"
+              className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-sm"
             >
               <option value="all">All Statuses</option>
               <option value="ready">Ready</option>
@@ -112,7 +112,7 @@ export function FilterPanel({
                   e.target.value as 'all' | '7days' | '30days' | '90days'
                 )
               }
-              className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-sm"
+              className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent text-sm"
             >
               <option value="all">All Time</option>
               <option value="7days">Last 7 days</option>
@@ -128,17 +128,17 @@ export function FilterPanel({
         <div className="pt-2 border-t border-[var(--border)] flex items-center gap-2 text-sm">
           <span className="text-[var(--foreground-secondary)]">Active filters:</span>
           {filterType !== 'all' && (
-            <span className="px-2 py-1 bg-[#00E5A0]/10 text-[#00E5A0] rounded text-xs">
+            <span className="px-2 py-1 bg-[#2563EB]/10 text-[#2563EB] rounded text-xs">
               Type: {filterType}
             </span>
           )}
           {filterStatus !== 'all' && (
-            <span className="px-2 py-1 bg-[#00E5A0]/10 text-[#00E5A0] rounded text-xs">
+            <span className="px-2 py-1 bg-[#2563EB]/10 text-[#2563EB] rounded text-xs">
               Status: {filterStatus}
             </span>
           )}
           {filterDateRange !== 'all' && (
-            <span className="px-2 py-1 bg-[#00E5A0]/10 text-[#00E5A0] rounded text-xs">
+            <span className="px-2 py-1 bg-[#2563EB]/10 text-[#2563EB] rounded text-xs">
               Date: {filterDateRange}
             </span>
           )}

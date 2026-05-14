@@ -78,7 +78,7 @@ export default function AdminUsersClient({ initialUsers, initialTotal }: AdminUs
       case 'admin':
         return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400';
       case 'owner':
-        return 'bg-[#00E5A0]/10 text-[#00E5A0] dark:bg-[#00E5A0]/10 dark:text-[#00E5A0]';
+        return 'bg-[#2563EB]/10 text-[#2563EB] dark:bg-[#2563EB]/10 dark:text-[#2563EB]';
       default:
         return 'bg-[var(--background-tertiary)] text-[var(--foreground-secondary)]';
     }
@@ -104,7 +104,7 @@ export default function AdminUsersClient({ initialUsers, initialTotal }: AdminUs
           value={search}
           onChange={(e) => handleSearchChange(e.target.value)}
           placeholder="Search by name or email..."
-          className="w-full pl-10 pr-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+          className="w-full pl-10 pr-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
         />
       </div>
 
@@ -147,8 +147,8 @@ export default function AdminUsersClient({ initialUsers, initialTotal }: AdminUs
                   >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] flex items-center justify-center">
-                          <span className="text-[#061A21] text-sm font-semibold">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#2563EB] to-[#1E3A8A] flex items-center justify-center">
+                          <span className="text-white text-sm font-semibold">
                             {user.firstName[0]}
                             {user.lastName[0]}
                           </span>

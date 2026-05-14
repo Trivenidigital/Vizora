@@ -40,21 +40,21 @@ export default function TemplateHeroSearch({
   return (
     <div className="relative overflow-hidden rounded-2xl">
       {/* Background layers */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[#061A21] via-[#0A2A33] to-[#0C2229]" />
+      <div className="absolute inset-0 bg-gradient-to-br from-[#111827] via-[#0A2A33] to-[#0C2229]" />
       <div
         className="absolute inset-0 opacity-[0.03]"
         style={{
-          backgroundImage: `radial-gradient(circle at 20% 50%, #00E5A0 0%, transparent 50%),
-                           radial-gradient(circle at 80% 20%, #00B4D8 0%, transparent 50%),
-                           radial-gradient(circle at 50% 80%, #00E5A0 0%, transparent 40%)`,
+          backgroundImage: `radial-gradient(circle at 20% 50%, #2563EB 0%, transparent 50%),
+                           radial-gradient(circle at 80% 20%, #1E3A8A 0%, transparent 50%),
+                           radial-gradient(circle at 50% 80%, #2563EB 0%, transparent 40%)`,
         }}
       />
       {/* Subtle grid overlay */}
       <div
         className="absolute inset-0 opacity-[0.04]"
         style={{
-          backgroundImage: `linear-gradient(rgba(0,229,160,0.3) 1px, transparent 1px),
-                           linear-gradient(90deg, rgba(0,229,160,0.3) 1px, transparent 1px)`,
+          backgroundImage: `linear-gradient(rgba(37, 99, 235,0.3) 1px, transparent 1px),
+                           linear-gradient(90deg, rgba(37, 99, 235,0.3) 1px, transparent 1px)`,
           backgroundSize: '60px 60px',
         }}
       />
@@ -68,7 +68,7 @@ export default function TemplateHeroSearch({
           }`}
         >
           Design Your Perfect{' '}
-          <span className="bg-gradient-to-r from-[#00E5A0] to-[#00B4D8] bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r from-[#2563EB] to-[#1E3A8A] bg-clip-text text-transparent">
             Display
           </span>
         </h1>
@@ -100,12 +100,12 @@ export default function TemplateHeroSearch({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search templates... e.g. restaurant menu, sale banner, welcome screen"
-              className="w-full pl-12 pr-32 py-4 rounded-xl bg-[var(--surface)]/80 backdrop-blur-sm border border-[var(--border)] text-[var(--foreground)] placeholder-[var(--foreground-tertiary)] focus:outline-none focus:ring-2 focus:ring-[#00E5A0]/40 focus:border-[#00E5A0]/40 text-base transition-all"
+              className="w-full pl-12 pr-32 py-4 rounded-xl bg-[var(--surface)]/80 backdrop-blur-sm border border-[var(--border)] text-[var(--foreground)] placeholder-[var(--foreground-tertiary)] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/40 focus:border-[#2563EB]/40 text-base transition-all"
               autoComplete="off"
             />
             <button
               type="submit"
-              className="absolute right-2 px-6 py-2.5 rounded-lg bg-[#00E5A0] text-[#061A21] font-semibold text-sm hover:bg-[#00CC8E] transition-all hover:shadow-[0_0_20px_rgba(0,229,160,0.3)]"
+              className="absolute right-2 px-6 py-2.5 rounded-lg bg-[#2563EB] text-white font-semibold text-sm hover:bg-[#1D4ED8] transition-all hover:shadow-[0_0_20px_rgba(37, 99, 235,0.3)]"
             >
               Search
             </button>
@@ -126,7 +126,7 @@ export default function TemplateHeroSearch({
                 setQuery(tag);
                 onTagClick(tag);
               }}
-              className="px-3 py-1.5 rounded-full text-xs font-medium bg-[var(--surface-hover)]/60 text-[var(--foreground-secondary)] border border-[var(--border)]/50 hover:border-[#00E5A0]/30 hover:text-[#00E5A0] hover:bg-[#00E5A0]/5 transition-all"
+              className="px-3 py-1.5 rounded-full text-xs font-medium bg-[var(--surface-hover)]/60 text-[var(--foreground-secondary)] border border-[var(--border)]/50 hover:border-[#2563EB]/30 hover:text-[#2563EB] hover:bg-[#2563EB]/5 transition-all"
             >
               {tag}
             </button>
@@ -136,7 +136,7 @@ export default function TemplateHeroSearch({
         {/* AI Designer CTA */}
         <button
           onClick={onAIDesignerClick}
-          className={`group inline-flex items-center gap-2.5 px-6 py-3 rounded-xl bg-gradient-to-r from-[#00E5A0]/10 to-[#00B4D8]/10 border border-[#00E5A0]/20 text-[#00E5A0] font-semibold text-sm hover:from-[#00E5A0]/20 hover:to-[#00B4D8]/20 hover:border-[#00E5A0]/40 hover:shadow-[0_0_30px_rgba(0,229,160,0.15)] transition-all duration-300 ${
+          className={`group inline-flex items-center gap-2.5 px-6 py-3 rounded-xl bg-gradient-to-r from-[#2563EB]/10 to-[#1E3A8A]/10 border border-[#2563EB]/20 text-[#2563EB] font-semibold text-sm hover:from-[#2563EB]/20 hover:to-[#1E3A8A]/20 hover:border-[#2563EB]/40 hover:shadow-[0_0_30px_rgba(37, 99, 235,0.15)] transition-all duration-300 ${
             mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
           }`}
           style={{ transitionDelay: '400ms' }}
@@ -148,7 +148,7 @@ export default function TemplateHeroSearch({
             <path d="M5 18L5.5 19.5L7 20L5.5 20.5L5 22L4.5 20.5L3 20L4.5 19.5L5 18Z" fill="currentColor" opacity="0.6" />
           </svg>
           Try AI Designer
-          <span className="text-[#00E5A0]/60 text-xs font-normal">New</span>
+          <span className="text-[#2563EB]/60 text-xs font-normal">New</span>
         </button>
       </div>
     </div>

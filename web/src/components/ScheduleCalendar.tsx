@@ -150,7 +150,7 @@ export default function ScheduleCalendar({
       };
     }
 
-    let backgroundColor = '#00E5A0'; // brand green (default / priority >= 3 / no priority)
+    let backgroundColor = '#2563EB'; // brand green (default / priority >= 3 / no priority)
 
     if (schedule.priority === 2) {
       backgroundColor = '#22C55E'; // green-500
@@ -163,7 +163,7 @@ export default function ScheduleCalendar({
         backgroundColor,
         borderRadius: '4px',
         border: 'none',
-        color: '#061A21',
+        color: '#111827',
       },
     };
   }, []);
@@ -215,11 +215,11 @@ export default function ScheduleCalendar({
           background-color: #E5E7EB;
         }
         .schedule-calendar .rbc-toolbar button.rbc-active {
-          background-color: #00E5A0;
-          color: #061A21;
+          background-color: #2563EB;
+          color: #111827;
         }
         .schedule-calendar .rbc-toolbar button.rbc-active:hover {
-          background-color: #00CC8E;
+          background-color: #1D4ED8;
         }
         .schedule-calendar .rbc-event {
           font-size: 0.75rem;
@@ -240,8 +240,8 @@ export default function ScheduleCalendar({
           background-color: #374151;
         }
         .dark .schedule-calendar .rbc-toolbar button.rbc-active {
-          background-color: #00E5A0;
-          color: #061A21;
+          background-color: #2563EB;
+          color: #111827;
         }
         .dark .schedule-calendar .rbc-today {
           background-color: #1E293B;

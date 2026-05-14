@@ -81,7 +81,7 @@ export function PromotionForm({ promotion, onSubmit, onCancel, isLoading = false
                 type="text"
                 value={formData.code}
                 onChange={(e) => setFormData((p) => ({ ...p, code: e.target.value.toUpperCase() }))}
-                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent uppercase"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent uppercase"
                 placeholder="SUMMER20"
                 required
               />
@@ -94,7 +94,7 @@ export function PromotionForm({ promotion, onSubmit, onCancel, isLoading = false
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
-                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
                 placeholder="Summer Sale"
                 required
               />
@@ -109,7 +109,7 @@ export function PromotionForm({ promotion, onSubmit, onCancel, isLoading = false
               value={formData.description || ''}
               onChange={(e) => setFormData((p) => ({ ...p, description: e.target.value }))}
               rows={2}
-              className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+              className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
             />
           </div>
 
@@ -121,7 +121,7 @@ export function PromotionForm({ promotion, onSubmit, onCancel, isLoading = false
               <select
                 value={formData.discountType}
                 onChange={(e) => setFormData((p) => ({ ...p, discountType: e.target.value as Promotion['discountType'] }))}
-                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
               >
                 <option value="percentage">Percentage</option>
                 <option value="fixed_amount">Fixed Amount</option>
@@ -137,7 +137,7 @@ export function PromotionForm({ promotion, onSubmit, onCancel, isLoading = false
                 step={formData.discountType === 'percentage' ? '1' : '0.01'}
                 value={formData.discountValue}
                 onChange={(e) => setFormData((p) => ({ ...p, discountValue: parseFloat(e.target.value) || 0 }))}
-                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
                 min={0}
                 required
               />
@@ -153,7 +153,7 @@ export function PromotionForm({ promotion, onSubmit, onCancel, isLoading = false
                 type="number"
                 value={formData.maxRedemptions ?? ''}
                 onChange={(e) => setFormData((p) => ({ ...p, maxRedemptions: e.target.value ? parseInt(e.target.value) : null }))}
-                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
                 placeholder="Unlimited"
                 min={0}
               />
@@ -166,7 +166,7 @@ export function PromotionForm({ promotion, onSubmit, onCancel, isLoading = false
                 type="number"
                 value={formData.maxPerCustomer}
                 onChange={(e) => setFormData((p) => ({ ...p, maxPerCustomer: parseInt(e.target.value) || 1 }))}
-                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
                 min={1}
               />
             </div>
@@ -181,7 +181,7 @@ export function PromotionForm({ promotion, onSubmit, onCancel, isLoading = false
                 type="datetime-local"
                 value={formData.startsAt ? formData.startsAt.slice(0, 16) : ''}
                 onChange={(e) => setFormData((p) => ({ ...p, startsAt: e.target.value }))}
-                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
                 required
               />
             </div>
@@ -193,7 +193,7 @@ export function PromotionForm({ promotion, onSubmit, onCancel, isLoading = false
                 type="datetime-local"
                 value={formData.expiresAt ? formData.expiresAt.slice(0, 16) : ''}
                 onChange={(e) => setFormData((p) => ({ ...p, expiresAt: e.target.value || null }))}
-                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
               />
             </div>
           </div>
@@ -203,7 +203,7 @@ export function PromotionForm({ promotion, onSubmit, onCancel, isLoading = false
               type="checkbox"
               checked={formData.isActive}
               onChange={(e) => setFormData((p) => ({ ...p, isActive: e.target.checked }))}
-              className="w-4 h-4 rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]"
+              className="w-4 h-4 rounded border-[var(--border)] text-[#2563EB] focus:ring-[#2563EB]"
             />
             <span className="text-sm text-[var(--foreground-secondary)]">Active</span>
           </label>
@@ -219,11 +219,11 @@ export function PromotionForm({ promotion, onSubmit, onCancel, isLoading = false
             <button
               type="submit"
               disabled={isLoading}
-              className="px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
+              className="px-4 py-2 bg-[#2563EB] text-white rounded-lg hover:bg-[#1D4ED8] disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
             >
               {isLoading ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-[#061A21]/30 border-t-[#061A21] rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   Saving...
                 </>
               ) : (

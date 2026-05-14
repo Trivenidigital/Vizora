@@ -23,7 +23,7 @@ interface DeviceHealthMonitorProps {
 
 const getHealthStatus = (score: number): { label: string; color: string; bgColor: string } => {
   if (score >= 90) return { label: 'Excellent', color: 'text-green-600 dark:text-green-400', bgColor: 'bg-green-100 dark:bg-green-900' };
-  if (score >= 70) return { label: 'Good', color: 'text-[#00E5A0]', bgColor: 'bg-[#00E5A0]/10' };
+  if (score >= 70) return { label: 'Good', color: 'text-[#2563EB]', bgColor: 'bg-[#2563EB]/10' };
   if (score >= 50) return { label: 'Fair', color: 'text-yellow-600 dark:text-yellow-400', bgColor: 'bg-yellow-100 dark:bg-yellow-900' };
   return { label: 'Poor', color: 'text-red-600 dark:text-red-400', bgColor: 'bg-red-100 dark:bg-red-900' };
 };

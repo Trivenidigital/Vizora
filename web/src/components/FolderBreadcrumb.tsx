@@ -60,7 +60,7 @@ export default function FolderBreadcrumb({
         className={`flex items-center gap-1 px-2 py-1 rounded-md transition ${
           currentFolderId === null
             ? 'text-[var(--foreground)] font-medium'
-            : 'text-[#00E5A0] hover:bg-[var(--surface-hover)]'
+            : 'text-[#2563EB] hover:bg-[var(--surface-hover)]'
         }`}
       >
         <Icon name="folder" size="sm" />
@@ -89,7 +89,7 @@ export default function FolderBreadcrumb({
             className={`px-2 py-1 rounded-md transition ${
               index === breadcrumbPath.length - 1
                 ? 'text-[var(--foreground)] font-medium'
-                : 'text-[#00E5A0] hover:bg-[var(--surface-hover)]'
+                : 'text-[#2563EB] hover:bg-[var(--surface-hover)]'
             }`}
           >
             {folder.name}

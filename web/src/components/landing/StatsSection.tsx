@@ -18,14 +18,14 @@ export default function StatsSection() {
           <div
             className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 py-10 px-6 sm:px-8 rounded-2xl"
             style={{
-              background: 'linear-gradient(135deg, rgba(0,229,160,0.04) 0%, rgba(0,180,216,0.03) 100%)',
-              border: '1px solid rgba(0,229,160,0.1)',
+              background: 'linear-gradient(135deg, rgba(37, 99, 235,0.04) 0%, rgba(30, 58, 138,0.03) 100%)',
+              border: '1px solid rgba(37, 99, 235,0.1)',
             }}
           >
             {STATS.map((stat) => (
               <div key={stat.label} className="text-center">
-                <stat.icon size={18} className="mx-auto mb-3" style={{ color: '#00E5A0', opacity: 0.7 }} />
-                <div className="text-2xl sm:text-3xl font-bold mb-1" style={{ color: '#F0ECE8' }}>
+                <stat.icon size={18} className="mx-auto mb-3" style={{ color: '#2563EB', opacity: 0.7 }} />
+                <div className="text-2xl sm:text-3xl font-bold mb-1" style={{ color: '#F9FAFB' }}>
                   {typeof stat.value === 'number' && stat.value >= 100 ? (
                     <AnimatedStat value={stat.value} suffix={stat.suffix} />
                   ) : (

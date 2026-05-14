@@ -4,8 +4,8 @@ import { Upload, CalendarClock, MonitorPlay } from 'lucide-react';
 import { Reveal } from './shared';
 
 const STEPS = [
-  { num: '01', icon: Upload, title: 'Upload Content', desc: 'Drag in images, videos, or HTML templates. Your library organizes and validates everything.', color: '#00E5A0' },
-  { num: '02', icon: CalendarClock, title: 'Schedule & Target', desc: 'Build playlists, set timezone-aware schedules, and target specific screens or groups.', color: '#00B4D8' },
+  { num: '01', icon: Upload, title: 'Upload Content', desc: 'Drag in images, videos, or HTML templates. Your library organizes and validates everything.', color: '#2563EB' },
+  { num: '02', icon: CalendarClock, title: 'Schedule & Target', desc: 'Build playlists, set timezone-aware schedules, and target specific screens or groups.', color: '#1E3A8A' },
   { num: '03', icon: MonitorPlay, title: 'Go Live', desc: 'Push to any screen instantly via WebSocket. Monitor status in real-time from your dashboard.', color: '#8B5CF6' },
 ];
 
@@ -16,13 +16,13 @@ export default function HowItWorksSection() {
         <Reveal>
           <div className="text-center mb-16">
             <span className="inline-block text-xs font-bold uppercase tracking-[0.15em] mb-4 px-3 py-1 rounded-full"
-              style={{ color: '#00E5A0', background: 'rgba(0,229,160,0.08)', border: '1px solid rgba(0,229,160,0.15)' }}>
+              style={{ color: '#2563EB', background: 'rgba(37, 99, 235,0.08)', border: '1px solid rgba(37, 99, 235,0.15)' }}>
               Get Started
             </span>
             <h2 className="eh-heading text-3xl sm:text-4xl font-bold mb-4">
               Up and running in <span className="eh-gradient">3 steps</span>
             </h2>
-            <p style={{ color: '#9A958E' }} className="max-w-lg mx-auto">
+            <p style={{ color: '#6B7280' }} className="max-w-lg mx-auto">
               From sign-up to live screens in under 5 minutes. No technician required.
             </p>
           </div>
@@ -34,7 +34,7 @@ export default function HowItWorksSection() {
             <div
               className="h-full"
               style={{
-                background: 'linear-gradient(90deg, #00E5A0, #00B4D8, #8B5CF6)',
+                background: 'linear-gradient(90deg, #2563EB, #1E3A8A, #8B5CF6)',
                 opacity: 0.25,
               }}
             />
@@ -59,7 +59,7 @@ export default function HowItWorksSection() {
                   {step.num}
                 </span>
                 <h3 className="eh-heading text-lg font-semibold mb-2">{step.title}</h3>
-                <p className="text-sm leading-relaxed" style={{ color: '#9A958E' }}>{step.desc}</p>
+                <p className="text-sm leading-relaxed" style={{ color: '#6B7280' }}>{step.desc}</p>
               </div>
             </Reveal>
           ))}

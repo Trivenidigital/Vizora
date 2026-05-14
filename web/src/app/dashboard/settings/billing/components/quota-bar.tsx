@@ -12,7 +12,7 @@ export function QuotaBar({ used, total, label }: QuotaBarProps) {
   const percentage = safeTotal > 0 ? Math.min((safeUsed / safeTotal) * 100, 100) : 0;
 
   // Determine color based on usage
-  let barColor = 'bg-[#00E5A0]';
+  let barColor = 'bg-[#2563EB]';
   if (percentage >= 90) {
     barColor = 'bg-red-500';
   } else if (percentage >= 75) {

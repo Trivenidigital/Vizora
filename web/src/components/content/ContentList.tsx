@@ -69,7 +69,7 @@ export function ContentList({
                 type="checkbox"
                 checked={selectedItems.size === content.length && content.length > 0}
                 onChange={onToggleSelectAll}
-                className="rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]"
+                className="rounded border-[var(--border)] text-[#2563EB] focus:ring-[#2563EB]"
               />
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-[var(--foreground-tertiary)] uppercase">
@@ -97,7 +97,7 @@ export function ContentList({
                   type="checkbox"
                   checked={selectedItems.has(item.id)}
                   onChange={() => onToggleSelect(item.id)}
-                  className="rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]"
+                  className="rounded border-[var(--border)] text-[#2563EB] focus:ring-[#2563EB]"
                   onClick={(e) => e.stopPropagation()}
                 />
               </td>
@@ -106,7 +106,7 @@ export function ContentList({
                   className="flex items-center gap-3 cursor-pointer"
                   onClick={() => onPreview(item)}
                 >
-                  <div className="w-12 h-12 bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] rounded flex items-center justify-center flex-shrink-0 overflow-hidden">
+                  <div className="w-12 h-12 bg-gradient-to-br from-[#2563EB] to-[#1E3A8A] rounded flex items-center justify-center flex-shrink-0 overflow-hidden">
                     {item.thumbnailUrl ? (
                       <img
                         src={item.thumbnailUrl}
@@ -171,7 +171,7 @@ export function ContentList({
                   </button>
                   <button
                     onClick={() => onEdit(item)}
-                    className="text-[#00E5A0] hover:text-[#00CC8E] hover:bg-[#00E5A0]/5 px-2 py-1 rounded transition"
+                    className="text-[#2563EB] hover:text-[#1D4ED8] hover:bg-[#2563EB]/5 px-2 py-1 rounded transition"
                     title="Edit"
                   >
                     <Icon name="edit" size="md" />

@@ -108,7 +108,7 @@ export default function TemplateEditor({
           onClick={() => setActiveTab('html')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'html'
-              ? 'border-[#00E5A0] text-[#00E5A0]'
+              ? 'border-[#2563EB] text-[#2563EB]'
               : 'border-transparent text-[var(--foreground-secondary)] hover:text-[var(--foreground)]'
           }`}
         >
@@ -119,7 +119,7 @@ export default function TemplateEditor({
           onClick={() => setActiveTab('data')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'data'
-              ? 'border-[#00E5A0] text-[#00E5A0]'
+              ? 'border-[#2563EB] text-[#2563EB]'
               : 'border-transparent text-[var(--foreground-secondary)] hover:text-[var(--foreground)]'
           }`}
         >
@@ -145,7 +145,7 @@ export default function TemplateEditor({
         <textarea
           value={dataText}
           onChange={(e) => handleDataChange(e.target.value)}
-          className="w-full h-[400px] p-4 font-mono text-sm rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] resize-none focus:outline-none focus:ring-2 focus:ring-[#00E5A0]/50 focus:border-[#00E5A0]"
+          className="w-full h-[400px] p-4 font-mono text-sm rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] resize-none focus:outline-none focus:ring-2 focus:ring-[#2563EB]/50 focus:border-[#2563EB]"
           spellCheck={false}
           placeholder='{ "key": "value" }'
         />
@@ -162,7 +162,7 @@ export default function TemplateEditor({
         type="button"
         onClick={onPreviewRequest}
         disabled={previewLoading}
-        className="flex items-center gap-2 px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+        className="flex items-center gap-2 px-4 py-2 bg-[#2563EB] text-white rounded-lg hover:bg-[#1D4ED8] transition font-medium disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {previewLoading ? (
           <LoadingSpinner size="sm" />

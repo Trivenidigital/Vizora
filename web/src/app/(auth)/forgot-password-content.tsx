@@ -94,14 +94,14 @@ export default function ForgotPasswordContent() {
         {/* Mobile-only compact trust banner */}
         <div className="md:hidden mb-8">
           <div className="flex items-center gap-2.5 mb-4">
-            <div className="w-7 h-7 rounded-lg bg-[#00E5A0]/10 border border-[#00E5A0]/20 flex items-center justify-center">
-              <span className="text-[#00E5A0] font-bold text-xs font-mono">V</span>
+            <div className="w-7 h-7 rounded-lg bg-[#2563EB]/10 border border-[#2563EB]/20 flex items-center justify-center">
+              <span className="text-[#2563EB] font-bold text-xs font-mono">V</span>
             </div>
             <span className="text-[var(--foreground)] font-semibold text-sm">Vizora</span>
           </div>
           <p className="text-[var(--foreground-tertiary)] text-sm">
             Secure account recovery.{' '}
-            <span className="text-[#00E5A0] font-medium">We&apos;ll help you get back in.</span>
+            <span className="text-[#2563EB] font-medium">We&apos;ll help you get back in.</span>
           </p>
         </div>
 

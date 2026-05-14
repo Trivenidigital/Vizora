@@ -25,7 +25,7 @@ export default function CheckoutCancelPage() {
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Link
             href="/dashboard/settings/billing/plans"
-            className="px-6 py-2.5 bg-[#00E5A0] text-[#061A21] font-semibold rounded-lg hover:bg-[#00CC8E] transition-colors"
+            className="px-6 py-2.5 bg-[#2563EB] text-white font-semibold rounded-lg hover:bg-[#1D4ED8] transition-colors"
           >
             Try Again
           </Link>

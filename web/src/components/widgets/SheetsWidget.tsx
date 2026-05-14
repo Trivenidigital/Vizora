@@ -109,8 +109,8 @@ export default function SheetsWidget({
     : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)';
   const textColor   = isDark ? '#ffffff' : '#1e293b';
   const mutedColor  = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(30,41,59,0.55)';
-  const headerBg    = isDark ? 'rgba(0,229,160,0.18)' : 'rgba(0,229,160,0.12)';
-  const headerColor = isDark ? '#00E5A0' : '#047857';
+  const headerBg    = isDark ? 'rgba(37, 99, 235,0.18)' : 'rgba(37, 99, 235,0.12)';
+  const headerColor = isDark ? '#2563EB' : '#047857';
   const rowEvenBg   = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)';
   const rowOddBg    = 'transparent';
   const borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';

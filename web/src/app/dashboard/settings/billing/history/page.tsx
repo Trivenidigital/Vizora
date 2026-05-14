@@ -148,7 +148,7 @@ export default function InvoiceHistoryPage() {
  href={invoice.pdfUrl}
  target="_blank"
  rel="noopener noreferrer"
- className="text-[#00E5A0] hover:text-[#00E5A0] dark:text-[#00E5A0] dark:hover:text-[#00CC8E] font-medium inline-flex items-center gap-1"
+ className="text-[#2563EB] hover:text-[#2563EB] dark:text-[#2563EB] dark:hover:text-[#1D4ED8] font-medium inline-flex items-center gap-1"
  >
  <Icon name="download" size="sm" />
  Download
@@ -174,7 +174,7 @@ export default function InvoiceHistoryPage() {
  using the download link. For any billing questions, please contact{' '}
  <a
  href="mailto:billing@vizora.io"
- className="text-[#00E5A0] hover:text-[#00E5A0] dark:text-[#00E5A0] dark:hover:text-[#00CC8E]"
+ className="text-[#2563EB] hover:text-[#2563EB] dark:text-[#2563EB] dark:hover:text-[#1D4ED8]"
  >
  billing@vizora.io
  </a>

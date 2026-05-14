@@ -87,26 +87,26 @@ export default function PairDevicePage() {
  <div className="bg-[var(--surface)] rounded-lg shadow-md p-8">
  <div className="space-y-6">
  {/* Step Instructions */}
- <div className="bg-gradient-to-r from-[#00E5A0]/5 to-[#00B4D8]/5 rounded-lg p-6 border border-[#00E5A0]/30">
+ <div className="bg-gradient-to-r from-[#2563EB]/5 to-[#1E3A8A]/5 rounded-lg p-6 border border-[#2563EB]/30">
  <h3 className="font-semibold text-[var(--foreground)] mb-3 flex items-center gap-2">
- <Icon name="devices" size="lg" className="text-[#00E5A0]" />
+ <Icon name="devices" size="lg" className="text-[#2563EB]" />
  How to Pair Your Device
  </h3>
  <ol className="space-y-2 text-sm text-[var(--foreground-secondary)]">
  <li className="flex items-start gap-2">
- <span className="font-bold text-[#00E5A0] min-w-[24px]">1.</span>
+ <span className="font-bold text-[#2563EB] min-w-[24px]">1.</span>
  <span>Open the Vizora Display App on your device</span>
  </li>
  <li className="flex items-start gap-2">
- <span className="font-bold text-[#00E5A0] min-w-[24px]">2.</span>
+ <span className="font-bold text-[#2563EB] min-w-[24px]">2.</span>
  <span>A 6-character pairing code will be displayed on the screen</span>
  </li>
  <li className="flex items-start gap-2">
- <span className="font-bold text-[#00E5A0] min-w-[24px]">3.</span>
+ <span className="font-bold text-[#2563EB] min-w-[24px]">3.</span>
  <span>Enter that code below along with a name for your device</span>
  </li>
  <li className="flex items-start gap-2">
- <span className="font-bold text-[#00E5A0] min-w-[24px]">4.</span>
+ <span className="font-bold text-[#2563EB] min-w-[24px]">4.</span>
  <span>Click "Pair Device" to complete the pairing</span>
  </li>
  </ol>
@@ -122,7 +122,7 @@ export default function PairDevicePage() {
  type="text"
  value={form.pairingCode}
  onChange={handleCodeChange}
- className="w-full px-4 py-4 text-center text-3xl font-bold tracking-widest border-2 border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent uppercase"
+ className="w-full px-4 py-4 text-center text-3xl font-bold tracking-widest border-2 border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent uppercase"
  placeholder="ABC123"
  maxLength={6}
  autoFocus
@@ -162,7 +162,7 @@ export default function PairDevicePage() {
  type="text"
  value={form.deviceName}
  onChange={(e) => setForm({ ...form, deviceName: e.target.value })}
- className="w-full px-4 py-3 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="w-full px-4 py-3 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
  placeholder="e.g., Lobby Display, Store Front Screen"
  />
  <p className="mt-2 text-xs text-[var(--foreground-tertiary)]">
@@ -179,7 +179,7 @@ export default function PairDevicePage() {
  type="text"
  value={form.location}
  onChange={(e) => setForm({ ...form, location: e.target.value })}
- className="w-full px-4 py-3 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="w-full px-4 py-3 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
  placeholder="e.g., Main Entrance, Floor 2"
  />
  <p className="mt-2 text-xs text-[var(--foreground-tertiary)]">
@@ -198,7 +198,7 @@ export default function PairDevicePage() {
  </button>
  <button
  onClick={handlePairing}
- className="flex-1 px-6 py-3 text-sm font-medium text-white bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center justify-center gap-2"
+ className="flex-1 px-6 py-3 text-sm font-medium text-white bg-[#2563EB] text-white rounded-lg hover:bg-[#1D4ED8] transition disabled:opacity-50 flex items-center justify-center gap-2"
  disabled={loading || !form.pairingCode || form.pairingCode.length !== 6 || !form.deviceName.trim()}
  >
  {loading ? (

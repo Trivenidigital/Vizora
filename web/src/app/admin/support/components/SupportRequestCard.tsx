@@ -76,7 +76,7 @@ export function SupportRequestCard({ request, onSelect }: SupportRequestCardProp
   return (
     <div
       onClick={() => onSelect(request)}
-      className="bg-[#111827] rounded-lg p-4 border border-[var(--border)] hover:border-[#00E5A0]/30 cursor-pointer transition-colors"
+      className="bg-[#111827] rounded-lg p-4 border border-[var(--border)] hover:border-[#2563EB]/30 cursor-pointer transition-colors"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
