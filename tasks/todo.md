@@ -174,3 +174,11 @@ Reposition the public Vizora homepage from the current dark, AI-forward "Electri
 - Visual verification captured: `homepage-redesign-desktop-review.png` and `homepage-redesign-mobile-review.png`.
 - Full `pnpm --filter @vizora/web build` is blocked before homepage compilation by existing Google font TLS fetch failures and Tailwind config module resolution for `./src/theme/colors` / `./src/theme/tokens`.
 - `pnpm --filter @vizora/web exec tsc --noEmit` is blocked by an existing generated `.next/dev/types/routes.d.ts` syntax error.
+
+### Deployment Review (2026-05-14)
+
+- Pushed `feat/vizora-frontend-redesign` and cherry-picked homepage commit `12420cb` onto the VPS deployment worktree as `10d0a65`, preserving unrelated local VPS edits.
+- Built `@vizora/web` on the VPS with `NEXT_TURBOPACK_EXPERIMENTAL_USE_SYSTEM_TLS_CERTS=1 pnpm --filter @vizora/web build`.
+- Restarted and saved PM2 process `vizora-web`.
+- Verified `https://vizora.cloud/` returns the new H1, pricing headline, metadata title, and no old AI/command-center homepage copy.
+- Captured deployed desktop/mobile screenshots: `deployed-homepage-desktop-full.png` and `deployed-homepage-mobile-full.png`.
