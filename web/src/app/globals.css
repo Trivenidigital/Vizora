@@ -752,3 +752,124 @@ body {
   background: linear-gradient(90deg, var(--primary), var(--info));
   transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+/* Vizora homepage refresh utilities. Scoped to the public landing page only. */
+.vh-home {
+  font-family: var(--font-dm), Inter, system-ui, sans-serif;
+}
+
+.vh-home h1,
+.vh-home h2,
+.vh-home h3 {
+  letter-spacing: 0;
+}
+
+.vh-primary-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 12px;
+  background: #2563EB;
+  color: #FFFFFF;
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.2;
+  transition: background 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.16);
+}
+
+.vh-primary-button:hover {
+  background: #1D4ED8;
+  transform: translateY(-1px);
+}
+
+.vh-primary-button:active {
+  transform: translateY(0);
+}
+
+.vh-secondary-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 12px;
+  border: 1px solid #D1D5DB;
+  background: #FFFFFF;
+  color: #111827;
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.2;
+  transition: border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+}
+
+.vh-secondary-button:hover {
+  border-color: #9CA3AF;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+  transform: translateY(-1px);
+}
+
+.vh-card {
+  border: 1px solid #E5E7EB;
+  border-radius: 20px;
+  background: #FFFFFF;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+  transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+.vh-card:hover {
+  border-color: #D1D5DB;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+  transform: translateY(-2px);
+}
+
+.vh-dashboard-shell {
+  overflow: hidden;
+  min-width: 0;
+  border: 1px solid #D1D5DB;
+  border-radius: 20px;
+  background: #FFFFFF;
+  box-shadow: 0 24px 60px rgba(17, 24, 39, 0.12);
+}
+
+.vh-deployment-photo {
+  min-height: 230px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(247, 248, 250, 0.95)),
+    linear-gradient(135deg, #EEF2FF 0%, #F8FAFC 45%, #E0F2FE 100%);
+}
+
+.vh-display-frame {
+  width: min(100%, 260px);
+  aspect-ratio: 16 / 10;
+  border: 10px solid #111827;
+  border-radius: 14px;
+  background: #111827;
+  box-shadow: 0 18px 36px rgba(17, 24, 39, 0.24);
+}
+
+.vh-display-frame img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vh-primary-button,
+  .vh-secondary-button,
+  .vh-card {
+    transition: none;
+  }
+
+  .vh-primary-button:hover,
+  .vh-secondary-button:hover,
+  .vh-card:hover {
+    transform: none;
+  }
+}

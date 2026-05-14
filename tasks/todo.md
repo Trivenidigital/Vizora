@@ -129,3 +129,48 @@
 ## Next Up (Not Started)
 
 _No active tasks. Pick from deferred items above or start a new feature/sprint._
+
+---
+
+## Active Task: Vizora Frontend Redesign (2026-05-13)
+
+### Goal
+
+Reposition the public Vizora homepage from the current dark, AI-forward "Electric Horizon" treatment to **Operational Simplicity with Premium Confidence**: light, trustworthy, SMB-friendly, product-first, and free of AI/cyber/NOC visual language.
+
+### Design Checklist
+
+- [x] Review current repo state, lessons, and landing page structure.
+- [x] Identify current design drift: neon dark palette, AI-heavy sections, glow/orb effects, enterprise command-center language.
+- [x] Confirm scope before implementation: homepage-only first, landing-specific utilities if needed, and metadata only if directly supporting new positioning.
+- [x] Replace homepage narrative with the provided wireframe: navigation, hero, trust cards, three pillars, deployments, scheduling simplicity, simple pricing, final CTA.
+- [x] Create believable operational product visuals using real-feeling locations, playlists, device status, schedules, and content library data.
+- [x] Remove AI-forward sections/copy from the public homepage flow.
+- [x] Update marketing palette toward #F7F8FA, #FFFFFF, #111827, #4B5563, #2563EB, #E5E7EB.
+- [x] Keep motion subtle: reveal, small hover elevation, no glow/orb/particle effects.
+- [x] Verify with focused web test and desktop/mobile browser screenshots. Full build is blocked by existing web build/Turbopack configuration issues noted below.
+
+### Proposed Implementation Plan
+
+1. Collapse the landing route to a simpler homepage composition in `web/src/app/page.tsx`.
+2. Rewrite or replace the landing section components under `web/src/components/landing/` to match the eight-section brief.
+3. Update global landing utilities in `web/src/app/globals.css` only where needed, avoiding broad dashboard token churn.
+4. Update homepage metadata in `web/src/app/layout.tsx` away from AI-driven positioning.
+5. Run focused verification: lint/type/build as available, then browser screenshot checks for layout, text fit, and visual tone.
+
+### Review Notes
+
+- Current homepage imports `AIFeaturesSection`, `StatsSection`, `SecuritySection`, `FAQSection`, and other sections not present in the new wireframe. These are candidates for removal from the homepage flow, not necessarily deletion from the repo.
+- Current visual system uses `eh-*` utilities with neon greens, deep teal backgrounds, glow animations, and negative letter spacing. The redesign should either replace these for landing usage or introduce new landing utilities while leaving dashboard styling stable.
+- The brief is specific enough to proceed once scope is confirmed; no Hermes/runtime/prod-state checks apply because this is a reversible public frontend redesign with no data or external-service side effects.
+
+### Implementation Review (2026-05-13)
+
+- Added isolated `web/src/components/landing/OperationalHomepage.tsx` and pointed `/` at it from `web/src/app/page.tsx`.
+- Added landing-only `vh-*` utilities to `web/src/app/globals.css`; dashboard tokens and existing shared app surfaces were not changed.
+- Updated direct homepage positioning metadata in `web/src/app/layout.tsx`.
+- Added `web/src/app/__tests__/homepage.test.tsx` to lock the new SMB positioning and prevent old AI/command-center copy from returning.
+- Verification passed: `pnpm --filter @vizora/web test -- --runTestsByPath src/app/__tests__/homepage.test.tsx`.
+- Visual verification captured: `homepage-redesign-desktop-review.png` and `homepage-redesign-mobile-review.png`.
+- Full `pnpm --filter @vizora/web build` is blocked before homepage compilation by existing Google font TLS fetch failures and Tailwind config module resolution for `./src/theme/colors` / `./src/theme/tokens`.
+- `pnpm --filter @vizora/web exec tsc --noEmit` is blocked by an existing generated `.next/dev/types/routes.d.ts` syntax error.

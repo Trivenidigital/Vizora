@@ -14,10 +14,10 @@ const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mon
 
 export const metadata = {
   title: {
-    default: 'Vizora — AI-Powered Digital Signage Platform',
+    default: 'Vizora - Digital signage your team can actually run',
     template: '%s | Vizora',
   },
-  description: 'AI-driven digital signage that runs itself. Generate content, optimize schedules, predict device issues, and manage thousands of screens autonomously.',
+  description: 'Simple, professional digital signage software for restaurants, retail stores, and growing multi-location businesses.',
   icons: {
     icon: '/favicon.ico',
   },
@@ -27,7 +27,7 @@ export const metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#00E5A0',
+  themeColor: '#2563EB',
 };
 
 export default function RootLayout({
