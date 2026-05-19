@@ -123,6 +123,15 @@ ssh root@vizora.cloud 'cd /opt/vizora/app/packages/database && npx prisma migrat
 cat .ssh_pmstat.txt
 # Expect: "Database schema is up to date!"
 
+# Check 2b (O7 — alert rules seed) — REQUIRED after migration 20260519050346_add_alert_rules
+# is applied for the FIRST time on prod. Without this step, existing orgs lose their
+# device-offline alerts (the rule-driven evaluator has nothing to evaluate).
+# Idempotent — safe to re-run; rows with the auto-migrated name are skipped.
+ssh root@vizora.cloud 'cd /opt/vizora/app && export $(grep DATABASE_URL .env | xargs) && npx tsx packages/database/scripts/seed-default-alert-rules.ts' > .ssh_seed.txt 2>&1
+cat .ssh_seed.txt
+# Expect: "[seed] Done. created=N skipped_existing=0 orgs_with_no_admins=M"
+# If `created=0 skipped_existing=N` on second run, the seed already landed — that's correct.
+
 # Check 3: OpenRouter balance + daily cap
 # Open https://openrouter.ai/settings/keys in browser
 # Verify per-day spend cap = $2.00 (or higher if customer #1 traffic profile demands)

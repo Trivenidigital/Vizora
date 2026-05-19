@@ -42,9 +42,11 @@ describe('MailService.sendDeviceOfflineAlertEmail', () => {
     const [to, subject, html, label, sender] = sendMailSpy.mock.calls[0];
 
     expect(to).toBe('ops@example.com');
-    expect(subject).toBe('Device offline: <bad>name</bad>');                  // subject is plain text — Nodemailer handles encoding
-    expect(html).toContain('&lt;bad&gt;name&lt;/bad&gt;');                    // body MUST be HTML-escaped
-    expect(html).not.toContain('<bad>name</bad>');                            // unescaped form MUST NOT appear in HTML
+    // PR-review fix: subject MUST also be escaped — some clients render HTML
+    // entities in subjects, and logging tools can choke on < or " in subjects.
+    expect(subject).toBe('Device offline: &lt;bad&gt;name&lt;/bad&gt;');
+    expect(html).toContain('&lt;bad&gt;name&lt;/bad&gt;');                    // body must be HTML-escaped too
+    expect(html).not.toContain('<bad>name</bad>');                            // unescaped form MUST NOT appear
     expect(label).toBe('Device offline alert');
     expect(sender).toBe('noreply');
   });

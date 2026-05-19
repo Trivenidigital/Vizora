@@ -235,12 +235,4 @@ export class AlertRuleEvaluator {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Test-only exposed methods (no underscore convention — these are also useful
-  // for the evaluator spec to exercise scope matching in isolation)
-  // ---------------------------------------------------------------------------
-  /** @internal — exposed for unit tests */
-  _scopeMatchesForTest(rule: any, device: any): boolean {
-    return this.scopeMatches(rule, device);
-  }
 }

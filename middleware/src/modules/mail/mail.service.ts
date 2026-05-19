@@ -351,8 +351,11 @@ export class MailService {
    * deviceName is user-controlled and is escaped before interpolation.
    */
   async sendDeviceOfflineAlertEmail(to: string, deviceName: string): Promise<void> {
-    const subject = `Device offline: ${deviceName}`;
     const safeName = MailService.escapeHtml(deviceName);
+    // Subject MUST also be escaped — some email clients render HTML entities
+    // in subjects, and a deviceName containing < or " can break logging /
+    // monitoring tools that consume the subject line. PR review found this.
+    const subject = `Device offline: ${safeName}`;
     const html = this.wrapInTemplate(`
           <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">Device offline</h1>
           <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
