@@ -32,6 +32,7 @@ import { SupportModule } from '../modules/support/support.module';
 import { FleetModule } from '../modules/fleet/fleet.module';
 import { AgentsModule } from '../modules/agents/agents.module';
 import { McpModule } from '../modules/mcp/mcp.module';
+import { WebhooksModule } from '../modules/webhooks/webhooks.module';
 
 @Module({
   imports: [
@@ -119,6 +120,7 @@ import { McpModule } from '../modules/mcp/mcp.module';
     FleetModule,
     AgentsModule,
     McpModule,
+    WebhooksModule,
   ],
   controllers: [AppController],
   providers: [
