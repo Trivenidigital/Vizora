@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { DatabaseService } from '../database/database.service';
+import { assertUrlIsPublic, SsrfError } from '../common/utils/ssrf-guard';
 import { CreateWebhookDto } from './dto/create-webhook.dto';
 import { UpdateWebhookDto } from './dto/update-webhook.dto';
 import {
@@ -19,34 +20,39 @@ import {
 /**
  * O5 — Webhook CRUD + delivery.
  *
- * Cross-org guards on every read/write. SSRF guard rejects loopback /
- * RFC1918 / link-local / IPv6 loopback/ULA/link-local (same pattern as
- * O8's GenericApiDataSource). HMAC-SHA256 signing with the customer's
- * secret, sent in the X-Vizora-Signature header.
+ * Cross-org guards on every read/write. SSRF guard resolves DNS and
+ * rejects loopback / RFC1918 / link-local / IPv6 loopback/ULA/link-local
+ * — runs at create/update AND at delivery time so a DNS-rebind that
+ * flips after config-validation is also caught. HMAC-SHA256 signing
+ * with the customer's secret, sent in the X-Vizora-Signature header.
  *
  * Auto-disable on AUTO_DISABLE_THRESHOLD consecutive failures — defends
  * customers from a misbehaving endpoint accumulating noise indefinitely.
+ *
+ * The webhook secret is NEVER returned from any controller-facing
+ * method. Customers keep their own copy of the secret they submitted;
+ * the server only stores it for signing outbound deliveries.
  */
 @Injectable()
 export class WebhooksService {
   private readonly logger = new Logger(WebhooksService.name);
 
-  // Same SSRF block list as GenericApiDataSource (O8).
-  private readonly BLOCKED_HOSTS: RegExp[] = [
-    /^localhost$/i,
-    /^127\./,
-    /^10\./,
-    /^172\.(1[6-9]|2\d|3[01])\./,
-    /^192\.168\./,
-    /^0\./,
-    /^169\.254\./,
-    /^::1$/,
-    /^::$/,
-    /^::ffff:/i,
-    /^2002:/i,
-    /^fc00:/i,
-    /^fe80:/i,
-  ];
+  // Single select shape — secret is intentionally omitted everywhere
+  // except findActiveSubscribers (internal use, never returned to a
+  // controller).
+  private readonly RESPONSE_SELECT = {
+    id: true,
+    organizationId: true,
+    name: true,
+    url: true,
+    events: true,
+    isActive: true,
+    lastDeliveryAt: true,
+    lastError: true,
+    failureCount: true,
+    createdAt: true,
+    updatedAt: true,
+  } as const;
 
   constructor(private readonly db: DatabaseService) {}
 
@@ -55,8 +61,12 @@ export class WebhooksService {
   // ---------------------------------------------------------------------------
 
   async create(organizationId: string, dto: CreateWebhookDto) {
-    this.assertUrlSafe(dto.url);
+    await this.assertUrlSafe(dto.url);
 
+    // PR-review fix (post-merge): use the same secret-less select shape
+    // as findAll/findOne/update. Response bodies get logged, cached,
+    // and recorded in more places than request bodies; the customer
+    // already has their own copy of the secret they submitted.
     return this.db.webhook.create({
       data: {
         organizationId,
@@ -66,27 +76,14 @@ export class WebhooksService {
         events: dto.events,
         isActive: dto.isActive ?? true,
       },
+      select: this.RESPONSE_SELECT,
     });
   }
 
   async findAll(organizationId: string) {
-    // Don't return the secret in the list response. Customers should keep
-    // their copy from the create response; we never need to expose it again.
     return this.db.webhook.findMany({
       where: { organizationId },
-      select: {
-        id: true,
-        organizationId: true,
-        name: true,
-        url: true,
-        events: true,
-        isActive: true,
-        lastDeliveryAt: true,
-        lastError: true,
-        failureCount: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      select: this.RESPONSE_SELECT,
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -94,19 +91,7 @@ export class WebhooksService {
   async findOne(organizationId: string, id: string) {
     const hook = await this.db.webhook.findFirst({
       where: { id, organizationId },
-      select: {
-        id: true,
-        organizationId: true,
-        name: true,
-        url: true,
-        events: true,
-        isActive: true,
-        lastDeliveryAt: true,
-        lastError: true,
-        failureCount: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      select: this.RESPONSE_SELECT,
     });
     if (!hook) {
       throw new NotFoundException(`Webhook ${id} not found`);
@@ -116,7 +101,7 @@ export class WebhooksService {
 
   async update(organizationId: string, id: string, dto: UpdateWebhookDto) {
     await this.findOne(organizationId, id);
-    if (dto.url !== undefined) this.assertUrlSafe(dto.url);
+    if (dto.url !== undefined) await this.assertUrlSafe(dto.url);
 
     return this.db.webhook.update({
       where: { id },
@@ -127,19 +112,7 @@ export class WebhooksService {
         ...(dto.events !== undefined ? { events: dto.events } : {}),
         ...(dto.isActive !== undefined ? { isActive: dto.isActive, failureCount: 0 } : {}),
       },
-      select: {
-        id: true,
-        organizationId: true,
-        name: true,
-        url: true,
-        events: true,
-        isActive: true,
-        lastDeliveryAt: true,
-        lastError: true,
-        failureCount: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      select: this.RESPONSE_SELECT,
     });
   }
 
@@ -185,10 +158,24 @@ export class WebhooksService {
     const body = JSON.stringify({ event, payload, deliveredAt: new Date().toISOString() });
     const signature = this.signBody(body, webhook.secret);
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), DELIVERY_TIMEOUT_MS);
     let ok = false;
     let errMsg: string | null = null;
+
+    // PR-review fix (post-merge): re-run the SSRF guard at delivery
+    // time. The URL was validated at create/update, but DNS can flip
+    // between then and now (DNS-rebind, infrastructure migration, etc.)
+    // — re-resolving makes a flip caught here rather than connecting to
+    // an internal address.
+    try {
+      await this.assertUrlSafe(webhook.url);
+    } catch (err) {
+      errMsg = err instanceof Error ? err.message : 'unknown';
+      await this.recordFailure(webhook.id, errMsg);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), DELIVERY_TIMEOUT_MS);
 
     try {
       const res = await fetch(webhook.url, {
@@ -202,7 +189,8 @@ export class WebhooksService {
         body,
         signal: controller.signal,
         // No redirect-following: webhook URLs are explicit customer endpoints,
-        // not redirector chains. Treat a 3xx as a misconfiguration.
+        // not redirector chains. Treat a 3xx as a misconfiguration — a
+        // redirect chain would also bypass the SSRF guard above.
         redirect: 'manual',
       });
       if (res.ok) {
@@ -228,9 +216,16 @@ export class WebhooksService {
       return;
     }
 
-    // Failed: increment counter and possibly auto-disable.
+    await this.recordFailure(webhook.id, errMsg);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Internal helpers
+  // ---------------------------------------------------------------------------
+
+  private async recordFailure(webhookId: string, errMsg: string | null): Promise<void> {
     const updated = await this.db.webhook.update({
-      where: { id: webhook.id },
+      where: { id: webhookId },
       data: {
         lastDeliveryAt: new Date(),
         lastError: errMsg,
@@ -241,37 +236,32 @@ export class WebhooksService {
 
     if (updated.failureCount >= AUTO_DISABLE_THRESHOLD) {
       await this.db.webhook.update({
-        where: { id: webhook.id },
+        where: { id: webhookId },
         data: { isActive: false },
       });
       this.logger.warn(
-        `Webhook ${webhook.id} auto-disabled after ${updated.failureCount} consecutive failures (last error: ${errMsg})`,
+        `Webhook ${webhookId} auto-disabled after ${updated.failureCount} consecutive failures (last error: ${errMsg})`,
       );
     }
   }
-
-  // ---------------------------------------------------------------------------
-  // Internal helpers
-  // ---------------------------------------------------------------------------
 
   private signBody(body: string, secret: string): string {
     return crypto.createHmac('sha256', secret).update(body).digest('hex');
   }
 
-  private assertUrlSafe(url: string): void {
-    let parsed: URL;
+  /**
+   * Validate URL is safe to dispatch to. HTTPS-only, public-resolution
+   * only. Used at create/update AND at every delivery (see deliver()
+   * for why).
+   */
+  private async assertUrlSafe(url: string): Promise<void> {
     try {
-      parsed = new URL(url);
-    } catch {
-      throw new BadRequestException('webhook url is not a valid absolute URL');
-    }
-    if (parsed.protocol !== 'https:') {
-      throw new BadRequestException('webhook url must use HTTPS');
-    }
-    // Strip IPv6 brackets so the regex patterns match the bare address.
-    const hostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '');
-    if (this.BLOCKED_HOSTS.some((p) => p.test(hostname))) {
-      throw new BadRequestException('webhook url points to a blocked address');
+      await assertUrlIsPublic(url);
+    } catch (err) {
+      if (err instanceof SsrfError) {
+        throw new BadRequestException(`webhook ${err.message}`);
+      }
+      throw err;
     }
   }
 }
