@@ -419,6 +419,10 @@ export class DisplaysService {
     );
 
     const results = await Promise.all(createPromises);
+
+    // O4: notify tag-rule evaluator that this display's tag set changed.
+    this.eventEmitter.emit('display.tags.changed', { organizationId, displayId });
+
     return results.map((dt) => dt.tag);
   }
 
@@ -431,6 +435,9 @@ export class DisplaysService {
         tagId: { in: tagIds },
       },
     });
+
+    // O4: notify tag-rule evaluator that this display's tag set changed.
+    this.eventEmitter.emit('display.tags.changed', { organizationId, displayId });
 
     return { success: true, removed: tagIds.length };
   }

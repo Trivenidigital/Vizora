@@ -8,6 +8,8 @@ import {
   HttpException,
   HttpStatus,
   ServiceUnavailableException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -22,6 +24,7 @@ import { AUTH_CONSTANTS } from './constants/auth.constants';
 import { GeoService } from '../common/services/geo.service';
 import { BillingService } from '../billing/billing.service';
 import { StorageService } from '../storage/storage.service';
+import { AlertRulesService } from '../notifications/alert-rules/alert-rules.service';
 
 // Account lockout constants
 const MAX_LOGIN_ATTEMPTS = 10;
@@ -42,6 +45,8 @@ export class AuthService {
     private billingService: BillingService,
     private storageService: StorageService,
     private events: EventEmitter2,
+    @Inject(forwardRef(() => AlertRulesService))
+    private alertRulesService: AlertRulesService,
   ) {}
 
   async register(dto: RegisterDto, clientIp?: string) {
@@ -126,6 +131,18 @@ export class AuthService {
     });
 
     const { organization, user } = result;
+
+    // Seed the default device-offline alert rule for this new org. Without
+    // this, new orgs created post-O7 have NO default rule and silently lose
+    // device-offline alerts (the old hard-coded handler was removed).
+    // Idempotent + retry-safe: re-runs are no-ops via the (organizationId,
+    // name) unique index. Errors are logged but never propagated — a failed
+    // seed must not block registration.
+    this.alertRulesService.seedDefaultRuleForOrg(organization.id, [user.id]).catch((err) => {
+      this.logger.warn(
+        `Failed to seed default alert rule for new org ${organization.id}: ${err instanceof Error ? err.message : 'unknown'}`,
+      );
+    });
 
     // Generate JWT token
     const token = this.generateToken(user, organization);
