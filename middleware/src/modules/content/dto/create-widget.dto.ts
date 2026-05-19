@@ -17,6 +17,7 @@ export class CreateWidgetDto {
     'social_facebook',
     'clock',
     'countdown',
+    'generic-api', // O8 — declarative HTTP-poll widget
   ])
   widgetType!: string;
 
