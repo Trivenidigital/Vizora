@@ -58,6 +58,7 @@ model Organization {
   contentRecommendations ContentRecommendation[]
   mcpTokens              McpToken[]
   agentRuns              AgentRun[]
+  webhooks               Webhook[]
 
   @@index([slug])
   @@index([stripeCustomerId])
@@ -1001,4 +1002,38 @@ model AgentRun {
   @@index([createdAt])
   @@index([organizationId, startedAt])
   @@map("agent_runs")
+}
+
+// ============================================================================
+// WEBHOOKS (O5 — outbound HTTP delivery of org events)
+// ============================================================================
+
+/// Per-org outbound webhook subscription. The dispatcher (@OnEvent) catches
+/// configured domain events, signs the payload with HMAC-SHA256 using the
+/// webhook's secret, and POSTs to `url`. On consecutive failures the
+/// webhook auto-disables (`failureCount >= AUTO_DISABLE_THRESHOLD`).
+///
+/// Cross-org: organizationId cascade-deletes. No per-delivery audit table
+/// in v1 — `lastDeliveryAt`/`lastError`/`failureCount` on the row cover
+/// the ops-visibility need; if customers ask for full audit, add a
+/// WebhookDelivery table in a follow-up.
+model Webhook {
+  id              String   @id @default(cuid())
+  organizationId  String
+  name            String
+  url             String                                // HTTPS only; SSRF guard at service layer
+  secret          String                                // HMAC secret stored as plaintext at create — see service comment about hashing tradeoff
+  events          String[]                              // event names this hook subscribes to
+  isActive        Boolean  @default(true)
+  lastDeliveryAt  DateTime?
+  lastError       String?
+  failureCount    Int      @default(0)                  // consecutive failures; auto-disable threshold check at service layer
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, name])                      // UI uniqueness
+  @@index([organizationId, isActive])
+  @@map("webhooks")
 }
