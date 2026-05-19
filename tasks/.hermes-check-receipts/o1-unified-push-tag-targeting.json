@@ -1,0 +1,17 @@
+{
+  "topic": "o1-unified-push-tag-targeting",
+  "task_text": "O1 — Unified push-to-screens endpoint that accepts target = display | tag | group and fans out via existing fleet command path. Includes append-to-playlist mode. Lean MVP cut: scheduled-push with auto-revert deferred (overlaps with existing fleet emergency override). UI-side push-from-templates/layouts/widgets deferred (out of scope; backend supports push via /displays/{id}/push-content + new /push endpoint). Depends on O4 tag infrastructure.",
+  "completed_at": "2026-05-19T14:00:00Z",
+  "drift_check_tag": "extends-Hermes",
+  "net_new_step_count": 8,
+  "hermes_step_count": 0,
+  "files_to_read_first": [
+    "middleware/src/modules/displays/displays.controller.ts",
+    "middleware/src/modules/displays/displays.service.ts",
+    "middleware/src/modules/fleet/fleet.service.ts",
+    "middleware/src/modules/fleet/fleet.controller.ts",
+    "middleware/src/modules/displays/dto/bulk-operations.dto.ts",
+    "middleware/src/modules/playlists/playlists.service.ts"
+  ],
+  "verdict": "Lean MVP scope for O1: ONE unified POST /push endpoint that resolves target = {display|tag|group} → list of displayIds → existing fleet command path. Tag resolution uses DisplayTag table (already exists). Append-to-playlist mode delegates to PlaylistsService. All within Vizora middleware; Hermes substrate orthogonal."
+}
