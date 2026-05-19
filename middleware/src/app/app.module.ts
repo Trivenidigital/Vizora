@@ -34,6 +34,7 @@ import { AgentsModule } from '../modules/agents/agents.module';
 import { McpModule } from '../modules/mcp/mcp.module';
 import { WebhooksModule } from '../modules/webhooks/webhooks.module';
 import { TagRulesModule } from '../modules/tag-rules/tag-rules.module';
+import { ProvisioningTemplatesModule } from '../modules/provisioning-templates/provisioning-templates.module';
 
 @Module({
   imports: [
@@ -123,6 +124,7 @@ import { TagRulesModule } from '../modules/tag-rules/tag-rules.module';
     McpModule,
     WebhooksModule,
     TagRulesModule,
+    ProvisioningTemplatesModule,
   ],
   controllers: [AppController],
   providers: [

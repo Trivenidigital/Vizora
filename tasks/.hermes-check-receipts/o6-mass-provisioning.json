@@ -1,0 +1,14 @@
+{
+  "topic": "o6-mass-provisioning",
+  "task_text": "O6 — Mass provisioning (lean MVP cut). ProvisioningTemplate Prisma model + CRUD + apply at pairing time. Customers create one template (default orientation, timezone, default playlist) and reference it when pairing N displays — eliminates per-device config for growing fleets. Bulk pre-pair via CSV deferred to follow-up.",
+  "completed_at": "2026-05-19T14:30:00Z",
+  "drift_check_tag": "extends-Hermes",
+  "net_new_step_count": 6,
+  "hermes_step_count": 0,
+  "files_to_read_first": [
+    "middleware/src/modules/displays/pairing.service.ts",
+    "middleware/src/modules/displays/dto/complete-pairing.dto.ts",
+    "packages/database/prisma/schema.prisma"
+  ],
+  "verdict": "New Prisma model + module + CRUD service/controller, with one wiring point at pairing-complete to apply template defaults. Cross-org/tenant validation at the service layer mirrors O4/O7 pattern."
+}
