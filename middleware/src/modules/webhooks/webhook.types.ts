@@ -32,3 +32,15 @@ export const SIGNATURE_HEADER = 'X-Vizora-Signature';
 
 /** Event-name header so customers can route incoming hooks without parsing the body. */
 export const EVENT_HEADER = 'X-Vizora-Event';
+
+/**
+ * Per-delivery audit status. Closed enum — repo style avoids Prisma
+ * enums, so we enforce the closed set at the DTO + service layer.
+ *
+ * - `success` — endpoint returned 2xx.
+ * - `failure` — HTTP non-2xx OR network error OR timeout.
+ * - `blocked` — SSRF guard rejected at delivery time (DNS rebind or
+ *   stale config). fetch() was never attempted.
+ */
+export const WEBHOOK_DELIVERY_STATUSES = ['success', 'failure', 'blocked'] as const;
+export type WebhookDeliveryStatus = (typeof WEBHOOK_DELIVERY_STATUSES)[number];

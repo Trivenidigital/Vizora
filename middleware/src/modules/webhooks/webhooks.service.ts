@@ -6,8 +6,10 @@ import {
 } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { DatabaseService } from '../database/database.service';
+import { PaginatedResponse } from '../common/dto/pagination.dto';
 import { assertUrlIsPublic, SsrfError } from '../common/utils/ssrf-guard';
 import { CreateWebhookDto } from './dto/create-webhook.dto';
+import { ListDeliveriesDto } from './dto/list-deliveries.dto';
 import { UpdateWebhookDto } from './dto/update-webhook.dto';
 import {
   AUTO_DISABLE_THRESHOLD,
@@ -15,10 +17,11 @@ import {
   EVENT_HEADER,
   SIGNATURE_HEADER,
   WebhookEvent,
+  WebhookDeliveryStatus,
 } from './webhook.types';
 
 /**
- * O5 — Webhook CRUD + delivery.
+ * O5 — Webhook CRUD + delivery + per-delivery audit.
  *
  * Cross-org guards on every read/write. SSRF guard resolves DNS and
  * rejects loopback / RFC1918 / link-local / IPv6 loopback/ULA/link-local
@@ -29,6 +32,12 @@ import {
  * Auto-disable on AUTO_DISABLE_THRESHOLD consecutive failures — defends
  * customers from a misbehaving endpoint accumulating noise indefinitely.
  *
+ * Every deliver() attempt records a WebhookDelivery audit row (status
+ * one of success / failure / blocked). The summary fields on the
+ * Webhook row (`lastDeliveryAt` / `lastError` / `failureCount`) are
+ * kept for fast row-level reads in CRUD responses; the audit table is
+ * the source of truth for delivery history.
+ *
  * The webhook secret is NEVER returned from any controller-facing
  * method. Customers keep their own copy of the secret they submitted;
  * the server only stores it for signing outbound deliveries.
@@ -36,6 +45,10 @@ import {
 @Injectable()
 export class WebhooksService {
   private readonly logger = new Logger(WebhooksService.name);
+
+  // Cap on errorMessage column width — audit rows hold short error
+  // text only, never full upstream response bodies.
+  private static readonly MAX_ERROR_MSG_LENGTH = 500;
 
   // Single select shape — secret is intentionally omitted everywhere
   // except findActiveSubscribers (internal use, never returned to a
@@ -122,6 +135,41 @@ export class WebhooksService {
   }
 
   // ---------------------------------------------------------------------------
+  // Delivery audit listing
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Paginated audit log for one webhook. Cross-org guarded via findOne
+   * — NotFound for foreign-org webhook id, identical to the other
+   * per-webhook endpoints. Newest-first; optional status filter.
+   */
+  async findDeliveries(
+    organizationId: string,
+    webhookId: string,
+    query: ListDeliveriesDto,
+  ) {
+    await this.findOne(organizationId, webhookId); // cross-org guard
+
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+
+    const where: { webhookId: string; status?: string } = { webhookId };
+    if (query.status) where.status = query.status;
+
+    const [rows, total] = await Promise.all([
+      this.db.webhookDelivery.findMany({
+        where,
+        orderBy: { attemptedAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.db.webhookDelivery.count({ where }),
+    ]);
+
+    return new PaginatedResponse(rows, total, page, limit);
+  }
+
+  // ---------------------------------------------------------------------------
   // Delivery (called from the @OnEvent dispatcher)
   // ---------------------------------------------------------------------------
 
@@ -149,33 +197,38 @@ export class WebhooksService {
    * On failure: lastError set, failureCount incremented. When failureCount
    * crosses AUTO_DISABLE_THRESHOLD, isActive flips to false until an
    * operator manually re-enables (which resets the counter).
+   *
+   * Every attempt — success, HTTP failure, network error, SSRF-blocked
+   * — records a WebhookDelivery audit row.
    */
   async deliver(
-    webhook: { id: string; url: string; secret: string },
+    webhook: { id: string; organizationId: string; url: string; secret: string },
     event: WebhookEvent,
     payload: Record<string, unknown>,
   ): Promise<void> {
+    const startedAt = Date.now();
     const body = JSON.stringify({ event, payload, deliveredAt: new Date().toISOString() });
     const signature = this.signBody(body, webhook.secret);
-
-    let ok = false;
-    let errMsg: string | null = null;
 
     // PR-review fix (post-merge): re-run the SSRF guard at delivery
     // time. The URL was validated at create/update, but DNS can flip
     // between then and now (DNS-rebind, infrastructure migration, etc.)
     // — re-resolving makes a flip caught here rather than connecting to
-    // an internal address.
+    // an internal address. The audit row gets status='blocked' so the
+    // customer can see that the dispatch never went out.
     try {
       await this.assertUrlSafe(webhook.url);
     } catch (err) {
-      errMsg = err instanceof Error ? err.message : 'unknown';
-      await this.recordFailure(webhook.id, errMsg);
+      const errMsg = this.truncateError(err instanceof Error ? err.message : 'unknown');
+      await this.recordAttempt(webhook, event, 'blocked', null, errMsg, Date.now() - startedAt);
       return;
     }
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), DELIVERY_TIMEOUT_MS);
+    let status: WebhookDeliveryStatus = 'failure';
+    let statusCode: number | null = null;
+    let errMsg: string | null = null;
 
     try {
       const res = await fetch(webhook.url, {
@@ -193,18 +246,62 @@ export class WebhooksService {
         // redirect chain would also bypass the SSRF guard above.
         redirect: 'manual',
       });
+      statusCode = res.status;
       if (res.ok) {
-        ok = true;
+        status = 'success';
       } else {
         errMsg = `HTTP ${res.status}`;
       }
     } catch (err) {
-      errMsg = err instanceof Error ? err.message : 'unknown';
+      errMsg = this.truncateError(err instanceof Error ? err.message : 'unknown');
     } finally {
       clearTimeout(timeoutId);
     }
 
-    if (ok) {
+    await this.recordAttempt(webhook, event, status, statusCode, errMsg, Date.now() - startedAt);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Internal helpers
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Records an audit row + updates the summary fields on the Webhook
+   * row + auto-disables if the failure counter trips. Single write-path
+   * for all four delivery outcomes (success / failure / blocked).
+   */
+  private async recordAttempt(
+    webhook: { id: string; organizationId: string },
+    event: WebhookEvent,
+    status: WebhookDeliveryStatus,
+    statusCode: number | null,
+    errorMessage: string | null,
+    durationMs: number,
+  ): Promise<void> {
+    // Audit row first — best-effort. If audit insert fails for any
+    // reason (table missing, schema drift), we still want to update
+    // the summary row so the customer sees lastError move. Log and
+    // continue.
+    try {
+      await this.db.webhookDelivery.create({
+        data: {
+          webhookId: webhook.id,
+          organizationId: webhook.organizationId,
+          event,
+          status,
+          statusCode,
+          errorMessage,
+          durationMs,
+        },
+      });
+    } catch (err) {
+      this.logger.error(
+        `Failed to record WebhookDelivery audit row for ${webhook.id}/${event}`,
+        err instanceof Error ? err.stack : String(err),
+      );
+    }
+
+    if (status === 'success') {
       await this.db.webhook.update({
         where: { id: webhook.id },
         data: {
@@ -216,19 +313,12 @@ export class WebhooksService {
       return;
     }
 
-    await this.recordFailure(webhook.id, errMsg);
-  }
-
-  // ---------------------------------------------------------------------------
-  // Internal helpers
-  // ---------------------------------------------------------------------------
-
-  private async recordFailure(webhookId: string, errMsg: string | null): Promise<void> {
+    // failure or blocked — increment counter, possibly auto-disable
     const updated = await this.db.webhook.update({
-      where: { id: webhookId },
+      where: { id: webhook.id },
       data: {
         lastDeliveryAt: new Date(),
-        lastError: errMsg,
+        lastError: errorMessage,
         failureCount: { increment: 1 },
       },
       select: { failureCount: true },
@@ -236,13 +326,18 @@ export class WebhooksService {
 
     if (updated.failureCount >= AUTO_DISABLE_THRESHOLD) {
       await this.db.webhook.update({
-        where: { id: webhookId },
+        where: { id: webhook.id },
         data: { isActive: false },
       });
       this.logger.warn(
-        `Webhook ${webhookId} auto-disabled after ${updated.failureCount} consecutive failures (last error: ${errMsg})`,
+        `Webhook ${webhook.id} auto-disabled after ${updated.failureCount} consecutive failures (last error: ${errorMessage})`,
       );
     }
+  }
+
+  private truncateError(msg: string): string {
+    if (msg.length <= WebhooksService.MAX_ERROR_MSG_LENGTH) return msg;
+    return msg.slice(0, WebhooksService.MAX_ERROR_MSG_LENGTH - 3) + '...';
   }
 
   private signBody(body: string, secret: string): string {

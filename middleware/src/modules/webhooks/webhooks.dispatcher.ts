@@ -93,7 +93,7 @@ export class WebhooksDispatcher {
       for (const hook of subscribers) {
         try {
           await this.webhooksService.deliver(
-            { id: hook.id, url: hook.url, secret: hook.secret },
+            { id: hook.id, organizationId: hook.organizationId, url: hook.url, secret: hook.secret },
             event,
             payload,
           );
