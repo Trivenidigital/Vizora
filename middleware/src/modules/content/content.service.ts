@@ -105,7 +105,7 @@ export class ContentService {
 
     // Validate filter values - only allow whitelisted values
     const validTypes = ['image', 'video', 'url', 'html', 'pdf', 'template', 'layout', 'widget'];
-    const validStatuses = ['active', 'archived', 'draft', 'flagged', 'rejected'];
+    const validStatuses = ['active', 'archived', 'draft', 'flagged', 'rejected', 'pending_approval'];
     const validOrientations = ['landscape', 'portrait', 'both'];
 
     const where: Prisma.ContentWhereInput = { organizationId };
@@ -1572,5 +1572,199 @@ export class ContentService {
       this.logger.error(`Failed to load widget template "${templateName}": ${error}`);
       throw new BadRequestException(`Widget template "${templateName}" not found`);
     }
+  }
+
+  // ===========================================================================
+  // O10 — Content approval pipeline
+  //
+  // Distinct from the existing moderation/flag flow (flagContent /
+  // reviewContent). The flag flow is "any user can flag suspect content for
+  // admin review." The approval pipeline is "proposer → approver" — any user
+  // can submit content for approval; admins/managers gate publication.
+  //
+  // States:
+  //   draft → submitForApproval() → pending_approval → approve() → active
+  //                                                  → reject(reason) → rejected
+  //
+  // The two flows share the Content.status field and the metadata JSON;
+  // they don't interact (moderation flags a previously-active piece; the
+  // approval pipeline gates the initial publication).
+  // ===========================================================================
+
+  /**
+   * Proposer step. Move content from `draft` to `pending_approval`. Any
+   * authenticated user in the org can submit; cross-org guard via findOne.
+   */
+  async submitForApproval(
+    organizationId: string,
+    id: string,
+    submittedBy: string,
+    note?: string,
+  ) {
+    const content = await this.findOne(organizationId, id);
+
+    if (content.status !== 'draft') {
+      throw new BadRequestException(
+        `Only draft content can be submitted for approval (current status: ${content.status})`,
+      );
+    }
+
+    const existingMetadata = (content.metadata || {}) as Record<string, unknown>;
+    const approvalMetadata = {
+      ...existingMetadata,
+      approval: {
+        ...((existingMetadata.approval as Record<string, unknown>) || {}),
+        submittedBy,
+        submittedAt: new Date().toISOString(),
+        submissionNote: note || null,
+      },
+    };
+
+    const result = await this.db.content.updateMany({
+      where: { id, organizationId, status: 'draft' },              // optimistic predicate
+      data: {
+        status: 'pending_approval',
+        metadata: approvalMetadata as Prisma.InputJsonValue,
+      },
+    });
+
+    if (result.count === 0) {
+      // Either gone OR status changed (e.g. concurrent submission). Re-fetch
+      // and surface the actual reason instead of pretending it's still draft.
+      throw new BadRequestException(
+        'Content could not be submitted — status may have changed concurrently',
+      );
+    }
+
+    this.eventEmitter.emit('content.approval.submitted', {
+      organizationId,
+      contentId: id,
+      submittedBy,
+    });
+
+    return this.mapContentResponse(await this.db.content.findUnique({ where: { id } }));
+  }
+
+  /**
+   * Approver step. Move content from `pending_approval` to `active`.
+   * RBAC enforced at the controller (@Roles('admin', 'manager')).
+   * Self-approval guard: the approver MUST NOT be the same user who submitted —
+   * matches enterprise approval norms.
+   */
+  async approveContent(
+    organizationId: string,
+    id: string,
+    approvedBy: string,
+    note?: string,
+  ) {
+    const content = await this.findOne(organizationId, id);
+
+    if (content.status !== 'pending_approval') {
+      throw new BadRequestException(
+        `Only pending_approval content can be approved (current status: ${content.status})`,
+      );
+    }
+
+    const existingMetadata = (content.metadata || {}) as Record<string, unknown>;
+    const existingApproval = (existingMetadata.approval as Record<string, unknown>) || {};
+
+    if (existingApproval.submittedBy === approvedBy) {
+      throw new BadRequestException(
+        'Self-approval is not allowed — content must be reviewed by a different user',
+      );
+    }
+
+    const approvalMetadata = {
+      ...existingMetadata,
+      approval: {
+        ...existingApproval,
+        approvedBy,
+        approvedAt: new Date().toISOString(),
+        approvalNote: note || null,
+        decision: 'approved',
+      },
+    };
+
+    const result = await this.db.content.updateMany({
+      where: { id, organizationId, status: 'pending_approval' },
+      data: {
+        status: 'active',
+        metadata: approvalMetadata as Prisma.InputJsonValue,
+      },
+    });
+
+    if (result.count === 0) {
+      throw new BadRequestException(
+        'Content could not be approved — status may have changed concurrently',
+      );
+    }
+
+    this.eventEmitter.emit('content.approval.approved', {
+      organizationId,
+      contentId: id,
+      approvedBy,
+    });
+
+    return this.mapContentResponse(await this.db.content.findUnique({ where: { id } }));
+  }
+
+  /**
+   * Approver step. Reject `pending_approval` content; sets status to
+   * `rejected` and records the reason. Self-rejection IS allowed (the
+   * submitter can withdraw their own pending content). RBAC at controller.
+   */
+  async rejectFromApproval(
+    organizationId: string,
+    id: string,
+    rejectedBy: string,
+    reason: string,
+  ) {
+    if (!reason || reason.trim().length === 0) {
+      throw new BadRequestException('Rejection reason is required');
+    }
+
+    const content = await this.findOne(organizationId, id);
+
+    if (content.status !== 'pending_approval') {
+      throw new BadRequestException(
+        `Only pending_approval content can be rejected (current status: ${content.status})`,
+      );
+    }
+
+    const existingMetadata = (content.metadata || {}) as Record<string, unknown>;
+    const existingApproval = (existingMetadata.approval as Record<string, unknown>) || {};
+
+    const approvalMetadata = {
+      ...existingMetadata,
+      approval: {
+        ...existingApproval,
+        rejectedBy,
+        rejectedAt: new Date().toISOString(),
+        rejectionReason: reason,
+        decision: 'rejected',
+      },
+    };
+
+    const result = await this.db.content.updateMany({
+      where: { id, organizationId, status: 'pending_approval' },
+      data: {
+        status: 'rejected',
+        metadata: approvalMetadata as Prisma.InputJsonValue,
+      },
+    });
+
+    if (result.count === 0) {
+      throw new BadRequestException(
+        'Content could not be rejected — status may have changed concurrently',
+      );
+    }
+
+    this.eventEmitter.emit('content.approval.rejected', {
+      organizationId,
+      contentId: id,
+      rejectedBy,
+    });
+
+    return this.mapContentResponse(await this.db.content.findUnique({ where: { id } }));
   }
 }

@@ -33,6 +33,11 @@ import { ReplaceFileDto } from './dto/replace-file.dto';
 import { SetContentExpirationDto } from './dto/set-content-expiration.dto';
 import { ContentQueryDto } from './dto/content-query.dto';
 import { FlagContentDto } from './dto/flag-content.dto';
+import {
+  SubmitForApprovalDto,
+  ApproveContentDto,
+  RejectFromApprovalDto,
+} from './dto/approval.dto';
 import { ReviewContentDto } from './dto/review-content.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import * as fs from 'fs';
@@ -328,6 +333,63 @@ export class ContentController {
     @Body() body: ReviewContentDto,
   ) {
     return this.contentService.reviewContent(organizationId, id, userId, body.action, body.reason);
+  }
+
+  // ============================================================================
+  // CONTENT APPROVAL PIPELINE (O10)
+  //
+  // Distinct from /flag and /review:
+  //   - /flag + /review = moderation: any user can flag a previously-active
+  //     piece for admin review.
+  //   - /submit-for-approval + /approve + /reject = approval: proposer creates
+  //     draft, admin gates publication.
+  // ============================================================================
+
+  /**
+   * Proposer step: move draft → pending_approval. Any logged-in org user.
+   */
+  @Post(':id/submit-for-approval')
+  @Roles('admin', 'manager', 'viewer')
+  @HttpCode(HttpStatus.OK)
+  submitForApproval(
+    @CurrentUser('organizationId') organizationId: string,
+    @CurrentUser('id') userId: string,
+    @Param('id', ParseIdPipe) id: string,
+    @Body() body: SubmitForApprovalDto,
+  ) {
+    return this.contentService.submitForApproval(organizationId, id, userId, body.note);
+  }
+
+  /**
+   * Approver step: move pending_approval → active. Admin/manager only.
+   * Self-approval is rejected at the service layer.
+   */
+  @Post(':id/approve')
+  @Roles('admin', 'manager')
+  @HttpCode(HttpStatus.OK)
+  approveContent(
+    @CurrentUser('organizationId') organizationId: string,
+    @CurrentUser('id') userId: string,
+    @Param('id', ParseIdPipe) id: string,
+    @Body() body: ApproveContentDto,
+  ) {
+    return this.contentService.approveContent(organizationId, id, userId, body.note);
+  }
+
+  /**
+   * Approver step: move pending_approval → rejected. Admin/manager only.
+   * Reason is required (>=3 chars; DTO + service both enforce).
+   */
+  @Post(':id/reject-from-approval')
+  @Roles('admin', 'manager')
+  @HttpCode(HttpStatus.OK)
+  rejectFromApproval(
+    @CurrentUser('organizationId') organizationId: string,
+    @CurrentUser('id') userId: string,
+    @Param('id', ParseIdPipe) id: string,
+    @Body() body: RejectFromApprovalDto,
+  ) {
+    return this.contentService.rejectFromApproval(organizationId, id, userId, body.reason);
   }
 
   @Post(':id/archive')
