@@ -341,6 +341,54 @@ export class MailService {
   // Auth emails
   // ---------------------------------------------------------------------------
 
+  // ---------------------------------------------------------------------------
+  // Alert emails (O7 — configurable downtime alert rules)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Sends a "device offline" alert to a single recipient. Called per-recipient
+   * by AlertRuleEvaluator when a rule matches a device.offline event. The
+   * deviceName is user-controlled and is escaped before interpolation.
+   */
+  async sendDeviceOfflineAlertEmail(to: string, deviceName: string): Promise<void> {
+    const subject = `Device offline: ${deviceName}`;
+    const safeName = MailService.escapeHtml(deviceName);
+    const html = this.wrapInTemplate(`
+          <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">Device offline</h1>
+          <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
+            The display <strong style="color:#F0ECE8;">${safeName}</strong> is currently offline.
+            You're receiving this because an alert rule on your Vizora account matches this device.
+          </p>
+          ${this.ctaButton('View Devices', `${this.appUrl}/dashboard/devices`)}
+          <p style="color:#5A6B73;font-size:12px;line-height:1.5;margin:16px 0 0 0;">
+            Manage your alert rules in Settings &rarr; Alerts.
+          </p>
+    `);
+    await this.sendMail(to, subject, html, 'Device offline alert', 'noreply');
+  }
+
+  /**
+   * Escape HTML-special characters so user-controlled input (e.g. device
+   * nickname) cannot break out of the surrounding markup or inject script.
+   * Defensive — the email is sent to internal operators, but a hostile org
+   * admin could otherwise plant XSS targeting their own users.
+   *
+   * Static so it can be called from contexts that haven't instantiated
+   * MailService (tests, callers that just want to sanitize).
+   */
+  static escapeHtml(input: string): string {
+    return input
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Auth emails (continued)
+  // ---------------------------------------------------------------------------
+
   async sendPasswordResetEmail(
     to: string,
     firstName: string,
