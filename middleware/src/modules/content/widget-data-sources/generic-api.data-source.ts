@@ -1,5 +1,6 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { CircuitBreakerService } from '../../common/services/circuit-breaker.service';
+import { assertUrlIsPublic, SsrfError } from '../../common/utils/ssrf-guard';
 import { WidgetDataSource } from './widget-data-source.interface';
 
 /**
@@ -30,29 +31,6 @@ export class GenericApiDataSource implements WidgetDataSource {
 
   private readonly REQUEST_TIMEOUT = 15_000;
 
-  /**
-   * SSRF block list — copied verbatim from RssDataSource.
-   * 10 patterns covering: localhost names; IPv4 loopback (127.0.0.0/8);
-   * RFC1918 private ranges (10/8, 172.16/12, 192.168/16); IPv4 unspecified
-   * (0.0.0.0/8); link-local (169.254/16); IPv6 loopback (::1); IPv6 ULA
-   * (fc00::/7); IPv6 link-local (fe80::/10).
-   */
-  private readonly BLOCKED_HOSTS: RegExp[] = [
-    /^localhost$/i,
-    /^127\./,
-    /^10\./,
-    /^172\.(1[6-9]|2\d|3[01])\./,
-    /^192\.168\./,
-    /^0\./,
-    /^169\.254\./,
-    /^::1$/,
-    /^::$/,                // PR-review: IPv6 unspecified
-    /^::ffff:/i,           // PR-review: IPv4-mapped IPv6 (e.g. ::ffff:127.0.0.1) — bypasses /^127\./ via the v6 form
-    /^2002:/i,             // PR-review: 6to4 prefix — can encode private IPv4 (2002:7f00:1:: = 127.0.0.1)
-    /^fc00:/i,
-    /^fe80:/i,
-  ];
-
   constructor(private readonly circuitBreaker: CircuitBreakerService) {}
 
   async fetchData(config: Record<string, unknown>): Promise<Record<string, unknown>> {
@@ -62,23 +40,19 @@ export class GenericApiDataSource implements WidgetDataSource {
       return this.getSampleData();
     }
 
-    let parsed: URL;
+    // PR-review fix (post-merge): replace hostname-only check with shared
+    // SSRF guard that resolves DNS and classifies the resulting IPs. A
+    // hostname-only regex is bypassable — a public-looking domain can
+    // resolve to 127.0.0.1 / 169.254.169.254 / RFC1918, and fetch() would
+    // happily connect. The guard re-runs on every fetch (widget polls
+    // periodically), so a DNS-rebind that flips later is also caught.
     try {
-      parsed = new URL(url);
-    } catch {
-      throw new BadRequestException('URL is not a valid absolute URL');
-    }
-
-    if (!['http:', 'https:'].includes(parsed.protocol)) {
-      throw new BadRequestException('URL must use HTTP or HTTPS');
-    }
-    // Node's URL parser returns IPv6 hostnames WITH brackets (e.g. "[fe80::1]").
-    // Strip them before matching the SSRF block-list regexes, which are
-    // written to match the bare address text. RssDataSource has the same
-    // gap; the bracket-stripping makes the IPv6 patterns actually fire.
-    const hostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '');
-    if (this.BLOCKED_HOSTS.some((p) => p.test(hostname))) {
-      throw new BadRequestException('URL points to a blocked address');
+      await assertUrlIsPublic(url, { allowHttp: true });
+    } catch (err) {
+      if (err instanceof SsrfError) {
+        throw new BadRequestException(err.message);
+      }
+      throw err;
     }
 
     const method = ((config.method as string) ?? 'GET').toUpperCase();
@@ -103,6 +77,12 @@ export class GenericApiDataSource implements WidgetDataSource {
           // they CANNOT override User-Agent / Accept. Letting a customer
           // override User-Agent would bypass rate-limiting / WAF rules
           // that upstream services use to identify Vizora's outbound traffic.
+          // PR-review fix (post-merge): redirect: 'manual' — a redirect
+          // chain would bypass the SSRF guard, since the guard runs
+          // against the original URL only. Treating 3xx as an error
+          // forces customers to give us the final destination directly.
+          // (Real APIs that intentionally redirect for v1 are rare; if
+          // a customer hits this we can revisit with per-hop revalidation.)
           const res = await fetch(url, {
             method,
             headers: {
@@ -111,7 +91,13 @@ export class GenericApiDataSource implements WidgetDataSource {
               'User-Agent': 'Vizora-Widget/1.0',
             },
             signal: controller.signal,
+            redirect: 'manual',
           });
+          if (res.status >= 300 && res.status < 400) {
+            throw new Error(
+              `Endpoint returned HTTP ${res.status} redirect — final-destination URLs only (redirects not followed)`,
+            );
+          }
           if (!res.ok) {
             throw new Error(`Endpoint returned HTTP ${res.status}`);
           }
