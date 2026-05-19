@@ -46,6 +46,9 @@ export class GenericApiDataSource implements WidgetDataSource {
     /^0\./,
     /^169\.254\./,
     /^::1$/,
+    /^::$/,                // PR-review: IPv6 unspecified
+    /^::ffff:/i,           // PR-review: IPv4-mapped IPv6 (e.g. ::ffff:127.0.0.1) — bypasses /^127\./ via the v6 form
+    /^2002:/i,             // PR-review: 6to4 prefix — can encode private IPv4 (2002:7f00:1:: = 127.0.0.1)
     /^fc00:/i,
     /^fe80:/i,
   ];
@@ -96,12 +99,16 @@ export class GenericApiDataSource implements WidgetDataSource {
         const timeoutId = setTimeout(() => controller.abort(), this.REQUEST_TIMEOUT);
 
         try {
+          // PR-review fix: customer headers spread BEFORE the defaults so
+          // they CANNOT override User-Agent / Accept. Letting a customer
+          // override User-Agent would bypass rate-limiting / WAF rules
+          // that upstream services use to identify Vizora's outbound traffic.
           const res = await fetch(url, {
             method,
             headers: {
+              ...headers,
               Accept: 'application/json',
               'User-Agent': 'Vizora-Widget/1.0',
-              ...headers,
             },
             signal: controller.signal,
           });

@@ -78,6 +78,19 @@ describe('GenericApiDataSource', () => {
       await expect(sample('http://[fe80::1]/path')).rejects.toThrow(BadRequestException);
     });
 
+    // PR-review fix: additional IPv6 SSRF coverage
+    it('rejects IPv6 unspecified ::', async () => {
+      await expect(sample('http://[::]/path')).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects IPv4-mapped IPv6 ::ffff:127.0.0.1 (bypassed v4 patterns before the fix)', async () => {
+      await expect(sample('http://[::ffff:127.0.0.1]/path')).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects 6to4 2002:: prefix (can embed private IPv4)', async () => {
+      await expect(sample('http://[2002:7f00:1::]/path')).rejects.toThrow(BadRequestException);
+    });
+
     it('rejects non-GET method (v1 is GET-only)', async () => {
       await expect(
         dataSource.fetchData({ url: 'https://api.example.com/x', method: 'POST' }),
@@ -153,6 +166,24 @@ describe('GenericApiDataSource', () => {
       // Default Accept + UA still set
       expect(fetchOpts.headers.Accept).toBe('application/json');
       expect(fetchOpts.headers['User-Agent']).toBe('Vizora-Widget/1.0');
+    });
+
+    // PR-review fix: customer cannot override User-Agent or Accept via headers
+    it('customer headers CANNOT override User-Agent or Accept (defense against WAF/rate-limit bypass)', async () => {
+      const fetchSpy = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({}),
+      });
+      global.fetch = fetchSpy as any;
+
+      await dataSource.fetchData({
+        url: 'https://api.example.com/x',
+        headers: { 'User-Agent': 'AttackerBot/1.0', Accept: 'text/html' },
+      });
+
+      const fetchOpts = fetchSpy.mock.calls[0][1];
+      expect(fetchOpts.headers['User-Agent']).toBe('Vizora-Widget/1.0');
+      expect(fetchOpts.headers.Accept).toBe('application/json');
     });
   });
 
