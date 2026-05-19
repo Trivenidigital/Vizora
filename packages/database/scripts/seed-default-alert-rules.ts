@@ -1,40 +1,45 @@
 /**
- * O7 — Seed default alert rules for existing orgs.
+ * O7 — Seed default alert rules for existing orgs (one-shot backfill).
  *
- * The same rule shape is also implemented in
- * `middleware/src/modules/notifications/alert-rules/alert-rules.service.ts`
- * → `seedDefaultRuleForOrg(orgId, adminUserIds)`. That path is what auto-seeds
- * NEW orgs at registration time. This standalone script is the one-shot
- * backfill for orgs that already existed before the migration landed.
+ * Runs ONCE at deploy time, AFTER `20260519050346_add_alert_rules` has been
+ * applied. For each existing Organization that does NOT already have a
+ * "Default offline alert (auto-migrated)" rule, inserts:
+ *   - One AlertRule: scope=all, triggerEvent=device.offline,
+ *     minOfflineSec=120, isActive=true
+ *   - One AlertRuleRecipient per active admin (role='admin'): channel=in_app,
+ *     target=user.id
  *
- * Both paths must stay in sync — if the default-rule shape changes (different
- * scope, recipients, etc.), edit both.
+ * Preserves the pre-O7 broadcast-to-all-admins behavior 1:1. NEW orgs created
+ * post-deploy are handled by `AuthService.register` → `seedDefaultRuleForOrg`
+ * (PR #63 follow-up); they get the same default rule automatically at
+ * registration time, so this backfill is needed only once for the orgs that
+ * pre-date the migration.
  *
- * Run ONCE at deploy time after the `20260519050346_add_alert_rules` migration:
+ * The runtime side of the same rule shape lives at
+ * `middleware/src/modules/notifications/alert-rules/alert-rules.service.ts` →
+ * `seedDefaultRuleForOrg(orgId, adminUserIds)`. The two paths MUST stay in
+ * sync — if the default-rule shape changes (different scope, recipients,
+ * etc.), edit both.
+ *
+ * Idempotent: the unique `(organizationId, name)` index causes the create to
+ * throw P2002 on re-run, which is caught and treated as success.
+ *
+ * Orgs with zero active admins get an AlertRule with zero recipients — the
+ * evaluator's dispatch loop iterates zero times (silent no-op). Logged at
+ * INFO so post-deploy ops can spot orgs that need a manual recipient added.
+ *
+ * Invocation:
  *
  *     npx tsx packages/database/scripts/seed-default-alert-rules.ts
  *
- * For every existing Organization that does NOT already have a rule named
- * "Default offline alert (auto-migrated)", inserts:
- *   - One AlertRule row: scope=all, triggerEvent=device.offline,
- *     minOfflineSec=120, isActive=true
- *   - One AlertRuleRecipient per admin user (role='admin'): channel=in_app,
- *     target=user.id
- *
- * This preserves the pre-O7 broadcast-to-all-admins behavior 1:1 for current
- * orgs. New orgs created post-deploy get NO default rule — they explicitly
- * opt in via the UI / API.
- *
- * Idempotent: re-running is safe because the unique index
- * `(organizationId, name)` on alert_rules causes `prisma.alertRule.create`
- * to throw P2002, which we catch and skip.
- *
- * Orgs with zero admin users get an AlertRule with zero recipients — the
- * evaluator's dispatch loop iterates zero times → silent no-op. Logged at
- * INFO so post-deploy ops can spot orgs that need a manual recipient added.
+ * The import path below resolves to this repo's generated Prisma client
+ * (output configured in `packages/database/prisma/schema.prisma` →
+ * `generator client { output = "../src/generated/prisma" }`). The script
+ * intentionally does NOT depend on `@prisma/client` or on `@vizora/database`
+ * being built — both have failed at deploy time in prior incidents.
  */
 
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../src/generated/prisma';
 
 const DEFAULT_RULE_NAME = 'Default offline alert (auto-migrated)';
 
