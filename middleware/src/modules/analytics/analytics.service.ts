@@ -525,4 +525,167 @@ export class AnalyticsService {
       playlistPerformance,
     };
   }
+
+  // ===========================================================================
+  // O2 — Proof-of-play reports (raw impression rows + CSV export)
+  // ===========================================================================
+
+  /**
+   * Paginated query over the ContentImpression table with optional filters.
+   * All filters are AND-combined. Cross-org guard is the `organizationId`
+   * predicate; FKs (contentId, displayId, playlistId) inside the same org
+   * are safe by schema construction.
+   *
+   * `displayTagId` joins through DisplayTag — find impressions whose Display
+   * carries the given tag.
+   */
+  async getProofOfPlay(
+    organizationId: string,
+    filters: {
+      dateFrom?: string;
+      dateTo?: string;
+      contentId?: string;
+      displayId?: string;
+      playlistId?: string;
+      displayTagId?: string;
+      page?: number;
+      limit?: number;
+    },
+  ) {
+    const page = Math.max(1, filters.page ?? 1);
+    const limit = Math.min(500, Math.max(1, filters.limit ?? 50));
+
+    const where = this.buildProofOfPlayWhere(organizationId, filters);
+
+    const [data, total] = await Promise.all([
+      this.db.contentImpression.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { timestamp: 'desc' },
+        include: {
+          content: { select: { id: true, name: true } },
+          display: { select: { id: true, nickname: true, deviceIdentifier: true } },
+        },
+      }),
+      this.db.contentImpression.count({ where }),
+    ]);
+
+    return {
+      data,
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  /**
+   * Streaming CSV export. Yields the header row first, then batches of 1000
+   * impression rows. Capped at 100,000 rows total to defend against
+   * unbounded memory use; operators wanting larger exports can iterate the
+   * paginated query directly.
+   */
+  async *streamProofOfPlayCsv(
+    organizationId: string,
+    filters: {
+      dateFrom?: string;
+      dateTo?: string;
+      contentId?: string;
+      displayId?: string;
+      playlistId?: string;
+      displayTagId?: string;
+    },
+  ): AsyncGenerator<string> {
+    const where = this.buildProofOfPlayWhere(organizationId, filters);
+
+    yield 'timestamp,contentId,contentName,displayId,displayName,playlistId,duration_sec,completion_percent\n';
+
+    const BATCH = 1000;
+    const MAX_ROWS = 100_000;
+    let skip = 0;
+    let emitted = 0;
+
+    while (emitted < MAX_ROWS) {
+      const batch = await this.db.contentImpression.findMany({
+        where,
+        skip,
+        take: BATCH,
+        orderBy: { timestamp: 'asc' }, // ascending so the CSV is chronological
+        include: {
+          content: { select: { id: true, name: true } },
+          display: { select: { id: true, nickname: true, deviceIdentifier: true } },
+        },
+      });
+      if (batch.length === 0) break;
+
+      for (const r of batch) {
+        if (emitted >= MAX_ROWS) break;
+        yield this.formatProofOfPlayCsvRow(r);
+        emitted++;
+      }
+      skip += BATCH;
+    }
+  }
+
+  private buildProofOfPlayWhere(orgId: string, f: {
+    dateFrom?: string; dateTo?: string;
+    contentId?: string; displayId?: string; playlistId?: string;
+    displayTagId?: string;
+  }) {
+    const where: Record<string, unknown> = { organizationId: orgId };
+
+    if (f.dateFrom || f.dateTo) {
+      where.date = {
+        ...(f.dateFrom ? { gte: new Date(f.dateFrom) } : {}),
+        ...(f.dateTo ? { lte: new Date(f.dateTo) } : {}),
+      };
+    }
+    if (f.contentId) where.contentId = f.contentId;
+    if (f.displayId) where.displayId = f.displayId;
+    if (f.playlistId) where.playlistId = f.playlistId;
+    if (f.displayTagId) {
+      where.display = { tags: { some: { tagId: f.displayTagId } } };
+    }
+
+    return where;
+  }
+
+  /**
+   * Format one impression row as CSV. Applies Excel-injection neutralization:
+   * any cell starting with =, +, -, @ gets a leading single-quote so Excel
+   * does NOT evaluate it as a formula.
+   */
+  private formatProofOfPlayCsvRow(r: {
+    timestamp: Date;
+    contentId: string;
+    displayId: string;
+    playlistId: string | null;
+    duration: number | null;
+    completionPercentage: number | null;
+    content: { name: string };
+    display: { nickname: string | null; deviceIdentifier: string };
+  }): string {
+    const cells = [
+      r.timestamp.toISOString(),
+      r.contentId,
+      r.content.name,
+      r.displayId,
+      r.display.nickname ?? r.display.deviceIdentifier,
+      r.playlistId ?? '',
+      r.duration?.toString() ?? '',
+      r.completionPercentage?.toString() ?? '',
+    ];
+    return cells.map((c) => this.csvEscape(c)).join(',') + '\n';
+  }
+
+  private csvEscape(value: string): string {
+    // RFC 4180 + Excel-injection neutralizer.
+    // PR-review on PR #67: also neutralize leading Tab (\t) which legacy
+    // Excel versions can treat as a formula delimiter, and ensure Tab
+    // inside cells triggers RFC 4180 quoting.
+    let v = value;
+    if (/^[=+\-@\t]/.test(v)) v = `'${v}`;
+    if (/[",\n\r\t]/.test(v)) {
+      v = `"${v.replace(/"/g, '""')}"`;
+    }
+    return v;
+  }
 }

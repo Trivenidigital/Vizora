@@ -1,6 +1,7 @@
 import {
   IsString,
   IsEnum,
+  IsNotEmpty,
   IsOptional,
   ValidateNested,
   IsIn,
@@ -9,10 +10,14 @@ import {
 import { Type } from 'class-transformer';
 
 class CommandTargetDto {
-  @IsEnum(['device', 'group', 'organization'])
-  type!: 'device' | 'group' | 'organization';
+  // 'tag' added in O1 — push to every display in the caller's org carrying
+  // the given tagId. The fleet resolver looks up DisplayTag, cross-checks
+  // org membership, and fans out via the same broadcast path.
+  @IsEnum(['device', 'group', 'organization', 'tag'])
+  type!: 'device' | 'group' | 'organization' | 'tag';
 
   @IsString()
+  @IsNotEmpty({ message: 'target.id must be a non-empty string' })
   id!: string;
 }
 

@@ -134,7 +134,7 @@ These are documented + non-blocking for customer-1. Investigations done; impleme
 | L2 | Set up UptimeRobot monitoring for health endpoints | XS (1h) | TODO | Manual: create account, add monitors |
 | L3 | Custom error pages (branded 404, 500) | S (4h) | TODO | Currently default/unstyled |
 | L4 | Basic knowledge base / help docs page | M (1d) | TODO | FAQ + getting started guide |
-| L5 | Proof-of-play tracking (log content displayed per device) | M (1d) | TODO | Advertisers need this |
+| L5 | Proof-of-play tracking (log content displayed per device) | M (1d) | TODO | Advertisers need this. **Expanded scope in O2 below** (saved views, scheduled email, tag filters, exports). |
 | L6 | Emergency content override (push urgent to all devices) | S (4h) | TODO | Critical for corporate/healthcare |
 | L7 | Device remote reload command via WebSocket | S (2h) | TODO | Remote restart already missing too |
 | L8 | Wire real-time notification emission on creation | S (2h) | TODO | Currently polling, not real-time |
@@ -151,10 +151,10 @@ These are documented + non-blocking for customer-1. Investigations done; impleme
 | M1 | CloudFlare CDN + DDoS protection | S (4h) | TODO | Static assets served directly now |
 | M2 | Weather widget (OpenWeatherMap free API) | M (1d) | TODO | Top customer request for signage |
 | M3 | Google Sheets data source integration | L (3d) | TODO | Key for dynamic menu boards |
-| M4 | Content moderation workflow (flag -> review -> approve) | M (2d) | TODO | |
+| M4 | Content moderation workflow (flag -> review -> approve) | M (2d) | TODO | Today's `content.service.ts:712-843` is a moderation flag, not an approval pipeline. **Expanded to proposer→approver→publish in O10 below.** |
 | M5 | Expand template library to 150 templates | M (2d) | TODO | Currently 78 |
 | M6 | Device remote restart command | S (4h) | TODO | |
-| M7 | Push-to-group endpoint (single API call) | S (4h) | TODO | Currently iterate client-side |
+| M7 | Push-to-group endpoint (single API call) | S (4h) | TODO | Currently iterate client-side. **Generalized in O1 below** (also adds tag-based targeting + push from templates/layouts/widgets/playlists). |
 | M8 | Data retention policy (auto-purge audit logs > 90 days) | S (4h) | TODO | |
 | M9 | Profile editing: avatar upload | S (4h) | TODO | Name editing done, avatar missing |
 | M10 | Fix Loki volume mount (logs lost on restart) | XS (1h) | TODO | Docker-compose change |
@@ -162,6 +162,29 @@ These are documented + non-blocking for customer-1. Investigations done; impleme
 | M12 | Security alert emails (new login, password changed) | S (4h) | TODO | |
 
 **Total effort: ~15 dev-days**
+
+---
+
+## OptiSigns Parity Roadmap (from 2026-05-17 audit)
+
+Items where Vizora has real foundation in the codebase + high customer value vs OptiSigns gaps. Full analysis: `docs/plans/2026-05-17-optsigns-vizora-feature-gap.md`. Cross-quarter — each item carries its own effort; no quarterly bucket.
+
+Items the audit listed but we are NOT pursuing live (Engage/kiosk, live remote view, WebRTC, Office docs, white-label, nested playlists, etc.) are parked in `tasks/feature-backlog.md` under "OptiSigns parity — deferred items" with trigger conditions.
+
+| # | Item | Effort | Foundation | Audit ref |
+|---|------|--------|------------|-----------|
+| O1 | **Unified Push to Screens** — first-class push endpoints from content/templates/layouts/widgets/playlists; **tag-based targeting** (push to `tag=lobby`); append-to-playlist mode; scheduled push with auto-revert; temporary takeover with expiration | M (3d) | `displays.controller.ts:198-211` exists; `Tag/DisplayTag` exist; fleet `resolveTargetDevices` (`fleet.service.ts:159-206`) needs tag resolver | P0 #2 |
+| O2 | **Proof-of-play reports** — saved report views, scheduled email delivery, asset/display tag filters, CSV/Excel/PDF/raw export over existing impression model | M (3d) | `ContentImpression` has duration + completionPercentage + indexes (`schema.prisma:284-305`). **Supersedes L5.** | P0 #4 |
+| O3 | **Designer depth extension** — shapes, layers, lockable template fields, animation, drawing, asset-library insertion, export-as-image. Extension of existing canvas, not a rewrite | L (5d) | `TemplateEditorCanvas` + `useEditorHistory` + `useCanvasZoom` + `DisplayPickerModal` already wired (`web/src/app/dashboard/templates/[id]/edit/page-client.tsx`) | P0 #1 |
+| O4 | **Tag-rule auto-assignment engine** — "if display has tag X then auto-assign playlist Y"; rule evaluator on tag-change / new-display events | M (2d) | New `TagRule` Prisma model + evaluator; pairs with O1's tag-based push | P0 #2 |
+| O5 | **Public customer API + SDK + webhooks** — production Swagger (not dev-only), OpenAPI export, npm SDK package, outbound webhook delivery for org events (display.offline, content.published, schedule.activated, etc.) | L (5d) | `ApiKey` + scopes already exist; Swagger gated to non-prod in `main.ts:129-166`; no SDK, no outbound webhooks today | P1 #10 |
+| O6 | **Mass provisioning** — bulk CSV pairing, provisioning templates (stored Wi-Fi + default playlist + orientation + scaling), pre-generated device-token CSVs, kiosk/player config bundles | M (3d) | Single-device pairing in `pairing.service.ts`; bulk-ops DTO is operations-only today (`displays/dto/bulk-operations.dto.ts`) | P1 #7 |
+| O7 | **Configurable downtime alert rules** — per tag/group with custom recipients, not just the hard-coded `device.offline` listener | S (1d) | `notifications.service.ts:277` is a fixed `@OnEvent` handler — replace with rule table + evaluator | P1 #6 |
+| O8 | **Generic API-to-screen data source** — JSON/XML/CSV polling source with mapping config, surfaced as a widget; the building block for POS-style integrations without bespoke per-vendor connectors | M (3d) | `widgets` module + `SheetsWidget` shipped; extends pattern to arbitrary HTTP source | P0 #3 |
+| O9 | **Teams + folder-level access control + custom roles** — new `Team`, `FolderPermission` (read/write/admin per folder), and `Role`/`Permission` models replacing the fixed `auth.constants.ts:46-50` enum | L (5d) | Flat org today: every user in an org sees everything. Foundation for enterprise plans | P0 #5 |
+| O10 | **Content proposal/approval pipeline** — separate proposer and approver roles; proposer creates draft, approver publishes; distinct from today's moderation flag | M (3d) | `content.service.ts:712-843` is moderation only. **Supersedes M4 + Q7.** | P0 #5 |
+
+**Total effort: ~36 dev-days.** Sequence recommendation from the audit (revised per O3 foundation note): O1 → O2 → O7 → O4 → O8 → O3 → O9 → O10 → O6 → O5. Reasoning: O1/O2/O7 connect existing primitives for fast visible wins; O3 (Designer) is bigger but already has scaffolding; O5 (Public API) goes last because it locks the contract.
 
 ---
 
@@ -175,7 +198,7 @@ These are documented + non-blocking for customer-1. Investigations done; impleme
 | Q4 | Social media feed widget (Instagram) | M (2d) | TODO | |
 | Q5 | Clock/countdown widget | S (4h) | TODO | |
 | Q6 | AI Template Designer (integrate Claude/OpenAI) | L (5d) | TODO | API costs — need revenue first |
-| Q7 | Content approval workflow | M (2d) | TODO | |
+| Q7 | Content approval workflow | M (2d) | TODO | **Superseded by O10 below.** |
 | Q8 | Custom branding per organization | M (2d) | TODO | |
 | Q9 | Return policy page + SLA page | S (4h) | TODO | Legal |
 | Q10 | Expand template library to 300+ | L (5d) | TODO | |

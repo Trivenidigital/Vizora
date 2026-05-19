@@ -9,7 +9,7 @@ export class ContentQueryDto extends PaginationDto {
 
   @IsOptional()
   @IsString()
-  @IsIn(['active', 'archived', 'draft', 'flagged', 'rejected'])
+  @IsIn(['active', 'archived', 'draft', 'flagged', 'rejected', 'pending_approval'])
   status?: string;
 
   @IsOptional()
