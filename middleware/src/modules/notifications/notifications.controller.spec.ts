@@ -32,7 +32,6 @@ describe('NotificationsController', () => {
       markAsRead: jest.fn(),
       markAllAsRead: jest.fn(),
       dismiss: jest.fn(),
-      createDeviceOfflineNotification: jest.fn(),
       createDeviceOnlineNotification: jest.fn(),
       createContentExpiredNotification: jest.fn(),
       createSystemNotification: jest.fn(),
