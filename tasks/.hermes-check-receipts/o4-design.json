@@ -1,0 +1,16 @@
+{
+  "topic": "o4-design",
+  "task_text": "O4 design — file shapes + code skeletons + migration SQL + test plan for TagAssignmentRule auto-assignment engine. Follow-up to o4-tag-rule-auto-assignment-plan.md after 2 parallel reviewers.",
+  "completed_at": "2026-05-19T13:50:00Z",
+  "drift_check_tag": "extends-Hermes",
+  "net_new_step_count": 11,
+  "hermes_step_count": 0,
+  "files_to_read_first": [
+    "middleware/src/modules/notifications/alert-rules/alert-rules.service.ts",
+    "middleware/src/modules/notifications/alert-rules/alert-rule.evaluator.ts",
+    "middleware/src/modules/notifications/alert-rules/alert-rules.controller.ts",
+    "middleware/src/modules/displays/displays.service.ts",
+    "middleware/src/modules/displays/pairing.service.ts"
+  ],
+  "verdict": "Design mirrors O7 shape (PR #63) — net-new at the Hermes-substrate level but pattern-reuse at the Vizora-middleware level. Notable design decision: playlistId FK is SetNull (not Cascade) per PR-review fix, evaluator detects null-playlist rules with WARN. Subscribe to existing display.paired event rather than inventing display.created."
+}
