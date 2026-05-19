@@ -109,6 +109,17 @@ describe('TagRulesService', () => {
       expect(db.displayTag.findMany).toHaveBeenCalledTimes(1); // sweep ran
     });
 
+    it('priority-only update persists the new priority value via Prisma update', async () => {
+      // PR-review gap: prove the priority change actually reaches the DB
+      // (not just that the sweep was triggered as a side effect).
+      db.tagAssignmentRule.update.mockResolvedValue({ ...before, priority: 50 });
+      await service.update(orgId, 'rule-1', { priority: 50 });
+      expect(db.tagAssignmentRule.update).toHaveBeenCalledWith({
+        where: { id: 'rule-1' },
+        data: { priority: 50 },
+      });
+    });
+
     it('name-only update does NOT trigger sweep (cosmetic)', async () => {
       db.tagAssignmentRule.update.mockResolvedValue({ ...before, name: 'renamed' });
       await service.update(orgId, 'rule-1', { name: 'renamed' });

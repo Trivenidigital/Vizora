@@ -198,6 +198,14 @@ export class TagRulesService {
 
       // Atomic CAS: only assigns if currentPlaylistId is still null. Under
       // PM2 cluster mode this guarantees exactly one writer wins.
+      //
+      // CONTRACT FOR FUTURE O1 (unified push): O1 is the OPPOSITE side of
+      // this contract — it overwrites currentPlaylistId unconditionally (push
+      // always wins). O1 implementers MUST NOT adopt this `currentPlaylistId:
+      // null` predicate; doing so would silently make manual pushes fail when
+      // a tag-rule already won. The two writers are coordinated by:
+      //   - O4 (here): only writes when null  → respects manual / O1 pushes
+      //   - O1 (future): always writes        → overrides O4's assignment
       const updated = await this.db.display.updateMany({
         where: { id: displayId, organizationId, currentPlaylistId: null },
         data: { currentPlaylistId: rule.playlistId },
