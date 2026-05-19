@@ -58,6 +58,7 @@ model Organization {
   contentRecommendations ContentRecommendation[]
   mcpTokens              McpToken[]
   agentRuns              AgentRun[]
+  provisioningTemplates  ProvisioningTemplate[]
 
   @@index([slug])
   @@index([stripeCustomerId])
@@ -251,10 +252,11 @@ model Playlist {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  items            PlaylistItem[]
-  schedules        Schedule[]
-  assignedDisplays Display[]           @relation("DisplayCurrentPlaylist")
-  impressions      ContentImpression[]
+  items                 PlaylistItem[]
+  schedules             Schedule[]
+  assignedDisplays      Display[]              @relation("DisplayCurrentPlaylist")
+  impressions           ContentImpression[]
+  provisioningTemplates ProvisioningTemplate[]
 
   @@index([organizationId])
   @@index([organizationId, updatedAt])
@@ -1001,4 +1003,41 @@ model AgentRun {
   @@index([createdAt])
   @@index([organizationId, startedAt])
   @@map("agent_runs")
+}
+
+// ============================================================================
+// PROVISIONING TEMPLATES (O6 — bulk-friendly Display defaults)
+// ============================================================================
+
+/// Per-org reusable provisioning config. Operator creates a template (e.g.
+/// "Lobby TVs" with portrait + UTC-8 + default playlist "Welcome reel") then
+/// references it when pairing N displays — eliminates per-device config for
+/// growing fleets.
+///
+/// At pairing time (`PairingService.completePairing`), if the DTO carries a
+/// `provisioningTemplateId`, the template's defaults are applied to the
+/// newly-created Display. Cross-org validation: tag/playlist must belong
+/// to the caller's org (service-layer guard, same pattern as O4/O7).
+///
+/// `defaultPlaylistId` uses SetNull cascade so playlist deletion preserves
+/// the template (matches O4's choice and rationale).
+model ProvisioningTemplate {
+  id                 String   @id @default(cuid())
+  organizationId     String
+  name               String
+  description        String?
+  defaultOrientation String   @default("landscape")        // "landscape" | "portrait"
+  defaultTimezone    String   @default("UTC")
+  defaultPlaylistId  String?
+  isDefault          Boolean  @default(false)              // one default per org (UI hint; not unique-enforced)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  defaultPlaylist Playlist?    @relation(fields: [defaultPlaylistId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, name])                          // UI uniqueness
+  @@index([organizationId])
+  @@index([defaultPlaylistId])
+  @@map("provisioning_templates")
 }
