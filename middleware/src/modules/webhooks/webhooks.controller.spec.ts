@@ -16,6 +16,7 @@ describe('WebhooksController', () => {
       findOne: jest.fn(),
       update: jest.fn(),
       remove: jest.fn(),
+      findDeliveries: jest.fn(),
     } as any;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -61,6 +62,16 @@ describe('WebhooksController', () => {
     expect(service.remove).toHaveBeenCalledWith(orgId, 'hook-1');
   });
 
+  it('GET /:id/deliveries forwards to service.findDeliveries with query', async () => {
+    service.findDeliveries.mockResolvedValue({ data: [], meta: {} } as any);
+    await controller.findDeliveries(orgId, 'hook-1', { status: 'blocked', page: 2, limit: 25 });
+    expect(service.findDeliveries).toHaveBeenCalledWith(orgId, 'hook-1', {
+      status: 'blocked',
+      page: 2,
+      limit: 25,
+    });
+  });
+
   describe('RBAC decorators', () => {
     const reflector = new Reflector();
 
@@ -87,6 +98,12 @@ describe('WebhooksController', () => {
     it('GET findOne does NOT require admin', () => {
       const roles = reflector.get<string[]>('roles', controller.findOne);
       expect(roles).toBeUndefined();
+    });
+
+    it('GET findDeliveries requires admin OR manager (NOT viewer)', () => {
+      const roles = reflector.get<string[]>('roles', controller.findDeliveries);
+      expect(roles).toEqual(expect.arrayContaining(['admin', 'manager']));
+      expect(roles).not.toContain('viewer');
     });
   });
 });

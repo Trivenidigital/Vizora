@@ -59,6 +59,7 @@ model Organization {
   mcpTokens              McpToken[]
   agentRuns              AgentRun[]
   webhooks               Webhook[]
+  webhookDeliveries      WebhookDelivery[]
   alertRules             AlertRule[]
   tagAssignmentRules     TagAssignmentRule[]
   provisioningTemplates  ProvisioningTemplate[]
@@ -1133,29 +1134,63 @@ model AlertRuleFire {
 /// webhook's secret, and POSTs to `url`. On consecutive failures the
 /// webhook auto-disables (`failureCount >= AUTO_DISABLE_THRESHOLD`).
 ///
-/// Cross-org: organizationId cascade-deletes. No per-delivery audit table
-/// in v1 — `lastDeliveryAt`/`lastError`/`failureCount` on the row cover
-/// the ops-visibility need; if customers ask for full audit, add a
-/// WebhookDelivery table in a follow-up.
+/// Per-delivery audit lives in `WebhookDelivery` — every dispatch attempt
+/// (success / failure / SSRF-blocked) records a row there. The summary
+/// fields here (`lastDeliveryAt` / `lastError` / `failureCount`) are kept
+/// for fast row-level reads in CRUD responses.
 model Webhook {
-  id              String   @id @default(cuid())
-  organizationId  String
-  name            String
-  url             String                                // HTTPS only; SSRF guard at service layer
-  secret          String                                // HMAC secret stored as plaintext at create — see service comment about hashing tradeoff
-  events          String[]                              // event names this hook subscribes to
-  isActive        Boolean  @default(true)
-  lastDeliveryAt  DateTime?
-  lastError       String?
-  failureCount    Int      @default(0)                  // consecutive failures; auto-disable threshold check at service layer
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String    @id @default(cuid())
+  organizationId String
+  name           String
+  url            String // HTTPS only; SSRF guard at service layer
+  secret         String // HMAC secret stored as plaintext at create — see service comment about hashing tradeoff
+  events         String[] // event names this hook subscribes to
+  isActive       Boolean   @default(true)
+  lastDeliveryAt DateTime?
+  lastError      String?
+  failureCount   Int       @default(0) // consecutive failures; auto-disable threshold check at service layer
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  deliveries   WebhookDelivery[]
 
-  @@unique([organizationId, name])                      // UI uniqueness
+  @@unique([organizationId, name]) // UI uniqueness
   @@index([organizationId, isActive])
   @@map("webhooks")
+}
+
+/// Per-delivery audit row. Recorded at every deliver() exit — success,
+/// HTTP failure, network error, or SSRF-blocked. Customers list this via
+/// `GET /webhooks/:id/deliveries` to debug their endpoint.
+///
+/// Body and HMAC signature are deliberately NOT stored:
+///   - body can be MBs and v1 doesn't need replay capability
+///   - signature + body = a secret-recovery surface (offline brute-force
+///     on a leaked audit dump would recover the HMAC secret)
+///
+/// status is a string + DTO `@IsIn` (no Prisma enums elsewhere in this
+/// schema). Closed values: `success` | `failure` | `blocked`. The
+/// `blocked` value means the SSRF guard rejected at delivery time
+/// (typically a DNS rebind) — fetch was never attempted.
+model WebhookDelivery {
+  id             String   @id @default(cuid())
+  webhookId      String
+  organizationId String // denormalized for fast org-scoped reads + future retention sweeps
+  event          String // e.g. "display.paired"
+  status         String // success | failure | blocked
+  statusCode     Int? // HTTP code if reached; null for blocked / network error
+  errorMessage   String? // truncated error text (no secret-recovery surface)
+  durationMs     Int // wall time of the deliver() call
+  attemptedAt    DateTime @default(now())
+
+  webhook      Webhook      @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId, attemptedAt(sort: Desc)]) // primary listing query (newest first)
+  @@index([organizationId, attemptedAt(sort: Desc)]) // future cross-webhook org view
+  @@index([attemptedAt]) // future retention sweep
+  @@map("webhook_deliveries")
 }
 
 // ============================================================================
