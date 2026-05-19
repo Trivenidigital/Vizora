@@ -58,6 +58,7 @@ model Organization {
   contentRecommendations ContentRecommendation[]
   mcpTokens              McpToken[]
   agentRuns              AgentRun[]
+  tagAssignmentRules     TagAssignmentRule[]
 
   @@index([slug])
   @@index([stripeCustomerId])
@@ -255,6 +256,7 @@ model Playlist {
   schedules        Schedule[]
   assignedDisplays Display[]           @relation("DisplayCurrentPlaylist")
   impressions      ContentImpression[]
+  assignmentRules  TagAssignmentRule[]
 
   @@index([organizationId])
   @@index([organizationId, updatedAt])
@@ -358,8 +360,9 @@ model Tag {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  content  ContentTag[]
-  displays DisplayTag[]
+  content         ContentTag[]
+  displays        DisplayTag[]
+  assignmentRules TagAssignmentRule[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -1001,4 +1004,41 @@ model AgentRun {
   @@index([createdAt])
   @@index([organizationId, startedAt])
   @@map("agent_runs")
+}
+
+// ============================================================================
+// TAG-RULE AUTO-ASSIGNMENT (O4 — auto-assign Playlist to Display by Tag)
+// ============================================================================
+
+/// Per-org rule: "every Display with `tag = scopeTagId` auto-assigns `playlist
+/// = scopePlaylistId` as its `currentPlaylistId`, IF the display has no
+/// playlist assigned yet (first-write-wins; manual assignments are NEVER
+/// overwritten by the evaluator).
+///
+/// Priority lower = higher precedence (1 = highest, 100 = default, 999 = lowest).
+/// Ties broken by createdAt (older wins).
+///
+/// `playlistId` uses SetNull cascade so playlist deletion preserves the rule
+/// in a broken state — the evaluator logs WARN and skips it; admin must fix.
+/// (See `TagRulesService.evaluateForDisplay`.)
+model TagAssignmentRule {
+  id             String    @id @default(cuid())
+  organizationId String
+  name           String
+  tagId          String                                    // when a Display has this tag...
+  playlistId     String?                                   // ...auto-assign this playlist (nullable for SetNull cascade)
+  isActive       Boolean   @default(true)
+  priority       Int       @default(100)                   // lower = higher priority
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tag          Tag          @relation(fields: [tagId],          references: [id], onDelete: Cascade)
+  playlist     Playlist?    @relation(fields: [playlistId],     references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, name])                         // UI uniqueness + idempotent create
+  @@index([organizationId, isActive])
+  @@index([tagId])
+  @@index([playlistId])
+  @@map("tag_assignment_rules")
 }
