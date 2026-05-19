@@ -1,6 +1,15 @@
 /**
  * O7 — Seed default alert rules for existing orgs.
  *
+ * The same rule shape is also implemented in
+ * `middleware/src/modules/notifications/alert-rules/alert-rules.service.ts`
+ * → `seedDefaultRuleForOrg(orgId, adminUserIds)`. That path is what auto-seeds
+ * NEW orgs at registration time. This standalone script is the one-shot
+ * backfill for orgs that already existed before the migration landed.
+ *
+ * Both paths must stay in sync — if the default-rule shape changes (different
+ * scope, recipients, etc.), edit both.
+ *
  * Run ONCE at deploy time after the `20260519050346_add_alert_rules` migration:
  *
  *     npx tsx packages/database/scripts/seed-default-alert-rules.ts

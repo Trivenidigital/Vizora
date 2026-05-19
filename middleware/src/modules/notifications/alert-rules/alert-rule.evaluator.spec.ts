@@ -244,7 +244,7 @@ describe('AlertRuleEvaluator', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Atomic dedup
+  // Atomic dedup — per (rule, device)
   // ---------------------------------------------------------------------------
   it('dispatches only when tryClaimDedupWindow returns true', async () => {
     db.display.findUnique.mockResolvedValue(makeDevice());
@@ -254,6 +254,41 @@ describe('AlertRuleEvaluator', () => {
     await evaluator.handleDeviceOffline(payload);
 
     expect(db.notification.create).not.toHaveBeenCalled();
+  });
+
+  it('passes both ruleId AND deviceId to tryClaimDedupWindow (per-device dedup)', async () => {
+    db.display.findUnique.mockResolvedValue(makeDevice());
+    alertRulesService.findActiveForEvent.mockResolvedValue([makeRule({ id: 'rule-X' })]);
+    alertRulesService.tryClaimDedupWindow.mockResolvedValue(true);
+    db.notification.create.mockResolvedValue({});
+
+    await evaluator.handleDeviceOffline(payload);
+
+    expect(alertRulesService.tryClaimDedupWindow).toHaveBeenCalledWith(
+      'rule-X',
+      deviceId,
+      expect.any(Date),
+    );
+  });
+
+  it('same rule fires for device A and then device B independently (the PR-review fix)', async () => {
+    db.display.findUnique.mockResolvedValue(makeDevice({ id: 'device-A' }));
+    alertRulesService.findActiveForEvent.mockResolvedValue([makeRule()]);
+    // First call: claim succeeds for device-A
+    alertRulesService.tryClaimDedupWindow.mockResolvedValueOnce(true);
+    db.notification.create.mockResolvedValue({});
+
+    await evaluator.handleDeviceOffline({ deviceId: 'device-A', deviceName: 'A', organizationId: orgId });
+
+    // Now device B goes offline — even though the rule fired 5 min ago for device-A,
+    // it must fire independently for device-B (different per-device dedup state).
+    db.display.findUnique.mockResolvedValue(makeDevice({ id: 'device-B' }));
+    alertRulesService.tryClaimDedupWindow.mockResolvedValueOnce(true);
+
+    await evaluator.handleDeviceOffline({ deviceId: 'device-B', deviceName: 'B', organizationId: orgId });
+
+    // Both devices got their in_app notification
+    expect(db.notification.create).toHaveBeenCalledTimes(2);
   });
 
   // ---------------------------------------------------------------------------

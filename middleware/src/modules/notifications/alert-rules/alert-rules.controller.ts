@@ -38,6 +38,7 @@ export class AlertRulesController {
   constructor(private readonly service: AlertRulesService) {}
 
   @Post()
+  @Roles('admin')
   create(
     @CurrentUser('organizationId') organizationId: string,
     @Body() dto: CreateAlertRuleDto,

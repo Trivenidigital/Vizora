@@ -150,6 +150,7 @@ model Display {
   auditLogs            AuditLog[]
   impressions          ContentImpression[]
   alertRulesScopedHere AlertRule[]
+  alertRuleFires       AlertRuleFire[]
 
   @@index([organizationId])
   @@index([deviceIdentifier])
@@ -1021,16 +1022,16 @@ model AlertRule {
   scopeTagId     String? // when scope="tag"
   scopeGroupId   String? // when scope="group"
   scopeDisplayId String? // when scope="display"
-  minOfflineSec  Int       @default(120) // floor — stale-heartbeat cron threshold is 2 min
-  lastFiredAt    DateTime? // dedup window (15 min) — atomic CAS via updateMany
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  minOfflineSec  Int      @default(120) // floor — stale-heartbeat cron threshold is 2 min
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   scopeTag     Tag?                 @relation(fields: [scopeTagId], references: [id], onDelete: SetNull)
   scopeGroup   DisplayGroup?        @relation(fields: [scopeGroupId], references: [id], onDelete: SetNull)
   scopeDisplay Display?             @relation(fields: [scopeDisplayId], references: [id], onDelete: SetNull)
   recipients   AlertRuleRecipient[]
+  fires        AlertRuleFire[]
 
   @@unique([organizationId, name]) // idempotent seed + UI uniqueness
   @@index([organizationId, isActive])
@@ -1051,4 +1052,27 @@ model AlertRuleRecipient {
 
   @@index([alertRuleId])
   @@map("alert_rule_recipients")
+}
+
+// Per-(rule, device) dedup state. One row per historical rule/device pair
+// (NOT one row per fire — `lastFiredAt` is mutable state, not an audit log).
+// The 15-min dedup window is claimed via atomic upsert in
+// `AlertRulesService.tryClaimDedupWindow(ruleId, deviceId, now)`.
+//
+// Growth is bounded by `rules × devices ever matched`. A 90-day prune of
+// stale rows can be added to db-maintainer if the table size becomes a
+// concern; for v1 it's left untouched.
+model AlertRuleFire {
+  id          String   @id @default(cuid())
+  alertRuleId String
+  deviceId    String
+  lastFiredAt DateTime
+  createdAt   DateTime @default(now())
+
+  alertRule AlertRule @relation(fields: [alertRuleId], references: [id], onDelete: Cascade)
+  device    Display   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@unique([alertRuleId, deviceId])
+  @@index([lastFiredAt])
+  @@map("alert_rule_fires")
 }

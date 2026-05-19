@@ -101,8 +101,14 @@ export class AlertRuleEvaluator {
       if (!this.scopeMatches(rule, device)) continue;
       if (offlineSec < rule.minOfflineSec) continue;
 
-      // Atomic CAS — only the instance whose UPDATE affects 1 row dispatches
-      const claimed = await this.alertRulesService.tryClaimDedupWindow(rule.id, now);
+      // Atomic CAS — only the instance whose upsert affects 1 row dispatches.
+      // Per-(rule, device) dedup: a rule matching N devices alerts for EACH
+      // device, not just the first to go offline in the window.
+      const claimed = await this.alertRulesService.tryClaimDedupWindow(
+        rule.id,
+        device.id,
+        now,
+      );
       if (!claimed) continue;
 
       await this.dispatchAll(rule, payload);

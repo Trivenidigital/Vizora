@@ -25,6 +25,10 @@ describe('AlertRulesService', () => {
         findFirst: jest.fn(),
         delete: jest.fn(),
       },
+      alertRuleFire: {
+        create: jest.fn(),
+        updateMany: jest.fn(),
+      },
       user: {
         findFirst: jest.fn(),
       },
@@ -217,32 +221,128 @@ describe('AlertRulesService', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // tryClaimDedupWindow — atomic CAS
+  // tryClaimDedupWindow — atomic CAS, per-(rule, device)
   // ---------------------------------------------------------------------------
   describe('tryClaimDedupWindow', () => {
-    it('returns true when updateMany reports count=1 (we claimed the window)', async () => {
-      db.alertRule.updateMany.mockResolvedValue({ count: 1 });
-      const claimed = await service.tryClaimDedupWindow('rule-1', new Date('2026-05-19T10:00:00Z'));
+    const ruleId = 'rule-1';
+    const deviceA = 'device-A';
+    const deviceB = 'device-B';
+    const now = new Date('2026-05-19T10:00:00Z');
+
+    it('updateMany count=1 (existing stale row claimed) → returns true', async () => {
+      db.alertRuleFire.updateMany.mockResolvedValue({ count: 1 });
+
+      const claimed = await service.tryClaimDedupWindow(ruleId, deviceA, now);
+
       expect(claimed).toBe(true);
+      expect(db.alertRuleFire.create).not.toHaveBeenCalled();
     });
 
-    it('returns false when updateMany reports count=0 (another instance won)', async () => {
-      db.alertRule.updateMany.mockResolvedValue({ count: 0 });
-      const claimed = await service.tryClaimDedupWindow('rule-1', new Date('2026-05-19T10:00:00Z'));
+    it('updateMany count=0 AND create succeeds (no prior row) → returns true', async () => {
+      db.alertRuleFire.updateMany.mockResolvedValue({ count: 0 });
+      db.alertRuleFire.create.mockResolvedValue({ id: 'fire-1' });
+
+      const claimed = await service.tryClaimDedupWindow(ruleId, deviceA, now);
+
+      expect(claimed).toBe(true);
+      expect(db.alertRuleFire.create).toHaveBeenCalledWith({
+        data: { alertRuleId: ruleId, deviceId: deviceA, lastFiredAt: now },
+      });
+    });
+
+    it('updateMany count=0 AND create throws P2002 (lost race / fresh row) → returns false', async () => {
+      db.alertRuleFire.updateMany.mockResolvedValue({ count: 0 });
+      const p2002 = Object.assign(new Error('Unique constraint'), { code: 'P2002' });
+      db.alertRuleFire.create.mockRejectedValue(p2002);
+
+      const claimed = await service.tryClaimDedupWindow(ruleId, deviceA, now);
+
       expect(claimed).toBe(false);
     });
 
-    it('predicate excludes rows that fired within the 15-min window', async () => {
-      db.alertRule.updateMany.mockResolvedValue({ count: 1 });
-      const now = new Date('2026-05-19T10:00:00Z');
-      await service.tryClaimDedupWindow('rule-1', now);
+    it('updateMany count=0 AND create throws non-P2002 → re-throws (real error)', async () => {
+      db.alertRuleFire.updateMany.mockResolvedValue({ count: 0 });
+      db.alertRuleFire.create.mockRejectedValue(new Error('connection refused'));
 
-      const whereArg = db.alertRule.updateMany.mock.calls[0][0].where;
-      expect(whereArg.id).toBe('rule-1');
-      // OR clause should let us claim if lastFiredAt is null OR older than the window
-      expect(whereArg.OR).toHaveLength(2);
-      const ltCondition = whereArg.OR.find((c: any) => c.lastFiredAt?.lt);
-      expect(ltCondition.lastFiredAt.lt).toEqual(new Date(now.getTime() - DEDUP_WINDOW_MS));
+      await expect(service.tryClaimDedupWindow(ruleId, deviceA, now)).rejects.toThrow(
+        'connection refused',
+      );
+    });
+
+    it('claims are independent per (rule, device) — same rule, two devices both claim', async () => {
+      db.alertRuleFire.updateMany.mockResolvedValueOnce({ count: 1 });
+      const claimedA = await service.tryClaimDedupWindow(ruleId, deviceA, now);
+
+      db.alertRuleFire.updateMany.mockResolvedValueOnce({ count: 0 });
+      db.alertRuleFire.create.mockResolvedValueOnce({ id: 'fire-B' });
+      const claimedB = await service.tryClaimDedupWindow(ruleId, deviceB, now);
+
+      expect(claimedA).toBe(true);
+      expect(claimedB).toBe(true);
+    });
+
+    it('updateMany predicate uses lastFiredAt < (now - DEDUP_WINDOW_MS)', async () => {
+      db.alertRuleFire.updateMany.mockResolvedValue({ count: 1 });
+
+      await service.tryClaimDedupWindow(ruleId, deviceA, now);
+
+      const where = db.alertRuleFire.updateMany.mock.calls[0][0].where;
+      expect(where.alertRuleId).toBe(ruleId);
+      expect(where.deviceId).toBe(deviceA);
+      expect(where.lastFiredAt.lt).toEqual(new Date(now.getTime() - DEDUP_WINDOW_MS));
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // seedDefaultRuleForOrg — used by post-migration script AND by AuthService
+  // for new-org auto-seeding. Idempotent.
+  // ---------------------------------------------------------------------------
+  describe('seedDefaultRuleForOrg', () => {
+    it('creates a default rule with one in_app recipient per admin', async () => {
+      db.alertRule.create.mockResolvedValue({ id: 'rule-1' });
+
+      await service.seedDefaultRuleForOrg(orgId, ['admin-1', 'admin-2']);
+
+      expect(db.alertRule.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          organizationId: orgId,
+          name: 'Default offline alert (auto-migrated)',
+          triggerEvent: 'device.offline',
+          isActive: true,
+          scope: 'all',
+          minOfflineSec: 120,
+          recipients: {
+            create: [
+              { channel: 'in_app', target: 'admin-1' },
+              { channel: 'in_app', target: 'admin-2' },
+            ],
+          },
+        }),
+      });
+    });
+
+    it('creates the rule with zero recipients when adminUserIds is empty', async () => {
+      db.alertRule.create.mockResolvedValue({ id: 'rule-1' });
+
+      await service.seedDefaultRuleForOrg(orgId, []);
+
+      const dataArg = db.alertRule.create.mock.calls[0][0].data;
+      expect(dataArg.recipients.create).toEqual([]);
+    });
+
+    it('is idempotent — re-seed catches P2002 and returns without error', async () => {
+      const p2002 = Object.assign(new Error('Unique constraint'), { code: 'P2002' });
+      db.alertRule.create.mockRejectedValue(p2002);
+
+      await expect(service.seedDefaultRuleForOrg(orgId, ['admin-1'])).resolves.toBeUndefined();
+    });
+
+    it('rethrows non-P2002 errors', async () => {
+      db.alertRule.create.mockRejectedValue(new Error('connection refused'));
+
+      await expect(service.seedDefaultRuleForOrg(orgId, ['admin-1'])).rejects.toThrow(
+        'connection refused',
+      );
     });
   });
 

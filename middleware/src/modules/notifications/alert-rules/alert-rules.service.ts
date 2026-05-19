@@ -182,26 +182,111 @@ export class AlertRulesService {
   }
 
   /**
-   * Atomic CAS-style claim of the 15-min dedup window.
+   * Atomic CAS-style claim of the 15-min dedup window for a specific
+   * (rule, device) pair.
    *
-   * Returns true if THIS caller successfully claimed the window (and should
-   * dispatch), false if another instance (PM2 cluster) already claimed it
-   * within the window.
+   * PR-review fix: dedup is per-device, not per-rule. A single rule scoped
+   * to `all` matching 20 offline devices must alert for EACH device, not
+   * just the first. Prior implementation used one `lastFiredAt` per rule
+   * which silently suppressed N-1 of N concurrent outages.
    *
-   * Implementation: `updateMany` with a predicate `lastFiredAt < threshold OR
-   * lastFiredAt IS NULL`. The `count` field tells us if the row was actually
-   * updated. Count === 1 means we won the race; count === 0 means we lost.
+   * Two-step pattern handles three states + the race cleanly:
+   *
+   *   1. Try to update an existing AlertRuleFire row whose lastFiredAt is
+   *      older than the window. `updateMany` returns count=1 if we claimed,
+   *      count=0 if the row exists but is still fresh, OR no row exists yet.
+   *   2. If count=0, attempt to create the row. If it already exists
+   *      (P2002 from the unique (alertRuleId, deviceId) index), another
+   *      instance created it just now — they win the race; we suppress.
+   *
+   * Outcomes:
+   *   - row missing, no race          → update miss → create succeeds → true
+   *   - row missing, lost race        → update miss → create P2002    → false
+   *   - row exists, lastFiredAt stale → update hit                    → true
+   *   - row exists, lastFiredAt fresh → update miss → create P2002    → false
+   *
+   * PM2 cluster safety: the unique index serializes concurrent creates;
+   * the updateMany predicate serializes concurrent updates. Exactly one
+   * instance dispatches per (rule, device, window).
    */
-  async tryClaimDedupWindow(ruleId: string, now: Date): Promise<boolean> {
+  async tryClaimDedupWindow(
+    ruleId: string,
+    deviceId: string,
+    now: Date,
+  ): Promise<boolean> {
     const threshold = new Date(now.getTime() - DEDUP_WINDOW_MS);
-    const result = await this.db.alertRule.updateMany({
-      where: {
-        id: ruleId,
-        OR: [{ lastFiredAt: null }, { lastFiredAt: { lt: threshold } }],
-      },
+
+    const updated = await this.db.alertRuleFire.updateMany({
+      where: { alertRuleId: ruleId, deviceId, lastFiredAt: { lt: threshold } },
       data: { lastFiredAt: now },
     });
-    return result.count === 1;
+    if (updated.count === 1) return true;
+
+    try {
+      await this.db.alertRuleFire.create({
+        data: { alertRuleId: ruleId, deviceId, lastFiredAt: now },
+      });
+      return true;
+    } catch (err) {
+      // P2002 = Prisma unique-constraint violation. Either we lost the
+      // create race with another instance, OR the row was created+fresh
+      // between our updateMany and our create. Both cases: do not dispatch.
+      if (this.isUniqueConstraintError(err)) return false;
+      throw err;
+    }
+  }
+
+  private isUniqueConstraintError(err: unknown): boolean {
+    return (
+      typeof err === 'object' &&
+      err !== null &&
+      'code' in err &&
+      (err as { code?: string }).code === 'P2002'
+    );
+  }
+
+  /**
+   * Seed the default downtime alert rule for a single org.
+   *
+   * Called from two places:
+   *   - The post-migration backfill script (`packages/database/scripts/
+   *     seed-default-alert-rules.ts`) — iterates over every existing org
+   *     and calls this once per org.
+   *   - `AuthService.register` — every NEW org registered post-deploy gets
+   *     the same default rule, so customer-1 / customer-2 / etc. don't lose
+   *     offline alerts after the hard-coded handler is removed.
+   *
+   * Idempotent — the unique `(organizationId, name)` index makes a re-call
+   * a no-op (P2002 caught and converted to a return-without-error).
+   *
+   * `adminUserIds` should be the list of admin users for the org. The
+   * default rule routes in-app notifications to each. If the list is empty,
+   * the rule is still created (zero recipients = silent no-op until an
+   * admin is added via the dedicated endpoint).
+   */
+  async seedDefaultRuleForOrg(
+    organizationId: string,
+    adminUserIds: string[],
+  ): Promise<void> {
+    try {
+      await this.db.alertRule.create({
+        data: {
+          organizationId,
+          name: 'Default offline alert (auto-migrated)',
+          triggerEvent: 'device.offline',
+          isActive: true,
+          scope: 'all',
+          minOfflineSec: 120,
+          recipients: {
+            create: adminUserIds.map((uid) => ({ channel: 'in_app', target: uid })),
+          },
+        },
+      });
+    } catch (err) {
+      // Idempotency: re-runs are safe.
+      if (this.isUniqueConstraintError(err)) return;
+      throw err;
+    }
   }
 
   // ---------------------------------------------------------------------------

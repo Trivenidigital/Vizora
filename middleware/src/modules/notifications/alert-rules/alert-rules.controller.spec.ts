@@ -114,9 +114,12 @@ describe('AlertRulesController', () => {
       expect(roles).toContain('admin');
     });
 
-    it('POST create does NOT require admin (any org user can create)', () => {
+    it('POST create requires @Roles("admin") — PR-review fix', () => {
+      // Was previously open to any org user. Tightened because POST allows
+      // inline recipients (same privilege as the admin-gated
+      // /:id/recipients endpoint — inconsistent to gate one but not the other).
       const roles = reflector.get<string[]>('roles', controller.create);
-      expect(roles).toBeUndefined();
+      expect(roles).toContain('admin');
     });
 
     it('GET findAll does NOT require admin', () => {
