@@ -58,6 +58,7 @@ model Organization {
   contentRecommendations ContentRecommendation[]
   mcpTokens              McpToken[]
   agentRuns              AgentRun[]
+  alertRules             AlertRule[]
 
   @@index([slug])
   @@index([stripeCustomerId])
@@ -143,11 +144,12 @@ model Display {
   pairedAt             DateTime?
   unpairedAt           DateTime?
 
-  schedules   Schedule[]
-  tags        DisplayTag[]
-  groups      DisplayGroupMember[]
-  auditLogs   AuditLog[]
-  impressions ContentImpression[]
+  schedules            Schedule[]
+  tags                 DisplayTag[]
+  groups               DisplayGroupMember[]
+  auditLogs            AuditLog[]
+  impressions          ContentImpression[]
+  alertRulesScopedHere AlertRule[]
 
   @@index([organizationId])
   @@index([deviceIdentifier])
@@ -167,8 +169,9 @@ model DisplayGroup {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  displays  DisplayGroupMember[]
-  schedules Schedule[]
+  displays             DisplayGroupMember[]
+  schedules            Schedule[]
+  alertRulesScopedHere AlertRule[]
 
   @@index([organizationId])
 }
@@ -358,8 +361,9 @@ model Tag {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  content  ContentTag[]
-  displays DisplayTag[]
+  content              ContentTag[]
+  displays             DisplayTag[]
+  alertRulesScopedHere AlertRule[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -1001,4 +1005,50 @@ model AgentRun {
   @@index([createdAt])
   @@index([organizationId, startedAt])
   @@map("agent_runs")
+}
+
+// ============================================================================
+// ALERT RULES (O7 — configurable downtime alert rules)
+// ============================================================================
+
+model AlertRule {
+  id             String    @id @default(cuid())
+  organizationId String
+  name           String // user-facing label
+  triggerEvent   String // "device.offline" (extensible)
+  isActive       Boolean   @default(true)
+  scope          String // "all" | "tag" | "group" | "display"
+  scopeTagId     String? // when scope="tag"
+  scopeGroupId   String? // when scope="group"
+  scopeDisplayId String? // when scope="display"
+  minOfflineSec  Int       @default(120) // floor — stale-heartbeat cron threshold is 2 min
+  lastFiredAt    DateTime? // dedup window (15 min) — atomic CAS via updateMany
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  scopeTag     Tag?                 @relation(fields: [scopeTagId], references: [id], onDelete: SetNull)
+  scopeGroup   DisplayGroup?        @relation(fields: [scopeGroupId], references: [id], onDelete: SetNull)
+  scopeDisplay Display?             @relation(fields: [scopeDisplayId], references: [id], onDelete: SetNull)
+  recipients   AlertRuleRecipient[]
+
+  @@unique([organizationId, name]) // idempotent seed + UI uniqueness
+  @@index([organizationId, isActive])
+  @@index([scopeTagId])
+  @@index([scopeGroupId])
+  @@index([scopeDisplayId])
+  @@map("alert_rules")
+}
+
+model AlertRuleRecipient {
+  id          String   @id @default(cuid())
+  alertRuleId String
+  channel     String // "in_app" | "email" | "slack_webhook"
+  target      String // userId (in_app) | email | webhook URL
+  createdAt   DateTime @default(now())
+
+  alertRule AlertRule @relation(fields: [alertRuleId], references: [id], onDelete: Cascade)
+
+  @@index([alertRuleId])
+  @@map("alert_rule_recipients")
 }
