@@ -677,10 +677,13 @@ export class AnalyticsService {
   }
 
   private csvEscape(value: string): string {
-    // RFC 4180 + Excel-injection neutralizer
+    // RFC 4180 + Excel-injection neutralizer.
+    // PR-review on PR #67: also neutralize leading Tab (\t) which legacy
+    // Excel versions can treat as a formula delimiter, and ensure Tab
+    // inside cells triggers RFC 4180 quoting.
     let v = value;
-    if (/^[=+\-@]/.test(v)) v = `'${v}`;
-    if (/[",\n\r]/.test(v)) {
+    if (/^[=+\-@\t]/.test(v)) v = `'${v}`;
+    if (/[",\n\r\t]/.test(v)) {
       v = `"${v.replace(/"/g, '""')}"`;
     }
     return v;

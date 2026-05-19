@@ -301,6 +301,10 @@ model ContentImpression {
   @@index([organizationId, date])
   @@index([contentId, date])
   @@index([displayId, date])
+  // O2 — backs proof-of-play stream which orders by timestamp (asc/desc).
+  // Without this, the streaming export does a full-table sort for large
+  // impression volumes.
+  @@index([organizationId, timestamp])
   @@map("content_impressions")
 }
 

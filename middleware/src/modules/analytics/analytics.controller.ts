@@ -5,6 +5,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AnalyticsService } from './analytics.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { SkipEnvelope } from '../common/interceptors/response-envelope.interceptor';
 import { ProofOfPlayQueryDto } from './dto/proof-of-play-query.dto';
 
 @UseGuards(RolesGuard)
@@ -145,6 +146,7 @@ export class AnalyticsController {
    */
   @Get('proof-of-play.csv')
   @Roles('admin', 'manager')
+  @SkipEnvelope()
   @Header('Content-Type', 'text/csv; charset=utf-8')
   @Header('Content-Disposition', 'attachment; filename="proof-of-play.csv"')
   async streamProofOfPlayCsv(
@@ -152,12 +154,22 @@ export class AnalyticsController {
     @Query() query: ProofOfPlayQueryDto,
     @Res() res: Response,
   ): Promise<void> {
-    for await (const chunk of this.analyticsService.streamProofOfPlayCsv(
-      organizationId,
-      query,
-    )) {
-      res.write(chunk);
+    try {
+      for await (const chunk of this.analyticsService.streamProofOfPlayCsv(
+        organizationId,
+        query,
+      )) {
+        res.write(chunk);
+      }
+      res.end();
+    } catch (err) {
+      // Mid-stream DB failure: the response has already been written with a
+      // 200 OK header, so a 500 status response is impossible. The fallback
+      // is a trailing comment line the client can detect — telling them the
+      // CSV is incomplete. PR-review fix.
+      const msg = err instanceof Error ? err.message : 'unknown error';
+      res.write(`# ERROR: proof-of-play stream truncated mid-response: ${msg}\n`);
+      res.end();
     }
-    res.end();
   }
 }
