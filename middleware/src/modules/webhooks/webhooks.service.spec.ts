@@ -1,19 +1,26 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import * as Sentry from '@sentry/nestjs';
 import * as crypto from 'crypto';
 import * as dns from 'dns/promises';
 import { WebhooksService } from './webhooks.service';
 import { DatabaseService } from '../database/database.service';
+import { MetricsService } from '../metrics/metrics.service';
 import { AUTO_DISABLE_THRESHOLD, SIGNATURE_HEADER, EVENT_HEADER } from './webhook.types';
 
 jest.mock('dns/promises');
+jest.mock('@sentry/nestjs', () => ({
+  captureException: jest.fn(),
+}));
 
 describe('WebhooksService', () => {
   let service: WebhooksService;
   let db: any;
+  let metrics: any;
   const orgId = 'org-123';
 
   const originalFetch = global.fetch;
   const mockLookup = dns.lookup as unknown as jest.Mock;
+  const mockSentryCapture = Sentry.captureException as unknown as jest.Mock;
 
   beforeEach(() => {
     db = {
@@ -30,11 +37,19 @@ describe('WebhooksService', () => {
         count: jest.fn(),
       },
     };
-    service = new WebhooksService(db as unknown as DatabaseService);
+    metrics = {
+      webhookDeliveriesTotal: { inc: jest.fn() },
+      webhookAuditFailuresTotal: { inc: jest.fn() },
+    };
+    service = new WebhooksService(
+      db as unknown as DatabaseService,
+      metrics as unknown as MetricsService,
+    );
 
     // Default DNS: public IP. Per-test mocks override for SSRF tests.
     mockLookup.mockReset();
     mockLookup.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]);
+    mockSentryCapture.mockReset();
   });
 
   afterEach(() => {
@@ -330,6 +345,14 @@ describe('WebhooksService', () => {
         expect(row.errorMessage).toBeNull();
         expect(typeof row.durationMs).toBe('number');
         expect(row.durationMs).toBeGreaterThanOrEqual(0);
+
+        // Every successful audit insert increments the deliveries
+        // counter — gives Grafana a delivery-rate signal and acts as
+        // independent evidence that the dispatch path reached the DB.
+        expect(metrics.webhookDeliveriesTotal.inc).toHaveBeenCalledWith({
+          status: 'success',
+          event: 'display.paired',
+        });
       });
 
       it('records failure row on HTTP non-2xx with statusCode + errorMessage', async () => {
@@ -382,15 +405,47 @@ describe('WebhooksService', () => {
         expect(row.errorMessage.endsWith('...')).toBe(true);
       });
 
-      it('audit insert failure does NOT block summary-row update (best-effort)', async () => {
-        // If the audit table is missing or constraints fail, we still
-        // want the summary row updated so the customer sees lastError.
-        db.webhookDelivery.create.mockRejectedValue(new Error('audit table missing'));
-        global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200 }) as any;
-        db.webhook.update.mockResolvedValue({ failureCount: 0 });
+      // Silent-failure prevention (CLAUDE.md §12). Best-effort behaviour
+      // is preserved (transient audit failure doesn't block delivery),
+      // but the failure surfaces via THREE independent signals so it
+      // cannot be missed by the operator.
+      describe('audit insert failure surfaces loudly (§12 silent-failure prevention)', () => {
+        beforeEach(() => {
+          db.webhookDelivery.create.mockRejectedValue(new Error('audit table missing'));
+          global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200 }) as any;
+          db.webhook.update.mockResolvedValue({ failureCount: 0 });
+        });
 
-        await expect(service.deliver(hook, 'display.paired', {})).resolves.toBeUndefined();
-        expect(db.webhook.update).toHaveBeenCalled();
+        it('does NOT block the summary-row update (best-effort delivery preserved)', async () => {
+          await expect(service.deliver(hook, 'display.paired', {})).resolves.toBeUndefined();
+          expect(db.webhook.update).toHaveBeenCalled();
+        });
+
+        it('increments the audit-failure Prom counter (Grafana / watchdog hook)', async () => {
+          await service.deliver(hook, 'display.paired', {});
+          expect(metrics.webhookAuditFailuresTotal.inc).toHaveBeenCalledWith({
+            event: 'display.paired',
+          });
+          // Deliveries counter must NOT increment — the audit row did
+          // not land.
+          expect(metrics.webhookDeliveriesTotal.inc).not.toHaveBeenCalled();
+        });
+
+        it('emits a Sentry capture with component+webhook context (alert-at-write-site)', async () => {
+          await service.deliver(hook, 'display.paired', {});
+
+          expect(mockSentryCapture).toHaveBeenCalledTimes(1);
+          const [err, ctx] = mockSentryCapture.mock.calls[0];
+          expect(err).toBeInstanceOf(Error);
+          expect((err as Error).message).toBe('audit table missing');
+          expect(ctx.tags).toEqual({ component: 'webhooks', subsystem: 'delivery-audit' });
+          expect(ctx.extra.webhookId).toBe(hook.id);
+          expect(ctx.extra.organizationId).toBe(orgId);
+          expect(ctx.extra.event).toBe('display.paired');
+          // Intentionally NOT including errorMessage from the upstream
+          // delivery — Sentry capture is about THIS insert failing.
+          expect(ctx.extra.errorMessage).toBeUndefined();
+        });
       });
     });
   });

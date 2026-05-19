@@ -4,8 +4,10 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import * as Sentry from '@sentry/nestjs';
 import * as crypto from 'crypto';
 import { DatabaseService } from '../database/database.service';
+import { MetricsService } from '../metrics/metrics.service';
 import { PaginatedResponse } from '../common/dto/pagination.dto';
 import { assertUrlIsPublic, SsrfError } from '../common/utils/ssrf-guard';
 import { CreateWebhookDto } from './dto/create-webhook.dto';
@@ -67,7 +69,10 @@ export class WebhooksService {
     updatedAt: true,
   } as const;
 
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly metrics: MetricsService,
+  ) {}
 
   // ---------------------------------------------------------------------------
   // CRUD
@@ -278,10 +283,23 @@ export class WebhooksService {
     errorMessage: string | null,
     durationMs: number,
   ): Promise<void> {
-    // Audit row first — best-effort. If audit insert fails for any
-    // reason (table missing, schema drift), we still want to update
-    // the summary row so the customer sees lastError move. Log and
-    // continue.
+    // Audit row first. Best-effort vs the summary-row update because a
+    // transient audit-insert failure shouldn't block the customer's
+    // dashboard from showing fresh lastError — but per CLAUDE.md §12
+    // (silent-failure prevention) "best-effort with log only" is too
+    // quiet: a missing migration / FK drift / table permissions issue
+    // would silently lose every audit row while customers keep seeing
+    // their summary fields move.
+    //
+    // Three signals at the write site so the divergence surfaces:
+    //   1. Sentry capture — pages the operator (§12b alert-at-write-site).
+    //   2. Prom counter vizora_webhook_audit_failures_total — alert on
+    //      ANY non-zero value via Grafana (§12a watchdog hook).
+    //   3. Structured log.error — for journalctl correlation.
+    //
+    // Every successful audit insert also increments
+    // vizora_webhook_deliveries_total{status,event} so a stalled counter
+    // is independent evidence that dispatch is broken.
     try {
       await this.db.webhookDelivery.create({
         data: {
@@ -294,7 +312,21 @@ export class WebhooksService {
           durationMs,
         },
       });
+      this.metrics.webhookDeliveriesTotal.inc({ status, event });
     } catch (err) {
+      this.metrics.webhookAuditFailuresTotal.inc({ event });
+      Sentry.captureException(err, {
+        tags: { component: 'webhooks', subsystem: 'delivery-audit' },
+        extra: {
+          webhookId: webhook.id,
+          organizationId: webhook.organizationId,
+          event,
+          status,
+          // Intentionally NOT including errorMessage — the upstream
+          // error text might mention internal hostnames; the Sentry
+          // capture is about THIS insert failing, not the delivery.
+        },
+      });
       this.logger.error(
         `Failed to record WebhookDelivery audit row for ${webhook.id}/${event}`,
         err instanceof Error ? err.stack : String(err),
