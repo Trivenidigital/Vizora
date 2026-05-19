@@ -163,23 +163,10 @@ export class NotificationsService {
     return notification;
   }
 
-  /**
-   * Factory helper: Create a device offline notification
-   */
-  async createDeviceOfflineNotification(
-    deviceId: string,
-    deviceName: string,
-    organizationId: string,
-  ) {
-    return this.create({
-      title: 'Device Offline',
-      message: `Device "${deviceName}" has gone offline.`,
-      type: 'device_offline',
-      severity: 'warning',
-      metadata: { deviceId, deviceName },
-      organizationId,
-    });
-  }
+  // createDeviceOfflineNotification removed in O7 — the rule-driven evaluator
+  // (alert-rules/alert-rule.evaluator.ts) now writes Notification rows
+  // directly per-recipient. The device.online path still uses the factory
+  // helper below — recovery alerts are out of scope for O7 v1.
 
   /**
    * Factory helper: Create a device online notification
@@ -271,17 +258,10 @@ export class NotificationsService {
     }
   }
 
-  /**
-   * Event listener: device went offline
-   */
-  @OnEvent('device.offline')
-  async handleDeviceOffline(payload: { deviceId: string; deviceName: string; organizationId: string }) {
-    try {
-      await this.createDeviceOfflineNotification(payload.deviceId, payload.deviceName, payload.organizationId);
-    } catch (error) {
-      this.logger.warn(`Failed to create device offline notification: ${error instanceof Error ? error.message : 'unknown'}`);
-    }
-  }
+  // device.offline handler removed in O7 — replaced by AlertRuleEvaluator
+  // (middleware/src/modules/notifications/alert-rules/alert-rule.evaluator.ts).
+  // The createDeviceOfflineNotification helper is also dead; the evaluator
+  // inlines the notification creation per matched recipient.
 
   /**
    * Delete old dismissed notifications (cleanup job)
