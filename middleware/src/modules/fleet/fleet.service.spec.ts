@@ -39,7 +39,14 @@ describe('FleetService', () => {
       displayGroup: {
         findFirst: jest.fn(),
       },
+
       displayGroupMember: {
+        findMany: jest.fn(),
+      },
+      tag: {
+        findFirst: jest.fn(),
+      },
+      displayTag: {
         findMany: jest.fn(),
       },
       content: {
@@ -181,6 +188,65 @@ describe('FleetService', () => {
 
       expect(result.deviceIds).toEqual(['dev-1', 'dev-2']);
       expect(result.targetName).toBe('All Devices');
+    });
+
+    // ---------- O1: tag-based target ------------------------------------------
+    describe('tag target (O1)', () => {
+      const tagId = 'tag-lobby';
+
+      it('resolves tag → all displays tagged with it in this org', async () => {
+        (db as any).tag.findFirst.mockResolvedValue({ id: tagId, name: 'lobby', organizationId: mockOrgId });
+        (db as any).displayTag.findMany.mockResolvedValue([
+          { displayId: 'dev-1' },
+          { displayId: 'dev-2' },
+          { displayId: 'dev-3' },
+        ]);
+
+        const result = await service.resolveTargetDevices(mockOrgId, {
+          type: 'tag',
+          id: tagId,
+        });
+
+        expect(result.deviceIds).toEqual(['dev-1', 'dev-2', 'dev-3']);
+        expect(result.targetName).toBe('tag: lobby');
+      });
+
+      it('throws NotFoundException when tag belongs to another org (cross-org guard)', async () => {
+        (db as any).tag.findFirst.mockResolvedValue(null); // foreign-org tag filtered by where
+
+        await expect(
+          service.resolveTargetDevices(mockOrgId, { type: 'tag', id: tagId }),
+        ).rejects.toThrow(NotFoundException);
+        expect((db as any).displayTag.findMany).not.toHaveBeenCalled();
+      });
+
+      it('returns empty array (no error) when tag has zero tagged displays', async () => {
+        (db as any).tag.findFirst.mockResolvedValue({ id: tagId, name: 'unused-tag', organizationId: mockOrgId });
+        (db as any).displayTag.findMany.mockResolvedValue([]);
+
+        const result = await service.resolveTargetDevices(mockOrgId, {
+          type: 'tag',
+          id: tagId,
+        });
+
+        expect(result.deviceIds).toEqual([]);
+        expect(result.targetName).toBe('tag: unused-tag');
+      });
+
+      it('DisplayTag query includes display.organizationId predicate (belt-and-braces cross-org guard)', async () => {
+        (db as any).tag.findFirst.mockResolvedValue({ id: tagId, name: 'lobby', organizationId: mockOrgId });
+        (db as any).displayTag.findMany.mockResolvedValue([]);
+
+        await service.resolveTargetDevices(mockOrgId, { type: 'tag', id: tagId });
+
+        expect((db as any).displayTag.findMany).toHaveBeenCalledWith({
+          where: {
+            tagId,
+            display: { organizationId: mockOrgId },
+          },
+          select: { displayId: true },
+        });
+      });
     });
   });
 

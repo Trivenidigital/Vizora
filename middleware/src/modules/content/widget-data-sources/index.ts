@@ -6,3 +6,4 @@ export {
   TwitterDataSource,
   FacebookDataSource,
 } from './social.data-source';
+export { GenericApiDataSource } from './generic-api.data-source';

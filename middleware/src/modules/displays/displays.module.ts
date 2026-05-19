@@ -7,6 +7,7 @@ import { PairingService } from './pairing.service';
 import { PairingController } from './pairing.controller';
 import { StorageModule } from '../storage/storage.module';
 import { BillingModule } from '../billing/billing.module';
+import { ProvisioningTemplatesModule } from '../provisioning-templates/provisioning-templates.module';
 
 @Module({
   imports: [
@@ -21,6 +22,9 @@ import { BillingModule } from '../billing/billing.module';
     }),
     HttpModule,
     StorageModule,
+    // O6 — PairingService.completePairing pulls defaults from the
+    // ProvisioningTemplate model when a templateId is supplied.
+    ProvisioningTemplatesModule,
   ],
   controllers: [DisplaysController, PairingController],
   providers: [DisplaysService, PairingService],

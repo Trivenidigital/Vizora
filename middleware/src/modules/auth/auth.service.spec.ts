@@ -72,6 +72,7 @@ describe('AuthService', () => {
   let mockRedisService: any;
   let mockMailService: any;
   let mockGeoService: any;
+  let mockAlertRulesService: any;
 
   const mockUser = {
     id: 'user-123',
@@ -156,6 +157,10 @@ describe('AuthService', () => {
 
     const mockEventEmitter = { emit: jest.fn() };
 
+    mockAlertRulesService = {
+      seedDefaultRuleForOrg: jest.fn().mockResolvedValue(undefined),
+    };
+
     // Directly instantiate the service with mocked dependencies
     service = new AuthService(
       mockDatabaseService as DatabaseService,
@@ -166,6 +171,7 @@ describe('AuthService', () => {
       mockBillingService as any,
       mockStorageService as any,
       mockEventEmitter as any,
+      mockAlertRulesService as any,
     );
     
     // Reset bcrypt mocks
@@ -206,6 +212,39 @@ describe('AuthService', () => {
       });
       // Default bcrypt rounds is 12 (matches env validation default)
       expect(bcrypt.hash).toHaveBeenCalledWith(registerDto.password, 12);
+    });
+
+    it('seeds the default downtime alert rule for the new org (PR-review fix)', async () => {
+      // The original O7 PR removed the hard-coded device.offline notification
+      // path. The seed script handles existing orgs at deploy time, but new
+      // orgs created post-deploy would silently lose offline alerts. This
+      // test pins the registration-time seed call.
+      mockDatabaseService.user.findUnique.mockResolvedValue(null);
+      mockDatabaseService.organization.findUnique.mockResolvedValue(null);
+      mockDatabaseService.organization.create.mockResolvedValue(mockOrganization);
+      mockDatabaseService.user.create.mockResolvedValue(mockUser);
+      mockDatabaseService.auditLog.create.mockResolvedValue({});
+      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-password');
+
+      await service.register(registerDto);
+
+      expect(mockAlertRulesService.seedDefaultRuleForOrg).toHaveBeenCalledWith(
+        mockOrganization.id,
+        [mockUser.id],
+      );
+    });
+
+    it('does not block registration if the seed fails (fire-and-forget with warn)', async () => {
+      mockDatabaseService.user.findUnique.mockResolvedValue(null);
+      mockDatabaseService.organization.findUnique.mockResolvedValue(null);
+      mockDatabaseService.organization.create.mockResolvedValue(mockOrganization);
+      mockDatabaseService.user.create.mockResolvedValue(mockUser);
+      mockDatabaseService.auditLog.create.mockResolvedValue({});
+      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-password');
+      mockAlertRulesService.seedDefaultRuleForOrg.mockRejectedValue(new Error('DB temporarily down'));
+
+      // Registration must still succeed — the seed is a best-effort follow-up.
+      await expect(service.register(registerDto)).resolves.toHaveProperty('token');
     });
 
     it('should throw ConflictException if email already exists', async () => {

@@ -1,0 +1,14 @@
+{
+  "topic": "o2-proof-of-play-reports",
+  "task_text": "O2 — Proof-of-play reports: paginated query endpoint over the existing ContentImpression model with filters (date range, contentId, displayId, displayTagId, playlistId) + CSV export endpoint. Saved-views, scheduled-email, Excel/PDF exports deferred.",
+  "completed_at": "2026-05-19T14:00:00Z",
+  "drift_check_tag": "extends-Hermes",
+  "net_new_step_count": 5,
+  "hermes_step_count": 0,
+  "files_to_read_first": [
+    "middleware/src/modules/analytics/analytics.controller.ts",
+    "middleware/src/modules/analytics/analytics.service.ts",
+    "packages/database/prisma/schema.prisma"
+  ],
+  "verdict": "Lean cut: 2 new endpoints on the existing AnalyticsController + 2 new service methods. ContentImpression model already exists with indexes for the query patterns we need. CSV export is hand-rolled (no new dep). Filtering by display tag uses the existing DisplayTag join."
+}

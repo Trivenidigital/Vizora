@@ -21,6 +21,7 @@ import {
   InstagramDataSource,
   TwitterDataSource,
   FacebookDataSource,
+  GenericApiDataSource,
 } from './widget-data-sources';
 
 @Module({
@@ -57,6 +58,7 @@ import {
     InstagramDataSource,
     TwitterDataSource,
     FacebookDataSource,
+    GenericApiDataSource,
   ],
   exports: [ContentService, TemplateRenderingService],
 })
