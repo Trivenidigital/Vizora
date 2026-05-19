@@ -366,36 +366,10 @@ describe('NotificationsService', () => {
     });
   });
 
-  describe('createDeviceOfflineNotification', () => {
-    it('should create a device offline notification', async () => {
-      db.notification.create.mockResolvedValue({
-        id: 'notif-offline',
-        title: 'Device Offline',
-        message: 'Device "Lobby Screen" has gone offline.',
-        type: 'device_offline',
-        severity: 'warning',
-        metadata: { deviceId: 'device-123', deviceName: 'Lobby Screen' },
-        organizationId,
-      });
+  // createDeviceOfflineNotification test removed in O7 — the helper itself
+  // was deleted; offline notifications now flow through AlertRuleEvaluator
+  // (covered by middleware/src/modules/notifications/alert-rules/alert-rule.evaluator.spec.ts).
 
-      const result = await service.createDeviceOfflineNotification(
-        'device-123',
-        'Lobby Screen',
-        organizationId,
-      );
-
-      expect(result.type).toBe('device_offline');
-      expect(result.severity).toBe('warning');
-      expect(db.notification.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          title: 'Device Offline',
-          type: 'device_offline',
-          severity: 'warning',
-          metadata: { deviceId: 'device-123', deviceName: 'Lobby Screen' },
-        }),
-      });
-    });
-  });
 
   describe('createDeviceOnlineNotification', () => {
     it('should create a device online notification', async () => {
