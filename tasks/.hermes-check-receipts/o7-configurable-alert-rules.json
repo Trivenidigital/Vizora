@@ -1,0 +1,17 @@
+{
+  "topic": "o7-configurable-alert-rules",
+  "task_text": "O7 — Configurable downtime alert rules: replace hard-coded device.offline handler with a rule table (AlertRule + AlertRuleRecipient Prisma models), per-org rules with scope (all/tag/group/display), recipient channels (in_app/email/slack_webhook), debounce threshold (minOfflineSec), 15-min dedup window. Audit ref P1 #6. This is a platform/runtime feature, not an agent.",
+  "completed_at": "2026-05-19T04:50:00Z",
+  "drift_check_tag": "extends-Hermes",
+  "net_new_step_count": 12,
+  "hermes_step_count": 0,
+  "files_to_read_first": [
+    "packages/database/prisma/schema.prisma",
+    "middleware/src/modules/notifications/notifications.service.ts",
+    "middleware/src/modules/displays/displays.service.ts",
+    "middleware/src/modules/notifications/notifications.service.spec.ts",
+    "middleware/src/modules/notifications/notifications.module.ts",
+    "middleware/src/modules/mail/mail.service.ts"
+  ],
+  "verdict": "All 12 steps net-new from Hermes substrate POV — expected for Vizora middleware/runtime work (not agent work). Hermes-first rule per CLAUDE.md applies to agent work; this is platform infrastructure for a domain Hermes doesn't own (NestJS event bus, Prisma schema, HTTP surface). Future agents may consume the new AlertRule table via an MCP read tool, but the table + evaluator themselves live in middleware."
+}

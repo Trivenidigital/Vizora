@@ -32,6 +32,8 @@ import { SupportModule } from '../modules/support/support.module';
 import { FleetModule } from '../modules/fleet/fleet.module';
 import { AgentsModule } from '../modules/agents/agents.module';
 import { McpModule } from '../modules/mcp/mcp.module';
+import { WebhooksModule } from '../modules/webhooks/webhooks.module';
+import { TagRulesModule } from '../modules/tag-rules/tag-rules.module';
 
 @Module({
   imports: [
@@ -119,6 +121,8 @@ import { McpModule } from '../modules/mcp/mcp.module';
     FleetModule,
     AgentsModule,
     McpModule,
+    WebhooksModule,
+    TagRulesModule,
   ],
   controllers: [AppController],
   providers: [

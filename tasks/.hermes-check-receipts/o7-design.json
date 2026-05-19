@@ -1,0 +1,17 @@
+{
+  "topic": "o7-design",
+  "task_text": "O7 design — file shapes, code skeletons, migration SQL, test plan for configurable downtime alert rules. Follow-up to o7-configurable-alert-rules-plan.md after 2 parallel reviewers.",
+  "completed_at": "2026-05-19T05:00:00Z",
+  "drift_check_tag": "extends-Hermes",
+  "net_new_step_count": 12,
+  "hermes_step_count": 0,
+  "files_to_read_first": [
+    "middleware/src/modules/mail/mail.service.ts",
+    "middleware/src/modules/notifications/notifications.controller.ts",
+    "middleware/src/modules/agents/onboarding.service.ts",
+    "middleware/src/modules/notifications/notifications.module.ts",
+    "packages/database/prisma/schema.prisma",
+    "middleware/src/modules/displays/displays.service.ts"
+  ],
+  "verdict": "Design layer of O7. All structural patterns now read directly: MailService.wrapInTemplate/sendMail (no .hbs needed), OnboardingService async-OnEvent invariant (top-level try/catch + fire-and-forget), NotificationsController @CurrentUser+@Roles RBAC pattern, NotificationsModule's current DatabaseModule+HttpModule imports (needs MailModule added)."
+}
