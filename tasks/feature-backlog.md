@@ -6,6 +6,34 @@ Not a sprint tracker — see `todo.md` for in-flight work.
 
 ---
 
+## OptiSigns parity — deferred items (from 2026-05-17 audit)
+
+**Opened:** 2026-05-17
+**Status:** Parked — listed in the audit but consciously not on the active parity roadmap
+**Source:** `docs/plans/2026-05-17-optsigns-vizora-feature-gap.md`
+**Trigger to revisit (per item below).** Active parity items are tracked in `backlog.md` under "OptiSigns Parity Roadmap" (O1–O10).
+
+Each entry is what we chose NOT to build now, why, and what would flip the decision.
+
+| Item | Why deferred | Trigger to revisit |
+|---|---|---|
+| **Engage / interactive signage** — kiosk builder, touch navigation, QR scan-to-interact, content-library kiosk, check-in/SMS, sensor/AI camera hooks | Separate product surface; the operator-facing dashboard and the kiosk builder share little. High cost; niche audience until a concrete ask | Pilot customer with explicit kiosk use case (retail check-in, healthcare wayfinding) — quote the audit's P1 #9 to scope |
+| **Live remote view / remote control (WebRTC)** | Static screenshot already covers most operator troubleshooting (`displays.controller.ts:213-241`). WebRTC infra is a major platform lift (TURN/STUN, peer auth, bandwidth) | Customer asks for live troubleshooting view, OR enterprise security RFP requires it |
+| **Scheduled device-side commands** — power/volume/brightness/mute/download windows on `Schedule` | Feature, not foundational; today's playlist scheduling already covers the most-asked use cases | First customer who flags "displays still on overnight wasting power" as a deal-blocker |
+| **Advanced layout zones** — percentage/pixel zones, scrolling strips, audio zones, background music, primary-zone sync | Today's fixed presets in `web/src/app/dashboard/layouts/page.tsx` cover most observed use cases. Free-form zone editor is multi-week and competes for designer-extension cycles (O3) | After O3 ships and we have a real customer needing per-zone audio or scrolling tickers |
+| **Office / OpenOffice document playback + auto-conversion** | PDF support already exists; native PowerPoint/Word would require Aspose, Microsoft Graph, or LibreOffice headless conversion — all ongoing licensing/ops cost | Customer asks for native PowerPoint upload as a deal-blocker, OR free conversion-API path emerges |
+| **Template marketplace at thousands-scale + industry packs** | Today's ~78 templates plus the Designer (O3) cover early customers. Content scaling is a slow burn (hire content designer / contract OptiSigns-quality work), not a feature | Marketplace requests from enterprise plans, OR content-team hiring decision |
+| **White-label / branded portal** | Partial foundation already exists via `CustomizationProvider` (brand name + logo per org). Full white-label (sub-domains, branded portal, branded emails) is a marketing-driven build | Agency-partner ask, OR a reseller pricing tier decision |
+| **Nested playlists + playlist-item schedules + per-item fallback** | Today's flat playlists meet most needs; nesting is a model + UI + renderer change for marginal value | Customer ask, OR a real coverage gap surfaces in the schedule-doctor ops agent |
+| **Compliance exports** — richer audit/report exports for account deletion, advertiser reporting, enterprise governance | GDPR data export already in P2 (`M11`). Beyond that is enterprise-compliance RFP territory | First enterprise compliance RFP that names SOC 2 advertiser-reporting or HIPAA audit-export |
+| **SAML/OIDC enterprise SSO** | Already tracked at `F2` in `backlog.md` (P4). Same enterprise-plan dependency as O9 (Teams/folders) | Same enterprise customer that triggers O9 likely triggers this; consider bundling |
+
+### Why this list exists (not just absent from `backlog.md`)
+
+Without an explicit "deferred and why" record, every future Claude/Sri session that reads the audit risks re-proposing these. The audit names them as gaps; this entry documents that *we read the audit, considered each, and chose not to build now* — with the specific signal that would change the answer.
+
+---
+
 ## Adopt shift-agent / Hermes patterns for Vizora business agents (evaluation)
 
 **Opened:** 2026-05-03
@@ -250,9 +278,140 @@ Hardware video-wall controllers (Userful, Datapath, Christie Pandoras Box) handl
 No customer ask. The bulk of the "vertical screen" market (menu boards, wayfinding, lobby displays) is solved by today's portrait + DisplayGroups + per-screen playlists. Real video-wall sync serves a much smaller slice (stadium displays, broadcast studios, premium retail) and competes against entrenched hardware-layer players. Build only on a concrete pull.
 
 
+## Schema-tolerant comparison reader for Hermes shadow JSONL
+
+**Opened:** 2026-05-05
+**Status:** **Blocking** the customer-lifecycle and support-triage live cutover gates
+**Trigger to revisit:** Today — this is the next concrete piece of work for the agent migration, not a "may build."
+
+### What this is
+
+The cutover plan for both `customer-lifecycle` and `support-triage` requires comparing Hermes shadow output to the existing PM2 cron's records for ≥7 days before promoting. Today there is no comparison reader — and (critically) we now know there *can't* be a strict-schema one, because gpt-4o-mini doesn't reliably copy field names verbatim. See memory: `feedback_gpt4o_mini_schema_fidelity.md`.
+
+The blocker is not "wait for the model to comply." Three SKILL iterations on 2026-05-05 confirmed it won't. The blocker is "build a reader that's tolerant to model-side schema drift but still measures what we care about."
+
+### What the reader needs to do
+
+1. **Read both sides:**
+   - Hermes shadow JSONL: `/var/log/hermes/vizora-{customer-lifecycle,support-triage}-shadow.jsonl` (server-appended via `log_shadow_row` MCP tool — schema authoritative on the server side, but the *agent-supplied* fields inside `payload` are model-emitted)
+   - PM2 cron audit: `log_shadow_row` rows in `mcp_audit_log` (timestamps + tool + status) and the existing PM2 cron's own state files (`logs/agent-state/customer-lifecycle.json`)
+
+2. **Bucket by run_id (server-overridden, never trust agent):** Every shadow row has a server-stamped `timestamp` and `run_id`. Match Hermes runs to PM2 cron runs by wall-clock proximity (e.g. ±5 min window) — not by run_id, since they're different identifier spaces.
+
+3. **Tolerant field extraction:** For each Hermes row, try a list of synonyms (`hermes_template`, `decision`, `template`, `nudge_template_key`) and fall back to keyword search inside `message`/`summary` fields. Document which synonym hit per row so we can see model-side drift over time.
+
+4. **Compute the metric we actually care about:**
+   - **customer-lifecycle:** did Hermes pick the same `dayN` template as PM2 cron for the same org (or at least the same `dayN` bucket)? Tolerance = exact match on `day1`/`day3`/`day7`/`autocomplete`.
+   - **support-triage:** did Hermes pick the same priority bucket (P1/P2/P3) and same category-v2 as the heuristic classifier? Tolerance = exact match.
+
+5. **Output:** daily JSON summary + one-page Markdown — `agreement_rate`, `mismatch_examples`, `schema_drift_log`, `runs_with_no_extractable_decision` (this last one is the canary for "model went off-script entirely").
+
+### Where it lives
+
+`scripts/agents/hermes/compare-shadow.ts` — read-only script, scheduled as a daily PM2 cron. Writes to `logs/hermes-shadow-comparison/YYYY-MM-DD.{json,md}`. Surfaces in Slack only on `agreement_rate < 85%` or `runs_with_no_extractable_decision > 10%`.
+
+### Cutover-gate semantics
+
+The 7-day shadow comparison gates promote only if:
+- `agreement_rate >= 85%` for 7 consecutive days, AND
+- `runs_with_no_extractable_decision <= 5%` for 7 consecutive days, AND
+- Zero days where Hermes made a decision PM2 cron rejected (false positive on the LLM side)
+
+If gpt-4o-mini can't hit these, we know to swap models *with evidence*, not reflex.
+
+### Why deferred from this session
+
+Out of scope for the 2026-05-05 PM2-driven cutover (PR #60). That PR's job was to get *firings* reliable. The reader is the *evaluation* layer on top.
+
+### Estimated effort
+
+~1 day. The hard part (server-side authoritative timestamping) is already shipped; this is just a comparison script.
+
+---
+
+## hermes-cron-vs-`-z` context investigation
+
+**Opened:** 2026-05-05
+**Status:** Root-cause work — the workaround is shipped (PR #60), the cause is not understood
+**Trigger to revisit:** Adding a third Hermes skill (we now have a precedent that we can't lean on hermes-cron), OR Hermes upstream releases a runtime change touching cron-mode prompt assembly.
+
+### What this is
+
+`hermes cron create` and `hermes -z` are nominally the same: same skill, same prompt, same model. Empirically they aren't — under cron context, gpt-4o-mini exhibits different tool-calling behavior on identical SKILL files. The workaround (PR #60) bypasses hermes-cron entirely with a PM2 cron_restart + bash runner that calls `hermes -z` directly. This works, but we don't know *why* the cron path differs.
+
+### Why it matters
+
+We currently can't recommend `hermes cron` for any new Vizora skill — but the upstream pattern is to use it. If we can identify the difference (system-prompt assembly, env-var inheritance, working-directory discrepancy, signal handling, lock-file contention), we can either fix it in Hermes or document the precise reason for our deviation. Without root cause, every future Hermes-cron decision becomes a context-free "well it didn't work last time."
+
+### Hypotheses to test
+
+1. **System-prompt assembly difference** — does hermes-cron inject extra context (job metadata, cron-history hints) that `-z` doesn't?
+2. **Working directory** — does hermes-cron run with a different `cwd`, affecting MCP-tool config resolution?
+3. **Stdin/stdout binding** — `-z` uses one-shot mode; cron may keep an interactive-style channel that subtly changes prompt framing
+4. **Concurrent firings or lock contention** — if cron jobs overlap, do we see degraded behavior?
+
+### Approach
+
+Side-by-side capture: same skill, same prompt, model temperature 0, run via both paths 20 times each, diff the resulting tool-call sequences. Hermes ships verbose-logging flags that should reveal the assembled system prompt — start there.
+
+### Why deferred
+
+Operational fix shipped; root cause is investigative work that can be scheduled rather than rushed.
+
+---
+
+## support-triage gpt-4o-mini "cannot proceed" false-alarm cleanup
+
+**Opened:** 2026-05-05
+**Status:** Open — observed in 2026-05-05 PM2 cutover; non-blocking but noisy
+**Trigger to revisit:** Bundle with the schema-tolerant comparison reader, OR if the false-alarm rate climbs above ~20% of firings.
+
+### What this is
+
+`vizora-support-triage` runs every 5 min. When zero new tickets exist (the steady-state condition), gpt-4o-mini sometimes emits "The operation completed silently" or analogous "cannot proceed" framing instead of the expected "Zero support requests found during triage." line. The shadow JSONL row still gets written (server-side via `log_shadow_row`), but the runner log looks like an error.
+
+Observed example from 2026-05-05 PM2 firings:
+```
+=== runner log: support-triage ===
+The operation completed silently.
+[2026-05-05T12:15:02Z] start skill=vizora-support-triage pid=731281
+[2026-05-05T12:15:57Z] end skill=vizora-support-triage exit=0
+```
+And: `hermes-support-triage | log_shadow_row | error | 2026-05-05 12:15:42` — but exit=0 because the bash runner forces it.
+
+### Why it's a false alarm (today)
+
+The shadow row still lands. The agent did its job. The runner log is human-confusing but operationally fine. The `error` status on the audit row is a separate question — that's an actual recoverable error mapping issue (likely the agent calling `log_shadow_row` with a stale or empty payload that fails server-side validation, which we now reject correctly).
+
+### What needs to happen
+
+1. **Inventory the failure modes** — in the next 7 days of shadow JSONL, classify the "cannot proceed" runs: how many actually wrote a row vs how many silently no-op'd?
+2. **Fix the audit-row error** — if the agent is calling `log_shadow_row` with malformed args on the zero-tickets path, that's a SKILL-prompt issue (probably "do not call this tool when the input set is empty"). Fix in the SKILL.
+3. **Decide whether to suppress or display** — if "operation completed silently" is going to be a steady-state output, the runner log should explicitly note "no work this cycle" instead of leaving it as orphan text.
+
+### Why deferred
+
+Cosmetic + diagnostic, not breaking. The skill works. Worth bundling with the schema-tolerant comparison reader since both are "make the evaluation layer trustworthy" work.
+
+---
+
 ## customer-lifecycle Hermes migration
 
-**What**
+**Updated:** 2026-05-05 (was 2026-05-04)
+**Status:** Read tools deployed; PM2-driven shadow firings live; comparison reader pending (see entry above)
+
+**Latest progress (2026-05-05)**
+
+- `log_shadow_row` MCP tool shipped (PR #58) — server-side safe append to `/var/log/hermes/vizora-customer-lifecycle-shadow.jsonl`, server overrides agent-supplied `timestamp` and `run_id`, PIPE_BUF (4096) line-size cap, scope `shadow:write`, platform-scope tokens only.
+- MCP-spec empty handlers shipped (PR #59) — fixes the probe-loop bug where Hermes auto-discovered `mcp_vizora_list_resources` / `mcp_vizora_get_prompt` and gpt-4o-mini retried-and-looped on "Method not found." See memory: `mcp_server_empty_spec_handlers.md`.
+- PM2-driven scheduling shipped (PR #60) — `hermes-vizora-customer-lifecycle` PM2 entry, cron_restart `*/30 * * * *`, fires `bash scripts/agents/hermes/run-hermes-skill.sh customer-lifecycle <prompt>` which calls `hermes -z`. The old `hermes cron` jobs were removed to prevent duplicate firings. See memory: `hermes_cron_vs_pm2_cron.md`.
+- First production firings on 2026-05-05 12:15 logged 10 candidate-evaluation rows successfully — Hermes is doing the read+evaluate path end-to-end with no email sends.
+
+**Now blocking**
+
+The schema-tolerant comparison reader (above). Without it, we cannot run the 7-day comparison gate, so we cannot promote past shadow-mode. **gpt-4o-mini does not reliably copy field names verbatim** — three SKILL iterations confirmed this — so the gate cannot rely on strict-schema parsing.
+
+**Original design sketch (still accurate)**
 
 Migrate `scripts/agents/customer-lifecycle.ts` (463 lines, runs every 30 min, sends day-1/3/7 onboarding nudges) to a Hermes skill following the same shadow-then-cutover pattern as `vizora-support-triage`.
 
