@@ -118,19 +118,45 @@ ssh root@vizora.cloud 'pm2 list'
 #         hermes-vizora-customer-lifecycle (cron: stopped between firings is normal)
 #         hermes-vizora-support-triage NOT enabled (per design — see follow-up #3 in production-readiness-report.md)
 
-# Check 2: Migrations applied
+# Check 2: Migrations applied (pre-flight visibility — no writes)
 ssh root@vizora.cloud 'cd /opt/vizora/app/packages/database && npx prisma migrate status' > .ssh_pmstat.txt 2>&1
 cat .ssh_pmstat.txt
-# Expect: "Database schema is up to date!"
+# Expect: "Database schema is up to date!" — OR a list of pending migrations
+# you're about to apply via Check 2a below.
 
-# Check 2b (O7 — alert rules seed) — REQUIRED after migration 20260519050346_add_alert_rules
+# ---------------------------------------------------------------------------
+# Checks 2a → 2b → 2c MUST run in this order. Skipping 2b (`prisma generate`)
+# between migrate-deploy and the seed leaves the local Prisma client stale,
+# and the seed will fail with a confusing `TypeError: Cannot read properties
+# of undefined (reading 'findUnique')` on whatever model was added by the
+# new migration. Verified locally 2026-05-19.
+# ---------------------------------------------------------------------------
+
+# Check 2a: Apply migrations
+ssh root@vizora.cloud 'cd /opt/vizora/app && pnpm --filter @vizora/database exec prisma migrate deploy' > .ssh_migrate.txt 2>&1
+cat .ssh_migrate.txt
+# Expect: "All migrations have been successfully applied." (or "No pending migrations.")
+
+# Check 2b: Regenerate the Prisma client BEFORE any script that imports
+# packages/database/src/generated/prisma (e.g. the O7 seed below). Schema
+# additions are invisible to runtime callers until generate runs.
+ssh root@vizora.cloud 'cd /opt/vizora/app && pnpm --filter @vizora/database exec prisma generate --schema packages/database/prisma/schema.prisma' > .ssh_prisma_generate.txt 2>&1
+cat .ssh_prisma_generate.txt
+# Expect: "Generated Prisma Client (v...) to ./src/generated/prisma in Xms"
+
+# Check 2c (O7 — alert rules seed) — REQUIRED after migration 20260519050346_add_alert_rules
 # is applied for the FIRST time on prod. Without this step, existing orgs lose their
-# device-offline alerts (the rule-driven evaluator has nothing to evaluate).
+# device-offline alerts (the rule-driven evaluator has nothing to evaluate). New orgs
+# created post-deploy are auto-seeded via AuthService.register (PR #63 follow-up); this
+# backfill is needed only for orgs that pre-date the migration.
 # Idempotent — safe to re-run; rows with the auto-migrated name are skipped.
 ssh root@vizora.cloud 'cd /opt/vizora/app && export $(grep DATABASE_URL .env | xargs) && npx tsx packages/database/scripts/seed-default-alert-rules.ts' > .ssh_seed.txt 2>&1
 cat .ssh_seed.txt
 # Expect: "[seed] Done. created=N skipped_existing=0 orgs_with_no_admins=M"
 # If `created=0 skipped_existing=N` on second run, the seed already landed — that's correct.
+# If you see "Cannot read properties of undefined (reading 'findUnique')" or similar
+# on prisma.alertRule / prisma.alertRuleFire — Check 2b was skipped or failed. Re-run
+# 2b and then 2c.
 
 # Check 3: OpenRouter balance + daily cap
 # Open https://openrouter.ai/settings/keys in browser
