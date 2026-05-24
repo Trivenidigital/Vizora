@@ -291,6 +291,27 @@ export class CircuitBreakerService {
     this.logger.warn(
       `Circuit ${circuitName} transitioned to OPEN. Will retry in ${config.resetTimeout / 1000}s`,
     );
+    // §12b write-site alert. A circuit going OPEN means a downstream
+    // dependency just failed N times in a row — operators should know
+    // immediately, not via the next ops-reporter aggregate cycle. Use
+    // Sentry's captureMessage (already wired in middleware) so the
+    // alert routes through whichever channels ops has configured on
+    // the Sentry project (Slack, PagerDuty, email).
+    //
+    // Lazy-require Sentry so the test boot path doesn't need the
+    // module mocked — the service is constructed before Sentry is
+    // available in test environments.
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const Sentry = require('@sentry/nestjs');
+      Sentry.captureMessage(`Circuit '${circuitName}' OPEN`, {
+        level: 'warning',
+        tags: { circuit: circuitName, event: 'circuit_open' },
+        extra: { resetTimeoutMs: config.resetTimeout },
+      });
+    } catch {
+      /* Sentry not loaded in this context (e.g., unit tests) — drop the alert */
+    }
   }
 
   private cleanupFailures(circuitName: string, windowMs: number): void {
