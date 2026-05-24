@@ -276,7 +276,15 @@ async function main(): Promise<void> {
       log(AGENT, `Dashboard update failed: ${err instanceof Error ? err.message : err}`);
     }
   } else {
-    log(AGENT, 'Dashboard update skipped (OPS_EMAIL/VALIDATOR_EMAIL not set)');
+    // This is a misconfiguration the operator should fix — without ops
+    // credentials, ops-state.json never syncs to the dashboard's Redis
+    // cache and the /dashboard/ops view shows stale data forever. Log
+    // it as a WARNING (not the previous info-level message) so it
+    // surfaces in alerting/log scrapers.
+    log(
+      AGENT,
+      'WARNING: dashboard update skipped — set OPS_EMAIL (or VALIDATOR_EMAIL) + OPS_PASSWORD to enable dashboard sync',
+    );
   }
 
   // ─── 7. Prune Old Data ────────────────────────────────────────────────────
