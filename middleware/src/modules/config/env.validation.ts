@@ -80,6 +80,22 @@ export const envSchema = z.object({
         path: ['MINIO_SECRET_KEY'],
       });
     }
+    // INTERNAL_API_SECRET is optional in the base schema (dev + test
+    // don't require it for the ops scripts to spin up against an empty
+    // env), but it is REQUIRED in production. Without it, every call
+    // to /api/v1/internal/* — ops agents writing back state, the
+    // realtime gateway pushing content, the in-process MCP audit
+    // hooks — returns 401, and the failure mode is silent because
+    // those calls fire-and-forget.
+    if (!data.INTERNAL_API_SECRET) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'INTERNAL_API_SECRET must be set in production (min 32 chars). ' +
+          'Used for service-to-service auth between middleware, realtime, and ops scripts.',
+        path: ['INTERNAL_API_SECRET'],
+      });
+    }
   }
 });
 
