@@ -360,14 +360,20 @@ describe('AlertRulesService', () => {
 
       await service.healMissingDefaultRules();
 
-      expect(db.organization.findMany).toHaveBeenCalledWith({
-        where: {
-          alertRules: {
-            none: { name: 'Default offline alert (auto-migrated)' },
+      // Pagination cursor + take added — query now includes orderBy/take but the
+      // where + select shape is preserved.
+      expect(db.organization.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            alertRules: {
+              none: { name: 'Default offline alert (auto-migrated)' },
+            },
           },
-        },
-        select: { id: true, name: true },
-      });
+          select: { id: true, name: true },
+          orderBy: { id: 'asc' },
+          take: 100,
+        }),
+      );
       expect(db.alertRule.create).not.toHaveBeenCalled();
     });
 
