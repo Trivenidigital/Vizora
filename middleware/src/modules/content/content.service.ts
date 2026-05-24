@@ -422,8 +422,22 @@ export class ContentService {
       },
     });
 
+    // Collect (playlistId, organizationId) pairs that need a device-fleet
+    // push after the transaction commits — without this, device clients
+    // continue serving the expired content (or the now-deleted playlist
+    // slot) until they reconnect, sometimes hours later.
+    const affectedPlaylists: Array<{ playlistId: string; organizationId: string }> = [];
+
     for (const content of expiredContent) {
       await this.db.$transaction(async (tx) => {
+        // Snapshot playlistIds BEFORE the updateMany / deleteMany — we
+        // can't read them after the contentId rewrite or row deletion.
+        const items = await tx.playlistItem.findMany({
+          where: { contentId: content.id },
+          select: { playlistId: true },
+        });
+        const distinctPlaylistIds = Array.from(new Set(items.map((i) => i.playlistId)));
+
         if (content.replacementContentId) {
           // Validate replacement content belongs to same organization
           const replacement = await tx.content.findFirst({
@@ -457,10 +471,40 @@ export class ContentService {
           where: { id: content.id },
           data: { status: 'expired' },
         });
+
+        for (const playlistId of distinctPlaylistIds) {
+          affectedPlaylists.push({
+            playlistId,
+            organizationId: content.organizationId,
+          });
+        }
       });
     }
 
-    return { processed: expiredContent.length };
+    // Notify device fleet AFTER the transactions commit so the realtime
+    // gateway pushes the up-to-date playlist (with replacement content
+    // swapped in OR with the expired slot removed). De-dup by playlistId
+    // — a single playlist with N expired items only needs one push.
+    const distinctAffected = new Map<string, string>();
+    for (const a of affectedPlaylists) {
+      distinctAffected.set(a.playlistId, a.organizationId);
+    }
+    for (const [playlistId, organizationId] of distinctAffected) {
+      // playlist.updated is already listened-to by PlaylistsService's
+      // notifyDisplaysOfPlaylistUpdate plumbing (via the @OnEvent
+      // handler that triggers off this event), so the device push
+      // pipeline is reused exactly. action='expired_content_replaced'
+      // tags the event so downstream consumers (audit log, ops
+      // dashboards) can distinguish a system-driven push from an
+      // operator-driven edit.
+      this.eventEmitter.emit('playlist.updated', {
+        entityId: playlistId,
+        organizationId,
+        action: 'expired_content_replaced',
+      });
+    }
+
+    return { processed: expiredContent.length, playlistsRefreshed: distinctAffected.size };
   }
 
 

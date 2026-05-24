@@ -17,6 +17,7 @@ import { CreateTemplateDto } from './dto/create-template.dto';
 describe('ContentService', () => {
   let service: ContentService;
   let mockDatabaseService: any;
+  let mockEventEmitter: { emit: jest.Mock };
   let mockTemplateRendering: jest.Mocked<TemplateRenderingService>;
   let mockDataSourceRegistry: jest.Mocked<DataSourceRegistryService>;
   let mockStorageQuotaService: jest.Mocked<StorageQuotaService>;
@@ -77,6 +78,7 @@ describe('ContentService', () => {
       playlistItem: {
         updateMany: jest.fn(),
         deleteMany: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
       },
       tag: {
         count: jest.fn(),
@@ -128,7 +130,7 @@ describe('ContentService', () => {
       isMinioAvailable: jest.fn().mockReturnValue(false),
     } as any;
 
-    const mockEventEmitter = { emit: jest.fn() };
+    mockEventEmitter = { emit: jest.fn() };
     const mockNotificationsService = { create: jest.fn().mockResolvedValue({}) };
     service = new ContentService(
       mockDatabaseService as DatabaseService,
@@ -1184,6 +1186,53 @@ describe('ContentService', () => {
       const result = await service.checkExpiredContent();
 
       expect(result.processed).toBe(0);
+    });
+
+    it('emits playlist.updated for each distinct affected playlist (device fleet refresh)', async () => {
+      // Regression: when content expires, devices used to keep
+      // serving the old/expired item until they reconnected — sometimes
+      // hours later. checkExpiredContent now emits playlist.updated
+      // with action='expired_content_replaced' so PlaylistsService's
+      // @OnEvent listener can push refreshes via realtime.
+      const expiredContent = {
+        ...mockContent,
+        id: 'content-exp',
+        expiresAt: new Date('2020-01-01'),
+        replacementContentId: 'replacement-x',
+        status: 'active',
+      };
+      mockDatabaseService.content.findMany.mockResolvedValue([expiredContent]);
+      mockDatabaseService.content.findFirst.mockResolvedValue({
+        id: 'replacement-x',
+        organizationId: 'org-123',
+      });
+      // Two distinct playlists contain this content (e.g. content
+      // shared across playlists). De-dup should collapse them.
+      mockDatabaseService.playlistItem.findMany.mockResolvedValue([
+        { playlistId: 'pl-a' },
+        { playlistId: 'pl-b' },
+        { playlistId: 'pl-a' }, // duplicate of pl-a — only one event expected
+      ]);
+      mockDatabaseService.playlistItem.updateMany.mockResolvedValue({ count: 3 });
+      mockDatabaseService.content.update.mockResolvedValue({
+        ...expiredContent,
+        status: 'expired',
+      });
+
+      const result = await service.checkExpiredContent();
+
+      expect(result.processed).toBe(1);
+      expect(result.playlistsRefreshed).toBe(2);
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith('playlist.updated', {
+        entityId: 'pl-a',
+        organizationId: 'org-123',
+        action: 'expired_content_replaced',
+      });
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith('playlist.updated', {
+        entityId: 'pl-b',
+        organizationId: 'org-123',
+        action: 'expired_content_replaced',
+      });
     });
 
     it('should only find active expired content', async () => {
