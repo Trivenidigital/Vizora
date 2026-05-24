@@ -4,6 +4,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { DatabaseService } from '../../database/database.service';
 import { CreateAlertRuleDto } from './dto/create-alert-rule.dto';
 import { UpdateAlertRuleDto } from './dto/update-alert-rule.dto';
@@ -287,6 +288,66 @@ export class AlertRulesService {
       if (this.isUniqueConstraintError(err)) return;
       throw err;
     }
+  }
+
+  /**
+   * Hourly heal: backfill the default downtime alert rule for any org
+   * that is missing it.
+   *
+   * Why this exists: `seedDefaultRuleForOrg` is called fire-and-forget
+   * from `AuthService.register` (the seed must not block registration).
+   * If the seed fails — DB transient error, Prisma client mid-restart,
+   * Redis/connection blip — the new org silently loses offline alerts.
+   * This cron is the safety-net: every hour, find orgs that have zero
+   * rows in alert_rules matching the seeded name and re-attempt the
+   * seed for each.
+   *
+   * The query uses Prisma's `none:` predicate on the back-relation,
+   * which compiles to a single LEFT JOIN with WHERE NULL — O(orgs)
+   * not O(orgs × rules). Per-org work is bounded by the admin-user
+   * lookup + one INSERT (or a no-op P2002 if the rule appeared in
+   * the meantime).
+   */
+  @Cron(CronExpression.EVERY_HOUR)
+  async healMissingDefaultRules(): Promise<void> {
+    const orgsNeedingRule = await this.db.organization.findMany({
+      where: {
+        alertRules: {
+          none: { name: 'Default offline alert (auto-migrated)' },
+        },
+      },
+      select: { id: true, name: true },
+    });
+
+    if (orgsNeedingRule.length === 0) {
+      this.logger.debug('Heal cron: all orgs have the default downtime alert rule');
+      return;
+    }
+
+    let healed = 0;
+    let failed = 0;
+    for (const org of orgsNeedingRule) {
+      try {
+        const admins = await this.db.user.findMany({
+          where: { organizationId: org.id, role: 'admin' },
+          select: { id: true },
+        });
+        await this.seedDefaultRuleForOrg(
+          org.id,
+          admins.map((a) => a.id),
+        );
+        healed++;
+      } catch (err) {
+        failed++;
+        this.logger.error(
+          `Heal cron: failed to seed default alert rule for org ${org.id}: ${err instanceof Error ? err.message : err}`,
+        );
+      }
+    }
+
+    this.logger.log(
+      `Heal cron: healed ${healed}, failed ${failed} of ${orgsNeedingRule.length} orgs needing default downtime alert rule`,
+    );
   }
 
   // ---------------------------------------------------------------------------

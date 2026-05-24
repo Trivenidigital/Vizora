@@ -371,8 +371,15 @@ function escapeHtml(text: string): string {
  * silent-failure rule (global CLAUDE.md), automated alerts that
  * silently mis-format are as bad as alerts that don't fire.
  *
- * Escapes: _ * ` ~  (the four mrkdwn formatting characters that occur
- * naturally in our incident type names and free-form messages).
+ * Escapes: _ * ` ~ < >
+ *
+ * The angle-bracket pair is Slack mrkdwn's auto-link trigger: a
+ * free-form incident `message` containing `<http://x>` (or even
+ * `<...>` around a hostname) renders as a clickable link. That's
+ * a click-bait surface in operator inboxes that we should not
+ * delegate to whatever string an automated ops agent generates.
+ * Escaping to `\<http://x\>` makes the angle brackets render as
+ * plain text.
  */
 function escapeMrkdwn(text: string): string {
   return text
@@ -380,5 +387,7 @@ function escapeMrkdwn(text: string): string {
     .replace(/_/g, '\\_')
     .replace(/\*/g, '\\*')
     .replace(/`/g, '\\`')
-    .replace(/~/g, '\\~');
+    .replace(/~/g, '\\~')
+    .replace(/</g, '\\<')
+    .replace(/>/g, '\\>');
 }
