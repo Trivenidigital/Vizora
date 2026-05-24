@@ -125,6 +125,36 @@ module.exports = {
       min_uptime: '10s',
     },
     {
+      // ContentImpression retention cleanup — runs daily at 3:30am
+      // (offset from db-maintainer's 3am window so the two long-running
+      // jobs don't lock-contend on the same tables). Default 90-day
+      // retention; tune via RETENTION_DAYS env var. R6 analytics scout
+      // flagged this as manual-only previously — at 12k rows/day/org
+      // the table grew unbounded between operator-triggered cleanups.
+      name: 'cleanup-impressions',
+      script: 'npx',
+      args: 'tsx scripts/cleanup-impressions.ts',
+      instances: 1,
+      exec_mode: 'fork',
+      cron_restart: '30 3 * * *', // Daily at 3:30am
+      autorestart: false,
+      watch: false,
+      max_memory_restart: '256M',
+      env: {
+        NODE_ENV: 'development',
+        RETENTION_DAYS: '90',
+      },
+      env_production: {
+        NODE_ENV: 'production',
+        RETENTION_DAYS: '90',
+      },
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      max_size: '10M',
+      error_file: './logs/cleanup-impressions-error.log',
+      out_file: './logs/cleanup-impressions-out.log',
+      merge_logs: true,
+    },
+    {
       name: 'vizora-validator',
       script: 'npx',
       args: 'tsx scripts/validate-monitor.ts',
