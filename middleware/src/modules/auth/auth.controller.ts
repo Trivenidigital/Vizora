@@ -377,6 +377,16 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Token validation result.' })
   @Public()
   @Get('validate-reset-token')
+  @Throttle({
+    // Match the reset-password POST cap. Without a throttle here an
+    // attacker could brute-force the token via the GET (no body, no
+    // CSRF, public endpoint) — and the responses are deterministic
+    // enough to oracle (200 + {valid:true|false}).
+    default: {
+      limit: process.env.NODE_ENV === 'production' ? 5 : 1000,
+      ttl: 60000,
+    },
+  })
   async validateResetToken(@Req() req: Request) {
     const token = req.query.token as string;
     if (!token) {

@@ -28,10 +28,16 @@ async function bootstrap() {
     crossOriginEmbedderPolicy: false, // Allow embedding for display clients
   }));
 
-  // Enable CORS
+  // Enable CORS. Fail-fast in production if CORS_ORIGIN is missing — a
+  // silent fallback to localhost in prod meant either every browser
+  // request was rejected (and the operator never saw why, because the
+  // warn-level log was buried in startup spam) OR if the host happened
+  // to match localhost via /etc/hosts, the gate didn't apply.
   const corsOrigin = process.env.CORS_ORIGIN?.split(',').map(s => s.trim());
   if (!corsOrigin && process.env.NODE_ENV === 'production') {
-    Logger.warn('⚠️  CORS_ORIGIN is not set — defaulting to localhost origins. Set CORS_ORIGIN for production.');
+    throw new Error(
+      'CORS_ORIGIN is required in production. Set it to a comma-separated list of allowed origins (e.g. "https://vizora.cloud") before booting realtime.',
+    );
   }
   app.enableCors({
     origin: corsOrigin || [
