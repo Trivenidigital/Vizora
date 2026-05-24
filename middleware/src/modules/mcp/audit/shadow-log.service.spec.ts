@@ -57,6 +57,23 @@ describe('ShadowLogService', () => {
     expect(row.run_id).toMatch(/^\d{10}$/);
   });
 
+  it('returns the SAME timestamp + run_id that were written to disk (correlation chain)', () => {
+    // Regression: previously the tool re-derived these from a fresh
+    // Date() AFTER the service call, which drifted under load and
+    // broke MCP-audit ↔ shadow-log row correlation. The service now
+    // returns the values it generated, the tool just passes through.
+    const result = svc.appendRow('vizora-support-triage-shadow', {
+      ticket_id: 't1',
+    });
+    const filePath = join(tmpDir, 'vizora-support-triage-shadow.jsonl');
+    const row = JSON.parse(readFileSync(filePath, 'utf8').trim());
+
+    expect(result.timestamp).toBe(row.timestamp);
+    expect(result.run_id).toBe(row.run_id);
+    expect(result.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(result.run_id).toMatch(/^\d{10}$/);
+  });
+
   it('APPENDS, never truncates — multiple calls accumulate rows', () => {
     svc.appendRow('vizora-support-triage-shadow', { ticket_id: 't1' });
     svc.appendRow('vizora-support-triage-shadow', { ticket_id: 't2' });

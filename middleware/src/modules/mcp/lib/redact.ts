@@ -9,7 +9,7 @@
  * substring matches in the older unanchored regex this regex replaced).
  */
 const FORBIDDEN_KEY_REGEX =
-  /^(token|secret|password|passphrase|apiKey|api_key|webhook|webhookUrl|jwt|credential|cookie|sessionId|session_token|privateKey|private_key|accessToken|access_token|refreshToken|refresh_token|authHeader|authorization|email|emailAddress|recipient|phone|phoneNumber|address|fullName)$/i;
+  /^(token|secret|password|passphrase|apiKey|api_key|webhook|webhookUrl|jwt|credential|cookie|sessionId|session_token|privateKey|private_key|accessToken|access_token|refreshToken|refresh_token|authHeader|authorization|bearer|bearerToken|bearer_token|authToken|auth_token|email|emailAddress|recipient|phone|phoneNumber|address|fullName)$/i;
 
 export function redactSecrets(value: unknown): unknown {
   if (Array.isArray(value)) return value.map((v) => redactSecrets(v));

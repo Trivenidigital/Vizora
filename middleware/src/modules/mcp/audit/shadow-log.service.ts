@@ -73,7 +73,13 @@ export class ShadowLogService {
   appendRow(
     logName: string,
     fields: Record<string, unknown>,
-  ): { logName: string; written: boolean; lineCount: number } {
+  ): {
+    logName: string;
+    written: boolean;
+    lineCount: number;
+    timestamp: string;
+    run_id: string;
+  } {
     if (!ShadowLogService.ALLOWLIST.has(logName)) {
       throw new Error(
         `logName '${logName}' is not in the shadow-log allowlist. Add it to ShadowLogService.ALLOWLIST and redeploy.`,
@@ -83,12 +89,21 @@ export class ShadowLogService {
       throw new Error('fields must be a JSON object (not array, not primitive)');
     }
 
+    // Generate the server-enforced fields once and reuse them in both
+    // the persisted row and the return value, so the MCP tool echoes
+    // back the SAME timestamp + run_id that landed on disk. The
+    // previous shape re-derived both values inside the calling tool
+    // (~ms later), which silently drifted under load and broke the
+    // shadow-log → audit-row correlation chain.
+    const timestamp = new Date().toISOString();
+    const run_id = String(Math.floor(Date.now() / 1000));
+
     // Build the row — server fields ALWAYS override anything the agent
     // tried to supply for these keys. This is the discipline boundary.
     const row = {
       ...fields,
-      timestamp: new Date().toISOString(),
-      run_id: String(Math.floor(Date.now() / 1000)),
+      timestamp,
+      run_id,
     };
 
     const line = JSON.stringify(row) + '\n';
@@ -129,6 +144,6 @@ export class ShadowLogService {
       lineCount = -1;
     }
 
-    return { logName, written: true, lineCount };
+    return { logName, written: true, lineCount, timestamp, run_id };
   }
 }

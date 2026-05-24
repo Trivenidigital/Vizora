@@ -24,6 +24,8 @@ function makeShadowLog(opts: {
         logName: 'vizora-customer-lifecycle-shadow',
         written: true,
         lineCount: 42,
+        timestamp: '2026-05-24T19:00:00.000Z',
+        run_id: '1748113200',
       }),
   };
 }
@@ -191,7 +193,13 @@ describe('logShadowRowTool', () => {
     const svc = makeShadowLog({
       appendRow: jest.fn((logName, fields) => {
         captured.push({ logName, fields });
-        return { logName, written: true, lineCount: 1 };
+        return {
+          logName,
+          written: true,
+          lineCount: 1,
+          timestamp: '2026-05-24T19:00:00.000Z',
+          run_id: '1748113200',
+        };
       }),
     });
     await logShadowRowTool(
