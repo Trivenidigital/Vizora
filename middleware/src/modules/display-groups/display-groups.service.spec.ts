@@ -30,7 +30,9 @@ describe('DisplayGroupsService', () => {
         findMany: jest.fn(),
         findFirst: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
         delete: jest.fn(),
+        deleteMany: jest.fn(),
         count: jest.fn(),
       },
       displayGroupMember: {
@@ -210,8 +212,8 @@ describe('DisplayGroupsService', () => {
     const updateDto = { name: 'Updated Group' };
 
     it('should update a display group', async () => {
-      mockDatabaseService.displayGroup.findFirst.mockResolvedValue(mockDisplayGroup);
-      mockDatabaseService.displayGroup.update.mockResolvedValue({
+      mockDatabaseService.displayGroup.updateMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.displayGroup.findFirst.mockResolvedValue({
         ...mockDisplayGroup,
         ...updateDto,
       });
@@ -219,10 +221,14 @@ describe('DisplayGroupsService', () => {
       const result = await service.update('org-123', 'group-123', updateDto);
 
       expect(result.name).toBe('Updated Group');
+      expect(mockDatabaseService.displayGroup.updateMany).toHaveBeenCalledWith({
+        where: { id: 'group-123', organizationId: 'org-123' },
+        data: updateDto,
+      });
     });
 
     it('should throw NotFoundException if display group not found', async () => {
-      mockDatabaseService.displayGroup.findFirst.mockResolvedValue(null);
+      mockDatabaseService.displayGroup.updateMany.mockResolvedValue({ count: 0 });
 
       await expect(service.update('org-123', 'invalid-id', updateDto)).rejects.toThrow(
         NotFoundException,
@@ -231,8 +237,8 @@ describe('DisplayGroupsService', () => {
 
     it('should update description only', async () => {
       const descDto = { description: 'Updated description' };
-      mockDatabaseService.displayGroup.findFirst.mockResolvedValue(mockDisplayGroup);
-      mockDatabaseService.displayGroup.update.mockResolvedValue({
+      mockDatabaseService.displayGroup.updateMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.displayGroup.findFirst.mockResolvedValue({
         ...mockDisplayGroup,
         ...descDto,
       });
@@ -242,39 +248,48 @@ describe('DisplayGroupsService', () => {
       expect(result.description).toBe('Updated description');
     });
 
-    it('should enforce organization isolation in update', async () => {
-      mockDatabaseService.displayGroup.findFirst.mockResolvedValue(null);
+    it('should enforce organization isolation in update (compound WHERE)', async () => {
+      mockDatabaseService.displayGroup.updateMany.mockResolvedValue({ count: 0 });
 
       await expect(
         service.update('org-different', 'group-123', { name: 'Hacked' }),
       ).rejects.toThrow(NotFoundException);
 
-      expect(mockDatabaseService.displayGroup.update).not.toHaveBeenCalled();
+      // The compound where binds the write to the verified org — the
+      // updateMany itself returns count=0 for a foreign-org id.
+      expect(mockDatabaseService.displayGroup.updateMany).toHaveBeenCalledWith({
+        where: { id: 'group-123', organizationId: 'org-different' },
+        data: { name: 'Hacked' },
+      });
     });
   });
 
   describe('remove', () => {
     it('should delete a display group', async () => {
-      mockDatabaseService.displayGroup.findFirst.mockResolvedValue(mockDisplayGroup);
-      mockDatabaseService.displayGroup.delete.mockResolvedValue(mockDisplayGroup);
+      mockDatabaseService.displayGroup.deleteMany.mockResolvedValue({ count: 1 });
 
       const result = await service.remove('org-123', 'group-123');
 
-      expect(result).toEqual(mockDisplayGroup);
+      expect(result).toEqual({ deleted: true, id: 'group-123' });
+      expect(mockDatabaseService.displayGroup.deleteMany).toHaveBeenCalledWith({
+        where: { id: 'group-123', organizationId: 'org-123' },
+      });
     });
 
     it('should throw NotFoundException if display group not found', async () => {
-      mockDatabaseService.displayGroup.findFirst.mockResolvedValue(null);
+      mockDatabaseService.displayGroup.deleteMany.mockResolvedValue({ count: 0 });
 
       await expect(service.remove('org-123', 'invalid-id')).rejects.toThrow(NotFoundException);
     });
 
-    it('should enforce organization isolation in remove', async () => {
-      mockDatabaseService.displayGroup.findFirst.mockResolvedValue(null);
+    it('should enforce organization isolation in remove (compound WHERE)', async () => {
+      mockDatabaseService.displayGroup.deleteMany.mockResolvedValue({ count: 0 });
 
       await expect(service.remove('org-different', 'group-123')).rejects.toThrow(NotFoundException);
 
-      expect(mockDatabaseService.displayGroup.delete).not.toHaveBeenCalled();
+      expect(mockDatabaseService.displayGroup.deleteMany).toHaveBeenCalledWith({
+        where: { id: 'group-123', organizationId: 'org-different' },
+      });
     });
   });
 

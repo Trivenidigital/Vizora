@@ -69,27 +69,30 @@ export class DisplayGroupsService {
   }
 
   async update(organizationId: string, id: string, dto: UpdateDisplayGroupDto) {
-    await this.findOne(organizationId, id);
-
-    return this.db.displayGroup.update({
-      where: { id },
+    // Compound WHERE to close the TOCTOU race — previously findOne()
+    // verified the org but update() used only `{id}`, so a parallel
+    // request from another tenant during the gap between read and
+    // write could mutate this row. R10 display-groups scout.
+    const result = await this.db.displayGroup.updateMany({
+      where: { id, organizationId },
       data: dto,
-      include: {
-        displays: {
-          include: {
-            display: true,
-          },
-        },
-      },
     });
+    if (result.count === 0) {
+      throw new NotFoundException('Display group not found');
+    }
+    return this.findOne(organizationId, id);
   }
 
   async remove(organizationId: string, id: string) {
-    await this.findOne(organizationId, id);
-
-    return this.db.displayGroup.delete({
-      where: { id },
+    // Same TOCTOU close as update() — compound WHERE binds the delete
+    // to the verified org.
+    const result = await this.db.displayGroup.deleteMany({
+      where: { id, organizationId },
     });
+    if (result.count === 0) {
+      throw new NotFoundException('Display group not found');
+    }
+    return { deleted: true, id };
   }
 
   async addDisplays(organizationId: string, groupId: string, dto: ManageDisplaysDto) {
