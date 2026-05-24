@@ -468,25 +468,33 @@ describe('NotificationsService', () => {
   });
 
   describe('cleanupOldNotifications', () => {
-    it('should delete old dismissed notifications', async () => {
+    it('should delete old dismissed notifications scoped to one org', async () => {
       db.notification.deleteMany.mockResolvedValue({ count: 50 });
 
-      const result = await service.cleanupOldNotifications(30);
+      const result = await service.cleanupOldNotifications('org-123', 30);
 
       expect(result.deleted).toBe(50);
       expect(db.notification.deleteMany).toHaveBeenCalledWith({
         where: {
+          organizationId: 'org-123',
           dismissedAt: { not: null, lt: expect.any(Date) },
         },
       });
     });
 
-    it('should use default days parameter', async () => {
+    it('should use default days parameter when only orgId provided', async () => {
       db.notification.deleteMany.mockResolvedValue({ count: 0 });
 
-      await service.cleanupOldNotifications();
+      await service.cleanupOldNotifications('org-123');
 
       expect(db.notification.deleteMany).toHaveBeenCalled();
+    });
+
+    it('throws when organizationId is missing — prevents cross-tenant wipe', async () => {
+      await expect(
+        service.cleanupOldNotifications('' as string, 30),
+      ).rejects.toThrow(/requires an organizationId/);
+      expect(db.notification.deleteMany).not.toHaveBeenCalled();
     });
   });
 });

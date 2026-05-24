@@ -264,19 +264,35 @@ export class NotificationsService {
   // inlines the notification creation per matched recipient.
 
   /**
-   * Delete old dismissed notifications (cleanup job)
+   * Delete old dismissed notifications for a SINGLE org. The orgId
+   * parameter is required and the deleteMany is compound-WHERE-scoped
+   * so the cleanup can NEVER cross tenants.
+   *
+   * R10 notifications scout (CRITICAL): the previous signature accepted
+   * only `daysOld` and deleted across all orgs in one call — a single
+   * stray invocation from a cron, ops script, or admin UI would wipe
+   * dismissed notifications for every customer in one statement. Making
+   * `organizationId` a required argument makes that misuse impossible
+   * to express. The platform-wide cleanup cron (if it exists) should
+   * iterate orgs and call this per-org.
    */
-  async cleanupOldNotifications(daysOld: number = 30) {
+  async cleanupOldNotifications(organizationId: string, daysOld: number = 30) {
+    if (!organizationId) {
+      throw new Error('cleanupOldNotifications requires an organizationId');
+    }
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - daysOld);
 
     const result = await this.db.notification.deleteMany({
       where: {
+        organizationId,
         dismissedAt: { not: null, lt: cutoffDate },
       },
     });
 
-    this.logger.log(`Cleaned up ${result.count} old dismissed notifications`);
+    this.logger.log(
+      `Cleaned up ${result.count} old dismissed notifications for org ${organizationId}`,
+    );
     return { deleted: result.count };
   }
 }

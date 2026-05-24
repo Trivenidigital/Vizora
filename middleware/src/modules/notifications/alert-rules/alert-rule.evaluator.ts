@@ -197,6 +197,22 @@ export class AlertRuleEvaluator {
     recipient: { target: string },
     payload: DeviceOfflinePayload,
   ): Promise<void> {
+    // Re-verify the recipient user belongs to the rule's org before
+    // creating the notification. The rule's recipients are validated at
+    // create-time by the IsValidRecipientTarget validator, but a
+    // direct DB edit OR a user-org reassignment after the rule was
+    // created could end up writing a notification to a user from
+    // another org — silent cross-tenant leak. R10 alert-rules scout.
+    const user = await this.db.user.findFirst({
+      where: { id: recipient.target, organizationId: payload.organizationId },
+      select: { id: true },
+    });
+    if (!user) {
+      this.logger.warn(
+        `In-app dispatch skipped: user ${recipient.target} not in org ${payload.organizationId} (recipient row likely stale)`,
+      );
+      return;
+    }
     await this.db.notification.create({
       data: {
         organizationId: payload.organizationId,

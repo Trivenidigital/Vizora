@@ -22,6 +22,9 @@ describe('AlertRuleEvaluator', () => {
     db = {
       display: { findUnique: jest.fn() },
       notification: { create: jest.fn() },
+      // Default: the recipient user exists in the rule's org. Override
+      // per-test for cross-tenant guard checks.
+      user: { findFirst: jest.fn().mockResolvedValue({ id: 'user-1' }) },
     };
     alertRulesService = {
       findActiveForEvent: jest.fn(),
@@ -334,6 +337,18 @@ describe('AlertRuleEvaluator', () => {
         severity: 'warning',
       }),
     });
+  });
+
+  it('in_app dispatch skips when recipient user no longer in the rule\'s org (cross-tenant guard)', async () => {
+    db.display.findUnique.mockResolvedValue(makeDevice());
+    alertRulesService.findActiveForEvent.mockResolvedValue([makeRule()]);
+    alertRulesService.tryClaimDedupWindow.mockResolvedValue(true);
+    // User was moved to another org since the recipient row was created.
+    db.user.findFirst.mockResolvedValue(null);
+
+    await evaluator.handleDeviceOffline(payload);
+
+    expect(db.notification.create).not.toHaveBeenCalled();
   });
 
   it('dispatches slack_webhook with maxRedirects:0 and 5s timeout', async () => {
