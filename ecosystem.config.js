@@ -474,112 +474,12 @@ module.exports = {
       out_file: './logs/hermes-insights-poller-out.log',
       merge_logs: true,
     },
-    // Scaffold agents below — gated OFF by default. Flip the corresponding
-    // *_ENABLED env var to true to activate once implementation lands.
-    {
-      name: 'agent-screen-health-customer',
-      script: 'npx',
-      args: 'tsx scripts/agents/screen-health-customer.ts',
-      instances: 1,
-      exec_mode: 'fork',
-      cron_restart: '*/10 * * * *',
-      autorestart: false,
-      watch: false,
-      max_memory_restart: '256M',
-      env: {
-        NODE_ENV: 'development',
-        VALIDATOR_BASE_URL: 'http://localhost:3000',
-        SCREEN_HEALTH_CUSTOMER_ENABLED: 'false',
-      },
-      env_production: {
-        NODE_ENV: 'production',
-        VALIDATOR_BASE_URL: 'http://localhost:3000',
-        SCREEN_HEALTH_CUSTOMER_ENABLED: 'false',
-      },
-      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      max_size: '10M',
-      error_file: './logs/agent-screen-health-customer-error.log',
-      out_file: './logs/agent-screen-health-customer-out.log',
-      merge_logs: true,
-    },
-    {
-      name: 'agent-billing-revenue',
-      script: 'npx',
-      args: 'tsx scripts/agents/billing-revenue.ts',
-      instances: 1,
-      exec_mode: 'fork',
-      cron_restart: '*/15 * * * *',
-      autorestart: false,
-      watch: false,
-      max_memory_restart: '256M',
-      env: {
-        NODE_ENV: 'development',
-        VALIDATOR_BASE_URL: 'http://localhost:3000',
-        BILLING_REVENUE_ENABLED: 'false',
-      },
-      env_production: {
-        NODE_ENV: 'production',
-        VALIDATOR_BASE_URL: 'http://localhost:3000',
-        BILLING_REVENUE_ENABLED: 'false',
-      },
-      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      max_size: '10M',
-      error_file: './logs/agent-billing-revenue-error.log',
-      out_file: './logs/agent-billing-revenue-out.log',
-      merge_logs: true,
-    },
-    {
-      name: 'agent-content-intelligence',
-      script: 'npx',
-      args: 'tsx scripts/agents/content-intelligence.ts',
-      instances: 1,
-      exec_mode: 'fork',
-      cron_restart: '0 * * * *', // hourly
-      autorestart: false,
-      watch: false,
-      max_memory_restart: '256M',
-      env: {
-        NODE_ENV: 'development',
-        VALIDATOR_BASE_URL: 'http://localhost:3000',
-        CONTENT_INTELLIGENCE_ENABLED: 'false',
-      },
-      env_production: {
-        NODE_ENV: 'production',
-        VALIDATOR_BASE_URL: 'http://localhost:3000',
-        CONTENT_INTELLIGENCE_ENABLED: 'false',
-      },
-      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      max_size: '10M',
-      error_file: './logs/agent-content-intelligence-error.log',
-      out_file: './logs/agent-content-intelligence-out.log',
-      merge_logs: true,
-    },
-    {
-      name: 'agent-orchestrator',
-      script: 'npx',
-      args: 'tsx scripts/agents/agent-orchestrator.ts',
-      instances: 1,
-      exec_mode: 'fork',
-      cron_restart: '*/30 * * * *',
-      autorestart: false,
-      watch: false,
-      max_memory_restart: '256M',
-      env: {
-        NODE_ENV: 'development',
-        VALIDATOR_BASE_URL: 'http://localhost:3000',
-        AGENT_ORCHESTRATOR_ENABLED: 'false',
-      },
-      env_production: {
-        NODE_ENV: 'production',
-        VALIDATOR_BASE_URL: 'http://localhost:3000',
-        AGENT_ORCHESTRATOR_ENABLED: 'false',
-      },
-      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      max_size: '10M',
-      error_file: './logs/agent-orchestrator-error.log',
-      out_file: './logs/agent-orchestrator-out.log',
-      merge_logs: true,
-    },
+    // Hermes-first scaffolds previously lived here (billing-revenue,
+    // content-intelligence, screen-health-customer, agent-orchestrator).
+    // They were no-op shells; per CLAUDE.md "Agent migration roadmap" each
+    // should be implemented as a Hermes skill, not a TypeScript agent —
+    // registering them in PM2 served no purpose. Re-add only if a
+    // non-Hermes implementation is intentionally chosen.
   ],
 
   // Deployment configuration (optional)

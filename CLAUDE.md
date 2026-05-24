@@ -367,12 +367,12 @@ Inventory of `scripts/agents/*.ts` and their migration status:
 |-------|-------|-------|----------------|
 | support-triage | 306 | LIVE (PM2 cron, every 5 min) | **Migrated to Hermes shadow.** Cutover gated on shadow-data review. |
 | customer-lifecycle | 463 | LIVE (PM2 cron, every 30 min). Currently dry-run on prod (`LIFECYCLE_LIVE` unset). | **Migrated to Hermes shadow + write tools shipped.** Read tool: `list_onboarding_candidates`. Write tools: `mark_onboarding_nudge_sent`, `auto_complete_org_onboarding`, `send_lifecycle_nudge_email`. Live skill: `SKILL-live.md` written, NOT deployed. Cutover playbook documented above (multi-step: scp + token-scope + PM2 stop + LIFECYCLE_LIVE flip). |
-| billing-revenue | 32 | SCAFFOLD (gated off). | Per Hermes-first rule, when implemented build as `hermes-skills/vizora-billing-revenue/SKILL.md`, not TS. |
-| content-intelligence | 32 | SCAFFOLD (gated off). | Per Hermes-first rule, build as `hermes-skills/vizora-content-intelligence/SKILL.md`. |
-| screen-health-customer | 33 | SCAFFOLD (gated off). | Per Hermes-first rule, build as `hermes-skills/vizora-screen-health/SKILL.md`. The `list_displays` MCP tool already exists; only `create_customer_incident` write tool needed. |
-| agent-orchestrator | 33 | SCAFFOLD (gated off). | Per Hermes-first rule, **Hermes IS the orchestrator runtime** — use its built-in `delegate_task` tool to coordinate per-family skills, don't write a custom loop. |
+| billing-revenue | DELETED | Scaffold removed; never implemented. | When implemented, build as `hermes-skills/vizora-billing-revenue/SKILL.md` per Hermes-first rule. |
+| content-intelligence | DELETED | Scaffold removed; never implemented. | When implemented, build as `hermes-skills/vizora-content-intelligence/SKILL.md`. |
+| screen-health-customer | DELETED | Scaffold removed; never implemented. | When implemented, build as `hermes-skills/vizora-screen-health/SKILL.md`. The `list_displays` MCP tool already exists; only `create_customer_incident` write tool needed. |
+| agent-orchestrator | DELETED | Scaffold removed; never implemented. | **Hermes IS the orchestrator runtime** — use its built-in `delegate_task` tool to coordinate per-family skills, don't write a custom loop. |
 
-Each scaffold's file header now carries the Hermes-first comment so future implementers see the rule without having to rediscover it.
+The four scaffolds above were gated-off no-op shells that registered idle PM2 cron processes on every deploy; they were deleted as part of the Hermes-first cleanup. Their PM2 entries are gone from `ecosystem.config.js`. If any of these capabilities is intentionally chosen to be built without Hermes, re-add the file + PM2 entry alongside an ADR explaining why the Hermes-first default was overridden.
 
 **Cutover playbook for support-triage (Hermes shadow → live)**
 
