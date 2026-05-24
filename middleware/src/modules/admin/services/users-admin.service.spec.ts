@@ -1,10 +1,12 @@
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { UsersAdminService, UserFiltersDto, UpdateUserAdminDto } from './users-admin.service';
 import { DatabaseService } from '../../database/database.service';
+import { RedisService } from '../../redis/redis.service';
 
 describe('UsersAdminService', () => {
   let service: UsersAdminService;
   let mockDb: any;
+  let mockRedis: any;
 
   const mockUser = {
     id: 'user-123',
@@ -41,7 +43,15 @@ describe('UsersAdminService', () => {
       },
     };
 
-    service = new UsersAdminService(mockDb as DatabaseService);
+    mockRedis = {
+      set: jest.fn().mockResolvedValue('OK'),
+      del: jest.fn().mockResolvedValue(1),
+    };
+
+    service = new UsersAdminService(
+      mockDb as DatabaseService,
+      mockRedis as RedisService,
+    );
   });
 
   it('should be defined', () => {
@@ -207,6 +217,15 @@ describe('UsersAdminService', () => {
 
       await expect(service.grantSuperAdmin('user-123')).rejects.toThrow(BadRequestException);
     });
+
+    it('should flush user_auth cache so new isSuperAdmin claim is picked up', async () => {
+      mockDb.user.findUnique.mockResolvedValue(mockUser);
+      mockDb.user.update.mockResolvedValue({ ...mockUser, isSuperAdmin: true });
+
+      await service.grantSuperAdmin('user-123');
+
+      expect(mockRedis.del).toHaveBeenCalledWith('user_auth:user-123');
+    });
   });
 
   describe('revokeSuperAdmin', () => {
@@ -231,6 +250,21 @@ describe('UsersAdminService', () => {
       mockDb.user.count.mockResolvedValue(1);
 
       await expect(service.revokeSuperAdmin('user-123')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should set user_revoked: flag and flush auth cache', async () => {
+      mockDb.user.findUnique.mockResolvedValue({ ...mockUser, isSuperAdmin: true });
+      mockDb.user.count.mockResolvedValue(2);
+      mockDb.user.update.mockResolvedValue({ ...mockUser, isSuperAdmin: false });
+
+      await service.revokeSuperAdmin('user-123');
+
+      expect(mockRedis.set).toHaveBeenCalledWith(
+        'user_revoked:user-123',
+        '1',
+        expect.any(Number),
+      );
+      expect(mockRedis.del).toHaveBeenCalledWith('user_auth:user-123');
     });
   });
 

@@ -5,6 +5,8 @@ import {
   Logger,
 } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
+import { RedisService } from '../../redis/redis.service';
+import { AUTH_CONSTANTS } from '../../auth/constants/auth.constants';
 import { Prisma } from '@vizora/database';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
@@ -33,7 +35,10 @@ export interface UpdateUserAdminDto {
 export class UsersAdminService {
   private readonly logger = new Logger(UsersAdminService.name);
 
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly redisService: RedisService,
+  ) {}
 
   /**
    * List all users across all organizations
@@ -283,6 +288,13 @@ export class UsersAdminService {
       },
     });
 
+    // Privilege change — flush cached AuthenticatedUser payload so the
+    // new isSuperAdmin claim is picked up on the next request rather
+    // than waiting for the 60s user_auth: TTL to elapse. R9 admin
+    // scout finding (grantSuperAdmin counterpart to PR #88's
+    // user_revoked: pattern).
+    await this.redisService.del(`user_auth:${id}`);
+
     this.logger.warn(`Granted super admin to user ${id} (${user.email})`);
     return updated;
   }
@@ -317,6 +329,18 @@ export class UsersAdminService {
         isSuperAdmin: true,
       },
     });
+
+    // Privilege REDUCTION — set user_revoked: so any outstanding JWT
+    // is rejected on its next request, not just after the cache TTL.
+    // Also flush user_auth: so the next login lookup reads from DB.
+    // R9 admin scout CRITICAL: previously a demoted super-admin kept
+    // operating with their old token until natural expiry.
+    await this.redisService.set(
+      `user_revoked:${id}`,
+      '1',
+      AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS,
+    );
+    await this.redisService.del(`user_auth:${id}`);
 
     this.logger.warn(`Revoked super admin from user ${id} (${user.email})`);
     return updated;

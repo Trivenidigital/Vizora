@@ -264,7 +264,12 @@ describe('OrganizationsService', () => {
   });
 
   describe('setOnboardingCompleted (customer-lifecycle write)', () => {
-    it('upserts completedAt=NOW() (idempotent)', async () => {
+    const ageMs = (days: number) => Date.now() - days * 24 * 60 * 60 * 1000;
+
+    it('upserts completedAt=NOW() (idempotent) when org is >= 30 days old', async () => {
+      mockDatabaseService.organization.findUnique.mockResolvedValue({
+        createdAt: new Date(ageMs(45)),
+      });
       mockDatabaseService.organizationOnboarding.upsert.mockResolvedValue({
         organizationId: 'org-1',
       });
@@ -273,6 +278,22 @@ describe('OrganizationsService', () => {
       const arg = mockDatabaseService.organizationOnboarding.upsert.mock.calls[0][0];
       expect(arg.create).toMatchObject({ organizationId: 'org-1', completedAt: expect.any(Date) });
       expect(arg.update).toMatchObject({ completedAt: expect.any(Date) });
+    });
+
+    it('refuses to mark complete when org is younger than 30 days', async () => {
+      mockDatabaseService.organization.findUnique.mockResolvedValue({
+        createdAt: new Date(ageMs(5)),
+      });
+      const ok = await service.setOnboardingCompleted('org-1');
+      expect(ok).toBe(false);
+      expect(mockDatabaseService.organizationOnboarding.upsert).not.toHaveBeenCalled();
+    });
+
+    it('returns false (does not throw) when org id not found', async () => {
+      mockDatabaseService.organization.findUnique.mockResolvedValue(null);
+      const ok = await service.setOnboardingCompleted('missing');
+      expect(ok).toBe(false);
+      expect(mockDatabaseService.organizationOnboarding.upsert).not.toHaveBeenCalled();
     });
   });
 
