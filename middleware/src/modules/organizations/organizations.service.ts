@@ -424,7 +424,10 @@ export class OrganizationsService {
    * Returns null if SMTP isn't configured (dev environments).
    */
   private lifecycleTransporter:
-    | { sendMail: (opts: Record<string, unknown>) => Promise<unknown> }
+    | {
+        sendMail: (opts: Record<string, unknown>) => Promise<unknown>;
+        close?: () => void;
+      }
     | null
     | undefined = undefined;
 
@@ -445,6 +448,33 @@ export class OrganizationsService {
       auth: smtpUser && smtpPass ? { user: smtpUser, pass: smtpPass } : undefined,
     });
     return this.lifecycleTransporter;
+  }
+
+  /**
+   * NestJS lifecycle hook — close the cached nodemailer transporter
+   * pool when the app shuts down (SIGTERM from PM2 reload or upgrade).
+   * Without this, the pool's TCP keep-alives leak into the OS until
+   * the process is killed, and rapid PM2 reloads can exhaust file
+   * descriptors on the SMTP host. R7 support+onboarding scout
+   * finding #11.
+   *
+   * enableShutdownHooks() in main.ts is what wires this method to
+   * SIGTERM / SIGINT — no extra setup needed here.
+   */
+  async onApplicationShutdown(): Promise<void> {
+    if (this.lifecycleTransporter && typeof this.lifecycleTransporter.close === 'function') {
+      try {
+        this.lifecycleTransporter.close();
+        this.logger.log('lifecycle SMTP transporter pool closed on shutdown');
+      } catch (err) {
+        this.logger.warn(
+          `lifecycle SMTP transporter close failed on shutdown: ${
+            err instanceof Error ? err.message : err
+          }`,
+        );
+      }
+    }
+    this.lifecycleTransporter = undefined;
   }
 
   /**
