@@ -47,6 +47,19 @@ export class ProofOfPlayQueryDto {
   @MinLength(1)
   displayTagId?: string;
 
+  /**
+   * Optional IANA timezone for the CSV `timestamp` column (e.g.
+   * `America/New_York`, `Asia/Kolkata`). Without this, timestamps
+   * render as UTC ISO strings and operators in non-UTC orgs have
+   * to mentally subtract their offset on every row. Invalid
+   * strings silently fall back to UTC inside the service so the
+   * export never 500s on a typo'd dropdown value.
+   */
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  tz?: string;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()

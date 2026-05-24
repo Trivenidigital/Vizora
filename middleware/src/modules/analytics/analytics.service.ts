@@ -592,10 +592,26 @@ export class AnalyticsService {
       displayId?: string;
       playlistId?: string;
       displayTagId?: string;
+      /**
+       * IANA timezone (e.g. 'America/New_York', 'Asia/Kolkata') used to
+       * format the timestamp column. Defaults to UTC. Without this,
+       * an operator in EST exporting a 15:00 UTC impression sees
+       * `2026-05-24T15:00:00.000Z` in the spreadsheet, has to
+       * mentally subtract 5h every row, and downstream consumers
+       * (NDA partners, retail HQ reports) get the wrong day for
+       * impressions near midnight.
+       */
+      tz?: string;
     },
   ): AsyncGenerator<string> {
     const where = this.buildProofOfPlayWhere(organizationId, filters);
+    const tz = this.normalizeTimezone(filters.tz);
 
+    // Header stays stable across tz values so downstream parsers don't
+    // break — the cell content carries the tz suffix for non-UTC rows
+    // (e.g. "2026-05-24 11:00:00 America/New_York"). UTC rows keep
+    // ISO format so the CSV is byte-identical to the pre-tz version
+    // when `tz` is unspecified.
     yield 'timestamp,contentId,contentName,displayId,displayName,playlistId,duration_sec,completion_percent\n';
 
     const BATCH = 1000;
@@ -618,10 +634,28 @@ export class AnalyticsService {
 
       for (const r of batch) {
         if (emitted >= MAX_ROWS) break;
-        yield this.formatProofOfPlayCsvRow(r);
+        yield this.formatProofOfPlayCsvRow(r, tz);
         emitted++;
       }
       skip += BATCH;
+    }
+  }
+
+  /**
+   * Validate operator-supplied IANA timezone via Intl. An invalid
+   * string (typo, language) silently falls back to UTC rather than
+   * throwing — the CSV export shouldn't 500 because the operator
+   * picked a wrong drop-down value. The header column name records
+   * the actual tz used so the spreadsheet's recipient can see what
+   * was applied.
+   */
+  private normalizeTimezone(tz: string | undefined): string {
+    if (!tz) return 'UTC';
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: tz });
+      return tz;
+    } catch {
+      return 'UTC';
     }
   }
 
@@ -662,9 +696,12 @@ export class AnalyticsService {
     completionPercentage: number | null;
     content: { name: string };
     display: { nickname: string | null; deviceIdentifier: string };
-  }): string {
+  }, tz: string = 'UTC'): string {
     const cells = [
-      r.timestamp.toISOString(),
+      // UTC fast-path uses native toISOString (well-tested, deterministic).
+      // Non-UTC formats via Intl with sortable yyyy-MM-dd HH:mm:ss shape
+      // so spreadsheets sort the column correctly without column-type fuss.
+      tz === 'UTC' ? r.timestamp.toISOString() : this.formatInTz(r.timestamp, tz),
       r.contentId,
       r.content.name,
       r.displayId,
@@ -674,6 +711,26 @@ export class AnalyticsService {
       r.completionPercentage?.toString() ?? '',
     ];
     return cells.map((c) => this.csvEscape(c)).join(',') + '\n';
+  }
+
+  /**
+   * Format a Date in the given IANA timezone as `yyyy-MM-dd HH:mm:ss tz`.
+   * Intl returns parts unordered; assemble manually so the column is
+   * sortable as a plain string in spreadsheets.
+   */
+  private formatInTz(d: Date, tz: string): string {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }).formatToParts(d);
+    const pick = (t: string) => parts.find((p) => p.type === t)?.value ?? '00';
+    return `${pick('year')}-${pick('month')}-${pick('day')} ${pick('hour')}:${pick('minute')}:${pick('second')} ${tz}`;
   }
 
   private csvEscape(value: string): string {
