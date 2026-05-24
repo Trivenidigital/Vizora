@@ -190,7 +190,7 @@ ANTHROPIC_API_KEY       # Required when AGENT_AI_PROVIDER=anthropic
 
 ```
 OPS_EMAIL, OPS_PASSWORD # Service-account credentials used by ops scripts
-OPS_ALERT_EMAIL         # Alert recipient email (optional; SMTP_TO is the actual envelope target)
+OPS_ALERT_EMAIL         # Preferred ops alert recipient. When set, ops alerts go here; otherwise falls back to SMTP_TO. Use to send ops alerts to a different mailbox than transactional mail.
 REALTIME_URL            # Realtime gateway base URL (default http://localhost:3002)
 WEB_URL                 # Web frontend base URL (default http://localhost:3001)
 VALIDATOR_BASE_URL      # Middleware base URL for ops scripts (default http://localhost:3000)

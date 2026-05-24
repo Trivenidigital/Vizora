@@ -13,7 +13,15 @@
  *   SMTP_USER                          — SMTP username
  *   SMTP_PASS                          — SMTP password
  *   SMTP_FROM                          — Sender email address
- *   SMTP_TO                            — Recipient email address(es), comma-separated
+ *   SMTP_TO                            — Generic SMTP envelope recipient,
+ *                                        comma-separated. Used as the
+ *                                        fallback for ops alerts when
+ *                                        OPS_ALERT_EMAIL is not set.
+ *   OPS_ALERT_EMAIL                    — Preferred ops alert recipient(s),
+ *                                        comma-separated. Distinct from
+ *                                        SMTP_TO so transactional mail
+ *                                        and ops alerts can target
+ *                                        different mailboxes.
  *   HEALTHCHECKS_HEALTH_GUARDIAN_URL   — healthchecks.io ping URL for the
  *                                        health-guardian heartbeat. When set,
  *                                        a successful health-guardian run POSTs
@@ -137,7 +145,7 @@ export async function sendSlackAlert(
   if (criticals.length > 0) {
     const list = criticals
       .slice(0, 5)
-      .map(i => `* *${i.type}*: ${i.message}`)
+      .map(i => `* *${escapeMrkdwn(i.type)}*: ${escapeMrkdwn(i.message)}`)
       .join('\n');
     blocks.push({
       type: 'section',
@@ -153,7 +161,7 @@ export async function sendSlackAlert(
   if (warnings.length > 0 && criticals.length === 0) {
     const list = warnings
       .slice(0, 3)
-      .map(i => `* *${i.type}*: ${i.message}`)
+      .map(i => `* *${escapeMrkdwn(i.type)}*: ${escapeMrkdwn(i.message)}`)
       .join('\n');
     blocks.push({
       type: 'section',
@@ -218,10 +226,14 @@ export async function sendEmailAlert(
   const user = process.env.SMTP_USER || '';
   const pass = process.env.SMTP_PASS || '';
   const from = process.env.SMTP_FROM || 'vizora-ops@vizora.cloud';
-  const to = process.env.SMTP_TO || '';
+  // Prefer the ops-specific recipient if configured. Falls back to SMTP_TO
+  // so existing deployments without OPS_ALERT_EMAIL continue to work, but
+  // operators who want ops alerts going to a different mailbox than
+  // transactional mail can now configure that without touching SMTP_TO.
+  const to = process.env.OPS_ALERT_EMAIL || process.env.SMTP_TO || '';
 
   if (!to) {
-    log('alerting', 'SMTP_TO not set — skipping email alert');
+    log('alerting', 'OPS_ALERT_EMAIL and SMTP_TO are both unset — skipping email alert');
     return;
   }
 
@@ -349,4 +361,24 @@ function escapeHtml(text: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+/**
+ * Escape characters that Slack mrkdwn treats as formatting markers.
+ * Without this, an incident type like `device_offline_long` renders as
+ * `device` italic `offline` italic `long` — operators see a mangled
+ * message and don't recognise it as a real alert. Per the §12b
+ * silent-failure rule (global CLAUDE.md), automated alerts that
+ * silently mis-format are as bad as alerts that don't fire.
+ *
+ * Escapes: _ * ` ~  (the four mrkdwn formatting characters that occur
+ * naturally in our incident type names and free-form messages).
+ */
+function escapeMrkdwn(text: string): string {
+  return text
+    .replace(/\\/g, '\\\\')
+    .replace(/_/g, '\\_')
+    .replace(/\*/g, '\\*')
+    .replace(/`/g, '\\`')
+    .replace(/~/g, '\\~');
 }
