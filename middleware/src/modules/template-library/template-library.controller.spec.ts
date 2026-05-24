@@ -59,16 +59,16 @@ describe('TemplateLibraryController', () => {
   });
 
   describe('findOne', () => {
-    it('should call service.findOne with id', async () => {
-      await controller.findOne('tmpl-1');
-      expect(mockService.findOne).toHaveBeenCalledWith('tmpl-1');
+    it('should forward id + caller organizationId to the service', async () => {
+      await controller.findOne('tmpl-1', 'org-1');
+      expect(mockService.findOne).toHaveBeenCalledWith('tmpl-1', 'org-1');
     });
   });
 
   describe('getPreview', () => {
-    it('should call service.getPreview with id', async () => {
-      await controller.getPreview('tmpl-1');
-      expect(mockService.getPreview).toHaveBeenCalledWith('tmpl-1');
+    it('should forward id + caller organizationId to the service', async () => {
+      await controller.getPreview('tmpl-1', 'org-1');
+      expect(mockService.getPreview).toHaveBeenCalledWith('tmpl-1', 'org-1');
     });
   });
 

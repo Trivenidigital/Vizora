@@ -52,33 +52,43 @@ export class TemplateLibraryService {
     const { page = 1, limit = 20, search, category, tag, orientation, difficulty } = dto;
     const skip = (page - 1) * limit;
 
+    // Combine category (JSON path) + search (name|description OR) via an
+    // explicit AND[]. The previous shape set both as top-level keys on a
+    // single where object, which worked for either filter in isolation
+    // but produced zero results when both were active — Prisma's SQL
+    // for JSON path + sibling OR clauses doesn't always combine the way
+    // a naive read of the where object suggests (and the failure mode is
+    // a silent empty result set). The AND[] form is unambiguous.
+    const conditions: Prisma.ContentWhereInput[] = [];
+
+    if (orientation) {
+      conditions.push({ templateOrientation: orientation });
+    }
+
+    if (category) {
+      conditions.push({
+        metadata: {
+          path: ['category'],
+          equals: category,
+        },
+      });
+    }
+
+    if (search) {
+      conditions.push({
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } },
+        ],
+      });
+    }
+
     const where: Prisma.ContentWhereInput = {
       isGlobal: true,
       type: 'template',
       status: 'active',
+      ...(conditions.length > 0 ? { AND: conditions } : {}),
     };
-
-    if (orientation) {
-      where.templateOrientation = orientation;
-    }
-
-    // For category, tag, and difficulty we filter via metadata JSONB
-    // Prisma supports JSON filtering with path
-    if (category) {
-      where.metadata = {
-        ...where.metadata,
-        path: ['category'],
-        equals: category,
-      };
-    }
-
-    // Build search conditions
-    if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-      ];
-    }
 
     const [data, total] = await Promise.all([
       this.db.content.findMany({
@@ -134,13 +144,23 @@ export class TemplateLibraryService {
   }
 
   /**
-   * Get single template detail
+   * Get single template detail.
+   *
+   * Access model:
+   *  - Global library templates (`isGlobal=true`) are readable by ANY
+   *    authenticated user — they're the shared seed library.
+   *  - Non-global templates (org clones, drafts) are readable ONLY
+   *    by the owning org. Previously this method fetched any template
+   *    by id without an org filter, which let a user from org A read
+   *    org B's customised template by guessing the id.
    */
-  async findOne(id: string) {
-    // Look for global library templates first, then fall back to any template by ID
-    // (cloned templates are non-global but should still be accessible via the editor)
+  async findOne(id: string, organizationId: string) {
     const template = await this.db.content.findFirst({
-      where: { id, type: 'template' },
+      where: {
+        id,
+        type: 'template',
+        OR: [{ isGlobal: true }, { organizationId }],
+      },
     });
 
     if (!template) {
@@ -151,10 +171,11 @@ export class TemplateLibraryService {
   }
 
   /**
-   * Get rendered preview HTML for a template
+   * Get rendered preview HTML for a template (with the same org-scoping
+   * as findOne so previews can't be probed cross-org).
    */
-  async getPreview(id: string) {
-    const template = await this.findOne(id);
+  async getPreview(id: string, organizationId: string) {
+    const template = await this.findOne(id, organizationId);
     const metadata = template.metadata as LibraryTemplateMetadata;
 
     if (!metadata?.templateHtml) {
@@ -525,19 +546,24 @@ export class TemplateLibraryService {
   }
 
   /**
-   * Save a user's own template (cloned or created, org-scoped)
+   * Save a user's own template (cloned or created, org-scoped).
+   *
+   * Previously, the fetch was unscoped and the post-fetch guard had a
+   * logic gap: when `isGlobal=true`, `!template.isGlobal` is false so
+   * the whole AND short-circuits, and the save proceeded against the
+   * shared library template. A regular org user could mutate seeded
+   * library HTML for everyone just by passing a global template's id.
+   *
+   * Fixed shape: query for the org's own non-global template by id.
+   * Global templates are read-only here — to "save" a global, the user
+   * must clone() it first (which mints a non-global org-owned copy).
    */
   async saveUserTemplate(id: string, dto: UpdateTemplateDto, organizationId: string) {
     const template = await this.db.content.findFirst({
-      where: { id, type: 'template' },
+      where: { id, type: 'template', isGlobal: false, organizationId },
     });
 
     if (!template) {
-      throw new NotFoundException('Template not found');
-    }
-
-    // For non-global templates, verify org ownership
-    if (!template.isGlobal && template.organizationId !== organizationId) {
       throw new NotFoundException('Template not found');
     }
 
