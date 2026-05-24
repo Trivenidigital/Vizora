@@ -92,8 +92,21 @@ export class SupportKnowledgeService {
     for (const entry of this.entries) {
       let score = 0;
       for (const keyword of entry.keywords) {
-        if (lower.includes(keyword)) {
-          score += keyword.length; // Longer keyword matches score higher
+        // Short keywords (< 4 chars) like "ai", "tv", "use" use word-
+        // boundary matching so they don't match inside longer words
+        // ("ai" inside "again", "use" inside "abuse"/"useful"). Longer
+        // keywords keep substring matching so "price" still matches
+        // "pricing", "plan" matches "plans", "template" matches
+        // "templates" — the natural English-plural/gerund forms that
+        // customers type. R7 support scout finding #12.
+        const matches = keyword.length < 4
+          ? new RegExp(
+              `\\b${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`,
+              'i',
+            ).test(lower)
+          : lower.includes(keyword);
+        if (matches) {
+          score += keyword.length;
         }
       }
       if (score > bestScore) {
@@ -102,7 +115,6 @@ export class SupportKnowledgeService {
       }
     }
 
-    // Require minimum threshold (at least one keyword match with length >= 3)
     return bestScore >= 3 ? bestMatch : null;
   }
 }
