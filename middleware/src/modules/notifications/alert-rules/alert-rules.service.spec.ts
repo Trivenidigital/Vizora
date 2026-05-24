@@ -347,6 +347,73 @@ describe('AlertRulesService', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // Heal cron — backfills the default rule for orgs that missed the seed
+  // ---------------------------------------------------------------------------
+  describe('healMissingDefaultRules', () => {
+    beforeEach(() => {
+      db.organization = { findMany: jest.fn() };
+      db.user.findMany = jest.fn();
+    });
+
+    it('no-ops when all orgs already have the default rule', async () => {
+      db.organization.findMany.mockResolvedValue([]);
+
+      await service.healMissingDefaultRules();
+
+      expect(db.organization.findMany).toHaveBeenCalledWith({
+        where: {
+          alertRules: {
+            none: { name: 'Default offline alert (auto-migrated)' },
+          },
+        },
+        select: { id: true, name: true },
+      });
+      expect(db.alertRule.create).not.toHaveBeenCalled();
+    });
+
+    it('seeds the default rule for every org that is missing it', async () => {
+      db.organization.findMany.mockResolvedValue([
+        { id: 'org-a', name: 'Org A' },
+        { id: 'org-b', name: 'Org B' },
+      ]);
+      db.user.findMany
+        .mockResolvedValueOnce([{ id: 'admin-a1' }, { id: 'admin-a2' }])
+        .mockResolvedValueOnce([{ id: 'admin-b1' }]);
+      db.alertRule.create.mockResolvedValue({});
+
+      await service.healMissingDefaultRules();
+
+      expect(db.alertRule.create).toHaveBeenCalledTimes(2);
+      // Per-org admin lookup is scoped to the org and to role='admin'.
+      expect(db.user.findMany).toHaveBeenNthCalledWith(1, {
+        where: { organizationId: 'org-a', role: 'admin' },
+        select: { id: true },
+      });
+      expect(db.user.findMany).toHaveBeenNthCalledWith(2, {
+        where: { organizationId: 'org-b', role: 'admin' },
+        select: { id: true },
+      });
+    });
+
+    it('continues healing remaining orgs when one seed fails', async () => {
+      db.organization.findMany.mockResolvedValue([
+        { id: 'org-fails', name: 'Org Fails' },
+        { id: 'org-ok', name: 'Org OK' },
+      ]);
+      db.user.findMany.mockResolvedValue([{ id: 'admin' }]);
+      // First create rejects with a non-idempotent error; second succeeds.
+      db.alertRule.create
+        .mockRejectedValueOnce(new Error('transient DB blip'))
+        .mockResolvedValueOnce({});
+
+      await service.healMissingDefaultRules();
+
+      // Both orgs attempted — failure in the first did not abort the second.
+      expect(db.alertRule.create).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // Constants regression
   // ---------------------------------------------------------------------------
   describe('constants', () => {
