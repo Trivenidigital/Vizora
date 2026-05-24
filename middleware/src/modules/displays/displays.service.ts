@@ -1,4 +1,11 @@
-import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  InternalServerErrorException,
+  ServiceUnavailableException,
+  Logger,
+} from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma } from '@vizora/database';
@@ -337,7 +344,13 @@ export class DisplaysService {
     // Generate device JWT token using DEVICE_JWT_SECRET (not the user JWT_SECRET)
     const deviceSecret = process.env.DEVICE_JWT_SECRET;
     if (!deviceSecret || deviceSecret.length < 32) {
-      throw new Error('DEVICE_JWT_SECRET must be set and be at least 32 characters');
+      // Server-side misconfiguration — surface to the client as 500 so
+      // ops sees it in error tracking without hiding behind a generic
+      // unhandled exception (which the global filter would turn into
+      // an empty 500 with no useful message in the audit log).
+      throw new InternalServerErrorException(
+        'DEVICE_JWT_SECRET must be set and be at least 32 characters',
+      );
     }
 
     const pairingToken = this.jwtService.sign(
@@ -469,7 +482,12 @@ export class DisplaysService {
 
     const headers = this.getInternalApiHeaders();
     if (!headers) {
-      throw new Error('INTERNAL_API_SECRET is not configured — cannot push content to display');
+      // Service-to-service auth is unconfigured — the client can't fix
+      // this, but 503 is the right signal (we're temporarily unable
+      // to fulfil the request) and clients/dashboards will back off.
+      throw new ServiceUnavailableException(
+        'INTERNAL_API_SECRET is not configured — cannot push content to display',
+      );
     }
 
     const url = `${this.realtimeUrl}/api/push/content`;
@@ -505,7 +523,7 @@ export class DisplaysService {
           this.logger.warn(
             `Realtime service circuit is open, cannot push content to display ${displayId}`,
           );
-          throw new Error('Realtime service temporarily unavailable');
+          throw new ServiceUnavailableException('Realtime service temporarily unavailable');
         }
       },
       REALTIME_CIRCUIT_CONFIG,
@@ -598,7 +616,9 @@ export class DisplaysService {
     // Send command to realtime service
     const headers = this.getInternalApiHeaders();
     if (!headers) {
-      throw new Error('INTERNAL_API_SECRET is not configured — cannot send commands to display');
+      throw new ServiceUnavailableException(
+        'INTERNAL_API_SECRET is not configured — cannot send commands to display',
+      );
     }
 
     const url = `${this.realtimeUrl}/api/internal/command`;
@@ -626,15 +646,21 @@ export class DisplaysService {
             this.logger.warn(
               `Realtime service circuit is open, cannot send screenshot command to display ${displayId}`,
             );
-            throw new Error('Realtime service temporarily unavailable');
+            throw new ServiceUnavailableException('Realtime service temporarily unavailable');
           }
         },
         REALTIME_CIRCUIT_CONFIG,
       );
     } catch (error) {
+      // If the downstream already threw a NestJS HttpException
+      // (e.g., the ServiceUnavailableException above), let it propagate
+      // so the original status code reaches the client. Wrap unknown
+      // errors as 503 (the realtime gateway is the dependency that
+      // failed, so we're temporarily unable to satisfy the request).
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Failed to request screenshot: ${errorMessage}`);
-      throw new Error('Failed to send screenshot request to device');
+      if (error instanceof ServiceUnavailableException) throw error;
+      throw new ServiceUnavailableException('Failed to send screenshot request to device');
     }
 
     return { requestId };

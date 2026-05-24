@@ -1,4 +1,11 @@
-import { Injectable, BadRequestException, NotFoundException, OnModuleDestroy, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  InternalServerErrorException,
+  OnModuleDestroy,
+  Logger,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DatabaseService } from '../database/database.service';
@@ -253,7 +260,12 @@ export class PairingService implements OnModuleDestroy {
 
     const deviceSecret = process.env.DEVICE_JWT_SECRET;
     if (!deviceSecret || deviceSecret.length < 32) {
-      throw new Error('DEVICE_JWT_SECRET must be set and be at least 32 characters');
+      // Server-side misconfiguration — surface as 500 with a clear
+      // message so ops sees the cause in error tracking rather than
+      // an empty 500 from a swallowed generic Error.
+      throw new InternalServerErrorException(
+        'DEVICE_JWT_SECRET must be set and be at least 32 characters',
+      );
     }
 
     const jwtToken = this.jwtService.sign(devicePayload, {
