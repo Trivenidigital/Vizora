@@ -141,8 +141,14 @@ export class MailService {
     trialDaysRemaining: number,
   ): Promise<void> {
     const subject = 'Welcome to Vizora!';
+    // Escape user-supplied firstName before interpolating into the HTML
+    // body. RegisterDto validates the shape but doesn't reject HTML, so
+    // an unusual signup name like `<img src=x onerror=...>` would land
+    // raw in the rendered email. Most modern clients sanitize, but the
+    // server should not rely on that.
+    const safeFirstName = MailService.escapeHtml(firstName);
     const html = this.wrapInTemplate(`
-          <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">Welcome to Vizora, ${firstName}!</h1>
+          <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">Welcome to Vizora, ${safeFirstName}!</h1>
           <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
             Your account is ready. You have <strong style="color:#00E5A0;">${trialDaysRemaining} days</strong> of full access
             on your free trial — no credit card required.
@@ -169,10 +175,11 @@ export class MailService {
   ): Promise<void> {
     const urgency = daysRemaining <= 2 ? 'expires very soon' : 'is ending soon';
     const subject = `Your Vizora trial ${urgency} — ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} left`;
+    const safeFirstName = MailService.escapeHtml(firstName);
     const html = this.wrapInTemplate(`
           <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">Your trial ${urgency}</h1>
           <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
-            Hi ${firstName},<br><br>
+            Hi ${safeFirstName},<br><br>
             You have <strong style="color:#00E5A0;">${daysRemaining} day${daysRemaining === 1 ? '' : 's'}</strong> remaining on your
             Vizora free trial. After that, you'll lose access to premium features including multi-display management and advanced scheduling.
           </p>
@@ -199,7 +206,7 @@ export class MailService {
     const html = this.wrapInTemplate(`
           <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">Your trial has ended</h1>
           <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
-            Hi ${firstName},<br><br>
+            Hi ${MailService.escapeHtml(firstName)},<br><br>
             Your Vizora free trial has expired. Your account is still active, but premium features — including
             multi-display management, advanced scheduling, and priority support — are now limited.
           </p>
@@ -228,7 +235,7 @@ export class MailService {
     const html = this.wrapInTemplate(`
           <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">Payment received</h1>
           <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
-            Hi ${firstName},<br><br>
+            Hi ${MailService.escapeHtml(firstName)},<br><br>
             We've received your payment. Here's a summary:
           </p>
           <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px 0;">
@@ -261,7 +268,7 @@ export class MailService {
     const html = this.wrapInTemplate(`
           <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">Payment failed</h1>
           <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
-            Hi ${firstName},<br><br>
+            Hi ${MailService.escapeHtml(firstName)},<br><br>
             We were unable to process your latest payment for your Vizora subscription.
             Please update your payment method to avoid service interruption.
           </p>
@@ -286,7 +293,7 @@ export class MailService {
     const html = this.wrapInTemplate(`
           <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">Plan updated</h1>
           <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
-            Hi ${firstName},<br><br>
+            Hi ${MailService.escapeHtml(firstName)},<br><br>
             Your Vizora subscription has been changed:
           </p>
           <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px 0;">
@@ -321,7 +328,7 @@ export class MailService {
     const html = this.wrapInTemplate(`
           <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">Subscription canceled</h1>
           <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
-            Hi ${firstName},<br><br>
+            Hi ${MailService.escapeHtml(firstName)},<br><br>
             Your Vizora subscription has been canceled as requested. You'll continue to have full access to
             premium features until <strong style="color:#F0ECE8;">${accessUntil}</strong>.
           </p>
@@ -401,7 +408,7 @@ export class MailService {
     const html = this.wrapInTemplate(`
           <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">Reset your password</h1>
           <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
-            Hi ${firstName},<br><br>
+            Hi ${MailService.escapeHtml(firstName)},<br><br>
             You requested a password reset for your Vizora account. Click the button below to create a new password.
           </p>
           ${this.ctaButton('Reset Password', resetUrl)}
