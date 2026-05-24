@@ -86,6 +86,20 @@ export default function TemplateLibraryPage() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // Close clone/delete confirmation modals on Escape — backdrop click
+  // already works but keyboard users had no way to dismiss them other
+  // than tabbing into the Cancel button.
+  useEffect(() => {
+    if (!cloneModalId && !deleteModalId) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (cloneModalId && !cloning) setCloneModalId(null);
+      if (deleteModalId && !deleting) setDeleteModalId(null);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [cloneModalId, deleteModalId, cloning, deleting]);
+
   // Load initial data
   useEffect(() => {
     Promise.all([
