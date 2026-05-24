@@ -45,6 +45,29 @@ async function bootstrap() {
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
+  // Trust proxy — sets req.ip from X-Forwarded-For according to the
+  // configured hop count. Without this, GeoService and the rate-
+  // limiter key on the upstream proxy's IP (loopback in our prod
+  // nginx setup) instead of the real client IP. The R6 webhooks+
+  // common scout flagged this as a CRITICAL gap because country-
+  // based provider routing (Stripe vs Razorpay) and per-IP throttles
+  // were both running on the wrong key.
+  //
+  // TRUST_PROXY_HOPS defaults to 1 (single nginx in front). Bump if
+  // additional reverse proxies (CDN, ALB) sit between nginx and
+  // Node — setting it too high lets a malicious client spoof IPs
+  // via X-Forwarded-For, so keep it tight to the actual topology.
+  const trustProxyHops = parseInt(process.env.TRUST_PROXY_HOPS || '1', 10);
+  if (Number.isFinite(trustProxyHops) && trustProxyHops >= 0) {
+    app.set('trust proxy', trustProxyHops);
+    Logger.log(`Express trust proxy configured at ${trustProxyHops} hop(s)`);
+  } else {
+    Logger.warn(
+      `TRUST_PROXY_HOPS="${process.env.TRUST_PROXY_HOPS}" invalid; defaulting to 1 hop`,
+    );
+    app.set('trust proxy', 1);
+  }
+
   // Serve static files (thumbnails) with cache headers
   app.useStaticAssets(join(process.cwd(), 'static'), {
     prefix: '/static/',
