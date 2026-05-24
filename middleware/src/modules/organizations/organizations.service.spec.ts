@@ -44,6 +44,9 @@ describe('OrganizationsService', () => {
       organizationOnboarding: {
         findUnique: jest.fn(),
         upsert: jest.fn(),
+        updateMany: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
       },
       $transaction: jest.fn((fn) => fn({
         organization: {
@@ -275,9 +278,13 @@ describe('OrganizationsService', () => {
 
   describe('sendOnboardingNudge (customer-lifecycle write — high blast radius)', () => {
     beforeEach(() => {
-      // Default: no existing onboarding row
+      // Default: claim succeeds (existing row had col=null, claim flipped it)
+      mockDatabaseService.organizationOnboarding.updateMany.mockResolvedValue({ count: 1 });
       mockDatabaseService.organizationOnboarding.findUnique.mockResolvedValue(null);
-      mockDatabaseService.organizationOnboarding.upsert.mockResolvedValue({
+      mockDatabaseService.organizationOnboarding.create.mockResolvedValue({
+        organizationId: 'org-1',
+      });
+      mockDatabaseService.organizationOnboarding.update.mockResolvedValue({
         organizationId: 'org-1',
       });
       mockDatabaseService.user.findFirst.mockResolvedValue({ email: 'admin@acme.example' });
@@ -299,20 +306,27 @@ describe('OrganizationsService', () => {
         recipientHashes: [],
         reason: 'dry_run',
       });
-      // Critical: dedup mark-sent must NOT have been called in dry-run
-      expect(mockDatabaseService.organizationOnboarding.upsert).not.toHaveBeenCalled();
+      // The claim was rolled back so the next cron firing can retry.
+      expect(mockDatabaseService.organizationOnboarding.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ day1NudgeSentAt: null }),
+        }),
+      );
     });
 
     it('returns already_sent when dayN_NudgeSentAt is already set — DOES NOT call SMTP', async () => {
+      // Claim failed (count=0 because the column was already non-null)
+      mockDatabaseService.organizationOnboarding.updateMany.mockResolvedValue({ count: 0 });
+      // Existence probe finds the row — dedup hit, not a missing-row case
       mockDatabaseService.organizationOnboarding.findUnique.mockResolvedValue({
-        organizationId: 'org-1',
-        day1NudgeSentAt: new Date('2026-04-30'),
+        id: 'onb-1',
       });
       process.env.LIFECYCLE_LIVE = 'true'; // even with live=true, dedup prevents send
       const out = await service.sendOnboardingNudge('org-1', 'day1-pair-screen');
       expect(out.sent).toBe(false);
       expect(out.reason).toBe('already_sent');
-      expect(mockDatabaseService.organizationOnboarding.upsert).not.toHaveBeenCalled();
+      // No SMTP, no create, no further claim manipulation
+      expect(mockDatabaseService.organizationOnboarding.create).not.toHaveBeenCalled();
     });
 
     it('returns no_admin when no admin/manager user found', async () => {
@@ -321,6 +335,12 @@ describe('OrganizationsService', () => {
       const out = await service.sendOnboardingNudge('org-1', 'day1-pair-screen');
       expect(out.sent).toBe(false);
       expect(out.reason).toBe('no_admin');
+      // Claim rolled back so the next cron firing can retry.
+      expect(mockDatabaseService.organizationOnboarding.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ day1NudgeSentAt: null }),
+        }),
+      );
     });
 
     it('NEVER returns plaintext recipient addresses — only sha256 hashes', async () => {
@@ -334,6 +354,23 @@ describe('OrganizationsService', () => {
       if (out.recipientHashes.length > 0) {
         expect(out.recipientHashes[0]).toMatch(/^[a-f0-9]{16}$/);
       }
+    });
+
+    it('creates a fresh onboarding row when one does not exist (no double-claim)', async () => {
+      // Claim count=0, AND no row exists → must create with col set in
+      // one shot so the claim is visible to concurrent callers.
+      mockDatabaseService.organizationOnboarding.updateMany.mockResolvedValue({ count: 0 });
+      mockDatabaseService.organizationOnboarding.findUnique.mockResolvedValue(null);
+      process.env.LIFECYCLE_LIVE = 'true';
+
+      await service.sendOnboardingNudge('org-1', 'day1-pair-screen');
+
+      expect(mockDatabaseService.organizationOnboarding.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          organizationId: 'org-1',
+          day1NudgeSentAt: expect.any(Date),
+        }),
+      });
     });
   });
 });

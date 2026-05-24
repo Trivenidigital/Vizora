@@ -250,13 +250,79 @@ export class OrganizationsService {
     const col = OrganizationsService.NUDGE_COLUMN[nudgeKey];
     const subject = OrganizationsService.NUDGE_SUBJECT[nudgeKey];
 
-    // Pre-check dedup
-    const existing = await this.db.organizationOnboarding.findUnique({
-      where: { organizationId },
+    // Atomic claim instead of pre-check-then-mark. Two concurrent cron
+    // firings for the same org used to both observe `dayN_NudgeSentAt
+    // == null`, both pass the pre-check, and both send the email —
+    // customer receives duplicates and the row finally landed with one
+    // of the two timestamps (depending on which mark-sent won the
+    // write race).
+    //
+    // The fix: try to write the column with `updateMany WHERE col IS
+    // NULL`. If count=0, either the row doesn't exist OR another caller
+    // already claimed. We disambiguate with a shallow existence probe
+    // (no PII fields) — present + null impossible at this point
+    // (updateMany would have matched), so present means "already
+    // sent." Missing means we need to create the row with the column
+    // set in one shot.
+    //
+    // On send failure further down, we roll back the claim so the
+    // nudge can be re-tried on the next cron firing. Worst-case race
+    // collapses to "we send 0 or 1 email per (org, nudgeKey) per
+    // cron-tick window."
+    const claim = await this.db.organizationOnboarding.updateMany({
+      where: { organizationId, [col]: null },
+      data: { [col]: new Date() },
     });
-    if (existing && existing[col] != null) {
-      return { sent: false, recipientCount: 0, recipientHashes: [], reason: 'already_sent' };
+
+    if (claim.count === 0) {
+      const exists = await this.db.organizationOnboarding.findUnique({
+        where: { organizationId },
+        select: { id: true },
+      });
+      if (exists) {
+        return {
+          sent: false,
+          recipientCount: 0,
+          recipientHashes: [],
+          reason: 'already_sent',
+        };
+      }
+      // No row at all — create it with the column set so the claim is
+      // visible to concurrent callers immediately. If create throws on
+      // P2002 (another caller created in the meantime), back off.
+      try {
+        await this.db.organizationOnboarding.create({
+          data: { organizationId, [col]: new Date() },
+        });
+      } catch (err) {
+        if ((err as { code?: string })?.code === 'P2002') {
+          return {
+            sent: false,
+            recipientCount: 0,
+            recipientHashes: [],
+            reason: 'already_sent',
+          };
+        }
+        throw err;
+      }
     }
+
+    // From here on, the claim is OUR responsibility. If we fail to send,
+    // we MUST roll back the column so a later cron can retry.
+    const rollbackClaim = async () => {
+      try {
+        await this.db.organizationOnboarding.update({
+          where: { organizationId },
+          data: { [col]: null },
+        });
+      } catch (err) {
+        this.logger.warn(
+          `lifecycle nudge rollback FAILED org=${organizationId} key=${nudgeKey}: ${
+            err instanceof Error ? err.message : err
+          }. Operator must manually clear ${col} for retry.`,
+        );
+      }
+    };
 
     // Find admin recipient (the actual customer-facing address)
     const admin = await this.db.user.findFirst({
@@ -269,6 +335,7 @@ export class OrganizationsService {
       select: { email: true },
     });
     if (!admin?.email) {
+      await rollbackClaim();
       return { sent: false, recipientCount: 0, recipientHashes: [], reason: 'no_admin' };
     }
 
@@ -291,6 +358,7 @@ export class OrganizationsService {
     const recipientHashes = recipients.map((e) => OrganizationsService.maskEmail(e));
 
     if (recipients.length === 0) {
+      await rollbackClaim();
       return { sent: false, recipientCount: 0, recipientHashes: [], reason: 'dry_run' };
     }
 
@@ -299,6 +367,7 @@ export class OrganizationsService {
     // same process lifetime.
     const transporter = await this.getLifecycleTransporter();
     if (!transporter) {
+      await rollbackClaim();
       return {
         sent: false,
         recipientCount: 0,
@@ -328,6 +397,7 @@ export class OrganizationsService {
     }
 
     if (sent === 0) {
+      await rollbackClaim();
       return {
         sent: false,
         recipientCount: 0,
@@ -336,8 +406,10 @@ export class OrganizationsService {
       };
     }
 
-    // Mark sent in the same logical step (dedup mitigation)
-    await this.setOnboardingNudgeSent(organizationId, nudgeKey);
+    // The claim is already persisted from the atomic upsert above —
+    // no need for a separate setOnboardingNudgeSent call. The previous
+    // shape risked a third race window between the send and the mark;
+    // the claim-first pattern removes it.
 
     return {
       sent: true,

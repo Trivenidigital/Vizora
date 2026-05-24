@@ -55,3 +55,13 @@ export class InternalCommandDto {
   @Type(() => DeviceCommandDto)
   command!: DeviceCommandDto;
 }
+
+export class BroadcastNotificationDto {
+  @IsString()
+  @IsNotEmpty()
+  organizationId!: string;
+
+  @IsObject()
+  @IsNotEmpty()
+  notification!: Record<string, unknown>;
+}
