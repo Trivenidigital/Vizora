@@ -27,7 +27,7 @@ import {
   makeIncidentId,
 } from './lib/state.js';
 import { login, OpsApiClient } from './lib/api-client.js';
-import { log } from './lib/alerting.js';
+import { log, sendInlineAlert } from './lib/alerting.js';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -117,6 +117,15 @@ async function checkExpiredContent(
 
       state.issuesFixed++;
       log(AGENT, `Archived expired content: ${label}`);
+      // §12b: write-site alert. The operator uploaded this content and
+      // set an expiry; we just flipped its status to archived. Tell
+      // them within seconds, not at the next ops-reporter cycle.
+      await sendInlineAlert(
+        AGENT,
+        'warning',
+        `Auto-archived expired content "${label}"`,
+        `Content id ${item.id} reached its expiresAt (${item.expiresAt}) and was archived. If still needed, restore via the content library and update the expiry date.`,
+      );
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       log(AGENT, `Failed to archive expired content ${label}: ${errorMsg}`);
@@ -219,6 +228,16 @@ async function checkOrphanedContent(
 
       state.issuesFixed++;
       log(AGENT, `Archived orphaned content: ${label}`);
+      // §12b: write-site alert. Orphan archive is gentler than expiry —
+      // the operator never picked an expiry, the cron is just garbage-
+      // collecting unused content after ORPHAN_AGE_DAYS. Still surfaces
+      // so an operator can restore if they were saving it for later.
+      await sendInlineAlert(
+        AGENT,
+        'warning',
+        `Auto-archived orphaned content "${label}"`,
+        `Content id ${item.id} was not referenced by any playlist and was older than ${ORPHAN_AGE_DAYS} days. Archived automatically. Restore via the content library if you still need it.`,
+      );
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       log(AGENT, `Failed to archive orphaned content ${label}: ${errorMsg}`);

@@ -28,7 +28,7 @@ import {
   addRemediation,
   makeIncidentId,
 } from './lib/state.js';
-import { log } from './lib/alerting.js';
+import { log, sendInlineAlert } from './lib/alerting.js';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -151,6 +151,15 @@ async function main(): Promise<void> {
       fixed = true;
       issuesFixed++;
       log(AGENT, `  -> Deactivated "${label}"`);
+      // §12b: write-site alert. The operator set isActive=true; we just
+      // flipped it to false. Tell them immediately rather than waiting
+      // for the next ops-reporter aggregate cycle.
+      await sendInlineAlert(
+        AGENT,
+        'warning',
+        `Auto-deactivated past-end schedule "${label}"`,
+        `Schedule id ${sched.id} had endDate=${sched.endDate} (in the past) but isActive=true. Deactivated automatically. If the endDate was meant to be in the future, re-activate and correct the date.`,
+      );
     } catch (err) {
       log(AGENT, `  -> Failed to deactivate "${label}": ${err instanceof Error ? err.message : err}`);
     }
@@ -197,6 +206,16 @@ async function main(): Promise<void> {
       fixed = true;
       issuesFixed++;
       log(AGENT, `  -> Deactivated "${label}"`);
+      // §12b: write-site alert. Orphan deactivation is more severe than
+      // past-end because it indicates the operator deleted a device but
+      // left a schedule pointing at it — likely a config inconsistency
+      // they should know about right now, not in 30 min.
+      await sendInlineAlert(
+        AGENT,
+        'critical',
+        `Auto-deactivated orphan schedule "${label}"`,
+        `Schedule id ${sched.id} referenced display ${sched.displayId}, which no longer exists. Deactivated automatically. Investigate whether the schedule should be reassigned or deleted.`,
+      );
     } catch (err) {
       log(AGENT, `  -> Failed to deactivate "${label}": ${err instanceof Error ? err.message : err}`);
     }

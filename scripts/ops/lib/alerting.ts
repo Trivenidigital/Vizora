@@ -352,6 +352,78 @@ export async function updateDashboard(
   }
 }
 
+// ─── Per-event inline alert (§12b) ──────────────────────────────────────────
+
+/**
+ * Fire an immediate Slack alert for a single automated state-reversal
+ * event. Use this from ops agents at the WRITE site (right next to
+ * the auto-disable / auto-archive / kill-switch flip) so the operator
+ * sees "we just turned off the thing you set up, here's why"
+ * within seconds instead of waiting for the next 30-min ops-reporter
+ * cycle.
+ *
+ * Implements the global CLAUDE.md §12b silent-failure prevention rule
+ * for the schedule-doctor + content-lifecycle auto-remediation paths.
+ * Each fire is independent of the aggregate sendSlackAlert flow.
+ *
+ * @param agent      Agent name for log attribution (e.g. "schedule-doctor")
+ * @param severity   "critical" | "warning" — drives the emoji + section header
+ * @param summary    One-line headline, will be bolded
+ * @param details    Optional multi-line body shown below the summary
+ *
+ * No-op if SLACK_WEBHOOK_URL is unset. Errors are logged but never thrown.
+ */
+export async function sendInlineAlert(
+  agent: string,
+  severity: 'critical' | 'warning',
+  summary: string,
+  details?: string,
+): Promise<void> {
+  const webhookUrl = process.env.SLACK_WEBHOOK_URL || '';
+  if (!webhookUrl) return;
+
+  const emoji = severity === 'critical' ? ':red_circle:' : ':large_yellow_circle:';
+  const headerText = severity === 'critical' ? 'CRITICAL' : 'WARNING';
+
+  const blocks: Record<string, unknown>[] = [
+    {
+      type: 'header',
+      text: { type: 'plain_text', text: `${emoji} Vizora Ops: ${headerText} (${agent})` },
+    },
+    {
+      type: 'section',
+      text: { type: 'mrkdwn', text: `*${escapeMrkdwn(summary)}*` },
+    },
+  ];
+
+  if (details) {
+    blocks.push({
+      type: 'section',
+      text: { type: 'mrkdwn', text: escapeMrkdwn(details) },
+    });
+  }
+
+  blocks.push({
+    type: 'context',
+    elements: [
+      { type: 'mrkdwn', text: `Vizora Ops | ${agent} | ${new Date().toISOString()}` },
+    ],
+  });
+
+  try {
+    const res = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ blocks }),
+    });
+    if (!res.ok) {
+      log(agent, `Inline Slack alert returned ${res.status}`);
+    }
+  } catch (err) {
+    log(agent, `Inline Slack alert failed: ${err instanceof Error ? err.message : err}`);
+  }
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function escapeHtml(text: string): string {
