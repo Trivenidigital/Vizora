@@ -72,6 +72,26 @@ export class OnboardingService {
         `onboarding handler failed (field=${field})`,
         err instanceof Error ? err.stack : String(err),
       );
+      // R7-HIGH: also surface to Sentry so repeated handler failures
+      // group as an issue and page on-call instead of hiding inside
+      // server logs nobody reads. Sentry's default integration only
+      // captures UNCAUGHT exceptions; we explicitly capture here
+      // because the catch is intentional fire-and-forget.
+      OnboardingService.captureSentry(err, { field, orgId: evt.organizationId });
+    }
+  }
+
+  /**
+   * Lazy Sentry capture — middleware boot wires Sentry but tests don't
+   * load it, so import-failure shouldn't poison the milestone path.
+   */
+  private static captureSentry(err: unknown, tags: Record<string, unknown>): void {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const Sentry = require('@sentry/nestjs');
+      Sentry.captureException(err, { tags: { event: 'onboarding_handler_failed', ...tags } });
+    } catch {
+      /* Sentry not loaded — silent drop, log.error already fired */
     }
   }
 
