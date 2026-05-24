@@ -79,12 +79,25 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Device tokens are not valid for user authentication');
     }
 
-    // Check if token has been revoked
+    // Check if THIS specific token has been revoked (logout / refresh).
     if (payload.jti) {
       const isRevoked = await this.redisService.exists(`revoked_token:${payload.jti}`);
       if (isRevoked) {
         throw new UnauthorizedException('Token has been revoked');
       }
+    }
+
+    // Check if ALL tokens for this user have been invalidated. Two
+    // admin-driven flows write this key: AuthService.deleteAccount
+    // (self-delete) and UsersService.deactivate (admin deactivation).
+    // Previously the deleteAccount path SET this key but nobody READ
+    // it — deactivation relied on the 60s user_auth: cache eviction
+    // to take effect, leaving a 60s window where a deactivated user
+    // could keep hitting the API with a cached token. The check here
+    // closes both windows.
+    const isUserRevoked = await this.redisService.exists(`user_revoked:${payload.sub}`);
+    if (isUserRevoked) {
+      throw new UnauthorizedException('User account is no longer active');
     }
 
     // Check Redis cache first to avoid DB hit on every request

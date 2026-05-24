@@ -299,7 +299,10 @@ describe('JwtStrategy', () => {
         });
       });
 
-      it('should skip revocation check when jti is not present', async () => {
+      it('should skip the per-token jti revocation check when jti is not present, but still run the per-user revocation check', async () => {
+        // jti-less tokens still get the user_revoked: check applied —
+        // that's the all-user invalidation path (deactivation /
+        // self-delete). The jti check is the specific-token path.
         const payload: JwtPayload = {
           sub: 'user-123',
           email: 'test@example.com',
@@ -311,7 +314,26 @@ describe('JwtStrategy', () => {
 
         await strategy.validate(payload);
 
-        expect(mockRedisService.exists).not.toHaveBeenCalled();
+        expect(mockRedisService.exists).toHaveBeenCalledTimes(1);
+        expect(mockRedisService.exists).toHaveBeenCalledWith('user_revoked:user-123');
+      });
+
+      it('rejects the request when the user_revoked: flag is set for the payload.sub', async () => {
+        // Admin deactivation / self-delete set this flag; the request
+        // must fail closed even if the per-jti revocation key isn't set.
+        const payload: JwtPayload = {
+          sub: 'user-deactivated',
+          email: 'x@y.com',
+          organizationId: 'org-123',
+          role: 'admin',
+          jti: 'jti-abc',
+        };
+
+        mockRedisService.exists.mockImplementation((key: string) =>
+          Promise.resolve(key === 'user_revoked:user-deactivated'),
+        );
+
+        await expect(strategy.validate(payload)).rejects.toThrow('User account is no longer active');
       });
     });
 

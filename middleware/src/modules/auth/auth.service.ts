@@ -906,8 +906,14 @@ export class AuthService {
       this.logger.warn(`Failed to send account deletion email to ${originalEmail}: ${err instanceof Error ? err.message : 'Unknown'}`);
     }
 
-    // 9. Invalidate all JWT tokens for this user via Redis
+    // 9. Invalidate all JWT tokens for this user via Redis. Uses the
+    // shared `user_revoked:` key that JwtStrategy.validate now checks
+    // on every request. Also write the legacy `user_deleted:` key so
+    // any third-party tooling still reading it keeps working during a
+    // transition window (safe to remove once external consumers move
+    // to the canonical key).
     try {
+      await this.redisService.set(`user_revoked:${userId}`, '1', AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS);
       await this.redisService.set(`user_deleted:${userId}`, '1', AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS);
       await this.redisService.del(`user_auth:${userId}`);
     } catch (err) {
