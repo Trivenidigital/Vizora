@@ -300,6 +300,37 @@ export class SchedulesService {
       where.daysOfWeek = { hasSome: dto.daysOfWeek };
     }
 
+    // Date-range overlap filter — without this, schedules in non-
+    // overlapping date windows (e.g. one ending in 2025, the other
+    // starting in 2026) were flagged as conflicting solely because
+    // they shared daysOfWeek + display. Both bounds are optional;
+    // an open-ended schedule (no startDate / endDate) on either
+    // side falls back to "always-overlapping in time" for that side.
+    const dateConditions: Prisma.ScheduleWhereInput[] = [];
+    if (dto.endDate) {
+      // Candidate ends BEFORE existing starts → no overlap; exclude
+      // anything whose startDate is strictly after the candidate's end.
+      dateConditions.push({
+        OR: [
+          { startDate: null },
+          { startDate: { lte: new Date(dto.endDate) } },
+        ],
+      });
+    }
+    if (dto.startDate) {
+      // Existing ended BEFORE candidate starts → no overlap; exclude
+      // anything whose endDate is strictly before the candidate's start.
+      dateConditions.push({
+        OR: [
+          { endDate: null },
+          { endDate: { gte: new Date(dto.startDate) } },
+        ],
+      });
+    }
+    if (dateConditions.length > 0) {
+      where.AND = dateConditions;
+    }
+
     // Exclude specific schedule (useful when editing)
     if (dto.excludeScheduleId) {
       where.id = { not: dto.excludeScheduleId };

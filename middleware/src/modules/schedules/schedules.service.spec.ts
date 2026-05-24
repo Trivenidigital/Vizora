@@ -704,6 +704,49 @@ describe('SchedulesService', () => {
       expect(result.hasConflicts).toBe(true);
       expect(result.conflicts).toHaveLength(1);
     });
+
+    it('should apply date-range filters to the conflict query', async () => {
+      // Regression: previously the WHERE clause had no date-range
+      // predicates, so two schedules in disjoint date windows (e.g.
+      // a 2025 Christmas slot vs a 2026 Diwali slot) were flagged as
+      // conflicting solely because they shared display + daysOfWeek.
+      databaseService.schedule.findMany.mockResolvedValue([]);
+
+      await service.checkConflicts('org-123', {
+        displayId: 'display-1',
+        daysOfWeek: [1],
+        startTime: 540,
+        endTime: 600,
+        startDate: '2026-11-01',
+        endDate: '2026-11-07',
+      });
+
+      // Both bounds should appear in the AND[] predicate. The
+      // endDate-filter excludes schedules that start AFTER the
+      // candidate ends; the startDate-filter excludes those that
+      // ended BEFORE the candidate starts. Open-ended schedules
+      // (startDate / endDate null) survive both filters.
+      expect(databaseService.schedule.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            AND: expect.arrayContaining([
+              expect.objectContaining({
+                OR: [
+                  { startDate: null },
+                  { startDate: { lte: new Date('2026-11-07') } },
+                ],
+              }),
+              expect.objectContaining({
+                OR: [
+                  { endDate: null },
+                  { endDate: { gte: new Date('2026-11-01') } },
+                ],
+              }),
+            ]),
+          }),
+        }),
+      );
+    });
   });
 
   describe('remove', () => {
