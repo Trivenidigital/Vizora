@@ -80,6 +80,20 @@ describe('QuotaGuard', () => {
         expect(result).toBe(true);
       });
 
+      it('should exclude disabled displays from the quota count (where: isDisabled: false)', async () => {
+        mockDatabaseService.organization.findUnique.mockResolvedValue({
+          screenQuota: 25,
+          _count: { displays: 12 },
+        } as any);
+
+        await guard.canActivate(mockExecutionContext);
+
+        const findUniqueArgs = mockDatabaseService.organization.findUnique.mock.calls[0][0];
+        expect(findUniqueArgs.select._count.select.displays).toEqual({
+          where: { isDisabled: false },
+        });
+      });
+
       it('should allow when quota is unlimited (-1)', async () => {
         mockDatabaseService.organization.findUnique.mockResolvedValue({
           screenQuota: -1,
@@ -172,7 +186,7 @@ describe('QuotaGuard', () => {
           select: {
             screenQuota: true,
             _count: {
-              select: { displays: true },
+              select: { displays: { where: { isDisabled: false } } },
             },
           },
         });

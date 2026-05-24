@@ -200,8 +200,32 @@ export class OrganizationsService {
    * path for stale (>30d) signups that never finish. Idempotent —
    * re-calling on an already-completed row updates the timestamp,
    * which is fine.
+   *
+   * R7 onboarding scout: server-side enforces the ">= 30 days old"
+   * contract documented in the MCP tool description. Without this
+   * guard, a buggy or hostile agent with `customer:write` could call
+   * auto-complete on a 1-day-old signup and silently skip every
+   * lifecycle nudge they were supposed to receive — the agent's
+   * client-side check is necessary but not sufficient.
    */
   async setOnboardingCompleted(organizationId: string): Promise<boolean> {
+    const MIN_AGE_DAYS = 30;
+    const org = await this.db.organization.findUnique({
+      where: { id: organizationId },
+      select: { createdAt: true },
+    });
+    if (!org) return false;
+    const ageMs = Date.now() - org.createdAt.getTime();
+    if (ageMs < MIN_AGE_DAYS * 24 * 60 * 60 * 1000) {
+      // Refuse — caller is trying to force-skip nudges. Returning false
+      // (vs throwing) keeps idempotent semantics for the MCP tool:
+      // result.completed === false means "no change was made", same
+      // shape as a re-call on an already-completed row.
+      this.logger.warn(
+        `Refusing setOnboardingCompleted for ${organizationId}: org age ${Math.round(ageMs / 86400000)}d < ${MIN_AGE_DAYS}d`,
+      );
+      return false;
+    }
     const res = await this.db.organizationOnboarding.upsert({
       where: { organizationId },
       create: { organizationId, completedAt: new Date() },
