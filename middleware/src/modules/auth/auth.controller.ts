@@ -19,6 +19,21 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { AUTH_CONSTANTS } from './constants/auth.constants';
 import { AuthenticatedUser } from './strategies/jwt.strategy';
 
+/**
+ * Auth endpoint rate-limit tiers. STRICT in production (per-minute caps
+ * chosen to block credential-stuffing / token-enumeration), RELAXED in
+ * dev/test so local development + CI don't trip throttles.
+ *
+ * Extracted as named constants so new public auth routes can't silently
+ * inherit a 1000-limit by copy-paste of the dev pattern. If you're
+ * adding a new public auth route, pick STRICT for sensitive operations
+ * (register, credentials, account modification) and STANDARD for
+ * lookup/validation operations.
+ */
+const RATE_LIMIT_STRICT = process.env.NODE_ENV === 'production' ? 3 : 1000;
+const RATE_LIMIT_STANDARD = process.env.NODE_ENV === 'production' ? 5 : 1000;
+const RATE_LIMIT_TTL_MS = 60_000;
+
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
@@ -88,8 +103,8 @@ export class AuthController {
   @Post('register')
   @Throttle({
     default: {
-      limit: process.env.NODE_ENV === 'production' ? 3 : 1000,
-      ttl: 60000
+      limit: RATE_LIMIT_STRICT,
+      ttl: RATE_LIMIT_TTL_MS
     }
   })
   async register(
@@ -128,8 +143,8 @@ export class AuthController {
   @Post('login')
   @Throttle({
     default: {
-      limit: process.env.NODE_ENV === 'production' ? 5 : 1000,
-      ttl: 60000
+      limit: RATE_LIMIT_STANDARD,
+      ttl: RATE_LIMIT_TTL_MS
     }
   })
   async login(
@@ -163,8 +178,8 @@ export class AuthController {
   @Post('google')
   @Throttle({
     default: {
-      limit: process.env.NODE_ENV === 'production' ? 3 : 1000,
-      ttl: 60000,
+      limit: RATE_LIMIT_STRICT,
+      ttl: RATE_LIMIT_TTL_MS,
     },
   })
   async googleLogin(
@@ -358,8 +373,8 @@ export class AuthController {
   @Post('forgot-password')
   @Throttle({
     default: {
-      limit: process.env.NODE_ENV === 'production' ? 5 : 1000,
-      ttl: 60000,
+      limit: RATE_LIMIT_STANDARD,
+      ttl: RATE_LIMIT_TTL_MS,
     },
   })
   async forgotPassword(@Body() dto: ForgotPasswordDto) {
@@ -383,8 +398,8 @@ export class AuthController {
     // CSRF, public endpoint) — and the responses are deterministic
     // enough to oracle (200 + {valid:true|false}).
     default: {
-      limit: process.env.NODE_ENV === 'production' ? 5 : 1000,
-      ttl: 60000,
+      limit: RATE_LIMIT_STANDARD,
+      ttl: RATE_LIMIT_TTL_MS,
     },
   })
   async validateResetToken(@Req() req: Request) {
@@ -410,8 +425,8 @@ export class AuthController {
   @Post('reset-password')
   @Throttle({
     default: {
-      limit: process.env.NODE_ENV === 'production' ? 5 : 1000,
-      ttl: 60000,
+      limit: RATE_LIMIT_STANDARD,
+      ttl: RATE_LIMIT_TTL_MS,
     },
   })
   async resetPassword(@Body() dto: ResetPasswordDto) {
@@ -435,8 +450,8 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Throttle({
     default: {
-      limit: process.env.NODE_ENV === 'production' ? 3 : 1000,
-      ttl: 60000,
+      limit: RATE_LIMIT_STRICT,
+      ttl: RATE_LIMIT_TTL_MS,
     },
   })
   async deleteAccount(
