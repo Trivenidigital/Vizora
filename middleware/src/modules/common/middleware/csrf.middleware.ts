@@ -48,8 +48,16 @@ export class CsrfMiddleware implements NestMiddleware {
       return next();
     }
 
-    // Skip CSRF for public endpoints that don't require cookies
-    // These use other protections (rate limiting)
+    // Skip CSRF for public endpoints that don't require cookies.
+    // Different paths use different protections:
+    //   - /auth/*: rate-limited (5/min in prod) per @Throttle decorator
+    //   - /devices/pairing/*: device-scoped pairing tokens with 5-min TTL
+    //   - /webhooks/*: provider signature verification. Stripe and
+    //     Razorpay sign the payload with a shared secret and the
+    //     receiving controller validates X-Stripe-Signature /
+    //     X-Razorpay-Signature headers before processing — CSRF would
+    //     be redundant since browsers aren't the caller.
+    //
     // Use endsWith() for exact suffix matching to prevent path traversal bypasses
     const fullPath = req.originalUrl || req.url || req.path;
     const csrfExemptSuffixes = [
@@ -59,8 +67,8 @@ export class CsrfMiddleware implements NestMiddleware {
       '/auth/reset-password',
       '/devices/pairing/request',
       '/devices/pairing/status',
-      '/webhooks/stripe',
-      '/webhooks/razorpay',
+      '/webhooks/stripe', // Validates X-Stripe-Signature
+      '/webhooks/razorpay', // Validates X-Razorpay-Signature
     ];
 
     // MCP endpoints use bearer-token auth (not cookies) and are called
