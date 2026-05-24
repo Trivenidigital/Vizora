@@ -58,18 +58,38 @@ export class CsrfMiddleware implements NestMiddleware {
     //     X-Razorpay-Signature headers before processing — CSRF would
     //     be redundant since browsers aren't the caller.
     //
-    // Use endsWith() for exact suffix matching to prevent path traversal bypasses
+    // ANCHORED exact-path match. The previous shape used endsWith()
+    // on the full URL, which would have matched any path that happened
+    // to end with `/webhooks/stripe` — including bogus prefixes like
+    // `/api/v1/internal/evil/webhooks/stripe`. The internal-secret
+    // guard would still reject the request, but the CSRF exemption
+    // reason ("provider signs the payload") doesn't apply on internal
+    // paths, so the exemption should not be granted at all. Each
+    // exempt path is now enumerated with its full prefix.
     const fullPath = req.originalUrl || req.url || req.path;
-    const csrfExemptSuffixes = [
-      '/auth/login',
-      '/auth/register',
-      '/auth/forgot-password',
-      '/auth/reset-password',
-      '/devices/pairing/request',
-      '/devices/pairing/status',
-      '/webhooks/stripe', // Validates X-Stripe-Signature
-      '/webhooks/razorpay', // Validates X-Razorpay-Signature
-    ];
+    const pathname = fullPath.split('?')[0];
+    // Both prefixes accepted: production runs `/api/v1/*` after the
+    // NestJS global prefix, but the test harness and nginx legacy
+    // rewrites also produce `/api/*`. Enumerate both forms rather
+    // than risk a startsWith/endsWith bypass.
+    const csrfExemptExactPaths = new Set([
+      '/api/v1/auth/login',
+      '/api/v1/auth/register',
+      '/api/v1/auth/forgot-password',
+      '/api/v1/auth/reset-password',
+      '/api/v1/devices/pairing/request',
+      '/api/v1/devices/pairing/status',
+      '/api/v1/webhooks/stripe', // Validates X-Stripe-Signature
+      '/api/v1/webhooks/razorpay', // Validates X-Razorpay-Signature
+      '/api/auth/login',
+      '/api/auth/register',
+      '/api/auth/forgot-password',
+      '/api/auth/reset-password',
+      '/api/devices/pairing/request',
+      '/api/devices/pairing/status',
+      '/api/webhooks/stripe',
+      '/api/webhooks/razorpay',
+    ]);
 
     // MCP endpoints use bearer-token auth (not cookies) and are called
     // server-to-server by agents (no browser, no CSRF surface). Exempt
@@ -80,7 +100,6 @@ export class CsrfMiddleware implements NestMiddleware {
     // would also exempt sibling routes like `/api/v1/mcp-admin` or
     // `/api/v1/mcpwhatever` if they ever exist. Query string is
     // stripped so a manipulated `?` parameter cannot match.
-    const pathname = fullPath.split('?')[0];
     const isMcpRoute =
       pathname === '/api/v1/mcp' || pathname.startsWith('/api/v1/mcp/');
 
@@ -92,8 +111,8 @@ export class CsrfMiddleware implements NestMiddleware {
     const isInternalRoute =
       pathname === '/api/v1/internal' || pathname.startsWith('/api/v1/internal/');
 
-    const isExempt = csrfExemptSuffixes.some(suffix => fullPath.endsWith(suffix))
-      || fullPath.match(/\/devices\/pairing\/status\/[A-Za-z0-9]+$/)
+    const isExempt = csrfExemptExactPaths.has(pathname)
+      || pathname.match(/^\/api(\/v1)?\/devices\/pairing\/status\/[A-Za-z0-9]+$/)
       || isMcpRoute
       || isInternalRoute;
 
