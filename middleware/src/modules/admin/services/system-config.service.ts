@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 
 export interface SetConfigDto {
@@ -14,11 +14,44 @@ export interface BulkConfigUpdate {
   value: unknown;
 }
 
+/**
+ * Allowlist of admin-settable config-key patterns. Each entry is a regex
+ * tested against the incoming key. Anything outside this list is rejected
+ * with a BadRequestException.
+ *
+ * R9 admin scout: previously `set()` accepted any string key with no
+ * gating. A typo (e.g. `disable_rate_limit` vs `disable_rate_limits`)
+ * silently saved as a new row that no consumer reads — looking like a
+ * working toggle but doing nothing. Worse, future developers could add
+ * a runtime-toggleable flag like `disable_rate_limits` and the admin UI
+ * would then expose that toggle without any explicit gating step.
+ *
+ * Adding a new admin-settable key requires adding its pattern here.
+ */
+const KEY_ALLOWLIST_PATTERNS: readonly RegExp[] = [
+  /^app\.[a-z0-9_.-]+$/, // legacy + general app-level settings
+  /^feature\.[a-z0-9_-]+$/, // feature flags
+  /^announcement\.[a-z0-9_-]+$/, // announcement banners
+  /^maintenance\.[a-z0-9_-]+$/, // maintenance-mode toggles
+  /^branding\.[a-z0-9_-]+$/, // platform-wide branding overrides
+  /^email\.[a-z0-9_-]+$/, // operator-controlled email settings (not secrets)
+  /^onboarding\.[a-z0-9_-]+$/, // onboarding tuning knobs
+  /^limit\.[a-z0-9_-]+$/, // adjustable usage limits
+];
+
 @Injectable()
 export class SystemConfigService {
   private readonly logger = new Logger(SystemConfigService.name);
 
   constructor(private readonly db: DatabaseService) {}
+
+  private assertKeyAllowed(key: string): void {
+    if (!KEY_ALLOWLIST_PATTERNS.some((re) => re.test(key))) {
+      throw new BadRequestException(
+        `Config key '${key}' is not in the allowlist. Allowed namespaces: feature.*, announcement.*, maintenance.*, branding.*, email.*, onboarding.*, limit.*`,
+      );
+    }
+  }
 
   /**
    * Get all system configurations
@@ -87,6 +120,7 @@ export class SystemConfigService {
    * Set a configuration value
    */
   async set(key: string, value: unknown, adminUserId: string, options?: Omit<SetConfigDto, 'value'>) {
+    this.assertKeyAllowed(key);
     const dataType = options?.dataType ?? this.inferDataType(value);
     const jsonValue = this.serializeValue(value, dataType);
 
@@ -139,6 +173,9 @@ export class SystemConfigService {
    * Bulk update multiple configurations
    */
   async bulkUpdate(configs: BulkConfigUpdate[], adminUserId: string) {
+    for (const { key } of configs) {
+      this.assertKeyAllowed(key);
+    }
     const results = await this.db.$transaction(
       configs.map(({ key, value }) => {
         const dataType = this.inferDataType(value);
