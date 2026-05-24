@@ -53,16 +53,18 @@ export class BillingService implements OnModuleInit {
 
   /**
    * Validate at startup that price/plan IDs are configured for every
-   * paid tier in PLAN_TIERS. Production: throw and refuse to boot if a
-   * required env var is missing. Non-production: warn loudly so the
-   * dev sees the gap without blocking local work.
+   * paid tier in PLAN_TIERS. Default behavior: warn. Hard-fail only
+   * when `BILLING_VALIDATION_STRICT=true` — that's a deliberate opt-in
+   * for environments that actually have paid plans wired up (Stripe/
+   * Razorpay products created, customers actively subscribing).
    *
-   * R9 billing scout finding (CRITICAL): previously
-   * `getStripePriceId`/`getRazorpayPlanId` returned `undefined` on
-   * every call when the env var was missing — checkout would 400 at
-   * the moment the customer clicked Buy, not at deploy time. Catching
-   * this at boot means a misconfigured deploy never reaches a real
-   * customer.
+   * Hotfix rationale: an earlier version of this method threw in any
+   * `NODE_ENV=production` boot, which crashed prod the moment the
+   * commit landed — prod was running free-tier-only at the time and
+   * had never needed the env vars. The validation is still useful
+   * (catches misconfig before a customer hits checkout), but the
+   * blast radius of forced-fail-at-boot is too large to default to.
+   * Opt in once the org's billing path is live.
    */
   onModuleInit(): void {
     const missing: string[] = [];
@@ -86,11 +88,13 @@ export class BillingService implements OnModuleInit {
     }
 
     const summary = `Missing billing price/plan env vars: ${missing.join(', ')}`;
-    if (process.env.NODE_ENV === 'production') {
+    if (process.env.BILLING_VALIDATION_STRICT === 'true') {
       this.logger.error(summary);
       throw new Error(summary);
     }
-    this.logger.warn(`${summary} (allowed in non-production)`);
+    this.logger.warn(
+      `${summary} (warn-only; set BILLING_VALIDATION_STRICT=true to fail boot)`,
+    );
   }
 
   /**

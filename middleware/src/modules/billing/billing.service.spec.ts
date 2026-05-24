@@ -173,7 +173,7 @@ describe('BillingService', () => {
       'RAZORPAY_ENTERPRISE_PLAN_ID',
     ];
     let savedEnv: Record<string, string | undefined>;
-    let savedNodeEnv: string | undefined;
+    let savedStrict: string | undefined;
 
     beforeEach(() => {
       savedEnv = {};
@@ -181,7 +181,8 @@ describe('BillingService', () => {
         savedEnv[k] = process.env[k];
         delete process.env[k];
       });
-      savedNodeEnv = process.env.NODE_ENV;
+      savedStrict = process.env.BILLING_VALIDATION_STRICT;
+      delete process.env.BILLING_VALIDATION_STRICT;
     });
 
     afterEach(() => {
@@ -189,22 +190,21 @@ describe('BillingService', () => {
         if (savedEnv[k] === undefined) delete process.env[k];
         else process.env[k] = savedEnv[k];
       });
-      if (savedNodeEnv === undefined) delete process.env.NODE_ENV;
-      else process.env.NODE_ENV = savedNodeEnv;
+      if (savedStrict === undefined) delete process.env.BILLING_VALIDATION_STRICT;
+      else process.env.BILLING_VALIDATION_STRICT = savedStrict;
     });
 
-    it('throws when production and a paid-tier env var is missing', () => {
-      process.env.NODE_ENV = 'production';
+    it('throws when STRICT mode is on and a paid-tier env var is missing', () => {
+      process.env.BILLING_VALIDATION_STRICT = 'true';
       expect(() => service.onModuleInit()).toThrow(/Missing billing price/);
     });
 
-    it('does NOT throw in non-production (warns instead)', () => {
-      process.env.NODE_ENV = 'development';
+    it('does NOT throw when STRICT is unset (default warn-only behavior)', () => {
       expect(() => service.onModuleInit()).not.toThrow();
     });
 
-    it('does NOT throw when all paid-tier env vars are set', () => {
-      process.env.NODE_ENV = 'production';
+    it('does NOT throw when STRICT mode is on AND all paid-tier env vars are set', () => {
+      process.env.BILLING_VALIDATION_STRICT = 'true';
       KEYS.forEach((k) => {
         process.env[k] = `${k}_VALUE`;
       });
@@ -212,7 +212,7 @@ describe('BillingService', () => {
     });
 
     it('does not require env vars for the free tier', () => {
-      process.env.NODE_ENV = 'production';
+      process.env.BILLING_VALIDATION_STRICT = 'true';
       KEYS.forEach((k) => {
         process.env[k] = `${k}_VALUE`;
       });
