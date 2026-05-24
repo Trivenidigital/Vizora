@@ -7,7 +7,11 @@ import { DisplaysService } from './displays.service';
 import { DatabaseService } from '../database/database.service';
 import { CircuitBreakerService } from '../common/services/circuit-breaker.service';
 import { StorageService } from '../storage/storage.service';
-import { NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  NotFoundException,
+  ConflictException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { CreateDisplayDto } from './dto/create-display.dto';
 import { UpdateDisplayDto } from './dto/update-display.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
@@ -520,6 +524,24 @@ describe('DisplaysService', () => {
       await expect(
         service.requestScreenshot('different-org', mockDisplayId)
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ServiceUnavailableException when INTERNAL_API_SECRET is missing', async () => {
+      // Regression: previously threw a generic Error → unhandled by the
+      // NestJS HTTP layer → the user got a bare 500 with no useful
+      // message in error tracking. Now mapped to 503.
+      const previousSecret = process.env.INTERNAL_API_SECRET;
+      delete process.env.INTERNAL_API_SECRET;
+      try {
+        databaseService.display.findFirst.mockResolvedValue(mockDisplayWithRelations);
+        await expect(
+          service.requestScreenshot(mockOrganizationId, mockDisplayId)
+        ).rejects.toThrow(ServiceUnavailableException);
+      } finally {
+        if (previousSecret !== undefined) {
+          process.env.INTERNAL_API_SECRET = previousSecret;
+        }
+      }
     });
   });
 
