@@ -309,15 +309,34 @@ describe('AllExceptionsFilter', () => {
       process.env.NODE_ENV = originalEnv;
     });
 
-    it('should include error property in non-production response', () => {
+    it('should include error property + raw message ONLY in development', () => {
       const originalEnv = process.env.NODE_ENV;
-      process.env.NODE_ENV = 'test';
+      process.env.NODE_ENV = 'development';
 
       filter.catch(new Error('test error'), mockHost);
 
       const jsonCall = mockResponse.json.mock.calls[0][0];
       expect(jsonCall).toHaveProperty('error', 'Internal Server Error');
+      expect(jsonCall).toHaveProperty('message', 'test error');
 
+      process.env.NODE_ENV = originalEnv;
+    });
+
+    it('should NOT expose internals in test/staging/production envs', () => {
+      // Previously the filter checked `NODE_ENV !== 'production'` which
+      // let staging through as if it were dev — a leaked exception
+      // message in staging can carry DB connection strings or file
+      // paths. Now only `development` exposes.
+      const originalEnv = process.env.NODE_ENV;
+      for (const env of ['test', 'staging', 'production']) {
+        process.env.NODE_ENV = env;
+        mockResponse.json.mockClear();
+        filter.catch(new Error('leaked internal detail'), mockHost);
+        const jsonCall = mockResponse.json.mock.calls[0][0];
+        expect(jsonCall.message).toBe('Internal server error');
+        expect(jsonCall.message).not.toContain('leaked internal detail');
+        expect(jsonCall).not.toHaveProperty('error');
+      }
       process.env.NODE_ENV = originalEnv;
     });
   });

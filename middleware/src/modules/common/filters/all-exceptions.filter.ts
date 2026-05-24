@@ -21,7 +21,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
-    const isProduction = process.env.NODE_ENV === 'production';
+    // Only expose internal error messages in LOCAL development. Staging
+    // and any other non-production env share a production-like blast
+    // radius — a leaked exception message can contain DB connection
+    // strings, file paths, or other internal-only data. The previous
+    // `isProduction` check let staging through as if it were dev.
+    const exposeInternals = process.env.NODE_ENV === 'development';
 
     if (exception instanceof HttpException) {
       const status = exception.getStatus();
@@ -57,10 +62,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
       statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-      message: isProduction
-        ? 'Internal server error'
-        : errorMessage,
-      ...(isProduction ? {} : { error: 'Internal Server Error' }),
+      message: exposeInternals ? errorMessage : 'Internal server error',
+      ...(exposeInternals ? { error: 'Internal Server Error' } : {}),
     });
   }
 }
