@@ -41,20 +41,26 @@ export class PlaylistsService {
   async create(organizationId: string, createPlaylistDto: CreatePlaylistDto) {
     const { items, ...playlistData } = createPlaylistDto;
 
-    // Validate all content items exist and belong to organization
+    // Validate all content items exist and belong to organization.
+    // Dedupe contentIds before the cardinality check — a playlist that
+    // reuses the same content multiple times is valid, but findMany
+    // returns each match once, so comparing lengths against the raw
+    // contentIds array would falsely reject legitimate playlists with
+    // a misleading "missing: " (empty) error message.
     if (items && items.length > 0) {
       const contentIds = items.map(item => item.contentId);
+      const uniqueContentIds = Array.from(new Set(contentIds));
       const contents = await this.db.content.findMany({
         where: {
-          id: { in: contentIds },
+          id: { in: uniqueContentIds },
           organizationId,
         },
         select: { id: true },
       });
 
-      if (contents.length !== contentIds.length) {
-        const foundIds = contents.map(c => c.id);
-        const missingIds = contentIds.filter(id => !foundIds.includes(id));
+      if (contents.length !== uniqueContentIds.length) {
+        const foundIds = new Set(contents.map(c => c.id));
+        const missingIds = uniqueContentIds.filter(id => !foundIds.has(id));
         throw new NotFoundException(
           `Content item(s) not found or do not belong to your organization: ${missingIds.join(', ')}`
         );

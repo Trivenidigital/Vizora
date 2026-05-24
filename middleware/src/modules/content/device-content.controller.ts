@@ -6,7 +6,6 @@ import {
   Res,
   NotFoundException,
   BadRequestException,
-  ForbiddenException,
   UnauthorizedException,
   Logger,
 } from '@nestjs/common';
@@ -87,16 +86,18 @@ export class DeviceContentController {
     @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {
-    const content = await this.contentService.findById(id);
+    // Device JWT is mandatory — throws UnauthorizedException if missing/invalid.
+    // Verify it BEFORE the DB query so an unauth caller can't probe content
+    // IDs for existence via timing or DB error patterns.
+    const devicePayload = this.verifyDeviceToken(req);
+
+    const content = await this.contentService.findByIdForDevice(
+      id,
+      devicePayload.organizationId,
+    );
 
     if (!content || !content.url) {
       throw new NotFoundException('Content not found');
-    }
-
-    // Device JWT is mandatory — throws UnauthorizedException if missing/invalid
-    const devicePayload = this.verifyDeviceToken(req);
-    if (content.organizationId !== devicePayload.organizationId) {
-      throw new ForbiddenException('Content not accessible to this device');
     }
 
     if (content.url.startsWith(MINIO_URL_PREFIX)) {

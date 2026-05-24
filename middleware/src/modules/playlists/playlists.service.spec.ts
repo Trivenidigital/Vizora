@@ -126,6 +126,45 @@ describe('PlaylistsService', () => {
 
       expect(result.items).toHaveLength(1);
     });
+
+    it('should allow the same contentId to appear multiple times in items', async () => {
+      // Regression: previously the validation compared findMany result
+      // length against the raw contentIds length, falsely rejecting any
+      // playlist that reused the same content twice with a misleading
+      // "missing: " (empty) error message.
+      const dtoWithDuplicateContent = {
+        ...createDto,
+        items: [
+          { contentId: 'content-123', order: 0 },
+          { contentId: 'content-123', order: 1 },
+          { contentId: 'content-456', order: 2 },
+        ],
+      };
+
+      mockDatabaseService.content.findMany.mockResolvedValue([
+        { id: 'content-123' },
+        { id: 'content-456' },
+      ]);
+
+      mockDatabaseService.playlist.create.mockResolvedValue({
+        ...mockPlaylist,
+        items: [mockPlaylistItem],
+      });
+
+      await expect(
+        service.create('org-123', dtoWithDuplicateContent),
+      ).resolves.toBeDefined();
+
+      // Ensure the de-duplication happens BEFORE the DB query — content.findMany
+      // should be called with the unique set, not the raw 3-item array.
+      expect(mockDatabaseService.content.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            id: { in: ['content-123', 'content-456'] },
+          }),
+        }),
+      );
+    });
   });
 
   describe('findAll', () => {
