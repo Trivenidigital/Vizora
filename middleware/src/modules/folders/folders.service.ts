@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { CreateFolderDto } from './dto/create-folder.dto';
 import { UpdateFolderDto } from './dto/update-folder.dto';
@@ -18,6 +18,8 @@ export interface FolderWithChildren {
 
 @Injectable()
 export class FoldersService {
+  private readonly logger = new Logger(FoldersService.name);
+
   constructor(private readonly db: DatabaseService) {}
 
   async create(organizationId: string, dto: CreateFolderDto) {
@@ -268,8 +270,16 @@ export class FoldersService {
     return { removed: result.count };
   }
 
+  /** Maximum supported folder nesting depth. A legitimate hierarchy
+   * 50 deep is already deeply pathological (operators top out around
+   * 5-10 in practice). The cap prevents an attacker from creating a
+   * 10k-deep chain and triggering O(N) DB query storms on every
+   * folder move — DoS via tree traversal. */
+  static readonly MAX_FOLDER_DEPTH = 50;
+
   /**
-   * Check if targetId is a descendant of parentId
+   * Check if targetId is a descendant of parentId. Walks the parent
+   * chain DB-query-per-hop, so the depth cap below bounds the work.
    */
   private async isDescendant(
     organizationId: string,
@@ -278,15 +288,27 @@ export class FoldersService {
   ): Promise<boolean> {
     let currentId: string | null = targetId;
     const visited = new Set<string>();
+    let hops = 0;
 
     while (currentId) {
       if (currentId === parentId) {
         return true;
       }
       if (visited.has(currentId)) {
-        break; // Prevent infinite loop
+        break; // Prevent infinite loop on a cycle
       }
       visited.add(currentId);
+
+      if (hops++ >= FoldersService.MAX_FOLDER_DEPTH) {
+        // Treat exceeding-depth as "not a descendant" so the move
+        // still proceeds — the caller's separate cycle-prevention
+        // guards handle the actual structural risk. Log so ops can
+        // catch a hierarchy that grew past sane bounds.
+        this.logger.warn(
+          `isDescendant aborted: folder chain for ${targetId} exceeded ${FoldersService.MAX_FOLDER_DEPTH} hops. Hierarchy likely needs cleanup.`,
+        );
+        break;
+      }
 
       const folder = await this.db.contentFolder.findFirst({
         where: { id: currentId, organizationId },
