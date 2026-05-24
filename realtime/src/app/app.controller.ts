@@ -4,7 +4,7 @@ import { RedisService } from '../services/redis.service';
 import { DatabaseService } from '../database/database.service';
 import { InternalApiGuard } from '../guards/internal-api.guard';
 import { PushPlaylistRequest, PushContentRequest, DeviceCommandType } from '../types';
-import { PushPlaylistDto, PushContentDto, BroadcastCommandDto, InternalCommandDto } from '../dto/internal-api.dto';
+import { PushPlaylistDto, PushContentDto, BroadcastCommandDto, InternalCommandDto, BroadcastNotificationDto } from '../dto/internal-api.dto';
 
 interface DependencyHealth {
   status: 'healthy' | 'unhealthy' | 'degraded';
@@ -241,14 +241,12 @@ export class AppController {
   @Post('notifications/broadcast')
   @UseGuards(InternalApiGuard)
   async broadcastNotification(
-    @Body() data: { organizationId: string; notification: any },
+    @Body() data: BroadcastNotificationDto,
   ): Promise<PushResponse> {
-    if (!data.organizationId || typeof data.organizationId !== 'string') {
-      throw new BadRequestException('organizationId is required and must be a string');
-    }
-    if (!data.notification || typeof data.notification !== 'object') {
-      throw new BadRequestException('notification is required and must be an object');
-    }
+    // class-validator + global ValidationPipe enforces the DTO shape
+    // before we reach this body — the prior inline `{organizationId,
+    // notification}` type bypassed validation and forced runtime
+    // typeof checks that drifted from the documented contract.
     this.deviceGateway.server
       .to(`org:${data.organizationId}`)
       .emit('notification:new', data.notification);
