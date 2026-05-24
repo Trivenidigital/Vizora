@@ -160,6 +160,67 @@ describe('BillingService', () => {
     expect(service).toBeDefined();
   });
 
+  describe('onModuleInit (price-ID startup validation)', () => {
+    const KEYS = [
+      'STRIPE_BASIC_MONTHLY_PRICE_ID',
+      'STRIPE_BASIC_YEARLY_PRICE_ID',
+      'RAZORPAY_BASIC_PLAN_ID',
+      'STRIPE_PRO_MONTHLY_PRICE_ID',
+      'STRIPE_PRO_YEARLY_PRICE_ID',
+      'RAZORPAY_PRO_PLAN_ID',
+      'STRIPE_ENTERPRISE_MONTHLY_PRICE_ID',
+      'STRIPE_ENTERPRISE_YEARLY_PRICE_ID',
+      'RAZORPAY_ENTERPRISE_PLAN_ID',
+    ];
+    let savedEnv: Record<string, string | undefined>;
+    let savedNodeEnv: string | undefined;
+
+    beforeEach(() => {
+      savedEnv = {};
+      KEYS.forEach((k) => {
+        savedEnv[k] = process.env[k];
+        delete process.env[k];
+      });
+      savedNodeEnv = process.env.NODE_ENV;
+    });
+
+    afterEach(() => {
+      KEYS.forEach((k) => {
+        if (savedEnv[k] === undefined) delete process.env[k];
+        else process.env[k] = savedEnv[k];
+      });
+      if (savedNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = savedNodeEnv;
+    });
+
+    it('throws when production and a paid-tier env var is missing', () => {
+      process.env.NODE_ENV = 'production';
+      expect(() => service.onModuleInit()).toThrow(/Missing billing price/);
+    });
+
+    it('does NOT throw in non-production (warns instead)', () => {
+      process.env.NODE_ENV = 'development';
+      expect(() => service.onModuleInit()).not.toThrow();
+    });
+
+    it('does NOT throw when all paid-tier env vars are set', () => {
+      process.env.NODE_ENV = 'production';
+      KEYS.forEach((k) => {
+        process.env[k] = `${k}_VALUE`;
+      });
+      expect(() => service.onModuleInit()).not.toThrow();
+    });
+
+    it('does not require env vars for the free tier', () => {
+      process.env.NODE_ENV = 'production';
+      KEYS.forEach((k) => {
+        process.env[k] = `${k}_VALUE`;
+      });
+      // Free tier env vars NOT set, but validation should pass — free has no price.
+      expect(() => service.onModuleInit()).not.toThrow();
+    });
+  });
+
   describe('getSubscriptionStatus', () => {
     it('should return subscription status for an organization', async () => {
       mockDatabaseService.organization.findUnique.mockResolvedValue(mockOrganization);
