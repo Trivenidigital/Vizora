@@ -1030,6 +1030,7 @@ export default function ContentClient() {
  <th className="eh-th">
  <input
  type="checkbox"
+ aria-label="Select all content items"
  checked={selectedItems.size === filteredContent.length && filteredContent.length > 0}
  onChange={toggleSelectAll}
  className="rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
@@ -1048,6 +1049,7 @@ export default function ContentClient() {
  <td className="eh-td">
  <input
  type="checkbox"
+ aria-label={`Select ${item.title}`}
  checked={selectedItems.has(item.id)}
  onChange={() => toggleSelectItem(item.id)}
  className="rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
@@ -1055,7 +1057,19 @@ export default function ContentClient() {
  />
  </td>
  <td className="eh-td">
- <div className="flex items-center gap-3 cursor-pointer" onClick={() => handlePreview(item)}>
+ <div
+ role="button"
+ tabIndex={0}
+ aria-label={`Preview ${item.title}`}
+ className="flex items-center gap-3 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--primary)] rounded"
+ onClick={() => handlePreview(item)}
+ onKeyDown={(e) => {
+ if (e.key === 'Enter' || e.key === ' ') {
+ e.preventDefault();
+ handlePreview(item);
+ }
+ }}
+ >
  <div className="w-12 h-12 bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] rounded flex items-center justify-center flex-shrink-0 overflow-hidden">
  {item.thumbnailUrl ? (
  <img src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
