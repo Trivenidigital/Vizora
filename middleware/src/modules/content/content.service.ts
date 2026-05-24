@@ -637,42 +637,69 @@ export class ContentService {
 
   async bulkDelete(organizationId: string, dto: BulkDeleteDto) {
     const { ids } = dto;
+    const uniqueIds = Array.from(new Set(ids));
 
     // Fetch items with file info for storage cleanup
     const items = await this.db.content.findMany({
-      where: { id: { in: ids }, organizationId },
+      where: { id: { in: uniqueIds }, organizationId },
       select: { id: true, fileSize: true, url: true },
     });
 
-    if (items.length !== ids.length) {
+    if (items.length !== uniqueIds.length) {
       throw new BadRequestException('Some content items not found or not accessible');
     }
 
-    // Delete files from storage with error collection
-    const deletionResults = await Promise.allSettled(
+    // Delete files from storage, tracking which items succeeded.
+    //
+    // Previously the function ran Promise.allSettled, logged failures,
+    // then deleteMany'd ALL DB rows — leaving the failed-MinIO files
+    // ORPHANED forever (consuming quota with no DB row pointing to
+    // them, no operator visibility). The new shape only deletes the DB
+    // rows whose storage file actually went away; failures stay in the
+    // DB so the operator (or a retry cron) can re-attempt the delete
+    // later. Quota decrement matches the same successful-only set.
+    const deletableIds: string[] = [];
+    const failedIds: string[] = [];
+    await Promise.all(
       items.map(async (item) => {
-        const objectKey = item.url?.startsWith('minio://') ? item.url.substring('minio://'.length) : null;
-        if (objectKey) {
+        const objectKey = item.url?.startsWith('minio://')
+          ? item.url.substring('minio://'.length)
+          : null;
+        if (!objectKey) {
+          // No file to delete (e.g., url-type content) — safe to drop DB row.
+          deletableIds.push(item.id);
+          return;
+        }
+        try {
           await this.storageService.deleteFile(objectKey);
+          deletableIds.push(item.id);
+        } catch (err) {
+          failedIds.push(item.id);
+          this.logger.warn(
+            `Bulk delete: storage delete failed for content ${item.id} (key=${objectKey}): ${
+              err instanceof Error ? err.message : err
+            }. DB row retained for retry.`,
+          );
         }
       }),
     );
-    const failures = deletionResults.filter(r => r.status === 'rejected');
-    if (failures.length > 0) {
-      this.logger.warn(`Bulk delete: ${failures.length}/${items.length} storage file(s) failed to delete`);
+
+    let deleted = 0;
+    if (deletableIds.length > 0) {
+      const result = await this.db.content.deleteMany({
+        where: { id: { in: deletableIds }, organizationId },
+      });
+      deleted = result.count;
+
+      const successfulBytes = items
+        .filter((i) => deletableIds.includes(i.id))
+        .reduce((sum, i) => sum + (i.fileSize || 0), 0);
+      if (successfulBytes > 0) {
+        await this.storageQuotaService.decrementUsage(organizationId, successfulBytes);
+      }
     }
 
-    const result = await this.db.content.deleteMany({
-      where: { id: { in: ids }, organizationId },
-    });
-
-    // Decrement storage quota for total file sizes
-    const totalBytes = items.reduce((sum, item) => sum + (item.fileSize || 0), 0);
-    if (totalBytes > 0) {
-      await this.storageQuotaService.decrementUsage(organizationId, totalBytes);
-    }
-
-    return { deleted: result.count };
+    return { deleted, failed: failedIds.length, failedIds };
   }
 
   async bulkAddTags(organizationId: string, dto: BulkTagDto) {
