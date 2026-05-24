@@ -146,6 +146,7 @@ describe('envSchema', () => {
         NODE_ENV: 'production',
         MINIO_ACCESS_KEY: 'prod-key',
         MINIO_SECRET_KEY: 'prod-secret',
+        INTERNAL_API_SECRET: 'x'.repeat(32),
       });
       expect(result.success).toBe(true);
     });
@@ -399,6 +400,34 @@ describe('envSchema', () => {
         NODE_ENV: 'production',
         MINIO_ACCESS_KEY: 'prod-key',
         MINIO_SECRET_KEY: 'prod-secret',
+        INTERNAL_API_SECRET: 'x'.repeat(32),
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject missing INTERNAL_API_SECRET in production', () => {
+      // Regression: previously INTERNAL_API_SECRET was simply optional, so
+      // a prod deploy without it silently broke every internal service-
+      // to-service call (ops scripts, realtime push, MCP audit hooks)
+      // with 401s that nothing surfaced. Now enforced at startup.
+      const result = envSchema.safeParse({
+        ...validEnv,
+        NODE_ENV: 'production',
+        MINIO_ACCESS_KEY: 'prod-key',
+        MINIO_SECRET_KEY: 'prod-secret',
+        // INTERNAL_API_SECRET intentionally omitted
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues.some(i => i.path[0] === 'INTERNAL_API_SECRET')).toBe(true);
+      }
+    });
+
+    it('should not enforce INTERNAL_API_SECRET in development', () => {
+      const result = envSchema.safeParse({
+        ...validEnv,
+        NODE_ENV: 'development',
+        // INTERNAL_API_SECRET intentionally omitted
       });
       expect(result.success).toBe(true);
     });

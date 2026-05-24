@@ -109,8 +109,10 @@ module.exports = {
           } catch { return {}; }
         })(),
       },
-      // Graceful shutdown
-      kill_timeout: 10000,
+      // Graceful shutdown — Next.js needs more time than the API services
+      // to drain in-flight SSR + RSC streams cleanly; 10s was occasionally
+      // truncating responses on PM2 reload. Match the middleware budget.
+      kill_timeout: 30000,
       // Logging
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       max_size: '50M',
