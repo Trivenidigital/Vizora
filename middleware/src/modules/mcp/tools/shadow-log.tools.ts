@@ -78,16 +78,18 @@ export async function logShadowRowTool(
     );
   }
 
-  // Re-derive the same server-generated timestamp + run_id from a fresh
-  // call so we can echo them back. The service doesn't return them today;
-  // could refactor later if it matters.
-  const now = new Date();
+  // Echo the SAME timestamp + run_id that the service actually wrote.
+  // Previously we re-derived these from a fresh Date() — close enough
+  // most of the time, but it drifted by 1+s under load and broke
+  // downstream correlation between MCP audit rows and shadow-log
+  // JSONL rows. ShadowLogService.appendRow now returns the values it
+  // generated; the tool just passes them through.
   return LogShadowRowResult.parse({
     log_name: result.logName,
     written: result.written,
     line_count: result.lineCount,
-    timestamp: now.toISOString(),
-    run_id: String(Math.floor(now.getTime() / 1000)),
+    timestamp: result.timestamp,
+    run_id: result.run_id,
   });
 }
 

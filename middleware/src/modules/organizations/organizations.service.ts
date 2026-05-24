@@ -272,12 +272,18 @@ export class OrganizationsService {
       return { sent: false, recipientCount: 0, recipientHashes: [], reason: 'no_admin' };
     }
 
-    // Resolve recipients per the LIFECYCLE_LIVE / LIFECYCLE_TEST_EMAILS rules
+    // Resolve recipients per the LIFECYCLE_LIVE / LIFECYCLE_TEST_EMAILS rules.
+    // Cap the test recipient list defensively — a misconfigured .env with
+    // thousands of addresses would otherwise fan out one nudge into a
+    // thousand real SMTP sends per agent firing. The cap is generous
+    // (any legitimate test-recipient list is single-digits) but bounded.
+    const MAX_TEST_RECIPIENTS = 10;
     const testEmailsRaw = process.env.LIFECYCLE_TEST_EMAILS || '';
     const testEmails = testEmailsRaw
       .split(',')
       .map((s) => s.trim())
-      .filter(Boolean);
+      .filter(Boolean)
+      .slice(0, MAX_TEST_RECIPIENTS);
     const live = process.env.LIFECYCLE_LIVE === 'true';
     const recipients =
       testEmails.length > 0 ? [...testEmails] : live ? [admin.email] : [];
