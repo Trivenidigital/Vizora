@@ -687,12 +687,31 @@ export class ContentService {
       throw new BadRequestException('Some content items not found or not accessible');
     }
 
+    // Dedupe both arrays before the org-scope checks. Prisma's
+    // `id: { in: [...] }` collapses duplicates internally, so
+    // comparing the count against the RAW length would falsely
+    // reject a request where the client posted the same tag id
+    // twice (same false-positive that PR #73 fixed for playlists).
+    const uniqueContentIds = Array.from(new Set(contentIds));
+    const uniqueTagIds = Array.from(new Set(tagIds));
+
+    if (uniqueContentIds.length !== contentIds.length) {
+      // Re-check the org-scope count against the unique set so the
+      // cardinality comparison is apples-to-apples.
+      const recheck = await this.db.content.count({
+        where: { id: { in: uniqueContentIds }, organizationId },
+      });
+      if (recheck !== uniqueContentIds.length) {
+        throw new BadRequestException('Some content items not found or not accessible');
+      }
+    }
+
     // Verify all tags belong to organization
     const tagCount = await this.db.tag.count({
-      where: { id: { in: tagIds }, organizationId },
+      where: { id: { in: uniqueTagIds }, organizationId },
     });
 
-    if (tagCount !== tagIds.length) {
+    if (tagCount !== uniqueTagIds.length) {
       throw new BadRequestException('Some tags not found or not accessible');
     }
 

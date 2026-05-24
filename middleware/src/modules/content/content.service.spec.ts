@@ -1505,6 +1505,29 @@ describe('ContentService', () => {
         }),
       ).rejects.toThrow(BadRequestException);
     });
+
+    it('should accept duplicate tagIds (deduped before the cardinality check)', async () => {
+      // Regression: previously a request with the same tag id listed
+      // twice would fail with "Some tags not found" because Prisma's
+      // `id: { in: [...] }` collapses duplicates internally so the
+      // count came back lower than the raw length. Same fix shape as
+      // PR #73 for playlists.
+      mockDatabaseService.content.count.mockResolvedValue(2);
+      mockDatabaseService.tag.count.mockResolvedValue(1);
+      mockDatabaseService.contentTag.createMany.mockResolvedValue({ count: 2 });
+
+      await expect(
+        service.bulkAddTags('org-123', {
+          contentIds: ['content-1', 'content-2'],
+          tagIds: ['tag-1', 'tag-1'], // duplicate
+        }),
+      ).resolves.toBeDefined();
+
+      // Tag count check should have been against the unique set (1 id).
+      expect(mockDatabaseService.tag.count).toHaveBeenCalledWith({
+        where: { id: { in: ['tag-1'] }, organizationId: 'org-123' },
+      });
+    });
   });
 
   describe('bulkSetDuration', () => {
