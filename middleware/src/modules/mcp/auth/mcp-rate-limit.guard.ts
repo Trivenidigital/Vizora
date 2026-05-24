@@ -33,6 +33,20 @@ interface Bucket {
 }
 
 /**
+ * Hard cap on the in-memory bucket Map. Prevents unbounded growth if
+ * an operator issues thousands of tokens (or, more realistically, if
+ * a token leak causes a flood of distinct token ids being seen for
+ * the first time). Default keeps memory under ~150KB at the bucket
+ * struct size and bounds the maybeSweep() O(n) cost. Override via
+ * MCP_RATE_LIMIT_BUCKET_CAP if the deployment legitimately exceeds.
+ */
+const BUCKET_CAP = parsePositiveInt(
+  process.env.MCP_RATE_LIMIT_BUCKET_CAP,
+  10_000,
+  'MCP_RATE_LIMIT_BUCKET_CAP',
+);
+
+/**
  * Per-token rate limit (in-memory). MUST run AFTER `McpAuthGuard` so
  * `req[MCP_CONTEXT_KEY]` is populated.
  *
@@ -100,7 +114,37 @@ export class McpRateLimitGuard implements CanActivate {
     bucket.minuteCount++;
     bucket.dayCount++;
     this.buckets.set(mcp.tokenId, bucket);
+    this.enforceCap();
     return true;
+  }
+
+  /**
+   * Keep `buckets` bounded at BUCKET_CAP. Tries the cheap path first
+   * (drop any expired-day-window buckets); if still over cap, evicts
+   * the oldest insertion-ordered entries. Map iteration is insertion-
+   * ordered in modern JS engines, so the first entries dropped are
+   * the least-recently-touched ones. Eviction is a last resort —
+   * normal operation never reaches it because maybeSweep() runs first.
+   */
+  private enforceCap(): void {
+    if (this.buckets.size <= BUCKET_CAP) return;
+    const now = Date.now();
+    for (const [tokenId, bucket] of this.buckets) {
+      if (bucket.dayResetAt < now) {
+        this.buckets.delete(tokenId);
+        if (this.buckets.size <= BUCKET_CAP) return;
+      }
+    }
+    if (this.buckets.size <= BUCKET_CAP) return;
+    let toEvict = this.buckets.size - BUCKET_CAP;
+    for (const tokenId of this.buckets.keys()) {
+      if (toEvict-- <= 0) break;
+      this.buckets.delete(tokenId);
+    }
+    this.logger.warn(
+      `Rate-limit bucket cap (${BUCKET_CAP}) reached — evicted oldest entries. ` +
+        'Consider raising MCP_RATE_LIMIT_BUCKET_CAP if this is sustained.',
+    );
   }
 
   private fresh(now: number): Bucket {

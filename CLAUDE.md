@@ -169,6 +169,7 @@ EMAIL_FROM              # Default sender for transactional mail
 MCP_TOKEN_TTL_DAYS                # Max issuance TTL in days. Default 90. Min 1.
 MCP_RATE_LIMIT_PER_MIN            # Per-token per-minute cap. Default 60.
 MCP_RATE_LIMIT_PER_DAY            # Per-token per-day cap. Default 1000.
+MCP_RATE_LIMIT_BUCKET_CAP         # Max distinct tokens tracked in the in-memory bucket Map. Default 10000. Older buckets are evicted when the cap is hit (warn log when this happens).
 ```
 
 ### Agent System (business agents — see also `docs/agents-architecture.md`)
