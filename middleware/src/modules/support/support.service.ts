@@ -360,9 +360,33 @@ export class SupportService {
   }
 
   /**
-   * Get a single support request with messages
+   * Get a single support request with messages.
+   *
+   * Two-step fetch: a shallow access check (id + organizationId +
+   * userId only) runs before the full include load. The unauthorized
+   * paths therefore never load other orgs' user PII, message bodies,
+   * or resolution notes — only the access fields. The Forbidden vs.
+   * NotFound signal is preserved for callers that depend on it.
    */
   async findOne(id: string, user: UserInfo) {
+    const access = await this.db.supportRequest.findUnique({
+      where: { id },
+      select: { id: true, organizationId: true, userId: true },
+    });
+
+    if (!access) {
+      throw new NotFoundException('Support request not found');
+    }
+
+    if (!user.isSuperAdmin) {
+      if (access.organizationId !== user.organizationId) {
+        throw new ForbiddenException('Access denied');
+      }
+      if (user.role !== 'admin' && access.userId !== user.id) {
+        throw new ForbiddenException('Access denied');
+      }
+    }
+
     const request = await this.db.supportRequest.findUnique({
       where: { id },
       include: {
@@ -379,17 +403,9 @@ export class SupportService {
     });
 
     if (!request) {
+      // The row existed in the access check above but got deleted before
+      // the full fetch. Race window is microseconds; surface as 404.
       throw new NotFoundException('Support request not found');
-    }
-
-    // Access control
-    if (!user.isSuperAdmin) {
-      if (request.organizationId !== user.organizationId) {
-        throw new ForbiddenException('Access denied');
-      }
-      if (user.role !== 'admin' && request.userId !== user.id) {
-        throw new ForbiddenException('Access denied');
-      }
     }
 
     return {

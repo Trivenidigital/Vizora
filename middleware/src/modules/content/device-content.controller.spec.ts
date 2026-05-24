@@ -9,7 +9,6 @@ jest.mock('isomorphic-dompurify', () => ({
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   NotFoundException,
-  ForbiddenException,
   UnauthorizedException,
   BadRequestException,
 } from '@nestjs/common';
@@ -47,7 +46,7 @@ describe('DeviceContentController', () => {
 
   beforeEach(async () => {
     mockContentService = {
-      findById: jest.fn(),
+      findByIdForDevice: jest.fn(),
     } as any;
 
     mockStorageService = {
@@ -103,7 +102,7 @@ describe('DeviceContentController', () => {
       const req = createMockRequest('valid-device-token');
       const res = createMockResponse();
 
-      mockContentService.findById.mockResolvedValue(mockContent as any);
+      mockContentService.findByIdForDevice.mockResolvedValue(mockContent as any);
       mockJwtService.verify.mockReturnValue(validDevicePayload);
 
       // Create an async iterable stream mock
@@ -117,7 +116,10 @@ describe('DeviceContentController', () => {
 
       await controller.serveFile(contentId, req, res);
 
-      expect(mockContentService.findById).toHaveBeenCalledWith(contentId);
+      expect(mockContentService.findByIdForDevice).toHaveBeenCalledWith(
+        contentId,
+        validDevicePayload.organizationId,
+      );
       expect(mockJwtService.verify).toHaveBeenCalledWith('valid-device-token', {
         secret: process.env.DEVICE_JWT_SECRET,
         algorithms: ['HS256'],
@@ -135,7 +137,7 @@ describe('DeviceContentController', () => {
       const req = createMockRequest(undefined, 'valid-query-token');
       const res = createMockResponse();
 
-      mockContentService.findById.mockResolvedValue(mockContent as any);
+      mockContentService.findByIdForDevice.mockResolvedValue(mockContent as any);
       mockJwtService.verify.mockReturnValue(validDevicePayload);
 
       const buffer = Buffer.from('file-content');
@@ -159,7 +161,7 @@ describe('DeviceContentController', () => {
       const req = createMockRequest();
       const res = createMockResponse();
 
-      mockContentService.findById.mockResolvedValue(mockContent as any);
+      mockContentService.findByIdForDevice.mockResolvedValue(mockContent as any);
 
       await expect(controller.serveFile(contentId, req, res)).rejects.toThrow(
         UnauthorizedException,
@@ -170,7 +172,7 @@ describe('DeviceContentController', () => {
       const req = createMockRequest('invalid-token');
       const res = createMockResponse();
 
-      mockContentService.findById.mockResolvedValue(mockContent as any);
+      mockContentService.findByIdForDevice.mockResolvedValue(mockContent as any);
       mockJwtService.verify.mockImplementation(() => {
         throw new Error('Invalid token');
       });
@@ -184,7 +186,7 @@ describe('DeviceContentController', () => {
       const req = createMockRequest('user-token');
       const res = createMockResponse();
 
-      mockContentService.findById.mockResolvedValue(mockContent as any);
+      mockContentService.findByIdForDevice.mockResolvedValue(mockContent as any);
       mockJwtService.verify.mockReturnValue({
         ...validDevicePayload,
         type: 'user',
@@ -195,19 +197,24 @@ describe('DeviceContentController', () => {
       );
     });
 
-    it('should return 403 when content belongs to different organization', async () => {
+    it('should return 404 when content belongs to a different organization', async () => {
+      // After the IDOR hardening, the org filter lives in the query
+      // (findByIdForDevice). A device with the wrong org id therefore
+      // gets a uniform NotFoundException — the service never loads
+      // the other org's row, so there is no record on which to
+      // distinguish Forbidden vs NotFound (which is intentional).
       const req = createMockRequest('valid-token');
       const res = createMockResponse();
 
-      const contentFromDifferentOrg = {
-        ...mockContent,
-        organizationId: 'other-org-999',
-      };
-      mockContentService.findById.mockResolvedValue(contentFromDifferentOrg as any);
+      mockContentService.findByIdForDevice.mockResolvedValue(null);
       mockJwtService.verify.mockReturnValue(validDevicePayload);
 
       await expect(controller.serveFile(contentId, req, res)).rejects.toThrow(
-        ForbiddenException,
+        NotFoundException,
+      );
+      expect(mockContentService.findByIdForDevice).toHaveBeenCalledWith(
+        contentId,
+        validDevicePayload.organizationId,
       );
     });
 
@@ -215,7 +222,8 @@ describe('DeviceContentController', () => {
       const req = createMockRequest('valid-token');
       const res = createMockResponse();
 
-      mockContentService.findById.mockResolvedValue(null);
+      mockJwtService.verify.mockReturnValue(validDevicePayload);
+      mockContentService.findByIdForDevice.mockResolvedValue(null);
 
       await expect(controller.serveFile(contentId, req, res)).rejects.toThrow(
         NotFoundException,
@@ -226,7 +234,8 @@ describe('DeviceContentController', () => {
       const req = createMockRequest('valid-token');
       const res = createMockResponse();
 
-      mockContentService.findById.mockResolvedValue({
+      mockJwtService.verify.mockReturnValue(validDevicePayload);
+      mockContentService.findByIdForDevice.mockResolvedValue({
         ...mockContent,
         url: null,
       } as any);
@@ -244,7 +253,7 @@ describe('DeviceContentController', () => {
         ...mockContent,
         url: 'https://cdn.example.com/image.jpg',
       };
-      mockContentService.findById.mockResolvedValue(externalContent as any);
+      mockContentService.findByIdForDevice.mockResolvedValue(externalContent as any);
       mockJwtService.verify.mockReturnValue(validDevicePayload);
 
       await controller.serveFile(contentId, req, res);
@@ -260,7 +269,7 @@ describe('DeviceContentController', () => {
       const req = createMockRequest('valid-token');
       const res = createMockResponse();
 
-      mockContentService.findById.mockResolvedValue(mockContent as any);
+      mockContentService.findByIdForDevice.mockResolvedValue(mockContent as any);
       mockJwtService.verify.mockReturnValue(validDevicePayload);
       mockStorageService.isMinioAvailable.mockReturnValue(false);
 
@@ -274,7 +283,7 @@ describe('DeviceContentController', () => {
       const res = createMockResponse();
 
       const contentNoMime = { ...mockContent, mimeType: null };
-      mockContentService.findById.mockResolvedValue(contentNoMime as any);
+      mockContentService.findByIdForDevice.mockResolvedValue(contentNoMime as any);
       mockJwtService.verify.mockReturnValue(validDevicePayload);
 
       const buffer = Buffer.from('binary-data');

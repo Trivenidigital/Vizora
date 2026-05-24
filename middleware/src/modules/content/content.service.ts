@@ -195,11 +195,17 @@ export class ContentService {
   }
 
   /**
-   * Find content by ID without org filter (for device content serving)
+   * Find content for device serving. The org filter is applied in the
+   * query (not after the fetch) so an attacker who guesses a content
+   * ID from another org gets a uniform NotFoundException without the
+   * service ever having loaded that org's record into memory.
+   *
+   * Callers MUST verify the device JWT before calling this and pass
+   * the device's organizationId from the verified payload.
    */
-  async findById(id: string) {
+  async findByIdForDevice(id: string, organizationId: string) {
     const content = await this.db.content.findFirst({
-      where: { id },
+      where: { id, organizationId },
     });
     return content;
   }

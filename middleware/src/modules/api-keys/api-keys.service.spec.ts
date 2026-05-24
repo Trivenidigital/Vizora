@@ -1,4 +1,5 @@
 import * as crypto from 'crypto';
+import { NotFoundException } from '@nestjs/common';
 import { ApiKeysService } from './api-keys.service';
 import { DatabaseService } from '../database/database.service';
 
@@ -194,6 +195,12 @@ describe('ApiKeysService', () => {
         where: { id: 'key-123', organizationId: 'org-123' },
         data: { revokedAt: expect.any(Date) },
       });
+    });
+
+    it('should throw NotFoundException when key does not exist in caller org', async () => {
+      mockDatabaseService.apiKey.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.revoke('org-123', 'missing-key')).rejects.toThrow(NotFoundException);
     });
   });
 
