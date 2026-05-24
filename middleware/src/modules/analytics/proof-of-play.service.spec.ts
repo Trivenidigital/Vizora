@@ -165,6 +165,59 @@ describe('AnalyticsService — Proof of play (O2)', () => {
       expect(out).toContain("'+CMD|calc.exe");
     });
 
+    it('formats the timestamp column in the requested IANA timezone', async () => {
+      // 15:00 UTC = 11:00 EDT in May (DST). Confirms operator's tz
+      // parameter is honored end-to-end without breaking the static
+      // header (downstream parsers stay backward-compatible).
+      const row = {
+        timestamp: new Date('2026-05-19T15:00:00Z'),
+        contentId: 'c1',
+        displayId: 'd1',
+        playlistId: null,
+        duration: 30,
+        completionPercentage: 100,
+        content: { id: 'c1', name: 'Promo' },
+        display: { id: 'd1', nickname: 'NY Lobby', deviceIdentifier: 'mac-1' },
+      };
+      db.contentImpression.findMany
+        .mockResolvedValueOnce([row])
+        .mockResolvedValueOnce([]);
+
+      const out = await collect(
+        service.streamProofOfPlayCsv(orgId, { tz: 'America/New_York' }),
+      );
+      const lines = out.split('\n').filter((l) => l.length > 0);
+      // Header is unchanged (no tz suffix) so existing parsers keep working.
+      expect(lines[0]).toBe(
+        'timestamp,contentId,contentName,displayId,displayName,playlistId,duration_sec,completion_percent',
+      );
+      // Cell carries the localized timestamp + tz tag.
+      expect(lines[1]).toContain('2026-05-19 11:00:00 America/New_York');
+    });
+
+    it('falls back to UTC ISO when tz is invalid (does not 500)', async () => {
+      const row = {
+        timestamp: new Date('2026-05-19T15:00:00Z'),
+        contentId: 'c1',
+        displayId: 'd1',
+        playlistId: null,
+        duration: null,
+        completionPercentage: null,
+        content: { id: 'c1', name: 'Promo' },
+        display: { id: 'd1', nickname: 'Foo', deviceIdentifier: 'mac-1' },
+      };
+      db.contentImpression.findMany
+        .mockResolvedValueOnce([row])
+        .mockResolvedValueOnce([]);
+
+      const out = await collect(
+        service.streamProofOfPlayCsv(orgId, { tz: 'Not/A_RealTimezone' }),
+      );
+      const lines = out.split('\n').filter((l) => l.length > 0);
+      // Invalid tz silently falls back to UTC ISO format.
+      expect(lines[1]).toContain('2026-05-19T15:00:00.000Z');
+    });
+
     it('CSV-escapes cells containing commas, quotes, or newlines', async () => {
       const row = {
         timestamp: new Date('2026-05-19T10:00:00Z'),

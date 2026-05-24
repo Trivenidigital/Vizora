@@ -269,4 +269,41 @@ describe('LoggingInterceptor', () => {
       process.env.NODE_ENV = originalNodeEnv;
     });
   });
+
+  describe('redactUrl (query-string secret redaction)', () => {
+    // Pure-function tests against the static helper — exercises the
+    // sensitive-key matcher without spinning up the full intercept flow.
+    const { LoggingInterceptor } = jest.requireActual('./logging.interceptor');
+
+    it('passes through URLs with no query string', () => {
+      expect(LoggingInterceptor.redactUrl('/api/v1/content')).toBe('/api/v1/content');
+    });
+
+    it('redacts known sensitive keys but keeps benign ones', () => {
+      const url = '/api/v1/auth/validate-reset-token?token=abc123&page=1&filter=foo';
+      const out = LoggingInterceptor.redactUrl(url);
+      expect(out).toBe('/api/v1/auth/validate-reset-token?token=REDACTED&page=1&filter=foo');
+    });
+
+    it('redacts api_key / apikey / access_token / refresh_token / password / secret / code / jwt / bearer / auth', () => {
+      const url =
+        '/x?api_key=A&apikey=B&access_token=C&refresh_token=D&password=E&secret=F&code=G&jwt=H&bearer=I&auth=J&page=2';
+      const out = LoggingInterceptor.redactUrl(url);
+      // Every sensitive key should be REDACTED; page survives.
+      for (const k of ['api_key', 'apikey', 'access_token', 'refresh_token', 'password', 'secret', 'code', 'jwt', 'bearer', 'auth']) {
+        expect(out).toContain(`${k}=REDACTED`);
+      }
+      expect(out).toContain('page=2');
+      // Original values must not appear anywhere in the redacted string.
+      for (const v of ['=A', '=B', '=C', '=D', '=E', '=F', '=G', '=H', '=I', '=J']) {
+        expect(out).not.toContain(v);
+      }
+    });
+
+    it('handles malformed query pairs (no = sign) without crashing', () => {
+      const url = '/x?orphan&token=x';
+      const out = LoggingInterceptor.redactUrl(url);
+      expect(out).toBe('/x?orphan&token=REDACTED');
+    });
+  });
 });
