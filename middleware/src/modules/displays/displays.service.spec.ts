@@ -693,4 +693,43 @@ describe('DisplaysService', () => {
       expect(databaseService.display.updateMany).not.toHaveBeenCalled();
     });
   });
+
+  describe('resetStalePairingDevices', () => {
+    it('resets displays stuck in status=pairing for >30 min back to offline', async () => {
+      // Devices that were paired but never made first WebSocket connection
+      // (device lost power / network / QR code never scanned). Stay in
+      // 'pairing' forever and block re-pairing of the same deviceIdentifier
+      // until the operator manually intervenes.
+      const stalePairing = [
+        { id: 'dev-stale-1', nickname: 'Foyer', deviceIdentifier: 'mac-1', organizationId: 'org-1' },
+        { id: 'dev-stale-2', nickname: null, deviceIdentifier: 'mac-2', organizationId: 'org-1' },
+      ];
+      databaseService.display.findMany.mockResolvedValue(stalePairing as any);
+      databaseService.display.updateMany.mockResolvedValue({ count: 2 });
+
+      await service.resetStalePairingDevices();
+
+      // Query uses updatedAt (not lastHeartbeat — pairing devices haven't
+      // heartbeated yet by definition).
+      expect(databaseService.display.findMany).toHaveBeenCalledWith({
+        where: {
+          status: 'pairing',
+          updatedAt: { lt: expect.any(Date) },
+        },
+        select: { id: true, nickname: true, deviceIdentifier: true, organizationId: true },
+      });
+      expect(databaseService.display.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ['dev-stale-1', 'dev-stale-2'] } },
+        data: { status: 'offline' },
+      });
+    });
+
+    it('no-ops when no stale pairing devices found', async () => {
+      databaseService.display.findMany.mockResolvedValue([]);
+
+      await service.resetStalePairingDevices();
+
+      expect(databaseService.display.updateMany).not.toHaveBeenCalled();
+    });
+  });
 });

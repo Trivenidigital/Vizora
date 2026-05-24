@@ -338,6 +338,50 @@ export class DisplaysService {
     this.logger.log(`Marked ${staleDevices.length} device(s) as offline (stale heartbeat)`);
   }
 
+  /**
+   * Reset displays stuck in 'pairing' state. A device gets status='pairing'
+   * when generatePairingToken() fires (operator started pairing) but
+   * transitions to 'online' only when the device makes its first WebSocket
+   * connection. If the device loses power or network in between — or the
+   * QR code never gets scanned — the row stays 'pairing' forever, which
+   * confuses dashboards and prevents the operator from re-pairing the same
+   * deviceIdentifier (the existing-display check throws "already paired").
+   *
+   * Threshold is 30 minutes — generous compared to the 5-min pairing-token
+   * TTL but tolerant of legitimate slow first-connect (cold cache, slow
+   * 3G, captive portal handshake). Past the threshold we drop status back
+   * to 'offline' so the device can be re-paired without operator action.
+   *
+   * Runs hourly — not every minute, because pairing is a low-frequency
+   * operator action and the cost of a 30-60min delay on cleanup is
+   * trivial.
+   */
+  @Cron(CronExpression.EVERY_HOUR)
+  async resetStalePairingDevices(): Promise<void> {
+    const threshold = new Date(Date.now() - 30 * 60 * 1000); // 30 minutes ago
+    const stale = await this.db.display.findMany({
+      where: {
+        status: 'pairing',
+        // Use updatedAt — that's when generatePairingToken touched the row.
+        // lastHeartbeat is the wrong field here because a pairing-state
+        // device by definition has never heartbeated.
+        updatedAt: { lt: threshold },
+      },
+      select: { id: true, nickname: true, deviceIdentifier: true, organizationId: true },
+    });
+
+    if (stale.length === 0) return;
+
+    await this.db.display.updateMany({
+      where: { id: { in: stale.map((d) => d.id) } },
+      data: { status: 'offline' },
+    });
+
+    this.logger.log(
+      `Reset ${stale.length} stale 'pairing'-state device(s) to 'offline' (>30min in pairing)`,
+    );
+  }
+
   async generatePairingToken(organizationId: string, id: string) {
     const display = await this.findOne(organizationId, id);
 

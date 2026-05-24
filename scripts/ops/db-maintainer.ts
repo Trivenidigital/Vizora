@@ -33,7 +33,15 @@ import { log } from './lib/alerting.js';
 
 const AGENT = 'db-maintainer';
 
-/** High-churn PostgreSQL tables to VACUUM ANALYZE */
+/**
+ * High-churn PostgreSQL tables to VACUUM ANALYZE.
+ *
+ * `content_impressions` is the proof-of-play table — at ~12k rows/day/org
+ * it bloats fast and was the top finding in the R6 analytics scout (table
+ * was previously absent from this list, so weekly bloat went unmanaged).
+ * Lower-case + underscores because the impressions model uses @@map for
+ * its physical table name, unlike the PascalCase Prisma defaults.
+ */
 const VACUUM_TABLES = [
   'Content',
   'Display',
@@ -41,6 +49,7 @@ const VACUUM_TABLES = [
   'Playlist',
   'AuditLog',
   'User',
+  'content_impressions',
 ];
 
 const VACUUM_TIMEOUT_MS = 120_000; // 2 minutes per table
