@@ -418,7 +418,18 @@ const TemplateEditorCanvas = forwardRef<CanvasHandle, TemplateEditorCanvasProps>
 
     const handleMessage = useCallback(
       (event: MessageEvent) => {
-        // Only accept messages from our iframe
+        // Only accept messages from our iframe.
+        //
+        // We compare `event.source` to the iframe's contentWindow rather
+        // than checking `event.origin === window.location.origin` because
+        // the iframe is loaded via `srcDoc` (inline HTML), which gives it
+        // an opaque "null" origin in modern browsers — an origin check
+        // would reject every legitimate message.
+        //
+        // The source check is the stronger guarantee: only THIS specific
+        // iframe's window object can be the event.source for a message
+        // we trust, so a malicious tab embedding our origin can't spoof
+        // editor events even if it knows the message shape.
         const iframe = iframeRef.current;
         if (!iframe || event.source !== iframe.contentWindow) return;
 
