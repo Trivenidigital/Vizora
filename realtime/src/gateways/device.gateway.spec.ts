@@ -68,6 +68,7 @@ describe('DeviceGateway', () => {
     display: {
       update: jest.fn().mockResolvedValue({ nickname: 'Test Device', deviceIdentifier: 'test-id' }),
       findUnique: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
     },
     playlist: {
       findUnique: jest.fn().mockResolvedValue(null),
@@ -755,6 +756,48 @@ describe('DeviceGateway', () => {
       await gateway.handleJoinOrganization(client as any, data as any);
 
       expect(client.data.isDashboard).toBe(true);
+    });
+  });
+
+  describe('sendDeviceStatusCatchUp (catch-up cap)', () => {
+    it('should cap a large fleet at 500 devices and warn about truncation', async () => {
+      const client = createMockSocket();
+      // Simulate 501 devices for one org — the cap is 500, so the
+      // query should request take=501 (cap + 1 peek) and the function
+      // should emit only the first 500 + a warning.
+      const fleet = Array.from({ length: 501 }, (_, i) => ({
+        id: `dev-${i}`,
+        status: 'offline',
+        lastHeartbeat: new Date(Date.now() - i * 1000),
+      }));
+      databaseService.display.findMany.mockResolvedValue(fleet as any);
+
+      const warnSpy = jest.spyOn((gateway as any).logger, 'warn');
+
+      await (gateway as any).sendDeviceStatusCatchUp(client, 'org-big');
+
+      expect(databaseService.display.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { organizationId: 'org-big' },
+          take: 501,
+        }),
+      );
+      expect(client.emit).toHaveBeenCalledTimes(500);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('truncated at 500'));
+    });
+
+    it('should send all devices when fleet is under the cap', async () => {
+      const client = createMockSocket();
+      const fleet = Array.from({ length: 7 }, (_, i) => ({
+        id: `dev-${i}`,
+        status: 'offline',
+        lastHeartbeat: new Date(),
+      }));
+      databaseService.display.findMany.mockResolvedValue(fleet as any);
+
+      await (gateway as any).sendDeviceStatusCatchUp(client, 'org-small');
+
+      expect(client.emit).toHaveBeenCalledTimes(7);
     });
   });
 
