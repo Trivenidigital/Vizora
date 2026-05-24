@@ -661,16 +661,31 @@ export class DeviceGateway
    * Send current device statuses to a newly connected dashboard client.
    * This ensures the dashboard has accurate online/offline state immediately,
    * even if the devices connected before the dashboard did.
+   *
+   * Capped at CATCH_UP_DEVICE_CAP devices per call. For larger fleets the
+   * dashboard can paginate via REST and rely on incremental status updates
+   * from then on. Without this cap, a single dashboard reconnect for a
+   * 10k-device org would load the entire fleet into memory and emit 10k
+   * events to one socket on the connection-handling path — which is what
+   * the "stale-org outage" follow-up was about.
    */
+  private static readonly CATCH_UP_DEVICE_CAP = 500;
+
   private async sendDeviceStatusCatchUp(client: Socket, orgId: string): Promise<void> {
     try {
+      const cap = DeviceGateway.CATCH_UP_DEVICE_CAP;
       const devices = await this.databaseService.display.findMany({
         where: { organizationId: orgId },
         select: { id: true, status: true, lastHeartbeat: true },
+        orderBy: { lastHeartbeat: 'desc' },
+        take: cap + 1, // peek one past the cap so we know if more exist
       });
 
+      const truncated = devices.length > cap;
+      const toSend = truncated ? devices.slice(0, cap) : devices;
+
       const now = new Date().toISOString();
-      for (const device of devices) {
+      for (const device of toSend) {
         // Check in-memory cache first (most accurate for connected devices)
         const cachedStatus = this.deviceStatusCache.get(device.id);
         const status = cachedStatus || device.status || 'offline';
@@ -682,7 +697,13 @@ export class DeviceGateway
         });
       }
 
-      this.logger.debug(`Sent status catch-up for ${devices.length} devices to dashboard (org: ${orgId})`);
+      if (truncated) {
+        this.logger.warn(
+          `Device catch-up truncated at ${cap} for org ${orgId}; dashboard should paginate the remainder via REST and rely on incremental events afterwards`,
+        );
+      } else {
+        this.logger.debug(`Sent status catch-up for ${toSend.length} devices to dashboard (org: ${orgId})`);
+      }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.warn(`Failed to send device status catch-up: ${errorMessage}`);
@@ -1239,6 +1260,7 @@ export class DeviceGateway
    * Device sends base64-encoded image data which we upload to MinIO
    */
   @SubscribeMessage('screenshot:response')
+  @UseGuards(WsDeviceGuard)
   @UsePipes(new WsValidationPipe())
   async handleScreenshotResponse(
     @ConnectedSocket() client: Socket,
