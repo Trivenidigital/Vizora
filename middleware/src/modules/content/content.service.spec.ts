@@ -21,6 +21,7 @@ describe('ContentService', () => {
   let mockTemplateRendering: jest.Mocked<TemplateRenderingService>;
   let mockDataSourceRegistry: jest.Mocked<DataSourceRegistryService>;
   let mockStorageQuotaService: jest.Mocked<StorageQuotaService>;
+  let mockStorageService: { deleteFile: jest.Mock; isMinioAvailable: jest.Mock };
 
   const mockContent = {
     id: 'content-123',
@@ -125,10 +126,10 @@ describe('ContentService', () => {
       recalculateUsage: jest.fn(),
     } as any;
 
-    const mockStorageService = {
+    mockStorageService = {
       deleteFile: jest.fn().mockResolvedValue(undefined),
       isMinioAvailable: jest.fn().mockReturnValue(false),
-    } as any;
+    };
 
     mockEventEmitter = { emit: jest.fn() };
     const mockNotificationsService = { create: jest.fn().mockResolvedValue({}) };
@@ -1403,6 +1404,34 @@ describe('ContentService', () => {
       await expect(
         service.bulkDelete('org-123', { ids: ['id-1', 'id-2', 'id-3'] }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('retains the DB row when MinIO delete fails so the file is not orphaned', async () => {
+      // Regression: previously the function logged storage-delete
+      // failures, then ran deleteMany on EVERY id. The MinIO file
+      // remained, the DB row was gone — quota counted, no operator
+      // visibility. Now only successful-MinIO ids get DB-deleted.
+      mockDatabaseService.content.findMany.mockResolvedValue([
+        { id: 'good-1', fileSize: 1000, url: 'minio://o/good-1.png' },
+        { id: 'bad-1', fileSize: 2000, url: 'minio://o/bad-1.png' },
+      ]);
+      mockStorageService.deleteFile.mockImplementation(async (key: string) => {
+        if (key === 'o/bad-1.png') throw new Error('connection refused');
+      });
+      mockDatabaseService.content.deleteMany.mockResolvedValue({ count: 1 });
+
+      const result = await service.bulkDelete('org-123', { ids: ['good-1', 'bad-1'] });
+
+      // Only the successful id is in the deleteMany WHERE.
+      expect(mockDatabaseService.content.deleteMany).toHaveBeenCalledWith({
+        where: { id: { in: ['good-1'] }, organizationId: 'org-123' },
+      });
+      // Result surfaces both counts so the caller can act on failures.
+      expect(result.deleted).toBe(1);
+      expect(result.failed).toBe(1);
+      expect(result.failedIds).toEqual(['bad-1']);
+      // Quota decrement is for the SUCCESSFUL bytes only (1000), not 3000.
+      expect(mockStorageQuotaService.decrementUsage).toHaveBeenCalledWith('org-123', 1000);
     });
   });
 
