@@ -33,15 +33,19 @@ jest.mock('@/components/providers/CustomizationProvider', () => ({
   }),
 }));
 
-jest.mock('@/components/ui/Card', () => ({
-  Card: ({ children, className }: any) => <div data-testid="card" className={className}>{children}</div>,
-  ...(() => {
-    const Card = ({ children, className }: any) => <div data-testid="card" className={className}>{children}</div>;
-    Card.Header = ({ children }: any) => <div data-testid="card-header">{children}</div>;
-    Card.Body = ({ children, className }: any) => <div data-testid="card-body" className={className}>{children}</div>;
-    return { Card };
-  })(),
-}));
+jest.mock('@/components/ui/Card', () => {
+  // Build Card with attached subcomponents in one place — the previous
+  // version declared `Card:` twice (once standalone, once via spread),
+  // which tsc flagged as TS2783 "specified more than once".
+  const Card: any = ({ children, className }: any) => (
+    <div data-testid="card" className={className}>{children}</div>
+  );
+  Card.Header = ({ children }: any) => <div data-testid="card-header">{children}</div>;
+  Card.Body = ({ children, className }: any) => (
+    <div data-testid="card-body" className={className}>{children}</div>
+  );
+  return { Card };
+});
 
 jest.mock('@/components/ui/Badge', () => ({
   Badge: ({ children }: any) => <span data-testid="badge">{children}</span>,

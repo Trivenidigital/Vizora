@@ -1,25 +1,35 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import NotificationDropdown from '../NotificationDropdown';
+import type { AppNotification } from '@/lib/types';
 
-const mockNotifications = [
+// AppNotification requires `type` from a closed union, plus dismissedAt
+// and organizationId. The fixture used to use `as const` on severity
+// and a free-form string for type, which tsc rejected. Aligning the
+// shape makes the test pass both ts-jest (already passing) and strict
+// `tsc --noEmit`.
+const mockNotifications: AppNotification[] = [
   {
     id: 'n1',
     title: 'Device went offline',
     message: 'Lobby screen is offline',
-    severity: 'critical' as const,
+    severity: 'critical',
     read: false,
     type: 'device_offline',
     createdAt: new Date().toISOString(),
+    dismissedAt: null,
+    organizationId: 'org-test',
     metadata: { deviceId: 'd1' },
   },
   {
     id: 'n2',
     title: 'Content uploaded',
     message: 'New video was uploaded successfully',
-    severity: 'info' as const,
+    severity: 'info',
     read: true,
-    type: 'content_uploaded',
+    type: 'system',
     createdAt: new Date(Date.now() - 3600000).toISOString(),
+    dismissedAt: null,
+    organizationId: 'org-test',
     metadata: {},
   },
 ];

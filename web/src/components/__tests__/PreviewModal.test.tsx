@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import PreviewModal from '../PreviewModal';
+import type { Content } from '@/lib/types';
 
 jest.mock('../Modal', () => {
   return function MockModal({ isOpen, onClose, title, children }: any) {
@@ -15,10 +16,13 @@ jest.mock('../Modal', () => {
 });
 
 describe('PreviewModal', () => {
-  const baseContent = {
+  // Satisfy the Content interface so `tsc --noEmit` doesn't flag the
+  // fixture as a partial type. Jest's ts-jest is permissive; tsc is
+  // strict — keep both green.
+  const baseContent: Content = {
     id: 'c1',
     title: 'Test Content',
-    type: 'image' as const,
+    type: 'image',
     url: 'https://example.com/image.jpg',
     status: 'ready',
     createdAt: '2024-01-01',
