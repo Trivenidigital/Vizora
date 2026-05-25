@@ -67,7 +67,8 @@ describe('DeviceGateway', () => {
   const mockDatabaseService = {
     display: {
       update: jest.fn().mockResolvedValue({ nickname: 'Test Device', deviceIdentifier: 'test-id' }),
-      findUnique: jest.fn().mockResolvedValue(null),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      findUnique: jest.fn().mockResolvedValue({ nickname: 'Test Device', deviceIdentifier: 'test-id' }),
       findMany: jest.fn().mockResolvedValue([]),
     },
     playlist: {
@@ -305,7 +306,7 @@ describe('DeviceGateway', () => {
       expect(mockRedisService.setDeviceStatus).toHaveBeenCalledWith('device-1', expect.objectContaining({
         status: 'offline',
       }));
-      expect(mockDatabaseService.display.update).toHaveBeenCalled();
+      expect(mockDatabaseService.display.updateMany).toHaveBeenCalled();
       expect(mockMetricsService.recordConnection).toHaveBeenCalledWith('org-1', 'disconnected');
     });
 
@@ -356,7 +357,7 @@ describe('DeviceGateway', () => {
       await gateway.handleHeartbeat(client as any, data as any);
 
       // DB update should NOT be called since status hasn't changed
-      expect(mockDatabaseService.display.update).not.toHaveBeenCalled();
+      expect(mockDatabaseService.display.updateMany).not.toHaveBeenCalled();
     });
 
     it('should write to DB when status transitions from offline to online', async () => {
@@ -369,7 +370,7 @@ describe('DeviceGateway', () => {
       await gateway.handleHeartbeat(client as any, data as any);
 
       // DB update SHOULD be called because status changed
-      expect(mockDatabaseService.display.update).toHaveBeenCalled();
+      expect(mockDatabaseService.display.updateMany).toHaveBeenCalled();
     });
 
     it('should return error response on failure', async () => {
@@ -1051,7 +1052,7 @@ describe('DeviceGateway', () => {
 
       // None of the disconnect side effects should have happened
       expect(mockRedisService.setDeviceStatus).not.toHaveBeenCalled();
-      expect(mockDatabaseService.display.update).not.toHaveBeenCalled();
+      expect(mockDatabaseService.display.updateMany).not.toHaveBeenCalled();
       expect(mockMetricsService.recordConnection).not.toHaveBeenCalled();
     });
   });

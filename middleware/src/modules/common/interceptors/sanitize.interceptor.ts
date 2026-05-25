@@ -149,11 +149,25 @@ export class SanitizeInterceptor implements NestInterceptor {
         if (key.toLowerCase().includes('password')) {
           sanitized[key] = value;
         } else if (this.templateHtmlFields.includes(key)) {
-          // Apply limited sanitization for template HTML fields:
-          // strips <script>, on* handlers, javascript: URIs while preserving HTML/CSS
-          sanitized[key] = typeof value === 'string'
-            ? this.sanitizeTemplateHtml(value)
-            : value;
+          // Template HTML fields:
+          // - INPUT side (decodeEntities=false): pass through untouched.
+          //   Mutating input here would silently strip <script>/on*/javascript:
+          //   from the request body BEFORE the service-layer validator
+          //   (TemplateRenderingService.validateTemplate) could run — the
+          //   operator's "create template with <script>" would then succeed
+          //   with the script silently removed. Let the validator reject
+          //   bad templates with a 400 instead. R10 E2E scout finding #2.
+          // - OUTPUT side (decodeEntities=true): apply limited sanitization
+          //   (strip <script>, on* handlers, javascript: URIs while
+          //   preserving HTML/CSS) — defense-in-depth against any DB row
+          //   that historically slipped through.
+          if (decodeEntities) {
+            sanitized[key] = typeof value === 'string'
+              ? this.sanitizeTemplateHtml(value)
+              : value;
+          } else {
+            sanitized[key] = value;
+          }
         } else {
           sanitized[key] = this.sanitizeObject(value, decodeEntities);
         }

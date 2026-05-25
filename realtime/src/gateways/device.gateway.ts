@@ -465,7 +465,7 @@ export class DeviceGateway
     const previousStatus = this.deviceStatusCache.get(deviceId);
     if (previousStatus !== 'online') {
       try {
-        await this.databaseService.display.update({
+        await this.databaseService.display.updateMany({
           where: { id: deviceId },
           data: {
             status: 'online',
@@ -739,15 +739,26 @@ export class DeviceGateway
         this.deviceStatusCache.delete(deviceId);
         let deviceName = deviceId;
         try {
-          const device = await this.databaseService.display.update({
+          // updateMany (vs update) silently no-ops when the device row
+          // no longer exists — happens during device deletion races and
+          // for ephemeral test sockets. Prevents the noisy P2025 Prisma
+          // log that disconnect.update used to produce on every stale
+          // session. Read nickname/identifier in a separate findUnique
+          // so the absent-row case stays log-free.
+          const updated = await this.databaseService.display.updateMany({
             where: { id: deviceId },
             data: {
               status: 'offline',
               lastHeartbeat: new Date(),
             },
-            select: { nickname: true, deviceIdentifier: true },
           });
-          deviceName = device?.nickname || device?.deviceIdentifier || deviceId;
+          if (updated.count > 0) {
+            const device = await this.databaseService.display.findUnique({
+              where: { id: deviceId },
+              select: { nickname: true, deviceIdentifier: true },
+            });
+            deviceName = device?.nickname || device?.deviceIdentifier || deviceId;
+          }
         } catch (dbError: unknown) {
           const errorMessage = dbError instanceof Error ? dbError.message : 'Unknown error';
           this.logger.warn(`Failed to update database for device ${deviceId}: ${errorMessage}`);
@@ -814,7 +825,11 @@ export class DeviceGateway
       const previousStatus = this.deviceStatusCache.get(deviceId);
       if (previousStatus !== 'online') {
         try {
-          await this.databaseService.display.update({
+          // updateMany — silently no-ops if the row was deleted between
+          // the device's JWT issuance and this heartbeat (test sockets,
+          // mid-flight device deletion). Avoids P2025 log noise without
+          // losing the status-write semantics.
+          await this.databaseService.display.updateMany({
             where: { id: deviceId },
             data: {
               status: 'online',

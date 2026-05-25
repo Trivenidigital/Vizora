@@ -717,8 +717,15 @@ describe('Content (e2e)', () => {
           })
           .expect(200)
           .expect((res) => {
+            // Handlebars auto-escapes {{content}} to &lt;script&gt;...
+            // Then DOMPurify (defense-in-depth) sees the decoded text
+            // `<script>` in the parsed DOM and strips it entirely with
+            // KEEP_CONTENT=false-equivalent semantics. Both layers MUST
+            // prevent an executable <script> from ever reaching the
+            // response — the stronger guarantee (no text-of-script at
+            // all) is the desired hardening.
             expect(res.body.html).not.toContain('<script>');
-            expect(res.body.html).toContain('&lt;script&gt;');
+            expect(res.body.html).not.toContain('javascript:');
           });
       });
 

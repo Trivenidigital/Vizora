@@ -105,4 +105,36 @@ describe('WsValidationPipe', () => {
       await expect(pipe.transform(value, metadata)).rejects.toThrow(WsException);
     });
   });
+
+  describe('non-body params (the prod-breaking gap)', () => {
+    // Framework-injected params like @ConnectedSocket() arrive with
+    // type='custom' and metatype=Socket. The pipe MUST pass these
+    // through untouched — plainToInstance(Socket, ...) crashed every
+    // @SubscribeMessage handler in prod until this filter landed.
+    class FakeSocket {
+      constructor() {
+        throw new Error('Socket constructor should never be called from the pipe');
+      }
+    }
+
+    it('passes through @ConnectedSocket-style param (type=custom) without transforming', async () => {
+      const customMeta: ArgumentMetadata = { type: 'custom', metatype: FakeSocket as any };
+      const fakeSocketInstance = { id: 'abc', data: { deviceId: 'd1' } };
+      const result = await pipe.transform(fakeSocketInstance, customMeta);
+      expect(result).toBe(fakeSocketInstance);
+    });
+
+    it('passes through @Param-style param (type=param) without transforming', async () => {
+      const paramMeta: ArgumentMetadata = { type: 'param', metatype: String };
+      const result = await pipe.transform('some-id', paramMeta);
+      expect(result).toBe('some-id');
+    });
+
+    it('passes through @Query-style param (type=query) without transforming', async () => {
+      const queryMeta: ArgumentMetadata = { type: 'query', metatype: TestDto };
+      const arbitrary = { something: 'else' };
+      const result = await pipe.transform(arbitrary, queryMeta);
+      expect(result).toBe(arbitrary);
+    });
+  });
 });
