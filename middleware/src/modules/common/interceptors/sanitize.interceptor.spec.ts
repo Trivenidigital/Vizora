@@ -649,5 +649,28 @@ describe('SanitizeInterceptor', () => {
 
       expect(mockRequest.body.customCss).toBe(css);
     });
+
+    it('should NOT silently strip <script> from input templateHtml — service-layer validator must see + reject it', () => {
+      // R10 E2E scout #2: previously the interceptor stripped script
+      // tags from input templates, so the service-layer validateTemplate
+      // never saw them and the create returned 201 with the script
+      // silently removed. Operator never knew their template was
+      // mutilated.
+      const bad = '<h1>Hello</h1><script>steal()</script>';
+      mockRequest.body = { templateHtml: bad };
+
+      interceptor.intercept(mockExecutionContext, mockCallHandler);
+
+      expect((mockRequest.body as any).templateHtml).toBe(bad);
+    });
+
+    it('should NOT strip onclick handlers from input templateHtml', () => {
+      const bad = '<button onclick="alert(1)">Click</button>';
+      mockRequest.body = { templateHtml: bad };
+
+      interceptor.intercept(mockExecutionContext, mockCallHandler);
+
+      expect((mockRequest.body as any).templateHtml).toBe(bad);
+    });
   });
 });

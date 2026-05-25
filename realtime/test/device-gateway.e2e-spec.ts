@@ -5,12 +5,14 @@ import { io, Socket } from 'socket.io-client';
 import { AppModule } from '../src/app/app.module';
 import { RedisService } from '../src/services/redis.service';
 import { DeviceGateway } from '../src/gateways/device.gateway';
+import { DatabaseService } from '../src/database/database.service';
 
 describe('DeviceGateway (E2E)', () => {
   let app: INestApplication;
   let jwtService: JwtService;
   let redisService: RedisService;
   let deviceGateway: DeviceGateway;
+  let databaseService: DatabaseService;
   let serverUrl: string;
   let deviceToken: string;
   let deviceId: string;
@@ -32,6 +34,7 @@ describe('DeviceGateway (E2E)', () => {
     jwtService = moduleFixture.get<JwtService>(JwtService);
     redisService = moduleFixture.get<RedisService>(RedisService);
     deviceGateway = moduleFixture.get<DeviceGateway>(DeviceGateway);
+    databaseService = moduleFixture.get<DatabaseService>(DatabaseService);
 
     // Generate test device token
     deviceId = 'test-device-001';
@@ -48,6 +51,33 @@ describe('DeviceGateway (E2E)', () => {
         expiresIn: '1h',
       }
     );
+
+    // Seed the org + display rows the gateway's handleConnection requires.
+    // Without these, findUnique({id: deviceId}) returns null and the
+    // gateway disconnects the socket immediately, causing every test that
+    // waits for a server-emitted event ('config', 'playlist:update', ...)
+    // to time out at 30s. The original suite was authored before the
+    // device-existence check landed on the connection path. R10 E2E fix.
+    await databaseService.organization.upsert({
+      where: { id: organizationId },
+      create: {
+        id: organizationId,
+        name: 'E2E Test Org',
+        slug: `e2e-test-${Date.now()}`,
+      },
+      update: {},
+    });
+    await databaseService.display.upsert({
+      where: { id: deviceId },
+      create: {
+        id: deviceId,
+        nickname: 'E2E Test Device',
+        deviceIdentifier: `TEST-DEVICE-001-${Date.now()}`,
+        organizationId,
+        status: 'offline',
+      },
+      update: { organizationId, status: 'offline' },
+    });
   });
 
   afterAll(async () => {
@@ -61,8 +91,16 @@ describe('DeviceGateway (E2E)', () => {
       // Ignore Redis errors during cleanup
     }
 
+    // Cleanup seeded DB rows (delete display first; org has FK cascade)
+    try {
+      await databaseService.display.deleteMany({ where: { id: deviceId } });
+      await databaseService.organization.deleteMany({ where: { id: organizationId } });
+    } catch {
+      // ignore — test may have already cleaned up
+    }
+
     await app.close();
-    
+
     // Give time for cleanup
     await new Promise((resolve) => setTimeout(resolve, 1000));
   });

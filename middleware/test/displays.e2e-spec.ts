@@ -406,7 +406,10 @@ describe('Displays (e2e)', () => {
       return request(app.getHttpServer())
         .get('/api/displays/invalid-uuid')
         .set('Authorization', `Bearer ${authToken}`)
-        .expect(404); // NestJS returns 404 for invalid UUID in route params
+        // ParseUUIDPipe / ParseIdPipe rejects malformed IDs at the
+        // input-validation layer → 400, not 404. The old comment was
+        // wrong about NestJS's actual behavior.
+        .expect(400);
     });
 
     it('should reject excessively long display names', () => {

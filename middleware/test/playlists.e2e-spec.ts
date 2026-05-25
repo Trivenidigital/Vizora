@@ -65,7 +65,15 @@ describe('Playlists (e2e)', () => {
     userId = registerRes.body.data.user.id;
     organizationId = registerRes.body.data.user.organizationId;
 
-    // Create test content items
+    // Create test content items.
+    // Note: content responses are envelope-wrapped ({ success, data })
+    // by the global ResponseEnvelopeInterceptor (registered via the
+    // AppModule's APP_INTERCEPTOR provider, NOT via useGlobalInterceptors
+    // in this file). Earlier the test pulled `body.id` directly,
+    // leaving contentId1/2 = undefined and propagating an empty
+    // contentId into the addItem POST body — DTO validation then
+    // returned 400 and the test was misread as a "playlist items
+    // validation" bug. Use body.data.id to match the wire format.
     const content1Res = await request(app.getHttpServer())
       .post('/api/content')
       .set('Authorization', `Bearer ${authToken}`)
@@ -74,7 +82,7 @@ describe('Playlists (e2e)', () => {
         type: 'image',
         url: 'https://example.com/image1.jpg',
       });
-    contentId1 = content1Res.body.id;
+    contentId1 = content1Res.body.data?.id ?? content1Res.body.id;
 
     const content2Res = await request(app.getHttpServer())
       .post('/api/content')
@@ -85,7 +93,7 @@ describe('Playlists (e2e)', () => {
         url: 'https://example.com/video1.mp4',
         duration: 30,
       });
-    contentId2 = content2Res.body.id;
+    contentId2 = content2Res.body.data?.id ?? content2Res.body.id;
 
     // Create second user for multi-tenant testing
     const timestamp2 = Date.now() + 1;
@@ -326,12 +334,16 @@ describe('Playlists (e2e)', () => {
 
   describe('/api/playlists/:id/items (POST)', () => {
     it('should add item to playlist', () => {
+      // NOTE: `order` was dropped from the request body — AddPlaylistItemDto
+      // only accepts contentId + duration. The service handles ordering
+      // by computing max(order)+1 server-side. Sending `order: 1` made
+      // class-validator reject the body (forbidNonWhitelisted) → 400,
+      // which was mis-read as a route bug. R10 E2E scout finding #4.
       return request(app.getHttpServer())
         .post(`/api/playlists/${playlistId}/items`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           contentId: contentId1,
-          order: 1,
           duration: 10,
         })
         .expect(201)
@@ -354,16 +366,15 @@ describe('Playlists (e2e)', () => {
     let itemToDelete: string;
 
     beforeAll(async () => {
+      // Same DTO discipline as the POST test above — drop `order`.
       const addRes = await request(app.getHttpServer())
         .post(`/api/playlists/${playlistId}/items`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           contentId: contentId2,
-          order: 2,
           duration: 30,
         });
-      
-      itemToDelete = addRes.body.id;
+      itemToDelete = addRes.body.data?.id ?? addRes.body.id;
     });
 
     it('should remove item from playlist', () => {

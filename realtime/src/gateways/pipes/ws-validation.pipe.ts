@@ -12,11 +12,36 @@ export class WsValidationPipe implements PipeTransform {
   private readonly logger = new Logger(WsValidationPipe.name);
 
   async transform(value: unknown, metadata: ArgumentMetadata) {
-    const { metatype } = metadata;
+    const { metatype, type } = metadata;
+
+    // Only validate @MessageBody() params. @ConnectedSocket() and other
+    // framework-injected parameters arrive here as `type !== 'body'` and
+    // their metatypes (Socket, Server, etc.) MUST NOT be passed to
+    // plainToInstance — Socket's constructor requires an internal server
+    // reference that class-transformer can't supply, and the resulting
+    // crash silently aborted every @SubscribeMessage handler. R10 E2E
+    // scout finding #1 (heartbeat/content:impression/playlist:request
+    // all failed in prod with "Cannot read properties of undefined
+    // (reading 'server')" until this filter was added).
+    if (type !== 'body') {
+      return value;
+    }
 
     // Skip validation if no metatype or if it's a primitive type
     if (!metatype || !this.toValidate(metatype)) {
       return value;
+    }
+
+    // Reject null / undefined payloads explicitly. class-validator's
+    // ValidationExecutor calls `.constructor` on the value and crashes
+    // on null with "Cannot read properties of null (reading 'constructor')"
+    // — that crash bubbled up as an unhandled WsException, abandoning
+    // the handler. Map to a clean validation error instead.
+    if (value === null || value === undefined || typeof value !== 'object') {
+      throw new WsException({
+        error: 'Validation failed',
+        details: { payload: ['payload must be a non-null object'] },
+      });
     }
 
     // Transform plain object to class instance
