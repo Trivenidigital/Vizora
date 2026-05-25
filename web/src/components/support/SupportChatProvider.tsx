@@ -21,7 +21,11 @@ interface SupportChatState {
   isComposing: boolean;
 }
 
-interface SupportChatContextValue extends SupportChatState {
+// Exported so `useSupportChat()` (defined in a sibling file) can
+// name this type in its return signature. Without the `export`, tsc
+// flags `useSupportChat`'s inferred return type as unnameable
+// (TS4058).
+export interface SupportChatContextValue extends SupportChatState {
   toggleChat: () => void;
   sendMessage: (content: string) => Promise<void>;
   startNewConversation: () => void;

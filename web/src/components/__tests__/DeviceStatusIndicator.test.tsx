@@ -1,7 +1,14 @@
 import { render, screen, act } from '@testing-library/react';
 import DeviceStatusIndicator from '../DeviceStatusIndicator';
 
-const mockSubscribeToDevice = jest.fn(() => jest.fn());
+// `jest.fn(() => jest.fn())` infers a zero-arg signature; the impl
+// then gets re-bound via .mockImplementation to a 2-arg `(id, cb)`
+// shape, which tsc rejects. Declare the signature explicitly so
+// downstream impls (and the production component's call site that
+// passes deviceId + callback) typecheck without `as any`.
+const mockSubscribeToDevice = jest.fn<() => void, [string, (status: { status: string; timestamp: number }) => void]>(
+  () => () => {},
+);
 const mockGetDeviceStatus = jest.fn();
 
 jest.mock('@/lib/context/DeviceStatusContext', () => ({
