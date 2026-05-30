@@ -1,5 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { NotificationsService } from './notifications.service';
 import { DatabaseService } from '../database/database.service';
 
@@ -141,6 +141,68 @@ describe('NotificationsService', () => {
           userId: 'user-123',
         }),
       });
+    });
+
+    it('broadcasts the new notification to the realtime gateway', async () => {
+      const created = { id: 'notif-1', title: 'Test', organizationId };
+      db.notification.create.mockResolvedValue(created);
+
+      const prevSecret = process.env.INTERNAL_API_SECRET;
+      process.env.INTERNAL_API_SECRET = 'test-internal-secret';
+      try {
+        await service.create({ title: 'Test', message: 'Hello', organizationId });
+      } finally {
+        if (prevSecret === undefined) {
+          delete process.env.INTERNAL_API_SECRET;
+        } else {
+          process.env.INTERNAL_API_SECRET = prevSecret;
+        }
+      }
+
+      expect(mockHttpService.post).toHaveBeenCalledWith(
+        expect.stringContaining('/api/notifications/broadcast'),
+        { organizationId, notification: created },
+        expect.objectContaining({
+          headers: { 'x-internal-api-key': 'test-internal-secret' },
+        }),
+      );
+    });
+
+    it('does not broadcast when INTERNAL_API_SECRET is unset', async () => {
+      db.notification.create.mockResolvedValue({ id: 'notif-1' });
+
+      const prevSecret = process.env.INTERNAL_API_SECRET;
+      delete process.env.INTERNAL_API_SECRET;
+      try {
+        await service.create({ title: 'Test', message: 'Hello', organizationId });
+      } finally {
+        if (prevSecret !== undefined) {
+          process.env.INTERNAL_API_SECRET = prevSecret;
+        }
+      }
+
+      expect(mockHttpService.post).not.toHaveBeenCalled();
+    });
+
+    it('does not throw when the realtime broadcast fails (fire-and-forget)', async () => {
+      db.notification.create.mockResolvedValue({ id: 'notif-1' });
+      // The realtime call is firstValueFrom(httpService.post(...)); model the
+      // real failure mode as a rejected observable, not a synchronous throw.
+      mockHttpService.post.mockReturnValue(throwError(() => new Error('realtime down')));
+
+      const prevSecret = process.env.INTERNAL_API_SECRET;
+      process.env.INTERNAL_API_SECRET = 'test-internal-secret';
+      try {
+        await expect(
+          service.create({ title: 'Test', message: 'Hello', organizationId }),
+        ).resolves.toEqual({ id: 'notif-1' });
+      } finally {
+        if (prevSecret === undefined) {
+          delete process.env.INTERNAL_API_SECRET;
+        } else {
+          process.env.INTERNAL_API_SECRET = prevSecret;
+        }
+      }
     });
   });
 
