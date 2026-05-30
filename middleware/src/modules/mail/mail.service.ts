@@ -442,9 +442,6 @@ export class MailService {
           <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
             Hi ${MailService.escapeHtml(firstName)},<br><br>
             This is a confirmation that the password for your Vizora account was just changed.
-            For your security, you've been signed out everywhere and will need to log in again.
-          </p>
-          <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
             If you made this change, no further action is needed.
           </p>
           ${this.ctaButton('Go to Dashboard', this.dashboardUrl)}
