@@ -54,6 +54,7 @@ interface UserPayload {
   organizationId: string;
   type?: string;
   jti?: string;
+  iat?: number; // issued-at (epoch seconds), set by jsonwebtoken — used for password-change session invalidation
 }
 
 type AuthPayload =
@@ -422,6 +423,34 @@ export class DeviceGateway
           const isRevoked = await this.redisService.exists(`revoked_token:${userPayload.jti}`);
           if (isRevoked) {
             this.logger.warn(`Connection rejected: User token revoked (jti: ${userPayload.jti})`);
+            client.disconnect();
+            return null;
+          }
+        }
+
+        // Mirror the REST JwtStrategy.validate session checks (PR #111) for the
+        // dashboard WebSocket handshake, which authenticates separately and
+        // previously only checked per-token revocation. The middleware writes
+        // these keys to the SAME Redis instance, so a stolen/other-device
+        // dashboard socket can't keep streaming after the account is
+        // deactivated or its password changed.
+        //
+        // (1) User-wide revocation — admin deactivation / self-delete.
+        const isUserRevoked = await this.redisService.exists(`user_revoked:${userPayload.sub}`);
+        if (isUserRevoked) {
+          this.logger.warn(`Connection rejected: user revoked (sub: ${userPayload.sub})`);
+          client.disconnect();
+          return null;
+        }
+
+        // (2) Password-change session invalidation — reject tokens minted
+        // before the last password change. Strict `<` so a fresh post-change
+        // login (iat >= marker) connects. Fail-open if the token has no iat
+        // (every middleware-issued token carries one — see JwtStrategy note).
+        if (userPayload.iat) {
+          const pwdChangedAt = await this.redisService.get(`pwd_changed:${userPayload.sub}`);
+          if (pwdChangedAt && userPayload.iat < Number(pwdChangedAt)) {
+            this.logger.warn(`Connection rejected: session expired by password change (sub: ${userPayload.sub})`);
             client.disconnect();
             return null;
           }

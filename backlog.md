@@ -150,12 +150,12 @@ These are documented + non-blocking for customer-1. Investigations done; impleme
 |---|------|--------|--------|-------|
 | M1 | CloudFlare CDN + DDoS protection | S (4h) | TODO | Static assets served directly now |
 | M2 | Weather widget (OpenWeatherMap free API) | M (1d) | TODO | Top customer request for signage |
-| M3 | Google Sheets data source integration | L (3d) | TODO | Key for dynamic menu boards |
+| M3 | Google Sheets data source integration | L (3d) | ✅ DONE | `content/widget-data-sources/google-sheets.data-source.ts` |
 | M4 | Content moderation workflow (flag -> review -> approve) | M (2d) | TODO | Today's `content.service.ts:712-843` is a moderation flag, not an approval pipeline. **Expanded to proposer→approver→publish in O10 below.** |
 | M5 | Expand template library to 150 templates | M (2d) | TODO | Currently 78 |
 | M6 | Device remote restart command | S (4h) | TODO | |
-| M7 | Push-to-group endpoint (single API call) | S (4h) | TODO | Currently iterate client-side. **Generalized in O1 below** (also adds tag-based targeting + push from templates/layouts/widgets/playlists). |
-| M8 | Data retention policy (auto-purge audit logs > 90 days) | S (4h) | TODO | |
+| M7 | Push-to-group endpoint (single API call) | S (4h) | ✅ DONE | Generalized in **O1** (#65) — tag/group/org targeting via `fleet.service` |
+| M8 | Data retention policy (auto-purge audit logs > 90 days) | S (4h) | ✅ DONE | `common/data-retention.service.ts` + `auditLog.deleteMany` |
 | M9 | Profile editing: avatar upload | S (4h) | TODO | Name editing done, avatar missing |
 | M10 | Fix Loki volume mount (logs lost on restart) | XS (1h) | TODO | Docker-compose change |
 | M11 | GDPR data export endpoint | M (1d) | TODO | Subject Access Request |
@@ -173,18 +173,18 @@ Items the audit listed but we are NOT pursuing live (Engage/kiosk, live remote v
 
 | # | Item | Effort | Foundation | Audit ref |
 |---|------|--------|------------|-----------|
-| O1 | **Unified Push to Screens** — first-class push endpoints from content/templates/layouts/widgets/playlists; **tag-based targeting** (push to `tag=lobby`); append-to-playlist mode; scheduled push with auto-revert; temporary takeover with expiration | M (3d) | `displays.controller.ts:198-211` exists; `Tag/DisplayTag` exist; fleet `resolveTargetDevices` (`fleet.service.ts:159-206`) needs tag resolver | P0 #2 |
-| O2 | **Proof-of-play reports** — saved report views, scheduled email delivery, asset/display tag filters, CSV/Excel/PDF/raw export over existing impression model | M (3d) | `ContentImpression` has duration + completionPercentage + indexes (`schema.prisma:284-305`). **Supersedes L5.** | P0 #4 |
-| O3 | **Designer depth extension** — shapes, layers, lockable template fields, animation, drawing, asset-library insertion, export-as-image. Extension of existing canvas, not a rewrite | L (5d) | `TemplateEditorCanvas` + `useEditorHistory` + `useCanvasZoom` + `DisplayPickerModal` already wired (`web/src/app/dashboard/templates/[id]/edit/page-client.tsx`) | P0 #1 |
-| O4 | **Tag-rule auto-assignment engine** — "if display has tag X then auto-assign playlist Y"; rule evaluator on tag-change / new-display events | M (2d) | New `TagRule` Prisma model + evaluator; pairs with O1's tag-based push | P0 #2 |
-| O5 | **Public customer API + SDK + webhooks** — production Swagger (not dev-only), OpenAPI export, npm SDK package, outbound webhook delivery for org events (display.offline, content.published, schedule.activated, etc.) | L (5d) | `ApiKey` + scopes already exist; Swagger gated to non-prod in `main.ts:129-166`; no SDK, no outbound webhooks today | P1 #10 |
-| O6 | **Mass provisioning** — bulk CSV pairing, provisioning templates (stored Wi-Fi + default playlist + orientation + scaling), pre-generated device-token CSVs, kiosk/player config bundles | M (3d) | Single-device pairing in `pairing.service.ts`; bulk-ops DTO is operations-only today (`displays/dto/bulk-operations.dto.ts`) | P1 #7 |
-| O7 | **Configurable downtime alert rules** — per tag/group with custom recipients, not just the hard-coded `device.offline` listener | S (1d) | `notifications.service.ts:277` is a fixed `@OnEvent` handler — replace with rule table + evaluator | P1 #6 |
-| O8 | **Generic API-to-screen data source** — JSON/XML/CSV polling source with mapping config, surfaced as a widget; the building block for POS-style integrations without bespoke per-vendor connectors | M (3d) | `widgets` module + `SheetsWidget` shipped; extends pattern to arbitrary HTTP source | P0 #3 |
-| O9 | **Teams + folder-level access control + custom roles** — new `Team`, `FolderPermission` (read/write/admin per folder), and `Role`/`Permission` models replacing the fixed `auth.constants.ts:46-50` enum | L (5d) | Flat org today: every user in an org sees everything. Foundation for enterprise plans | P0 #5 |
-| O10 | **Content proposal/approval pipeline** — separate proposer and approver roles; proposer creates draft, approver publishes; distinct from today's moderation flag | M (3d) | `content.service.ts:712-843` is moderation only. **Supersedes M4 + Q7.** | P0 #5 |
+| O1 | ✅ DONE (#65) — **Unified Push to Screens** — tag-based targeting (`type:'tag'`) + push endpoints | M (3d) | `fleet/dto/send-command.dto.ts` (`tag` target enum) + `fleet.service` tag resolver (`case 'tag'`, cross-org guard). Supersedes M7. (Append-to-playlist / scheduled-auto-revert were lean-cut deferrals — verify if needed.) | P0 #2 |
+| O2 | ✅ DONE (#67) — **Proof-of-play reports** — paginated query + CSV export over the impression model | M (3d) | `analytics/proof-of-play.service.ts`. Supersedes L5. (Scheduled-email/PDF/Excel were the lean-cut deferrals — verify if needed.) | P0 #4 |
+| O3 | TODO — **Designer depth extension** — shapes, layers, lockable template fields, animation, drawing, asset-library insertion, export-as-image. Extension of existing canvas, not a rewrite | L (5d) | Baseline `templates/[id]/edit` canvas exists; depth features NOT built. One of two remaining O-items. | P0 #1 |
+| O4 | ✅ DONE (#64) — **Tag-rule auto-assignment engine** | M (2d) | `middleware/src/modules/tag-rules/` service + evaluator | P0 #2 |
+| O5 | ✅ DONE (#70/#71) — **Outbound webhooks** (lean cut) + per-delivery audit | L (5d) | `middleware/src/modules/webhooks/`. (SDK/OpenAPI-export/prod-Swagger were lean-cut deferrals — verify if needed.) | P1 #10 |
+| O6 | ✅ DONE (#68) — **Provisioning templates** (apply-at-pairing MVP) | M (3d) | `middleware/src/modules/provisioning-templates/` (service/controller/DTOs) + migration `20260519142834_add_provisioning_templates`. (Bulk-CSV pairing / token-CSV export were lean-cut deferrals — verify if needed.) | P1 #7 |
+| O7 | ✅ DONE (#63) — **Configurable downtime alert rules** — per tag/group with custom recipients | S (1d) | `notifications/alert-rules/` rule table + `alert-rule.evaluator` (in_app/email/slack dispatch). Supersedes L1. | P1 #6 |
+| O8 | ✅ DONE (#66/#109) — **Generic API-to-screen data source** (JSON, v1) | M (3d) | `content/widget-data-sources/generic-api.data-source.ts` + `widget-templates/generic-api.hbs` (backend). Web create-UI exposure deprioritized per operator. XML/CSV deferred. | P0 #3 |
+| O9 | TODO — **Teams + folder-level access control + custom roles** — `Team`, `FolderPermission` (read/write/admin per folder), `Role`/`Permission` models | L (5d) | Confirmed NOT built — no `Team`/`FolderPermission` model in `schema.prisma` (count 0). One of two remaining O-items. | P0 #5 |
+| O10 | ✅ DONE (#69) — **Content proposal/approval pipeline** — proposer/approver roles, draft→publish | M (3d) | `content/content-approval.service.ts` + `content/dto/approval.dto.ts`. **Supersedes M4 + Q7.** | P0 #5 |
 
-**Total effort: ~36 dev-days.** Sequence recommendation from the audit (revised per O3 foundation note): O1 → O2 → O7 → O4 → O8 → O3 → O9 → O10 → O6 → O5. Reasoning: O1/O2/O7 connect existing primitives for fast visible wins; O3 (Designer) is bigger but already has scaffolding; O5 (Public API) goes last because it locks the contract.
+**Status (reconciled 2026-05-31): 8 of 10 OptiSigns items SHIPPED** (O1/O2/O4/O5/O6/O7/O8/O10 — PRs #63–#71 + #109). **Only O3 (Designer depth) and O9 (Teams/folder-ACL) remain**, both L (5d) and not yet started. Several shipped items were "lean MVP / lean cut" — secondary sub-features (O2 scheduled-email/PDF, O5 SDK/OpenAPI-export, O6 bulk-CSV) may be partial; verify against the specific sub-feature before claiming a gap.
 
 ---
 
