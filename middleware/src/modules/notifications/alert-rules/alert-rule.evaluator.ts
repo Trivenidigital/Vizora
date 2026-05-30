@@ -2,9 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { OnEvent } from '@nestjs/event-emitter';
 import { firstValueFrom } from 'rxjs';
-import { Prisma } from '@vizora/database';
 import { DatabaseService } from '../../database/database.service';
 import { MailService } from '../../mail/mail.service';
+import { NotificationsService } from '../notifications.service';
 import { AlertRulesService } from './alert-rules.service';
 import {
   Channel,
@@ -49,6 +49,7 @@ export class AlertRuleEvaluator {
     private readonly alertRulesService: AlertRulesService,
     private readonly mail: MailService,
     private readonly http: HttpService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /**
@@ -213,16 +214,19 @@ export class AlertRuleEvaluator {
       );
       return;
     }
-    await this.db.notification.create({
-      data: {
-        organizationId: payload.organizationId,
-        userId: recipient.target,
-        type: 'device_offline',
-        severity: 'warning',
-        title: 'Device offline',
-        message: `${payload.deviceName} is offline`,
-        metadata: { deviceId: payload.deviceId } as Prisma.InputJsonValue,
-      },
+    // Route through NotificationsService.create() rather than a raw
+    // db.notification.create() so the new row is broadcast over the realtime
+    // gateway (notification:new) — otherwise the dashboard bell only picks up
+    // a device-offline alert on its next 5-min poll. The org-scope re-check
+    // inside create() is harmless defense-in-depth on top of the guard above.
+    await this.notifications.create({
+      organizationId: payload.organizationId,
+      userId: recipient.target,
+      type: 'device_offline',
+      severity: 'warning',
+      title: 'Device offline',
+      message: `${payload.deviceName} is offline`,
+      metadata: { deviceId: payload.deviceId },
     });
   }
 
