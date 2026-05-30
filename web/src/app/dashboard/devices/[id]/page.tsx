@@ -7,6 +7,7 @@ import { apiClient } from '@/lib/api';
 import { Display } from '@/lib/types';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import DeviceStatusIndicator from '@/components/DeviceStatusIndicator';
+import { DeviceControls } from '@/components/devices/DeviceControls';
 import { Icon } from '@/theme/icons';
 
 // Extended display type for fields the backend returns but the base type doesn't include
@@ -217,6 +218,9 @@ export default function DeviceDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Device Controls */}
+      <DeviceControls deviceId={device.id} />
 
       {/* Current Playlist */}
       {device.currentPlaylistId && (
