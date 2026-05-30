@@ -1,8 +1,9 @@
-import { of, throwError } from 'rxjs';
+import { of } from 'rxjs';
 import { AlertRuleEvaluator } from './alert-rule.evaluator';
 import { AlertRulesService } from './alert-rules.service';
 import { DatabaseService } from '../../database/database.service';
 import { MailService } from '../../mail/mail.service';
+import { NotificationsService } from '../notifications.service';
 import { HttpService } from '@nestjs/axios';
 
 describe('AlertRuleEvaluator', () => {
@@ -11,6 +12,11 @@ describe('AlertRuleEvaluator', () => {
   let alertRulesService: jest.Mocked<Pick<AlertRulesService, 'findActiveForEvent' | 'tryClaimDedupWindow'>>;
   let mail: jest.Mocked<Pick<MailService, 'sendDeviceOfflineAlertEmail'>>;
   let http: jest.Mocked<Pick<HttpService, 'post'>>;
+  // in_app dispatch now routes through NotificationsService.create() (not a raw
+  // db write) so the new notification is broadcast over the realtime gateway.
+  // Tests assert against this mock as the "an in_app notification was created"
+  // sentinel.
+  let notifications: jest.Mocked<Pick<NotificationsService, 'create'>>;
 
   const orgId = 'org-123';
   const deviceId = 'device-1';
@@ -32,12 +38,14 @@ describe('AlertRuleEvaluator', () => {
     } as any;
     mail = { sendDeviceOfflineAlertEmail: jest.fn() } as any;
     http = { post: jest.fn() } as any;
+    notifications = { create: jest.fn().mockResolvedValue({ id: 'notif-1' }) } as any;
 
     evaluator = new AlertRuleEvaluator(
       db as unknown as DatabaseService,
       alertRulesService as unknown as AlertRulesService,
       mail as unknown as MailService,
       http as unknown as HttpService,
+      notifications as unknown as NotificationsService,
     );
   });
 
@@ -87,7 +95,7 @@ describe('AlertRuleEvaluator', () => {
     await evaluator.handleDeviceOffline(payload);
 
     expect(alertRulesService.tryClaimDedupWindow).not.toHaveBeenCalled();
-    expect(db.notification.create).not.toHaveBeenCalled();
+    expect(notifications.create).not.toHaveBeenCalled();
   });
 
   it('top-level try/catch swallows DB failures so EventEmitter does not crash', async () => {
@@ -103,11 +111,10 @@ describe('AlertRuleEvaluator', () => {
     db.display.findUnique.mockResolvedValue(makeDevice({ lastHeartbeat: null }));
     alertRulesService.findActiveForEvent.mockResolvedValue([makeRule({ minOfflineSec: 99999 })]);
     alertRulesService.tryClaimDedupWindow.mockResolvedValue(true);
-    db.notification.create.mockResolvedValue({});
 
     await evaluator.handleDeviceOffline(payload);
 
-    expect(db.notification.create).toHaveBeenCalledTimes(1);
+    expect(notifications.create).toHaveBeenCalledTimes(1);
   });
 
   // ---------------------------------------------------------------------------
@@ -116,7 +123,6 @@ describe('AlertRuleEvaluator', () => {
   describe('scope', () => {
     beforeEach(() => {
       alertRulesService.tryClaimDedupWindow.mockResolvedValue(true);
-      db.notification.create.mockResolvedValue({});
     });
 
     it('scope=all matches every device', async () => {
@@ -125,7 +131,7 @@ describe('AlertRuleEvaluator', () => {
 
       await evaluator.handleDeviceOffline(payload);
 
-      expect(db.notification.create).toHaveBeenCalledTimes(1);
+      expect(notifications.create).toHaveBeenCalledTimes(1);
     });
 
     it('scope=tag matches when device has the tag', async () => {
@@ -138,7 +144,7 @@ describe('AlertRuleEvaluator', () => {
 
       await evaluator.handleDeviceOffline(payload);
 
-      expect(db.notification.create).toHaveBeenCalledTimes(1);
+      expect(notifications.create).toHaveBeenCalledTimes(1);
     });
 
     it('scope=tag skips when device lacks the tag', async () => {
@@ -149,7 +155,7 @@ describe('AlertRuleEvaluator', () => {
 
       await evaluator.handleDeviceOffline(payload);
 
-      expect(db.notification.create).not.toHaveBeenCalled();
+      expect(notifications.create).not.toHaveBeenCalled();
     });
 
     it('scope=tag with scopeTagId=null (Tag was deleted) skips with WARN log', async () => {
@@ -161,7 +167,7 @@ describe('AlertRuleEvaluator', () => {
 
       await evaluator.handleDeviceOffline(payload);
 
-      expect(db.notification.create).not.toHaveBeenCalled();
+      expect(notifications.create).not.toHaveBeenCalled();
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('scope=tag but scopeTagId=null'));
     });
 
@@ -175,7 +181,7 @@ describe('AlertRuleEvaluator', () => {
 
       await evaluator.handleDeviceOffline(payload);
 
-      expect(db.notification.create).toHaveBeenCalledTimes(1);
+      expect(notifications.create).toHaveBeenCalledTimes(1);
     });
 
     it('scope=group with scopeGroupId=null skips with WARN log', async () => {
@@ -187,7 +193,7 @@ describe('AlertRuleEvaluator', () => {
 
       await evaluator.handleDeviceOffline(payload);
 
-      expect(db.notification.create).not.toHaveBeenCalled();
+      expect(notifications.create).not.toHaveBeenCalled();
       expect(warnSpy).toHaveBeenCalled();
     });
 
@@ -199,7 +205,7 @@ describe('AlertRuleEvaluator', () => {
 
       await evaluator.handleDeviceOffline(payload);
 
-      expect(db.notification.create).toHaveBeenCalledTimes(1);
+      expect(notifications.create).toHaveBeenCalledTimes(1);
     });
 
     it('scope=display skips when scopeDisplayId is different', async () => {
@@ -210,7 +216,7 @@ describe('AlertRuleEvaluator', () => {
 
       await evaluator.handleDeviceOffline(payload);
 
-      expect(db.notification.create).not.toHaveBeenCalled();
+      expect(notifications.create).not.toHaveBeenCalled();
     });
 
     it('unknown scope value skips with WARN log', async () => {
@@ -220,7 +226,7 @@ describe('AlertRuleEvaluator', () => {
 
       await evaluator.handleDeviceOffline(payload);
 
-      expect(db.notification.create).not.toHaveBeenCalled();
+      expect(notifications.create).not.toHaveBeenCalled();
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Unknown scope'));
     });
   });
@@ -256,14 +262,13 @@ describe('AlertRuleEvaluator', () => {
 
     await evaluator.handleDeviceOffline(payload);
 
-    expect(db.notification.create).not.toHaveBeenCalled();
+    expect(notifications.create).not.toHaveBeenCalled();
   });
 
   it('passes both ruleId AND deviceId to tryClaimDedupWindow (per-device dedup)', async () => {
     db.display.findUnique.mockResolvedValue(makeDevice());
     alertRulesService.findActiveForEvent.mockResolvedValue([makeRule({ id: 'rule-X' })]);
     alertRulesService.tryClaimDedupWindow.mockResolvedValue(true);
-    db.notification.create.mockResolvedValue({});
 
     await evaluator.handleDeviceOffline(payload);
 
@@ -279,7 +284,6 @@ describe('AlertRuleEvaluator', () => {
     alertRulesService.findActiveForEvent.mockResolvedValue([makeRule()]);
     // First call: claim succeeds for device-A
     alertRulesService.tryClaimDedupWindow.mockResolvedValueOnce(true);
-    db.notification.create.mockResolvedValue({});
 
     await evaluator.handleDeviceOffline({ deviceId: 'device-A', deviceName: 'A', organizationId: orgId });
 
@@ -291,7 +295,7 @@ describe('AlertRuleEvaluator', () => {
     await evaluator.handleDeviceOffline({ deviceId: 'device-B', deviceName: 'B', organizationId: orgId });
 
     // Both devices got their in_app notification
-    expect(db.notification.create).toHaveBeenCalledTimes(2);
+    expect(notifications.create).toHaveBeenCalledTimes(2);
   });
 
   // ---------------------------------------------------------------------------
@@ -308,8 +312,8 @@ describe('AlertRuleEvaluator', () => {
       }),
     ]);
     alertRulesService.tryClaimDedupWindow.mockResolvedValue(true);
-    // Make the in_app dispatch throw — emulating an FK violation on userId
-    db.notification.create.mockRejectedValueOnce(new Error('FK violation on userId'));
+    // Make the in_app dispatch throw — emulating a failure inside create()
+    notifications.create.mockRejectedValueOnce(new Error('create failed'));
     mail.sendDeviceOfflineAlertEmail.mockResolvedValue(undefined);
 
     await evaluator.handleDeviceOffline(payload);
@@ -321,22 +325,24 @@ describe('AlertRuleEvaluator', () => {
   // ---------------------------------------------------------------------------
   // Channels
   // ---------------------------------------------------------------------------
-  it('dispatches in_app via db.notification.create with scoped userId', async () => {
+  it('dispatches in_app via NotificationsService.create with scoped userId (so it broadcasts)', async () => {
     db.display.findUnique.mockResolvedValue(makeDevice());
     alertRulesService.findActiveForEvent.mockResolvedValue([makeRule()]);
     alertRulesService.tryClaimDedupWindow.mockResolvedValue(true);
-    db.notification.create.mockResolvedValue({});
 
     await evaluator.handleDeviceOffline(payload);
 
-    expect(db.notification.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
+    expect(notifications.create).toHaveBeenCalledWith(
+      expect.objectContaining({
         organizationId: orgId,
         userId: 'user-1',
         type: 'device_offline',
         severity: 'warning',
       }),
-    });
+    );
+    // The raw db write is no longer used by the in_app path — the broadcast
+    // only fires when routed through NotificationsService.create().
+    expect(db.notification.create).not.toHaveBeenCalled();
   });
 
   it('in_app dispatch skips when recipient user no longer in the rule\'s org (cross-tenant guard)', async () => {
@@ -348,7 +354,7 @@ describe('AlertRuleEvaluator', () => {
 
     await evaluator.handleDeviceOffline(payload);
 
-    expect(db.notification.create).not.toHaveBeenCalled();
+    expect(notifications.create).not.toHaveBeenCalled();
   });
 
   it('dispatches slack_webhook with maxRedirects:0 and 5s timeout', async () => {
@@ -420,7 +426,7 @@ describe('AlertRuleEvaluator', () => {
 
     await evaluator.handleDeviceOffline(payload);
 
-    expect(db.notification.create).not.toHaveBeenCalled();
+    expect(notifications.create).not.toHaveBeenCalled();
     expect(mail.sendDeviceOfflineAlertEmail).not.toHaveBeenCalled();
     expect(http.post).not.toHaveBeenCalled();
   });
