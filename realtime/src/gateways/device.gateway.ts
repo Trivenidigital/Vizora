@@ -90,6 +90,15 @@ export class DeviceGateway
   // 2.5: Device socket deduplication (deviceId -> socketId)
   private readonly deviceSockets: Map<string, string> = new Map();
 
+  // Dashboard (user) sockets: userId -> set of socketIds. Lets the periodic
+  // session-invalidation sweep target ONLY dashboard sockets (not the device
+  // fleet) and disconnect a specific user's live sockets mid-session — closing
+  // the connect-time-only residual from PR #112.
+  private readonly dashboardSockets: Map<string, Set<string>> = new Map();
+
+  // Reentrancy guard so a slow sweep (Redis latency) can't overlap itself.
+  private sweepRunning = false;
+
   // Per-message rate limiting: socketId -> { count, resetAt }
   private readonly messageRates: Map<string, { count: number; resetAt: number }> = new Map();
 
@@ -118,6 +127,9 @@ export class DeviceGateway
     this.cleanupIntervals.push(setInterval(() => this.cleanupMessageRateLimits(), 60000));
     // Periodically clean up stale deviceStatusCache entries (every 5 min)
     this.cleanupIntervals.push(setInterval(() => this.cleanupStaleEntries(), 5 * 60 * 1000));
+    // Periodically tear down dashboard sockets whose session was invalidated
+    // mid-connection (password change / deactivation) — see sweepInvalidatedSessions.
+    this.cleanupIntervals.push(setInterval(() => this.sweepInvalidatedSessions(), 60000));
   }
 
   async onModuleDestroy() {
@@ -228,6 +240,88 @@ export class DeviceGateway
     }
   }
 
+  /**
+   * Periodically tear down dashboard sockets whose session was invalidated AFTER
+   * they connected. PR #112 added these checks at connect-time only; a socket
+   * established before a password change / account deactivation otherwise keeps
+   * streaming until it reconnects. This re-applies the handshake checks to the
+   * in-memory `dashboardSockets` map (dashboard sockets only — never devices).
+   *
+   * Per distinct user: one `exists(user_revoked:)` + one `get(pwd_changed:)`.
+   * - user_revoked → disconnect ALL that user's sockets (no iat needed).
+   * - pwd_changed  → per-socket: disconnect only sockets whose token iat predates
+   *                  the change (strict `<`, matching the connect-time guard, so a
+   *                  fresh post-change login's socket survives). Sockets without a
+   *                  stored tokenIat are fail-open here (same as the connect-time
+   *                  guard) but still caught by the user_revoked branch.
+   *
+   * Reentrancy-guarded (first async cleanup interval — a slow Redis cycle must not
+   * overlap itself); per-user try/catch so one user's Redis error never aborts the
+   * sweep; whole body wrapped so an unexpected throw can't leak out of setInterval.
+   */
+  private async sweepInvalidatedSessions(): Promise<void> {
+    if (this.sweepRunning || this.dashboardSockets.size === 0) {
+      return;
+    }
+    this.sweepRunning = true;
+    try {
+      // Snapshot userIds so concurrent connect/disconnect can't mutate mid-iteration.
+      for (const userId of Array.from(this.dashboardSockets.keys())) {
+        try {
+          const socketIds = this.dashboardSockets.get(userId);
+          if (!socketIds || socketIds.size === 0) {
+            continue;
+          }
+
+          const revoked = await this.redisService.exists(`user_revoked:${userId}`);
+          let pwdChangedAt: number | null = null;
+          if (!revoked) {
+            const pc = await this.redisService.get(`pwd_changed:${userId}`);
+            pwdChangedAt = pc ? Number(pc) : null;
+            if (pwdChangedAt === null) {
+              continue; // Nothing to enforce for this user this cycle.
+            }
+          }
+
+          for (const socketId of Array.from(socketIds)) {
+            const socket = this.server.sockets.sockets.get(socketId);
+            if (!socket) {
+              // Socket already gone; drop the stale entry defensively.
+              socketIds.delete(socketId);
+              continue;
+            }
+            const tokenIat = socket.data?.tokenIat;
+            const expiredByPwd =
+              typeof tokenIat === 'number' &&
+              pwdChangedAt !== null &&
+              tokenIat < pwdChangedAt;
+            if (revoked || expiredByPwd) {
+              const reason = revoked ? 'revoked' : 'password_changed';
+              // Emit before the forced disconnect so the dashboard can show a
+              // "signed out" state instead of a silent drop. handleDisconnect
+              // owns removing the socketId from dashboardSockets.
+              socket.emit('session:expired', { reason });
+              socket.disconnect(true);
+              this.logger.log(
+                `Session sweep: disconnected dashboard socket ${socketId} (user: ${userId}, reason: ${reason})`,
+              );
+            }
+          }
+        } catch (err) {
+          this.logger.warn(
+            `Session sweep failed for user ${userId}: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Session sweep aborted: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    } finally {
+      this.sweepRunning = false;
+    }
+  }
+
   async handleConnection(client: Socket) {
     try {
       // Step 1: Rate limiting
@@ -244,8 +338,25 @@ export class DeviceGateway
       // User/dashboard connections: join org room and send current device statuses
       if (authResult.kind === 'user') {
         const orgId = authResult.payload.organizationId;
+        const userId = authResult.payload.sub;
         await client.join(`org:${orgId}`);
-        this.logger.log(`Dashboard client joined org:${orgId} (user: ${authResult.payload.sub}, socket: ${client.id})`);
+
+        // Store the token's iat + register this dashboard socket so the periodic
+        // sweep can invalidate it mid-session if the user's password changes or
+        // their account is deactivated after they connected (PR #112 only checked
+        // at connect-time). iat is per-socket so two tabs (pre/post change) are
+        // torn down independently.
+        client.data.userId = userId;
+        client.data.isDashboard = true;
+        client.data.tokenIat = authResult.payload.iat;
+        let userSockets = this.dashboardSockets.get(userId);
+        if (!userSockets) {
+          userSockets = new Set();
+          this.dashboardSockets.set(userId, userSockets);
+        }
+        userSockets.add(client.id);
+
+        this.logger.log(`Dashboard client joined org:${orgId} (user: ${userId}, socket: ${client.id})`);
 
         // Send current device statuses so dashboard has accurate state on connect
         await this.sendDeviceStatusCatchUp(client, orgId);
@@ -743,6 +854,16 @@ export class DeviceGateway
     // Clean up per-message rate limit entry for this socket
     this.messageRates.delete(client.id);
 
+    // Deregister dashboard (user) sockets from the sweep map. Pure in-memory
+    // bookkeeping (no I/O), so kept outside the try below.
+    const dashUserId = client.data?.userId;
+    if (dashUserId && client.data?.isDashboard) {
+      const set = this.dashboardSockets.get(dashUserId);
+      if (set) {
+        set.delete(client.id);
+        if (set.size === 0) this.dashboardSockets.delete(dashUserId);
+      }
+    }
 
     try {
       const deviceId = client.data?.deviceId;
