@@ -428,4 +428,31 @@ export class MailService {
 
     await this.sendMail(to, subject, html, 'Password reset', 'auth');
   }
+
+  /**
+   * Security notification sent after a user's password is changed (M12).
+   * Confirms the change and gives the user a recovery path if it wasn't them.
+   * Contains no secrets — only the display name + static copy. firstName is
+   * user-controlled, so it's escaped before interpolation.
+   */
+  async sendPasswordChangedEmail(to: string, firstName: string): Promise<void> {
+    const subject = 'Your Vizora password was changed';
+    const html = this.wrapInTemplate(`
+          <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">Your password was changed</h1>
+          <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
+            Hi ${MailService.escapeHtml(firstName)},<br><br>
+            This is a confirmation that the password for your Vizora account was just changed.
+            For your security, you've been signed out everywhere and will need to log in again.
+          </p>
+          <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
+            If you made this change, no further action is needed.
+          </p>
+          ${this.ctaButton('Go to Dashboard', this.dashboardUrl)}
+          <p style="color:#5A6B73;font-size:12px;line-height:1.5;margin:16px 0 0 0;">
+            If you did <strong style="color:#F0ECE8;">not</strong> change your password, reset it immediately
+            and contact support@vizora.cloud — your account may be compromised.
+          </p>
+    `);
+    await this.sendMail(to, subject, html, 'Password changed', 'auth');
+  }
 }

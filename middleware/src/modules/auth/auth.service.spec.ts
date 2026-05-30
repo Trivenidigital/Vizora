@@ -138,6 +138,7 @@ describe('AuthService', () => {
     mockMailService = {
       sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
       sendWelcomeEmail: jest.fn().mockResolvedValue(undefined),
+      sendPasswordChangedEmail: jest.fn().mockResolvedValue(undefined),
     };
 
     mockGeoService = {
@@ -795,6 +796,54 @@ describe('AuthService', () => {
 
       await expect(service.googleLogin('malformed')).rejects.toThrow(UnauthorizedException);
       await expect(service.googleLogin('malformed')).rejects.toThrow('Invalid Google token');
+    });
+  });
+
+  describe('changePassword', () => {
+    it('changes the password, invalidates the cache, and sends the security email (M12)', async () => {
+      mockDatabaseService.user.findUnique.mockResolvedValue(mockUser);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      (bcrypt.hash as jest.Mock).mockResolvedValue('new-hashed-password');
+      mockDatabaseService.user.update.mockResolvedValue({ ...mockUser });
+
+      await service.changePassword('user-123', 'current-pw', 'new-pw');
+
+      expect(mockDatabaseService.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-123' },
+        data: { passwordHash: 'new-hashed-password' },
+      });
+      expect(mockRedisService.del).toHaveBeenCalledWith('user_auth:user-123');
+      // Security alert: the user is emailed that their password changed.
+      expect(mockMailService.sendPasswordChangedEmail).toHaveBeenCalledWith(
+        mockUser.email,
+        mockUser.firstName,
+      );
+    });
+
+    it('throws and does NOT email when the current password is wrong', async () => {
+      mockDatabaseService.user.findUnique.mockResolvedValue(mockUser);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+
+      await expect(
+        service.changePassword('user-123', 'wrong-pw', 'new-pw'),
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(mockDatabaseService.user.update).not.toHaveBeenCalled();
+      expect(mockMailService.sendPasswordChangedEmail).not.toHaveBeenCalled();
+    });
+
+    it('still succeeds when the security email fails (non-blocking)', async () => {
+      mockDatabaseService.user.findUnique.mockResolvedValue(mockUser);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      (bcrypt.hash as jest.Mock).mockResolvedValue('new-hashed-password');
+      mockDatabaseService.user.update.mockResolvedValue({ ...mockUser });
+      mockMailService.sendPasswordChangedEmail.mockRejectedValue(new Error('smtp down'));
+
+      await expect(
+        service.changePassword('user-123', 'current-pw', 'new-pw'),
+      ).resolves.toBeUndefined();
+
+      expect(mockDatabaseService.user.update).toHaveBeenCalled();
     });
   });
 });
