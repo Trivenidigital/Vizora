@@ -627,6 +627,18 @@ export class AuthService {
 
     // Invalidate user cache so next auth uses fresh data
     await this.redisService.del(`user_auth:${userId}`);
+
+    // Security notification (M12): tell the user their password changed, so an
+    // unauthorized change is noticed. Non-blocking — sendMail already swallows
+    // its own errors, but guard here too so a mail-layer throw can never fail
+    // the password change itself.
+    try {
+      await this.mailService.sendPasswordChangedEmail(user.email, user.firstName);
+    } catch (err) {
+      this.logger.warn(
+        `Failed to send password-changed email for user ${userId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   async updateProfile(userId: string, data: { firstName?: string; lastName?: string }) {
