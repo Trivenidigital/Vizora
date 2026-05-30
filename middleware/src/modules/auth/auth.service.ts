@@ -601,6 +601,40 @@ export class AuthService {
 
     // Clear login attempt counter for this user
     await this.redisService.del(`login_attempts:${tokenRecord.user.email}`);
+
+    // Invalidate user cache + kill all sessions issued before this reset. This
+    // is the primary account-takeover case: an attacker who resets a stolen
+    // account must not leave the legitimate user's live sessions valid.
+    await this.redisService.del(`user_auth:${tokenRecord.userId}`);
+    await this.markPasswordChanged(tokenRecord.userId);
+  }
+
+  /**
+   * Record the moment a user's password changed so JwtStrategy.validate can
+   * reject any token minted before it (session invalidation). Stored as a
+   * Redis epoch-seconds timestamp under `pwd_changed:${userId}` with the same
+   * 7-day TTL as the token lifetime — by expiry, every pre-change token is
+   * already dead, so the key self-cleans.
+   *
+   * Non-blocking: a Redis failure must never fail the password change. The
+   * worst case on failure is the status quo (old tokens survive to natural
+   * expiry), so we log and continue rather than throw.
+   *
+   * Uses `<` (strict) in the validate-side comparison, so the user's fresh
+   * post-change login (iat >= this timestamp) is never rejected.
+   */
+  private async markPasswordChanged(userId: string): Promise<void> {
+    try {
+      await this.redisService.set(
+        `pwd_changed:${userId}`,
+        String(Math.floor(Date.now() / 1000)),
+        AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS,
+      );
+    } catch (err) {
+      this.logger.warn(
+        `Failed to write pwd_changed marker for user ${userId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   async changePassword(userId: string, currentPassword: string, newPassword: string) {
@@ -627,6 +661,11 @@ export class AuthService {
 
     // Invalidate user cache so next auth uses fresh data
     await this.redisService.del(`user_auth:${userId}`);
+
+    // Kill all sessions issued before this change (other devices / a stolen
+    // session). JwtStrategy.validate rejects tokens with iat < this timestamp;
+    // the user's fresh re-login passes.
+    await this.markPasswordChanged(userId);
 
     // Security notification (M12): tell the user their password changed, so an
     // unauthorized change is noticed. Non-blocking — sendMail already swallows
