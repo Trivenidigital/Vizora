@@ -320,10 +320,14 @@ describe('GenericApiDataSource', () => {
       expect(schema).toHaveProperty('url');
     });
 
-    it('getDefaultTemplate returns a Handlebars string', () => {
+    it('getDefaultTemplate returns the .hbs filename token, not inline markup', () => {
+      // loadWidgetTemplate() is filename-based (reads widget-templates/<name>.hbs).
+      // Returning inline Handlebars made it sanitize the markup to a garbage
+      // filename, miss the .hbs, and throw — so generic-api widgets never
+      // rendered. The contract is a bare filename, like every other source.
       const tpl = dataSource.getDefaultTemplate();
-      expect(typeof tpl).toBe('string');
-      expect(tpl).toContain('{{');
+      expect(tpl).toBe('generic-api');
+      expect(tpl).not.toContain('{{');
     });
 
     it('getSampleData returns a structurally-valid sample', () => {

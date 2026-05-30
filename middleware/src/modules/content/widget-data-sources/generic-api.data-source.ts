@@ -178,17 +178,14 @@ export class GenericApiDataSource implements WidgetDataSource {
   }
 
   getDefaultTemplate(): string {
-    return `
-{{#if data}}
-  {{#if (isArray data)}}
-    <ul>{{#each data}}<li>{{this}}</li>{{/each}}</ul>
-  {{else}}
-    <pre>{{json data}}</pre>
-  {{/if}}
-{{else}}
-  <p>No data.</p>
-{{/if}}
-`.trim();
+    // Return the template FILENAME (without .hbs), matching the contract every
+    // other data source follows (weather → 'weather', rss → 'rss', …).
+    // loadWidgetTemplate() is filename-based: it sanitizes this value and loads
+    // widget-templates/<name>.hbs. Returning inline Handlebars here made it
+    // sanitize the markup to a garbage filename, miss the existing
+    // widget-templates/generic-api.hbs, and silently fall back to a raw
+    // <pre> JSON dump instead of the styled list the .hbs renders.
+    return 'generic-api';
   }
 
   getSampleData(): Record<string, unknown> {

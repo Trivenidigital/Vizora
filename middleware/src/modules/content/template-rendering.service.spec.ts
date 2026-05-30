@@ -14,7 +14,10 @@ jest.mock('isomorphic-dompurify', () => ({
 }));
 
 // Import after mocking
+import * as fs from 'fs';
+import * as path from 'path';
 import { TemplateRenderingService } from './template-rendering.service';
+import { GenericApiDataSource } from './widget-data-sources/generic-api.data-source';
 
 // Mock fetch globally
 const mockFetch = jest.fn();
@@ -640,6 +643,41 @@ describe('TemplateRenderingService', () => {
       expect(result).toContain('Menu');
       expect(result).toContain('Burger');
       expect(result).toContain('Fries');
+    });
+  });
+
+  describe('generic-api widget template (O8)', () => {
+    // End-to-end proof for the O8 fix: getDefaultTemplate() now points at
+    // widget-templates/generic-api.hbs (filename, not inline markup). Confirm
+    // that file exists and renders the data source's sample data into the
+    // styled list using only built-in helpers — not the "No data" fallback.
+    const hbsPath = path.join(__dirname, 'widget-templates', 'generic-api.hbs');
+
+    it('the .hbs file the data source points at exists on disk', () => {
+      const source = new GenericApiDataSource({} as any);
+      const filename = source.getDefaultTemplate();
+      expect(fs.existsSync(path.join(__dirname, 'widget-templates', `${filename}.hbs`))).toBe(true);
+    });
+
+    it('renders array sample data into the list (not the empty fallback)', () => {
+      const hbs = fs.readFileSync(hbsPath, 'utf-8');
+      const sample = new GenericApiDataSource({} as any).getSampleData();
+
+      const result = service.renderTemplate(hbs, sample);
+
+      expect(result).toContain('generic-api-widget');
+      expect(result).toContain('<ul');
+      expect(result).toContain('Sample Item A'); // {{#each data}} → {{this.name}}
+      expect(result).not.toContain('No data available');
+    });
+
+    it('renders the empty fallback when data is missing', () => {
+      const hbs = fs.readFileSync(hbsPath, 'utf-8');
+
+      const result = service.renderTemplate(hbs, {});
+
+      expect(result).toContain('No data available');
+      expect(result).not.toContain('<ul');
     });
   });
 });
