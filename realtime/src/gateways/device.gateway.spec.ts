@@ -34,6 +34,7 @@ describe('DeviceGateway', () => {
     setPendingPlaylist: jest.fn().mockResolvedValue(undefined),
     getPendingPlaylist: jest.fn().mockResolvedValue(null),
     exists: jest.fn().mockResolvedValue(false),
+    get: jest.fn().mockResolvedValue(null),
     getCachedPlaylist: jest.fn().mockResolvedValue(null),
     cachePlaylist: jest.fn().mockResolvedValue(undefined),
   };
@@ -264,6 +265,80 @@ describe('DeviceGateway', () => {
 
       await gateway.handleConnection(client as any);
       expect(client.disconnect).toHaveBeenCalled();
+    });
+
+    // Dashboard-user session invalidation — mirrors the REST JwtStrategy
+    // checks (PR #111) on the realtime handshake, reading the shared Redis
+    // keys middleware writes: user_revoked:${sub} and pwd_changed:${sub}.
+    it('should reject a dashboard user whose account was revoked (user_revoked:)', async () => {
+      mockJwtService.verify
+        .mockImplementationOnce(() => { throw new Error('invalid device token'); })
+        .mockReturnValueOnce({
+          sub: 'user-1',
+          email: 'test@example.com',
+          organizationId: 'org-1',
+          type: 'user',
+          jti: 'jti-1',
+        });
+      mockRedisService.exists.mockImplementation((key: string) =>
+        Promise.resolve(key === 'user_revoked:user-1'),
+      );
+
+      const client = createMockSocket();
+
+      await gateway.handleConnection(client as any);
+      expect(client.disconnect).toHaveBeenCalled();
+      expect(client.join).not.toHaveBeenCalledWith('org:org-1');
+    });
+
+    it('should reject a dashboard user token minted before the last password change (pwd_changed:)', async () => {
+      mockJwtService.verify
+        .mockImplementationOnce(() => { throw new Error('invalid device token'); })
+        .mockReturnValueOnce({
+          sub: 'user-1',
+          email: 'test@example.com',
+          organizationId: 'org-1',
+          type: 'user',
+          jti: 'jti-1',
+          iat: 1_999_999,
+        });
+      mockRedisService.exists.mockResolvedValue(false); // not revoked
+      mockRedisService.get.mockImplementation((key: string) =>
+        Promise.resolve(key === 'pwd_changed:user-1' ? '2000000' : null),
+      );
+
+      const client = createMockSocket();
+
+      await gateway.handleConnection(client as any);
+      expect(client.disconnect).toHaveBeenCalled();
+      expect(client.join).not.toHaveBeenCalledWith('org:org-1');
+    });
+
+    it('should accept a dashboard user token minted after the last password change', async () => {
+      mockJwtService.verify
+        .mockImplementationOnce(() => { throw new Error('invalid device token'); })
+        .mockReturnValueOnce({
+          sub: 'user-1',
+          email: 'test@example.com',
+          organizationId: 'org-1',
+          type: 'user',
+          jti: 'jti-1',
+          iat: 2_000_001,
+        });
+      mockRedisService.exists.mockResolvedValue(false);
+      mockRedisService.get.mockImplementation((key: string) =>
+        Promise.resolve(key === 'pwd_changed:user-1' ? '2000000' : null),
+      );
+
+      const client = createMockSocket();
+
+      await gateway.handleConnection(client as any);
+      // Assert the pwd_changed key was actually queried — without this, the
+      // test would stay green even if the whole check were deleted (a fresh
+      // login always connects). This makes it a real positive sentinel.
+      expect(mockRedisService.get).toHaveBeenCalledWith('pwd_changed:user-1');
+      expect(client.join).toHaveBeenCalledWith('org:org-1');
+      expect(client.disconnect).not.toHaveBeenCalled();
     });
 
     it('should rate limit excessive connections from same IP', async () => {
