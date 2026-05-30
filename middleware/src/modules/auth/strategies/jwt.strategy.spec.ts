@@ -337,6 +337,93 @@ describe('JwtStrategy', () => {
       });
     });
 
+    describe('password-change session invalidation (pwd_changed:)', () => {
+      const mockUser = {
+        id: 'user-123',
+        email: 'test@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        organizationId: 'org-123',
+        role: 'admin',
+        isActive: true,
+        organization: {
+          id: 'org-123',
+          name: 'Test Organization',
+          storageUsedBytes: BigInt(0),
+          storageQuotaBytes: BigInt(1073741824),
+        },
+      };
+
+      const basePayload: JwtPayload = {
+        sub: 'user-123',
+        email: 'test@example.com',
+        organizationId: 'org-123',
+        role: 'admin',
+      };
+
+      // exists() stays false (no jti/user revocation). get() returns the
+      // change-timestamp for `pwd_changed:` and null for the user_auth cache,
+      // so each test exercises the DB path unless it asserts a rejection first.
+      const withPwdChangedAt = (ts: number) =>
+        mockRedisService.get.mockImplementation((key: string) =>
+          Promise.resolve(key.startsWith('pwd_changed:') ? String(ts) : null),
+        );
+
+      beforeEach(() => {
+        mockDatabaseService.user.findUnique.mockResolvedValue(mockUser as any);
+      });
+
+      it('rejects a token minted BEFORE the last password change', async () => {
+        withPwdChangedAt(2_000_000);
+        await expect(
+          strategy.validate({ ...basePayload, iat: 1_999_999 }),
+        ).rejects.toThrow('Session expired — please log in again');
+      });
+
+      it('does not hit the database for a pre-change (rejected) token', async () => {
+        withPwdChangedAt(2_000_000);
+        await strategy.validate({ ...basePayload, iat: 1_999_999 }).catch(() => {});
+        expect(mockDatabaseService.user.findUnique).not.toHaveBeenCalled();
+      });
+
+      it('passes a token minted AFTER the last password change', async () => {
+        withPwdChangedAt(2_000_000);
+        const result = await strategy.validate({ ...basePayload, iat: 2_000_001 });
+        expect(result).toMatchObject({ id: 'user-123' });
+      });
+
+      it('passes a token minted in the SAME second as the change (strict <, no lockout)', async () => {
+        withPwdChangedAt(2_000_000);
+        const result = await strategy.validate({ ...basePayload, iat: 2_000_000 });
+        expect(result).toMatchObject({ id: 'user-123' });
+      });
+
+      it('passes when no pwd_changed: marker exists', async () => {
+        mockRedisService.get.mockResolvedValue(null);
+        const result = await strategy.validate({ ...basePayload, iat: 2_000_000 });
+        expect(result).toMatchObject({ id: 'user-123' });
+      });
+
+      it('passes when the token carries no iat (check is a safe no-op)', async () => {
+        withPwdChangedAt(2_000_000);
+        const result = await strategy.validate(basePayload); // no iat
+        expect(result).toMatchObject({ id: 'user-123' });
+      });
+
+      it('checks pwd_changed BEFORE the user_auth cache (cache cannot skip invalidation)', async () => {
+        // A cache HIT would normally short-circuit; the pwd_changed check runs
+        // first, so a stale cached user with a pre-change token is still rejected.
+        mockRedisService.get.mockImplementation((key: string) => {
+          if (key.startsWith('pwd_changed:')) return Promise.resolve('2000000');
+          if (key.startsWith('user_auth:')) return Promise.resolve(JSON.stringify(mockUser));
+          return Promise.resolve(null);
+        });
+        await expect(
+          strategy.validate({ ...basePayload, iat: 1_999_999 }),
+        ).rejects.toThrow('Session expired — please log in again');
+      });
+    });
+
     describe('token type handling', () => {
       it('should treat undefined type as user token', async () => {
         const payload: JwtPayload = {

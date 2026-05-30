@@ -14,6 +14,7 @@ export interface JwtPayload {
   isSuperAdmin?: boolean;
   type?: string; // 'user' or 'device'
   jti?: string; // JWT ID for token revocation
+  iat?: number; // issued-at (epoch seconds) — set by jsonwebtoken; used for password-change session invalidation
 }
 
 /** Shape of request.user set by JwtStrategy.validate() */
@@ -98,6 +99,25 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const isUserRevoked = await this.redisService.exists(`user_revoked:${payload.sub}`);
     if (isUserRevoked) {
       throw new UnauthorizedException('User account is no longer active');
+    }
+
+    // Reject tokens minted BEFORE the user's last password change (session
+    // invalidation). changePassword / resetPassword write `pwd_changed:${sub}`
+    // = epoch-seconds; any token with an older `iat` is a pre-change session
+    // (other device, or a stolen token) and must die. Strict `<` so the user's
+    // fresh post-change login (iat >= timestamp) is never rejected. Placed
+    // before the user_auth: cache read so a cached user can't skip it.
+    // Fail-OPEN on a token with no `iat` (the `if (payload.iat)` guard skips
+    // the check). Acceptable today: every token generateToken() produces carries
+    // iat (jsonwebtoken sets it unless signOptions has `noTimestamp`, which we
+    // don't). If a future code path mints iat-less user tokens, this check
+    // silently stops invalidating them — re-evaluate then. Strict `<` so the
+    // user's fresh post-change login (iat >= marker, incl. same-second) passes.
+    if (payload.iat) {
+      const pwdChangedAt = await this.redisService.get(`pwd_changed:${payload.sub}`);
+      if (pwdChangedAt && payload.iat < Number(pwdChangedAt)) {
+        throw new UnauthorizedException('Session expired — please log in again');
+      }
     }
 
     // Check Redis cache first to avoid DB hit on every request

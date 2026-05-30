@@ -115,6 +115,10 @@ describe('AuthService', () => {
       auditLog: {
         create: jest.fn(),
       },
+      passwordResetToken: {
+        findUnique: jest.fn(),
+        update: jest.fn(),
+      },
       // Mock $transaction to execute the callback with the same mock database
       $transaction: jest.fn().mockImplementation(async (callback) => {
         return callback(mockDatabaseService);
@@ -813,6 +817,13 @@ describe('AuthService', () => {
         data: { passwordHash: 'new-hashed-password' },
       });
       expect(mockRedisService.del).toHaveBeenCalledWith('user_auth:user-123');
+      // Session invalidation: writes the pwd_changed marker so pre-change
+      // tokens (other devices / stolen) are rejected by JwtStrategy.validate.
+      expect(mockRedisService.set).toHaveBeenCalledWith(
+        'pwd_changed:user-123',
+        expect.any(String),
+        expect.any(Number),
+      );
       // Security alert: the user is emailed that their password changed.
       expect(mockMailService.sendPasswordChangedEmail).toHaveBeenCalledWith(
         mockUser.email,
@@ -844,6 +855,38 @@ describe('AuthService', () => {
       ).resolves.toBeUndefined();
 
       expect(mockDatabaseService.user.update).toHaveBeenCalled();
+    });
+  });
+
+  describe('resetPassword', () => {
+    it('writes the pwd_changed marker so the reset kills pre-reset sessions (takeover defense)', async () => {
+      // forgot-password reset is the primary account-takeover case: an attacker
+      // who resets a stolen-email account must invalidate the legit user's
+      // live sessions. Reset returns no token; the user logs in afterward.
+      mockDatabaseService.passwordResetToken.findUnique.mockResolvedValue({
+        id: 'tok-1',
+        userId: 'user-123',
+        token: 'hashed',
+        usedAt: null,
+        expiresAt: new Date(Date.now() + 60_000),
+        user: { id: 'user-123', email: 'test@example.com', organizationId: 'org-123' },
+      });
+      mockDatabaseService.user.update.mockResolvedValue({ id: 'user-123' });
+      mockDatabaseService.passwordResetToken.update.mockResolvedValue({ id: 'tok-1' });
+      (bcrypt.hash as jest.Mock).mockResolvedValue('new-hashed-password');
+
+      await service.resetPassword('raw-token', 'new-pw');
+
+      expect(mockDatabaseService.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-123' },
+        data: { passwordHash: 'new-hashed-password' },
+      });
+      expect(mockRedisService.del).toHaveBeenCalledWith('user_auth:user-123');
+      expect(mockRedisService.set).toHaveBeenCalledWith(
+        'pwd_changed:user-123',
+        expect.any(String),
+        expect.any(Number),
+      );
     });
   });
 });
