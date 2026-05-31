@@ -100,7 +100,7 @@ jobs:
 
       - name: Run display unit tests
         working-directory: display
-        run: pnpm test -- --runInBand
+        run: pnpm test:ci
 
       - name: Typecheck display client
         working-directory: display

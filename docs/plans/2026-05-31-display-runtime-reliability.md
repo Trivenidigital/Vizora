@@ -39,6 +39,7 @@ Awesome-Hermes-agent ecosystem check: not applicable; this change does not intro
 - Electron runtime reviewer: initial packaged-guard and process-listener findings fixed; final re-review CLEAN.
 - Customer-readiness/CI reviewer: initial cache ID, AppImage, and docs findings fixed; final re-review found only stale wording, now corrected.
 - `pnpm --filter @vizora/display test -- --runInBand` - pass, 6 suites / 124 tests.
+- `pnpm --filter @vizora/display test:ci` - pass, 6 suites / 124 tests; validates the CI-safe Jest invocation after GitHub Actions exposed pnpm argument-forwarding drift.
 - `pnpm --filter @vizora/display typecheck` - pass.
 - `pnpm --filter @vizora/display build` - pass.
 - `git diff --check` - pass; line-ending warnings only.

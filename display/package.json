@@ -15,7 +15,8 @@
     "package:mac": "npm run build && electron-builder --mac --publish never",
     "package:linux": "npm run build && electron-builder --linux --publish never",
     "package:all": "npm run build && electron-builder -mwl --publish never",
-    "test": "jest"
+    "test": "jest",
+    "test:ci": "jest --runInBand"
   },
   "build": {
     "appId": "com.vizora.display",

@@ -30,6 +30,7 @@
 
 **Local verification**
 - [x] `pnpm --filter @vizora/display test -- --runInBand` - pass, 6 suites / 124 tests.
+- [x] `pnpm --filter @vizora/display test:ci` - pass, 6 suites / 124 tests; validates the CI-safe Jest invocation after GitHub Actions exposed pnpm argument-forwarding drift.
 - [x] `pnpm --filter @vizora/display typecheck` - pass.
 - [x] `pnpm --filter @vizora/display build` - pass.
 - [x] `git diff --check` - pass; line-ending warnings only.
