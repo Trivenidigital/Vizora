@@ -101,6 +101,28 @@ describe('useDeviceConnection', () => {
     expect(ack).toHaveBeenCalledWith({ ok: true });
   });
 
+  it('passes push_content duration through as minutes with a 5 minute default', () => {
+    const socket = createSocket();
+    (io as jest.Mock).mockReturnValue(socket);
+    const onContentPush = jest.fn();
+
+    renderConnection({ onContentPush });
+    const commandHandler = socket.on.mock.calls.find(
+      (call: any[]) => call[0] === 'command',
+    )?.[1];
+    const ack = jest.fn();
+    const content = { id: 'content-1', name: 'Emergency', type: 'image', url: '/emergency.png' };
+
+    act(() => {
+      commandHandler({ type: 'push_content', payload: { content, duration: 60 } }, ack);
+      commandHandler({ type: 'push_content', payload: { content } }, ack);
+    });
+
+    expect(onContentPush).toHaveBeenNthCalledWith(1, content, 60);
+    expect(onContentPush).toHaveBeenNthCalledWith(2, content, 5);
+    expect(ack).toHaveBeenCalledWith({ ok: true });
+  });
+
   it('negative-acknowledges commands when applying them fails', () => {
     const socket = createSocket();
     (io as jest.Mock).mockReturnValue(socket);

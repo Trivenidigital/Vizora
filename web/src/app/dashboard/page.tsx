@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { serverFetch } from '@/lib/server-api';
+import { unwrapPaginatedData } from '@/lib/api/pagination';
 import DashboardClient from './page-client';
 
 export const metadata: Metadata = {
@@ -12,17 +13,15 @@ export default async function DashboardPage() {
 
  try {
  const results = await Promise.allSettled([
- serverFetch<any>('/content'),
- serverFetch<any>('/playlists'),
+ serverFetch<any>('/content?limit=100'),
+ serverFetch<any>('/playlists?limit=100'),
  ]);
 
  if (results[0].status === 'fulfilled') {
- const val = results[0].value;
- content = Array.isArray(val?.data) ? val.data : Array.isArray(val) ? val : [];
+ content = unwrapPaginatedData(results[0].value);
  }
  if (results[1].status === 'fulfilled') {
- const val = results[1].value;
- playlists = Array.isArray(val?.data) ? val.data : Array.isArray(val) ? val : [];
+ playlists = unwrapPaginatedData(results[1].value);
  }
  } catch {
  // Client handles empty state gracefully

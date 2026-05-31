@@ -252,6 +252,78 @@ describe('ContentService', () => {
     });
   });
 
+  describe('getResolvedLayout', () => {
+    it('emits display-compatible resolvedPlaylist and resolvedContent zone fields', async () => {
+      mockDatabaseService.content.findFirst.mockResolvedValue({
+        ...mockContent,
+        id: 'layout-1',
+        type: 'layout',
+        metadata: {
+          zones: [
+            { id: 'zone-playlist', gridArea: 'main', playlistId: 'playlist-1' },
+            { id: 'zone-content', gridArea: 'side', contentId: 'content-2' },
+          ],
+        },
+      });
+      mockDatabaseService.playlist = {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'playlist-1',
+            name: 'Menu Loop',
+            items: [
+              {
+                id: 'item-1',
+                contentId: 'content-1',
+                duration: 15,
+                order: 0,
+                content: {
+                  id: 'content-1',
+                  name: 'Menu Image',
+                  type: 'image',
+                  url: '/menu.png',
+                  thumbnail: '/thumb.png',
+                },
+              },
+            ],
+          },
+        ]),
+      };
+      mockDatabaseService.content.findMany.mockResolvedValue([
+        {
+          id: 'content-2',
+          name: 'Weather',
+          type: 'url',
+          url: 'https://example.com/weather',
+          thumbnail: null,
+        },
+      ]);
+
+      const result = await service.getResolvedLayout('org-123', 'layout-1');
+      const zones = result.metadata.zones as any[];
+
+      expect(zones[0].resolvedPlaylist).toEqual(
+        expect.objectContaining({
+          id: 'playlist-1',
+          name: 'Menu Loop',
+          items: expect.arrayContaining([
+            expect.objectContaining({
+              content: expect.objectContaining({ name: 'Menu Image' }),
+            }),
+          ]),
+        }),
+      );
+      expect(zones[0].playlist).toBeUndefined();
+      expect(zones[1].resolvedContent).toEqual(
+        expect.objectContaining({
+          id: 'content-2',
+          name: 'Weather',
+          url: 'https://example.com/weather',
+        }),
+      );
+      expect(zones[1].content).toBeUndefined();
+    });
+  });
+
   describe('update', () => {
     const updateDto = { name: 'Updated Content' };
 

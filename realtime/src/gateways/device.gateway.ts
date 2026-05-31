@@ -863,7 +863,7 @@ export class DeviceGateway
 
             // Resolve layout content inline so devices receive self-contained data
             if (baseItem.content?.type === 'layout') {
-              baseItem.content = await this.resolveLayoutContent(baseItem.content);
+              baseItem.content = await this.resolveLayoutContent(baseItem.content, orgId);
             }
 
             return baseItem;
@@ -1787,7 +1787,7 @@ export class DeviceGateway
    * Returns a self-contained layout object that devices can render without
    * additional API calls.
    */
-  private async resolveLayoutContent(content: any): Promise<any> {
+  private async resolveLayoutContent(content: any, organizationId: string): Promise<any> {
     const metadata = (content.metadata as Record<string, any>) || {};
     const zones = metadata.zones || [];
 
@@ -1798,8 +1798,8 @@ export class DeviceGateway
         // Resolve playlist content for zone
         if (zone.playlistId) {
           try {
-            const playlist = await this.databaseService.playlist.findUnique({
-              where: { id: zone.playlistId },
+            const playlist = await this.databaseService.playlist.findFirst({
+              where: { id: zone.playlistId, organizationId },
               include: {
                 items: {
                   include: { content: true },
@@ -1809,7 +1809,7 @@ export class DeviceGateway
             });
 
             if (playlist) {
-              resolved.playlist = {
+              resolved.resolvedPlaylist = {
                 id: playlist.id,
                 name: playlist.name,
                 items: (playlist.items || []).map((item: any) => {
@@ -1841,8 +1841,8 @@ export class DeviceGateway
         // Resolve single content for zone
         if (zone.contentId) {
           try {
-            const zoneContent = await this.databaseService.content.findUnique({
-              where: { id: zone.contentId },
+            const zoneContent = await this.databaseService.content.findFirst({
+              where: { id: zone.contentId, organizationId },
             });
 
             if (zoneContent) {
@@ -1852,7 +1852,7 @@ export class DeviceGateway
                 contentUrl = `${apiBaseUrl}/api/v1/device-content/${zoneContent.id}/file`;
               }
 
-              resolved.content = {
+              resolved.resolvedContent = {
                 id: zoneContent.id,
                 name: zoneContent.name,
                 type: zoneContent.type,

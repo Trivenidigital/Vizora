@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
+import { fetchAllPaginated } from '@/lib/api/pagination';
 import { Playlist, Content, Display } from '@/lib/types';
 import Modal from '@/components/Modal';
 import ConfirmDialog from '@/components/ConfirmDialog';
@@ -196,8 +197,8 @@ export default function PlaylistsClient() {
  const loadPlaylists = async () => {
  try {
  setLoading(true);
- const response = await apiClient.getPlaylists();
- setPlaylists(response.data || response || []);
+ const playlistList = await fetchAllPaginated((params) => apiClient.getPlaylists(params));
+ setPlaylists(playlistList);
  } catch (error: any) {
  toast.error(error.message || 'Failed to load playlists');
  } finally {
@@ -207,8 +208,8 @@ export default function PlaylistsClient() {
 
  const loadContent = async () => {
  try {
- const response = await apiClient.getContent();
- setContent(response.data || response || []);
+ const contentList = await fetchAllPaginated((params) => apiClient.getContent(params));
+ setContent(contentList);
  } catch (error) {
  toast.error('Failed to load content');
  }
@@ -216,8 +217,8 @@ export default function PlaylistsClient() {
 
  const loadDevices = async () => {
  try {
- const response = await apiClient.getDisplays();
- setDevices(response.data || response || []);
+ const devicesList = await fetchAllPaginated((params) => apiClient.getDisplays(params));
+ setDevices(devicesList);
  } catch (error) {
  toast.error('Failed to load devices');
  }

@@ -5,6 +5,7 @@ import { apiClient } from '@/lib/api';
 import { useToast } from '@/lib/hooks/useToast';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { Icon } from '@/theme/icons';
+import { toastFleetCommandResult } from './commandResultMessage';
 
 interface FleetCommandDropdownProps {
   organizationId: string;
@@ -42,9 +43,7 @@ export default function FleetCommandDropdown({ organizationId }: FleetCommandDro
         command: confirmCommand.command,
         target: { type: 'organization', id: organizationId },
       });
-      toast.success(
-        `Command sent to ${result.devicesTargeted} devices (${result.devicesOnline} online, ${result.devicesQueued} queued)`
-      );
+      toastFleetCommandResult(toast, confirmCommand.label, result);
     } catch (error: any) {
       toast.error(error.message || 'Failed to send command');
     } finally {

@@ -6,6 +6,13 @@ jest.mock('@/theme/icons', () => ({
 }));
 
 const mockSendFleetCommand = jest.fn();
+const mockToast = {
+  success: jest.fn(),
+  warning: jest.fn(),
+  error: jest.fn(),
+  info: jest.fn(),
+  ToastContainer: () => null,
+};
 
 jest.mock('@/lib/api', () => ({
   apiClient: {
@@ -14,12 +21,7 @@ jest.mock('@/lib/api', () => ({
 }));
 
 jest.mock('@/lib/hooks/useToast', () => ({
-  useToast: () => ({
-    success: jest.fn(),
-    error: jest.fn(),
-    info: jest.fn(),
-    ToastContainer: () => null,
-  }),
+  useToast: () => mockToast,
 }));
 
 describe('FleetCommandDropdown', () => {
@@ -55,6 +57,8 @@ describe('FleetCommandDropdown', () => {
       devicesTargeted: 5,
       devicesOnline: 3,
       devicesQueued: 2,
+      devicesDelivered: 3,
+      devicesFailed: 0,
     });
 
     render(<FleetCommandDropdown organizationId="org-1" />);
@@ -67,6 +71,57 @@ describe('FleetCommandDropdown', () => {
         command: 'reload',
         target: { type: 'organization', id: 'org-1' },
       });
+    });
+    expect(mockToast.success).toHaveBeenCalledWith(
+      'Reload All Devices delivered to 3 devices; 2 queued for offline devices',
+    );
+  });
+
+  it('warns when a fleet command partially fails', async () => {
+    mockSendFleetCommand.mockResolvedValue({
+      commandId: 'cmd-1',
+      command: 'reload',
+      target: { type: 'organization', id: 'org-1' },
+      devicesTargeted: 5,
+      devicesOnline: 4,
+      devicesQueued: 0,
+      devicesDelivered: 3,
+      devicesFailed: 2,
+    });
+
+    render(<FleetCommandDropdown organizationId="org-1" />);
+    fireEvent.click(screen.getByText('Fleet Commands'));
+    fireEvent.click(screen.getByText('Reload All Devices'));
+    fireEvent.click(screen.getByText('Send Command'));
+
+    await waitFor(() => {
+      expect(mockToast.warning).toHaveBeenCalledWith(
+        'Reload All Devices reached 3 of 5 devices; 2 failed',
+      );
+    });
+  });
+
+  it('errors when a fleet command fails for every targeted device', async () => {
+    mockSendFleetCommand.mockResolvedValue({
+      commandId: 'cmd-1',
+      command: 'reload',
+      target: { type: 'organization', id: 'org-1' },
+      devicesTargeted: 2,
+      devicesOnline: 0,
+      devicesQueued: 0,
+      devicesDelivered: 0,
+      devicesFailed: 2,
+    });
+
+    render(<FleetCommandDropdown organizationId="org-1" />);
+    fireEvent.click(screen.getByText('Fleet Commands'));
+    fireEvent.click(screen.getByText('Reload All Devices'));
+    fireEvent.click(screen.getByText('Send Command'));
+
+    await waitFor(() => {
+      expect(mockToast.error).toHaveBeenCalledWith(
+        'Reload All Devices failed for all 2 targeted devices',
+      );
     });
   });
 });

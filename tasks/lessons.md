@@ -1,5 +1,13 @@
 # Vizora - Lessons Learned
 
+## Session: 2026-05-31 - Autonomous Builder Correction
+
+### Session Coordination
+- When the operator says there is no other session, treat Codex as the sole builder and use local subagents only as review/research workers. Do not preserve stale "other session" coordination language from an old prompt.
+
+### Worktree Editing
+- In this environment `apply_patch` defaults to the primary checkout path from the initial context, not necessarily the shell command workdir. For isolated worktree tasks, use absolute paths in `apply_patch` and verify `git status` in both the primary checkout and worktree after the first edit.
+
 ## Session: 2026-02-09 - Pilot Readiness Fix Sprint
 
 ### Team Orchestration

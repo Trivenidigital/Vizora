@@ -5,6 +5,8 @@ import { getDeviceIdentifier, getDeviceMetadata } from '../lib/device-identifier
 import type { DeviceCredentials, PairingResponse, PairingStatusResponse } from '../lib/types';
 
 const CREDENTIALS_KEY = 'vizora_display_credentials';
+const PAIRING_STATUS_POLL_MS = 8000;
+const PAIRING_STATUS_RATE_LIMIT_BACKOFF_MS = 16000;
 
 function getStoredCredentials(): DeviceCredentials | null {
   if (typeof window === 'undefined') return null;
@@ -34,6 +36,7 @@ export function usePairing() {
   const [isPairing, setIsPairing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pausedUntilRef = useRef(0);
   const mountedRef = useRef(true);
 
   // Check for stored credentials on mount
@@ -88,15 +91,23 @@ export function usePairing() {
 
   const startPolling = useCallback((code: string) => {
     if (pollRef.current) clearInterval(pollRef.current);
+    pausedUntilRef.current = 0;
 
     pollRef.current = setInterval(async () => {
       try {
+        if (Date.now() < pausedUntilRef.current) return;
+
         const res = await fetch(`/api/v1/devices/pairing/status/${code}`);
 
         if (res.status === 404) {
           // Code expired, request a new one
           if (pollRef.current) clearInterval(pollRef.current);
           if (mountedRef.current) requestPairingCode();
+          return;
+        }
+
+        if (res.status === 429) {
+          pausedUntilRef.current = Date.now() + PAIRING_STATUS_RATE_LIMIT_BACKOFF_MS;
           return;
         }
 
@@ -123,11 +134,12 @@ export function usePairing() {
       } catch {
         // Silently retry on next interval
       }
-    }, 2000);
+    }, PAIRING_STATUS_POLL_MS);
   }, [requestPairingCode]);
 
   const resetPairing = useCallback(() => {
     if (pollRef.current) clearInterval(pollRef.current);
+    pausedUntilRef.current = 0;
     clearCredentials();
     setCredentials(null);
     setPairingCode(null);

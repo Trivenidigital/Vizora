@@ -24,11 +24,11 @@ export class MailService {
     const host = process.env.SMTP_HOST;
     const port = parseInt(process.env.SMTP_PORT || '587', 10);
     const user = process.env.SMTP_USER;
-    const pass = process.env.SMTP_PASSWORD;
+    const pass = process.env.SMTP_PASSWORD || process.env.SMTP_PASS;
 
     if (!host || !user || !pass) {
       this.logger.warn(
-        'SMTP not configured (SMTP_HOST, SMTP_USER, SMTP_PASSWORD required). ' +
+        'SMTP not configured (SMTP_HOST, SMTP_USER, SMTP_PASSWORD or SMTP_PASS required). ' +
         'Email sending is disabled. Password reset links will be logged to console.',
       );
       return;

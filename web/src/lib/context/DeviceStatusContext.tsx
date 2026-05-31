@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback, ReactNode } from 'react';
 import { useSocket } from '@/lib/hooks/useSocket';
 import { apiClient } from '@/lib/api';
+import { fetchAllPaginated } from '@/lib/api/pagination';
 
 export type DeviceStatus = 'online' | 'offline' | 'idle' | 'error';
 
@@ -54,8 +55,7 @@ export function DeviceStatusProvider({ children, user }: DeviceStatusProviderPro
     const initializeFromAPI = async () => {
       try {
         setIsInitializing(true);
-        const response = await apiClient.getDisplays();
-        const devices = response.data || response || [];
+        const devices = await fetchAllPaginated((params) => apiClient.getDisplays(params));
 
         // Convert API Display objects to DeviceStatusUpdate
         const updates = devices.map((device: any) => ({

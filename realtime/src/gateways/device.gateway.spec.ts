@@ -75,9 +75,11 @@ describe('DeviceGateway', () => {
     },
     playlist: {
       findUnique: jest.fn().mockResolvedValue(null),
+      findFirst: jest.fn().mockResolvedValue(null),
     },
     content: {
       findUnique: jest.fn().mockResolvedValue(null),
+      findFirst: jest.fn().mockResolvedValue(null),
     },
   };
 
@@ -160,6 +162,115 @@ describe('DeviceGateway', () => {
 
   afterEach(() => {
     jest.useRealTimers();
+  });
+
+  describe('layout content resolution', () => {
+    it('emits display-compatible resolvedPlaylist and resolvedContent zone fields', async () => {
+      mockDatabaseService.playlist.findFirst.mockResolvedValueOnce({
+        id: 'playlist-1',
+        name: 'Menu Loop',
+        items: [
+          {
+            id: 'item-1',
+            contentId: 'content-1',
+            duration: 10,
+            order: 0,
+            content: {
+              id: 'content-1',
+              name: 'Menu Image',
+              type: 'image',
+              url: 'minio://org/content-1.png',
+              thumbnail: '/thumb.png',
+              mimeType: 'image/png',
+              duration: 10,
+            },
+          },
+        ],
+      });
+      mockDatabaseService.content.findFirst.mockResolvedValueOnce({
+        id: 'content-2',
+        name: 'Weather',
+        type: 'url',
+        url: 'https://example.com/weather',
+        thumbnail: null,
+        mimeType: null,
+        duration: null,
+      });
+
+      const result = await (gateway as any).resolveLayoutContent({
+        id: 'layout-1',
+        type: 'layout',
+        metadata: {
+          zones: [
+            { id: 'zone-playlist', gridArea: 'main', playlistId: 'playlist-1' },
+            { id: 'zone-content', gridArea: 'side', contentId: 'content-2' },
+          ],
+        },
+      }, 'org-1');
+
+      expect(result.metadata.zones[0].resolvedPlaylist).toEqual(
+        expect.objectContaining({
+          id: 'playlist-1',
+          items: expect.arrayContaining([
+            expect.objectContaining({
+              content: expect.objectContaining({
+                id: 'content-1',
+                name: 'Menu Image',
+                url: 'http://localhost:3000/api/v1/device-content/content-1/file',
+              }),
+            }),
+          ]),
+        }),
+      );
+      expect(result.metadata.zones[0].playlist).toBeUndefined();
+      expect(result.metadata.zones[1].resolvedContent).toEqual(
+        expect.objectContaining({
+          id: 'content-2',
+          name: 'Weather',
+          url: 'https://example.com/weather',
+        }),
+      );
+      expect(result.metadata.zones[1].content).toBeUndefined();
+      expect(mockDatabaseService.playlist.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'playlist-1', organizationId: 'org-1' },
+        }),
+      );
+      expect(mockDatabaseService.content.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'content-2', organizationId: 'org-1' },
+        }),
+      );
+    });
+
+    it('does not resolve cross-organization layout zone references', async () => {
+      mockDatabaseService.playlist.findFirst.mockResolvedValueOnce(null);
+      mockDatabaseService.content.findFirst.mockResolvedValueOnce(null);
+
+      const result = await (gateway as any).resolveLayoutContent({
+        id: 'layout-1',
+        type: 'layout',
+        metadata: {
+          zones: [
+            { id: 'zone-playlist', gridArea: 'main', playlistId: 'other-org-playlist' },
+            { id: 'zone-content', gridArea: 'side', contentId: 'other-org-content' },
+          ],
+        },
+      }, 'org-1');
+
+      expect(result.metadata.zones[0].resolvedPlaylist).toBeUndefined();
+      expect(result.metadata.zones[1].resolvedContent).toBeUndefined();
+      expect(mockDatabaseService.playlist.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'other-org-playlist', organizationId: 'org-1' },
+        }),
+      );
+      expect(mockDatabaseService.content.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'other-org-content', organizationId: 'org-1' },
+        }),
+      );
+    });
   });
 
   describe('handleConnection', () => {

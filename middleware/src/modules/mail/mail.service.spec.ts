@@ -1,4 +1,9 @@
+import * as nodemailer from 'nodemailer';
 import { MailService } from './mail.service';
+
+jest.mock('nodemailer', () => ({
+  createTransport: jest.fn(() => ({ sendMail: jest.fn() })),
+}));
 
 describe('MailService.escapeHtml', () => {
   it('escapes &, <, >, ", and \'', () => {
@@ -18,6 +23,38 @@ describe('MailService.escapeHtml', () => {
 
   it('returns plain text unchanged', () => {
     expect(MailService.escapeHtml('Lobby Display 01')).toBe('Lobby Display 01');
+  });
+});
+
+describe('MailService SMTP config', () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env = { ...originalEnv };
+    delete process.env.SMTP_PASSWORD;
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it('accepts SMTP_PASS as the documented password alias', () => {
+    process.env.SMTP_HOST = 'smtp.resend.com';
+    process.env.SMTP_PORT = '587';
+    process.env.SMTP_USER = 'resend';
+    process.env.SMTP_PASS = 'resend-secret';
+
+    new MailService();
+
+    expect(nodemailer.createTransport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        host: 'smtp.resend.com',
+        port: 587,
+        secure: false,
+        auth: { user: 'resend', pass: 'resend-secret' },
+      }),
+    );
   });
 });
 

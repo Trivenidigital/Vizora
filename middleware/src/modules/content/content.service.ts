@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma } from '@vizora/database';
 import { DatabaseService } from '../database/database.service';
@@ -1377,7 +1377,7 @@ export class ContentService {
       if (zone.playlistId) {
         const playlist = playlistMap.get(zone.playlistId as string);
         if (playlist) {
-          resolved.playlist = {
+          resolved.resolvedPlaylist = {
             id: playlist.id,
             name: playlist.name,
             items: playlist.items.map((item) => ({
@@ -1394,7 +1394,7 @@ export class ContentService {
       if (zone.contentId) {
         const content = contentMap.get(zone.contentId as string);
         if (content) {
-          resolved.content = this.mapContentResponse(content as unknown as Record<string, unknown>);
+          resolved.resolvedContent = this.mapContentResponse(content as unknown as Record<string, unknown>);
         }
       }
 
