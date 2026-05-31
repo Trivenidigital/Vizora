@@ -22,7 +22,16 @@ ssh root@vizora.cloud 'grep -E "^SMTP_|^RESEND_|^EMAIL_FROM" /opt/vizora/app/.en
 Smoke test:
 ```bash
 ssh root@vizora.cloud 'cd /opt/vizora/app && bash scripts/smoke/api-critical-path.sh'
-# Should return ALL 12 PASSED. Then trigger a real welcome email:
+# Should return ALL critical-path checks passed. The script creates
+# timestamped smoke-test user/org/display/content/playlist/schedule rows.
+#
+# To probe public API/web ingress from the VPS, run:
+ssh root@vizora.cloud 'cd /opt/vizora/app && API_BASE=https://vizora.cloud WEB_BASE=https://vizora.cloud bash scripts/smoke/api-critical-path.sh'
+# Realtime health is still checked locally on the VPS at the default
+# RT_BASE=http://localhost:3002. Public WebSocket ingress is covered by
+# the real-device walkthrough below, not by direct :3002 HTTPS.
+#
+# Then trigger a real welcome email:
 curl -X POST https://vizora.cloud/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email":"<your-real-email>","password":"Test123!@#",
@@ -76,8 +85,8 @@ Run in this order:
 1. `pnpm --filter @vizora/middleware test --testPathIgnorePatterns="e2e-spec"` → expect 2335/2367 pass
 2. `pnpm --filter @vizora/realtime test` → expect 212/212
 3. `pnpm --filter @vizora/web test` → expect 864/864
-4. `bash scripts/smoke/api-critical-path.sh` (against localhost first)
-5. `API_BASE=https://vizora.cloud bash scripts/smoke/api-critical-path.sh` (against prod)
+4. `bash scripts/smoke/api-critical-path.sh` (against localhost first; creates smoke-test rows)
+5. `ssh root@vizora.cloud 'cd /opt/vizora/app && API_BASE=https://vizora.cloud WEB_BASE=https://vizora.cloud bash scripts/smoke/api-critical-path.sh'` (against prod API/web ingress from the VPS; creates smoke-test rows; realtime health remains local `RT_BASE=http://localhost:3002`)
 6. Open `https://vizora.cloud` in a fresh incognito browser → verify landing page renders, all CTAs work
 7. Sign up with a NEW disposable email → verify welcome email lands within 60s
 8. Click email verify link → verify landed in dashboard
@@ -166,9 +175,10 @@ cat .ssh_seed.txt
 # Open https://resend.com/domains
 # Verify mail.vizora.cloud shows DKIM/SPF/DMARC all green
 
-# Check 5: All health endpoints
-for url in https://vizora.cloud/api/v1/health https://vizora.cloud/ https://vizora.cloud:3002/api/health; do
-  curl -s -o /dev/null -w "$url -> %{http_code}\n" "$url"
+# Check 5: All health endpoints. Realtime is intentionally checked over
+# localhost on the VPS; direct public :3002 HTTPS is not the supported ingress.
+for url in https://vizora.cloud/api/v1/health https://vizora.cloud/ http://localhost:3002/api/health; do
+  ssh root@vizora.cloud "curl -s -o /dev/null -w '$url -> %{http_code}\n' '$url'"
 done
 ```
 
@@ -266,4 +276,4 @@ If the customer asks for an OUT-of-scope feature, log it in `tasks/feature-backl
 - `docs/runbooks/monitoring-playbook.md` (Grafana panels + thresholds)
 - `docs/plans/2026-05-09-production-readiness-report.md` (go/no-go context)
 - `docs/runbooks/migrations.md` (migration rollback procedure)
-- `scripts/smoke/api-critical-path.sh` (12-endpoint smoke test)
+- `scripts/smoke/api-critical-path.sh` (customer-1 critical-path smoke test)
