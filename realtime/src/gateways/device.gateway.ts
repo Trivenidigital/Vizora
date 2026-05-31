@@ -40,6 +40,7 @@ import * as Sentry from '@sentry/nestjs';
 import { createHash } from 'node:crypto';
 import { WsAllExceptionsFilter } from './filters/ws-exception.filter';
 import { WsAuthGuard, WsDeviceGuard } from './guards/ws-auth.guard';
+import { redactSensitiveTokens } from '../utils/redact-sensitive-url';
 
 interface DevicePayload {
   sub: string; // device ID
@@ -1282,8 +1283,10 @@ export class DeviceGateway
     this.logger.warn(`Content error on ${deviceId}: ${data.errorType} - ${data.contentId}`);
 
     try {
+      const sanitizedData = redactSensitiveTokens(data);
+
       // Log error for analytics
-      await this.heartbeatService.logError(deviceId, data);
+      await this.heartbeatService.logError(deviceId, sanitizedData);
 
       // Record metrics
       this.metricsService.recordContentError(deviceId, data.errorType);
@@ -1297,9 +1300,9 @@ export class DeviceGateway
           contentId: data.contentId,
         },
         extra: {
-          errorMessage: data.errorMessage,
-          errorCode: data.errorCode,
-          context: data.context,
+          errorMessage: sanitizedData.errorMessage,
+          errorCode: sanitizedData.errorCode,
+          context: sanitizedData.context,
         },
       });
 

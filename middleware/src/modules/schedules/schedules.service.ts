@@ -145,9 +145,12 @@ export class SchedulesService {
     // Fetch the display's timezone to compute "now" in local time
     const display = await this.db.display.findFirst({
       where: { id: displayId, organizationId },
-      select: { timezone: true },
+      select: { timezone: true, isDisabled: true },
     });
-    const timezone = display?.timezone || 'UTC';
+    if (!display || display.isDisabled) {
+      throw new NotFoundException('Display not found');
+    }
+    const timezone = display.timezone || 'UTC';
 
     // Compute current day/time in the display's timezone
     const now = new Date();

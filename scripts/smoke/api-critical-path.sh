@@ -349,7 +349,10 @@ fi
 COMPLETE_BODY=$(CODE="$CODE" json_body code=__env__:CODE nickname="Smoke Display")
 COMPLETE_OUT="$(tmp_json pairing-complete)"
 post_json "Pairing complete" "201" "$API_BASE/api/v1/devices/pairing/complete" "$COMPLETE_BODY" "$COMPLETE_OUT" "${auth_headers[@]}"
-DISPLAY_ID="$(json_get "$COMPLETE_OUT" "display.id")"
+DISPLAY_ID="$(json_get "$COMPLETE_OUT" "data.display.id")"
+if [[ -z "$DISPLAY_ID" ]]; then
+  DISPLAY_ID="$(json_get "$COMPLETE_OUT" "display.id")"
+fi
 make_label "Display id parsed"
 parse_label="$CHECK_LABEL"
 if [[ -n "$DISPLAY_ID" ]]; then

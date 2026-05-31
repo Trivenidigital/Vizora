@@ -32,8 +32,8 @@ describe('SchedulesController', () => {
     } as any;
 
     mockJwtService = {
-      verify: jest.fn().mockReturnValue({ type: 'device', sub: 'device-123', organizationId }),
-      verifyAsync: jest.fn().mockResolvedValue({ type: 'device', sub: 'device-123', organizationId }),
+      verify: jest.fn().mockReturnValue({ type: 'device', sub: 'display-123', organizationId }),
+      verifyAsync: jest.fn().mockResolvedValue({ type: 'device', sub: 'display-123', organizationId }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -205,12 +205,23 @@ describe('SchedulesController', () => {
     });
 
     it('should work with valid device JWT (public endpoint)', async () => {
+      mockJwtService.verify.mockReturnValueOnce({ type: 'device', sub: 'display-456', organizationId });
       mockSchedulesService.findActiveSchedules.mockResolvedValue([]);
 
       const mockReq = createMockRequest('valid-device-token');
       const result = await controller.findActiveSchedules('display-456', mockReq as any);
 
       expect(result).toEqual([]);
+    });
+
+    it('should reject a device JWT for a different display', async () => {
+      mockJwtService.verify.mockReturnValueOnce({ type: 'device', sub: 'display-999', organizationId });
+
+      const mockReq = createMockRequest('valid-device-token');
+
+      expect(() => controller.findActiveSchedules('display-456', mockReq as any))
+        .toThrow('Device token does not match requested display');
+      expect(mockSchedulesService.findActiveSchedules).not.toHaveBeenCalled();
     });
   });
 

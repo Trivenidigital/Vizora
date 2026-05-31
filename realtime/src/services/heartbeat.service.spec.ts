@@ -235,6 +235,27 @@ describe('HeartbeatService', () => {
       expect(storedData[0].timestamp).toBeDefined();
     });
 
+    it('should redact device tokens before storing errors', async () => {
+      const data = {
+        contentId: 'c-1',
+        errorType: 'decode_error',
+        errorMessage: 'failed /api/v1/device-content/c-1/file?token=device-jwt',
+        context: {
+          url: '/api/v1/device-content/c-1/file?variant=original&token=device-jwt',
+        },
+      };
+
+      await service.logError('device-1', data as any);
+
+      const storedData = JSON.parse(mockRedisService.set.mock.calls[0][1]);
+      expect(storedData[0].errorMessage).toBe(
+        'failed /api/v1/device-content/c-1/file?token=[redacted]',
+      );
+      expect(storedData[0].context.url).toBe(
+        '/api/v1/device-content/c-1/file?variant=original&token=[redacted]',
+      );
+    });
+
     it('should not throw when Redis fails', async () => {
       mockRedisService.get.mockRejectedValueOnce(new Error('Redis down'));
 

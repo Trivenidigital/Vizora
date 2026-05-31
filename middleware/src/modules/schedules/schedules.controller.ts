@@ -86,6 +86,12 @@ export class SchedulesController {
       if (payload.type !== 'device') {
         throw new UnauthorizedException('Invalid token type');
       }
+      if (!payload.sub || payload.sub !== displayId) {
+        throw new UnauthorizedException('Device token does not match requested display');
+      }
+      if (!payload.organizationId) {
+        throw new UnauthorizedException('Device token missing organization');
+      }
       organizationId = payload.organizationId;
     } catch (error) {
       if (error instanceof UnauthorizedException) throw error;
