@@ -4,10 +4,11 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { fetchAllPaginated } from '@/lib/api/pagination';
+import type { StorageInfo } from '@/lib/api/organizations';
 import { useDeviceStatus } from '@/lib/context/DeviceStatusContext';
-import LoadingSpinner from '@/components/LoadingSpinner';
 import UpgradeBanner from '@/components/UpgradeBanner';
 import { HelpIcon } from '@/components/Tooltip';
+import { isApiError } from '@/lib/error-handler';
 import { Icon, type IconName, iconMap } from '@/theme/icons';
 
 // Helper to ensure valid icon names
@@ -21,9 +22,129 @@ const getValidIconName = (name: string | undefined): IconName => {
 interface DashboardClientProps {
  initialContent: any[];
  initialPlaylists: any[];
+ initialContentComplete?: boolean;
+ initialPlaylistsComplete?: boolean;
+ initialStorageInfo?: StorageInfo | null;
+ initialSystemHealth?: DashboardSystemHealth | null;
 }
 
-export default function DashboardClient({ initialContent, initialPlaylists }: DashboardClientProps) {
+type DashboardHealthStatus = 'ok' | 'degraded' | 'unhealthy' | 'unknown';
+
+interface DashboardSystemHealth {
+ status: DashboardHealthStatus;
+ timestamp?: string;
+ message?: string;
+ checks?: Record<string, { status?: string; message?: string }>;
+}
+
+type DashboardListResult = {
+ data: any[];
+};
+
+const UNKNOWN_HEALTH: DashboardSystemHealth = {
+ status: 'unknown',
+ message: 'Readiness unavailable',
+};
+
+const formatBytes = (bytes: number): string => {
+ if (!Number.isFinite(bytes) || bytes <= 0) {
+ return '0 B';
+ }
+
+ const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+ let value = bytes;
+ let unitIndex = 0;
+
+ while (value >= 1024 && unitIndex < units.length - 1) {
+ value /= 1024;
+ unitIndex += 1;
+ }
+
+ const valueText = Number.isInteger(value) || value >= 10
+ ? value.toFixed(0)
+ : value.toFixed(1);
+ return `${valueText} ${units[unitIndex]}`;
+};
+
+const getStorageUsagePercent = (storageInfo: StorageInfo | null): number => {
+ if (!storageInfo || storageInfo.quotaBytes <= 0) {
+ return 0;
+ }
+
+ const reportedPercent = Number.isFinite(storageInfo.usagePercent)
+ ? storageInfo.usagePercent
+ : (storageInfo.usedBytes / storageInfo.quotaBytes) * 100;
+
+ return Math.max(0, Math.min(reportedPercent, 100));
+};
+
+const getHealthSummary = (health: DashboardSystemHealth | null) => {
+ switch (health?.status) {
+ case 'ok':
+ return {
+ label: 'Healthy',
+ detail: 'All systems operational',
+ dotClassName: 'bg-success-300 animate-pulse',
+ cardClassName: 'bg-gradient-to-br from-[#00E5A0] to-[#00B4D8]',
+ textClassName: 'text-primary-100',
+ iconClassName: 'text-primary-200',
+ };
+ case 'degraded':
+ return {
+ label: 'Degraded',
+ detail: health.message || 'Some dependencies degraded',
+ dotClassName: 'bg-amber-200 animate-pulse',
+ cardClassName: 'bg-gradient-to-br from-amber-500 to-orange-500',
+ textClassName: 'text-amber-50',
+ iconClassName: 'text-amber-100',
+ };
+ case 'unhealthy':
+ return {
+ label: 'Critical',
+ detail: health.message || 'Core service needs attention',
+ dotClassName: 'bg-red-200 animate-pulse',
+ cardClassName: 'bg-gradient-to-br from-red-600 to-rose-500',
+ textClassName: 'text-red-50',
+ iconClassName: 'text-red-100',
+ };
+ default:
+ return {
+ label: 'Unknown',
+ detail: 'Status unavailable',
+ dotClassName: 'bg-slate-300',
+ cardClassName: 'bg-gradient-to-br from-slate-600 to-slate-500',
+ textClassName: 'text-slate-100',
+ iconClassName: 'text-slate-200',
+ };
+ }
+};
+
+const loadSystemHealth = async (): Promise<DashboardSystemHealth> => {
+ try {
+ return await apiClient.get<DashboardSystemHealth>('/health/ready');
+ } catch (error) {
+ if (isApiError(error) && error.statusCode === 503) {
+ return {
+ status: 'unhealthy',
+ message: 'Core service needs attention',
+ };
+ }
+
+ if (process.env.NODE_ENV === 'development') {
+ console.warn('System readiness check failed:', error);
+ }
+ return UNKNOWN_HEALTH;
+ }
+};
+
+export default function DashboardClient({
+ initialContent,
+ initialPlaylists,
+ initialContentComplete = false,
+ initialPlaylistsComplete = false,
+ initialStorageInfo = null,
+ initialSystemHealth = null,
+}: DashboardClientProps) {
  const router = useRouter();
  const { deviceStatuses, isInitialized } = useDeviceStatus();
  const [stats, setStats] = useState({
@@ -32,11 +153,16 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  playlists: { total: 0, active: 0 },
  });
  const [recentActivity, setRecentActivity] = useState<any[]>([]);
+ const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(initialStorageInfo);
+ const [systemHealth, setSystemHealth] = useState<DashboardSystemHealth | null>(
+ initialSystemHealth,
+ );
  const [loading, setLoading] = useState(false);
  const [error, setError] = useState<string | null>(null);
  const activityContentRef = useRef(initialContent);
  const activityPlaylistsRef = useRef(initialPlaylists);
  const deviceStatusesRef = useRef(deviceStatuses);
+ const initialRefreshCompleteRef = useRef(false);
  deviceStatusesRef.current = deviceStatuses;
 
  // Initialize stats from server-fetched data
@@ -60,6 +186,14 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
 
  buildRecentActivity(content, playlists, deviceStatusesRef.current);
  }, [initialContent, initialPlaylists]);
+
+ useEffect(() => {
+ setStorageInfo(initialStorageInfo);
+ }, [initialStorageInfo]);
+
+ useEffect(() => {
+ setSystemHealth(initialSystemHealth);
+ }, [initialSystemHealth]);
 
  useEffect(() => {
  loadStats(false);
@@ -121,17 +255,39 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  const loadStats = async (showLoading = true) => {
  try {
  if (showLoading) setLoading(true);
+ const isInitialAutoRefresh = !showLoading && !initialRefreshCompleteRef.current;
+ if (isInitialAutoRefresh) {
+ initialRefreshCompleteRef.current = true;
+ }
+
+ const contentPromise: Promise<DashboardListResult> = isInitialAutoRefresh && initialContentComplete
+ ? Promise.resolve({ data: activityContentRef.current })
+ : fetchAllPaginated((params) => apiClient.getContent(params))
+ .then((data) => ({ data }));
+ const playlistsPromise: Promise<DashboardListResult> = isInitialAutoRefresh && initialPlaylistsComplete
+ ? Promise.resolve({ data: activityPlaylistsRef.current })
+ : fetchAllPaginated((params) => apiClient.getPlaylists(params))
+ .then((data) => ({ data }));
+
  const results = await Promise.allSettled([
- fetchAllPaginated((params) => apiClient.getContent(params)),
- fetchAllPaginated((params) => apiClient.getPlaylists(params)),
+ contentPromise,
+ playlistsPromise,
+ apiClient.getStorageInfo(),
+ loadSystemHealth(),
  ]);
 
- const content = results[0].status === 'fulfilled' ? results[0].value : null;
- const playlists = results[1].status === 'fulfilled' ? results[1].value : null;
+ const content = results[0].status === 'fulfilled' ? results[0].value.data : null;
+ const playlists = results[1].status === 'fulfilled' ? results[1].value.data : null;
  if (content) activityContentRef.current = content;
  if (playlists) activityPlaylistsRef.current = playlists;
+ if (results[2].status === 'fulfilled') {
+ setStorageInfo(results[2].value);
+ }
+ if (results[3].status === 'fulfilled') {
+ setSystemHealth(results[3].value);
+ }
 
- results.forEach((result, index) => {
+ results.slice(0, 2).forEach((result, index) => {
  if (result.status === 'rejected') {
  if (process.env.NODE_ENV === 'development') {
  console.warn(`API call ${index + 1} failed:`, result.reason);
@@ -167,7 +323,7 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  );
  }
 
- if (content && playlists) {
+ if (results[0].status === 'fulfilled' && results[1].status === 'fulfilled') {
  setError(null);
  } else {
  setError('Some dashboard data could not refresh');
@@ -212,6 +368,18 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  </div>
  );
  }
+
+ const healthSummary = getHealthSummary(systemHealth);
+ const storageUsagePercent = getStorageUsagePercent(storageInfo);
+ const hasStorageQuota = !!storageInfo && storageInfo.quotaBytes > 0;
+ const storageUsageText = storageInfo
+ ? `${formatBytes(storageInfo.usedBytes)} / ${storageInfo.quotaBytes > 0 ? formatBytes(storageInfo.quotaBytes) : 'No quota'}`
+ : 'Not reported';
+ const storageFooterText = storageInfo
+ ? hasStorageQuota
+ ? `${storageUsagePercent.toFixed(1)}% used`
+ : 'Quota unavailable'
+ : 'Storage data unavailable';
 
  return (
  <div className="space-y-8">
@@ -293,15 +461,15 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  </p>
  </div>
 
- <div className="bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] p-6 rounded-lg border border-[var(--border)] hover:-translate-y-[2px] hover:shadow-md transition-all duration-300 text-white animate-[fadeIn_0.6s_ease-out]">
+ <div className={`${healthSummary.cardClassName} p-6 rounded-lg border border-[var(--border)] hover:-translate-y-[2px] hover:shadow-md transition-all duration-300 text-white animate-[fadeIn_0.6s_ease-out]`}>
  <div className="flex items-center justify-between mb-4">
- <p className="text-sm font-medium text-primary-100">System Status</p>
- <Icon name="power" size="2xl" className="text-primary-200" />
+ <p className={`text-sm font-medium ${healthSummary.textClassName}`}>System Status</p>
+ <Icon name="power" size="2xl" className={healthSummary.iconClassName} />
  </div>
- <p className="text-4xl font-bold mb-2">Healthy</p>
+ <p className="text-4xl font-bold mb-2">{healthSummary.label}</p>
  <div className="flex items-center gap-2">
- <span className="w-2 h-2 bg-success-300 rounded-full animate-pulse"></span>
- <p className="text-sm text-primary-100">All systems operational</p>
+ <span className={`w-2 h-2 rounded-full ${healthSummary.dotClassName}`}></span>
+ <p className={`text-sm ${healthSummary.textClassName}`}>{healthSummary.detail}</p>
  </div>
  </div>
  </div>
@@ -406,24 +574,20 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  <div className="flex justify-between text-sm">
  <span className="text-[var(--foreground-secondary)]">Content Storage</span>
  <span className="font-medium text-[var(--foreground)]">
- {stats.content.total > 0
- ? `~${(stats.content.total * 2.5).toFixed(1)} MB`
- : '0 MB'} / 5 GB
+ {storageUsageText}
  </span>
  </div>
  <div className="eh-progress">
  <div
  className="eh-progress-bar transition-all duration-500"
  style={{
- width: `${Math.min((stats.content.total * 2.5 / 5000) * 100, 100)}%`,
+ width: `${storageUsagePercent}%`,
  }}
  />
  </div>
  <div className="flex justify-between text-xs text-[var(--foreground-tertiary)]">
- <span>{stats.content.total} items stored</span>
- <span>
- {((stats.content.total * 2.5 / 5000) * 100).toFixed(1)}% used
- </span>
+ <span>{stats.content.total} {storageInfo ? 'items stored' : 'items tracked'}</span>
+ <span>{storageFooterText}</span>
  </div>
  </div>
  </div>

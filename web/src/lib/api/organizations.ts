@@ -16,6 +16,13 @@ export interface BrandingConfig {
 
 export type FeatureFlags = Record<string, boolean>;
 
+export interface StorageInfo {
+  usedBytes: number;
+  quotaBytes: number;
+  availableBytes: number;
+  usagePercent: number;
+}
+
 declare module './client' {
   interface ApiClient {
     getOrganization(): Promise<Organization>;
@@ -25,6 +32,7 @@ declare module './client' {
     uploadBrandingLogo(orgId: string, file: File): Promise<{ logoUrl: string }>;
     getFeatureFlags(): Promise<FeatureFlags>;
     updateFeatureFlags(flags: Partial<FeatureFlags>): Promise<FeatureFlags>;
+    getStorageInfo(): Promise<StorageInfo>;
   }
 }
 
@@ -65,4 +73,8 @@ ApiClient.prototype.updateFeatureFlags = async function (flags: Partial<FeatureF
     method: 'PATCH',
     body: JSON.stringify(flags),
   });
+};
+
+ApiClient.prototype.getStorageInfo = async function (): Promise<StorageInfo> {
+  return this.request<StorageInfo>('/organizations/storage');
 };
