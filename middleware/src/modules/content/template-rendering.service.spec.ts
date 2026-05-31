@@ -545,7 +545,7 @@ describe('TemplateRenderingService', () => {
           ok: false,
           status: 302,
           statusText: 'Found',
-          headers: { get: jest.fn((name: string) => (name.toLowerCase() === 'location' ? 'https://api.example.com/final' : null)) },
+          headers: { get: jest.fn((name: string) => (name.toLowerCase() === 'location' ? 'https://api2.example.com/final' : null)) },
           json: jest.fn(),
         })
         .mockResolvedValueOnce({
@@ -558,6 +558,9 @@ describe('TemplateRenderingService', () => {
       const dataSource: DataSourceDto = {
         type: 'rest_api',
         url: 'https://api.example.com/data',
+        headers: {
+          'X-Api-Key': 'secret-value',
+        },
       };
 
       await expect(service.fetchDataFromSource(dataSource)).resolves.toEqual(redirectedData);
@@ -568,8 +571,14 @@ describe('TemplateRenderingService', () => {
       );
       expect(mockFetch).toHaveBeenNthCalledWith(
         2,
-        'https://api.example.com/final',
-        expect.objectContaining({ redirect: 'manual' }),
+        'https://api2.example.com/final',
+        expect.objectContaining({
+          redirect: 'manual',
+          headers: {
+            accept: 'application/json',
+            'user-agent': 'Vizora-Template-Service/1.0',
+          },
+        }),
       );
     });
 
@@ -600,6 +609,39 @@ describe('TemplateRenderingService', () => {
         'url points to a blocked address',
       );
       expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('should reject HTTPS-to-HTTP redirects in production', async () => {
+      const originalNodeEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+      mockCircuitBreaker.executeWithFallback.mockImplementation(async (_name, fn, fallback) => {
+        try {
+          return await fn();
+        } catch (error) {
+          return fallback(error as Error);
+        }
+      });
+      (lookup as jest.Mock).mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }]);
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 302,
+        statusText: 'Found',
+        headers: { get: jest.fn((name: string) => (name.toLowerCase() === 'location' ? 'http://api.example.com/final' : null)) },
+        json: jest.fn(),
+      });
+      const dataSource: DataSourceDto = {
+        type: 'rest_api',
+        url: 'https://api.example.com/data',
+      };
+
+      try {
+        await expect(service.fetchDataFromSource(dataSource)).rejects.toThrow(
+          'url must use HTTPS',
+        );
+        expect(mockFetch).toHaveBeenCalledTimes(1);
+      } finally {
+        process.env.NODE_ENV = originalNodeEnv;
+      }
     });
 
     it('should fetch data from external URL using circuit breaker', async () => {

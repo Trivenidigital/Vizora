@@ -260,5 +260,44 @@ describe('ssrf-guard', () => {
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
+
+    it('drops non-safe headers on cross-origin redirects when requested', async () => {
+      mockLookup.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]);
+      mockFetch
+        .mockResolvedValueOnce({
+          status: 302,
+          headers: {
+            get: jest.fn((name: string) => (
+              name.toLowerCase() === 'location'
+                ? 'https://api2.example.com/final'
+                : null
+            )),
+          },
+        })
+        .mockResolvedValueOnce({ ok: true, status: 200, headers: { get: jest.fn() } });
+
+      await fetchWithSsrfGuard(
+        'https://api1.example.com/start',
+        {
+          headers: {
+            Accept: 'application/json',
+            'User-Agent': 'Vizora-Test/1.0',
+            'X-Api-Key': 'secret-value',
+          },
+        },
+        { dropHeadersOnCrossOriginRedirect: true },
+      );
+
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        2,
+        'https://api2.example.com/final',
+        expect.objectContaining({
+          headers: {
+            accept: 'application/json',
+            'user-agent': 'Vizora-Test/1.0',
+          },
+        }),
+      );
+    });
   });
 });

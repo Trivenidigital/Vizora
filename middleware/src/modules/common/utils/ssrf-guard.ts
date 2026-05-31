@@ -38,6 +38,8 @@ export interface SsrfFetchOptions extends SsrfCheckOptions {
   maxRedirects?: number;
   /** Skip validating the first URL when the caller already did it. Redirect hops are always validated. */
   skipInitialValidation?: boolean;
+  /** Drop caller-supplied headers that could leak secrets when a redirect crosses origins. */
+  dropHeadersOnCrossOriginRedirect?: boolean;
 }
 
 // IPv4 ranges that must never be reachable from outbound fetches.
@@ -113,7 +115,12 @@ export async function fetchWithSsrfGuard(
   init: RequestInit = {},
   opts: SsrfFetchOptions = {},
 ): Promise<Response> {
-  const { maxRedirects = 3, skipInitialValidation = false, ...ssrfOptions } = opts;
+  const {
+    maxRedirects = 3,
+    skipInitialValidation = false,
+    dropHeadersOnCrossOriginRedirect = false,
+    ...ssrfOptions
+  } = opts;
   let currentUrl = url;
   let requestInit: RequestInit = { ...init, redirect: 'manual' };
 
@@ -147,9 +154,16 @@ export async function fetchWithSsrfGuard(
       throw new SsrfError('redirect Location is not a valid URL');
     }
 
+    const previousUrl = currentUrl;
     currentUrl = nextUrl.toString();
     await assertUrlIsPublic(currentUrl, ssrfOptions);
-    requestInit = redirectRequestInit(requestInit, response.status);
+    requestInit = redirectRequestInit(
+      requestInit,
+      response.status,
+      previousUrl,
+      currentUrl,
+      dropHeadersOnCrossOriginRedirect,
+    );
   }
 }
 
@@ -161,13 +175,47 @@ function isRedirectStatus(status: number): boolean {
     || status === 308;
 }
 
-function redirectRequestInit(init: RequestInit, status: number): RequestInit {
+function redirectRequestInit(
+  init: RequestInit,
+  status: number,
+  previousUrl: string,
+  nextUrl: string,
+  dropHeadersOnCrossOriginRedirect: boolean,
+): RequestInit {
   const method = (init.method ?? 'GET').toUpperCase();
+  let nextInit = init;
+
   if (status === 303 || ((status === 301 || status === 302) && method === 'POST')) {
     const { body: _body, ...rest } = init;
-    return { ...rest, method: 'GET', redirect: 'manual' };
+    nextInit = { ...rest, method: 'GET', redirect: 'manual' };
   }
-  return { ...init, redirect: 'manual' };
+
+  if (dropHeadersOnCrossOriginRedirect && originsDiffer(previousUrl, nextUrl)) {
+    nextInit = {
+      ...nextInit,
+      headers: keepNonSecretRedirectHeaders(nextInit.headers),
+    };
+  }
+
+  return { ...nextInit, redirect: 'manual' };
+}
+
+function originsDiffer(previousUrl: string, nextUrl: string): boolean {
+  return new URL(previousUrl).origin !== new URL(nextUrl).origin;
+}
+
+function keepNonSecretRedirectHeaders(headers: HeadersInit | undefined): HeadersInit | undefined {
+  if (!headers) return undefined;
+
+  const safeHeaders = new Set(['accept', 'user-agent']);
+  const kept: Record<string, string> = {};
+  new Headers(headers).forEach((value, key) => {
+    if (safeHeaders.has(key.toLowerCase())) {
+      kept[key] = value;
+    }
+  });
+
+  return kept;
 }
 
 export function isPrivateAddress(ip: string): boolean {

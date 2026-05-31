@@ -278,9 +278,10 @@ export class TemplateRenderingService {
               },
               signal: controller.signal,
             }, {
-              allowHttp: true,
+              allowHttp: process.env.NODE_ENV !== 'production',
               maxRedirects: 3,
               skipInitialValidation: true,
+              dropHeadersOnCrossOriginRedirect: true,
             });
 
             if (!response.ok) {
