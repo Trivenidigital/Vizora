@@ -108,6 +108,13 @@ agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
 - [x] `NODE_OPTIONS=--use-system-ca pnpm audit --audit-level=high` - fails with
   150 dependency advisories (1 critical, 56 high). CI marks audit
   continue-on-error; dependency upgrades are deferred to a dedicated security pass.
+- [x] PR #133 opened. Initial CI build failed on Linux because `multer` was
+  only available transitively in local installs; fixed by declaring
+  `multer@2.1.1` in `@vizora/middleware` and updating the lockfile importer.
+- [x] Post-CI-fix verification: `pnpm install --frozen-lockfile --offline
+  --ignore-scripts`, `npx nx build @vizora/middleware`, `pnpm --filter
+  @vizora/middleware exec tsc --noEmit --pretty false`, and `git diff --check`
+  pass locally.
 
 **Deferred follow-ups**
 - [ ] True multipart/chunked resumable uploads with server-side session state.

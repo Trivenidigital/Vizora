@@ -128,6 +128,7 @@
     "isomorphic-dompurify": "^3.0.0",
     "minio": "^8.0.7",
     "mongoose": "^9.1.5",
+    "multer": "2.1.1",
     "nodemailer": "^8.0.1",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
