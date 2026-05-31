@@ -210,6 +210,73 @@ describe('ContentService', () => {
         }),
       );
     });
+
+    it('should filter by search across name and description while preserving organization scope', async () => {
+      mockDatabaseService.content.findMany.mockResolvedValue([]);
+      mockDatabaseService.content.count.mockResolvedValue(0);
+
+      await service.findAll('org-123', { page: 1, limit: 10 }, { search: 'lunch menu' } as any);
+
+      expect(mockDatabaseService.content.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            organizationId: 'org-123',
+            AND: expect.arrayContaining([
+              {
+                OR: [
+                  { name: { contains: 'lunch menu', mode: 'insensitive' } },
+                  { description: { contains: 'lunch menu', mode: 'insensitive' } },
+                ],
+              },
+            ]),
+          }),
+        }),
+      );
+      expect(mockDatabaseService.content.count).toHaveBeenCalledWith({
+        where: expect.objectContaining({ organizationId: 'org-123' }),
+      });
+    });
+
+    it('should filter by date range and tenant-scoped tags', async () => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-05-31T12:00:00Z'));
+      mockDatabaseService.content.findMany.mockResolvedValue([]);
+      mockDatabaseService.content.count.mockResolvedValue(0);
+
+      try {
+        await service.findAll('org-123', { page: 1, limit: 10 }, {
+          dateRange: '7days',
+          tagNames: ['Marketing'],
+        } as any);
+
+        expect(mockDatabaseService.content.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              organizationId: 'org-123',
+              createdAt: { gte: new Date('2026-05-24T12:00:00Z') },
+              AND: expect.arrayContaining([
+                {
+                  OR: expect.arrayContaining([
+                    {
+                      tags: {
+                        some: {
+                          tag: {
+                            organizationId: 'org-123',
+                            name: { equals: 'Marketing', mode: 'insensitive' },
+                          },
+                        },
+                      },
+                    },
+                    { metadata: { path: ['tags'], array_contains: 'Marketing' } },
+                  ]),
+                },
+              ]),
+            }),
+          }),
+        );
+      } finally {
+        jest.useRealTimers();
+      }
+    });
   });
 
   describe('findOne', () => {

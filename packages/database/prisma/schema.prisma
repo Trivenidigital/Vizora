@@ -247,6 +247,7 @@ model Content {
   @@index([organizationId, status, createdAt(sort: Desc)])
   @@index([organizationId, type, createdAt(sort: Desc)])
   @@index([organizationId, templateOrientation, createdAt(sort: Desc)])
+  @@index([organizationId, folderId, createdAt(sort: Desc)])
   @@index([type])
   @@index([status])
   @@index([expiresAt])

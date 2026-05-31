@@ -4,6 +4,7 @@ import { CreateFolderDto } from './dto/create-folder.dto';
 import { UpdateFolderDto } from './dto/update-folder.dto';
 import { MoveContentDto } from './dto/move-content.dto';
 import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
+import { buildContentListWhere, type ContentListFilters } from '../content/content-list-query';
 
 export interface FolderWithChildren {
   id: string;
@@ -214,16 +215,18 @@ export class FoldersService {
     organizationId: string,
     folderId: string,
     pagination: PaginationDto,
+    filters?: ContentListFilters,
   ) {
     // Verify folder exists
     await this.findOne(organizationId, folderId);
 
     const { page = 1, limit = 10 } = pagination;
     const skip = (page - 1) * limit;
+    const where = buildContentListWhere(organizationId, { ...filters, folderId });
 
     const [data, total] = await Promise.all([
       this.db.content.findMany({
-        where: { folderId, organizationId },
+        where,
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
@@ -233,7 +236,7 @@ export class FoldersService {
           },
         },
       }),
-      this.db.content.count({ where: { folderId, organizationId } }),
+      this.db.content.count({ where }),
     ]);
 
     // Map content response for frontend compatibility

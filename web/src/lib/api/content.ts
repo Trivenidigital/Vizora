@@ -4,9 +4,20 @@ import { devLog } from '../logger';
 import type { Content, PaginatedResponse, ContentFolder } from '../types';
 import { ApiClient, getCsrfToken } from './client';
 
+export interface ContentListParams {
+  page?: number;
+  limit?: number;
+  type?: string;
+  status?: string;
+  templateOrientation?: 'landscape' | 'portrait' | 'both';
+  search?: string;
+  dateRange?: '7days' | '30days' | '90days';
+  tagNames?: string[];
+}
+
 declare module './client' {
   interface ApiClient {
-    getContent(params?: { page?: number; limit?: number; type?: string; status?: string; templateOrientation?: 'landscape' | 'portrait' | 'both' }): Promise<PaginatedResponse<Content>>;
+    getContent(params?: ContentListParams): Promise<PaginatedResponse<Content>>;
     getContentItem(id: string): Promise<Content>;
     createContent(data: { title: string; type: string; url?: string; file?: File; metadata?: Record<string, unknown> }): Promise<Content>;
     updateContent(id: string, data: Partial<{ title: string; metadata?: Record<string, unknown> }>): Promise<Content>;
@@ -25,20 +36,30 @@ declare module './client' {
     updateFolder(id: string, data: { name?: string; parentId?: string }): Promise<ContentFolder>;
     deleteFolder(id: string): Promise<void>;
     moveContentToFolder(folderId: string, contentIds: string[]): Promise<{ moved: number }>;
-    getFolderContent(folderId: string, params?: { page?: number; limit?: number }): Promise<PaginatedResponse<Content>>;
+    getFolderContent(folderId: string, params?: ContentListParams): Promise<PaginatedResponse<Content>>;
   }
 }
 
-ApiClient.prototype.getContent = async function (params?: {
-  page?: number;
-  limit?: number;
-  type?: string;
-  status?: string;
-  templateOrientation?: 'landscape' | 'portrait' | 'both';
-}): Promise<PaginatedResponse<Content>> {
-  const query = params ? new URLSearchParams(
-    Object.fromEntries(Object.entries(params).filter(([_, v]) => v !== undefined)) as Record<string, string>
-  ).toString() : '';
+const buildContentListQuery = (params?: ContentListParams): string => {
+  if (!params) return '';
+  const query = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
+    if (Array.isArray(value)) {
+      if (value.length > 0) {
+        query.set(key, value.join(','));
+      }
+      return;
+    }
+    query.set(key, String(value));
+  });
+
+  return query.toString();
+};
+
+ApiClient.prototype.getContent = async function (params?: ContentListParams): Promise<PaginatedResponse<Content>> {
+  const query = buildContentListQuery(params);
   return this.request<PaginatedResponse<Content>>(`/content${query ? `?${query}` : ''}`);
 };
 
@@ -285,7 +306,7 @@ ApiClient.prototype.moveContentToFolder = async function (folderId: string, cont
   });
 };
 
-ApiClient.prototype.getFolderContent = async function (folderId: string, params?: { page?: number; limit?: number }): Promise<PaginatedResponse<Content>> {
-  const query = params ? new URLSearchParams(params as Record<string, string>).toString() : '';
+ApiClient.prototype.getFolderContent = async function (folderId: string, params?: ContentListParams): Promise<PaginatedResponse<Content>> {
+  const query = buildContentListQuery(params);
   return this.request<PaginatedResponse<Content>>(`/folders/${folderId}/content${query ? `?${query}` : ''}`);
 };

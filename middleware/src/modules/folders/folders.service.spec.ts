@@ -503,6 +503,61 @@ describe('FoldersService', () => {
       );
     });
 
+    it('should apply server-side filters within the requested folder and organization', async () => {
+      mockDatabaseService.contentFolder.findFirst.mockResolvedValue({
+        ...mockFolder,
+        parent: null,
+        children: [],
+        _count: { content: 0 },
+      });
+      mockDatabaseService.content.findMany.mockResolvedValue([]);
+      mockDatabaseService.content.count.mockResolvedValue(0);
+
+      await service.getContents('org-123', 'folder-123', { page: 1, limit: 10 }, {
+        search: 'menu',
+        type: 'image',
+        tagNames: ['Marketing'],
+      } as any);
+
+      expect(mockDatabaseService.content.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            folderId: 'folder-123',
+            organizationId: 'org-123',
+            type: 'image',
+            AND: expect.arrayContaining([
+              {
+                OR: [
+                  { name: { contains: 'menu', mode: 'insensitive' } },
+                  { description: { contains: 'menu', mode: 'insensitive' } },
+                ],
+              },
+              {
+                OR: expect.arrayContaining([
+                  {
+                    tags: {
+                      some: {
+                        tag: {
+                          organizationId: 'org-123',
+                          name: { equals: 'Marketing', mode: 'insensitive' },
+                        },
+                      },
+                    },
+                  },
+                ]),
+              },
+            ]),
+          }),
+        }),
+      );
+      expect(mockDatabaseService.content.count).toHaveBeenCalledWith({
+        where: expect.objectContaining({
+          folderId: 'folder-123',
+          organizationId: 'org-123',
+        }),
+      });
+    });
+
     it('should map content with title and thumbnailUrl', async () => {
       mockDatabaseService.contentFolder.findFirst.mockResolvedValue({
         ...mockFolder,

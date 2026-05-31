@@ -19,6 +19,7 @@ import { DataSourceRegistryService } from './data-source-registry.service';
 import { StorageQuotaService } from '../storage/storage-quota.service';
 import { StorageService } from '../storage/storage.service';
 import type { WidgetDataSource } from './widget-data-sources';
+import { buildContentListWhere, type ContentListFilters } from './content-list-query';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -98,26 +99,12 @@ export class ContentService {
   async findAll(
     organizationId: string,
     pagination: PaginationDto,
-    filters?: { type?: string; status?: string; templateOrientation?: string },
+    filters?: ContentListFilters,
   ) {
     const { page = 1, limit = 10 } = pagination;
     const skip = (page - 1) * limit;
 
-    // Validate filter values - only allow whitelisted values
-    const validTypes = ['image', 'video', 'url', 'html', 'pdf', 'template', 'layout', 'widget'];
-    const validStatuses = ['active', 'archived', 'draft', 'flagged', 'rejected', 'pending_approval'];
-    const validOrientations = ['landscape', 'portrait', 'both'];
-
-    const where: Prisma.ContentWhereInput = { organizationId };
-    if (filters?.type && validTypes.includes(filters.type)) {
-      where.type = filters.type;
-    }
-    if (filters?.status && validStatuses.includes(filters.status)) {
-      where.status = filters.status;
-    }
-    if (filters?.templateOrientation && validOrientations.includes(filters.templateOrientation)) {
-      where.templateOrientation = filters.templateOrientation;
-    }
+    const where = buildContentListWhere(organizationId, filters);
 
     const [data, total] = await Promise.all([
       this.db.content.findMany({

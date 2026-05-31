@@ -31,6 +31,7 @@ jest.mock('@/lib/api', () => ({
 }));
 
 const mockToast = {
+  showToast: jest.fn(),
   success: jest.fn(),
   error: jest.fn(),
   info: jest.fn(),
@@ -39,7 +40,7 @@ const mockToast = {
 };
 
 jest.mock('@/lib/hooks/useToast', () => ({
-  useToast: () => mockToast,
+  useToast: () => ({ ...mockToast }),
 }));
 
 jest.mock('@/lib/hooks/useDebounce', () => ({
@@ -48,13 +49,29 @@ jest.mock('@/lib/hooks/useDebounce', () => ({
 
 jest.mock('@/lib/hooks', () => ({
   useRealtimeEvents: jest.fn(() => ({ isConnected: false, isOffline: true })),
-  useOptimisticState: jest.fn((initialState: any) => ({
+  useOptimisticState: jest.fn((_initialState: any) => ({
     updateOptimistic: jest.fn(),
     commitOptimistic: jest.fn(),
     rollbackOptimistic: jest.fn(),
     getPendingCount: jest.fn(() => 0),
   })),
-  useErrorRecovery: jest.fn(() => ({ retry: jest.fn(), recordError: jest.fn(), isRecovering: false })),
+  useErrorRecovery: jest.fn(() => ({
+    retry: jest.fn(async (
+      _id: string,
+      operation: () => Promise<unknown>,
+      onSuccess?: () => void,
+      onError?: (error: unknown) => void,
+    ) => {
+      try {
+        await operation();
+        onSuccess?.();
+      } catch (error) {
+        onError?.(error);
+      }
+    }),
+    recordError: jest.fn(),
+    isRecovering: false,
+  })),
 }));
 
 jest.mock('@/lib/validation', () => ({
@@ -109,8 +126,8 @@ jest.mock('@/components/ConfirmDialog', () => {
 });
 
 jest.mock('@/components/SearchFilter', () => {
-  return function MockSearch({ onSearch }: any) {
-    return <input data-testid="search-input" placeholder="Search..." onChange={(e) => onSearch?.(e.target.value)} />;
+  return function MockSearch({ value, onChange }: any) {
+    return <input data-testid="search-input" value={value} placeholder="Search..." onChange={(e) => onChange?.(e.target.value)} />;
   };
 });
 
@@ -195,8 +212,8 @@ const sampleContent = [
 describe('ContentClient', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockGetContent.mockResolvedValue({ data: [], meta: { total: 0 } });
-    mockGetFolderContent.mockResolvedValue({ data: [] });
+    mockGetContent.mockResolvedValue({ data: [], meta: { page: 1, limit: 50, total: 0, totalPages: 0 } });
+    mockGetFolderContent.mockResolvedValue({ data: [], meta: { page: 1, limit: 50, total: 0, totalPages: 0 } });
     mockGetFolders.mockResolvedValue([]);
     mockGetDisplays.mockResolvedValue({ data: [] });
     mockGetPlaylists.mockResolvedValue({ data: [] });
@@ -306,33 +323,151 @@ describe('ContentClient', () => {
     expect(screen.getByText('Menu PDF')).toBeInTheDocument();
   });
 
-  it('renders content from every paginated page', async () => {
+  it('renders one content page at a time and fetches the next page on demand', async () => {
     mockGetContent
       .mockResolvedValueOnce({
         data: [sampleContent[0]],
-        meta: { page: 1, limit: 100, total: 2, totalPages: 2 },
+        meta: { page: 1, limit: 50, total: 2, totalPages: 2 },
       })
       .mockResolvedValueOnce({
         data: [sampleContent[1]],
-        meta: { page: 2, limit: 100, total: 2, totalPages: 2 },
+        meta: { page: 2, limit: 50, total: 2, totalPages: 2 },
       });
 
     render(<ContentClient />);
 
     await waitFor(() => {
       expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
-      expect(screen.getByText('Promo Video')).toBeInTheDocument();
     });
     await waitForAuxiliaryRequestsToSettle();
-    expect(mockGetContent).toHaveBeenNthCalledWith(1, { page: 1, limit: 100 });
-    expect(mockGetContent).toHaveBeenNthCalledWith(2, { page: 2, limit: 100 });
+    expect(screen.queryByText('Promo Video')).not.toBeInTheDocument();
+    expect(screen.getByText('1-1 of 2 items')).toBeInTheDocument();
+    expect(mockGetContent).toHaveBeenNthCalledWith(1, { page: 1, limit: 50 });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Promo Video')).toBeInTheDocument();
+    });
+    expect(mockGetContent).toHaveBeenNthCalledWith(2, { page: 2, limit: 50 });
+  });
+
+  it('sends search and type filters to the server and resets to the first page', async () => {
+    mockGetContent.mockResolvedValue({
+      data: [sampleContent[0]],
+      meta: { page: 1, limit: 50, total: 1, totalPages: 1 },
+    });
+
+    render(<ContentClient />);
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+    mockGetContent.mockClear();
+
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'menu' } });
+
+    await waitFor(() => {
+      expect(mockGetContent).toHaveBeenCalledWith(expect.objectContaining({
+        page: 1,
+        limit: 50,
+        search: 'menu',
+      }));
+    });
+
+    mockGetContent.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'Video' }));
+
+    await waitFor(() => {
+      expect(mockGetContent).toHaveBeenCalledWith(expect.objectContaining({
+        page: 1,
+        limit: 50,
+        search: 'menu',
+        type: 'video',
+      }));
+    });
+  });
+
+  it('sends selected tag filters to folder content queries', async () => {
+    mockGetContent.mockResolvedValue({
+      data: sampleContent,
+      meta: { page: 1, limit: 50, total: 3, totalPages: 1 },
+    });
+    mockGetFolderContent.mockResolvedValue({
+      data: [sampleContent[0]],
+      meta: { page: 1, limit: 50, total: 1, totalPages: 1 },
+    });
+
+    render(<ContentClient />);
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+
+    fireEvent.click(screen.getByTestId('select-folder'));
+    await waitFor(() => {
+      expect(mockGetFolderContent).toHaveBeenCalledWith('folder-1', expect.objectContaining({
+        page: 1,
+        limit: 50,
+      }));
+    });
+    mockGetFolderContent.mockClear();
+
+    fireEvent.click(screen.getByText(/Tags/));
+    fireEvent.click(screen.getByText('Select Marketing Tag'));
+
+    await waitFor(() => {
+      expect(mockGetFolderContent).toHaveBeenCalledWith('folder-1', expect.objectContaining({
+        page: 1,
+        limit: 50,
+        tagNames: ['Marketing'],
+      }));
+    });
+  });
+
+  it('moves back to a valid page after deleting the only item on a later page', async () => {
+    mockGetContent
+      .mockResolvedValueOnce({
+        data: [sampleContent[0]],
+        meta: { page: 1, limit: 50, total: 2, totalPages: 2 },
+      })
+      .mockResolvedValueOnce({
+        data: [sampleContent[1]],
+        meta: { page: 2, limit: 50, total: 2, totalPages: 2 },
+      })
+      .mockResolvedValueOnce({
+        data: [sampleContent[0]],
+        meta: { page: 1, limit: 50, total: 1, totalPages: 1 },
+      });
+
+    render(<ContentClient />);
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
+    await waitFor(() => {
+      expect(screen.getByText('Promo Video')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Delete'));
+    fireEvent.click(screen.getByText('Confirm'));
+
+    await waitFor(() => {
+      expect(mockDeleteContent).toHaveBeenCalledWith('c2');
+    });
+    await waitFor(() => {
+      expect(mockGetContent).toHaveBeenLastCalledWith({ page: 1, limit: 50 });
+    });
+    expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    expect(screen.queryByText('Promo Video')).not.toBeInTheDocument();
   });
 
   it('shows error toast on fetch failure', async () => {
     mockGetContent.mockRejectedValue(new Error('Network error'));
     render(<ContentClient />);
     await waitFor(() => {
-      expect(mockToast.error).toHaveBeenCalled();
+      expect(mockToast.showToast).toHaveBeenCalledWith('Network error', 'error');
     });
     await waitForAuxiliaryRequestsToSettle();
   });
@@ -395,18 +530,25 @@ describe('ContentClient', () => {
     await waitForAuxiliaryRequestsToSettle();
 
     fireEvent.click(screen.getByText(/Tags/));
+    mockGetContent.mockClear();
     fireEvent.click(screen.getByText('Select Marketing Tag'));
 
     await waitFor(() => {
-      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
-      expect(screen.queryByText('Promo Video')).not.toBeInTheDocument();
+      expect(mockGetContent).toHaveBeenCalledWith(expect.objectContaining({
+        page: 1,
+        limit: 50,
+        tagNames: ['Marketing'],
+      }));
     });
+    expect(screen.getByTestId('selected-tags')).toHaveTextContent('1');
 
+    mockGetContent.mockClear();
     fireEvent.click(screen.getByText('Clear all'));
 
     await waitFor(() => {
-      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
-      expect(screen.getByText('Promo Video')).toBeInTheDocument();
+      expect(mockGetContent).toHaveBeenCalledWith(expect.not.objectContaining({
+        tagNames: expect.anything(),
+      }));
     });
     expect(screen.getByTestId('selected-tags')).toHaveTextContent('');
   });
