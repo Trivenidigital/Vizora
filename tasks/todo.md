@@ -1,8 +1,71 @@
 # Vizora - Task Tracker
 
-## In Progress: Device Token Current-Hash Enforcement (2026-05-31)
+## In Progress: Customer Contract, Security, and Performance Pass 6 (2026-05-31)
+
+**Branch:** `feat/customer-performance-review-6`
+
+**Why now:** PR #128 merged and CI is green, but deploy remains blocked by dirty/diverged prod-local work. The next repo-side slice should fix customer-visible contract failures and small performance/security defects that do not require secrets, customer credentials, live hardware, or production state mutation.
+
+**New primitives introduced:** none. Reuse the existing `ApiClient`, Next `serverFetch`, display push path, realtime push response contract, shared SSRF guard, and display Cache API preload path.
+
+**Hermes-first analysis:** not applicable; this pass does not add business-agent behavior, MCP tools, Hermes skills, AI provider calls, or spend paths.
+
+**Plan/design:** `docs/plans/2026-05-31-customer-contract-security-performance-pass-6.md`
+
+**Selected fix bundle**
+- [x] Billing checkout/portal responses normalize backend `{ checkoutUrl }` / `{ portalUrl }` to web `{ url }`.
+- [x] `serverFetch` reads `vizora_auth_token`, forwards auth correctly, and unwraps response envelopes.
+- [x] Middleware display push-content surfaces realtime `success:false` as failure instead of returning false success.
+- [x] Bulk playlist assignment rejects mixed-organization display IDs before DB update or realtime notification.
+- [x] Bulk group assignment rejects mixed-organization display IDs before membership creation.
+- [x] RSS preview, template data sources, and URL-thumbnail fetches reject redirects after SSRF validation.
+- [x] Display media preload uses authenticated `/device-content/...` URLs so cache warmup can actually succeed.
+- [x] Run focused red/green tests.
+- [x] Run multi-subagent review before broader tests.
+- [x] Run post-fix re-review before broader tests.
+- [x] Run broader affected tests/builds.
+- [ ] PR, CI, merge.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Analysis feed**
+- [x] Local drift check confirmed billing response mismatch, `serverFetch` cookie/envelope drift, push-content false success, RSS/thumbnail redirect gap, and unauthenticated display preload path still exist after PR #128.
+- [x] Customer/dashboard subagent review returned and triaged. In-scope: billing response drift. Deferred: pairing UX canonicalization, content rename `title`/`name`, overnight schedules, 403 handling, conflict warnings, storage estimates, proof-of-play UI, notification pagination.
+- [x] Performance subagent review returned and triaged. In-scope: authenticated display preload. Deferred: streaming upload/direct-to-storage design, dashboard summary endpoint, dashboard-only realtime rooms, media metadata cache, pairing-key index, summary list endpoints.
+- [x] Security/reliability subagent review returned and triaged. In-scope: cross-tenant bulk playlist/group assignment and template data-source SSRF redirect/DNS guard. Deferred: active schedule playback path and REST heartbeat ID contract.
+
+**Focused verification**
+- [x] Red run: `pnpm --filter @vizora/web test -- --runInBand --testPathPattern="billing|server-api|DisplayClient"` failed on backend-shaped billing responses, missing `serverFetch` auth/envelope unwrap, and unauthenticated display preload.
+- [x] Red run: `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="displays.service|widgets.controller|thumbnail.service|template-rendering.service"` failed on push-content false success, mixed-org bulk operations, and redirect-following SSRF surfaces.
+- [x] Green run: `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="displays.service|widgets.controller|thumbnail.service|template-rendering.service"` - pass, 6 suites / 170 tests.
+- [x] Green run: `pnpm --filter @vizora/web test -- --runInBand --testPathPattern="billing|server-api|DisplayClient"` - pass, 7 suites / 81 tests.
+- [x] Review-fix run: `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="displays.service|widgets.controller|thumbnail.service|template-rendering.service"` - pass, 6 suites / 171 tests.
+- [x] Review-fix run: `pnpm --filter @vizora/web test -- --runInBand --testPathPattern="billing|server-api|DisplayClient"` - pass, 7 suites / 83 tests.
+- [x] Redirect follow-up run: `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="ssrf-guard|widgets.controller|thumbnail.service|template-rendering.service|displays.service"` - pass, 7 suites / 218 tests.
+- [x] Template redirect-secret follow-up run: `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="ssrf-guard|widgets.controller|thumbnail.service|template-rendering.service|displays.service"` - pass, 7 suites / 220 tests.
+
+**Review gate**
+- [x] Security/tenant/SSRF reviewer: CLEAN for tenant checks and redirect SSRF guards.
+- [x] Customer/performance reviewer: initial findings fixed by keeping realtime `success:false` outside circuit-failure accounting, rethrowing template redirect policy errors from fallback, failing fast on malformed billing redirect responses, and consolidating thumbnail URL validation to the shared SSRF guard.
+- [x] Customer/performance post-fix reviewer found P2 customer breakage from blanket redirect rejection; fixed with bounded redirect following that validates every hop through the shared SSRF guard.
+- [x] Security post-fix reviewer found P2 template redirect downgrade/header-leak risk; fixed by enforcing production HTTPS on redirected template URLs and dropping non-safe headers on cross-origin redirects.
+- [x] Post-fix security re-review: CLEAN. Residual risks: documented DNS lookup-to-fetch TOCTOU remains, and billing redirect URLs still trust middleware/provider responses.
+- [x] Post-fix customer/performance re-review: CLEAN. Residual risk: template APIs that require custom headers after cross-origin redirects must use the final URL directly or a same-origin redirect.
+
+**Broader verification**
+- [x] `pnpm --filter @vizora/middleware test -- --runInBand` - pass, 143 suites / 2813 tests.
+- [x] `pnpm --filter @vizora/web test -- --runInBand` - pass, 92 suites / 942 tests; existing React `act(...)`, jsdom navigation, and intentional negative-path console warnings remain.
+- [x] `pnpm --filter @vizora/middleware exec tsc --noEmit --pretty false` - pass.
+- [x] `pnpm --filter @vizora/web exec tsc --noEmit --pretty false` - pass.
+- [x] `npx nx build @vizora/middleware` - pass with existing webpack warnings.
+- [x] `NODE_OPTIONS=--max-old-space-size=4096 NEXT_PUBLIC_SOCKET_URL=http://localhost:3002 NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1 BACKEND_URL=http://localhost:3000 npx nx build @vizora/web` - pass with existing Next middleware/proxy deprecation and TS project-reference warnings.
+- [x] `git diff --check origin/main...HEAD` - pass.
+
+---
+
+## Completed: Device Token Current-Hash Enforcement (2026-05-31)
 
 **Branch:** `feat/customer-performance-review-5`
+**PR / merge commit:** #128 / `48e6a229d8cb0557f304629c54ed1b605eba7e2d`
 
 **Why now:** PR #127 merged and CI is green, but deployment remains blocked by dirty/diverged prod-local work. A fresh realtime/display/code review found a P0 auth-boundary gap: signed display JWTs remain accepted after re-pairing or token rotation because middleware and realtime verify signature claims but do not compare the presented token to the current token hash stored on `Display.jwtToken`.
 
@@ -33,8 +96,8 @@
 - [x] Run focused verification.
 - [x] Run multi-subagent review before broad verification.
 - [x] Run broader affected tests/builds.
-- [ ] PR, CI, merge.
-- [ ] Re-check deployment gate; deploy only if prod checkout and runtime token state are safe.
+- [x] PR, CI, merge.
+- [x] Re-check deployment gate; deploy only if prod checkout and runtime token state are safe.
 
 **Runtime-state gate before deploy**
 - [x] Query prod display token-hash coverage: 15 displays total, 15 with `jwtToken`, 0 missing `jwtToken`, 15 active non-pairing, 0 active non-pairing missing `jwtToken`.
@@ -65,6 +128,13 @@
 - [x] Initial parallel `npx nx build @vizora/middleware` collided with simultaneous `@vizora/database:build` copying into `packages/database/dist/generated` on Windows (`EPIPE`, file in use). Serial rerun completed successfully.
 - [x] `npx nx build @vizora/middleware` - pass with existing webpack warnings.
 - [x] `git diff --check origin/main...HEAD` - pass.
+
+**Merge / CI / deployment gate**
+- [x] PR #128 merged after GitHub checks passed: lint, audit, test, build, security, and e2e.
+- [x] GitHub main after merge: `48e6a229d8cb0557f304629c54ed1b605eba7e2d`.
+- [x] Open PRs after merge: none.
+- [x] Production health probe returned `success: true`, database connected at `2026-05-31T14:28:38.620Z`.
+- [x] Production deploy remains blocked: `/opt/vizora/app` is dirty and diverged (`HEAD=bb76aa1838740bff5b58623dfef7a906d44f46a6`, `origin/main=48e6a229d8cb0557f304629c54ed1b605eba7e2d`, `ahead 17, behind 58`). Do not pull/reset/stash/restart services until prod-local work is reconciled.
 
 ---
 

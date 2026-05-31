@@ -3,6 +3,7 @@ import * as Handlebars from 'handlebars';
 import DOMPurify from 'isomorphic-dompurify';
 import { CircuitBreakerService } from '../common/services/circuit-breaker.service';
 import { DataSourceDto } from './dto/create-template.dto';
+import { assertUrlIsPublic, fetchWithSsrfGuard, SsrfError } from '../common/utils/ssrf-guard';
 
 /**
  * Result of template validation
@@ -246,7 +247,7 @@ export class TemplateRenderingService {
     }
 
     // Block private/internal IPs
-    this.validateExternalUrl(dataSource.url);
+    await this.validateExternalUrl(dataSource.url);
 
     const circuitName = `template-data-${url.hostname}`;
 
@@ -268,7 +269,7 @@ export class TemplateRenderingService {
                 )
               : {};
 
-            const response = await fetch(dataSource.url!, {
+            const response = await fetchWithSsrfGuard(dataSource.url!, {
               method: dataSource.method || 'GET',
               headers: {
                 'Accept': 'application/json',
@@ -276,6 +277,11 @@ export class TemplateRenderingService {
                 ...safeHeaders,
               },
               signal: controller.signal,
+            }, {
+              allowHttp: process.env.NODE_ENV !== 'production',
+              maxRedirects: 3,
+              skipInitialValidation: true,
+              dropHeadersOnCrossOriginRedirect: true,
             });
 
             if (!response.ok) {
@@ -289,6 +295,9 @@ export class TemplateRenderingService {
           }
         },
         (error) => {
+          if (error instanceof SsrfError) {
+            throw error;
+          }
           this.logger.warn(`Data source fetch failed, using empty data: ${error?.message}`);
           return {};
         },
@@ -338,7 +347,7 @@ export class TemplateRenderingService {
   /**
    * Validate URL is not pointing to internal/private resources
    */
-  private validateExternalUrl(urlString: string): void {
+  private async validateExternalUrl(urlString: string): Promise<void> {
     const url = new URL(urlString);
     const hostname = url.hostname.toLowerCase();
 
@@ -386,6 +395,15 @@ export class TemplateRenderingService {
 
     if (metadataHostnames.includes(hostname)) {
       throw new BadRequestException('Cloud metadata endpoints are not allowed');
+    }
+
+    try {
+      await assertUrlIsPublic(urlString, { allowHttp: true });
+    } catch (error) {
+      if (error instanceof SsrfError) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
     }
   }
 

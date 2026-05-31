@@ -537,10 +537,10 @@ export class DisplaysService {
     const url = `${this.realtimeUrl}/api/push/content`;
 
     // Use circuit breaker with fallback
-    await this.circuitBreaker.executeWithFallback(
+    const realtimeResult = await this.circuitBreaker.executeWithFallback(
       'realtime-service',
       async () => {
-        await firstValueFrom(
+        const response = await firstValueFrom(
           this.httpService.post(url, {
             deviceId: displayId,
             content: {
@@ -556,6 +556,7 @@ export class DisplaysService {
           }, { headers }),
         );
         this.logger.log(`Pushed content ${contentId} to display ${displayId} for ${duration} min`);
+        return response.data as { success?: boolean; message?: string };
       },
       (error) => {
         if (error) {
@@ -573,6 +574,12 @@ export class DisplaysService {
       REALTIME_CIRCUIT_CONFIG,
     );
 
+    if (realtimeResult?.success === false) {
+      throw new ServiceUnavailableException(
+        realtimeResult.message || 'Realtime service did not deliver content push',
+      );
+    }
+
     return { success: true, message: 'Content pushed to display' };
   }
 
@@ -587,6 +594,7 @@ export class DisplaysService {
   }
 
   async bulkAssignPlaylist(organizationId: string, displayIds: string[], playlistId: string) {
+    const uniqueDisplayIds = [...new Set(displayIds)];
     // Verify playlist belongs to org (include items for realtime notification)
     const playlist = await this.db.playlist.findFirst({
       where: { id: playlistId, organizationId },
@@ -602,16 +610,23 @@ export class DisplaysService {
       throw new NotFoundException('Playlist not found or does not belong to your organization');
     }
 
+    const validDisplayCount = await this.db.display.count({
+      where: { id: { in: uniqueDisplayIds }, organizationId },
+    });
+    if (validDisplayCount !== uniqueDisplayIds.length) {
+      throw new NotFoundException('One or more displays not found');
+    }
+
     const result = await this.db.display.updateMany({
       where: {
-        id: { in: displayIds },
+        id: { in: uniqueDisplayIds },
         organizationId,
       },
       data: { currentPlaylistId: playlistId },
     });
 
     // Notify each device via realtime gateway (fire-and-forget)
-    for (const displayId of displayIds) {
+    for (const displayId of uniqueDisplayIds) {
       this.notifyPlaylistUpdate(displayId, playlist).catch(error => {
         this.logger.error(`Failed to notify realtime for display ${displayId}: ${error.message}`);
       });
@@ -621,6 +636,7 @@ export class DisplaysService {
   }
 
   async bulkAssignGroup(organizationId: string, displayIds: string[], displayGroupId: string) {
+    const uniqueDisplayIds = [...new Set(displayIds)];
     // Verify group belongs to org
     const group = await this.db.displayGroup.findFirst({
       where: { id: displayGroupId, organizationId },
@@ -629,7 +645,14 @@ export class DisplaysService {
       throw new NotFoundException('Display group not found or does not belong to your organization');
     }
 
-    const members = displayIds.map(displayId => ({
+    const validDisplayCount = await this.db.display.count({
+      where: { id: { in: uniqueDisplayIds }, organizationId },
+    });
+    if (validDisplayCount !== uniqueDisplayIds.length) {
+      throw new NotFoundException('One or more displays not found');
+    }
+
+    const members = uniqueDisplayIds.map(displayId => ({
       displayId,
       displayGroupId,
     }));

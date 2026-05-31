@@ -13,6 +13,31 @@ import { StatusBar } from './components/StatusBar';
 import { FullscreenButton } from './components/FullscreenButton';
 import { redactSensitiveUrl } from './lib/redact-sensitive-url';
 
+function authenticateDisplayContentUrl(url: string, token?: string): string {
+  if (!token || !url) return url;
+  try {
+    const baseOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
+    const parsed = new URL(url, baseOrigin);
+    const apiOrigin = process.env.NEXT_PUBLIC_API_URL
+      ? new URL(process.env.NEXT_PUBLIC_API_URL).origin
+      : baseOrigin;
+    const isDeviceContentPath =
+      /^\/(?:api\/v1\/)?device-content\/[^/]+\/file$/.test(parsed.pathname);
+
+    if (!new Set([baseOrigin, apiOrigin]).has(parsed.origin) || !isDeviceContentPath) {
+      return url;
+    }
+
+    parsed.searchParams.set('token', token);
+    if (/^[a-z][a-z\d+\-.]*:/i.test(url)) {
+      return parsed.toString();
+    }
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return url;
+  }
+}
+
 export function DisplayClient() {
   const [state, setState] = useState<DisplayState>('LOADING');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -55,10 +80,10 @@ export function DisplayClient() {
     const urls = playlist.items
       .slice(0, 5)
       .filter((item) => item.content && (item.content.type === 'image' || item.content.type === 'video'))
-      .map((item) => item.content!.url)
+      .map((item) => authenticateDisplayContentUrl(item.content!.url, credentials?.deviceToken))
       .filter(Boolean);
     if (urls.length > 0) preloadItems(urls);
-  }, [player, preloadItems]);
+  }, [credentials?.deviceToken, player, preloadItems]);
 
   const handleCommand = useCallback((command: DeviceCommand) => {
     switch (command.type) {

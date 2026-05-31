@@ -24,9 +24,14 @@ jest.mock('fs', () => ({
   },
 }));
 
+jest.mock('dns/promises', () => ({
+  lookup: jest.fn().mockResolvedValue([{ address: '93.184.216.34', family: 4 }]),
+}));
+
 // Now import the service
 import { ThumbnailService } from './thumbnail.service';
 import sharp from 'sharp';
+import { lookup } from 'dns/promises';
 
 // Mock fetch
 global.fetch = jest.fn();
@@ -140,7 +145,7 @@ describe('ThumbnailService', () => {
     it('should fetch image from URL and generate thumbnail', async () => {
       const result = await service.generateThumbnailFromUrl(contentId, imageUrl);
 
-      expect(global.fetch).toHaveBeenCalledWith(imageUrl);
+      expect(global.fetch).toHaveBeenCalledWith(imageUrl, expect.objectContaining({ redirect: 'manual' }));
       expect(result).toBe(`/static/thumbnails/${contentId}.jpg`);
     });
 
@@ -176,6 +181,54 @@ describe('ThumbnailService', () => {
       await expect(
         service.generateThumbnailFromUrl(contentId, imageUrl),
       ).rejects.toThrow('Network error');
+    });
+
+    it('should follow public redirects after validating each thumbnail URL', async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          status: 302,
+          headers: {
+            get: jest.fn((name: string) => (name.toLowerCase() === 'location' ? 'https://cdn.example.com/image.jpg' : null)),
+          },
+        })
+        .mockResolvedValueOnce({
+          status: 200,
+          arrayBuffer: jest.fn().mockResolvedValue(new ArrayBuffer(100)),
+          headers: {
+            get: jest.fn().mockReturnValue('image/jpeg'),
+          },
+        });
+
+      const result = await service.generateThumbnailFromUrl(contentId, imageUrl);
+
+      expect(result).toBe(`/static/thumbnails/${contentId}.jpg`);
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        1,
+        imageUrl,
+        expect.objectContaining({ redirect: 'manual' }),
+      );
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        2,
+        'https://cdn.example.com/image.jpg',
+        expect.objectContaining({ redirect: 'manual' }),
+      );
+    });
+
+    it('should reject private redirect targets before fetching them', async () => {
+      (lookup as jest.Mock)
+        .mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }])
+        .mockResolvedValueOnce([{ address: '127.0.0.1', family: 4 }]);
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        status: 302,
+        headers: {
+          get: jest.fn((name: string) => (name.toLowerCase() === 'location' ? 'http://127.0.0.1/image.jpg' : null)),
+        },
+      });
+
+      await expect(
+        service.generateThumbnailFromUrl(contentId, imageUrl),
+      ).rejects.toThrow('url points to a blocked address');
+      expect(global.fetch).toHaveBeenCalledTimes(1);
     });
   });
 
