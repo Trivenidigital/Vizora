@@ -1,17 +1,17 @@
 # Vizora Backlog
 
-**Last updated:** 2026-05-31 (main at `7ecd6f3`)
+**Last updated:** 2026-05-31 (main at `1b28608`)
 **Production readiness:** ~75% — three operator-driven launch blockers open (see P0 below); technical foundation strongest on record
 **Tests:** 124 middleware suites / 2335 tests, 10 realtime suites / 212 tests, 79 web suites / 864 tests — ALL PASSING (zero failures). Playwright 24 specs at >90% pass post-2026-05-09 refresh. Verified by autonomous pass `docs/plans/2026-05-09-test-results.md`.
 **Customer-1 launch target:** 2026-05-13 (T-2 from today) — **status unconfirmed**; operator must confirm before T-2 prep work continues.
 
-**Security/realtime hardening wave (#107–#114, merged through 2026-05-31, main `7ecd6f3`):** session invalidation now spans REST + WebSocket — password-change / account-deactivation force-logout across all devices (REST `#111`, WS connect-time `#112`, WS mid-session 60s sweep `#114`). Launch-week and first-month rows shipped across the #63–#114 waves; M12 half-shipped. P1/P2 tables below reconciled to match.
+**Security/realtime/readiness wave (#107–#117, merged through 2026-05-31, main `1b28608`):** session invalidation now spans REST + WebSocket — password-change / account-deactivation force-logout across all devices (REST `#111`, WS connect-time `#112`, WS mid-session 60s sweep `#114`). Customer-1 smoke coverage is hardened (#116), and M12 security alert emails are complete (#117). P1/P2 tables below reconciled to match.
 
 ---
 
 ## COMPLETED (Since Last Backlog Update — 2026-03-18 → 2026-05-11)
 
-### Security & realtime hardening wave (2026-05-30 → 2026-05-31, PRs #107–#114)
+### Security, realtime, and readiness wave (2026-05-30 → 2026-05-31, PRs #107–#117)
 
 | # | Item | PR / commit |
 |---|------|-------------|
@@ -23,6 +23,9 @@
 | H6 | Session invalidation — WS connect-time handshake consults both keys | #112 (`277a6eb`) |
 | H7 | Backlog reconciliation (OptiSigns O-series) | #113 (`6cf99a6`) |
 | H8 | Session invalidation — WS mid-session 60s sweep (`sweepInvalidatedSessions`) closes the #112 connect-time-only residual | #114 (`7ecd6f3`) |
+| H9 | Backlog/test/current-state reconciliation for customer-1 readiness | #115 (`6959673`) |
+| H10 | Customer-1 smoke script now covers pair-complete, playlist creation, schedule assignment, and device active-schedule read path | #116 (`ad57b2b`) |
+| H11 | New-login/unrecognized-context security email using existing login audit history; password and Google login paths covered | #117 (`1b28608`) |
 
 ### Agent Platform Redesign (2026-05-08 → 2026-05-09)
 Triggered by 2026-05-06 OpenRouter credit drain. PR #62 (merged `801b517` on 2026-05-09) + 5 hotfix commits on main bring cost defense to 4 layers (provider cap → app daily cap → per-firing Hermes hard-stop → cross-firing breaker designed for P4).
@@ -174,9 +177,9 @@ These are documented + non-blocking for customer-1. Investigations done; impleme
 | M9 | Profile editing: avatar upload | S (4h) | ✅ DONE | `POST/DELETE /auth/me/avatar` + settings-page upload/remove UI backed by storage presigned URLs. |
 | M10 | Fix Loki volume mount (logs lost on restart) | XS (1h) | ✅ DONE | `docker/docker-compose.yml` mounts named volume `loki_data:/loki` and declares `loki_data` under `volumes:`. |
 | M11 | GDPR data export endpoint | M (1d) | ✅ DONE | `POST /users/me/data-export` returns user/org/content/display/playlist/schedule/audit/notification export; settings page downloads JSON. |
-| M12 | Security alert emails (new login, password changed) | S (4h) | 🟡 PARTIAL | Password-changed email shipped (#110, `MailService.sendPasswordChangedEmail`). New-login / unrecognized-device half DEFERRED — needs login IP / device-history schema migration. |
+| M12 | Security alert emails (new login, password changed) | S (4h) | ✅ DONE | Password-changed email shipped (#110). New-login/unrecognized-context email shipped (#117) using existing `AuditLog.ipAddress` + `AuditLog.userAgent` history, with password and Google login paths covered. |
 
-**Remaining P2 repo-side items:** M1, M5, and M12's new-login/unrecognized-device half. M2/M3/M4/M6/M7/M8/M9/M10/M11 shipped.
+**Remaining P2 repo-side items:** M1 and M5. M2/M3/M4/M6/M7/M8/M9/M10/M11/M12 shipped.
 
 ---
 
