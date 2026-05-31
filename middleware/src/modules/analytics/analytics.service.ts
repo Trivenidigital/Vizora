@@ -283,20 +283,35 @@ export class AnalyticsService {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const [totalDevices, onlineDevices, totalContent, totalPlaylists, totalImpressions] = await Promise.all([
+    const [
+      totalDevices,
+      onlineDevices,
+      totalContent,
+      processingContent,
+      totalPlaylists,
+      activePlaylists,
+      totalImpressions,
+      contentSize,
+    ] = await Promise.all([
       this.db.display.count({ where: { organizationId } }),
       this.db.display.count({ where: { organizationId, status: 'online' } }),
       this.db.content.count({ where: { organizationId } }),
+      this.db.content.count({ where: { organizationId, status: 'processing' } }),
       this.db.playlist.count({ where: { organizationId } }),
+      this.db.playlist.count({
+        where: {
+          organizationId,
+          OR: [{ isDefault: true }, { items: { some: {} } }],
+        },
+      }),
       this.db.contentImpression.count({
         where: { organizationId, timestamp: { gte: thirtyDaysAgo } },
       }),
+      this.db.content.aggregate({
+        where: { organizationId },
+        _sum: { fileSize: true },
+      }),
     ]);
-
-    const contentSize = await this.db.content.aggregate({
-      where: { organizationId },
-      _sum: { fileSize: true },
-    });
 
     const uptimePercent = totalDevices > 0
       ? ((onlineDevices / totalDevices) * 100).toFixed(1)
@@ -306,7 +321,9 @@ export class AnalyticsService {
       totalDevices,
       onlineDevices,
       totalContent,
+      processingContent,
       totalPlaylists,
+      activePlaylists,
       totalContentSize: contentSize._sum.fileSize || 0,
       uptimePercent: parseFloat(uptimePercent),
       totalImpressions,

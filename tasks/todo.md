@@ -1,6 +1,94 @@
 # Vizora - Task Tracker
 
-## In Progress: Content Library Performance Pass 14 (2026-05-31)
+## In Progress: Dashboard Summary Performance Pass 15 (2026-05-31)
+
+**Branch:** `feat/customer-dashboard-pass-15`
+
+**Why now:** PR #137 merged server-side content-library pagination/filtering,
+but the dashboard overview still risks all-page content/playlist refreshes just
+to compute top-level counts. A customer with a real media library should see the
+overview hydrate from aggregate counters and tiny recent-activity samples.
+
+**New primitives introduced:** two aggregate fields on the existing analytics
+summary response: `processingContent` and `activePlaylists`.
+
+**Hermes-first analysis:** not applicable. This pass does not add business
+agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
+
+**Plan**
+- [x] Merge PR #137 after CI green.
+- [x] Re-check production deploy gate after merge.
+- [x] Start fresh branch from `origin/main`.
+- [x] Write scoped plan/design for dashboard summary performance.
+- [x] Collect multi-subagent customer/performance/security/test review
+  findings before test gate.
+- [x] Add focused failing tests.
+- [x] Implement analytics-summary-backed dashboard overview.
+- [x] Run multi-subagent code review before broader tests.
+- [x] Run focused and broader affected verification.
+- [ ] PR, CI, merge.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Plan/design:**
+`docs/plans/2026-05-31-dashboard-summary-performance-pass-15.md`
+
+**Current merge/deploy state**
+- [x] PR #137 merged at
+  `7d32929678162e60ad7560f7c3cc81db4c9fc019`; CI green for audit, build, e2e,
+  lint, security, and test.
+- [x] Prod deploy remains blocked: `/opt/vizora/app` is on `main` at
+  `bb76aa1838740bff5b58623dfef7a906d44f46a6`, ahead 17 and behind 77 from
+  `origin/main`, with tracked edits across Hermes scripts, seed templates,
+  thumbnails, landing UI, Tailwind config, plus untracked operator approvals,
+  docs, and preview assets. No production pull, reset, stash, env edit,
+  service restart, DB mutation, or deploy performed.
+
+**Review**
+- [x] Pre-implementation customer/performance/security/test review found the
+  next high-value repo-side dashboard/performance slice: replace overview
+  all-page refreshes with analytics aggregates and bounded activity samples.
+- [x] Backend contract/security review CLEAN: `/analytics/summary` remains
+  tenant-scoped, envelope-compatible, and safe for `viewer` read access.
+- [x] Frontend/runtime review found two blockers: missing server activity
+  samples were not retried, and late summary refreshes could overwrite fresher
+  realtime device counts. Both were fixed and regression-tested.
+- [x] Test/CI review found `AnalyticsSummary` should keep backend-required
+  fields required in web types and that viewer role metadata needed a test.
+  Both were fixed.
+- [x] Follow-up review CLEAN after fixes.
+
+**Verification**
+- [x] Focused middleware tests passed:
+  `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="analytics.(service|controller)"`
+  (2 suites, 47 tests).
+- [x] Focused dashboard tests passed:
+  `pnpm --filter @vizora/web test -- --runInBand --runTestsByPath src/app/dashboard/__tests__/dashboard-page.test.tsx src/app/dashboard/__tests__/dashboard-server-page.test.tsx`
+  (2 suites, 20 tests).
+- [x] Broader dashboard web tests passed:
+  `pnpm --filter @vizora/web test -- --runInBand --testPathPattern="dashboard"`
+  (22 suites, 303 tests; pre-existing React `act(...)` warnings remain).
+- [x] Full middleware tests passed:
+  `pnpm --filter @vizora/middleware test -- --runInBand`
+  (143 suites, 2874 tests).
+- [x] Full web tests passed:
+  `pnpm --filter @vizora/web test -- --runInBand`
+  (95 suites, 982 tests; pre-existing React `act(...)` and jsdom navigation
+  warnings remain).
+- [x] TypeScript passed:
+  `pnpm --filter @vizora/web exec tsc --noEmit` and
+  `pnpm --filter @vizora/middleware exec tsc --noEmit`.
+- [x] Builds passed:
+  `npx nx build @vizora/middleware`, `npx nx build @vizora/realtime`, and
+  `npx nx build @vizora/web` with the standard local public URL env vars.
+  The first realtime build attempt failed only because it ran concurrently with
+  middleware build and Windows locked `packages/database/dist/generated/prisma`;
+  sequential rerun passed.
+- [x] Changed-file ESLint passed with warnings only; `git diff --check` passed
+  with CRLF warnings only.
+
+---
+
+## Completed: Content Library Performance Pass 14 (2026-05-31)
 
 **Branch:** `feat/customer-performance-pass-14`
 
@@ -27,14 +115,16 @@ agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
 - [x] Implement backend query filters and web paged loading.
 - [x] Run multi-subagent code review before broader tests.
 - [x] Run focused and broader affected verification.
-- [ ] PR, CI, merge.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe.
 
 **Current merge/deploy state**
 - [x] PR #136 merged at
   `35609734a185366f981efc47246e46229836f22d`; CI green for audit, build, e2e,
   lint, security, and test.
-- [x] No open GitHub PRs after #136 merge.
+- [x] PR #137 merged at
+  `7d32929678162e60ad7560f7c3cc81db4c9fc019`; CI green for audit, build, e2e,
+  lint, security, and test.
 - [x] Prod deploy remains blocked: `/opt/vizora/app` is dirty and
   ahead/behind stale prod `origin/main`, with many local template/web/script
   changes and untracked operator/docs assets. No production pull, reset, stash,
@@ -91,8 +181,8 @@ agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
 - [x] `git diff --check` passed; Windows CRLF conversion warnings only.
 
 **Residual risks / deploy gate**
-- [ ] CI pending until PR is opened.
-- [ ] Production deploy still blocked by the dirty/diverged prod checkout.
+- [x] CI green and PR #137 merged.
+- [x] Production deploy still blocked by the dirty/diverged prod checkout.
   No production pull, reset, stash, env edit, service restart, DB mutation, or
   deploy performed.
 

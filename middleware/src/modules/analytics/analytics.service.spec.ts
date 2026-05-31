@@ -209,6 +209,8 @@ describe('AnalyticsService', () => {
       expect(result.onlineDevices).toBe(0);
       expect(result.totalContent).toBe(0);
       expect(result.totalPlaylists).toBe(0);
+      expect(result.processingContent).toBe(0);
+      expect(result.activePlaylists).toBe(0);
       expect(result.uptimePercent).toBe(0);
       expect(result.totalImpressions).toBe(0);
     });
@@ -217,8 +219,12 @@ describe('AnalyticsService', () => {
       mockDb.display.count
         .mockResolvedValueOnce(10) // total
         .mockResolvedValueOnce(8); // online
-      mockDb.content.count.mockResolvedValue(50);
-      mockDb.playlist.count.mockResolvedValue(5);
+      mockDb.content.count.mockImplementation((args: any) => (
+        args.where?.status === 'processing' ? Promise.resolve(4) : Promise.resolve(50)
+      ));
+      mockDb.playlist.count.mockImplementation((args: any) => (
+        args.where?.OR ? Promise.resolve(3) : Promise.resolve(5)
+      ));
       mockDb.contentImpression.count.mockResolvedValue(1200);
       mockDb.content.aggregate.mockResolvedValue({ _sum: { fileSize: 1024000 } });
 
@@ -227,9 +233,20 @@ describe('AnalyticsService', () => {
       expect(result.onlineDevices).toBe(8);
       expect(result.uptimePercent).toBe(80);
       expect(result.totalContent).toBe(50);
+      expect(result.processingContent).toBe(4);
       expect(result.totalPlaylists).toBe(5);
+      expect(result.activePlaylists).toBe(3);
       expect(result.totalContentSize).toBe(1024000);
       expect(result.totalImpressions).toBe(1200);
+      expect(mockDb.content.count).toHaveBeenCalledWith({
+        where: { organizationId: 'org-123', status: 'processing' },
+      });
+      expect(mockDb.playlist.count).toHaveBeenCalledWith({
+        where: {
+          organizationId: 'org-123',
+          OR: [{ isDefault: true }, { items: { some: {} } }],
+        },
+      });
     });
   });
 

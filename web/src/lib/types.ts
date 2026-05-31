@@ -319,9 +319,13 @@ export interface AnalyticsSummary {
   totalDevices: number;
   onlineDevices: number;
   totalContent: number;
+  processingContent: number;
   totalPlaylists: number;
+  activePlaylists: number;
   totalImpressions: number;
-  avgUptimePercent: number;
+  totalContentSize: number;
+  uptimePercent: number;
+  avgUptimePercent?: number;
 }
 
 export interface DeviceMetric {
