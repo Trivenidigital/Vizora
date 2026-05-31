@@ -20,7 +20,7 @@
 - [x] Implement per-file upload type, progress, bounded concurrency, and upload-while-running locks.
 - [x] Run focused verification.
 - [x] Run multi-subagent review before broad verification.
-- [ ] Run broader web verification/build.
+- [x] Run broader web verification/build.
 - [ ] PR, CI, merge.
 - [ ] Re-check deployment gate; deploy only if prod checkout is safe.
 
@@ -30,6 +30,12 @@
 - [x] Re-review regression for removed-file URL upload - red first, then pass, content page 21 tests; combined focused suite now 2 suites / 33 tests.
 - [x] `pnpm --filter @vizora/web exec tsc --noEmit --pretty false` - pass.
 - [x] `git diff --check` - pass; line-ending warnings only.
+
+**Broader verification**
+- [x] `pnpm --filter @vizora/web test -- --runInBand` - pass, 89 suites / 934 tests; existing React `act(...)` and jsdom navigation warnings remain.
+- [x] `pnpm --filter @vizora/web exec tsc --noEmit --pretty false` - pass.
+- [x] `git diff --check origin/main...HEAD` - pass.
+- [x] `NODE_OPTIONS=--max-old-space-size=4096 NEXT_PUBLIC_SOCKET_URL=http://localhost:3002 NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1 BACKEND_URL=http://localhost:3000 npx nx build @vizora/web` - pass with existing Next middleware deprecation and TypeScript project-reference warnings.
 
 **Review gate**
 - [x] Customer/UX reviewer: initial P1 hidden queued files after switching to URL mode fixed with disabled URL option and guarded change handler; P2 modal-close upload state loss fixed by ignoring close while uploading.
