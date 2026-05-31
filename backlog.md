@@ -1,13 +1,28 @@
 # Vizora Backlog
 
-**Last updated:** 2026-05-11
+**Last updated:** 2026-05-31 (main at `7ecd6f3`)
 **Production readiness:** ~75% — three operator-driven launch blockers open (see P0 below); technical foundation strongest on record
 **Tests:** 124 middleware suites / 2335 tests, 10 realtime suites / 212 tests, 79 web suites / 864 tests — ALL PASSING (zero failures). Playwright 24 specs at >90% pass post-2026-05-09 refresh. Verified by autonomous pass `docs/plans/2026-05-09-test-results.md`.
 **Customer-1 launch target:** 2026-05-13 (T-2 from today) — **status unconfirmed**; operator must confirm before T-2 prep work continues.
 
+**Security/realtime hardening wave (#107–#114, merged through 2026-05-31, main `7ecd6f3`):** session invalidation now spans REST + WebSocket — password-change / account-deactivation force-logout across all devices (REST `#111`, WS connect-time `#112`, WS mid-session 60s sweep `#114`). Launch-week items L3/L5/L6/L7/L8/L9 + M6 shipped behind #107–#110; M12 half-shipped. P1/P2 tables below reconciled to match.
+
 ---
 
 ## COMPLETED (Since Last Backlog Update — 2026-03-18 → 2026-05-11)
+
+### Security & realtime hardening wave (2026-05-30 → 2026-05-31, PRs #107–#114)
+
+| # | Item | PR / commit |
+|---|------|-------------|
+| H1 | Real-time notification emission gap — device-offline alert bypassed the realtime broadcast (surfaced only on poll) | #107 (`b860100`) |
+| H2 | Per-device remote control on device detail page (reload / restart / clear_cache) | #108 (`875d2fe`) |
+| H3 | generic-api widget always-400 + webpack shipped zero `.hbs` (every widget type broke in prod) | #109 (`5059bfe`) |
+| H4 | Password-changed security email (`MailService.sendPasswordChangedEmail`) | #110 (`7c2d089`) |
+| H5 | Session invalidation — REST: `pwd_changed:`/`user_revoked:` Redis keys + `JwtStrategy.validate` reject (strict `iat <`) | #111 (`82c5c01`) |
+| H6 | Session invalidation — WS connect-time handshake consults both keys | #112 (`277a6eb`) |
+| H7 | Backlog reconciliation (OptiSigns O-series) | #113 (`6cf99a6`) |
+| H8 | Session invalidation — WS mid-session 60s sweep (`sweepInvalidatedSessions`) closes the #112 connect-time-only residual | #114 (`7ecd6f3`) |
 
 ### Agent Platform Redesign (2026-05-08 → 2026-05-09)
 Triggered by 2026-05-06 OpenRouter credit drain. PR #62 (merged `801b517` on 2026-05-09) + 5 hotfix commits on main bring cost defense to 4 layers (provider cap → app daily cap → per-firing Hermes hard-stop → cross-firing breaker designed for P4).
@@ -130,17 +145,17 @@ These are documented + non-blocking for customer-1. Investigations done; impleme
 
 | # | Item | Effort | Status | Notes |
 |---|------|--------|--------|-------|
-| L1 | Device offline email notification to customers | S (4h) | TODO | Ops agent detects offline but doesn't email customer |
+| L1 | Device offline email notification to customers | S (4h) | ✅ DONE | Superseded by **O7** (#63) — `alert-rules` evaluator dispatches in_app/email/slack on device-offline per tag/group with custom recipients. |
 | L2 | Set up UptimeRobot monitoring for health endpoints | XS (1h) | TODO | Manual: create account, add monitors |
-| L3 | Custom error pages (branded 404, 500) | S (4h) | TODO | Currently default/unstyled |
+| L3 | Custom error pages (branded 404, 500) | S (4h) | ✅ DONE | `web/src/app/{not-found,error,global-error}.tsx` + 7 per-route error boundaries (shipped in #92–#106 wave). |
 | L4 | Basic knowledge base / help docs page | M (1d) | TODO | FAQ + getting started guide |
-| L5 | Proof-of-play tracking (log content displayed per device) | M (1d) | TODO | Advertisers need this. **Expanded scope in O2 below** (saved views, scheduled email, tag filters, exports). |
-| L6 | Emergency content override (push urgent to all devices) | S (4h) | TODO | Critical for corporate/healthcare |
-| L7 | Device remote reload command via WebSocket | S (2h) | TODO | Remote restart already missing too |
-| L8 | Wire real-time notification emission on creation | S (2h) | TODO | Currently polling, not real-time |
-| L9 | Reduce notification polling (25s -> 60s or WebSocket) | XS (1h) | TODO | Performance improvement |
+| L5 | Proof-of-play tracking (log content displayed per device) | M (1d) | ✅ DONE | Core shipped as **O2** (#67) — `analytics/proof-of-play.service.ts` + CSV export. Secondary (scheduled-email/PDF/saved-views) lean-cut; verify before claiming gap. |
+| L6 | Emergency content override (push urgent to all devices) | S (4h) | ✅ DONE | Full stack: `EmergencyOverrideModal` + `ActiveOverrideBanner` on devices page + `fleet.service` create/clear + Electron push_content/clear_override + crash-recovery. |
+| L7 | Device remote reload command via WebSocket | S (2h) | ✅ DONE | reload/restart/clear_cache stack (realtime command enum + `fleet POST /commands` + Electron handlers); per-device control `DeviceControls.tsx` on device detail page (#108). Covers M6 (restart) too. |
+| L8 | Wire real-time notification emission on creation | S (2h) | ✅ DONE | `NotificationsService.create()` → `/api/notifications/broadcast` realtime emit. Device-offline alert path that bypassed the broadcast fixed in #107. |
+| L9 | Reduce notification polling (25s -> 60s or WebSocket) | XS (1h) | ✅ DONE | `useNotifications` defaults `pollInterval=300000` (5min), unread-count only, plus WebSocket `notification:new`. |
 
-**Total effort: ~7 dev-days**
+**Remaining P1: L2 (UptimeRobot), L4 (help docs) only — L1/L3/L5/L6/L7/L8/L9 shipped.**
 
 ---
 
@@ -153,13 +168,13 @@ These are documented + non-blocking for customer-1. Investigations done; impleme
 | M3 | Google Sheets data source integration | L (3d) | ✅ DONE | `content/widget-data-sources/google-sheets.data-source.ts` |
 | M4 | Content moderation workflow (flag -> review -> approve) | M (2d) | TODO | Today's `content.service.ts:712-843` is a moderation flag, not an approval pipeline. **Expanded to proposer→approver→publish in O10 below.** |
 | M5 | Expand template library to 150 templates | M (2d) | TODO | Currently 78 |
-| M6 | Device remote restart command | S (4h) | TODO | |
+| M6 | Device remote restart command | S (4h) | ✅ DONE | Part of the L7 fleet command stack (#108) — `restart` in the realtime command enum + Electron handler. |
 | M7 | Push-to-group endpoint (single API call) | S (4h) | ✅ DONE | Generalized in **O1** (#65) — tag/group/org targeting via `fleet.service` |
 | M8 | Data retention policy (auto-purge audit logs > 90 days) | S (4h) | ✅ DONE | `common/data-retention.service.ts` + `auditLog.deleteMany` |
 | M9 | Profile editing: avatar upload | S (4h) | TODO | Name editing done, avatar missing |
 | M10 | Fix Loki volume mount (logs lost on restart) | XS (1h) | TODO | Docker-compose change |
 | M11 | GDPR data export endpoint | M (1d) | TODO | Subject Access Request |
-| M12 | Security alert emails (new login, password changed) | S (4h) | TODO | |
+| M12 | Security alert emails (new login, password changed) | S (4h) | 🟡 PARTIAL | Password-changed email shipped (#110, `MailService.sendPasswordChangedEmail`). New-login / unrecognized-device half DEFERRED — needs login IP / device-history schema migration. |
 
 **Total effort: ~15 dev-days**
 
