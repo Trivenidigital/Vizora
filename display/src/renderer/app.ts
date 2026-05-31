@@ -1,4 +1,6 @@
 // Renderer process code
+import { getEntityId } from './ids';
+
 declare global {
   interface Window {
     electronAPI: {
@@ -37,10 +39,8 @@ class DisplayApp {
   private currentIndex = 0;
   private playbackTimer: NodeJS.Timeout | null = null;
   private pairingCheckInterval: NodeJS.Timeout | null = null;
-  private currentCode: string | null = null;
   private isPairingScreenShown = false;
   private contentStartTime: number = 0;
-  private qrOverlayConfig: any = null;
   private zoneTimers: Map<string, NodeJS.Timeout> = new Map();
   private zoneIndices: Map<string, number> = new Map();
 
@@ -150,7 +150,6 @@ class DisplayApp {
       }
 
       if (result.code) {
-        this.currentCode = result.code;
         // Store the pairing code in case we need it again
         localStorage.setItem('lastPairingCode', result.code);
         this.displayPairingCode(result.code);
@@ -249,7 +248,6 @@ class DisplayApp {
           try {
             const newResult = await window.electronAPI.getPairingCode();
             console.log('[App] ✅ New pairing code received:', newResult.code);
-            this.currentCode = newResult.code;
             currentCode = newResult.code;
             localStorage.setItem('lastPairingCode', newResult.code);
             this.displayPairingCode(newResult.code);
@@ -306,7 +304,6 @@ class DisplayApp {
             try {
               const newResult = await window.electronAPI.getPairingCode();
               console.log('[App] ✅ New pairing code received after errors:', newResult.code);
-              this.currentCode = newResult.code;
               currentCode = newResult.code;
               localStorage.setItem('lastPairingCode', newResult.code);
               this.displayPairingCode(newResult.code);
@@ -429,7 +426,6 @@ class DisplayApp {
     const contentDiv = document.createElement('div');
     contentDiv.className = 'content-item active';
 
-    const startTime = Date.now();
 
     // Support both 'source' and 'url' field names for compatibility
     let contentSource = currentItem.content?.source || currentItem.content?.url;
@@ -437,16 +433,20 @@ class DisplayApp {
     // Check cache for image/video content
     if (currentItem.content?.type === 'image' || currentItem.content?.type === 'video') {
       try {
-        const contentId = currentItem.content._id || currentItem.content.id;
-        const cached = await window.electronAPI.cacheGet(contentId);
-        if (cached.path) {
-          contentSource = cached.path;
-          console.log('[App] Using cached content:', cached.path);
+        const contentId = getEntityId(currentItem.content);
+        if (contentId && contentSource) {
+          const cached = await window.electronAPI.cacheGet(contentId);
+          if (cached.path) {
+            contentSource = cached.path;
+            console.log('[App] Using cached content:', cached.path);
+          } else {
+            // Background download for future use
+            const mimeType = currentItem.content.mimeType || (currentItem.content.type === 'video' ? 'video/mp4' : 'image/jpeg');
+            window.electronAPI.cacheDownload(contentId, contentSource, mimeType)
+              .catch(err => console.warn('[App] Background cache failed:', err));
+          }
         } else {
-          // Background download for future use
-          const mimeType = currentItem.content.mimeType || (currentItem.content.type === 'video' ? 'video/mp4' : 'image/jpeg');
-          window.electronAPI.cacheDownload(contentId, contentSource, mimeType)
-            .catch(err => console.warn('[App] Background cache failed:', err));
+          console.warn('[App] Skipping cache for content without id or source');
         }
       } catch (err) {
         console.warn('[App] Cache check failed:', err);
@@ -509,8 +509,8 @@ class DisplayApp {
 
     // Log initial impression
     window.electronAPI.logImpression({
-      contentId: currentItem.content?._id,
-      playlistId: this.currentPlaylist._id,
+      contentId: getEntityId(currentItem.content),
+      playlistId: getEntityId(this.currentPlaylist),
       timestamp: this.contentStartTime,
     });
 
@@ -522,8 +522,8 @@ class DisplayApp {
 
         // Log completion with duration and completion data
         window.electronAPI.logImpression({
-          contentId: currentItem.content?._id,
-          playlistId: this.currentPlaylist._id,
+          contentId: getEntityId(currentItem.content),
+          playlistId: getEntityId(this.currentPlaylist),
           duration: Math.round(actualDurationMs / 1000),
           completionPercentage,
           timestamp: Date.now(),
@@ -547,8 +547,8 @@ class DisplayApp {
       const completionPercentage = Math.min(100, Math.round((actualDurationMs / expectedDuration) * 100));
 
       window.electronAPI.logImpression({
-        contentId: currentItem.content?._id,
-        playlistId: this.currentPlaylist._id,
+        contentId: getEntityId(currentItem.content),
+        playlistId: getEntityId(this.currentPlaylist),
         duration: Math.round(actualDurationMs / 1000),
         completionPercentage,
         timestamp: Date.now(),
@@ -574,7 +574,7 @@ class DisplayApp {
     console.error('Content error:', errorMessage, item);
 
     window.electronAPI.logError({
-      contentId: item.content?._id,
+      contentId: getEntityId(item.content),
       errorType: 'playback_error',
       errorMessage,
       timestamp: Date.now(),
@@ -610,11 +610,9 @@ class DisplayApp {
     if (!config || !config.enabled) {
       overlay.classList.add('hidden');
       overlay.innerHTML = '';
-      this.qrOverlayConfig = null;
       return;
     }
 
-    this.qrOverlayConfig = config;
     overlay.innerHTML = '';
     overlay.className = config.position || 'bottom-right';
     overlay.style.backgroundColor = config.backgroundColor || '#ffffff';
@@ -778,7 +776,7 @@ class DisplayApp {
 
   private cleanupLayout() {
     // Stop all zone timers
-    for (const [zoneId, timer] of this.zoneTimers) {
+    for (const timer of this.zoneTimers.values()) {
       clearTimeout(timer);
     }
     this.zoneTimers.clear();
@@ -792,10 +790,15 @@ class DisplayApp {
       if (type !== 'image' && type !== 'video') continue;
 
       const contentUrl = item.content.source || item.content.url;
-      const contentId = item.content._id || item.content.id;
+      const contentId = getEntityId(item.content);
       const mimeType = item.content.mimeType || (type === 'video' ? 'video/mp4' : 'image/jpeg');
 
       try {
+        if (!contentId || !contentUrl) {
+          console.warn('[App] Skipping preload for content without id or source');
+          continue;
+        }
+
         const cached = await window.electronAPI.cacheGet(contentId);
         if (!cached.path) {
           console.log('[App] Preloading content:', contentId);

@@ -1,5 +1,42 @@
 # Vizora - Task Tracker
 
+## In Progress: Display Runtime Reliability (2026-05-31)
+
+**Branch:** `fix/display-runtime-reliability`
+
+**Why now:** PR #124 merged critical upload/streaming smoke coverage, and production deploy remains blocked by dirty/diverged prod-local work. The next repo-side customer-1 reliability gap is unattended display runtime behavior: after reboot/screensaver/power policy changes, displays must come back and continue emitting reliable proof-of-play signals.
+
+**New primitives introduced:** none. Reuse Electron lifecycle APIs, `powerSaveBlocker`, Linux desktop autostart files, existing renderer proof-of-play paths, and CI workflow patterns.
+
+**Hermes-first analysis:** not applicable; this is display runtime/CI hardening, not a business-agent, MCP, Hermes, or AI/spend path.
+
+**Plan/design:** `docs/plans/2026-05-31-display-runtime-reliability.md`
+
+**Plan**
+- [x] Drift-check K1/K2/K3/K4 and renderer proof-of-play ID paths.
+- [x] Add packaged-display auto-start.
+- [x] Add packaged-display sleep prevention.
+- [x] Fix renderer proof-of-play/error IDs to prefer API `id` with `_id` fallback.
+- [x] Gate display unit tests in CI.
+- [x] Gate display renderer/main typecheck and display build in CI.
+- [x] Run multi-subagent review before broad verification.
+- [x] Run focused/broad verification.
+- [ ] PR, CI, merge.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Review gate**
+- [x] Electron runtime reviewer: initial packaged-guard and process-listener findings fixed; final re-review CLEAN.
+- [x] Customer-readiness/CI reviewer: initial cache ID, AppImage, and docs findings fixed; final re-review found only stale wording, now corrected.
+
+**Local verification**
+- [x] `pnpm --filter @vizora/display test -- --runInBand` - pass, 6 suites / 124 tests.
+- [x] `pnpm --filter @vizora/display test:ci` - pass, 6 suites / 124 tests; validates the CI-safe Jest invocation after GitHub Actions exposed pnpm argument-forwarding drift.
+- [x] `pnpm --filter @vizora/display typecheck` - pass.
+- [x] `pnpm --filter @vizora/display build` - pass.
+- [x] `git diff --check` - pass; line-ending warnings only.
+
+---
+
 ## In Progress: Critical Smoke Upload + Streaming Coverage (2026-05-31)
 
 **Branch:** `feat/customer-readiness-next`

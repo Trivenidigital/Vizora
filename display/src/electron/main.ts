@@ -1,4 +1,5 @@
-import { app, BrowserWindow, ipcMain, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, powerSaveBlocker, screen } from 'electron';
+import * as fs from 'fs';
 import * as path from 'path';
 import { DeviceClient } from './device-client';
 import { CacheManager } from './cache-manager';
@@ -15,8 +16,119 @@ const store = new Store({
 let mainWindow: BrowserWindow | null = null;
 let deviceClient: DeviceClient | null = null;
 let cacheManager: CacheManager | null = null;
+let sleepBlockerId: number | null = null;
 const PLAYLIST_RENDERER_ACK_TIMEOUT_MS = 5000;
 const COMMAND_RENDERER_ACK_TIMEOUT_MS = 5000;
+const LINUX_AUTOSTART_FILE = 'vizora-display.desktop';
+const PROCESS_ERROR_HANDLERS_REGISTERED = '__vizoraDisplayProcessErrorHandlersRegistered';
+
+function shouldEnableRuntimeGuards(): boolean {
+  return app.isPackaged;
+}
+
+function quoteDesktopExec(value: string): string {
+  return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+}
+
+function getLinuxAutostartExecPath(): string {
+  return process.env.APPIMAGE || process.execPath;
+}
+
+function configureAutoStart(): void {
+  if (!shouldEnableRuntimeGuards()) {
+    return;
+  }
+
+  try {
+    if (process.platform === 'win32' || process.platform === 'darwin') {
+      app.setLoginItemSettings({
+        openAtLogin: true,
+        openAsHidden: false,
+        path: process.execPath,
+      });
+      console.log('[Main] Auto-start enabled via login item settings');
+      return;
+    }
+
+    if (process.platform === 'linux') {
+      const autostartDir = path.join(app.getPath('home'), '.config', 'autostart');
+      const desktopPath = path.join(autostartDir, LINUX_AUTOSTART_FILE);
+      fs.mkdirSync(autostartDir, { recursive: true });
+      fs.writeFileSync(
+        desktopPath,
+        [
+          '[Desktop Entry]',
+          'Type=Application',
+          'Name=Vizora Display',
+          `Exec=${quoteDesktopExec(getLinuxAutostartExecPath())}`,
+          'Terminal=false',
+          'X-GNOME-Autostart-enabled=true',
+          '',
+        ].join('\n'),
+        'utf8',
+      );
+      console.log(`[Main] Auto-start enabled via ${desktopPath}`);
+    }
+  } catch (error) {
+    console.error('[Main] Failed to configure auto-start:', error);
+  }
+}
+
+function registerProcessErrorHandlers(): void {
+  const handlerState = globalThis as typeof globalThis & {
+    [PROCESS_ERROR_HANDLERS_REGISTERED]?: boolean;
+  };
+
+  if (handlerState[PROCESS_ERROR_HANDLERS_REGISTERED]) {
+    return;
+  }
+
+  // Handle uncaught exceptions from renderer process
+  process.on('uncaughtException', (error) => {
+    console.error('[Main] Uncaught exception:', error);
+    // Continue running - don't crash
+  });
+
+  // Handle unhandled promise rejections
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('[Main] Unhandled rejection at:', promise, 'reason:', reason);
+    // Continue running - don't crash
+  });
+
+  handlerState[PROCESS_ERROR_HANDLERS_REGISTERED] = true;
+}
+
+function startDisplaySleepBlocker(): void {
+  if (!shouldEnableRuntimeGuards()) {
+    return;
+  }
+
+  try {
+    if (sleepBlockerId !== null && powerSaveBlocker.isStarted(sleepBlockerId)) {
+      return;
+    }
+    sleepBlockerId = powerSaveBlocker.start('prevent-display-sleep');
+    console.log(`[Main] Display sleep prevention enabled (${sleepBlockerId})`);
+  } catch (error) {
+    console.error('[Main] Failed to enable display sleep prevention:', error);
+  }
+}
+
+function stopDisplaySleepBlocker(): void {
+  if (sleepBlockerId === null) {
+    return;
+  }
+
+  try {
+    if (powerSaveBlocker.isStarted(sleepBlockerId)) {
+      powerSaveBlocker.stop(sleepBlockerId);
+    }
+  } catch (error) {
+    console.error('[Main] Failed to stop display sleep prevention:', error);
+  } finally {
+    sleepBlockerId = null;
+  }
+}
 
 function sendPlaylistToRenderer(playlist: any): Promise<void> {
   if (!mainWindow) {
@@ -386,7 +498,11 @@ ipcMain.handle('cache:clear', async () => {
 });
 
 // App lifecycle
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  configureAutoStart();
+  startDisplaySleepBlocker();
+  createWindow();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
@@ -402,17 +518,8 @@ app.on('activate', () => {
 
 // Handle app termination
 app.on('before-quit', () => {
+  stopDisplaySleepBlocker();
   deviceClient?.disconnect();
 });
 
-// Handle uncaught exceptions from renderer process
-process.on('uncaughtException', (error) => {
-  console.error('[Main] Uncaught exception:', error);
-  // Continue running - don't crash
-});
-
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('[Main] Unhandled rejection at:', promise, 'reason:', reason);
-  // Continue running - don't crash
-});
+registerProcessErrorHandlers();
