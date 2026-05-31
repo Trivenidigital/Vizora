@@ -3,7 +3,8 @@
 # api-critical-path.sh - operator-facing smoke test for the customer-1
 # critical path. It proves the minimum onboarding path:
 # health -> register -> login -> pair display -> create content ->
-# create playlist -> schedule playlist -> device reads active schedule.
+# upload content -> stream uploaded content -> create playlist ->
+# schedule playlist -> device reads active schedule.
 #
 # Usage:
 #   bash scripts/smoke/api-critical-path.sh
@@ -22,16 +23,18 @@ WEB_BASE="${WEB_BASE:-http://localhost:3001}"
 RT_BASE="${RT_BASE:-http://localhost:3002}"
 CURL_CONNECT_TIMEOUT="${CURL_CONNECT_TIMEOUT:-5}"
 CURL_MAX_TIME="${CURL_MAX_TIME:-20}"
+SMOKE_CLEANUP_UPLOAD="${SMOKE_CLEANUP_UPLOAD:-true}"
 umask 077
 
 RESULTS=()
 FAILED=0
 CHECK_NUM=0
 TIMESTAMP=$(date +%s)
-EMAIL="smoke-test-${TIMESTAMP}@vizora.test"
+RUN_SUFFIX="${TIMESTAMP}-${RANDOM}-$$"
+EMAIL="smoke-test-${RUN_SUFFIX}@vizora.test"
 PASSWORD='SmokeTest123!@#'
-ORG_NAME="smoke-test-${TIMESTAMP}"
-DEVICE_ID="smoke-device-${TIMESTAMP}"
+ORG_NAME="smoke-test-${RUN_SUFFIX}"
+DEVICE_ID="smoke-device-${RUN_SUFFIX}"
 TMP_PARENT="${TMPDIR:-/tmp}"
 TMP_DIR="$(mktemp -d "${TMP_PARENT%/}/vizora-smoke-${TIMESTAMP}.XXXXXX")"
 if [[ -z "$TMP_DIR" || ! -d "$TMP_DIR" ]]; then
@@ -42,6 +45,9 @@ COOKIE_JAR="$TMP_DIR/cookie.txt"
 TMP_FILES=()
 CSRF_TOKEN=""
 CHECK_LABEL=""
+UPLOAD_CONTENT_ID=""
+UPLOAD_CONTENT_DELETED=0
+CLEANED_UP=0
 
 tmp_json() {
   local name="$1"
@@ -57,12 +63,41 @@ tmp_headers() {
   printf '%s' "$path"
 }
 
+tmp_file() {
+  local name="$1"
+  local path="$TMP_DIR/$name"
+  TMP_FILES+=("$path")
+  printf '%s' "$path"
+}
+
 cleanup() {
+  if [[ "${CLEANED_UP:-0}" == "1" ]]; then
+    return
+  fi
+  CLEANED_UP=1
+
+  if [[
+    "${SMOKE_CLEANUP_UPLOAD:-true}" != "false" &&
+    "${SMOKE_CLEANUP_UPLOAD:-true}" != "0" &&
+    -n "${UPLOAD_CONTENT_ID:-}" &&
+    "${UPLOAD_CONTENT_DELETED:-0}" != "1" &&
+    -n "${COOKIE_JAR:-}" &&
+    -f "${COOKIE_JAR:-}"
+  ]]; then
+    local cleanup_headers=(-b "$COOKIE_JAR")
+    if [[ -n "${CSRF_TOKEN:-}" ]]; then
+      cleanup_headers+=(-H "X-CSRF-Token: $CSRF_TOKEN")
+    fi
+    curl "${curl_common[@]}" -X DELETE "${cleanup_headers[@]}" \
+      "$API_BASE/api/v1/content/$UPLOAD_CONTENT_ID" >/dev/null 2>&1 || true
+  fi
+
   if [[ -n "${TMP_DIR:-}" && -d "$TMP_DIR" && "$TMP_DIR" == *vizora-smoke-* ]]; then
     rm -rf "$TMP_DIR" 2>/dev/null || true
   fi
 }
-trap cleanup EXIT HUP INT TERM
+trap cleanup EXIT
+trap 'cleanup; exit 130' HUP INT TERM
 
 make_label() {
   CHECK_NUM=$((CHECK_NUM + 1))
@@ -141,6 +176,19 @@ print(json.dumps(payload))
 PY
 }
 
+write_smoke_pdf() {
+  local output_path="$1"
+  python3 - "$output_path" <<'PY'
+import sys
+
+# Tiny PDF-like fixture. It exercises multipart upload and byte-range
+# streaming without triggering image thumbnail generation.
+pdf = b"%PDF-1.1\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n"
+with open(sys.argv[1], "wb") as handle:
+    handle.write(pdf)
+PY
+}
+
 auth_headers=()
 curl_common=(-s --connect-timeout "$CURL_CONNECT_TIMEOUT" --max-time "$CURL_MAX_TIME")
 refresh_auth_headers() {
@@ -190,6 +238,33 @@ post_json() {
   : > "$out"
   actual="$(curl "${curl_common[@]}" -o "$out" -w '%{http_code}' \
     -X POST -H "Content-Type: application/json" "$@" -d "$body" "$url" 2>/dev/null)"
+
+  if [[ "$actual" == "$expected" ]]; then
+    record_ok "$label" "$actual"
+  else
+    record_fail "$label" "got '$actual'; expected '$expected'"
+    echo "$label response body:"
+    print_response_preview "$out"
+  fi
+}
+
+post_multipart_upload() {
+  local label expected url file_path out actual
+  make_label "$1"
+  label="$CHECK_LABEL"
+  expected="$2"
+  url="$3"
+  file_path="$4"
+  out="$5"
+  shift 5
+
+  : > "$out"
+  actual="$(curl "${curl_common[@]}" -o "$out" -w '%{http_code}' \
+    -X POST "$@" \
+    -F "file=@${file_path};type=application/pdf;filename=smoke-upload.pdf" \
+    -F "name=Smoke Upload ${TIMESTAMP}" \
+    -F "type=pdf" \
+    "$url" 2>/dev/null)"
 
   if [[ "$actual" == "$expected" ]]; then
     record_ok "$label" "$actual"
@@ -317,6 +392,97 @@ else
 fi
 
 probe_status_authed "List content" "200" "$API_BASE/api/v1/content"
+
+UPLOAD_FILE="$(tmp_file smoke-upload.pdf)"
+write_smoke_pdf "$UPLOAD_FILE"
+UPLOAD_FILE_SIZE="$(python3 - "$UPLOAD_FILE" <<'PY'
+import os
+import sys
+
+try:
+    print(os.path.getsize(sys.argv[1]))
+except Exception:
+    print("")
+PY
+)"
+UPLOAD_OUT="$(tmp_json upload-content)"
+post_multipart_upload "Upload PDF content" "201" "$API_BASE/api/v1/content/upload" "$UPLOAD_FILE" "$UPLOAD_OUT" "${auth_headers[@]}"
+UPLOAD_CONTENT_ID="$(json_get "$UPLOAD_OUT" "data.content.id")"
+if [[ -z "$UPLOAD_CONTENT_ID" ]]; then
+  UPLOAD_CONTENT_ID="$(json_get "$UPLOAD_OUT" "content.id")"
+fi
+make_label "Uploaded content id parsed"
+parse_label="$CHECK_LABEL"
+if [[ -n "$UPLOAD_CONTENT_ID" ]]; then
+  record_ok "$parse_label" "$UPLOAD_CONTENT_ID"
+else
+  record_fail "$parse_label" "missing uploaded content id"
+fi
+
+RANGE_OUT="$(tmp_file uploaded-content-range.bin)"
+RANGE_HEADERS="$(tmp_headers uploaded-content-range)"
+make_label "Device streams uploaded content range"
+range_label="$CHECK_LABEL"
+if [[ -n "$UPLOAD_CONTENT_ID" && -n "$DEVICE_TOKEN" ]]; then
+  : > "$RANGE_OUT"
+  : > "$RANGE_HEADERS"
+  RANGE_STATUS="$(curl "${curl_common[@]}" -D "$RANGE_HEADERS" -o "$RANGE_OUT" -w '%{http_code}' \
+    -H "Authorization: Bearer $DEVICE_TOKEN" \
+    -H "Range: bytes=0-4" \
+    "$API_BASE/api/v1/device-content/$UPLOAD_CONTENT_ID/file" 2>/dev/null)"
+  RANGE_HEX="$(python3 - "$RANGE_OUT" <<'PY'
+import sys
+
+try:
+    with open(sys.argv[1], "rb") as handle:
+        print(handle.read().hex())
+except Exception:
+    print("")
+PY
+)"
+  CONTENT_RANGE="$(python3 - "$RANGE_HEADERS" <<'PY'
+import sys
+
+try:
+    with open(sys.argv[1], "r", encoding="utf-8", errors="ignore") as handle:
+        for line in handle:
+            if line.lower().startswith("content-range:"):
+                print(line.split(":", 1)[1].strip())
+                break
+except Exception:
+    pass
+PY
+)"
+  EXPECTED_CONTENT_RANGE="bytes 0-4/$UPLOAD_FILE_SIZE"
+  if [[ "$RANGE_STATUS" == "206" && "$RANGE_HEX" == "255044462d" && "$CONTENT_RANGE" == "$EXPECTED_CONTENT_RANGE" ]]; then
+    record_ok "$range_label" "206 + PDF header range"
+  else
+    record_fail "$range_label" "got status '$RANGE_STATUS', range '$CONTENT_RANGE', hex '$RANGE_HEX'; expected 206 $EXPECTED_CONTENT_RANGE PDF header"
+    print_response_preview "$RANGE_OUT"
+  fi
+else
+  record_fail "$range_label" "missing uploaded content id or device token"
+fi
+
+DELETE_UPLOAD_OUT="$(tmp_json delete-upload-content)"
+make_label "Delete uploaded PDF content"
+delete_upload_label="$CHECK_LABEL"
+if [[ -n "$UPLOAD_CONTENT_ID" ]]; then
+  : > "$DELETE_UPLOAD_OUT"
+  refresh_auth_headers
+  DELETE_UPLOAD_STATUS="$(curl "${curl_common[@]}" -o "$DELETE_UPLOAD_OUT" -w '%{http_code}' \
+    -X DELETE "${auth_headers[@]}" \
+    "$API_BASE/api/v1/content/$UPLOAD_CONTENT_ID" 2>/dev/null)"
+  if [[ "$DELETE_UPLOAD_STATUS" == "200" || "$DELETE_UPLOAD_STATUS" == "204" ]]; then
+    UPLOAD_CONTENT_DELETED=1
+    record_ok "$delete_upload_label" "$DELETE_UPLOAD_STATUS"
+  else
+    record_fail "$delete_upload_label" "got '$DELETE_UPLOAD_STATUS'; expected 200 or 204"
+    print_response_preview "$DELETE_UPLOAD_OUT"
+  fi
+else
+  record_fail "$delete_upload_label" "missing uploaded content id"
+fi
 
 PLAYLIST_ITEMS=$(CONTENT_ID="$CONTENT_ID" python3 - <<'PY'
 import json
