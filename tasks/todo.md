@@ -1,8 +1,9 @@
 # Vizora - Task Tracker
 
-## Active: M12 Unrecognized Login Alert (2026-05-31)
+## Completed: M12 Unrecognized Login Alert (2026-05-31)
 
 **Branch:** `feat/m12-unrecognized-login-alert`
+**PR / merge commit:** #117 / `1b28608`
 
 **Why now:** `backlog.md` marks M12 partial. Password-changed alerts shipped, but the remaining new-login/unrecognized-device alert is deferred. This is a repo-side P2 security/readiness item and does not require operator credentials.
 
@@ -19,7 +20,7 @@
 - [x] Add MailService template and tests for HTML escaping.
 - [x] Add focused AuthService/AuthController tests for metadata propagation, audit writes, first-login suppression, recognized-login suppression, normalized browser-version matching, unrecognized-login email, and mail-failure non-blocking.
 - [x] Run focused tests and final review.
-- [ ] Open PR, wait for CI, and merge if clean.
+- [x] Open PR, wait for CI, and merge if clean.
 
 **Verification so far**
 - `pnpm install --frozen-lockfile` in isolated worktree (needed because worktree had no `node_modules`).
@@ -27,11 +28,14 @@
 - `NODE_OPTIONS=--use-system-ca pnpm --dir packages/database exec prisma generate`: PASS. Needed only for the fresh isolated worktree because generated Prisma client was absent.
 - `npx nx build @vizora/middleware`: PASS with existing webpack warnings.
 - `pnpm --filter @vizora/middleware test -- --runInBand`: PASS, 141 suites / 2739 tests.
+- PR #117 CI: PASS — audit, build, lint, security, test, and e2e.
 
 **Review notes**
 - Local `claude -p` review is blocked by operator auth (`Not logged in - Please run /login`). Fallback reviewers used via local subagent tool.
 - Reviewer findings fixed: mail send and alert-history lookup now run after audit write in a fail-open background task; same-IP history lookup is bounded; prior rows are constrained to `createdAt < currentAuditLog.createdAt`; existing Google OAuth logins now pass IP/User-Agent through the same audit/alert path; password and Google registration now seed metadata-bearing login rows without sending an alert; Firefox `rv:` and mobile Edge UA version normalization are covered by tests.
 - Final reviewer gate: CLEAN.
+
+**Deploy status:** not deployed. No env/secrets/schema changes.
 
 ---
 
