@@ -1,8 +1,93 @@
 # Vizora - Task Tracker
 
-## In Progress: Customer Contract, Security, and Performance Pass 6 (2026-05-31)
+## In Progress: Device Content Streaming Performance Pass 7 (2026-05-31)
+
+**Branch:** `feat/content-streaming-performance-7`
+
+**Why now:** Customer display playback is a hot path and the middleware device-content route repeats
+device-token DB validation, content DB lookup, and MinIO metadata lookup for every video byte-range
+request. This is repo-side, customer-visible performance work that does not require secrets,
+production state mutation, or live hardware.
+
+**New primitives introduced:** small in-process TTL caches inside `DeviceContentController` for
+verified current device-token payloads, tenant-scoped content rows, and MinIO object metadata.
+
+**Hermes-first analysis:** not applicable; this pass does not add business-agent behavior, MCP tools,
+Hermes skills, AI provider calls, or spend paths.
+
+**Plan/design:** `docs/plans/2026-05-31-device-content-streaming-performance-pass-7.md`
+
+**Plan**
+- [x] Create fresh branch from merged `origin/main`.
+- [x] Write plan/design and tracker section.
+- [x] Run multi-subagent design review before tests.
+- [x] Add failing focused tests for duplicate range-request work and cache headers.
+- [x] Implement bounded short-TTL auth/content/metadata caches on the existing controller path.
+- [x] Run focused middleware tests.
+- [x] Run multi-subagent code review before broader tests.
+- [x] Run broader affected tests/builds/typecheck.
+- [ ] PR, CI, merge.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Baseline evidence**
+- [x] Code inspection: `DeviceContentController.serveFile` calls `verifyCurrentDeviceToken`,
+  `contentService.findByIdForDevice`, and `storageService.getFileMetadata` on every request before
+  selecting full/range streaming.
+- [x] Existing response headers use `Cache-Control: private, no-store` on successful media responses,
+  preventing short browser/device cache reuse.
+
+**Design review gate**
+- [x] Customer/performance reviewer found a blocking design problem with `private, max-age=30` on
+  stable media URLs; revised design keeps successful media responses `private, no-store`.
+- [x] Customer/performance reviewer found a stale-content replacement failure mode; revised design
+  invalidates cached content/metadata and retries once on pre-header MinIO stream-acquisition failure.
+- [x] Security/tenant reviewer found the same response-cache stale-auth risk and called out the
+  pre-existing org-scoped content authorization model; revised docs make that boundary explicit.
+- [x] Security/tenant reviewer accepted a 5s server-side auth cache if populated only after full
+  current-token validation and capped by JWT `exp`.
+
+**Focused verification**
+- [x] Red run: `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern=device-content.controller`
+  failed on duplicate JWT/content/metadata calls and missing stale-object retry.
+- [x] Green run: `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern=device-content.controller`
+  passed, 1 suite / 30 tests.
+- [x] Code review found concurrent stale-object misses could poison the shared MinIO range circuit;
+  fixed by serializing cached-object stream acquisition per old object key and re-resolving waiters
+  after invalidation.
+- [x] Code review found metadata-miss replacement could transiently 404 for the content-cache TTL;
+  fixed by evicting cached content/metadata on metadata miss and retrying cached rows once.
+- [x] Code review found the content cache stored full rows; fixed `findByIdForDevice` to select only
+  `id`, `organizationId`, `url`, and `mimeType`.
+- [x] Review-fix run: `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="device-content.controller|content.service"`
+  passed, 2 suites / 130 tests.
+- [x] Post-review low coverage fix: added direct same-request cached-row metadata-miss retry coverage.
+- [x] Post-review focused run: `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="device-content.controller|content.service"`
+  passed, 2 suites / 131 tests.
+
+**Review gate**
+- [x] Security/runtime re-review: CLEAN; verified metadata-miss retry, narrow content query, stale old-key lock,
+  token-exp auth-cache cap, org cache keying, and no browser `max-age`.
+- [x] Playback/performance re-review: CLEAN; verified pending-load coalescing, stale old-key retry/circuit fix,
+  no-store behavior, and that only stream acquisition is serialized, not response body transfer.
+
+**Broader verification**
+- [x] `pnpm --filter @vizora/middleware test -- --runInBand` - pass, 143 suites / 2821 tests.
+- [x] `pnpm --filter @vizora/middleware exec tsc --noEmit --pretty false` - pass.
+- [x] `npx nx build @vizora/middleware` - pass with existing webpack warnings; Nx reported
+  `@vizora/database:build` as flaky after successful completion.
+- [x] `git diff --check` - pass with expected LF-to-CRLF warnings only.
+
+**PR / CI**
+- [x] Branch commit created: `perf(middleware): cache device content streaming lookups`.
+- [x] PR #130 opened and mergeable.
+- [x] GitHub CI green at first pushed head: audit, lint, test, build, security, and e2e passed.
+
+---
+
+## Completed: Customer Contract, Security, and Performance Pass 6 (2026-05-31)
 
 **Branch:** `feat/customer-performance-review-6`
+**PR / merge commit:** #129 / `8805aa90ea2fb04df907c71ceb5a11d723e22bea`
 
 **Why now:** PR #128 merged and CI is green, but deploy remains blocked by dirty/diverged prod-local work. The next repo-side slice should fix customer-visible contract failures and small performance/security defects that do not require secrets, customer credentials, live hardware, or production state mutation.
 
@@ -24,8 +109,8 @@
 - [x] Run multi-subagent review before broader tests.
 - [x] Run post-fix re-review before broader tests.
 - [x] Run broader affected tests/builds.
-- [ ] PR, CI, merge.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe.
 
 **Analysis feed**
 - [x] Local drift check confirmed billing response mismatch, `serverFetch` cookie/envelope drift, push-content false success, RSS/thumbnail redirect gap, and unauthenticated display preload path still exist after PR #128.
@@ -59,6 +144,16 @@
 - [x] `npx nx build @vizora/middleware` - pass with existing webpack warnings.
 - [x] `NODE_OPTIONS=--max-old-space-size=4096 NEXT_PUBLIC_SOCKET_URL=http://localhost:3002 NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1 BACKEND_URL=http://localhost:3000 npx nx build @vizora/web` - pass with existing Next middleware/proxy deprecation and TS project-reference warnings.
 - [x] `git diff --check origin/main...HEAD` - pass.
+
+**Merge / CI / deployment gate**
+- [x] PR #129 merged after GitHub checks passed: lint, audit, test, build, security, and e2e.
+- [x] GitHub main after merge: `8805aa90ea2fb04df907c71ceb5a11d723e22bea`.
+- [x] Open PRs after merge: none.
+- [x] Production health probe returned `success: true`, database connected at `2026-05-31T15:33:14.762Z`.
+- [x] Production deploy remains blocked: `/opt/vizora/app` is dirty and diverged
+  (`HEAD=bb76aa1838740bff5b58623dfef7a906d44f46a6`, `origin/main=8805aa90ea2fb04df907c71ceb5a11d723e22bea`,
+  `ahead 17, behind 65`). Do not pull/reset/stash/restart services until prod-local work is
+  reconciled.
 
 ---
 

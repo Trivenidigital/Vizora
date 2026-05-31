@@ -206,6 +206,12 @@ export class ContentService {
   async findByIdForDevice(id: string, organizationId: string) {
     const content = await this.db.content.findFirst({
       where: { id, organizationId },
+      select: {
+        id: true,
+        organizationId: true,
+        url: true,
+        mimeType: true,
+      },
     });
     return content;
   }
