@@ -252,6 +252,35 @@ describe('ContentService', () => {
     });
   });
 
+  describe('findByIdForDevice', () => {
+    it('selects only fields needed by the device file-serving path', async () => {
+      mockDatabaseService.content.findFirst.mockResolvedValue({
+        id: 'content-123',
+        organizationId: 'org-123',
+        url: 'minio://org-123/uploads/test.jpg',
+        mimeType: 'image/jpeg',
+      });
+
+      const result = await service.findByIdForDevice('content-123', 'org-123');
+
+      expect(result).toEqual({
+        id: 'content-123',
+        organizationId: 'org-123',
+        url: 'minio://org-123/uploads/test.jpg',
+        mimeType: 'image/jpeg',
+      });
+      expect(mockDatabaseService.content.findFirst).toHaveBeenCalledWith({
+        where: { id: 'content-123', organizationId: 'org-123' },
+        select: {
+          id: true,
+          organizationId: true,
+          url: true,
+          mimeType: true,
+        },
+      });
+    });
+  });
+
   describe('getResolvedLayout', () => {
     it('emits display-compatible resolvedPlaylist and resolvedContent zone fields', async () => {
       mockDatabaseService.content.findFirst.mockResolvedValue({
