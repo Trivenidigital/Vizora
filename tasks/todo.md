@@ -1,8 +1,47 @@
 # Vizora - Task Tracker
 
-## In Progress: Customer Performance Readiness Pass 3 (2026-05-31)
+## In Progress: Critical Smoke Upload + Streaming Coverage (2026-05-31)
+
+**Branch:** `feat/customer-readiness-next`
+
+**Why now:** PR #123 merged the customer-readiness hot-path hardening, but the operator smoke still proves URL content creation rather than real multipart upload and authenticated media streaming. Customer-1 go-live needs the smoke to exercise the path displays actually use for uploaded assets.
+
+**New primitives introduced:** none. Reuse the existing smoke script, upload endpoint, device JWT pairing flow, and device-content streaming route.
+
+**Hermes-first analysis:** not applicable; this is API smoke coverage in existing middleware/display paths, not a business-agent, MCP, Hermes, or AI/spend path.
+
+**Plan/design:** `docs/plans/2026-05-31-critical-smoke-upload-streaming.md`
+
+**Plan**
+- [x] Re-check current branch/CI/prod deploy gate after PR #123 merge.
+- [x] Drift-check smoke coverage for upload and device-content streaming.
+- [x] Add generated tiny PDF multipart upload to the critical-path smoke.
+- [x] Add authenticated device-content byte-range streaming verification.
+- [x] Add uploaded-object cleanup so production smoke runs do not leave MinIO objects behind.
+- [x] Run subagent review before broad verification.
+- [x] Run focused verification; full smoke blocked because Docker/local services are unavailable.
+- [ ] PR, CI, merge.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Review gate**
+- [x] Bash/operator-safety reviewer: initial run-ID, range-validation, and interrupt-handling notes fixed; final re-review CLEAN.
+- [x] Customer-readiness/operator-state reviewer: initial persistent-artifact finding fixed with PDF fixture + uploaded-content delete; final re-review CLEAN.
+
+**Local verification**
+- [x] `pnpm install --frozen-lockfile` - pass.
+- [x] `C:\Program Files\Git\bin\bash.exe -n scripts/smoke/api-critical-path.sh` - pass.
+- [x] `git diff --check` - pass; line-ending warnings only.
+- [x] `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="file-validation.service|content.controller|device-content.controller"` - pass, 7 suites / 190 tests.
+- [x] `pnpm --filter @vizora/middleware test -- --runInBand` - pass, 143 suites / 2787 tests.
+- [x] `pnpm --dir packages/database exec prisma validate --schema prisma/schema.prisma` with `NODE_OPTIONS=--use-system-ca` - pass.
+- [x] Full local smoke not run: Docker Desktop is not running and local 3000/3001/3002 services are unavailable. Production smoke is intentionally not used as a substitute while prod deploy gate is blocked.
+
+---
+
+## Completed: Customer Performance Readiness Pass 3 (2026-05-31)
 
 **Branch:** `feat/customer-performance-readiness-3`
+**PR / merge commit:** #123 / `0c45c468243b5271eb3afee24284dc16ecce370f`
 
 **Why now:** PRs #120-#122 closed the first display delivery, dashboard readiness, and stale PR #34 residual slices. The next repo-side push is a fresh customer-perspective review plus performance/code-review pass focused on content upload, pairing, content streaming, middleware hot paths, and any remaining production-readiness issues that are buildable and testable without operator-only actions.
 
@@ -24,8 +63,8 @@
 - [x] Implement fixes with focused tests.
 - [x] Run multi-subagent review before broad tests.
 - [x] Run focused/broad local verification.
-- [ ] PR, CI, merge.
-- [ ] Re-check deployment gate and deploy only if prod checkout is safe.
+- [x] PR, CI, merge.
+- [x] Re-check deployment gate; deployment remains blocked by dirty/diverged prod checkout.
 
 **Selected fix bundle**
 - [x] Reject disabled/deleted display tokens in realtime and device-content paths.
@@ -60,10 +99,10 @@
 - [x] `NODE_OPTIONS=--max-old-space-size=4096 NEXT_PUBLIC_SOCKET_URL=http://localhost:3002 NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1 npx nx build @vizora/web` - pass with existing Next middleware deprecation and TypeScript project-reference warnings.
 
 **Current deployment gate**
-- GitHub main: `48affb3e0ff6163ae5babf6bbe74d702c67e5348` after PR #122.
-- Open PRs: none after closing stale PR #34.
-- Production health: `/api/v1/health` returned `success: true`, database connected at `2026-05-31T08:22:03.846Z`.
-- Production deploy is blocked: `/opt/vizora/app` is dirty, local `HEAD=bb76aa1838740bff5b58623dfef7a906d44f46a6`, and after fetch is `ahead 17, behind 38` relative to `origin/main=48affb3e0ff6163ae5babf6bbe74d702c67e5348`. Do not pull/reset/stash/restart services until prod-local work is reconciled.
+- GitHub main: `0c45c468243b5271eb3afee24284dc16ecce370f` after PR #123.
+- Open PRs: none after merging PR #123.
+- Production health: `/api/v1/health` returned `success: true`, database connected at `2026-05-31T10:16:01.382Z`.
+- Production deploy is blocked: `/opt/vizora/app` is dirty, local `HEAD=bb76aa1838740bff5b58623dfef7a906d44f46a6`, and after fetch is `ahead 17, behind 39` relative to `origin/main=0c45c468243b5271eb3afee24284dc16ecce370f`. Do not pull/reset/stash/restart services until prod-local work is reconciled.
 
 ---
 
