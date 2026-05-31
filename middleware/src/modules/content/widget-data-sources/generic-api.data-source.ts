@@ -20,8 +20,6 @@ import { WidgetDataSource } from './widget-data-source.interface';
  *   - OAuth flows (customer can paste a Bearer token into headers)
  *   - Full JSONPath ($.store.book[?(@.price < 10)]) — simple dot-path
  *     covers the typical case; full JSONPath needs a dependency
- *   - Response size limits — acceptable v1 risk; add a content-length
- *     check if real customers report issues
  */
 @Injectable()
 export class GenericApiDataSource implements WidgetDataSource {
@@ -30,6 +28,7 @@ export class GenericApiDataSource implements WidgetDataSource {
   readonly type = 'generic-api';
 
   private readonly REQUEST_TIMEOUT = 15_000;
+  private readonly MAX_RESPONSE_BYTES = 1024 * 1024;
 
   constructor(private readonly circuitBreaker: CircuitBreakerService) {}
 
@@ -104,7 +103,7 @@ export class GenericApiDataSource implements WidgetDataSource {
 
           let json: unknown;
           try {
-            json = await res.json();
+            json = JSON.parse(await this.readJsonBodyWithLimit(res));
           } catch (err) {
             throw new Error(
               `Endpoint did not return valid JSON: ${err instanceof Error ? err.message : 'unknown'}`,
@@ -123,6 +122,63 @@ export class GenericApiDataSource implements WidgetDataSource {
         return this.getSampleData();
       },
     );
+  }
+
+  private async readJsonBodyWithLimit(res: Response): Promise<string> {
+    const contentLength = res.headers.get('content-length');
+    if (contentLength) {
+      const declaredBytes = Number(contentLength);
+      if (Number.isFinite(declaredBytes) && declaredBytes > this.MAX_RESPONSE_BYTES) {
+        await this.cancelResponseBody(res);
+        throw new Error(`Endpoint response is too large; maximum is ${this.MAX_RESPONSE_BYTES} bytes`);
+      }
+    }
+
+    if (!res.body) {
+      const text = await res.text();
+      if (Buffer.byteLength(text, 'utf8') > this.MAX_RESPONSE_BYTES) {
+        throw new Error(`Endpoint response is too large; maximum is ${this.MAX_RESPONSE_BYTES} bytes`);
+      }
+      return text;
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let receivedBytes = 0;
+    let text = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        receivedBytes += value.byteLength;
+        if (receivedBytes > this.MAX_RESPONSE_BYTES) {
+          await this.cancelReader(reader);
+          throw new Error(`Endpoint response is too large; maximum is ${this.MAX_RESPONSE_BYTES} bytes`);
+        }
+        text += decoder.decode(value, { stream: true });
+      }
+      text += decoder.decode();
+      return text;
+    } finally {
+      reader.releaseLock();
+    }
+  }
+
+  private async cancelResponseBody(res: Response): Promise<void> {
+    try {
+      await res.body?.cancel();
+    } catch {
+      // The size rejection is the important error; body cancellation is cleanup.
+    }
+  }
+
+  private async cancelReader(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<void> {
+    try {
+      await reader.cancel();
+    } catch {
+      // Preserve the response-size error even if stream cancellation fails.
+    }
   }
 
   /**

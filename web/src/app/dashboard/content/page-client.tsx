@@ -90,6 +90,10 @@ export default function ContentClient() {
  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
  const [devices, setDevices] = useState<Display[]>([]);
  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+ const [devicesLoading, setDevicesLoading] = useState(false);
+ const [playlistsLoading, setPlaylistsLoading] = useState(false);
+ const [devicesLoadError, setDevicesLoadError] = useState<string | null>(null);
+ const [playlistsLoadError, setPlaylistsLoadError] = useState<string | null>(null);
  const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
  const [selectedPlaylist, setSelectedPlaylist] = useState('');
  const [pushDuration, setPushDuration] = useState(5);
@@ -141,6 +145,10 @@ export default function ContentClient() {
  const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
  const hasHandledInitialFolderLoadRef = useRef(false);
  const loadContentRequestRef = useRef(0);
+ const devicesLoadedRef = useRef(false);
+ const playlistsLoadedRef = useRef(false);
+ const devicesLoadPromiseRef = useRef<Promise<void> | null>(null);
+ const playlistsLoadPromiseRef = useRef<Promise<void> | null>(null);
  useEffect(() => {
    return () => {
      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
@@ -192,8 +200,6 @@ export default function ContentClient() {
 
  useEffect(() => {
  loadContent();
- loadDevices();
- loadPlaylists();
  loadFolders();
  }, []);
 
@@ -237,14 +243,13 @@ export default function ContentClient() {
  if (requestId !== loadContentRequestRef.current) {
  return;
  }
- toast.error(error.message || 'Failed to load content');
- } finally {
- if (requestId !== loadContentRequestRef.current) {
- return;
- }
+  toast.error(error.message || 'Failed to load content');
+  } finally {
+ if (requestId === loadContentRequestRef.current) {
  setLoading(false);
- }
- };
+  }
+  }
+  };
 
  const loadFolders = async () => {
  try {
@@ -302,32 +307,60 @@ export default function ContentClient() {
 
  const loadDevices = async () => {
  try {
+ setDevicesLoading(true);
+ setDevicesLoadError(null);
  const devicesList = await fetchAllPaginated((params) => apiClient.getDisplays(params));
  setDevices(devicesList);
+ devicesLoadedRef.current = true;
  } catch (error: any) {
+ const message = error.message || 'Could not load devices list';
+ setDevicesLoadError(message);
  if (process.env.NODE_ENV === 'development') {
   console.error('[ContentPage] Failed to load devices:', error);
  }
- // Non-critical: devices are optional for content listing
- if (process.env.NODE_ENV === 'development') {
- toast.warning('Could not load devices list');
- }
+ toast.error(message);
+ } finally {
+ setDevicesLoading(false);
  }
  };
 
  const loadPlaylists = async () => {
  try {
+ setPlaylistsLoading(true);
+ setPlaylistsLoadError(null);
  const playlistList = await fetchAllPaginated((params) => apiClient.getPlaylists(params));
  setPlaylists(playlistList);
+ playlistsLoadedRef.current = true;
  } catch (error: any) {
+ const message = error.message || 'Could not load playlists list';
+ setPlaylistsLoadError(message);
  if (process.env.NODE_ENV === 'development') {
   console.error('[ContentPage] Failed to load playlists:', error);
  }
- // Non-critical: playlists are optional for content listing
- if (process.env.NODE_ENV === 'development') {
- toast.warning('Could not load playlists list');
+ toast.error(message);
+ } finally {
+ setPlaylistsLoading(false);
  }
+ };
+
+ const ensureDevicesLoaded = async (forceRefresh = false) => {
+ if (!forceRefresh && devicesLoadedRef.current) return;
+ if (!devicesLoadPromiseRef.current) {
+ devicesLoadPromiseRef.current = loadDevices().finally(() => {
+ devicesLoadPromiseRef.current = null;
+ });
  }
+ await devicesLoadPromiseRef.current;
+ };
+
+ const ensurePlaylistsLoaded = async (forceRefresh = false) => {
+ if (!forceRefresh && playlistsLoadedRef.current) return;
+ if (!playlistsLoadPromiseRef.current) {
+ playlistsLoadPromiseRef.current = loadPlaylists().finally(() => {
+ playlistsLoadPromiseRef.current = null;
+ });
+ }
+ await playlistsLoadPromiseRef.current;
  };
 
  const handleBulkUpload = async () => {
@@ -616,6 +649,7 @@ export default function ContentClient() {
  setSelectedDevices([]);
  setPushDuration(5);
  setIsPushModalOpen(true);
+ void ensureDevicesLoaded(true);
  };
 
  const confirmPush = async () => {
@@ -643,6 +677,7 @@ export default function ContentClient() {
  setSelectedContent(item);
  setSelectedPlaylist('');
  setIsAddToPlaylistModalOpen(true);
+ void ensurePlaylistsLoaded(true);
  };
 
  const confirmAddToPlaylist = async () => {
@@ -653,6 +688,7 @@ export default function ContentClient() {
  await apiClient.addPlaylistItem(selectedPlaylist, selectedContent.id);
  toast.success('Content added to playlist');
  setIsAddToPlaylistModalOpen(false);
+ playlistsLoadedRef.current = false;
  } catch (error: any) {
  toast.error(error.message || 'Failed to add to playlist');
  } finally {
@@ -891,6 +927,12 @@ export default function ContentClient() {
 
  const hasActiveFilters = filterType !== 'all' || filterStatus !== 'all' || filterDateRange !== 'all' || searchQuery !== '' || selectedTags.length > 0;
  const retryableUploadCount = uploadQueue.filter(item => item.status !== 'success').length;
+ const onlineDeviceCount = devices.filter(d => d.status === 'online').length;
+ const deviceSelectionLabel = devicesLoading
+ ? 'Select Devices (loading...)'
+ : devicesLoadError
+ ? 'Select Devices'
+ : `Select Devices (${onlineDeviceCount} online)`;
 
  return (
  <div className="flex h-full">
@@ -1766,10 +1808,23 @@ export default function ContentClient() {
  {/* Device Selection */}
  <div>
  <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
- Select Devices ({devices.filter(d => d.status === 'online').length} online)
+ {deviceSelectionLabel}
  </label>
  <div className="max-h-48 overflow-y-auto space-y-2 border border-[var(--border)] rounded-lg p-2">
- {devices.length === 0 ? (
+ {devicesLoading ? (
+ <div className="py-4 flex justify-center"><LoadingSpinner size="sm" /></div>
+ ) : devicesLoadError ? (
+ <div className="py-4 text-center space-y-3">
+ <p className="text-sm text-error-600 dark:text-error-400">{devicesLoadError}</p>
+ <button
+ type="button"
+ onClick={() => void ensureDevicesLoaded(true)}
+ className="px-3 py-1.5 text-sm font-medium bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition"
+ >
+ Retry loading devices
+ </button>
+ </div>
+ ) : devices.length === 0 ? (
  <p className="text-sm text-[var(--foreground-tertiary)] text-center py-4">No devices available</p>
  ) : (
  devices.map((device) => (
@@ -1845,15 +1900,34 @@ export default function ContentClient() {
  <select
  value={selectedPlaylist}
  onChange={(e) => setSelectedPlaylist(e.target.value)}
+ disabled={playlistsLoading || !!playlistsLoadError}
  className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
  >
- <option value="">Select a playlist</option>
+ <option value="">
+ {playlistsLoading
+ ? 'Loading playlists...'
+ : playlistsLoadError
+ ? 'Unable to load playlists'
+ : 'Select a playlist'}
+ </option>
  {playlists.map((playlist) => (
  <option key={playlist.id} value={playlist.id}>
  {playlist.name} ({playlist.items?.length || 0} items)
  </option>
  ))}
  </select>
+ {playlistsLoadError && (
+ <div className="mt-3 text-center space-y-3">
+ <p className="text-sm text-error-600 dark:text-error-400">{playlistsLoadError}</p>
+ <button
+ type="button"
+ onClick={() => void ensurePlaylistsLoaded(true)}
+ className="px-3 py-1.5 text-sm font-medium bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition"
+ >
+ Retry loading playlists
+ </button>
+ </div>
+ )}
  <div className="flex justify-end gap-3 pt-4">
  <button
  onClick={() => setIsAddToPlaylistModalOpen(false)}

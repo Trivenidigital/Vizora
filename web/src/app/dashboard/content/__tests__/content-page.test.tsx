@@ -11,6 +11,7 @@ const mockUploadContent = jest.fn();
 const mockCreateContent = jest.fn();
 const mockUploadContentWithProgress = jest.fn();
 const mockGenerateThumbnail = jest.fn();
+const mockAddPlaylistItem = jest.fn();
 let lastDropzoneOptions: any;
 
 jest.mock('@/lib/api', () => ({
@@ -25,6 +26,7 @@ jest.mock('@/lib/api', () => ({
     createContent: (...args: any[]) => mockCreateContent(...args),
     uploadContentWithProgress: (...args: any[]) => mockUploadContentWithProgress(...args),
     generateThumbnail: (...args: any[]) => mockGenerateThumbnail(...args),
+    addPlaylistItem: (...args: any[]) => mockAddPlaylistItem(...args),
   },
 }));
 
@@ -203,6 +205,7 @@ describe('ContentClient', () => {
     mockCreateContent.mockResolvedValue({ id: 'new-1', title: 'New Content' });
     mockUploadContentWithProgress.mockResolvedValue({ id: 'new-1', title: 'New Content' });
     mockGenerateThumbnail.mockResolvedValue({});
+    mockAddPlaylistItem.mockResolvedValue({});
     lastDropzoneOptions = undefined;
     Object.defineProperty(URL, 'createObjectURL', {
       configurable: true,
@@ -218,8 +221,6 @@ describe('ContentClient', () => {
     await waitFor(() => {
       expect(mockGetContent).toHaveBeenCalled();
       expect(mockGetFolders).toHaveBeenCalled();
-      expect(mockGetDisplays).toHaveBeenCalled();
-      expect(mockGetPlaylists).toHaveBeenCalled();
     });
     await waitFor(() => {
       expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
@@ -232,8 +233,6 @@ describe('ContentClient', () => {
   const waitForAuxiliaryRequestsToSettle = async () => {
     await waitFor(() => {
       expect(mockGetFolders).toHaveBeenCalled();
-      expect(mockGetDisplays).toHaveBeenCalled();
-      expect(mockGetPlaylists).toHaveBeenCalled();
     });
     await act(async () => {
       await Promise.resolve();
@@ -412,9 +411,218 @@ describe('ContentClient', () => {
     expect(screen.getByTestId('selected-tags')).toHaveTextContent('');
   });
 
-  it('also fetches displays and playlists for push/add features', async () => {
+  it('does not fetch modal-only displays and playlists on mount', async () => {
     render(<ContentClient />);
     await waitForInitialRequestsToSettle();
+    expect(mockGetDisplays).not.toHaveBeenCalled();
+    expect(mockGetPlaylists).not.toHaveBeenCalled();
+  });
+
+  it('lazy-loads displays when opening the push modal', async () => {
+    mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
+    mockGetDisplays.mockResolvedValue({
+      data: [{ id: 'd1', nickname: 'Lobby Display', status: 'online', location: 'Lobby' }],
+      meta: { total: 1, totalPages: 1 },
+    });
+
+    render(<ContentClient />);
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    expect(mockGetDisplays).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getAllByText('Push')[0]);
+
+    await waitFor(() => {
+      expect(mockGetDisplays).toHaveBeenCalledWith({ page: 1, limit: 100 });
+      expect(screen.getByText('Lobby Display')).toBeInTheDocument();
+    });
+    expect(mockGetPlaylists).not.toHaveBeenCalled();
+  });
+
+  it('shows a retryable device-load error in the push modal', async () => {
+    mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
+    mockGetDisplays
+      .mockRejectedValueOnce(new Error('Devices unavailable'))
+      .mockResolvedValueOnce({
+        data: [{ id: 'd2', nickname: 'Recovered Display', status: 'online', location: 'Lobby' }],
+        meta: { total: 1, totalPages: 1 },
+      });
+
+    render(<ContentClient />);
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByText('Push')[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText('Devices unavailable')).toBeInTheDocument();
+      expect(screen.getByText('Retry loading devices')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('No devices available')).not.toBeInTheDocument();
+    expect(screen.getByText('Select Devices')).toBeInTheDocument();
+    expect(screen.queryByText('Select Devices (0 online)')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Retry loading devices'));
+
+    await waitFor(() => {
+      expect(mockGetDisplays).toHaveBeenCalledTimes(2);
+      expect(screen.getByText('Recovered Display')).toBeInTheDocument();
+      expect(screen.getByText('Select Devices (1 online)')).toBeInTheDocument();
+    });
+  });
+
+  it('lazy-loads playlists when opening the add-to-playlist modal', async () => {
+    mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
+    mockGetPlaylists.mockResolvedValue({
+      data: [{ id: 'p1', name: 'Lunch Menu', items: [] }],
+      meta: { total: 1, totalPages: 1 },
+    });
+
+    render(<ContentClient />);
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    expect(mockGetPlaylists).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getAllByText('Playlist')[0]);
+
+    await waitFor(() => {
+      expect(mockGetPlaylists).toHaveBeenCalledWith({ page: 1, limit: 100 });
+      expect(screen.getByText('Lunch Menu (0 items)')).toBeInTheDocument();
+    });
+    expect(mockGetDisplays).not.toHaveBeenCalled();
+  });
+
+  it('shows a retryable playlist-load error in the add-to-playlist modal', async () => {
+    mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
+    mockGetPlaylists
+      .mockRejectedValueOnce(new Error('Playlists unavailable'))
+      .mockResolvedValueOnce({
+        data: [{ id: 'p2', name: 'Recovered Playlist', items: [] }],
+        meta: { total: 1, totalPages: 1 },
+      });
+
+    render(<ContentClient />);
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByText('Playlist')[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText('Playlists unavailable')).toBeInTheDocument();
+      expect(screen.getByText('Retry loading playlists')).toBeInTheDocument();
+    });
+    expect(screen.getByDisplayValue('Unable to load playlists')).toBeDisabled();
+
+    fireEvent.click(screen.getByText('Retry loading playlists'));
+
+    await waitFor(() => {
+      expect(mockGetPlaylists).toHaveBeenCalledTimes(2);
+      expect(screen.getByText('Recovered Playlist (0 items)')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Select a playlist')).not.toBeDisabled();
+    });
+  });
+
+  it('refreshes devices each time the push modal is opened', async () => {
+    mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
+    mockGetDisplays
+      .mockResolvedValueOnce({
+        data: [{ id: 'd1', nickname: 'Lobby Display', status: 'online', location: 'Lobby' }],
+        meta: { total: 1, totalPages: 1 },
+      })
+      .mockResolvedValueOnce({
+        data: [{ id: 'd2', nickname: 'Kitchen Display', status: 'offline', location: 'Kitchen' }],
+        meta: { total: 1, totalPages: 1 },
+      });
+
+    render(<ContentClient />);
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByText('Push')[0]);
+    await waitFor(() => {
+      expect(screen.getByText('Lobby Display')).toBeInTheDocument();
+      expect(screen.getByText('Select Devices (1 online)')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByLabelText('Close modal'));
+    fireEvent.click(screen.getAllByText('Push')[0]);
+
+    await waitFor(() => {
+      expect(mockGetDisplays).toHaveBeenCalledTimes(2);
+      expect(screen.getByText('Kitchen Display')).toBeInTheDocument();
+      expect(screen.getByText('Select Devices (0 online)')).toBeInTheDocument();
+    });
+  });
+
+  it('refreshes playlists each time the add-to-playlist modal is opened', async () => {
+    mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
+    mockGetPlaylists
+      .mockResolvedValueOnce({
+        data: [{ id: 'p1', name: 'Lunch Menu', items: [] }],
+        meta: { total: 1, totalPages: 1 },
+      })
+      .mockResolvedValueOnce({
+        data: [{ id: 'p2', name: 'Dinner Menu', items: [{ id: 'item-1' }] }],
+        meta: { total: 1, totalPages: 1 },
+      });
+
+    render(<ContentClient />);
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByText('Playlist')[0]);
+    await waitFor(() => {
+      expect(screen.getByText('Lunch Menu (0 items)')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByLabelText('Close modal'));
+    fireEvent.click(screen.getAllByText('Playlist')[0]);
+
+    await waitFor(() => {
+      expect(mockGetPlaylists).toHaveBeenCalledTimes(2);
+      expect(screen.getByText('Dinner Menu (1 items)')).toBeInTheDocument();
+    });
+  });
+
+  it('refetches playlist options after adding content to a playlist', async () => {
+    mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
+    mockGetPlaylists
+      .mockResolvedValueOnce({
+        data: [{ id: 'p1', name: 'Lunch Menu', items: [] }],
+        meta: { total: 1, totalPages: 1 },
+      })
+      .mockResolvedValueOnce({
+        data: [{ id: 'p1', name: 'Lunch Menu', items: [{ id: 'item-1' }] }],
+        meta: { total: 1, totalPages: 1 },
+      });
+
+    render(<ContentClient />);
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByText('Playlist')[0]);
+    await waitFor(() => {
+      expect(screen.getByText('Lunch Menu (0 items)')).toBeInTheDocument();
+    });
+    fireEvent.change(screen.getByDisplayValue('Select a playlist'), { target: { value: 'p1' } });
+    fireEvent.click(screen.getAllByText('Add to Playlist').at(-1)!);
+
+    await waitFor(() => {
+      expect(mockAddPlaylistItem).toHaveBeenCalledWith('p1', 'c1');
+    });
+
+    fireEvent.click(screen.getAllByText('Playlist')[0]);
+    await waitFor(() => {
+      expect(mockGetPlaylists).toHaveBeenCalledTimes(2);
+      expect(screen.getByText('Lunch Menu (1 items)')).toBeInTheDocument();
+    });
   });
 
   it('bulk upload preserves each queued file type after the selector changes', async () => {

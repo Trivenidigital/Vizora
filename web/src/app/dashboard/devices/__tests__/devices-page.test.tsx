@@ -73,7 +73,21 @@ jest.mock('@/lib/hooks', () => ({
     getPendingCount: jest.fn(() => 0),
     hasPendingUpdates: jest.fn(() => false),
   })),
-  useErrorRecovery: jest.fn(() => ({ retry: jest.fn(), recordError: jest.fn(), clearError: jest.fn(), isRecovering: false })),
+  useErrorRecovery: jest.fn(() => ({
+    retry: jest.fn(async (_id, fn, onSuccess, onError) => {
+      try {
+        const result = await fn();
+        onSuccess?.(result);
+        return result;
+      } catch (error) {
+        onError?.(error);
+        throw error;
+      }
+    }),
+    recordError: jest.fn(),
+    clearError: jest.fn(),
+    isRecovering: false,
+  })),
 }));
 
 jest.mock('@/theme/icons', () => ({
@@ -216,12 +230,73 @@ describe('DevicesClient', () => {
     }, { timeout: 3000 });
   });
 
-  it('calls getDisplays API', async () => {
+  it('does not refetch devices or playlists when server props are already present', async () => {
     mockGetDisplays.mockResolvedValue({ data: sampleDevices, meta: { total: 3 } });
-    render(<DevicesClient initialDevices={sampleDevices as any} initialPlaylists={samplePlaylists as any} />);
+    render(
+      <DevicesClient
+        initialDevices={sampleDevices as any}
+        initialPlaylists={samplePlaylists as any}
+        initialDevicesComplete
+        initialPlaylistsComplete
+      />,
+    );
     await waitFor(() => {
       expect(screen.getByText('Lobby Display')).toBeInTheDocument();
     });
+    expect(mockGetDisplays).not.toHaveBeenCalled();
+    expect(mockGetPlaylists).not.toHaveBeenCalled();
+  });
+
+  it('fetches devices and playlists on mount when server props are empty', async () => {
+    mockGetDisplays.mockResolvedValue({ data: sampleDevices, meta: { total: 3 } });
+    mockGetPlaylists.mockResolvedValue({ data: samplePlaylists, meta: { total: 2 } });
+
+    render(<DevicesClient initialDevices={[]} initialPlaylists={[]} />);
+
+    await waitFor(() => {
+      expect(mockGetDisplays).toHaveBeenCalledWith({ page: 1, limit: 100 });
+      expect(mockGetPlaylists).toHaveBeenCalledWith({ page: 1, limit: 100 });
+      expect(screen.getByText('Lobby Display')).toBeInTheDocument();
+    });
+  });
+
+  it('fetches all devices and playlists when server props are only the first page', async () => {
+    mockGetDisplays
+      .mockResolvedValueOnce({
+        data: [{ ...sampleDevices[0], id: 'd100', nickname: 'Fetched First Page Device' }],
+        meta: { page: 1, limit: 100, total: 101, totalPages: 2 },
+      })
+      .mockResolvedValueOnce({
+        data: [{ ...sampleDevices[2], id: 'd101', nickname: 'Overflow Device' }],
+        meta: { page: 2, limit: 100, total: 101, totalPages: 2 },
+      });
+    mockGetPlaylists
+      .mockResolvedValueOnce({
+        data: [{ id: 'p100', name: 'Fetched First Page Playlist', isActive: true }],
+        meta: { page: 1, limit: 100, total: 101, totalPages: 2 },
+      })
+      .mockResolvedValueOnce({
+        data: [{ id: 'p101', name: 'Overflow Playlist', isActive: true }],
+        meta: { page: 2, limit: 100, total: 101, totalPages: 2 },
+      });
+
+    render(
+      <DevicesClient
+        initialDevices={[sampleDevices[0]] as any}
+        initialPlaylists={[samplePlaylists[0]] as any}
+        initialDevicesComplete={false}
+        initialPlaylistsComplete={false}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(mockGetDisplays).toHaveBeenCalledWith({ page: 1, limit: 100 });
+      expect(mockGetPlaylists).toHaveBeenCalledWith({ page: 1, limit: 100 });
+      expect(screen.getByText('Overflow Device')).toBeInTheDocument();
+    });
+    expect(mockGetDisplays).toHaveBeenCalledWith({ page: 2, limit: 100 });
+    expect(mockGetPlaylists).toHaveBeenCalledWith({ page: 2, limit: 100 });
+    expect(screen.getByText('Fetched First Page Device')).toBeInTheDocument();
   });
 
   it('renders devices from initial props', async () => {

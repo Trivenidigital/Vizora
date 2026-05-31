@@ -24,9 +24,16 @@ import { useAuth } from '@/lib/hooks/useAuth';
 interface DevicesClientProps {
  initialDevices: Display[];
  initialPlaylists: Playlist[];
+ initialDevicesComplete?: boolean;
+ initialPlaylistsComplete?: boolean;
 }
 
-export default function DevicesClient({ initialDevices, initialPlaylists }: DevicesClientProps) {
+export default function DevicesClient({
+ initialDevices,
+ initialPlaylists,
+ initialDevicesComplete,
+ initialPlaylistsComplete,
+}: DevicesClientProps) {
  const router = useRouter();
  const toast = useToast();
  const { user } = useAuth();
@@ -58,6 +65,8 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  const [bulkPlaylistId, setBulkPlaylistId] = useState('');
  const [bulkGroupId, setBulkGroupId] = useState('');
  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline' | 'error'>('offline');
+ const hasCompleteInitialDevices = initialDevicesComplete ?? initialDevices.length > 0;
+ const hasCompleteInitialPlaylists = initialPlaylistsComplete ?? initialPlaylists.length > 0;
 
  // Memoized callback for device status changes
  const handleDeviceStatusChange = useCallback((update: { deviceId: string; status: 'online' | 'offline'; lastSeen?: string; currentPlaylistId?: string }) => {
@@ -116,8 +125,12 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  });
 
  useEffect(() => {
- loadDevices(initialDevices.length === 0);
+ if (!hasCompleteInitialDevices) {
+ loadDevices(true);
+ }
+ if (!hasCompleteInitialPlaylists) {
  loadPlaylists();
+ }
  loadGroups();
  }, []);
 
