@@ -48,7 +48,7 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  },
  playlists: {
  total: playlists.length,
- active: playlists.filter((p: any) => p?.isActive === true).length,
+ active: playlists.filter((p: any) => (p?.items?.length || 0) > 0 || p?.isDefault === true).length,
  },
  }));
 
@@ -144,7 +144,7 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  ? {
  playlists: {
  total: playlists.length,
- active: playlists.filter((p: any) => p?.isActive === true).length,
+ active: playlists.filter((p: any) => (p?.items?.length || 0) > 0 || p?.isDefault === true).length,
  },
  }
  : {}),
@@ -273,7 +273,7 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  </div>
  <p className="text-4xl font-bold text-[var(--foreground)] font-[var(--font-sora)] mb-2">{stats.playlists.total}</p>
  <p className="text-sm text-[var(--foreground-tertiary)]">
- {stats.playlists.active} active
+ {stats.playlists.active} ready
  </p>
  </div>
 

@@ -16,6 +16,7 @@ describe('DeviceGateway (E2E)', () => {
   let serverUrl: string;
   let deviceToken: string;
   let deviceId: string;
+  let deviceIdentifier: string;
   let organizationId: string;
 
   beforeAll(async () => {
@@ -38,11 +39,12 @@ describe('DeviceGateway (E2E)', () => {
 
     // Generate test device token
     deviceId = 'test-device-001';
+    deviceIdentifier = `TEST-DEVICE-001-${Date.now()}`;
     organizationId = 'test-org-001';
     deviceToken = jwtService.sign(
       {
         sub: deviceId,
-        deviceIdentifier: 'TEST-DEVICE-001',
+        deviceIdentifier,
         organizationId,
         type: 'device',
       },
@@ -72,11 +74,11 @@ describe('DeviceGateway (E2E)', () => {
       create: {
         id: deviceId,
         nickname: 'E2E Test Device',
-        deviceIdentifier: `TEST-DEVICE-001-${Date.now()}`,
+        deviceIdentifier,
         organizationId,
         status: 'offline',
       },
-      update: { organizationId, status: 'offline' },
+      update: { deviceIdentifier, organizationId, status: 'offline' },
     });
   });
 
@@ -91,10 +93,30 @@ describe('DeviceGateway (E2E)', () => {
       // Ignore Redis errors during cleanup
     }
 
-    // Cleanup seeded DB rows (delete display first; org has FK cascade)
+    // Cleanup seeded DB rows (delete displays first; org has FK cascade)
     try {
-      await databaseService.display.deleteMany({ where: { id: deviceId } });
-      await databaseService.organization.deleteMany({ where: { id: organizationId } });
+      await databaseService.display.deleteMany({
+        where: {
+          id: {
+            in: [
+              deviceId,
+              'test-device-0',
+              'test-device-1',
+              'test-device-2',
+              'test-device-3',
+              'test-device-4',
+              'test-device-concurrent-0',
+              'test-device-concurrent-1',
+              'test-device-concurrent-2',
+              'broadcast-device-1',
+              'broadcast-device-2',
+            ],
+          },
+        },
+      });
+      await databaseService.organization.deleteMany({
+        where: { id: { in: [organizationId, 'broadcast-org'] } },
+      });
     } catch {
       // ignore — test may have already cleaned up
     }
@@ -561,14 +583,37 @@ describe('DeviceGateway (E2E)', () => {
 
     it('should handle multiple devices connecting simultaneously', async () => {
       const deviceCount = 5;
-      const tokens = [];
+      const devices = Array.from({ length: deviceCount }, (_, i) => ({
+        id: `test-device-${i}`,
+        deviceIdentifier: `TEST-DEVICE-${i}`,
+      }));
+
+      await Promise.all(
+        devices.map((device) =>
+          databaseService.display.upsert({
+            where: { id: device.id },
+            create: {
+              id: device.id,
+              nickname: `E2E Test Device ${device.id}`,
+              deviceIdentifier: device.deviceIdentifier,
+              organizationId,
+              status: 'offline',
+            },
+            update: {
+              deviceIdentifier: device.deviceIdentifier,
+              organizationId,
+              status: 'offline',
+            },
+          })
+        )
+      );
 
       // Generate tokens for multiple devices
-      for (let i = 0; i < deviceCount; i++) {
-        const token = jwtService.sign(
+      const tokens = devices.map((device) =>
+        jwtService.sign(
           {
-            sub: `test-device-${i}`,
-            deviceIdentifier: `TEST-DEVICE-${i}`,
+            sub: device.id,
+            deviceIdentifier: device.deviceIdentifier,
             organizationId,
             type: 'device',
           },
@@ -576,9 +621,8 @@ describe('DeviceGateway (E2E)', () => {
             secret: process.env.DEVICE_JWT_SECRET,
             expiresIn: '1h',
           }
-        );
-        tokens.push(token);
-      }
+        )
+      );
 
       // Connect all devices
       const connectPromises = tokens.map((token) => {
@@ -609,13 +653,36 @@ describe('DeviceGateway (E2E)', () => {
 
     it('should handle concurrent heartbeats from multiple devices', async () => {
       const deviceCount = 3;
-      const tokens = [];
+      const devices = Array.from({ length: deviceCount }, (_, i) => ({
+        id: `test-device-concurrent-${i}`,
+        deviceIdentifier: `TEST-DEVICE-CONCURRENT-${i}`,
+      }));
 
-      for (let i = 0; i < deviceCount; i++) {
-        const token = jwtService.sign(
+      await Promise.all(
+        devices.map((device) =>
+          databaseService.display.upsert({
+            where: { id: device.id },
+            create: {
+              id: device.id,
+              nickname: `E2E Test Device ${device.id}`,
+              deviceIdentifier: device.deviceIdentifier,
+              organizationId,
+              status: 'offline',
+            },
+            update: {
+              deviceIdentifier: device.deviceIdentifier,
+              organizationId,
+              status: 'offline',
+            },
+          })
+        )
+      );
+
+      const tokens = devices.map((device) =>
+        jwtService.sign(
           {
-            sub: `test-device-concurrent-${i}`,
-            deviceIdentifier: `TEST-DEVICE-CONCURRENT-${i}`,
+            sub: device.id,
+            deviceIdentifier: device.deviceIdentifier,
             organizationId,
             type: 'device',
           },
@@ -623,9 +690,8 @@ describe('DeviceGateway (E2E)', () => {
             secret: process.env.DEVICE_JWT_SECRET,
             expiresIn: '1h',
           }
-        );
-        tokens.push(token);
-      }
+        )
+      );
 
       // Connect all devices
       for (const token of tokens) {
@@ -660,9 +726,51 @@ describe('DeviceGateway (E2E)', () => {
       });
     });
 
-    it('should broadcast to organization correctly', (done) => {
+    it('should broadcast to organization correctly', async () => {
       let receivedCount = 0;
       const expectedCount = 2;
+
+      await databaseService.organization.upsert({
+        where: { id: 'broadcast-org' },
+        create: {
+          id: 'broadcast-org',
+          name: 'Broadcast E2E Org',
+          slug: `broadcast-e2e-${Date.now()}`,
+        },
+        update: {},
+      });
+      await Promise.all([
+        databaseService.display.upsert({
+          where: { id: 'broadcast-device-1' },
+          create: {
+            id: 'broadcast-device-1',
+            nickname: 'Broadcast Device 1',
+            deviceIdentifier: 'BROADCAST-DEVICE-1',
+            organizationId: 'broadcast-org',
+            status: 'offline',
+          },
+          update: {
+            deviceIdentifier: 'BROADCAST-DEVICE-1',
+            organizationId: 'broadcast-org',
+            status: 'offline',
+          },
+        }),
+        databaseService.display.upsert({
+          where: { id: 'broadcast-device-2' },
+          create: {
+            id: 'broadcast-device-2',
+            nickname: 'Broadcast Device 2',
+            deviceIdentifier: 'BROADCAST-DEVICE-2',
+            organizationId: 'broadcast-org',
+            status: 'offline',
+          },
+          update: {
+            deviceIdentifier: 'BROADCAST-DEVICE-2',
+            organizationId: 'broadcast-org',
+            status: 'offline',
+          },
+        }),
+      ]);
 
       const token1 = jwtService.sign(
         {
@@ -702,32 +810,36 @@ describe('DeviceGateway (E2E)', () => {
 
       clients.push(client1, client2);
 
-      const checkDone = () => {
-        receivedCount++;
-        if (receivedCount === expectedCount) {
-          done();
-        }
-      };
+      const received = new Promise<void>((resolve) => {
+        const checkDone = () => {
+          receivedCount++;
+          if (receivedCount === expectedCount) {
+            resolve();
+          }
+        };
 
-      client1.on('test:broadcast', (data) => {
-        expect(data.message).toBe('Hello organization');
-        checkDone();
-      });
+        client1.on('test:broadcast', (data) => {
+          expect(data.message).toBe('Hello organization');
+          checkDone();
+        });
 
-      client2.on('test:broadcast', (data) => {
-        expect(data.message).toBe('Hello organization');
-        checkDone();
-      });
-
-      Promise.all([
-        new Promise<void>((resolve) => client1.on('connect', () => resolve())),
-        new Promise<void>((resolve) => client2.on('connect', () => resolve())),
-      ]).then(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        await deviceGateway.broadcastToOrganization('broadcast-org', 'test:broadcast', {
-          message: 'Hello organization',
+        client2.on('test:broadcast', (data) => {
+          expect(data.message).toBe('Hello organization');
+          checkDone();
         });
       });
+
+      await Promise.all([
+        new Promise<void>((resolve) => client1.on('connect', () => resolve())),
+        new Promise<void>((resolve) => client2.on('connect', () => resolve())),
+      ]);
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      await deviceGateway.broadcastToOrganization('broadcast-org', 'test:broadcast', {
+        message: 'Hello organization',
+      });
+
+      await received;
     });
   });
 

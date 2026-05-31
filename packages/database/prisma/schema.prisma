@@ -157,6 +157,9 @@ model Display {
   alertRuleFires       AlertRuleFire[]
 
   @@index([organizationId])
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([organizationId, status, createdAt(sort: Desc)])
+  @@index([organizationId, currentPlaylistId])
   @@index([deviceIdentifier])
   @@index([status])
   @@index([pairingCode])
@@ -240,6 +243,10 @@ model Content {
   impressions   ContentImpression[]
 
   @@index([organizationId])
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([organizationId, status, createdAt(sort: Desc)])
+  @@index([organizationId, type, createdAt(sort: Desc)])
+  @@index([organizationId, templateOrientation, createdAt(sort: Desc)])
   @@index([type])
   @@index([status])
   @@index([expiresAt])
@@ -267,6 +274,7 @@ model Playlist {
   provisioningTemplates ProvisioningTemplate[]
 
   @@index([organizationId])
+  @@index([organizationId, createdAt(sort: Desc)])
   @@index([organizationId, updatedAt])
 }
 
@@ -349,6 +357,8 @@ model Schedule {
   displayGroup   DisplayGroup? @relation(fields: [displayGroupId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
+  @@index([organizationId, isActive, priority(sort: Desc), createdAt(sort: Desc)])
+  @@index([daysOfWeek], type: Gin, map: "Schedule_daysOfWeek_gin_idx")
   @@index([playlistId])
   @@index([displayId])
   @@index([displayGroupId])

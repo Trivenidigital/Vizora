@@ -17,6 +17,7 @@ import { JwtService } from '@nestjs/jwt';
 import { DeviceContentController } from './device-content.controller';
 import { ContentService } from './content.service';
 import { StorageService } from '../storage/storage.service';
+import { DatabaseService } from '../database/database.service';
 import { Readable, Writable } from 'node:stream';
 
 describe('DeviceContentController', () => {
@@ -24,6 +25,7 @@ describe('DeviceContentController', () => {
   let mockContentService: jest.Mocked<ContentService>;
   let mockStorageService: jest.Mocked<StorageService>;
   let mockJwtService: jest.Mocked<JwtService>;
+  let mockDatabaseService: any;
 
   const organizationId = 'org-123';
   const deviceId = 'device-456';
@@ -63,12 +65,23 @@ describe('DeviceContentController', () => {
       verify: jest.fn(),
     } as any;
 
+    mockDatabaseService = {
+      display: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: deviceId,
+          organizationId,
+          isDisabled: false,
+        }),
+      },
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [DeviceContentController],
       providers: [
         { provide: ContentService, useValue: mockContentService },
         { provide: StorageService, useValue: mockStorageService },
         { provide: JwtService, useValue: mockJwtService },
+        { provide: DatabaseService, useValue: mockDatabaseService },
       ],
     }).compile();
 
@@ -145,6 +158,22 @@ describe('DeviceContentController', () => {
       expect(mockStorageService.getObject).toHaveBeenCalledWith(objectKey);
       expect(mockStorageService.getObjectRange).not.toHaveBeenCalled();
       expect(res.getBody().toString()).toBe('file-content');
+    });
+
+    it('should reject disabled display tokens before serving content', async () => {
+      const req = createMockRequest('valid-device-token');
+      const res = createMockResponse();
+      mockJwtService.verify.mockReturnValue(validDevicePayload);
+      mockDatabaseService.display.findUnique.mockResolvedValueOnce({
+        id: deviceId,
+        organizationId,
+        isDisabled: true,
+      });
+
+      await expect(controller.serveFile(contentId, req, res)).rejects.toThrow(UnauthorizedException);
+
+      expect(mockContentService.findByIdForDevice).not.toHaveBeenCalled();
+      expect(mockStorageService.getObject).not.toHaveBeenCalled();
     });
 
     it('should serve content file with valid device JWT from query parameter', async () => {
@@ -437,7 +466,7 @@ describe('DeviceContentController', () => {
       );
       expect(res.set).not.toHaveBeenCalledWith(
         expect.objectContaining({
-          'Cache-Control': 'public, max-age=86400',
+          'Cache-Control': 'private, no-store',
         }),
       );
       expect(mockStorageService.getObject).not.toHaveBeenCalled();

@@ -121,10 +121,21 @@ describe('NotificationService', () => {
   describe('wasDeviceOfflineLong', () => {
     it('should return false when no notification exists', async () => {
       mockRedisService.get.mockResolvedValueOnce(null);
+      mockRedisService.exists.mockResolvedValueOnce(false);
 
       const result = await service.wasDeviceOfflineLong('device-1');
 
       expect(result).toBe(false);
+    });
+
+    it('should return true when an offline notification already fired', async () => {
+      mockRedisService.get.mockResolvedValueOnce(null);
+      mockRedisService.exists.mockResolvedValueOnce(true);
+
+      const result = await service.wasDeviceOfflineLong('device-1');
+
+      expect(result).toBe(true);
+      expect(mockRedisService.exists).toHaveBeenCalledWith('notify:fired-offline:device-1');
     });
 
     it('should return true when scheduled time has passed', async () => {
@@ -187,6 +198,11 @@ describe('NotificationService', () => {
         }),
       });
       expect(mockRedisService.delete).toHaveBeenCalled();
+      expect(mockRedisService.set).toHaveBeenCalledWith(
+        'notify:fired-offline:device-1',
+        expect.any(String),
+        86400,
+      );
     });
 
     it('should not process notifications that are not yet due', async () => {

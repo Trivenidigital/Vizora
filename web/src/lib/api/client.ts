@@ -69,8 +69,8 @@ export interface RegisterResponse {
 export interface ScheduleData {
   name: string;
   playlistId: string;
-  displayId?: string;
-  displayGroupId?: string;
+  displayId?: string | null;
+  displayGroupId?: string | null;
   startDate: string;
   endDate?: string;
   startTime?: string | number;

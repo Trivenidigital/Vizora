@@ -159,7 +159,7 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  id: g.id,
  name: g.name,
  description: g.description || '',
- deviceIds: g.displays?.map((d: any) => d.displayId) || [],
+ deviceIds: g.deviceIds || g.displays?.map((d: any) => d.displayId || d.display?.id).filter(Boolean) || [],
  })));
  } catch (error) {
  toast.error('Failed to load device groups');
@@ -362,11 +362,17 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
 
  // Filter and sort devices
  const filteredAndSortedDevices = devices
- .filter(d =>
+ .filter(d => {
+ const matchesSearch =
  !debouncedSearch ||
  (d.nickname || '').toLowerCase().includes(debouncedSearch.toLowerCase()) ||
- (d.location && d.location.toLowerCase().includes(debouncedSearch.toLowerCase()))
- )
+ (d.location && d.location.toLowerCase().includes(debouncedSearch.toLowerCase()));
+ if (!matchesSearch) return false;
+ if (selectedGroups.length === 0) return true;
+ return deviceGroups
+ .filter(group => selectedGroups.includes(group.id))
+ .some(group => group.deviceIds?.includes(d.id));
+ })
  .sort((a, b) => {
  if (!sortField) return 0;
  const aVal = a[sortField];
@@ -389,7 +395,7 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  useEffect(() => {
  setCurrentPage(1);
  setSelectedDeviceIds(new Set());
- }, [debouncedSearch]);
+ }, [debouncedSearch, selectedGroups]);
 
  const getSortIcon = (field: keyof Display) => {
  if (sortField !== field) return null;

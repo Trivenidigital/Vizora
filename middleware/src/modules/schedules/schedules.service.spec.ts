@@ -430,6 +430,62 @@ describe('SchedulesService', () => {
 
       expect(databaseService.schedule.update).not.toHaveBeenCalled();
     });
+
+    it('should clear displayGroupId when moving a group schedule to a display', async () => {
+      const updateDto: UpdateScheduleDto = {
+        displayId: mockDisplayId,
+      };
+
+      databaseService.schedule.findFirst.mockResolvedValue(mockScheduleWithRelations);
+      databaseService.display.findFirst.mockResolvedValue({ id: mockDisplayId });
+      databaseService.schedule.update.mockResolvedValue({
+        ...mockSchedule,
+        displayId: mockDisplayId,
+        displayGroupId: null,
+        playlist: {},
+        display: {},
+        displayGroup: null,
+      });
+
+      await service.update(mockOrganizationId, mockScheduleId, updateDto);
+
+      expect(databaseService.schedule.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            displayId: mockDisplayId,
+            displayGroupId: null,
+          }),
+        }),
+      );
+    });
+
+    it('should clear displayId when moving a display schedule to a group', async () => {
+      const updateDto: UpdateScheduleDto = {
+        displayGroupId: 'group-123',
+      };
+
+      databaseService.schedule.findFirst.mockResolvedValue(mockScheduleWithRelations);
+      databaseService.displayGroup.findFirst.mockResolvedValue({ id: 'group-123' });
+      databaseService.schedule.update.mockResolvedValue({
+        ...mockSchedule,
+        displayId: null,
+        displayGroupId: 'group-123',
+        playlist: {},
+        display: null,
+        displayGroup: {},
+      });
+
+      await service.update(mockOrganizationId, mockScheduleId, updateDto);
+
+      expect(databaseService.schedule.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            displayId: null,
+            displayGroupId: 'group-123',
+          }),
+        }),
+      );
+    });
   });
 
   describe('duplicate', () => {

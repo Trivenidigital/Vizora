@@ -128,7 +128,9 @@ describe('DeviceClient', () => {
         destroy: jest.fn(),
       };
 
-      (http.request as jest.Mock).mockImplementation((_url: any, _opts: any, cb: Function) => {
+      let requestedUrl = '';
+      (http.request as jest.Mock).mockImplementation((url: any, _opts: any, cb: Function) => {
+        requestedUrl = url.toString();
         cb(mockResponse);
         // Simulate async data
         Promise.resolve().then(() => {
@@ -141,6 +143,7 @@ describe('DeviceClient', () => {
       const result = await client.requestPairingCode();
 
       expect(result).toEqual({ code: 'ABC123', qrCode: 'data:image/png;base64,...' });
+      expect(requestedUrl).toContain('/api/v1/devices/pairing/request');
       expect(mockReq.write).toHaveBeenCalled();
       expect(mockReq.end).toHaveBeenCalled();
     });
@@ -167,7 +170,9 @@ describe('DeviceClient', () => {
         destroy: jest.fn(),
       };
 
-      (http.request as jest.Mock).mockImplementation((_url: any, _opts: any, cb: Function) => {
+      let requestedUrl = '';
+      (http.request as jest.Mock).mockImplementation((url: any, _opts: any, cb: Function) => {
+        requestedUrl = url.toString();
         cb(mockResponse);
         Promise.resolve().then(() => {
           dataCallback('Internal Server Error');
@@ -227,7 +232,9 @@ describe('DeviceClient', () => {
         destroy: jest.fn(),
       };
 
-      (http.request as jest.Mock).mockImplementation((_url: any, _opts: any, cb: Function) => {
+      let requestedUrl = '';
+      (http.request as jest.Mock).mockImplementation((url: any, _opts: any, cb: Function) => {
+        requestedUrl = url.toString();
         cb(mockResponse);
         Promise.resolve().then(() => {
           dataCallback(JSON.stringify({ status: 'paired', deviceToken: 'jwt-token-123' }));
@@ -240,6 +247,7 @@ describe('DeviceClient', () => {
 
       expect(result.status).toBe('paired');
       expect(result.deviceToken).toBe('jwt-token-123');
+      expect(requestedUrl).toContain('/api/v1/devices/pairing/status/ABC123');
       expect(mockConfig.onPaired).toHaveBeenCalledWith('jwt-token-123');
       expect(io).toHaveBeenCalled();
     });
@@ -533,14 +541,14 @@ describe('DeviceClient', () => {
       expect(mockSocket.connect).toHaveBeenCalled();
     });
 
-    it('should acknowledge commands after applying them', async () => {
+    it('should acknowledge renderer-owned commands after applying them', async () => {
       client.connect('test-token');
 
       const commandCall = mockSocket.on.mock.calls.find(
         (call: any[]) => call[0] === 'command',
       );
       const ack = jest.fn();
-      const command = { type: 'clear_cache' };
+      const command = { type: 'unknown_command' };
 
       await commandCall![1](command, ack);
 
@@ -655,6 +663,42 @@ describe('DeviceClient', () => {
       } finally {
         logSpy.mockRestore();
       }
+    });
+
+    it('should clear overrides in the main process even when the renderer command path is unavailable', async () => {
+      const electron = require('electron');
+      const mockWindow = {
+        webContents: {
+          getURL: jest.fn().mockReturnValue('file:///display/index.html'),
+        },
+        loadURL: jest.fn().mockResolvedValue(undefined),
+      };
+      electron.BrowserWindow.getAllWindows.mockReturnValue([mockWindow]);
+      mockConfig.onCommand.mockRejectedValue(new Error('renderer unavailable'));
+      client.connect('device-token-123');
+
+      const commandCall = mockSocket.on.mock.calls.find(
+        (call: any[]) => call[0] === 'command',
+      );
+
+      await commandCall![1]({
+        type: 'push_content',
+        payload: {
+          content: {
+            id: 'content-1',
+            url: 'http://localhost:3000/api/v1/device-content/content-1/file',
+          },
+          duration: 1,
+        },
+      }, jest.fn());
+      mockWindow.loadURL.mockClear();
+
+      const ack = jest.fn();
+      await commandCall![1]({ type: 'clear_override' }, ack);
+
+      expect(mockConfig.onCommand).not.toHaveBeenCalled();
+      expect(mockWindow.loadURL).toHaveBeenCalledWith('file:///display/index.html');
+      expect(ack).toHaveBeenCalledWith({ ok: true });
     });
 
     it('should start heartbeat on connect event', () => {

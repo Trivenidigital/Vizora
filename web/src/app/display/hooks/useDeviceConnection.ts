@@ -21,10 +21,12 @@ interface UseDeviceConnectionOptions {
   onConfig: (config: DeviceConfig) => void;
   onContentPush?: (content: PushContent, duration: number) => void;
   onUnauthorized: () => void;
+  onTokenRefresh?: (deviceToken: string) => void;
   currentContentId: string | null;
 }
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3002';
+const CREDENTIALS_KEY = 'vizora_display_credentials';
 
 export function useDeviceConnection({
   credentials,
@@ -33,6 +35,7 @@ export function useDeviceConnection({
   onConfig,
   onContentPush,
   onUnauthorized,
+  onTokenRefresh,
   currentContentId,
 }: UseDeviceConnectionOptions) {
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
@@ -145,6 +148,40 @@ export function useDeviceConnection({
 
     socket.on('config', (config: DeviceConfig) => {
       onConfig(config);
+    });
+
+    socket.on('token:refresh', (data: { token?: string }) => {
+      if (!data?.token || typeof window === 'undefined') return;
+
+      let parsed: Record<string, unknown> = {};
+      try {
+        const stored = localStorage.getItem(CREDENTIALS_KEY);
+        parsed = stored ? JSON.parse(stored) : {};
+      } catch (err) {
+        console.error('[Vizora Display] Failed to parse stored display credentials:', err);
+      }
+
+      try {
+        localStorage.setItem(
+          CREDENTIALS_KEY,
+          JSON.stringify({
+            ...parsed,
+            deviceToken: data.token,
+          }),
+        );
+      } catch (err) {
+        console.error('[Vizora Display] Failed to persist refreshed device token:', err);
+      }
+
+      socket.auth = {
+        ...(socket.auth || {}),
+        token: data.token,
+        capabilities: {
+          ...((socket.auth as any)?.capabilities || {}),
+          deliveryAck: true,
+        },
+      };
+      onTokenRefresh?.(data.token);
     });
 
     socket.on('playlist:update', (data: { playlist: Playlist }, ack?: SocketAck) => {

@@ -369,6 +369,39 @@ describe('ContentService', () => {
 
       await expect(service.remove('org-123', 'invalid-id')).rejects.toThrow(NotFoundException);
     });
+
+    it('should retain DB row and quota when MinIO delete fails', async () => {
+      mockDatabaseService.content.findFirst.mockResolvedValue({
+        ...mockContent,
+        url: 'minio://org-123/uploads/file.jpg',
+        fileSize: 1000,
+      });
+      mockStorageService.deleteFile.mockRejectedValueOnce(new Error('MinIO unavailable'));
+
+      await expect(service.remove('org-123', 'content-123')).rejects.toThrow(
+        'Content file could not be deleted from storage',
+      );
+
+      expect(mockDatabaseService.content.deleteMany).not.toHaveBeenCalled();
+      expect(mockStorageQuotaService.decrementUsage).not.toHaveBeenCalled();
+    });
+
+    it('should not decrement quota when a concurrent delete already removed the row', async () => {
+      mockDatabaseService.content.findFirst.mockResolvedValue({
+        ...mockContent,
+        fileSize: 1000,
+      });
+      mockDatabaseService.content.deleteMany.mockResolvedValue({ count: 0 });
+
+      const result = await service.remove('org-123', 'content-123');
+
+      expect(result).toEqual({ count: 0 });
+      expect(mockStorageQuotaService.decrementUsage).not.toHaveBeenCalled();
+      expect(mockEventEmitter.emit).not.toHaveBeenCalledWith(
+        'content.deleted',
+        expect.anything(),
+      );
+    });
   });
 
   describe('archive', () => {
@@ -871,6 +904,87 @@ describe('ContentService', () => {
           versionNumber: 2,
         }),
       });
+    });
+
+    it('should delete old MinIO object after simple replacement succeeds', async () => {
+      mockDatabaseService.content.findFirst.mockResolvedValue({
+        ...existingContent,
+        url: 'minio://org-123/uploads/old.jpg',
+      });
+      mockDatabaseService.content.updateMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.content.findUnique.mockResolvedValue({
+        ...existingContent,
+        url: 'minio://org-123/uploads/new.jpg',
+        versionNumber: 2,
+      });
+
+      await service.replaceFile(
+        'org-123',
+        'content-123',
+        'minio://org-123/uploads/new.jpg',
+      );
+
+      expect(mockStorageService.deleteFile).toHaveBeenCalledWith('org-123/uploads/old.jpg');
+    });
+
+    it('should account and mark metadata when old MinIO object cleanup fails', async () => {
+      mockDatabaseService.content.findFirst.mockResolvedValue({
+        ...existingContent,
+        url: 'minio://org-123/uploads/old.jpg',
+        fileSize: 1000,
+        metadata: { fileHash: 'old' },
+      });
+      mockDatabaseService.content.updateMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.content.findUnique.mockResolvedValue({
+        ...existingContent,
+        url: 'minio://org-123/uploads/new.jpg',
+        versionNumber: 2,
+      });
+      mockStorageService.deleteFile.mockRejectedValueOnce(new Error('delete failed'));
+
+      await service.replaceFile(
+        'org-123',
+        'content-123',
+        'minio://org-123/uploads/new.jpg',
+      );
+
+      expect(mockStorageQuotaService.incrementUsage).toHaveBeenCalledWith('org-123', 1000);
+      expect(mockDatabaseService.content.updateMany).toHaveBeenLastCalledWith({
+        where: { id: 'content-123', organizationId: 'org-123' },
+        data: {
+          metadata: expect.objectContaining({
+            fileHash: 'old',
+            orphanedPreviousFileKey: 'org-123/uploads/old.jpg',
+            orphanedPreviousFileDeleteFailedAt: expect.any(String),
+          }),
+        },
+      });
+    });
+
+    it('should not fail replacement if orphan metadata marking fails after DB pointer update', async () => {
+      mockDatabaseService.content.findFirst.mockResolvedValue({
+        ...existingContent,
+        url: 'minio://org-123/uploads/old.jpg',
+        fileSize: 512,
+      });
+      mockDatabaseService.content.updateMany
+        .mockResolvedValueOnce({ count: 1 })
+        .mockRejectedValueOnce(new Error('metadata write failed'));
+      mockDatabaseService.content.findUnique.mockResolvedValue({
+        ...existingContent,
+        url: 'minio://org-123/uploads/new.jpg',
+        versionNumber: 2,
+      });
+      mockStorageService.deleteFile.mockRejectedValueOnce(new Error('delete failed'));
+
+      const result = await service.replaceFile(
+        'org-123',
+        'content-123',
+        'minio://org-123/uploads/new.jpg',
+      );
+
+      expect(result.url).toBe('minio://org-123/uploads/new.jpg');
+      expect(mockStorageQuotaService.incrementUsage).toHaveBeenCalledWith('org-123', 512);
     });
 
     it('should replace file with backup', async () => {
@@ -1455,7 +1569,7 @@ describe('ContentService', () => {
         { id: 'id-2', fileSize: 2000, fileKey: null, url: null },
         { id: 'id-3', fileSize: 0, fileKey: null, url: null },
       ]);
-      mockDatabaseService.content.deleteMany.mockResolvedValue({ count: 3 });
+      mockDatabaseService.content.deleteMany.mockResolvedValue({ count: 1 });
 
       const result = await service.bulkDelete('org-123', {
         ids: ['id-1', 'id-2', 'id-3'],
@@ -1463,8 +1577,16 @@ describe('ContentService', () => {
 
       expect(result.deleted).toBe(3);
       expect(mockDatabaseService.content.deleteMany).toHaveBeenCalledWith({
-        where: { id: { in: ['id-1', 'id-2', 'id-3'] }, organizationId: 'org-123' },
+        where: { id: 'id-1', organizationId: 'org-123' },
       });
+      expect(mockDatabaseService.content.deleteMany).toHaveBeenCalledWith({
+        where: { id: 'id-2', organizationId: 'org-123' },
+      });
+      expect(mockDatabaseService.content.deleteMany).toHaveBeenCalledWith({
+        where: { id: 'id-3', organizationId: 'org-123' },
+      });
+      expect(mockStorageQuotaService.decrementUsage).toHaveBeenCalledWith('org-123', 1000);
+      expect(mockStorageQuotaService.decrementUsage).toHaveBeenCalledWith('org-123', 2000);
     });
 
     it('should throw error if some content not found', async () => {
@@ -1496,7 +1618,7 @@ describe('ContentService', () => {
 
       // Only the successful id is in the deleteMany WHERE.
       expect(mockDatabaseService.content.deleteMany).toHaveBeenCalledWith({
-        where: { id: { in: ['good-1'] }, organizationId: 'org-123' },
+        where: { id: 'good-1', organizationId: 'org-123' },
       });
       // Result surfaces both counts so the caller can act on failures.
       expect(result.deleted).toBe(1);
@@ -1504,6 +1626,55 @@ describe('ContentService', () => {
       expect(result.failedIds).toEqual(['bad-1']);
       // Quota decrement is for the SUCCESSFUL bytes only (1000), not 3000.
       expect(mockStorageQuotaService.decrementUsage).toHaveBeenCalledWith('org-123', 1000);
+    });
+
+    it('decrements quota only for bulk-delete rows actually removed', async () => {
+      mockDatabaseService.content.findMany.mockResolvedValue([
+        { id: 'id-1', fileSize: 1000, fileKey: null, url: null },
+        { id: 'id-2', fileSize: 2000, fileKey: null, url: null },
+      ]);
+      mockDatabaseService.content.deleteMany
+        .mockResolvedValueOnce({ count: 1 })
+        .mockResolvedValueOnce({ count: 0 });
+
+      const result = await service.bulkDelete('org-123', {
+        ids: ['id-1', 'id-2'],
+      });
+
+      expect(result.deleted).toBe(1);
+      expect(mockStorageQuotaService.decrementUsage).toHaveBeenCalledWith('org-123', 1000);
+    });
+
+    it('continues bulk delete and adjusts quota when a DB delete fails after storage cleanup', async () => {
+      mockDatabaseService.content.findMany.mockResolvedValue([
+        { id: 'id-1', fileSize: 1000, fileKey: null, url: 'minio://o/id-1.png' },
+        { id: 'id-2', fileSize: 2000, fileKey: null, url: 'minio://o/id-2.png' },
+      ]);
+      mockDatabaseService.content.deleteMany
+        .mockRejectedValueOnce(new Error('db temporarily unavailable'))
+        .mockResolvedValueOnce({ count: 1 });
+
+      const result = await service.bulkDelete('org-123', {
+        ids: ['id-1', 'id-2'],
+      });
+
+      expect(result.deleted).toBe(1);
+      expect(result.failed).toBe(1);
+      expect(result.failedIds).toEqual(['id-1']);
+      expect(mockDatabaseService.content.updateMany).toHaveBeenCalledWith({
+        where: { id: 'id-1', organizationId: 'org-123' },
+        data: expect.objectContaining({
+          status: 'archived',
+          metadata: expect.objectContaining({
+            storageObjectRemovedDuringBulkDelete: true,
+          }),
+        }),
+      });
+      expect(mockDatabaseService.playlistItem.deleteMany).toHaveBeenCalledWith({
+        where: { contentId: 'id-1' },
+      });
+      expect(mockStorageQuotaService.decrementUsage).toHaveBeenCalledWith('org-123', 1000);
+      expect(mockStorageQuotaService.decrementUsage).toHaveBeenCalledWith('org-123', 2000);
     });
   });
 

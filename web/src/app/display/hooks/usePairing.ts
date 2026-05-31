@@ -148,6 +148,15 @@ export function usePairing() {
     setError(null);
   }, []);
 
+  const updateDeviceToken = useCallback((deviceToken: string) => {
+    setCredentials((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, deviceToken };
+      storeCredentials(next);
+      return next;
+    });
+  }, []);
+
   return {
     pairingCode,
     qrCode,
@@ -156,5 +165,6 @@ export function usePairing() {
     error,
     requestPairingCode,
     resetPairing,
+    updateDeviceToken,
   };
 }

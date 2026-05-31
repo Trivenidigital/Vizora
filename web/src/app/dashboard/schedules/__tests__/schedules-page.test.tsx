@@ -6,6 +6,7 @@ const mockGetPlaylists = jest.fn();
 const mockGetDisplays = jest.fn();
 const mockGetDisplayGroups = jest.fn();
 const mockCreateSchedule = jest.fn();
+const mockUpdateSchedule = jest.fn();
 const mockDeleteSchedule = jest.fn();
 
 jest.mock('@/lib/api', () => ({
@@ -15,6 +16,7 @@ jest.mock('@/lib/api', () => ({
     getDisplays: (...args: any[]) => mockGetDisplays(...args),
     getDisplayGroups: (...args: any[]) => mockGetDisplayGroups(...args),
     createSchedule: (...args: any[]) => mockCreateSchedule(...args),
+    updateSchedule: (...args: any[]) => mockUpdateSchedule(...args),
     deleteSchedule: (...args: any[]) => mockDeleteSchedule(...args),
   },
 }));
@@ -71,7 +73,15 @@ jest.mock('@/components/TimePicker', () => {
 });
 
 jest.mock('@/components/DaySelector', () => {
-  return function MockDaySelector() { return <div data-testid="day-selector">Day Selector</div>; };
+  return function MockDaySelector({ onChange }: any) {
+    return (
+      <div data-testid="day-selector">
+        <button type="button" onClick={() => onChange?.(['Monday', 'Tuesday'])}>
+          Select Weekdays
+        </button>
+      </div>
+    );
+  };
 });
 
 jest.mock('@/components/ScheduleCalendar', () => {
@@ -130,6 +140,15 @@ const samplePlaylists = [
   { id: 'p3', name: 'Holiday Playlist', isActive: false },
 ];
 
+const sampleDisplays = [
+  { id: 'd1', nickname: 'Lobby Display', status: 'online' },
+  { id: 'd2', nickname: 'Conference Room', status: 'online' },
+];
+
+const sampleGroups = [
+  { id: 'g1', name: 'Lobby Group', _count: { displays: 2 } },
+];
+
 describe('SchedulesClient', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -138,6 +157,7 @@ describe('SchedulesClient', () => {
     mockGetDisplays.mockResolvedValue({ data: [] });
     mockGetDisplayGroups.mockResolvedValue({ data: [] });
     mockCreateSchedule.mockResolvedValue({ id: 'new-1' });
+    mockUpdateSchedule.mockImplementation((id, payload) => Promise.resolve({ id, ...payload, isActive: true }));
     mockDeleteSchedule.mockResolvedValue({});
   });
 
@@ -214,5 +234,151 @@ describe('SchedulesClient', () => {
       expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
     });
     expect(screen.getAllByText(/schedule/i).length).toBeGreaterThan(0);
+  });
+
+  it('creates one backend schedule per selected device target', async () => {
+    mockGetSchedules.mockResolvedValue({ data: [] });
+    mockGetPlaylists.mockResolvedValue({ data: samplePlaylists });
+    mockGetDisplays.mockResolvedValue({ data: sampleDisplays });
+    mockCreateSchedule.mockImplementation((payload) => Promise.resolve({
+      id: `schedule-${payload.displayId}`,
+      ...payload,
+      isActive: true,
+    }));
+
+    render(<SchedulesClient />);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByText('Create Schedule')[0]);
+    fireEvent.change(screen.getByPlaceholderText('e.g., Morning Content, Holiday Special'), {
+      target: { value: 'Morning Loop' },
+    });
+    fireEvent.click(screen.getByText('Select Weekdays'));
+
+    const selects = screen.getAllByRole('combobox');
+    fireEvent.change(selects[1], { target: { value: 'p1' } });
+    fireEvent.click(screen.getByLabelText('Lobby Display'));
+    fireEvent.click(screen.getByLabelText('Conference Room'));
+    fireEvent.click(screen.getByText('Create'));
+
+    await waitFor(() => {
+      expect(mockCreateSchedule).toHaveBeenCalledTimes(2);
+    });
+    expect(mockCreateSchedule).toHaveBeenNthCalledWith(1, expect.objectContaining({ displayId: 'd1' }));
+    expect(mockCreateSchedule).toHaveBeenNthCalledWith(2, expect.objectContaining({ displayId: 'd2' }));
+  });
+
+  it('rolls back already-created device schedules if a later target create fails', async () => {
+    mockGetSchedules.mockResolvedValue({ data: [] });
+    mockGetPlaylists.mockResolvedValue({ data: samplePlaylists });
+    mockGetDisplays.mockResolvedValue({ data: sampleDisplays });
+    mockCreateSchedule
+      .mockResolvedValueOnce({ id: 'schedule-d1', displayId: 'd1', playlistId: 'p1', daysOfWeek: [1] })
+      .mockRejectedValueOnce(new Error('create failed'));
+
+    render(<SchedulesClient />);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByText('Create Schedule')[0]);
+    fireEvent.change(screen.getByPlaceholderText('e.g., Morning Content, Holiday Special'), {
+      target: { value: 'Morning Loop' },
+    });
+    fireEvent.click(screen.getByText('Select Weekdays'));
+
+    const selects = screen.getAllByRole('combobox');
+    fireEvent.change(selects[1], { target: { value: 'p1' } });
+    fireEvent.click(screen.getByLabelText('Lobby Display'));
+    fireEvent.click(screen.getByLabelText('Conference Room'));
+    fireEvent.click(screen.getByText('Create'));
+
+    await waitFor(() => {
+      expect(mockDeleteSchedule).toHaveBeenCalledWith('schedule-d1');
+    });
+  });
+
+  it('round-trips group-targeted schedules into group edit mode', async () => {
+    mockGetSchedules.mockResolvedValue({ data: sampleSchedules });
+    mockGetPlaylists.mockResolvedValue({ data: samplePlaylists });
+    mockGetDisplays.mockResolvedValue({ data: sampleDisplays });
+    mockGetDisplayGroups.mockResolvedValue({ data: sampleGroups });
+
+    render(<SchedulesClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Weekend Specials')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('Lobby Group (2 devices)')).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByText('Edit')[1]);
+
+    const groupSelect = screen
+      .getAllByRole('combobox')
+      .find((select) => (select as HTMLSelectElement).value === 'g1') as HTMLSelectElement;
+
+    expect(groupSelect).toBeDefined();
+  });
+
+  it('submits null opposite target when editing a group schedule to an individual device', async () => {
+    mockGetSchedules.mockResolvedValue({ data: sampleSchedules });
+    mockGetPlaylists.mockResolvedValue({ data: samplePlaylists });
+    mockGetDisplays.mockResolvedValue({ data: sampleDisplays });
+    mockGetDisplayGroups.mockResolvedValue({ data: sampleGroups });
+
+    render(<SchedulesClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Weekend Specials')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByText('Edit')[1]);
+    fireEvent.click(screen.getByText('Individual Device'));
+    fireEvent.click(screen.getByLabelText('Lobby Display'));
+    fireEvent.click(screen.getByText('Update'));
+
+    await waitFor(() => {
+      expect(mockUpdateSchedule).toHaveBeenCalledWith(
+        's2',
+        expect.objectContaining({
+          displayId: 'd1',
+          displayGroupId: null,
+        }),
+      );
+    });
+  });
+
+  it('duplicates group schedules as group-targeted schedules', async () => {
+    mockGetSchedules.mockResolvedValue({ data: sampleSchedules });
+    mockGetPlaylists.mockResolvedValue({ data: samplePlaylists });
+    mockGetDisplays.mockResolvedValue({ data: sampleDisplays });
+    mockGetDisplayGroups.mockResolvedValue({ data: sampleGroups });
+
+    render(<SchedulesClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Weekend Specials')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByText('Duplicate')[1]);
+    fireEvent.click(screen.getByText('Create'));
+
+    await waitFor(() => {
+      expect(mockCreateSchedule).toHaveBeenCalledWith(
+        expect.objectContaining({
+          displayGroupId: 'g1',
+        }),
+      );
+    });
+    expect(mockCreateSchedule).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        displayId: 'g1',
+      }),
+    );
   });
 });

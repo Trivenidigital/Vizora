@@ -30,6 +30,7 @@ export function DisplayClient() {
     error: pairingError,
     requestPairingCode,
     resetPairing,
+    updateDeviceToken,
   } = usePairing();
 
   // Stable callback that delegates to the connection's emitImpression once available
@@ -97,6 +98,7 @@ export function DisplayClient() {
     onConfig: handleConfig,
     onContentPush: handleContentPush,
     onUnauthorized: handleUnauthorized,
+    onTokenRefresh: updateDeviceToken,
     currentContentId: player.currentContentId,
   });
 

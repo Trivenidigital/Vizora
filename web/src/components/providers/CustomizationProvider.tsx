@@ -1,15 +1,26 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { BrandConfig, loadBrandConfig, updateBrandConfig, applyCSSVariables } from '@/lib/customization';
+import { BrandConfig, loadBrandConfig, applyCSSVariables } from '@/lib/customization';
+import { apiClient } from '@/lib/api';
 
 interface CustomizationContextType {
   brandConfig: BrandConfig;
-  updateBrandConfig: (updates: Partial<BrandConfig>) => void;
+  updateBrandConfig: (updates: Partial<BrandConfig>) => Promise<BrandConfig>;
   organizationId: string | null;
 }
 
 const CustomizationContext = createContext<CustomizationContextType | undefined>(undefined);
+
+const defaultBrandConfig: BrandConfig = {
+  id: 'default',
+  name: 'Vizora',
+  primaryColor: '#00E5A0',
+  secondaryColor: '#00B4D8',
+  accentColor: '#00CC8E',
+  fontFamily: 'sans',
+  showPoweredBy: true,
+};
 
 export function CustomizationProvider({ children }: { children: React.ReactNode }) {
   const [brandConfig, setBrandConfig] = useState<BrandConfig | null>(null);
@@ -99,38 +110,36 @@ export function CustomizationProvider({ children }: { children: React.ReactNode 
   }, []);
 
   const handleUpdateBrandConfig = async (updates: Partial<BrandConfig>) => {
-    const newConfig = updateBrandConfig(updates);
+    const newConfig = {
+      ...(brandConfig ?? loadBrandConfig()),
+      ...updates,
+    };
+
+    if (!organizationId) {
+      throw new Error('Organization branding is still loading');
+    }
+
+    await apiClient.updateBranding(organizationId, {
+      name: newConfig.name,
+      logoUrl: newConfig.logo,
+      primaryColor: newConfig.primaryColor,
+      secondaryColor: newConfig.secondaryColor,
+      accentColor: newConfig.accentColor,
+      fontFamily: newConfig.fontFamily,
+      showPoweredBy: newConfig.showPoweredBy,
+      customDomain: newConfig.customDomain,
+      customCSS: newConfig.customCSS,
+    });
+
     setBrandConfig(newConfig);
     applyCSSVariables(newConfig);
+    loadBrandConfig(newConfig);
 
-    // Save to localStorage for persistence
+    // Save to localStorage after the durable API write succeeds.
     if (typeof window !== 'undefined') {
       localStorage.setItem('brand-config', JSON.stringify(newConfig));
     }
-
-    // Persist to API if we have an org ID
-    if (organizationId) {
-      try {
-        await fetch(`/api/v1/organizations/${organizationId}/branding`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            name: newConfig.name,
-            logoUrl: newConfig.logo,
-            primaryColor: newConfig.primaryColor,
-            secondaryColor: newConfig.secondaryColor,
-            accentColor: newConfig.accentColor,
-            fontFamily: newConfig.fontFamily,
-            showPoweredBy: newConfig.showPoweredBy,
-            customDomain: newConfig.customDomain,
-            customCSS: newConfig.customCSS,
-          }),
-        });
-      } catch {
-        // API save failed, localStorage still has the update
-      }
-    }
+    return newConfig;
   };
 
   // Don't render until client-side hydration is complete
@@ -153,16 +162,10 @@ export function CustomizationProvider({ children }: { children: React.ReactNode 
 
 // Default fallback when context is not yet available (pre-hydration)
 const defaultCustomizationContext: CustomizationContextType = {
-  brandConfig: {
-    id: 'default',
-    name: 'Vizora',
-    primaryColor: '#00E5A0',
-    secondaryColor: '#00B4D8',
-    accentColor: '#00CC8E',
-    fontFamily: 'sans',
-    showPoweredBy: true,
+  brandConfig: defaultBrandConfig,
+  updateBrandConfig: async () => {
+    throw new Error('Organization branding is still loading');
   },
-  updateBrandConfig: () => {},
   organizationId: null,
 };
 

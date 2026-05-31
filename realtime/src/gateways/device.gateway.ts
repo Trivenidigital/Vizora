@@ -37,6 +37,7 @@ import {
   BroadcastData,
 } from '../types';
 import * as Sentry from '@sentry/nestjs';
+import { createHash } from 'node:crypto';
 import { WsAllExceptionsFilter } from './filters/ws-exception.filter';
 import { WsAuthGuard, WsDeviceGuard } from './guards/ws-auth.guard';
 
@@ -183,6 +184,47 @@ export class DeviceGateway
 
   private isActiveDeviceSocket(client: { id?: string }, deviceId: string): boolean {
     return this.deviceSockets.get(deviceId) === client.id;
+  }
+
+  private isDeliveryDeviceSocket(client: { id?: string; data?: Record<string, any> }, deviceId: string): boolean {
+    return (
+      client.data?.deviceId === deviceId &&
+      client.data?.isDashboard !== true &&
+      this.isActiveDeviceSocket(client, deviceId)
+    );
+  }
+
+  private filterDeliverySockets<T extends { id?: string; data?: Record<string, any> }>(
+    sockets: T[],
+    deviceId: string,
+  ): T[] {
+    return sockets.filter((socket) => this.isDeliveryDeviceSocket(socket, deviceId));
+  }
+
+  hasActiveDeviceSocket(deviceId: string): boolean {
+    const socketId = this.deviceSockets.get(deviceId);
+    return Boolean(socketId && this.server?.sockets?.sockets?.has(socketId));
+  }
+
+  disconnectDevice(deviceId: string, reason = 'device_disconnected'): boolean {
+    const socketId = this.deviceSockets.get(deviceId);
+    if (!socketId) {
+      return false;
+    }
+
+    const socket = this.server?.sockets?.sockets?.get(socketId);
+    if (!socket) {
+      this.deviceSockets.delete(deviceId);
+      return false;
+    }
+
+    socket.data = {
+      ...(socket.data || {}),
+      suppressOfflineNotification: reason === 'device_disabled',
+    };
+    socket.emit('error', { message: reason });
+    socket.disconnect(true);
+    return true;
   }
 
   private shouldAttemptHeartbeatReplay(deviceId: string): boolean {
@@ -522,21 +564,9 @@ export class DeviceGateway
         return;
       }
 
-      // Device connection flow (unchanged)
+      // Device connection flow
       const deviceId = authResult.payload.sub;
       const orgId = authResult.payload.organizationId;
-
-      // Step 3: Verify device exists in database and belongs to the JWT's org (B.1 + M2)
-      const device = await this.databaseService.display.findUnique({
-        where: { id: deviceId },
-        select: { id: true, organizationId: true },
-      });
-      if (!device || device.organizationId !== orgId) {
-        this.logger.warn(`Connection rejected: Device not found or org mismatch (id: ${deviceId}, jwtOrg: ${orgId}, deviceOrg: ${device?.organizationId})`);
-        client.emit('error', { message: 'device_not_found' });
-        client.disconnect();
-        return;
-      }
 
       // Step 4: Room joins + Redis status
       await this.setupDeviceRooms(client, deviceId, orgId);
@@ -558,25 +588,29 @@ export class DeviceGateway
    * Returns true if the connection is allowed, false if rate-limited.
    */
   private validateConnectionRate(client: Socket): boolean {
+    const token = this.getTokenFromClient(client);
     const clientIp = client.handshake.address;
+    const rateKey = token
+      ? `token:${createHash('sha256').update(token).digest('hex').slice(0, 16)}`
+      : `ip:${clientIp}`;
     const now = Date.now();
-    const rateEntry = this.connectionAttempts.get(clientIp);
+    const rateEntry = this.connectionAttempts.get(rateKey);
 
     if (rateEntry) {
       if (now > rateEntry.resetAt) {
         // Reset window
-        this.connectionAttempts.set(clientIp, { count: 1, resetAt: now + 60000 });
+        this.connectionAttempts.set(rateKey, { count: 1, resetAt: now + 60000 });
       } else {
         rateEntry.count++;
         if (rateEntry.count > 10) {
-          this.logger.warn(`Connection rate limited for IP: ${clientIp}`);
+          this.logger.warn(`Connection rate limited for ${token ? 'token' : 'IP'}: ${token ? rateKey : clientIp}`);
           client.emit('error', { message: 'rate_limited' });
           client.disconnect();
           return false;
         }
       }
     } else {
-      this.connectionAttempts.set(clientIp, { count: 1, resetAt: now + 60000 });
+      this.connectionAttempts.set(rateKey, { count: 1, resetAt: now + 60000 });
     }
 
     return true;
@@ -634,6 +668,24 @@ export class DeviceGateway
         }
 
         const deviceId = payload.sub;
+        const device = await this.databaseService.display.findUnique({
+          where: { id: deviceId },
+          select: { id: true, organizationId: true, isDisabled: true },
+        });
+        if (!device || device.organizationId !== payload.organizationId) {
+          this.logger.warn(
+            `Connection rejected: Device not found or org mismatch (id: ${deviceId}, jwtOrg: ${payload.organizationId}, deviceOrg: ${device?.organizationId})`,
+          );
+          client.emit('error', { message: 'device_not_found' });
+          client.disconnect();
+          return null;
+        }
+        if (device.isDisabled) {
+          this.logger.warn(`Connection rejected: Device is disabled (id: ${deviceId})`);
+          client.emit('error', { message: 'device_disabled' });
+          client.disconnect();
+          return null;
+        }
 
         // 2.5: Device socket deduplication - disconnect old socket if device already connected
         const existingSocketId = this.deviceSockets.get(deviceId);
@@ -1075,11 +1127,13 @@ export class DeviceGateway
         const orgId = client.data?.organizationId;
         if (orgId) {
           try {
-            await this.notificationService.scheduleOfflineNotification(
-              deviceId,
-              deviceName,
-              orgId,
-            );
+            if (client.data?.suppressOfflineNotification !== true) {
+              await this.notificationService.scheduleOfflineNotification(
+                deviceId,
+                deviceName,
+                orgId,
+              );
+            }
           } catch (notifError) {
             this.logger.warn(`Failed to schedule offline notification for device ${deviceId}`);
           }
@@ -1457,7 +1511,8 @@ export class DeviceGateway
 
     // Get all sockets in the device room
     const roomName = `device:${deviceId}`;
-    const sockets = await this.server.in(roomName).fetchSockets();
+    const allSockets = await this.server.in(roomName).fetchSockets();
+    const sockets = this.filterDeliverySockets(allSockets as any[], deviceId);
 
     if (sockets.length === 0) {
       this.logger.warn(`pushPlaylist: no sockets in room ${roomName} for device ${deviceId} — queuing for reconnect`);
@@ -1499,7 +1554,8 @@ export class DeviceGateway
   async sendCommand(deviceId: string, command: DeviceCommand): Promise<{ delivered: boolean; reason?: string }> {
     const commandWithTimestamp = { ...command, timestamp: new Date().toISOString() };
     const roomName = `device:${deviceId}`;
-    const sockets = await this.server.in(roomName).fetchSockets();
+    const allSockets = await this.server.in(roomName).fetchSockets();
+    const sockets = this.filterDeliverySockets(allSockets as any[], deviceId);
 
     if (sockets.length === 0) {
       this.logger.warn(`sendCommand: no sockets for device ${deviceId} — queuing`);

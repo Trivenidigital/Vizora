@@ -10,6 +10,7 @@ interface ContentRendererProps {
   url: string;
   name?: string;
   metadata?: LayoutMetadata;
+  authenticateUrl?: (url: string) => string;
   onEnded?: () => void;
   onError?: (errorType: string, errorMessage: string) => void;
 }
@@ -61,11 +62,12 @@ function shouldFetchImageAsBlob(url: string): boolean {
   return url.includes('/device-content/') && url.includes('/file');
 }
 
-export function ContentRenderer({ type, url, name, metadata, onEnded, onError }: ContentRendererProps) {
+export function ContentRenderer({ type, url, name, metadata, authenticateUrl, onEnded, onError }: ContentRendererProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const renderedUrl = authenticateUrl ? authenticateUrl(url) : url;
   const isImage = type === 'image';
-  const shouldFetchBlob = isImage && shouldFetchImageAsBlob(url);
-  const { blobUrl, error: fetchError } = useBlobUrl(url, shouldFetchBlob);
+  const shouldFetchBlob = isImage && shouldFetchImageAsBlob(renderedUrl);
+  const { blobUrl, error: fetchError } = useBlobUrl(renderedUrl, shouldFetchBlob);
 
   // Attempt autoplay when video mounts
   useEffect(() => {
@@ -78,25 +80,25 @@ export function ContentRenderer({ type, url, name, metadata, onEnded, onError }:
         }
       });
     }
-  }, [type, url]);
+  }, [type, renderedUrl]);
 
   // Report fetch errors for images
   useEffect(() => {
     if (isImage && fetchError) {
-      onError?.('load_error', `Image fetch failed: ${fetchError} (url: ${url})`);
+      onError?.('load_error', `Image fetch failed: ${fetchError} (url: ${renderedUrl})`);
     }
-  }, [isImage, fetchError, url, onError]);
+  }, [isImage, fetchError, renderedUrl, onError]);
 
   switch (type) {
     case 'image':
       if (!shouldFetchBlob) {
         return (
           <img
-            src={url}
+            src={renderedUrl}
             alt={name || 'Display content'}
             style={styles.image}
             onError={() => {
-              onError?.('load_error', `Image failed to load: ${url}`);
+              onError?.('load_error', `Image failed to load: ${renderedUrl}`);
               onEnded?.();
             }}
           />
@@ -105,7 +107,7 @@ export function ContentRenderer({ type, url, name, metadata, onEnded, onError }:
       if (fetchError) {
         return (
           <div style={{ ...styles.image, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ff6b6b', fontSize: '14px', padding: '20px', textAlign: 'center' as const }}>
-            Image load error: {fetchError}<br />URL: {url?.substring(0, 80)}...
+            Image load error: {fetchError}<br />URL: {renderedUrl?.substring(0, 80)}...
           </div>
         );
       }
@@ -132,14 +134,14 @@ export function ContentRenderer({ type, url, name, metadata, onEnded, onError }:
       return (
         <video
           ref={videoRef}
-          src={url}
+          src={renderedUrl}
           autoPlay
           muted
           playsInline
           style={styles.video}
           onEnded={onEnded}
           onError={() => {
-            onError?.('load_error', `Video failed to load: ${url}`);
+            onError?.('load_error', `Video failed to load: ${renderedUrl}`);
             onEnded?.();
           }}
         />
@@ -149,12 +151,12 @@ export function ContentRenderer({ type, url, name, metadata, onEnded, onError }:
     case 'webpage':
       return (
         <iframe
-          src={url}
+          src={renderedUrl}
           style={styles.iframe}
           allow="autoplay; fullscreen"
           title={name || 'Web content'}
           onError={() => {
-            onError?.('load_error', `Webpage failed to load: ${url}`);
+            onError?.('load_error', `Webpage failed to load: ${renderedUrl}`);
             onEnded?.();
           }}
         />
@@ -164,7 +166,7 @@ export function ContentRenderer({ type, url, name, metadata, onEnded, onError }:
     case 'template':
       return (
         <iframe
-          srcDoc={url}
+          srcDoc={renderedUrl}
           sandbox="allow-scripts"
           style={styles.iframe}
           title={name || 'HTML content'}
@@ -173,7 +175,7 @@ export function ContentRenderer({ type, url, name, metadata, onEnded, onError }:
 
     case 'layout':
       if (metadata) {
-        return <LayoutRenderer metadata={metadata} onError={onError} />;
+        return <LayoutRenderer metadata={metadata} authenticateUrl={authenticateUrl} onError={onError} />;
       }
       return null;
 

@@ -156,6 +156,28 @@ describe('DisplayGroupsService', () => {
 
       expect(result.data[0]._count.displays).toBe(3);
     });
+
+    it('should include member display ids for dashboard group filtering', async () => {
+      mockDatabaseService.displayGroup.findMany.mockResolvedValue([
+        {
+          ...mockDisplayGroup,
+          displays: [{ displayId: 'display-1' }],
+          _count: { displays: 1 },
+        },
+      ]);
+      mockDatabaseService.displayGroup.count.mockResolvedValue(1);
+
+      await service.findAll('org-123', { page: 1, limit: 10 });
+
+      expect(mockDatabaseService.displayGroup.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: expect.objectContaining({
+            displays: { select: { displayId: true } },
+            _count: { select: { displays: true } },
+          }),
+        }),
+      );
+    });
   });
 
   describe('findOne', () => {

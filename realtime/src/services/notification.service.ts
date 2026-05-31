@@ -15,6 +15,7 @@ export class NotificationService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(NotificationService.name);
   private readonly OFFLINE_DELAY_MS = 120000; // 2 minutes
   private readonly REDIS_KEY_PREFIX = 'notify:offline:';
+  private readonly REDIS_FIRED_KEY_PREFIX = 'notify:fired-offline:';
   private intervalId: NodeJS.Timeout | null = null;
   private isCheckingPendingNotifications = false;
 
@@ -78,15 +79,23 @@ export class NotificationService implements OnModuleInit, OnModuleDestroy {
    */
   async cancelOfflineNotification(deviceId: string): Promise<boolean> {
     const key = `${this.REDIS_KEY_PREFIX}${deviceId}`;
-    const exists = await this.redisService.exists(key);
+    const firedKey = `${this.REDIS_FIRED_KEY_PREFIX}${deviceId}`;
+    const [exists, firedExists] = await Promise.all([
+      this.redisService.exists(key),
+      this.redisService.exists(firedKey),
+    ]);
 
     if (exists) {
       await this.redisService.delete(key);
       this.logger.log(`Cancelled offline notification for device ${deviceId}`);
-      return true;
     }
 
-    return false;
+    if (firedExists) {
+      await this.redisService.delete(firedKey);
+      this.logger.log(`Cleared fired offline notification marker for device ${deviceId}`);
+    }
+
+    return Boolean(exists || firedExists);
   }
 
   /**
@@ -98,7 +107,7 @@ export class NotificationService implements OnModuleInit, OnModuleDestroy {
     const dataStr = await this.redisService.get(key);
 
     if (!dataStr) {
-      return false;
+      return Boolean(await this.redisService.exists(`${this.REDIS_FIRED_KEY_PREFIX}${deviceId}`));
     }
 
     try {
@@ -142,6 +151,12 @@ export class NotificationService implements OnModuleInit, OnModuleDestroy {
           if (now >= data.scheduledFor) {
             // Create the notification in the database
             await this.createOfflineNotification(data);
+
+            await this.redisService.set(
+              `${this.REDIS_FIRED_KEY_PREFIX}${data.deviceId}`,
+              JSON.stringify({ ...data, firedAt: now }),
+              86400,
+            );
 
             // Remove the scheduled notification from Redis
             await this.redisService.delete(key);

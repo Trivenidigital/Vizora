@@ -1,8 +1,76 @@
 # Vizora - Task Tracker
 
-## In Progress: PR #34 Readiness Residuals (2026-05-31)
+## In Progress: Customer Performance Readiness Pass 3 (2026-05-31)
+
+**Branch:** `feat/customer-performance-readiness-3`
+
+**Why now:** PRs #120-#122 closed the first display delivery, dashboard readiness, and stale PR #34 residual slices. The next repo-side push is a fresh customer-perspective review plus performance/code-review pass focused on content upload, pairing, content streaming, middleware hot paths, and any remaining production-readiness issues that are buildable and testable without operator-only actions.
+
+**New primitives introduced:** none planned. Prefer existing Next dashboard pages/components, NestJS modules/controllers/services/DTOs, Prisma models/indexes, realtime gateway/Socket.IO paths, display clients, ops scripts, and the existing response envelope.
+
+**Hermes-first analysis:** not applicable unless a selected fix involves business agents, MCP tools, Hermes skills, or AI/provider spend. This pass is dashboard UX, middleware/content performance, realtime/display reliability, and code-review hardening.
+
+**Plan/design:** `docs/plans/2026-05-31-customer-performance-readiness-3.md`
+
+**Plan**
+- [x] Merge PR #122 and close stale PR #34.
+- [x] Re-check production deploy gate.
+- [x] Run independent dashboard/customer UX analysis.
+- [x] Run independent middleware/content performance analysis.
+- [x] Run independent pairing/realtime/display reliability analysis.
+- [x] Run independent code-review/security/readiness analysis.
+- [x] Synthesize a ranked customer-facing issue list.
+- [x] Select a scoped buildable bundle with file/line evidence.
+- [x] Implement fixes with focused tests.
+- [x] Run multi-subagent review before broad tests.
+- [x] Run focused/broad local verification.
+- [ ] PR, CI, merge.
+- [ ] Re-check deployment gate and deploy only if prod checkout is safe.
+
+**Selected fix bundle**
+- [x] Reject disabled/deleted display tokens in realtime and device-content paths.
+- [x] Filter command/playlist delivery to active device sockets, not dashboard sockets in `device:{id}` rooms.
+- [x] Prevent web display token leakage to attacker-origin device-content lookalikes.
+- [x] Persist browser display `token:refresh` and move Electron pairing requests to `/api/v1`.
+- [x] Execute Electron main-process override commands even when the renderer path is unavailable.
+- [x] Preserve back-online notifications after offline notifications have already fired.
+- [x] Reserve upload quota atomically and release reservations on upload/DB failure.
+- [x] Fail closed for production MinIO upload failures instead of creating unreachable `/uploads` content.
+- [x] Keep DB rows when storage delete fails; avoid silent bucket/accounting drift.
+- [x] Add query-shaped database indexes for hot customer list and active schedule paths.
+- [x] Fix dashboard API-key scopes, device group filter, schedule group round-trip / multi-device targeting, active playlist KPI, and customization save durability.
+
+**Review gate**
+- [x] Backend/runtime reviewer: initial storage quota/delete/realtime findings fixed; final re-review CLEAN.
+- [x] Frontend/customer UX reviewer: initial schedule/customization/display-token findings fixed; final re-review CLEAN.
+
+**Local verification**
+- [x] `git diff --check` - pass; line-ending warnings only.
+- [x] `pnpm --filter @vizora/middleware test -- content.service.spec.ts --runInBand` - pass, 96 tests.
+- [x] `pnpm --filter @vizora/middleware test -- --runInBand` - pass, 143 suites / 2787 tests.
+- [x] `pnpm --filter @vizora/middleware exec tsc --noEmit --pretty false` - pass.
+- [x] `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/vizora pnpm --filter @vizora/database exec prisma validate` - pass.
+- [x] `pnpm --filter @vizora/realtime test -- --runInBand` - pass, 11 suites / 256 tests.
+- [x] Post-PR E2E fixture follow-up: `pnpm --filter @vizora/realtime test -- device.gateway.spec.ts --runInBand` - pass, 1 suite / 85 tests. Local realtime E2E run is blocked in this worktree by generated `realtime/dist/package.json` Jest haste collision plus missing local E2E `DATABASE_URL`/Redis setup; GitHub CI is the authoritative E2E verifier.
+- [x] `pnpm --filter @vizora/web test -- --runInBand` - pass, 89 suites / 925 tests; existing React `act(...)` and jsdom navigation warnings remain.
+- [x] `pnpm --filter @vizora/display test -- --runInBand` - pass, 5 suites / 116 tests; expected negative-path logs and existing MaxListeners warning remain.
+- [x] `pnpm --filter @vizora/web exec tsc --noEmit --pretty false` - pass.
+- [x] `npx nx build @vizora/middleware` - pass with existing webpack warnings.
+- [x] `npx nx build @vizora/realtime` - pass with existing source-map / optional `ws` warnings.
+- [x] `NODE_OPTIONS=--max-old-space-size=4096 NEXT_PUBLIC_SOCKET_URL=http://localhost:3002 NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1 npx nx build @vizora/web` - pass with existing Next middleware deprecation and TypeScript project-reference warnings.
+
+**Current deployment gate**
+- GitHub main: `48affb3e0ff6163ae5babf6bbe74d702c67e5348` after PR #122.
+- Open PRs: none after closing stale PR #34.
+- Production health: `/api/v1/health` returned `success: true`, database connected at `2026-05-31T08:22:03.846Z`.
+- Production deploy is blocked: `/opt/vizora/app` is dirty, local `HEAD=bb76aa1838740bff5b58623dfef7a906d44f46a6`, and after fetch is `ahead 17, behind 38` relative to `origin/main=48affb3e0ff6163ae5babf6bbe74d702c67e5348`. Do not pull/reset/stash/restart services until prod-local work is reconciled.
+
+---
+
+## Completed: PR #34 Readiness Residuals (2026-05-31)
 
 **Branch:** `fix/readiness-pr34-residual`
+**PR / merge commit:** #122 / `48affb3e0ff6163ae5babf6bbe74d702c67e5348`
 
 **Why now:** PR #34 is the only remaining open PR, but it is stale, dirty against main, and has failing April checks. Current main already absorbed part of it (`TRUST_PROXY_HOPS`), while web CSP hardening, realtime orphan notification cleanup, and content lifecycle archive endpoint fixes still have residual gaps.
 
@@ -20,10 +88,12 @@
 - [x] Port content-lifecycle archive endpoint and failure-classification fixes while preserving current inline operator alerts.
 - [x] Update env/docs for `TRUST_PROXY_HOPS` and CI web build env.
 - [x] Run focused tests/builds, review, PR, CI, merge.
-- [ ] Close or supersede stale PR #34 after replacement is merged.
+- [x] Close or supersede stale PR #34 after replacement is merged.
 
 **Evidence**
 - Replacement PR branch: `fix/readiness-pr34-residual`; stale PR #34 is not mergeable on current main and is superseded by this branch.
+- PR #122 CI passed: audit, build, e2e, lint, security, test.
+- Stale PR #34 closed as superseded.
 - Security/runtime reviewer: initial CSP and external image findings fixed; final re-review CLEAN.
 - Ops/realtime reviewer: initial lock-scope, CI wiring, overlap, and archive-error findings fixed; final re-review CLEAN.
 - `pnpm --filter @vizora/realtime test -- --runInBand --testPathPattern=notification.service` - pass, 24 tests.
@@ -42,9 +112,10 @@
 
 ---
 
-## In Progress: Customer Dashboard Quality + Performance Pass (2026-05-31)
+## Completed: Customer Dashboard Quality + Performance Pass (2026-05-31)
 
 **Branch:** `feat/customer-dashboard-quality-pass`
+**PR / merge commit:** #121 / `043c82a18b0480a646be1c8b90f06e20fae7d5bb`
 
 **Why now:** After PR #120 closed the display-delivery reliability slice, the next customer-facing gaps are dashboard quality and middleware/display performance bottlenecks that are repo-side, testable, and do not need production secrets or hardware.
 
@@ -62,7 +133,7 @@
 - [x] Implement fixes with focused tests.
 - [x] Run multi-subagent review before broader tests.
 - [x] Run focused and broader verification.
-- [ ] Open PR, wait for CI, merge if clean.
+- [x] Open PR, wait for CI, merge if clean.
 
 **First scoped bundle selected from subagent reviews**
 - [x] SMTP env parity: `MailService` must accept `SMTP_PASS` as documented/health-checked.

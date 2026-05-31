@@ -11,6 +11,8 @@ jest.mock('next/navigation', () => ({
 }));
 
 const mockUpdateBrandConfig = jest.fn();
+let currentBrandConfig: any;
+let currentOrganizationId: string | null;
 const mockBrandConfig = {
   id: 'org-1',
   name: 'Vizora Test',
@@ -27,10 +29,16 @@ const mockBrandConfig = {
 
 jest.mock('@/components/providers/CustomizationProvider', () => ({
   useCustomization: () => ({
-    brandConfig: mockBrandConfig,
+    brandConfig: currentBrandConfig,
     updateBrandConfig: mockUpdateBrandConfig,
-    organizationId: 'org-1',
+    organizationId: currentOrganizationId,
   }),
+}));
+
+jest.mock('@/lib/api', () => ({
+  apiClient: {
+    uploadBrandingLogo: jest.fn(),
+  },
 }));
 
 jest.mock('@/components/ui/Card', () => {
@@ -52,8 +60,8 @@ jest.mock('@/components/ui/Badge', () => ({
 }));
 
 jest.mock('@/components/Button', () => {
-  return function MockButton({ children, onClick, variant }: any) {
-    return <button data-testid={`btn-${variant}`} onClick={onClick}>{children}</button>;
+  return function MockButton({ children, onClick, variant, disabled }: any) {
+    return <button data-testid={`btn-${variant}`} onClick={onClick} disabled={disabled}>{children}</button>;
   };
 });
 
@@ -62,6 +70,9 @@ import CustomizationPage from '../page';
 describe('CustomizationPage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    currentBrandConfig = mockBrandConfig;
+    currentOrganizationId = 'org-1';
+    mockUpdateBrandConfig.mockResolvedValue(mockBrandConfig);
   });
 
   it('renders without crashing', () => {
@@ -119,10 +130,12 @@ describe('CustomizationPage', () => {
     expect(screen.getByText('Reset')).toBeInTheDocument();
   });
 
-  it('calls updateBrandConfig on save', () => {
+  it('calls updateBrandConfig on save', async () => {
     render(<CustomizationPage />);
     fireEvent.click(screen.getByText('Save Changes'));
-    expect(mockUpdateBrandConfig).toHaveBeenCalledWith(mockBrandConfig);
+    await waitFor(() => {
+      expect(mockUpdateBrandConfig).toHaveBeenCalledWith(mockBrandConfig);
+    });
   });
 
   it('shows success message after save', async () => {
@@ -131,6 +144,56 @@ describe('CustomizationPage', () => {
     await waitFor(() => {
       expect(screen.getByText(/Brand configuration saved successfully/)).toBeInTheDocument();
     });
+  });
+
+  it('shows an error instead of success when save fails', async () => {
+    mockUpdateBrandConfig.mockRejectedValueOnce(new Error('Branding API failed'));
+
+    render(<CustomizationPage />);
+    fireEvent.click(screen.getByText('Save Changes'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Branding API failed')).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/Brand configuration saved successfully/)).not.toBeInTheDocument();
+  });
+
+  it('disables saving while organization branding context is unavailable', () => {
+    currentOrganizationId = null;
+
+    render(<CustomizationPage />);
+
+    expect(screen.getByText('Save Changes')).toBeDisabled();
+  });
+
+  it('syncs form fields when async branding loads before the user edits', () => {
+    const { rerender } = render(<CustomizationPage />);
+
+    currentBrandConfig = {
+      ...mockBrandConfig,
+      name: 'Loaded Brand',
+      primaryColor: '#111111',
+    };
+    rerender(<CustomizationPage />);
+
+    const nameInput = screen.getByPlaceholderText('Your Brand Name') as HTMLInputElement;
+    expect(nameInput.value).toBe('Loaded Brand');
+  });
+
+  it('does not overwrite local edits when provider branding refreshes', () => {
+    const { rerender } = render(<CustomizationPage />);
+    const nameInput = screen.getByPlaceholderText('Your Brand Name') as HTMLInputElement;
+    fireEvent.change(nameInput, { target: { value: 'Unsaved Local Brand' } });
+
+    currentBrandConfig = {
+      ...mockBrandConfig,
+      name: 'Loaded Brand',
+    };
+    rerender(<CustomizationPage />);
+
+    expect((screen.getByPlaceholderText('Your Brand Name') as HTMLInputElement).value).toBe(
+      'Unsaved Local Brand',
+    );
   });
 
   it('renders preview section with logo', () => {

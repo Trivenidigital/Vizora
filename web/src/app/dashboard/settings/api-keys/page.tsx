@@ -14,14 +14,12 @@ import { Icon } from '@/theme/icons';
 const AVAILABLE_SCOPES = [
  { value: 'read:content', label: 'Read Content', description: 'View content items' },
  { value: 'write:content', label: 'Write Content', description: 'Create, update, delete content' },
- { value: 'read:playlists', label: 'Read Playlists', description: 'View playlists' },
  { value: 'write:playlists', label: 'Write Playlists', description: 'Create, update, delete playlists' },
  { value: 'read:displays', label: 'Read Displays', description: 'View display devices' },
  { value: 'write:displays', label: 'Write Displays', description: 'Manage display devices' },
- { value: 'read:schedules', label: 'Read Schedules', description: 'View schedules' },
  { value: 'write:schedules', label: 'Write Schedules', description: 'Create, update, delete schedules' },
+ { value: 'read:analytics', label: 'Read Analytics', description: 'View analytics and reports' },
  { value: 'read:all', label: 'Read All', description: 'Read access to all resources' },
- { value: 'write:all', label: 'Write All', description: 'Full read/write access to all resources' },
 ];
 
 export default function ApiKeysPage() {
