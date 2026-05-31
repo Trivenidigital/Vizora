@@ -217,25 +217,40 @@ export class AppController {
   async broadcastCommand(
     @Body() data: BroadcastCommandDto,
   ) {
-    const commandWithTimestamp = {
-      ...data.command,
-      timestamp: new Date().toISOString(),
-    };
-
-    const results = await Promise.allSettled(
-      data.deviceIds.map(async (deviceId) => {
+    const onlineDevices = new Set(
+      data.deviceIds.filter((deviceId) => {
         const room = this.deviceGateway.server.sockets.adapter.rooms.get(`device:${deviceId}`);
-        const isOnline = room && room.size > 0;
-        this.deviceGateway.server.to(`device:${deviceId}`).emit('command', commandWithTimestamp);
-        if (!isOnline) {
-          await this.redisService.addDeviceCommand(deviceId, commandWithTimestamp);
-        }
-        return isOnline;
+        return Boolean(room && room.size > 0);
       }),
     );
-    const devicesOnline = results.filter(r => r.status === 'fulfilled' && r.value).length;
 
-    return { devicesOnline };
+    const results = await Promise.allSettled(
+      data.deviceIds.map((deviceId) => this.deviceGateway.sendCommand(deviceId, data.command)),
+    );
+
+    let delivered = 0;
+    let queued = 0;
+    let failed = 0;
+
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        failed += 1;
+        continue;
+      }
+
+      if (result.value.delivered) {
+        delivered += 1;
+      } else {
+        queued += 1;
+      }
+    }
+
+    return {
+      devicesOnline: onlineDevices.size,
+      delivered,
+      queued,
+      failed,
+    };
   }
 
   @Post('notifications/broadcast')

@@ -13,6 +13,8 @@ declare module './client' {
       devicesTargeted: number;
       devicesOnline: number;
       devicesQueued: number;
+      devicesDelivered?: number;
+      devicesFailed?: number;
     }>;
     getActiveOverrides(): Promise<Array<{
       commandId: string;

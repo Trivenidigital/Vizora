@@ -72,12 +72,15 @@ export function DeviceControls({ deviceId }: DeviceControlsProps) {
         command: meta.command,
         target: { type: 'device', id: deviceId },
       });
-      if (result.devicesOnline > 0) {
-        toast.success(`${meta.label} sent`);
-      } else {
+      const devicesDelivered = result.devicesDelivered ?? result.devicesOnline;
+      if ((result.devicesFailed ?? 0) > 0 && devicesDelivered === 0 && result.devicesQueued === 0) {
+        toast.error(`${meta.label} failed to reach the device`);
+      } else if (result.devicesQueued > 0 && devicesDelivered === 0) {
         toast.success(
           `Device is offline — ${meta.label} queued and will run when it reconnects`,
         );
+      } else {
+        toast.success(`${meta.label} sent`);
       }
     } catch (err) {
       toast.error(

@@ -30,6 +30,9 @@ interface ResolvedTarget {
 
 interface GatewayBroadcastResult {
   devicesOnline: number;
+  delivered?: number;
+  queued?: number;
+  failed?: number;
 }
 
 interface OverrideRecord {
@@ -116,13 +119,15 @@ export class FleetService {
     // Call gateway broadcast — command shape: { type, payload, commandId }
     // For simple commands (reload, restart): payload is empty
     // For push_content: payload contains { content, duration, priority }
-    const { devicesOnline } = await this.callGatewayBroadcast(deviceIds, {
+    const gatewayResult = await this.callGatewayBroadcast(deviceIds, {
       commandId,
       command: dto.command,
       payload: gatewayPayload,
     });
-
-    const devicesQueued = deviceIds.length - devicesOnline;
+    const devicesOnline = gatewayResult.devicesOnline;
+    const devicesDelivered = gatewayResult.delivered ?? devicesOnline;
+    const devicesQueued = gatewayResult.queued ?? Math.max(deviceIds.length - devicesOnline, 0);
+    const devicesFailed = gatewayResult.failed ?? 0;
 
     // Handle emergency override with push_content
     if (
@@ -153,6 +158,8 @@ export class FleetService {
       devicesTargeted: deviceIds.length,
       devicesOnline,
       devicesQueued,
+      devicesDelivered,
+      devicesFailed,
     };
   }
 
@@ -280,7 +287,12 @@ export class FleetService {
       },
     );
 
-    return { devicesOnline: result?.devicesOnline ?? 0 };
+    return {
+      devicesOnline: result?.devicesOnline ?? 0,
+      delivered: result?.delivered,
+      queued: result?.queued,
+      failed: result?.failed,
+    };
   }
 
   async createOverride(

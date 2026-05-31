@@ -157,6 +157,14 @@ describe('RedisService', () => {
       const result = await service.getCachedPlaylist('device-1');
       expect(result).toBeNull();
     });
+
+    it('should delete pending playlist', async () => {
+      await service.deletePendingPlaylist('device-1');
+
+      expect((service as any).redis.del).toHaveBeenCalledWith(
+        'device:pending-playlist:device-1',
+      );
+    });
   });
 
   describe('increment', () => {
