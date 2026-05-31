@@ -21,7 +21,7 @@ import { CreateWidgetDto } from '../dto/create-widget.dto';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { parseRssFeed, extractFeedTitle } from '../rss-parser';
-import { assertUrlIsPublic, SsrfError } from '../../common/utils/ssrf-guard';
+import { fetchWithSsrfGuard, SsrfError } from '../../common/utils/ssrf-guard';
 
 /** Maximum response body size from Google Sheets (2 MB). */
 const MAX_SHEET_RESPONSE_BYTES = 2 * 1024 * 1024;
@@ -180,30 +180,22 @@ export class WidgetsController {
       throw new BadRequestException('Only http/https URLs are supported');
     }
 
-    try {
-      await assertUrlIsPublic(feedUrl, { allowHttp: true });
-    } catch (error) {
-      if (error instanceof SsrfError) {
-        throw new BadRequestException(error.message);
-      }
-      throw error;
-    }
-
     const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 50);
 
     let response: Response;
     try {
-      response = await fetch(feedUrl, {
+      response = await fetchWithSsrfGuard(feedUrl, {
         signal: AbortSignal.timeout(10000),
-        redirect: 'manual',
         headers: { 'User-Agent': 'Vizora/1.0 Digital Signage RSS Reader' },
+      }, {
+        allowHttp: true,
+        maxRedirects: 3,
       });
     } catch (err: any) {
+      if (err instanceof SsrfError) {
+        throw new BadRequestException(err.message);
+      }
       throw new NotFoundException(`Failed to fetch RSS feed: ${err.message || 'timeout or network error'}`);
-    }
-
-    if (response.status >= 300 && response.status < 400) {
-      throw new BadRequestException('RSS feed redirects are not allowed');
     }
 
     if (!response.ok) {

@@ -40,10 +40,12 @@
 - [x] Green run: `pnpm --filter @vizora/web test -- --runInBand --testPathPattern="billing|server-api|DisplayClient"` - pass, 7 suites / 81 tests.
 - [x] Review-fix run: `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="displays.service|widgets.controller|thumbnail.service|template-rendering.service"` - pass, 6 suites / 171 tests.
 - [x] Review-fix run: `pnpm --filter @vizora/web test -- --runInBand --testPathPattern="billing|server-api|DisplayClient"` - pass, 7 suites / 83 tests.
+- [x] Redirect follow-up run: `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="ssrf-guard|widgets.controller|thumbnail.service|template-rendering.service|displays.service"` - pass, 7 suites / 218 tests.
 
 **Review gate**
 - [x] Security/tenant/SSRF reviewer: CLEAN for tenant checks and redirect SSRF guards.
 - [x] Customer/performance reviewer: initial findings fixed by keeping realtime `success:false` outside circuit-failure accounting, rethrowing template redirect policy errors from fallback, failing fast on malformed billing redirect responses, and consolidating thumbnail URL validation to the shared SSRF guard.
+- [x] Customer/performance post-fix reviewer found P2 customer breakage from blanket redirect rejection; fixed with bounded redirect following that validates every hop through the shared SSRF guard.
 - [ ] Post-fix re-review.
 
 ---

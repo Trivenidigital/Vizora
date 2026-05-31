@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import sharp from 'sharp';
 import { promises as fs } from 'fs';
 import { join } from 'path';
-import { assertUrlIsPublic } from '../common/utils/ssrf-guard';
+import { assertUrlIsPublic, fetchWithSsrfGuard } from '../common/utils/ssrf-guard';
 
 @Injectable()
 export class ThumbnailService {
@@ -91,10 +91,11 @@ export class ThumbnailService {
 
     try {
       // Fetch image from URL with streaming size check
-      const response = await fetch(imageUrl, { redirect: 'manual' });
-      if (response.status >= 300 && response.status < 400) {
-        throw new Error('Thumbnail source redirects are not allowed');
-      }
+      const response = await fetchWithSsrfGuard(imageUrl, {}, {
+        allowHttp: true,
+        maxRedirects: 3,
+        skipInitialValidation: true,
+      });
       const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
       if (contentLength > this.MAX_FILE_SIZE) {
         throw new Error('Image too large for thumbnail generation');

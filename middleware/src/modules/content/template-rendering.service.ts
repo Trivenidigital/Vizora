@@ -3,7 +3,7 @@ import * as Handlebars from 'handlebars';
 import DOMPurify from 'isomorphic-dompurify';
 import { CircuitBreakerService } from '../common/services/circuit-breaker.service';
 import { DataSourceDto } from './dto/create-template.dto';
-import { assertUrlIsPublic, SsrfError } from '../common/utils/ssrf-guard';
+import { assertUrlIsPublic, fetchWithSsrfGuard, SsrfError } from '../common/utils/ssrf-guard';
 
 /**
  * Result of template validation
@@ -269,20 +269,19 @@ export class TemplateRenderingService {
                 )
               : {};
 
-            const response = await fetch(dataSource.url!, {
+            const response = await fetchWithSsrfGuard(dataSource.url!, {
               method: dataSource.method || 'GET',
               headers: {
                 'Accept': 'application/json',
                 'User-Agent': 'Vizora-Template-Service/1.0',
                 ...safeHeaders,
               },
-              redirect: 'manual',
               signal: controller.signal,
+            }, {
+              allowHttp: true,
+              maxRedirects: 3,
+              skipInitialValidation: true,
             });
-
-            if (response.status >= 300 && response.status < 400) {
-              throw new Error('Template data source redirects are not allowed');
-            }
 
             if (!response.ok) {
               throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -295,7 +294,7 @@ export class TemplateRenderingService {
           }
         },
         (error) => {
-          if (error?.message === 'Template data source redirects are not allowed') {
+          if (error instanceof SsrfError) {
             throw error;
           }
           this.logger.warn(`Data source fetch failed, using empty data: ${error?.message}`);

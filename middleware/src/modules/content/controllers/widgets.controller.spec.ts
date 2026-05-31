@@ -12,6 +12,7 @@ jest.mock('dns/promises', () => ({
 import { Test, TestingModule } from '@nestjs/testing';
 import { WidgetsController } from './widgets.controller';
 import { ContentService } from '../content.service';
+import { lookup } from 'dns/promises';
 
 describe('WidgetsController', () => {
   let controller: WidgetsController;
@@ -468,8 +469,45 @@ describe('WidgetsController', () => {
       ).rejects.toThrow('Failed to fetch RSS feed: HTTP 404');
     });
 
-    it('should reject redirects instead of following them after SSRF validation', async () => {
-      (global.fetch as jest.Mock).mockResolvedValue({
+    it('should follow public redirects after validating each RSS feed URL', async () => {
+      const rssXml = `<rss><channel>
+        <title>Redirected Feed</title>
+        <item><title>Article 1</title><description>Desc</description></item>
+      </channel></rss>`;
+
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 301,
+          headers: new Map([['location', 'https://feeds.example.com/rss']]),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          headers: new Map([['content-length', '0']]),
+          text: async () => rssXml,
+        });
+
+      const result = await controller.getRssFeed('https://example.com/rss', '10');
+
+      expect(result.feedTitle).toBe('Redirected Feed');
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        1,
+        'https://example.com/rss',
+        expect.objectContaining({ redirect: 'manual' }),
+      );
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        2,
+        'https://feeds.example.com/rss',
+        expect.objectContaining({ redirect: 'manual' }),
+      );
+    });
+
+    it('should reject private redirect targets before fetching them', async () => {
+      (lookup as jest.Mock)
+        .mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }])
+        .mockResolvedValueOnce([{ address: '127.0.0.1', family: 4 }]);
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: false,
         status: 302,
         headers: new Map([['location', 'http://127.0.0.1/rss']]),
@@ -477,12 +515,13 @@ describe('WidgetsController', () => {
 
       await expect(
         controller.getRssFeed('https://example.com/rss', '10'),
-      ).rejects.toThrow('RSS feed redirects are not allowed');
+      ).rejects.toThrow('url points to a blocked address');
 
       expect(global.fetch).toHaveBeenCalledWith(
         'https://example.com/rss',
         expect.objectContaining({ redirect: 'manual' }),
       );
+      expect(global.fetch).toHaveBeenCalledTimes(1);
     });
 
     it('should throw NotFoundException on network error', async () => {

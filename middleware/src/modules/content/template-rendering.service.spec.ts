@@ -531,7 +531,7 @@ describe('TemplateRenderingService', () => {
       expect(mockCircuitBreaker.executeWithFallback).not.toHaveBeenCalled();
     });
 
-    it('should reject redirects instead of following them after SSRF validation', async () => {
+    it('should follow public redirects after validating each data-source URL', async () => {
       mockCircuitBreaker.executeWithFallback.mockImplementation(async (_name, fn, fallback) => {
         try {
           return await fn();
@@ -539,11 +539,56 @@ describe('TemplateRenderingService', () => {
           return fallback(error as Error);
         }
       });
+      const redirectedData = { items: [{ name: 'Redirected Item' }] };
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 302,
+          statusText: 'Found',
+          headers: { get: jest.fn((name: string) => (name.toLowerCase() === 'location' ? 'https://api.example.com/final' : null)) },
+          json: jest.fn(),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          headers: { get: jest.fn() },
+          json: jest.fn().mockResolvedValue(redirectedData),
+        });
+      const dataSource: DataSourceDto = {
+        type: 'rest_api',
+        url: 'https://api.example.com/data',
+      };
+
+      await expect(service.fetchDataFromSource(dataSource)).resolves.toEqual(redirectedData);
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        1,
+        'https://api.example.com/data',
+        expect.objectContaining({ redirect: 'manual' }),
+      );
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        2,
+        'https://api.example.com/final',
+        expect.objectContaining({ redirect: 'manual' }),
+      );
+    });
+
+    it('should reject private redirect targets before fetching them', async () => {
+      mockCircuitBreaker.executeWithFallback.mockImplementation(async (_name, fn, fallback) => {
+        try {
+          return await fn();
+        } catch (error) {
+          return fallback(error as Error);
+        }
+      });
+      (lookup as jest.Mock)
+        .mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }])
+        .mockResolvedValueOnce([{ address: '169.254.169.254', family: 4 }]);
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 302,
         statusText: 'Found',
-        headers: { get: jest.fn().mockReturnValue('http://169.254.169.254/latest') },
+        headers: { get: jest.fn((name: string) => (name.toLowerCase() === 'location' ? 'http://169.254.169.254/latest' : null)) },
         json: jest.fn(),
       });
       const dataSource: DataSourceDto = {
@@ -552,12 +597,9 @@ describe('TemplateRenderingService', () => {
       };
 
       await expect(service.fetchDataFromSource(dataSource)).rejects.toThrow(
-        'Template data source redirects are not allowed',
+        'url points to a blocked address',
       );
-      expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.example.com/data',
-        expect.objectContaining({ redirect: 'manual' }),
-      );
+      expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
     it('should fetch data from external URL using circuit breaker', async () => {

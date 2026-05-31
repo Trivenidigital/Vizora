@@ -14,8 +14,8 @@ import * as net from 'net';
  *   await assertUrlIsPublic(url);                       // https-only
  *   await assertUrlIsPublic(url, { allowHttp: true });  // widget polling
  *
- * Pair with `redirect: 'manual'` on fetch(); a redirect to a private host
- * would otherwise bypass this check.
+ * Pair with `fetchWithSsrfGuard()` or `redirect: 'manual'` on fetch(); a
+ * redirect to a private host would otherwise bypass this check.
  *
  * TOCTOU note: there is a small window between dns.lookup() and the
  * actual fetch() where DNS could flip. To close it completely we'd need
@@ -31,6 +31,13 @@ import * as net from 'net';
 export interface SsrfCheckOptions {
   /** Allow plain http:// in addition to https://. Default: https-only. */
   allowHttp?: boolean;
+}
+
+export interface SsrfFetchOptions extends SsrfCheckOptions {
+  /** Maximum number of redirects to follow after validating every hop. Default: 3. */
+  maxRedirects?: number;
+  /** Skip validating the first URL when the caller already did it. Redirect hops are always validated. */
+  skipInitialValidation?: boolean;
 }
 
 // IPv4 ranges that must never be reachable from outbound fetches.
@@ -99,6 +106,68 @@ export async function assertUrlIsPublic(
       throw new SsrfError('url points to a blocked address');
     }
   }
+}
+
+export async function fetchWithSsrfGuard(
+  url: string,
+  init: RequestInit = {},
+  opts: SsrfFetchOptions = {},
+): Promise<Response> {
+  const { maxRedirects = 3, skipInitialValidation = false, ...ssrfOptions } = opts;
+  let currentUrl = url;
+  let requestInit: RequestInit = { ...init, redirect: 'manual' };
+
+  if (!skipInitialValidation) {
+    await assertUrlIsPublic(currentUrl, ssrfOptions);
+  }
+
+  for (let redirectCount = 0; ; redirectCount++) {
+    const response = await fetch(currentUrl, {
+      ...requestInit,
+      redirect: 'manual',
+    });
+
+    if (!isRedirectStatus(response.status)) {
+      return response;
+    }
+
+    if (redirectCount >= maxRedirects) {
+      throw new SsrfError(`too many redirects (max ${maxRedirects})`);
+    }
+
+    const location = response.headers.get('location');
+    if (!location) {
+      throw new SsrfError('redirect response missing Location header');
+    }
+
+    let nextUrl: URL;
+    try {
+      nextUrl = new URL(location, currentUrl);
+    } catch {
+      throw new SsrfError('redirect Location is not a valid URL');
+    }
+
+    currentUrl = nextUrl.toString();
+    await assertUrlIsPublic(currentUrl, ssrfOptions);
+    requestInit = redirectRequestInit(requestInit, response.status);
+  }
+}
+
+function isRedirectStatus(status: number): boolean {
+  return status === 301
+    || status === 302
+    || status === 303
+    || status === 307
+    || status === 308;
+}
+
+function redirectRequestInit(init: RequestInit, status: number): RequestInit {
+  const method = (init.method ?? 'GET').toUpperCase();
+  if (status === 303 || ((status === 301 || status === 302) && method === 'POST')) {
+    const { body: _body, ...rest } = init;
+    return { ...rest, method: 'GET', redirect: 'manual' };
+  }
+  return { ...init, redirect: 'manual' };
 }
 
 export function isPrivateAddress(ip: string): boolean {
