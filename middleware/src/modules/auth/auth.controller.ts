@@ -113,7 +113,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const clientIp = req.ip || req.socket?.remoteAddress || '';
-    const result = await this.authService.register(dto, clientIp);
+    const result = await this.authService.register(dto, clientIp, req.headers?.['user-agent']);
 
     // Set httpOnly cookie with JWT token
     this.setAuthCookie(res, result.token);
@@ -149,9 +149,13 @@ export class AuthController {
   })
   async login(
     @Body() dto: LoginDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.authService.login(dto);
+    const result = await this.authService.login(dto, {
+      ipAddress: req.ip || req.socket?.remoteAddress || '',
+      userAgent: req.headers?.['user-agent'],
+    });
 
     // Set httpOnly cookie with JWT token
     this.setAuthCookie(res, result.token);
@@ -184,9 +188,13 @@ export class AuthController {
   })
   async googleLogin(
     @Body() dto: GoogleLoginDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.authService.googleLogin(dto.credential);
+    const result = await this.authService.googleLogin(dto.credential, {
+      ipAddress: req.ip || req.socket?.remoteAddress || '',
+      userAgent: req.headers?.['user-agent'],
+    });
 
     // Set httpOnly cookie with JWT token
     this.setAuthCookie(res, result.token);

@@ -29,6 +29,12 @@ import { AlertRulesService } from '../notifications/alert-rules/alert-rules.serv
 // Account lockout constants
 const MAX_LOGIN_ATTEMPTS = 10;
 const LOCKOUT_TTL_SECONDS = 15 * 60; // 15 minutes
+const MAX_LOGIN_CONTEXT_USER_AGENTS = 500;
+
+interface LoginContext {
+  ipAddress?: string;
+  userAgent?: string | string[];
+}
 
 @Injectable()
 export class AuthService {
@@ -49,7 +55,7 @@ export class AuthService {
     private alertRulesService: AlertRulesService,
   ) {}
 
-  async register(dto: RegisterDto, clientIp?: string) {
+  async register(dto: RegisterDto, clientIp?: string, userAgent?: string | string[]) {
     // Check if email already exists
     const existingUser = await this.databaseService.user.findUnique({
       where: { email: dto.email },
@@ -127,6 +133,19 @@ export class AuthService {
         },
       });
 
+      await tx.auditLog.create({
+        data: {
+          organizationId: organization.id,
+          userId: user.id,
+          action: 'user_login',
+          entityType: 'user',
+          entityId: user.id,
+          changes: { reason: 'registration' },
+          ipAddress: clientIp || undefined,
+          userAgent: this.normalizeHeaderValue(userAgent),
+        },
+      });
+
       return { organization, user };
     });
 
@@ -174,7 +193,7 @@ export class AuthService {
     };
   }
 
-  async googleLogin(credential: string) {
+  async googleLogin(credential: string, context: LoginContext = {}) {
     // C2: Audience must be configured — fail closed if missing.
     const clientId = process.env.GOOGLE_CLIENT_ID;
     if (!clientId) {
@@ -277,6 +296,19 @@ export class AuthService {
           },
         });
 
+        await tx.auditLog.create({
+          data: {
+            organizationId: organization.id,
+            userId: newUser.id,
+            action: 'user_login',
+            entityType: 'user',
+            entityId: newUser.id,
+            changes: { provider: 'google', reason: 'registration' },
+            ipAddress: this.normalizeHeaderValue(context.ipAddress),
+            userAgent: this.normalizeHeaderValue(context.userAgent),
+          },
+        });
+
         return newUser;
       });
 
@@ -304,18 +336,8 @@ export class AuthService {
     // Generate JWT token
     const token = this.generateToken(user, user.organization);
 
-    // Log audit event for login
     if (!isNewUser) {
-      await this.databaseService.auditLog.create({
-        data: {
-          organizationId: user.organizationId,
-          userId: user.id,
-          action: 'user_login',
-          entityType: 'user',
-          entityId: user.id,
-          changes: { provider: 'google' },
-        },
-      });
+      await this.createLoginAuditAndCheckUnrecognizedLogin(user, context, { provider: 'google' });
     }
 
     return {
@@ -332,7 +354,141 @@ export class AuthService {
     };
   }
 
-  async login(dto: LoginDto) {
+  private normalizeHeaderValue(value?: string | string[]): string | undefined {
+    if (Array.isArray(value)) {
+      return value.find(Boolean);
+    }
+    return value || undefined;
+  }
+
+  private normalizeUserAgentForLoginContext(userAgent: string): string {
+    return userAgent
+      .replace(/\brv:[\d.]+/gi, 'rv')
+      .replace(/\b(AppleWebKit|Chrome|Chromium|Firefox|Version|Safari|EdgA|EdgiOS|Edg|OPR|CriOS|FxiOS|SamsungBrowser)\/[\d.]+/gi, '$1')
+      .replace(/\bMobile\/[A-Za-z0-9.]+/gi, 'Mobile')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private hasRecognizedLoginContextUserAgent(
+    currentUserAgent: string,
+    priorLoginsFromSameIp: Array<{ userAgent: string | null }>,
+  ): boolean {
+    const normalizedCurrentUserAgent = this.normalizeUserAgentForLoginContext(currentUserAgent);
+
+    return priorLoginsFromSameIp.some((login) => {
+      if (!login.userAgent) {
+        return false;
+      }
+      return this.normalizeUserAgentForLoginContext(login.userAgent) === normalizedCurrentUserAgent;
+    });
+  }
+
+  private async sendUnrecognizedLoginEmailIfNeeded(
+    user: { id: string; organizationId: string; email: string; firstName: string },
+    currentAuditLogId: string,
+    currentAuditLogCreatedAt: Date,
+    details: { ipAddress: string; userAgent: string; occurredAt: Date },
+  ): Promise<void> {
+    const loginHistoryWhere = {
+      organizationId: user.organizationId,
+      userId: user.id,
+      action: 'user_login',
+      entityType: 'user',
+      id: { not: currentAuditLogId },
+      createdAt: { lt: currentAuditLogCreatedAt },
+      ipAddress: { not: null },
+      userAgent: { not: null },
+    };
+
+    const priorMetadataLogin = await this.databaseService.auditLog.findFirst({
+      where: loginHistoryWhere,
+      select: {
+        id: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!priorMetadataLogin) {
+      return;
+    }
+
+    const priorLoginsFromSameIp = await this.databaseService.auditLog.findMany({
+      where: {
+        ...loginHistoryWhere,
+        ipAddress: details.ipAddress,
+      },
+      select: {
+        userAgent: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: MAX_LOGIN_CONTEXT_USER_AGENTS,
+    });
+
+    const isRecognizedLoginContext = this.hasRecognizedLoginContextUserAgent(
+      details.userAgent,
+      priorLoginsFromSameIp,
+    );
+
+    if (isRecognizedLoginContext) {
+      return;
+    }
+
+    await this.mailService.sendUnrecognizedLoginEmail(user.email, user.firstName, details);
+  }
+
+  private checkUnrecognizedLoginInBackground(
+    user: { id: string; organizationId: string; email: string; firstName: string },
+    currentAuditLogId: string,
+    currentAuditLogCreatedAt: Date,
+    details: { ipAddress: string; userAgent: string; occurredAt: Date },
+  ): void {
+    void this.sendUnrecognizedLoginEmailIfNeeded(user, currentAuditLogId, currentAuditLogCreatedAt, details)
+      .catch((err) => {
+        this.logger.warn(
+          `Failed to process unrecognized-login alert for user ${user.id}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      });
+  }
+
+  private async createLoginAuditAndCheckUnrecognizedLogin(
+    user: { id: string; organizationId: string; email: string; firstName: string },
+    context: LoginContext,
+    changes?: Record<string, unknown>,
+  ): Promise<void> {
+    const ipAddress = this.normalizeHeaderValue(context.ipAddress);
+    const userAgent = this.normalizeHeaderValue(context.userAgent);
+
+    const loginAuditLog = await this.databaseService.auditLog.create({
+      data: {
+        organizationId: user.organizationId,
+        userId: user.id,
+        action: 'user_login',
+        entityType: 'user',
+        entityId: user.id,
+        changes,
+        ipAddress,
+        userAgent,
+      },
+    });
+
+    // M12: alert on a successful login from a previously unseen login context.
+    // Use the existing audit log as the history source so we don't introduce a
+    // parallel device-history table. Run the history lookup after the required
+    // audit write, in the background, and only compare against rows older than
+    // this row so concurrent duplicate logins cannot mutually self-suppress.
+    // Lookup/mail failures fail open: a security notification must not block a
+    // successful login.
+    if (ipAddress && userAgent) {
+      this.checkUnrecognizedLoginInBackground(user, loginAuditLog.id, loginAuditLog.createdAt, {
+        ipAddress,
+        userAgent,
+        occurredAt: new Date(),
+      });
+    }
+  }
+
+  async login(dto: LoginDto, context: LoginContext = {}) {
     // Check account lockout — fail CLOSED if Redis is unreachable
     const lockoutKey = `login_attempts:${dto.email}`;
     let attempts = 0;
@@ -395,16 +551,8 @@ export class AuthService {
     // Generate JWT token
     const token = this.generateToken(user, user.organization);
 
-    // Log audit event
-    await this.databaseService.auditLog.create({
-      data: {
-        organizationId: user.organizationId,
-        userId: user.id,
-        action: 'user_login',
-        entityType: 'user',
-        entityId: user.id,
-      },
-    });
+    // Log audit event and run the M12 unrecognized-login alert check.
+    await this.createLoginAuditAndCheckUnrecognizedLogin(user, context);
 
     return {
       user: {

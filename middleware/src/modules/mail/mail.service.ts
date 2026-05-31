@@ -452,4 +452,52 @@ export class MailService {
     `);
     await this.sendMail(to, subject, html, 'Password changed', 'auth');
   }
+
+  /**
+   * Security notification sent after a successful login from a new context.
+   * This is intentionally framed as "new login context" rather than a durable
+   * trusted-device system: IPs and browser User-Agent strings can legitimately
+   * change. All caller-supplied values are escaped before interpolation.
+   */
+  async sendUnrecognizedLoginEmail(
+    to: string,
+    firstName: string,
+    details: { ipAddress: string; userAgent: string; occurredAt: Date },
+  ): Promise<void> {
+    const subject = 'New login to your Vizora account';
+    const html = this.wrapInTemplate(`
+          <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">New login detected</h1>
+          <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
+            Hi ${MailService.escapeHtml(firstName)},<br><br>
+            We noticed a successful login to your Vizora account from a new login context.
+            If this was you, no action is needed.
+          </p>
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px 0;">
+            <tr>
+              <td style="padding:12px 16px;background:#0A1E26;border-radius:8px 8px 0 0;border-bottom:1px solid #1B3D47;">
+                <span style="color:#5A6B73;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">Time</span><br>
+                <span style="color:#F0ECE8;font-size:14px;">${MailService.escapeHtml(details.occurredAt.toISOString())}</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:12px 16px;background:#0A1E26;border-bottom:1px solid #1B3D47;">
+                <span style="color:#5A6B73;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">IP address</span><br>
+                <span style="color:#F0ECE8;font-size:14px;">${MailService.escapeHtml(details.ipAddress)}</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:12px 16px;background:#0A1E26;border-radius:0 0 8px 8px;">
+                <span style="color:#5A6B73;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">Browser</span><br>
+                <span style="color:#F0ECE8;font-size:14px;word-break:break-word;">${MailService.escapeHtml(details.userAgent)}</span>
+              </td>
+            </tr>
+          </table>
+          ${this.ctaButton('Review Account', `${this.appUrl}/dashboard/settings`)}
+          <p style="color:#5A6B73;font-size:12px;line-height:1.5;margin:16px 0 0 0;">
+            If you do <strong style="color:#F0ECE8;">not</strong> recognize this login,
+            change your password immediately and contact support@vizora.cloud.
+          </p>
+    `);
+    await this.sendMail(to, subject, html, 'Unrecognized login', 'auth');
+  }
 }

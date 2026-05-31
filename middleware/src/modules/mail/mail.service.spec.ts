@@ -66,3 +66,55 @@ describe('MailService.sendDeviceOfflineAlertEmail', () => {
     expect(html).toContain('a&quot;b&#39;c');
   });
 });
+
+describe('MailService.sendUnrecognizedLoginEmail', () => {
+  let service: MailService;
+  let sendMailSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    process.env.APP_URL = 'https://app.vizora.test';
+    service = new MailService();
+    sendMailSpy = jest.spyOn(service as unknown as { sendMail: jest.Func }, 'sendMail').mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    delete process.env.APP_URL;
+    jest.restoreAllMocks();
+  });
+
+  it('sends via the auth sender with account review CTA', async () => {
+    await service.sendUnrecognizedLoginEmail('user@example.com', 'Ada', {
+      ipAddress: '203.0.113.10',
+      userAgent: 'Mozilla/5.0 Chrome/125.0',
+      occurredAt: new Date('2026-05-31T12:00:00.000Z'),
+    });
+
+    expect(sendMailSpy).toHaveBeenCalledTimes(1);
+    const [to, subject, html, label, sender] = sendMailSpy.mock.calls[0];
+
+    expect(to).toBe('user@example.com');
+    expect(subject).toBe('New login to your Vizora account');
+    expect(html).toContain('New login detected');
+    expect(html).toContain('https://app.vizora.test/dashboard/settings');
+    expect(html).toContain('Review Account');
+    expect(label).toBe('Unrecognized login');
+    expect(sender).toBe('auth');
+  });
+
+  it('escapes caller-supplied name, IP address, and user agent', async () => {
+    await service.sendUnrecognizedLoginEmail('user@example.com', '<Ada>', {
+      ipAddress: '203.0.113.10"><script>',
+      userAgent: 'Browser <img src=x onerror=alert(1)>',
+      occurredAt: new Date('2026-05-31T12:00:00.000Z'),
+    });
+
+    const [, , html] = sendMailSpy.mock.calls[0];
+
+    expect(html).toContain('&lt;Ada&gt;');
+    expect(html).toContain('203.0.113.10&quot;&gt;&lt;script&gt;');
+    expect(html).toContain('Browser &lt;img src=x onerror=alert(1)&gt;');
+    expect(html).not.toContain('<Ada>');
+    expect(html).not.toContain('203.0.113.10"><script>');
+    expect(html).not.toContain('<img src=x onerror=alert(1)>');
+  });
+});

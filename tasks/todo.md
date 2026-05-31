@@ -1,6 +1,41 @@
 # Vizora - Task Tracker
 
-## Active: Customer-1 Smoke Hardening (2026-05-31)
+## Active: M12 Unrecognized Login Alert (2026-05-31)
+
+**Branch:** `feat/m12-unrecognized-login-alert`
+
+**Why now:** `backlog.md` marks M12 partial. Password-changed alerts shipped, but the remaining new-login/unrecognized-device alert is deferred. This is a repo-side P2 security/readiness item and does not require operator credentials.
+
+**New primitives introduced:** none planned. Use existing `AuditLog.ipAddress` + `AuditLog.userAgent` fields as login history instead of adding a parallel device-history table.
+
+**Hermes-first analysis:** not applicable. This is a synchronous auth/mail security notification path, not a business-agent, MCP, or AI/provider-spend workflow.
+
+**Plan**
+- [x] Drift-check existing auth/mail/audit support for login metadata.
+- [x] Add request IP/User-Agent propagation from `AuthController.login` to `AuthService.login`.
+- [x] Log `ipAddress` and `userAgent` on `user_login` audit rows.
+- [x] Send a non-blocking security email only when a successful password/Google login has prior metadata-bearing login history but no prior matching IP/User-Agent pair.
+- [x] Seed metadata-bearing login audit rows on password and Google registration so the first later different-context login can alert.
+- [x] Add MailService template and tests for HTML escaping.
+- [x] Add focused AuthService/AuthController tests for metadata propagation, audit writes, first-login suppression, recognized-login suppression, normalized browser-version matching, unrecognized-login email, and mail-failure non-blocking.
+- [x] Run focused tests and final review.
+- [ ] Open PR, wait for CI, and merge if clean.
+
+**Verification so far**
+- `pnpm install --frozen-lockfile` in isolated worktree (needed because worktree had no `node_modules`).
+- `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="auth.service|auth.controller|mail.service"`: PASS, 3 suites / 90 tests.
+- `NODE_OPTIONS=--use-system-ca pnpm --dir packages/database exec prisma generate`: PASS. Needed only for the fresh isolated worktree because generated Prisma client was absent.
+- `npx nx build @vizora/middleware`: PASS with existing webpack warnings.
+- `pnpm --filter @vizora/middleware test -- --runInBand`: PASS, 141 suites / 2739 tests.
+
+**Review notes**
+- Local `claude -p` review is blocked by operator auth (`Not logged in - Please run /login`). Fallback reviewers used via local subagent tool.
+- Reviewer findings fixed: mail send and alert-history lookup now run after audit write in a fail-open background task; same-IP history lookup is bounded; prior rows are constrained to `createdAt < currentAuditLog.createdAt`; existing Google OAuth logins now pass IP/User-Agent through the same audit/alert path; password and Google registration now seed metadata-bearing login rows without sending an alert; Firefox `rv:` and mobile Edge UA version normalization are covered by tests.
+- Final reviewer gate: CLEAN.
+
+---
+
+## Completed: Customer-1 Smoke Hardening (2026-05-31)
 
 **Branch:** `feat/customer1-smoke-hardening`
 
