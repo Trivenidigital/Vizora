@@ -34,6 +34,7 @@ describe('AuthController', () => {
     const mockAuthService = {
       register: jest.fn(),
       login: jest.fn(),
+      googleLogin: jest.fn(),
       refresh: jest.fn(),
       logout: jest.fn(),
       forgotPassword: jest.fn(),
@@ -72,6 +73,7 @@ describe('AuthController', () => {
     const mockRegisterRequest = {
       ip: '127.0.0.1',
       socket: { remoteAddress: '127.0.0.1' },
+      headers: { 'user-agent': 'Mozilla/5.0' },
     } as unknown as Request;
 
     it('should register a new user and set auth cookie', async () => {
@@ -110,7 +112,7 @@ describe('AuthController', () => {
       expect(result.data).not.toHaveProperty('token');
     });
 
-    it('should pass client IP to auth service', async () => {
+    it('should pass client IP and user agent to auth service', async () => {
       authService.register.mockResolvedValue({
         user: mockUser,
         organization: mockOrganization,
@@ -120,7 +122,7 @@ describe('AuthController', () => {
 
       await controller.register(registerDto, mockRegisterRequest, mockResponse as Response);
 
-      expect(authService.register).toHaveBeenCalledWith(registerDto, '127.0.0.1');
+      expect(authService.register).toHaveBeenCalledWith(registerDto, '127.0.0.1', 'Mozilla/5.0');
     });
 
     it('should propagate ConflictException when email exists', async () => {
@@ -136,6 +138,11 @@ describe('AuthController', () => {
       email: 'test@example.com',
       password: 'Password123!',
     };
+    const mockLoginRequest = {
+      ip: '203.0.113.10',
+      socket: { remoteAddress: '10.0.0.1' },
+      headers: { 'user-agent': 'Mozilla/5.0' },
+    } as unknown as Request;
 
     it('should login user and set auth cookie', async () => {
       authService.login.mockResolvedValue({
@@ -144,7 +151,7 @@ describe('AuthController', () => {
         expiresIn: AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS,
       });
 
-      const result = await controller.login(loginDto, mockResponse as Response);
+      const result = await controller.login(loginDto, mockLoginRequest, mockResponse as Response);
 
       expect(result.success).toBe(true);
       expect(result.data.user).toEqual(mockUser);
@@ -158,6 +165,21 @@ describe('AuthController', () => {
       );
     });
 
+    it('should pass login request metadata to auth service', async () => {
+      authService.login.mockResolvedValue({
+        user: mockUser,
+        token: 'jwt-token',
+        expiresIn: AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS,
+      });
+
+      await controller.login(loginDto, mockLoginRequest, mockResponse as Response);
+
+      expect(authService.login).toHaveBeenCalledWith(loginDto, {
+        ipAddress: '203.0.113.10',
+        userAgent: 'Mozilla/5.0',
+      });
+    });
+
     it('should not include token in response body', async () => {
       authService.login.mockResolvedValue({
         user: mockUser,
@@ -165,7 +187,7 @@ describe('AuthController', () => {
         expiresIn: AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS,
       });
 
-      const result = await controller.login(loginDto, mockResponse as Response);
+      const result = await controller.login(loginDto, mockLoginRequest, mockResponse as Response);
 
       expect(result.data).not.toHaveProperty('token');
     });
@@ -173,8 +195,57 @@ describe('AuthController', () => {
     it('should propagate UnauthorizedException for invalid credentials', async () => {
       authService.login.mockRejectedValue(new UnauthorizedException('Invalid email or password'));
 
-      await expect(controller.login(loginDto, mockResponse as Response))
+      await expect(controller.login(loginDto, mockLoginRequest, mockResponse as Response))
         .rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  describe('googleLogin', () => {
+    const googleDto = {
+      credential: 'google-id-token',
+    };
+    const mockGoogleRequest = {
+      ip: '203.0.113.20',
+      socket: { remoteAddress: '10.0.0.2' },
+      headers: { 'user-agent': 'Mozilla/5.0 Chrome/126.0' },
+    } as unknown as Request;
+
+    it('should login with Google and set auth cookie', async () => {
+      authService.googleLogin.mockResolvedValue({
+        user: mockUser,
+        token: 'jwt-token',
+        expiresIn: AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS,
+        isNewUser: false,
+      });
+
+      const result = await controller.googleLogin(googleDto, mockGoogleRequest, mockResponse as Response);
+
+      expect(result.success).toBe(true);
+      expect(result.data.user).toEqual(mockUser);
+      expect(mockResponse.cookie).toHaveBeenCalledWith(
+        AUTH_CONSTANTS.COOKIE_NAME,
+        'jwt-token',
+        expect.objectContaining({
+          httpOnly: true,
+          path: '/',
+        }),
+      );
+    });
+
+    it('should pass Google login request metadata to auth service', async () => {
+      authService.googleLogin.mockResolvedValue({
+        user: mockUser,
+        token: 'jwt-token',
+        expiresIn: AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS,
+        isNewUser: false,
+      });
+
+      await controller.googleLogin(googleDto, mockGoogleRequest, mockResponse as Response);
+
+      expect(authService.googleLogin).toHaveBeenCalledWith('google-id-token', {
+        ipAddress: '203.0.113.20',
+        userAgent: 'Mozilla/5.0 Chrome/126.0',
+      });
     });
   });
 
@@ -293,6 +364,7 @@ describe('AuthController', () => {
     const mockRegisterRequest = {
       ip: '127.0.0.1',
       socket: { remoteAddress: '127.0.0.1' },
+      headers: { 'user-agent': 'Mozilla/5.0' },
     } as unknown as Request;
 
     beforeEach(() => {
