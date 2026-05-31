@@ -18,6 +18,7 @@ describe('useDeviceConnection', () => {
     emit: jest.fn(),
     disconnect: jest.fn(),
     connected: true,
+    auth: {},
   });
 
   const renderConnection = (overrides: Partial<Parameters<typeof useDeviceConnection>[0]> = {}) => {
@@ -37,6 +38,7 @@ describe('useDeviceConnection', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    localStorage.clear();
   });
 
   it('acknowledges playlist updates after applying them', () => {
@@ -144,6 +146,63 @@ describe('useDeviceConnection', () => {
     expect(ack).toHaveBeenCalledWith({
       ok: false,
       error: 'command failed',
+    });
+  });
+
+  it('persists refreshed device tokens for future reconnects', () => {
+    const socket = createSocket();
+    (io as jest.Mock).mockReturnValue(socket);
+    const onTokenRefresh = jest.fn();
+    localStorage.setItem(
+      'vizora_display_credentials',
+      JSON.stringify({ deviceToken: 'old-token', deviceId: 'display-1', organizationId: 'org-1' }),
+    );
+
+    renderConnection({ onTokenRefresh });
+    const refreshHandler = socket.on.mock.calls.find(
+      (call: any[]) => call[0] === 'token:refresh',
+    )?.[1];
+
+    act(() => {
+      refreshHandler({ token: 'new-token' });
+    });
+
+    expect(JSON.parse(localStorage.getItem('vizora_display_credentials') || '{}')).toEqual(
+      expect.objectContaining({ deviceToken: 'new-token', deviceId: 'display-1' }),
+    );
+    expect(socket.auth).toEqual(
+      expect.objectContaining({
+        token: 'new-token',
+        capabilities: expect.objectContaining({ deliveryAck: true }),
+      }),
+    );
+    expect(onTokenRefresh).toHaveBeenCalledWith('new-token');
+  });
+
+  it('still adopts refreshed tokens when stored credentials JSON is corrupt', () => {
+    const socket = createSocket();
+    (io as jest.Mock).mockReturnValue(socket);
+    const onTokenRefresh = jest.fn();
+    localStorage.setItem('vizora_display_credentials', '{not-json');
+
+    renderConnection({ onTokenRefresh });
+    const refreshHandler = socket.on.mock.calls.find(
+      (call: any[]) => call[0] === 'token:refresh',
+    )?.[1];
+
+    act(() => {
+      refreshHandler({ token: 'new-token' });
+    });
+
+    expect(socket.auth).toEqual(
+      expect.objectContaining({
+        token: 'new-token',
+        capabilities: expect.objectContaining({ deliveryAck: true }),
+      }),
+    );
+    expect(onTokenRefresh).toHaveBeenCalledWith('new-token');
+    expect(JSON.parse(localStorage.getItem('vizora_display_credentials') || '{}')).toEqual({
+      deviceToken: 'new-token',
     });
   });
 });

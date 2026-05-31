@@ -235,10 +235,18 @@ export class SchedulesService {
       }
     }
 
+    const targetUpdate =
+      updateScheduleDto.displayId
+        ? { displayId: updateScheduleDto.displayId, displayGroupId: null }
+        : updateScheduleDto.displayGroupId
+          ? { displayId: null, displayGroupId: updateScheduleDto.displayGroupId }
+          : {};
+
     const updated = await this.db.schedule.update({
       where: { id },
       data: {
         ...updateScheduleDto,
+        ...targetUpdate,
         startDate: updateScheduleDto.startDate ? new Date(updateScheduleDto.startDate) : undefined,
         endDate: updateScheduleDto.endDate ? new Date(updateScheduleDto.endDate) : undefined,
       },

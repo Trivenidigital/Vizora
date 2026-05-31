@@ -30,6 +30,8 @@ describe('AppController', () => {
       } as any,
       sendPlaylistUpdate: jest.fn(),
       sendCommand: jest.fn(),
+      hasActiveDeviceSocket: jest.fn((deviceId: string) => mockRooms.has(`device:${deviceId}`)),
+      disconnectDevice: jest.fn(),
     };
 
     mockRedisService = {
@@ -157,6 +159,24 @@ describe('AppController', () => {
         queued: 0,
         failed: 1,
       });
+    });
+  });
+
+  describe('sendCommand', () => {
+    it('disconnects active sockets for disable commands instead of relying on client command handling', async () => {
+      (mockDeviceGateway.disconnectDevice as jest.Mock).mockReturnValue(true);
+
+      const result = await controller.sendCommand({
+        deviceId: 'dev-a',
+        command: { type: 'disable' },
+      });
+
+      expect(result).toEqual({
+        success: true,
+        message: 'Device disconnected after disable',
+      });
+      expect(mockDeviceGateway.disconnectDevice).toHaveBeenCalledWith('dev-a', 'device_disabled');
+      expect(mockDeviceGateway.sendCommand).not.toHaveBeenCalled();
     });
   });
 

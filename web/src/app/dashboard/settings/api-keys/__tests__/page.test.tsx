@@ -88,7 +88,7 @@ const sampleApiKeys = [
     id: 'key-2',
     name: 'Test Key',
     prefix: 'vz_test',
-    scopes: ['read:content', 'read:playlists', 'read:displays', 'write:schedules'],
+    scopes: ['read:content', 'read:analytics', 'read:displays', 'write:schedules'],
     lastUsedAt: null,
     expiresAt: '2027-06-01T00:00:00Z',
     createdAt: '2026-02-01T00:00:00Z',

@@ -146,8 +146,8 @@ export default function SchedulesClient() {
  ...s,
  // Convert daysOfWeek numbers to day names for UI
  days: s.daysOfWeek ? dayNumbersToNames(s.daysOfWeek) : [],
- // Convert displayId to deviceIds array for UI
- deviceIds: s.displayId ? [s.displayId] : [],
+ // Convert display/group target to a single UI selection array
+ deviceIds: s.displayId ? [s.displayId] : s.displayGroupId ? [s.displayGroupId] : [],
  // Calculate duration from integer startTime and endTime
  duration: calculateDuration(s.startTime as number | undefined, s.endTime as number | undefined),
  // Default timezone
@@ -198,19 +198,27 @@ export default function SchedulesClient() {
  return Object.keys(errors).length === 0;
  };
 
+ const handleTargetTypeChange = (nextTargetType: 'device' | 'group') => {
+ setTargetType(nextTargetType);
+ setFormData((prev) => ({ ...prev, deviceIds: [] }));
+ setFormErrors((prev) => {
+ const { deviceIds, ...rest } = prev;
+ return rest;
+ });
+ };
+
  const handleCreate = async () => {
  if (!validateForm()) return;
 
  try {
  setActionLoading(true);
 
- // Transform UI data to backend format
- const scheduleData = {
+ const buildScheduleData = (targetId: string) => ({
  name: formData.name,
  playlistId: formData.playlistId,
  ...(targetType === 'device'
- ? { displayId: formData.deviceIds[0] }
- : { displayGroupId: formData.deviceIds[0] }),
+ ? { displayId: targetId }
+ : { displayGroupId: targetId }),
  // Convert day names to numbers (0-6)
  daysOfWeek: dayNamesToNumbers(formData.days),
  // Start date is required - use today
@@ -221,24 +229,40 @@ export default function SchedulesClient() {
  endTime: calculateEndTimeMinutes(formData.startTime, formData.duration),
  isActive: true,
  priority: 1,
- };
+ });
 
- const createdSchedule = await apiClient.createSchedule(scheduleData);
+ const targets = targetType === 'device' ? formData.deviceIds : [formData.deviceIds[0]];
+ const createdSchedules: any[] = [];
+ try {
+ for (const targetId of targets) {
+ createdSchedules.push(await apiClient.createSchedule(buildScheduleData(targetId)));
+ }
+ } catch (error) {
+ if (createdSchedules.length > 0) {
+ await Promise.allSettled(
+ createdSchedules
+ .filter((schedule) => schedule?.id)
+ .map((schedule) => apiClient.deleteSchedule(schedule.id)),
+ );
+ await loadData();
+ }
+ throw error;
+ }
 
  // Transform response back to UI format and add to state
- const uiSchedule: Schedule = {
+ const uiSchedules: Schedule[] = createdSchedules.map((createdSchedule: any) => ({
  ...createdSchedule,
  days: dayNumbersToNames(createdSchedule.daysOfWeek || []),
- deviceIds: createdSchedule.displayId ? [createdSchedule.displayId] : [],
+ deviceIds: createdSchedule.displayId ? [createdSchedule.displayId] : createdSchedule.displayGroupId ? [createdSchedule.displayGroupId] : [],
  duration: calculateDuration(createdSchedule.startTime, createdSchedule.endTime),
  timezone: formData.timezone,
  active: createdSchedule.isActive,
- };
+ }));
 
- setSchedules([...schedules, uiSchedule]);
+ setSchedules([...schedules, ...uiSchedules]);
  resetForm();
  setIsCreateModalOpen(false);
- toast.success('Schedule created successfully');
+ toast.success(createdSchedules.length > 1 ? `${createdSchedules.length} schedules created successfully` : 'Schedule created successfully');
  } catch (error: any) {
  toast.error(error.message || 'Failed to create schedule');
  } finally {
@@ -257,8 +281,8 @@ export default function SchedulesClient() {
  name: formData.name,
  playlistId: formData.playlistId,
  ...(targetType === 'device'
- ? { displayId: formData.deviceIds[0] }
- : { displayGroupId: formData.deviceIds[0] }),
+ ? { displayId: formData.deviceIds[0], displayGroupId: null }
+ : { displayId: null, displayGroupId: formData.deviceIds[0] }),
  daysOfWeek: dayNamesToNumbers(formData.days),
  startTime: hhmmToMinutes(formData.startTime),
  endTime: calculateEndTimeMinutes(formData.startTime, formData.duration),
@@ -270,7 +294,7 @@ export default function SchedulesClient() {
  const uiSchedule: Schedule = {
  ...updatedSchedule,
  days: dayNumbersToNames(updatedSchedule.daysOfWeek || []),
- deviceIds: updatedSchedule.displayId ? [updatedSchedule.displayId] : [],
+ deviceIds: updatedSchedule.displayId ? [updatedSchedule.displayId] : updatedSchedule.displayGroupId ? [updatedSchedule.displayGroupId] : [],
  duration: calculateDuration(updatedSchedule.startTime, updatedSchedule.endTime),
  timezone: formData.timezone,
  active: updatedSchedule.isActive,
@@ -317,6 +341,7 @@ export default function SchedulesClient() {
  playlistId: schedule.playlistId,
  deviceIds: schedule.deviceIds || [],
  });
+ setTargetType((schedule as any).displayGroupId ? 'group' : 'device');
  setFormErrors({});
  setIsEditModalOpen(true);
  };
@@ -346,10 +371,15 @@ export default function SchedulesClient() {
  return playlists.find(p => p.id === playlistId)?.name || 'Unknown Playlist';
  };
 
- const getDeviceNames = (deviceIds: string[]) => {
- return deviceIds
- .map(id => devices.find(d => d.id === id)?.nickname || id)
- .join(', ');
+ const getScheduleTargetDescription = (schedule: Schedule) => {
+ if (schedule.displayGroupId) {
+ const group = displayGroups.find((g: any) => g.id === schedule.displayGroupId);
+ const displayCount = group?._count?.displays ?? group?.displays?.length;
+ return `${group?.name || schedule.displayGroupId}${typeof displayCount === 'number' ? ` (${displayCount} devices)` : ''}`;
+ }
+
+ const count = schedule.deviceIds?.length || 0;
+ return `${count} device${count !== 1 ? 's' : ''}`;
  };
 
  const formatScheduleTime = (startTime?: number | string, duration?: number) => {
@@ -509,8 +539,8 @@ export default function SchedulesClient() {
  <p className="text-[var(--foreground-secondary)] truncate">{getPlaylistName(schedule.playlistId)}</p>
  </div>
  <div>
- <span className="font-medium text-[var(--foreground-secondary)]">Devices:</span>
- <p className="text-[var(--foreground-secondary)] truncate">{(schedule.deviceIds?.length || 0)} device{(schedule.deviceIds?.length || 0) !== 1 ? 's' : ''}</p>
+ <span className="font-medium text-[var(--foreground-secondary)]">Target:</span>
+ <p className="text-[var(--foreground-secondary)] truncate">{getScheduleTargetDescription(schedule)}</p>
  </div>
  </div>
  </div>
@@ -529,6 +559,7 @@ export default function SchedulesClient() {
  onClick={() => {
  // Don't set selectedSchedule so it's treated as a new schedule
  setSelectedSchedule(null);
+ setTargetType((schedule as any).displayGroupId ? 'group' : 'device');
  setFormData({
  name: `${schedule.name} (Copy)`,
  startTime: schedule.startTime != null ? minutesToHHMM(schedule.startTime) : '09:00',
@@ -716,7 +747,7 @@ export default function SchedulesClient() {
  <div className="flex gap-2">
  <button
  type="button"
- onClick={() => setTargetType('device')}
+ onClick={() => handleTargetTypeChange('device')}
  className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition ${
  targetType === 'device'
  ? 'bg-[#00E5A0] text-[#061A21]'
@@ -727,7 +758,7 @@ export default function SchedulesClient() {
  </button>
  <button
  type="button"
- onClick={() => setTargetType('group')}
+ onClick={() => handleTargetTypeChange('group')}
  className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition ${
  targetType === 'group'
  ? 'bg-[#00E5A0] text-[#061A21]'

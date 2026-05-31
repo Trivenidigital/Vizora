@@ -36,6 +36,11 @@ export class DisplayGroupsService {
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
+          displays: {
+            select: {
+              displayId: true,
+            },
+          },
           _count: {
             select: {
               displays: true,

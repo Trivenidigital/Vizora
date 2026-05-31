@@ -1,39 +1,57 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useCustomization } from '@/components/providers/CustomizationProvider';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import Button from '@/components/Button';
+import { apiClient } from '@/lib/api';
 
 export const dynamic = 'force-dynamic';
 
 export default function CustomizationPage() {
  const { brandConfig, updateBrandConfig, organizationId } = useCustomization();
  const [formData, setFormData] = useState(brandConfig);
+ const [isDirty, setIsDirty] = useState(false);
  const [saveSuccess, setSaveSuccess] = useState(false);
  const [logoUploading, setLogoUploading] = useState(false);
  const [logoUploadError, setLogoUploadError] = useState<string | null>(null);
+ const [saveError, setSaveError] = useState<string | null>(null);
  const fileInputRef = useRef<HTMLInputElement>(null);
 
  const handleInputChange = (
  e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
  ) => {
  const { name, value, type } = e.currentTarget;
+ setIsDirty(true);
  setFormData((prev) => ({
  ...prev,
  [name]: type === 'checkbox' ? (e.currentTarget as HTMLInputElement).checked : value,
  }));
  };
 
- const handleSave = () => {
- updateBrandConfig(formData);
+ useEffect(() => {
+ if (!isDirty) {
+ setFormData(brandConfig);
+ }
+ }, [brandConfig, isDirty]);
+
+ const handleSave = async () => {
+ setSaveError(null);
+ try {
+ await updateBrandConfig(formData);
+ setIsDirty(false);
  setSaveSuccess(true);
  setTimeout(() => setSaveSuccess(false), 3000);
+ } catch (error: any) {
+ setSaveSuccess(false);
+ setSaveError(error.message || 'Failed to save brand configuration');
+ }
  };
 
  const handleReset = () => {
  setFormData(brandConfig);
+ setIsDirty(false);
  };
 
  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -55,23 +73,10 @@ export default function CustomizationPage() {
  setLogoUploadError(null);
 
  try {
-   const formDataUpload = new FormData();
-   formDataUpload.append('file', file);
-
-   const res = await fetch(`/api/organizations/${organizationId}/branding/logo`, {
-     method: 'POST',
-     credentials: 'include',
-     body: formDataUpload,
-   });
-
-   if (!res.ok) {
-     const err = await res.json().catch(() => ({}));
-     throw new Error(err.message || 'Upload failed');
-   }
-
-   const result = await res.json();
+   const result = await apiClient.uploadBrandingLogo(organizationId, file);
+   setIsDirty(true);
    setFormData((prev) => ({ ...prev, logo: result.logoUrl }));
-   updateBrandConfig({ logo: result.logoUrl });
+   await updateBrandConfig({ logo: result.logoUrl });
  } catch (err: any) {
    setLogoUploadError(err.message || 'Failed to upload logo');
  } finally {
@@ -97,6 +102,14 @@ export default function CustomizationPage() {
  <div className="bg-success-100 dark:bg-success-900 border border-success-300 dark:border-success-700 rounded-lg p-4">
  <p className="text-success-800 dark:text-success-100 font-medium">
  Brand configuration saved successfully!
+ </p>
+ </div>
+ )}
+
+ {saveError && (
+ <div className="bg-red-100 dark:bg-red-900 border border-red-300 dark:border-red-700 rounded-lg p-4">
+ <p className="text-red-800 dark:text-red-100 font-medium">
+ {saveError}
  </p>
  </div>
  )}
@@ -360,6 +373,7 @@ export default function CustomizationPage() {
  onClick={handleSave}
  variant="primary"
  className="flex-1"
+ disabled={!organizationId}
  >
  Save Changes
  </Button>

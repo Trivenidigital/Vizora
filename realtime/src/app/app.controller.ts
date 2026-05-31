@@ -219,8 +219,7 @@ export class AppController {
   ) {
     const onlineDevices = new Set(
       data.deviceIds.filter((deviceId) => {
-        const room = this.deviceGateway.server.sockets.adapter.rooms.get(`device:${deviceId}`);
-        return Boolean(room && room.size > 0);
+        return this.deviceGateway.hasActiveDeviceSocket(deviceId);
       }),
     );
 
@@ -277,6 +276,16 @@ export class AppController {
   async sendCommand(
     @Body() data: InternalCommandDto,
   ): Promise<PushResponse> {
+    if (data.command.type === 'disable') {
+      const disconnected = this.deviceGateway.disconnectDevice(data.deviceId, 'device_disabled');
+      return {
+        success: disconnected,
+        message: disconnected
+          ? 'Device disconnected after disable'
+          : 'Device not connected',
+      };
+    }
+
     const result = await this.deviceGateway.sendCommand(data.deviceId, data.command);
     if (!result.delivered) {
       this.logger.warn(`Command delivery failed for device ${data.deviceId}: ${result.reason ?? 'unknown'}`);

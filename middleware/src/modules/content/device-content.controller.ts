@@ -18,6 +18,7 @@ import { SkipEnvelope } from '../common/interceptors/response-envelope.intercept
 import { SkipOutputSanitize } from '../common/interceptors/sanitize.interceptor';
 import { ContentService } from './content.service';
 import { StorageService } from '../storage/storage.service';
+import { DatabaseService } from '../database/database.service';
 import { pipeline } from 'node:stream/promises';
 
 const MINIO_URL_PREFIX = 'minio://';
@@ -53,6 +54,7 @@ export class DeviceContentController {
     private readonly contentService: ContentService,
     private readonly storageService: StorageService,
     private readonly jwtService: JwtService,
+    private readonly databaseService: DatabaseService,
   ) {}
 
   /**
@@ -186,6 +188,14 @@ export class DeviceContentController {
     // IDs for existence via timing or DB error patterns.
     const devicePayload = this.verifyDeviceToken(req);
 
+    const display = await this.databaseService.display.findUnique({
+      where: { id: devicePayload.sub },
+      select: { id: true, organizationId: true, isDisabled: true },
+    });
+    if (!display || display.organizationId !== devicePayload.organizationId || display.isDisabled) {
+      throw new UnauthorizedException('Device is not authorized');
+    }
+
     const content = await this.contentService.findByIdForDevice(
       id,
       devicePayload.organizationId,
@@ -242,7 +252,7 @@ export class DeviceContentController {
           'Accept-Ranges': 'bytes',
           'Content-Length': String(length),
           'Content-Range': `bytes ${range.range.start}-${range.range.end}/${metadata.size}`,
-          'Cache-Control': 'public, max-age=86400',
+          'Cache-Control': 'private, no-store',
           'Cross-Origin-Resource-Policy': 'cross-origin',
         });
         await this.streamToResponse(stream, res);
@@ -254,7 +264,7 @@ export class DeviceContentController {
         'Content-Type': mimeType,
         'Accept-Ranges': 'bytes',
         'Content-Length': String(metadata.size),
-        'Cache-Control': 'public, max-age=86400',
+        'Cache-Control': 'private, no-store',
         'Cross-Origin-Resource-Policy': 'cross-origin',
       });
       await this.streamToResponse(stream, res);

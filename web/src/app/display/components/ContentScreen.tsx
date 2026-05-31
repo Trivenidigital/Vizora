@@ -17,11 +17,28 @@ interface ContentScreenProps {
  */
 function authenticateUrl(url: string, token?: string): string {
   if (!token || !url) return url;
-  if (url.includes('/device-content/') && url.includes('/file')) {
-    const separator = url.includes('?') ? '&' : '?';
-    return `${url}${separator}token=${encodeURIComponent(token)}`;
+  try {
+    const baseOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
+    const parsed = new URL(url, baseOrigin);
+    const apiOrigin = process.env.NEXT_PUBLIC_API_URL
+      ? new URL(process.env.NEXT_PUBLIC_API_URL).origin
+      : baseOrigin;
+    const trustedOrigins = new Set([baseOrigin, apiOrigin]);
+    const isDeviceContentPath =
+      /^\/(?:api\/v1\/)?device-content\/[^/]+\/file$/.test(parsed.pathname);
+
+    if (!trustedOrigins.has(parsed.origin) || !isDeviceContentPath) {
+      return url;
+    }
+
+    parsed.searchParams.set('token', token);
+    if (/^[a-z][a-z\d+\-.]*:/i.test(url)) {
+      return parsed.toString();
+    }
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return url;
   }
-  return url;
 }
 
 export function ContentScreen({
@@ -39,6 +56,7 @@ export function ContentScreen({
           type={temporaryContent.type}
           url={authenticateUrl(temporaryContent.url, deviceToken)}
           name={temporaryContent.name}
+          authenticateUrl={(url) => authenticateUrl(url, deviceToken)}
           onEnded={onVideoEnded}
           onError={(errType, errMsg) => onContentError?.(temporaryContent.id, errType, errMsg)}
         />
@@ -55,6 +73,7 @@ export function ContentScreen({
           url={authenticateUrl(currentItem.content.url, deviceToken)}
           name={currentItem.content.name}
           metadata={currentItem.content.metadata}
+          authenticateUrl={(url) => authenticateUrl(url, deviceToken)}
           onEnded={onVideoEnded}
           onError={(errType, errMsg) => onContentError?.(currentItem.content!.id, errType, errMsg)}
         />

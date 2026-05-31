@@ -91,12 +91,12 @@ export class DeviceClient {
           metadata: this.getDeviceMetadata(),
         });
 
-        console.log('[DeviceClient] Requesting pairing code from:', `${this.apiUrl}/api/devices/pairing/request`);
+        console.log('[DeviceClient] Requesting pairing code from:', `${this.apiUrl}/api/v1/devices/pairing/request`);
         console.log('[DeviceClient] Device Identifier:', deviceIdentifier);
         console.log('[DeviceClient] Nickname:', os.hostname());
 
         // Fix localhost resolution to IPv4 instead of IPv6
-        const urlStr = `${this.apiUrl}/api/devices/pairing/request`.replace(/localhost/g, '127.0.0.1');
+        const urlStr = `${this.apiUrl}/api/v1/devices/pairing/request`.replace(/localhost/g, '127.0.0.1');
         const url = new URL(urlStr);
         const options = {
           method: 'POST',
@@ -173,7 +173,7 @@ export class DeviceClient {
     return new Promise((resolve, reject) => {
       try {
         // Fix localhost resolution to IPv4 instead of IPv6
-        const urlStr = `${this.apiUrl}/api/devices/pairing/status/${code}`.replace(/localhost/g, '127.0.0.1');
+        const urlStr = `${this.apiUrl}/api/v1/devices/pairing/status/${code}`.replace(/localhost/g, '127.0.0.1');
         const url = new URL(urlStr);
         const options = {
           method: 'GET',
@@ -351,6 +351,14 @@ export class DeviceClient {
           return;
         }
 
+        if (this.isMainProcessOwnedCommand(command)) {
+          await this.handleCommand(command);
+          if (!ackSent) {
+            sendAck({ ok: true });
+          }
+          return;
+        }
+
         await this.config.onCommand(command);
         await this.handleCommand(command);
         if (!ackSent) {
@@ -467,6 +475,10 @@ export class DeviceClient {
 
   private shouldAckBeforeCommandExecution(command: any): boolean {
     return command?.type === 'restart' || command?.type === 'reboot';
+  }
+
+  private isMainProcessOwnedCommand(command: any): boolean {
+    return ['push_content', 'clear_override', 'clear_cache'].includes(command?.type);
   }
 
   private async waitForSelfTerminatingCommandAckFlush(): Promise<void> {
@@ -825,7 +837,7 @@ export class DeviceClient {
     return new Promise((resolve, reject) => {
       try {
         const deviceIdentifier = this.getDeviceIdentifier();
-        const urlStr = `${this.apiUrl}/api/devices/pairing/unpair`.replace(/localhost/g, '127.0.0.1');
+        const urlStr = `${this.apiUrl}/api/v1/devices/pairing/unpair`.replace(/localhost/g, '127.0.0.1');
         const url = new URL(urlStr);
         const payload = JSON.stringify({ deviceIdentifier });
 

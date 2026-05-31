@@ -6,10 +6,11 @@ import { ContentRenderer } from './ContentRenderer';
 
 interface LayoutRendererProps {
   metadata: LayoutMetadata;
+  authenticateUrl?: (url: string) => string;
   onError?: (errorType: string, errorMessage: string) => void;
 }
 
-export function LayoutRenderer({ metadata, onError }: LayoutRendererProps) {
+export function LayoutRenderer({ metadata, authenticateUrl, onError }: LayoutRendererProps) {
   const gridStyle: React.CSSProperties = {
     width: '100%',
     height: '100%',
@@ -27,13 +28,21 @@ export function LayoutRenderer({ metadata, onError }: LayoutRendererProps) {
   return (
     <div style={gridStyle}>
       {metadata.zones.map((zone) => (
-        <ZonePlayer key={zone.id} zone={zone} onError={onError} />
+        <ZonePlayer key={zone.id} zone={zone} authenticateUrl={authenticateUrl} onError={onError} />
       ))}
     </div>
   );
 }
 
-function ZonePlayer({ zone, onError }: { zone: LayoutZone; onError?: (t: string, m: string) => void }) {
+function ZonePlayer({
+  zone,
+  authenticateUrl,
+  onError,
+}: {
+  zone: LayoutZone;
+  authenticateUrl?: (url: string) => string;
+  onError?: (t: string, m: string) => void;
+}) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -69,7 +78,7 @@ function ZonePlayer({ zone, onError }: { zone: LayoutZone; onError?: (t: string,
       <div style={zoneStyle}>
         <ContentRenderer
           type={zone.resolvedContent.type}
-          url={zone.resolvedContent.url}
+          url={authenticateUrl ? authenticateUrl(zone.resolvedContent.url) : zone.resolvedContent.url}
           name={zone.resolvedContent.name}
           onError={onError}
         />
@@ -87,7 +96,7 @@ function ZonePlayer({ zone, onError }: { zone: LayoutZone; onError?: (t: string,
     <div style={zoneStyle}>
       <ContentRenderer
         type={item.content.type}
-        url={item.content.url}
+        url={authenticateUrl ? authenticateUrl(item.content.url) : item.content.url}
         name={item.content.name}
         onEnded={advance}
         onError={onError}

@@ -93,7 +93,7 @@ describe('DeviceGateway', () => {
   // Mock socket that auto-invokes ack callbacks on emit
   const mockRemoteSocket = {
     id: 'remote-socket-1',
-    data: { deliveryAckCapable: true },
+    data: { deliveryAckCapable: true, deviceId: 'device-1' },
     emit: jest.fn((_event: string, _data: any, ackCb?: () => void) => {
       if (ackCb) ackCb();
     }),
@@ -158,6 +158,7 @@ describe('DeviceGateway', () => {
 
     // Assign mock server
     (gateway as any).server = mockServer;
+    (gateway as any).deviceSockets.set('device-1', 'remote-socket-1');
   });
 
   afterEach(() => {
@@ -354,6 +355,28 @@ describe('DeviceGateway', () => {
       expect(mockRedisService.setDeviceStatus).toHaveBeenCalled();
     });
 
+    it('should reject disabled device connections', async () => {
+      mockJwtService.verify.mockReturnValue({
+        sub: 'device-1',
+        type: 'device',
+        organizationId: 'org-1',
+        deviceIdentifier: 'test-id',
+      });
+      mockDatabaseService.display.findUnique.mockResolvedValue({
+        id: 'device-1',
+        organizationId: 'org-1',
+        isDisabled: true,
+      });
+
+      const client = createMockSocket();
+
+      await gateway.handleConnection(client as any);
+
+      expect(client.emit).toHaveBeenCalledWith('error', { message: 'device_disabled' });
+      expect(client.disconnect).toHaveBeenCalled();
+      expect(client.join).not.toHaveBeenCalledWith('device:device-1');
+    });
+
     it('should reject connections with a revoked token', async () => {
       mockJwtService.verify.mockReturnValue({
         sub: 'device-1',
@@ -481,6 +504,30 @@ describe('DeviceGateway', () => {
       await gateway.handleConnection(client as any);
       expect(client.disconnect).toHaveBeenCalled();
     });
+
+    it('should not rate limit different tokens sharing one proxy IP', async () => {
+      mockJwtService.verify.mockImplementation((token: string) => ({
+        sub: token,
+        type: 'device',
+        organizationId: 'org-1',
+        deviceIdentifier: token,
+      }));
+      mockDatabaseService.display.findUnique.mockImplementation(({ where }: any) =>
+        Promise.resolve({ id: where.id, organizationId: 'org-1', isDisabled: false }),
+      );
+
+      const clients = [];
+      for (let i = 0; i < 12; i++) {
+        const client = createMockSocket({
+          id: `socket-token-${i}`,
+          handshake: { auth: { token: `device-token-${i}` }, address: '10.0.0.1' },
+        });
+        clients.push(client);
+        await gateway.handleConnection(client as any);
+      }
+
+      expect(clients.every((client) => client.disconnect.mock.calls.length === 0)).toBe(true);
+    });
   });
 
   describe('handleDisconnect', () => {
@@ -511,12 +558,48 @@ describe('DeviceGateway', () => {
       expect(mockRedisService.setDeviceStatus).not.toHaveBeenCalled();
     });
 
+    it('does not schedule an offline notification for intentional disable disconnects', async () => {
+      (gateway as any).deviceSockets.set('device-1', 'socket-1');
+
+      const client = createMockSocket({
+        data: {
+          deviceId: 'device-1',
+          organizationId: 'org-1',
+          suppressOfflineNotification: true,
+        },
+      });
+
+      await gateway.handleDisconnect(client as any);
+
+      expect(mockNotificationService.scheduleOfflineNotification).not.toHaveBeenCalled();
+      expect(mockMetricsService.recordConnection).toHaveBeenCalledWith('org-1', 'disconnected');
+    });
+
     it('should handle disconnect for non-device clients gracefully', async () => {
       const client = createMockSocket({
         data: {}, // no deviceId
       });
 
       await expect(gateway.handleDisconnect(client as any)).resolves.not.toThrow();
+    });
+  });
+
+  describe('disconnectDevice', () => {
+    it('emits a reason and disconnects the active device socket', () => {
+      const socket = {
+        id: 'remote-socket-1',
+        emit: jest.fn(),
+        disconnect: jest.fn(),
+      };
+      mockServer.sockets.sockets.set('remote-socket-1', socket);
+      (gateway as any).deviceSockets.set('device-1', 'remote-socket-1');
+
+      const result = gateway.disconnectDevice('device-1', 'device_disabled');
+
+      expect(result).toBe(true);
+      expect(socket.data).toEqual(expect.objectContaining({ suppressOfflineNotification: true }));
+      expect(socket.emit).toHaveBeenCalledWith('error', { message: 'device_disabled' });
+      expect(socket.disconnect).toHaveBeenCalledWith(true);
     });
   });
 
@@ -931,10 +1014,10 @@ describe('DeviceGateway', () => {
     it('should emit playlist:update to device room', async () => {
       const playlist = { id: 'p-1', name: 'Test', items: [] };
 
-      const result = await gateway.sendPlaylistUpdate('device-2', playlist as any);
+      const result = await gateway.sendPlaylistUpdate('device-1', playlist as any);
 
       expect(result).toEqual({ delivered: true });
-      expect(mockServer.in).toHaveBeenCalledWith('device:device-2');
+      expect(mockServer.in).toHaveBeenCalledWith('device:device-1');
       expect(mockRemoteSocket.emit).toHaveBeenCalledWith(
         'playlist:update',
         expect.objectContaining({
@@ -995,6 +1078,9 @@ describe('DeviceGateway', () => {
       await Promise.resolve();
       await Promise.resolve();
 
+      mockServer.in.mockReturnValueOnce({
+        fetchSockets: jest.fn().mockResolvedValue([pendingClient]),
+      });
       const pushResult = await gateway.sendPlaylistUpdate('device-1', newPlaylist as any);
       resolveDisplay({ metadata: {} });
       const replayResult = await replay;
@@ -1023,6 +1109,26 @@ describe('DeviceGateway', () => {
       expect((gateway as any).heartbeatReplayState.has('device-99')).toBe(false);
     });
 
+    it('should queue playlist when only a dashboard socket is in the device room', async () => {
+      const dashboardSocket = {
+        id: 'dashboard-socket',
+        data: { isDashboard: true, organizationId: 'org-1' },
+        emit: jest.fn(),
+      };
+      mockServer.in.mockReturnValueOnce({
+        fetchSockets: jest.fn().mockResolvedValue([dashboardSocket]),
+      });
+
+      const result = await gateway.sendPlaylistUpdate('device-1', { id: 'p-1', name: 'Test', items: [] } as any);
+
+      expect(result).toEqual({ delivered: false, reason: 'no_sockets' });
+      expect(dashboardSocket.emit).not.toHaveBeenCalled();
+      expect(mockRedisService.setPendingPlaylist).toHaveBeenCalledWith(
+        'device-1',
+        expect.objectContaining({ id: 'p-1' }),
+      );
+    });
+
     it('should requeue playlist when the device sends a negative ack', async () => {
       mockRemoteSocket.emit.mockImplementationOnce(
         (_event: string, _data: any, ackCb?: (ack?: { ok: boolean; error?: string }) => void) => {
@@ -1043,9 +1149,10 @@ describe('DeviceGateway', () => {
     it('should treat no-ack legacy sockets as best-effort delivered', async () => {
       const legacySocket = {
         id: 'legacy-socket',
-        data: { deliveryAckCapable: false },
+        data: { deliveryAckCapable: false, deviceId: 'device-1' },
         emit: jest.fn(),
       };
+      (gateway as any).deviceSockets.set('device-1', 'legacy-socket');
       mockServer.in.mockReturnValueOnce({
         fetchSockets: jest.fn().mockResolvedValue([legacySocket]),
       });
@@ -1096,6 +1203,27 @@ describe('DeviceGateway', () => {
       expect((gateway as any).heartbeatReplayState.has('device-99')).toBe(false);
     });
 
+    it('should queue command when only a dashboard socket is in the device room', async () => {
+      const dashboardSocket = {
+        id: 'dashboard-socket',
+        data: { isDashboard: true, organizationId: 'org-1' },
+        emit: jest.fn(),
+      };
+      mockServer.in.mockReturnValueOnce({
+        fetchSockets: jest.fn().mockResolvedValue([dashboardSocket]),
+      });
+      const command = { type: 'reload' as any };
+
+      const result = await gateway.sendCommand('device-1', command);
+
+      expect(result).toEqual({ delivered: false, reason: 'no_sockets' });
+      expect(dashboardSocket.emit).not.toHaveBeenCalled();
+      expect(mockRedisService.addDeviceCommand).toHaveBeenCalledWith(
+        'device-1',
+        expect.objectContaining({ type: 'reload', timestamp: expect.any(String) }),
+      );
+    });
+
     it('should queue command when the device sends a negative ack', async () => {
       mockRemoteSocket.emit.mockImplementationOnce(
         (_event: string, _data: any, ackCb?: (ack?: { ok: boolean; error?: string }) => void) => {
@@ -1116,9 +1244,10 @@ describe('DeviceGateway', () => {
     it('should treat no-ack legacy sockets as best-effort delivered for commands', async () => {
       const legacySocket = {
         id: 'legacy-socket',
-        data: { deliveryAckCapable: false },
+        data: { deliveryAckCapable: false, deviceId: 'device-1' },
         emit: jest.fn(),
       };
+      (gateway as any).deviceSockets.set('device-1', 'legacy-socket');
       mockServer.in.mockReturnValueOnce({
         fetchSockets: jest.fn().mockResolvedValue([legacySocket]),
       });

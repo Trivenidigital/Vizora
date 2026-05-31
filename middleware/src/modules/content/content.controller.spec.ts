@@ -86,6 +86,7 @@ describe('ContentController', () => {
     mockStorageQuotaService = {
       getStorageInfo: jest.fn(),
       checkQuota: jest.fn(),
+      reserveQuota: jest.fn(),
       incrementUsage: jest.fn(),
       decrementUsage: jest.fn(),
       recalculateUsage: jest.fn(),
@@ -199,6 +200,46 @@ describe('ContentController', () => {
 
       expect(result).toHaveProperty('content');
       expect(result).toHaveProperty('fileHash', 'abc123hash');
+      expect(mockStorageQuotaService.reserveQuota).toHaveBeenCalledWith(organizationId, mockFile.size);
+      expect(mockStorageQuotaService.incrementUsage).not.toHaveBeenCalled();
+    });
+
+    it('should release reserved quota when content creation fails', async () => {
+      mockContentService.create.mockRejectedValueOnce(new Error('db write failed'));
+
+      await expect(controller.uploadFile(organizationId, mockFile)).rejects.toThrow('db write failed');
+
+      expect(mockStorageQuotaService.reserveQuota).toHaveBeenCalledWith(organizationId, mockFile.size);
+      expect(mockStorageQuotaService.decrementUsage).toHaveBeenCalledWith(organizationId, mockFile.size);
+    });
+
+    it('keeps quota reserved when uploaded object cleanup fails after content creation failure', async () => {
+      mockStorageService.isMinioAvailable.mockReturnValueOnce(true);
+      mockStorageService.generateObjectKey.mockReturnValueOnce('org-123/uploads/uploaded.jpg');
+      mockContentService.create.mockRejectedValueOnce(new Error('db write failed'));
+      mockStorageService.deleteFile.mockRejectedValueOnce(new Error('delete failed'));
+
+      await expect(controller.uploadFile(organizationId, mockFile)).rejects.toThrow('db write failed');
+
+      expect(mockStorageQuotaService.reserveQuota).toHaveBeenCalledWith(organizationId, mockFile.size);
+      expect(mockStorageQuotaService.decrementUsage).not.toHaveBeenCalledWith(organizationId, mockFile.size);
+    });
+
+    it('should fail closed in production when object storage is unavailable', async () => {
+      const oldEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+      try {
+        mockStorageService.isMinioAvailable.mockReturnValueOnce(false);
+
+        await expect(controller.uploadFile(organizationId, mockFile)).rejects.toThrow(
+          'Storage service is currently unavailable',
+        );
+
+        expect(mockContentService.create).not.toHaveBeenCalled();
+        expect(mockStorageQuotaService.decrementUsage).toHaveBeenCalledWith(organizationId, mockFile.size);
+      } finally {
+        process.env.NODE_ENV = oldEnv;
+      }
     });
 
     it('should validate file with magic numbers', async () => {
@@ -467,6 +508,31 @@ describe('ContentController', () => {
       );
     });
 
+    it('should not reserve additional quota when replacement validation fails', async () => {
+      mockFileValidationService.validateFile.mockRejectedValueOnce(new BadRequestException('Invalid file'));
+
+      await expect(controller.replaceFile(organizationId, 'content-123', mockFile, {})).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(mockStorageQuotaService.reserveQuota).not.toHaveBeenCalled();
+      expect(mockStorageQuotaService.decrementUsage).not.toHaveBeenCalled();
+    });
+
+    it('keeps replacement quota reserved when uploaded replacement cleanup fails after service failure', async () => {
+      mockStorageService.isMinioAvailable.mockReturnValueOnce(true);
+      mockStorageService.generateObjectKey.mockReturnValueOnce('org-123/uploads/replacement.jpg');
+      mockContentService.replaceFile.mockRejectedValueOnce(new Error('db write failed'));
+      mockStorageService.deleteFile.mockRejectedValueOnce(new Error('delete failed'));
+
+      await expect(controller.replaceFile(organizationId, 'content-123', mockFile, {})).rejects.toThrow(
+        'db write failed',
+      );
+
+      expect(mockStorageQuotaService.reserveQuota).toHaveBeenCalledWith(organizationId, 1024);
+      expect(mockStorageQuotaService.decrementUsage).not.toHaveBeenCalledWith(organizationId, 1024);
+    });
+
     it('should sanitize filename', async () => {
       await controller.replaceFile(organizationId, 'content-123', mockFile, {});
 
@@ -476,11 +542,28 @@ describe('ContentController', () => {
     it('should pass keepBackup option to service', async () => {
       await controller.replaceFile(organizationId, 'content-123', mockFile, { keepBackup: true });
 
+      expect(mockStorageQuotaService.reserveQuota).toHaveBeenCalledWith(organizationId, mockFile.size);
       expect(mockContentService.replaceFile).toHaveBeenCalledWith(
         organizationId,
         'content-123',
         expect.any(String),
         expect.objectContaining({ keepBackup: true }),
+      );
+    });
+
+    it('should not decrement quota for smaller keepBackup replacement because the old file is retained', async () => {
+      mockContentService.findOne.mockResolvedValueOnce({
+        id: 'content-123',
+        name: 'old-image.jpg',
+        fileSize: 4096,
+      } as any);
+
+      await controller.replaceFile(organizationId, 'content-123', mockFile, { keepBackup: true });
+
+      expect(mockStorageQuotaService.reserveQuota).toHaveBeenCalledWith(organizationId, mockFile.size);
+      expect(mockStorageQuotaService.decrementUsage).not.toHaveBeenCalledWith(
+        organizationId,
+        expect.any(Number),
       );
     });
 

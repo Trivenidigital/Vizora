@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma } from '@vizora/database';
 import { DatabaseService } from '../database/database.service';
@@ -259,6 +259,7 @@ export class ContentService {
         await this.storageService.deleteFile(content.fileKey);
       } catch (error) {
         this.logger.error(`Failed to delete file ${content.fileKey} from storage: ${error}`);
+        throw new ServiceUnavailableException('Content file could not be deleted from storage; DB row retained for retry');
       }
     } else if (content.url?.startsWith('minio://')) {
       // Fall back to extracting object key from minio:// URL
@@ -267,6 +268,7 @@ export class ContentService {
         await this.storageService.deleteFile(objectKey);
       } catch (error) {
         this.logger.error(`Failed to delete file ${objectKey} from storage: ${error}`);
+        throw new ServiceUnavailableException('Content file could not be deleted from storage; DB row retained for retry');
       }
     }
 
@@ -275,12 +277,15 @@ export class ContentService {
       where: { id, organizationId },
     });
 
-    // Decrement storage usage if the content had a file size
-    if (content.fileSize && content.fileSize > 0) {
+    // Decrement storage usage only if this request actually removed the row.
+    // Concurrent deletes can both read the row before one delete wins.
+    if (deleted.count > 0 && content.fileSize && content.fileSize > 0) {
       await this.storageQuotaService.decrementUsage(organizationId, content.fileSize);
     }
 
-    this.eventEmitter.emit('content.deleted', { action: 'deleted', entityType: 'content', entityId: id, organizationId });
+    if (deleted.count > 0) {
+      this.eventEmitter.emit('content.deleted', { action: 'deleted', entityType: 'content', entityId: id, organizationId });
+    }
     return deleted;
   }
 
@@ -321,6 +326,9 @@ export class ContentService {
     options: { name?: string; keepBackup?: boolean; thumbnail?: string; fileSize?: number; mimeType?: string } = {},
   ) {
     const existingContent = await this.findOne(organizationId, id);
+    const previousObjectKey = existingContent.url?.startsWith('minio://')
+      ? existingContent.url.substring('minio://'.length)
+      : null;
 
     if (options.keepBackup) {
       // Create backup and update original in a transaction to prevent data loss
@@ -383,7 +391,66 @@ export class ContentService {
     }
     const updatedContent = await this.db.content.findUnique({ where: { id } });
 
+    if (previousObjectKey && newUrl !== `minio://${previousObjectKey}`) {
+      await this.cleanupPreviousReplacementObject(
+        organizationId,
+        id,
+        previousObjectKey,
+        existingContent.fileSize,
+        existingContent.metadata,
+      );
+    }
+
     return this.mapContentResponse(updatedContent);
+  }
+
+  private async cleanupPreviousReplacementObject(
+    organizationId: string,
+    contentId: string,
+    previousObjectKey: string,
+    previousFileSize?: number | null,
+    metadata?: unknown,
+  ): Promise<void> {
+    try {
+      await this.storageService.deleteFile(previousObjectKey);
+      return;
+    } catch (error) {
+      this.logger.warn(
+        `Replacement kept previous storage object ${previousObjectKey} after delete failure: ${error}`,
+      );
+    }
+
+    // The DB row already points at the replacement object by this point. Any
+    // accounting/audit cleanup below must not make the controller delete that
+    // replacement object as if the whole replace failed.
+    try {
+      if (previousFileSize && previousFileSize > 0) {
+        await this.storageQuotaService.incrementUsage(organizationId, previousFileSize);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to account retained previous object ${previousObjectKey}: ${error}`);
+    }
+
+    try {
+      const previousMetadata =
+        metadata &&
+        typeof metadata === 'object' &&
+        !Array.isArray(metadata)
+          ? (metadata as Record<string, unknown>)
+          : {};
+      await this.db.content.updateMany({
+        where: { id: contentId, organizationId },
+        data: {
+          metadata: {
+            ...previousMetadata,
+            orphanedPreviousFileKey: previousObjectKey,
+            orphanedPreviousFileDeleteFailedAt: new Date().toISOString(),
+          } as Prisma.InputJsonValue,
+        },
+      });
+    } catch (error) {
+      this.logger.error(`Failed to mark retained previous object ${previousObjectKey}: ${error}`);
+    }
   }
 
   async getVersionHistory(organizationId: string, id: string) {
@@ -642,7 +709,7 @@ export class ContentService {
     // Fetch items with file info for storage cleanup
     const items = await this.db.content.findMany({
       where: { id: { in: uniqueIds }, organizationId },
-      select: { id: true, fileSize: true, url: true },
+      select: { id: true, fileSize: true, url: true, metadata: true },
     });
 
     if (items.length !== uniqueIds.length) {
@@ -686,16 +753,55 @@ export class ContentService {
 
     let deleted = 0;
     if (deletableIds.length > 0) {
-      const result = await this.db.content.deleteMany({
-        where: { id: { in: deletableIds }, organizationId },
-      });
-      deleted = result.count;
-
-      const successfulBytes = items
-        .filter((i) => deletableIds.includes(i.id))
-        .reduce((sum, i) => sum + (i.fileSize || 0), 0);
-      if (successfulBytes > 0) {
-        await this.storageQuotaService.decrementUsage(organizationId, successfulBytes);
+      for (const item of items.filter((i) => deletableIds.includes(i.id))) {
+        const bytes = item.fileSize || 0;
+        try {
+          const result = await this.db.content.deleteMany({
+            where: { id: item.id, organizationId },
+          });
+          if (result.count > 0) {
+            deleted += result.count;
+            if (bytes > 0) {
+              await this.storageQuotaService.decrementUsage(organizationId, bytes);
+            }
+          }
+        } catch (err) {
+          failedIds.push(item.id);
+          this.logger.warn(
+            `Bulk delete: DB delete failed for content ${item.id} after storage cleanup: ${
+              err instanceof Error ? err.message : err
+            }. Row retained but storage quota is adjusted to match removed object.`,
+          );
+          try {
+            const previousMetadata =
+              item.metadata &&
+              typeof item.metadata === 'object' &&
+              !Array.isArray(item.metadata)
+                ? (item.metadata as Record<string, unknown>)
+                : {};
+            await this.db.content.updateMany({
+              where: { id: item.id, organizationId },
+              data: {
+                status: 'archived',
+                metadata: {
+                  ...previousMetadata,
+                  bulkDeleteDbDeleteFailedAt: new Date().toISOString(),
+                  storageObjectRemovedDuringBulkDelete: true,
+                } as Prisma.InputJsonValue,
+              },
+            });
+            await this.db.playlistItem.deleteMany({
+              where: { contentId: item.id },
+            });
+          } catch (markError) {
+            this.logger.error(
+              `Bulk delete: failed to mark retained row or remove playlist assignments for ${item.id} after storage cleanup: ${markError}`,
+            );
+          }
+          if (bytes > 0) {
+            await this.storageQuotaService.decrementUsage(organizationId, bytes);
+          }
+        }
       }
     }
 

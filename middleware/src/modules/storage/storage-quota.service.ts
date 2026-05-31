@@ -55,6 +55,47 @@ export class StorageQuotaService {
   }
 
   /**
+   * Atomically reserve storage quota for an upload.
+   *
+   * This increments usage in the same conditional database write that checks
+   * available quota, so concurrent uploads cannot both pass a stale read.
+   * Call `decrementUsage` to release the reservation if later storage or DB
+   * writes fail.
+   */
+  async reserveQuota(organizationId: string, fileSizeBytes: number): Promise<void> {
+    if (fileSizeBytes <= 0) return;
+
+    const requestedBytes = BigInt(fileSizeBytes);
+    const rows = await this.db.$queryRaw<Array<{ storageUsedBytes: bigint; storageQuotaBytes: bigint }>>`
+      UPDATE "organizations"
+      SET "storageUsedBytes" = "storageUsedBytes" + ${requestedBytes}
+      WHERE "id" = ${organizationId}
+        AND "storageUsedBytes" + ${requestedBytes} <= "storageQuotaBytes"
+      RETURNING "storageUsedBytes", "storageQuotaBytes"
+    `;
+
+    if (rows.length > 0) {
+      return;
+    }
+
+    const org = await this.db.organization.findUnique({
+      where: { id: organizationId },
+      select: { storageUsedBytes: true, storageQuotaBytes: true },
+    });
+    if (!org) return;
+
+    const usedBytes = Number(org.storageUsedBytes);
+    const quotaBytes = Number(org.storageQuotaBytes);
+    throw new PayloadTooLargeException({
+      message: 'Storage quota exceeded',
+      usedBytes,
+      quotaBytes,
+      availableBytes: quotaBytes - usedBytes,
+      requestedBytes: fileSizeBytes,
+    });
+  }
+
+  /**
    * Increment storage usage after a successful upload.
    */
   async incrementUsage(organizationId: string, bytes: number): Promise<void> {
@@ -68,18 +109,14 @@ export class StorageQuotaService {
    * Decrement storage usage after a file deletion.
    */
   async decrementUsage(organizationId: string, bytes: number): Promise<void> {
-    // Prevent going below zero
-    const org = await this.db.organization.findUnique({
-      where: { id: organizationId },
-      select: { storageUsedBytes: true },
-    });
-    if (!org) return;
-    const currentUsed = Number(org.storageUsedBytes);
-    const newUsed = Math.max(0, currentUsed - bytes);
-    await this.db.organization.update({
-      where: { id: organizationId },
-      data: { storageUsedBytes: BigInt(newUsed) },
-    });
+    if (bytes <= 0) return;
+
+    const releaseBytes = BigInt(bytes);
+    await this.db.$executeRaw`
+      UPDATE "organizations"
+      SET "storageUsedBytes" = GREATEST("storageUsedBytes" - ${releaseBytes}, ${BigInt(0)})
+      WHERE "id" = ${organizationId}
+    `;
   }
 
   /**

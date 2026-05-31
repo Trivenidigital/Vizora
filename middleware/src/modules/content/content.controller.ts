@@ -14,6 +14,7 @@ import {
   UseGuards,
   BadRequestException,
   NotFoundException,
+  ServiceUnavailableException,
   Logger,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
@@ -89,9 +90,6 @@ export class ContentController {
       throw new BadRequestException('No file provided');
     }
 
-    // Check storage quota before processing
-    await this.storageQuotaService.checkQuota(organizationId, file.size);
-
     // Validate file using magic numbers, size, etc.
     const validation = await this.fileValidationService.validateFile(
       file.buffer,
@@ -106,65 +104,79 @@ export class ContentController {
 
     let fileUrl: string;
     const filename = `${validation.hash}-${safeFilename}`;
+    let uploadedObjectKey: string | null = null;
 
-    // Try MinIO first, fall back to local storage
-    if (this.storageService.isMinioAvailable()) {
-      try {
+    await this.storageQuotaService.reserveQuota(organizationId, file.size);
+    try {
+      // Try MinIO first. In production, fail closed instead of creating
+      // unreachable /uploads content when object storage is unhealthy.
+      if (this.storageService.isMinioAvailable()) {
         const objectKey = this.storageService.generateObjectKey(
           organizationId,
           validation.hash,
           safeFilename,
         );
         await this.storageService.uploadFile(file.buffer, objectKey, file.mimetype);
+        uploadedObjectKey = objectKey;
         // Store with minio:// prefix to identify MinIO-stored content
         fileUrl = `${MINIO_URL_PREFIX}${objectKey}`;
         this.logger.debug(`File uploaded to MinIO: ${objectKey}`);
-      } catch (error) {
-        this.logger.warn(`MinIO upload failed, falling back to local storage: ${error}`);
-        // Fall back to local storage
+      } else if (process.env.NODE_ENV === 'production') {
+        throw new ServiceUnavailableException('Storage service is currently unavailable');
+      } else {
+        // Development fallback only; production middleware no longer serves
+        // /uploads, so accepting this path there would create dead content.
         fileUrl = await this.saveFileLocally(organizationId, filename, file.buffer);
       }
-    } else {
-      // MinIO not available, use local storage
-      fileUrl = await this.saveFileLocally(organizationId, filename, file.buffer);
+
+      // Determine the content type from the file mimetype
+      const contentType = type || (file.mimetype.startsWith('video/') ? 'video' :
+                                   file.mimetype.startsWith('image/') ? 'image' :
+                                   file.mimetype === 'application/pdf' ? 'pdf' : 'url');
+
+      // Create content record (fileHash stored in metadata since not in schema)
+      const content = await this.contentService.create(organizationId, {
+        name: name || safeFilename,
+        type: contentType,
+        url: fileUrl,
+        fileSize: file.size,
+        mimeType: file.mimetype,
+        metadata: { fileHash: validation.hash },
+      } as CreateContentDto);
+
+      // Generate thumbnail in background (fire-and-forget to avoid blocking upload response)
+      if (contentType === 'image') {
+        this.thumbnailService.generateThumbnail(
+          content.id,
+          file.buffer,
+          file.mimetype,
+        ).then(async (thumbnailUrl) => {
+          await this.contentService.update(organizationId, content.id, { thumbnail: thumbnailUrl });
+          this.logger.debug(`Thumbnail generated in background: ${thumbnailUrl}`);
+        }).catch((error) => {
+          this.logger.warn(`Background thumbnail generation failed: ${error}`);
+        });
+      }
+
+      return {
+        content,
+        fileHash: validation.hash,
+      };
+    } catch (error) {
+      let canReleaseQuota = true;
+      if (uploadedObjectKey) {
+        try {
+          await this.storageService.deleteFile(uploadedObjectKey);
+        } catch (deleteError) {
+          canReleaseQuota = false;
+          this.logger.warn(`Failed to clean up uploaded object after upload failure: ${deleteError}`);
+        }
+      }
+      if (canReleaseQuota) {
+        await this.releaseQuotaReservation(organizationId, file.size);
+      }
+      throw error;
     }
-
-    // Determine the content type from the file mimetype
-    const contentType = type || (file.mimetype.startsWith('video/') ? 'video' :
-                                 file.mimetype.startsWith('image/') ? 'image' :
-                                 file.mimetype === 'application/pdf' ? 'pdf' : 'url');
-
-    // Create content record (fileHash stored in metadata since not in schema)
-    const content = await this.contentService.create(organizationId, {
-      name: name || safeFilename,
-      type: contentType,
-      url: fileUrl,
-      fileSize: file.size,
-      mimeType: file.mimetype,
-      metadata: { fileHash: validation.hash },
-    } as CreateContentDto);
-
-    // Track storage usage after successful upload
-    await this.storageQuotaService.incrementUsage(organizationId, file.size);
-
-    // Generate thumbnail in background (fire-and-forget to avoid blocking upload response)
-    if (contentType === 'image') {
-      this.thumbnailService.generateThumbnail(
-        content.id,
-        file.buffer,
-        file.mimetype,
-      ).then(async (thumbnailUrl) => {
-        await this.contentService.update(organizationId, content.id, { thumbnail: thumbnailUrl });
-        this.logger.debug(`Thumbnail generated in background: ${thumbnailUrl}`);
-      }).catch((error) => {
-        this.logger.warn(`Background thumbnail generation failed: ${error}`);
-      });
-    }
-
-    return {
-      content,
-      fileHash: validation.hash,
-    };
   }
 
   /**
@@ -432,11 +444,7 @@ export class ContentController {
     const existingContent = await this.contentService.findOne(organizationId, id);
     const oldFileSize = existingContent.fileSize || 0;
     const netIncrease = file.size - oldFileSize;
-
-    // Check storage quota only if net storage increases
-    if (netIncrease > 0) {
-      await this.storageQuotaService.checkQuota(organizationId, netIncrease);
-    }
+    const keepBackup = replaceFileDto.keepBackup === true;
 
     // Validate file
     const validation = await this.fileValidationService.validateFile(
@@ -452,68 +460,98 @@ export class ContentController {
 
     let fileUrl: string;
     const filename = `${validation.hash}-${safeFilename}`;
+    let uploadedObjectKey: string | null = null;
 
-    // Try MinIO first, fall back to local storage
-    if (this.storageService.isMinioAvailable()) {
-      try {
+    // Reserve quota only after validation succeeds so rejected files cannot
+    // leave behind accounting reservations. Backup replacements retain the
+    // previous file, so the quota increase is the full new file size.
+    const quotaReservation = keepBackup ? file.size : Math.max(0, netIncrease);
+    if (quotaReservation > 0) {
+      await this.storageQuotaService.reserveQuota(organizationId, quotaReservation);
+    }
+
+    try {
+      // Try MinIO first. In production, fail closed instead of creating
+      // unreachable /uploads content when object storage is unhealthy.
+      if (this.storageService.isMinioAvailable()) {
         const objectKey = this.storageService.generateObjectKey(
           organizationId,
           validation.hash,
           safeFilename,
         );
         await this.storageService.uploadFile(file.buffer, objectKey, file.mimetype);
+        uploadedObjectKey = objectKey;
         fileUrl = `${MINIO_URL_PREFIX}${objectKey}`;
         this.logger.debug(`Replacement file uploaded to MinIO: ${objectKey}`);
-      } catch (error) {
-        this.logger.warn(`MinIO upload failed for replacement, falling back to local: ${error}`);
+      } else if (process.env.NODE_ENV === 'production') {
+        throw new ServiceUnavailableException('Storage service is currently unavailable');
+      } else {
         fileUrl = await this.saveFileLocally(organizationId, filename, file.buffer);
       }
-    } else {
-      fileUrl = await this.saveFileLocally(organizationId, filename, file.buffer);
-    }
 
-    // Determine thumbnail for images
-    const contentType = file.mimetype.startsWith('video/') ? 'video' :
-                       file.mimetype.startsWith('image/') ? 'image' :
-                       file.mimetype === 'application/pdf' ? 'pdf' : 'url';
+      // Determine thumbnail for images
+      const contentType = file.mimetype.startsWith('video/') ? 'video' :
+                         file.mimetype.startsWith('image/') ? 'image' :
+                         file.mimetype === 'application/pdf' ? 'pdf' : 'url';
 
-    const content = await this.contentService.replaceFile(
-      organizationId,
-      id,
-      fileUrl,
-      {
-        name: replaceFileDto.name,
-        keepBackup: replaceFileDto.keepBackup,
-        fileSize: file.size,
-        mimeType: file.mimetype,
-      },
-    );
-
-    // Update storage usage: adjust for the net difference
-    if (netIncrease > 0) {
-      await this.storageQuotaService.incrementUsage(organizationId, netIncrease);
-    } else if (netIncrease < 0) {
-      await this.storageQuotaService.decrementUsage(organizationId, Math.abs(netIncrease));
-    }
-
-    // Generate thumbnail in background (fire-and-forget)
-    if (contentType === 'image') {
-      this.thumbnailService.generateThumbnail(
+      const content = await this.contentService.replaceFile(
+        organizationId,
         id,
-        file.buffer,
-        file.mimetype,
-      ).then(async (thumbnailUrl) => {
-        await this.contentService.update(organizationId, id, { thumbnail: thumbnailUrl });
-        this.logger.debug(`Replacement thumbnail generated in background: ${thumbnailUrl}`);
-      }).catch((error) => {
-        this.logger.warn(`Background thumbnail generation failed during replace: ${error}`);
-      });
-    }
+        fileUrl,
+        {
+          name: replaceFileDto.name,
+          keepBackup,
+          fileSize: file.size,
+          mimeType: file.mimetype,
+        },
+      );
 
-    return {
-      content,
-      fileHash: validation.hash,
-    };
+      // Update storage usage: adjust for the net difference
+      if (!keepBackup && netIncrease < 0) {
+        await this.storageQuotaService.decrementUsage(organizationId, Math.abs(netIncrease));
+      }
+
+      // Generate thumbnail in background (fire-and-forget)
+      if (contentType === 'image') {
+        this.thumbnailService.generateThumbnail(
+          id,
+          file.buffer,
+          file.mimetype,
+        ).then(async (thumbnailUrl) => {
+          await this.contentService.update(organizationId, id, { thumbnail: thumbnailUrl });
+          this.logger.debug(`Replacement thumbnail generated in background: ${thumbnailUrl}`);
+        }).catch((error) => {
+          this.logger.warn(`Background thumbnail generation failed during replace: ${error}`);
+        });
+      }
+
+      return {
+        content,
+        fileHash: validation.hash,
+      };
+    } catch (error) {
+      let canReleaseQuota = true;
+      if (uploadedObjectKey) {
+        try {
+          await this.storageService.deleteFile(uploadedObjectKey);
+        } catch (deleteError) {
+          canReleaseQuota = false;
+          this.logger.warn(`Failed to clean up replacement object after failure: ${deleteError}`);
+        }
+      }
+      if (canReleaseQuota && quotaReservation > 0) {
+        await this.releaseQuotaReservation(organizationId, quotaReservation);
+      }
+      throw error;
+    }
+  }
+
+  private async releaseQuotaReservation(organizationId: string, bytes: number): Promise<void> {
+    try {
+      await this.storageQuotaService.decrementUsage(organizationId, bytes);
+    } catch (error) {
+      this.logger.error(`Failed to release reserved storage quota for ${organizationId}: ${error}`);
+    }
   }
 
   @Get(':id/versions')

@@ -110,7 +110,29 @@ jest.mock('@/components/DeviceStatusIndicator', () => {
 });
 
 jest.mock('@/components/DeviceGroupSelector', () => {
-  return function MockGroupSelector() { return null; };
+  return function MockGroupSelector({ groups, selectedGroupIds, onChange }: any) {
+    return (
+      <div data-testid="group-selector">
+        {groups.map((group: any) => (
+          <label key={group.id}>
+            <input
+              aria-label={`group-${group.name}`}
+              type="checkbox"
+              checked={selectedGroupIds.includes(group.id)}
+              onChange={(event) => {
+                onChange(
+                  event.currentTarget.checked
+                    ? [...selectedGroupIds, group.id]
+                    : selectedGroupIds.filter((id: string) => id !== group.id),
+                );
+              }}
+            />
+            {group.name}
+          </label>
+        ))}
+      </div>
+    );
+  };
 });
 
 jest.mock('@/components/DevicePreviewModal', () => {
@@ -231,6 +253,26 @@ describe('DevicesClient', () => {
     await waitFor(() => {
       expect(mockGetDisplayGroups).toHaveBeenCalled();
     });
+  });
+
+  it('filters devices by selected device group membership', async () => {
+    mockGetDisplays.mockResolvedValue({ data: sampleDevices, meta: { total: 3 } });
+    mockGetDisplayGroups.mockResolvedValue({
+      data: [{ id: 'g1', name: 'Lobby Group', description: '', displays: [{ displayId: 'd1' }] }],
+    });
+
+    render(<DevicesClient initialDevices={sampleDevices as any} initialPlaylists={samplePlaylists as any} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Lobby Display')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Device Groups (1)'));
+    fireEvent.click(screen.getByLabelText('group-Lobby Group'));
+
+    expect(screen.getByText('Lobby Display')).toBeInTheDocument();
+    expect(screen.queryByText('Conference Room')).not.toBeInTheDocument();
+    expect(screen.queryByText('Cafeteria Screen')).not.toBeInTheDocument();
   });
 
   it('renders with provided playlists', async () => {
