@@ -18,6 +18,7 @@ import { DeviceContentController } from './device-content.controller';
 import { ContentService } from './content.service';
 import { StorageService } from '../storage/storage.service';
 import { DatabaseService } from '../database/database.service';
+import { createHash } from 'node:crypto';
 import { Readable, Writable } from 'node:stream';
 
 describe('DeviceContentController', () => {
@@ -31,6 +32,9 @@ describe('DeviceContentController', () => {
   const deviceId = 'device-456';
   const contentId = 'content-789';
   const objectKey = `${organizationId}/uploads/test-image.jpg`;
+
+  const hashToken = (token: string) =>
+    createHash('sha256').update(token).digest('hex');
 
   const validDevicePayload = {
     sub: deviceId,
@@ -71,6 +75,7 @@ describe('DeviceContentController', () => {
           id: deviceId,
           organizationId,
           isDisabled: false,
+          jwtToken: hashToken('valid-device-token'),
         }),
       },
     };
@@ -103,6 +108,15 @@ describe('DeviceContentController', () => {
       }
       if (queryToken) {
         req.query.token = queryToken;
+      }
+      const presentedToken = token ?? queryToken;
+      if (presentedToken) {
+        mockDatabaseService.display.findUnique.mockResolvedValue({
+          id: deviceId,
+          organizationId,
+          isDisabled: false,
+          jwtToken: hashToken(presentedToken),
+        });
       }
       return req;
     };
@@ -168,9 +182,67 @@ describe('DeviceContentController', () => {
         id: deviceId,
         organizationId,
         isDisabled: true,
+        jwtToken: hashToken('valid-device-token'),
       });
 
       await expect(controller.serveFile(contentId, req, res)).rejects.toThrow(UnauthorizedException);
+
+      expect(mockContentService.findByIdForDevice).not.toHaveBeenCalled();
+      expect(mockStorageService.getObject).not.toHaveBeenCalled();
+    });
+
+    it('should reject a signed device JWT that is not the current stored token', async () => {
+      const req = createMockRequest('stale-device-token');
+      const res = createMockResponse();
+      mockJwtService.verify.mockReturnValue(validDevicePayload);
+      mockDatabaseService.display.findUnique.mockResolvedValueOnce({
+        id: deviceId,
+        organizationId,
+        isDisabled: false,
+        jwtToken: hashToken('current-device-token'),
+      });
+
+      await expect(controller.serveFile(contentId, req, res)).rejects.toThrow(
+        UnauthorizedException,
+      );
+
+      expect(mockContentService.findByIdForDevice).not.toHaveBeenCalled();
+      expect(mockStorageService.getObject).not.toHaveBeenCalled();
+    });
+
+    it('should reject a signed device JWT when the display has no stored token hash', async () => {
+      const req = createMockRequest('valid-device-token');
+      const res = createMockResponse();
+      mockJwtService.verify.mockReturnValue(validDevicePayload);
+      mockDatabaseService.display.findUnique.mockResolvedValueOnce({
+        id: deviceId,
+        organizationId,
+        isDisabled: false,
+        jwtToken: null,
+      });
+
+      await expect(controller.serveFile(contentId, req, res)).rejects.toThrow(
+        UnauthorizedException,
+      );
+
+      expect(mockContentService.findByIdForDevice).not.toHaveBeenCalled();
+      expect(mockStorageService.getObject).not.toHaveBeenCalled();
+    });
+
+    it('should reject a signed device JWT when the stored token hash is malformed', async () => {
+      const req = createMockRequest('valid-device-token');
+      const res = createMockResponse();
+      mockJwtService.verify.mockReturnValue(validDevicePayload);
+      mockDatabaseService.display.findUnique.mockResolvedValueOnce({
+        id: deviceId,
+        organizationId,
+        isDisabled: false,
+        jwtToken: 'legacy-plaintext-token',
+      });
+
+      await expect(controller.serveFile(contentId, req, res)).rejects.toThrow(
+        UnauthorizedException,
+      );
 
       expect(mockContentService.findByIdForDevice).not.toHaveBeenCalled();
       expect(mockStorageService.getObject).not.toHaveBeenCalled();

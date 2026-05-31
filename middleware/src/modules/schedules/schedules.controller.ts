@@ -16,6 +16,7 @@ import {
 import { ParseIdPipe } from '../common/pipes/parse-id.pipe';
 import type { Request } from 'express';
 import { JwtService } from '@nestjs/jwt';
+import { DatabaseService } from '../database/database.service';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RequiresSubscription } from '../billing/decorators/requires-subscription.decorator';
@@ -26,6 +27,10 @@ import { CheckConflictsDto } from './dto/check-conflicts.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
+import {
+  getDeviceTokenFromRequest,
+  verifyCurrentDeviceToken,
+} from '../common/device-token-auth.util';
 
 @UseGuards(RolesGuard)
 @RequiresSubscription()
@@ -34,6 +39,7 @@ export class SchedulesController {
   constructor(
     private readonly schedulesService: SchedulesService,
     private readonly jwtService: JwtService,
+    private readonly databaseService: DatabaseService,
   ) {}
 
   @Post()
@@ -72,32 +78,14 @@ export class SchedulesController {
 
   @Get('active/:displayId')
   @Public() // Bypass user JWT guard -- device JWT verified manually below
-  findActiveSchedules(@Param('displayId', ParseIdPipe) displayId: string, @Req() req: Request) {
-    // Verify device JWT to prevent unauthenticated schedule access
-    const token = (req.headers.authorization as string)?.replace('Bearer ', '');
-    if (!token) {
-      throw new UnauthorizedException('Device authentication required');
-    }
-    let organizationId: string;
-    try {
-      const payload = this.jwtService.verify(token, {
-        secret: process.env.DEVICE_JWT_SECRET,
-      });
-      if (payload.type !== 'device') {
-        throw new UnauthorizedException('Invalid token type');
-      }
-      if (!payload.sub || payload.sub !== displayId) {
-        throw new UnauthorizedException('Device token does not match requested display');
-      }
-      if (!payload.organizationId) {
-        throw new UnauthorizedException('Device token missing organization');
-      }
-      organizationId = payload.organizationId;
-    } catch (error) {
-      if (error instanceof UnauthorizedException) throw error;
-      throw new UnauthorizedException('Invalid or expired device token');
-    }
-    return this.schedulesService.findActiveSchedules(displayId, organizationId);
+  async findActiveSchedules(@Param('displayId', ParseIdPipe) displayId: string, @Req() req: Request) {
+    const { payload } = await verifyCurrentDeviceToken({
+      jwtService: this.jwtService,
+      databaseService: this.databaseService,
+      token: getDeviceTokenFromRequest(req),
+      expectedDisplayId: displayId,
+    });
+    return this.schedulesService.findActiveSchedules(displayId, payload.organizationId);
   }
 
   @Get(':id')

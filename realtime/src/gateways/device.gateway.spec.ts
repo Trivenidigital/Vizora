@@ -8,6 +8,7 @@ import { NotificationService } from '../services/notification.service';
 import { MetricsService } from '../metrics/metrics.service';
 import { DatabaseService } from '../database/database.service';
 import { StorageService } from '../storage/storage.service';
+import { createHash } from 'node:crypto';
 
 // Mock Sentry
 jest.mock('@sentry/nestjs', () => ({
@@ -25,7 +26,11 @@ describe('DeviceGateway', () => {
 
   const mockJwtService = {
     verify: jest.fn(),
+    sign: jest.fn(),
   };
+
+  const hashToken = (token: string) =>
+    createHash('sha256').update(token).digest('hex');
 
   const mockRedisService = {
     setDeviceStatus: jest.fn().mockResolvedValue(undefined),
@@ -70,7 +75,14 @@ describe('DeviceGateway', () => {
     display: {
       update: jest.fn().mockResolvedValue({ nickname: 'Test Device', deviceIdentifier: 'test-id' }),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-      findUnique: jest.fn().mockResolvedValue({ nickname: 'Test Device', deviceIdentifier: 'test-id' }),
+      findUnique: jest.fn().mockResolvedValue({
+        id: 'device-1',
+        organizationId: 'org-1',
+        isDisabled: false,
+        nickname: 'Test Device',
+        deviceIdentifier: 'test-id',
+        jwtToken: hashToken('valid-token'),
+      }),
       findMany: jest.fn().mockResolvedValue([]),
     },
     playlist: {
@@ -90,14 +102,30 @@ describe('DeviceGateway', () => {
     getPresignedUrl: jest.fn().mockResolvedValue('https://storage/test.png'),
   };
 
-  // Mock socket that auto-invokes ack callbacks on emit
-  const mockRemoteSocket = {
-    id: 'remote-socket-1',
-    data: { deliveryAckCapable: true, deviceId: 'device-1' },
-    emit: jest.fn((_event: string, _data: any, ackCb?: () => void) => {
+  const createDeliverySocket = (
+    id: string,
+    options: {
+      token?: string;
+      deviceId?: string;
+      organizationId?: string;
+      deliveryAckCapable?: boolean;
+      emit?: jest.Mock;
+    } = {},
+  ) => ({
+    id,
+    data: {
+      deliveryAckCapable: options.deliveryAckCapable ?? true,
+      deviceId: options.deviceId ?? 'device-1',
+      organizationId: options.organizationId ?? 'org-1',
+      deviceTokenHash: hashToken(options.token ?? 'valid-token'),
+    },
+    emit: options.emit ?? jest.fn((_event: string, _data: any, ackCb?: () => void) => {
       if (ackCb) ackCb();
     }),
-  };
+  });
+
+  // Mock socket that auto-invokes ack callbacks on emit
+  const mockRemoteSocket = createDeliverySocket('remote-socket-1');
 
   const mockServer = {
     to: jest.fn().mockReturnValue({
@@ -132,6 +160,26 @@ describe('DeviceGateway', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockRemoteSocket.emit.mockImplementation((_event: string, _data: any, ackCb?: () => void) => {
+      if (ackCb) ackCb();
+    });
+    mockDatabaseService.display.findUnique.mockResolvedValue({
+      id: 'device-1',
+      organizationId: 'org-1',
+      isDisabled: false,
+      nickname: 'Test Device',
+      deviceIdentifier: 'test-id',
+      jwtToken: hashToken('valid-token'),
+    });
+    mockDatabaseService.display.update.mockResolvedValue({
+      nickname: 'Test Device',
+      deviceIdentifier: 'test-id',
+    });
+    mockDatabaseService.display.updateMany.mockResolvedValue({ count: 1 });
+    mockDatabaseService.display.findMany.mockResolvedValue([]);
+    mockServer.in.mockReturnValue({
+      fetchSockets: jest.fn().mockResolvedValue([mockRemoteSocket]),
+    });
     // Use fake timers to prevent setInterval leaks
     jest.useFakeTimers();
 
@@ -344,7 +392,12 @@ describe('DeviceGateway', () => {
         organizationId: 'org-1',
         deviceIdentifier: 'test-id',
       });
-      mockDatabaseService.display.findUnique.mockResolvedValue({ id: 'device-1', organizationId: 'org-1' });
+      mockDatabaseService.display.findUnique.mockResolvedValue({
+        id: 'device-1',
+        organizationId: 'org-1',
+        isDisabled: false,
+        jwtToken: hashToken('valid-token'),
+      });
 
       const client = createMockSocket();
 
@@ -366,6 +419,7 @@ describe('DeviceGateway', () => {
         id: 'device-1',
         organizationId: 'org-1',
         isDisabled: true,
+        jwtToken: hashToken('valid-token'),
       });
 
       const client = createMockSocket();
@@ -375,6 +429,86 @@ describe('DeviceGateway', () => {
       expect(client.emit).toHaveBeenCalledWith('error', { message: 'device_disabled' });
       expect(client.disconnect).toHaveBeenCalled();
       expect(client.join).not.toHaveBeenCalledWith('device:device-1');
+    });
+
+    it('should reject a signed device token that is not the current stored token', async () => {
+      mockJwtService.verify.mockReturnValue({
+        sub: 'device-1',
+        type: 'device',
+        organizationId: 'org-1',
+        deviceIdentifier: 'test-id',
+      });
+      mockDatabaseService.display.findUnique.mockResolvedValue({
+        id: 'device-1',
+        organizationId: 'org-1',
+        isDisabled: false,
+        jwtToken: hashToken('current-device-token'),
+      });
+
+      const client = createMockSocket({
+        handshake: { auth: { token: 'stale-device-token' }, address: '127.0.0.1' },
+      });
+
+      await gateway.handleConnection(client as any);
+
+      expect(client.emit).toHaveBeenCalledWith('error', { message: 'device_token_stale' });
+      expect(client.disconnect).toHaveBeenCalled();
+      expect(client.join).not.toHaveBeenCalledWith('device:device-1');
+      expect(mockRedisService.setDeviceStatus).not.toHaveBeenCalled();
+    });
+
+    it('should reject a signed device token when the display has no stored token hash', async () => {
+      mockJwtService.verify.mockReturnValue({
+        sub: 'device-1',
+        type: 'device',
+        organizationId: 'org-1',
+        deviceIdentifier: 'test-id',
+      });
+      mockDatabaseService.display.findUnique.mockResolvedValue({
+        id: 'device-1',
+        organizationId: 'org-1',
+        isDisabled: false,
+        jwtToken: null,
+      });
+
+      const client = createMockSocket();
+
+      await gateway.handleConnection(client as any);
+
+      expect(client.emit).toHaveBeenCalledWith('error', { message: 'device_token_stale' });
+      expect(client.disconnect).toHaveBeenCalled();
+      expect(client.join).not.toHaveBeenCalledWith('device:device-1');
+    });
+
+    it('should not auto-rotate near-expiry device tokens without an ACK-backed grace design', async () => {
+      const oldToken = 'valid-token';
+      mockJwtService.verify.mockReturnValue({
+        sub: 'device-1',
+        type: 'device',
+        organizationId: 'org-1',
+        deviceIdentifier: 'test-id',
+        exp: Math.floor(Date.now() / 1000) + 3 * 86400,
+      });
+      mockDatabaseService.display.findUnique.mockResolvedValue({
+        id: 'device-1',
+        organizationId: 'org-1',
+        isDisabled: false,
+        jwtToken: hashToken(oldToken),
+      });
+
+      const client = createMockSocket({
+        handshake: { auth: { token: oldToken }, address: '127.0.0.1' },
+      });
+
+      await gateway.handleConnection(client as any);
+
+      expect(mockJwtService.sign).not.toHaveBeenCalled();
+      expect(mockDatabaseService.display.updateMany).toHaveBeenCalledWith({
+        where: { id: 'device-1' },
+        data: expect.objectContaining({ status: 'online' }),
+      });
+      expect(client.disconnect).not.toHaveBeenCalled();
+      expect(client.emit).not.toHaveBeenCalledWith('token:refresh', expect.anything());
     });
 
     it('should reject connections with a revoked token', async () => {
@@ -485,7 +619,12 @@ describe('DeviceGateway', () => {
         organizationId: 'org-1',
         deviceIdentifier: 'test-id',
       });
-      mockDatabaseService.display.findUnique.mockResolvedValue({ id: 'device-1', organizationId: 'org-1' });
+      mockDatabaseService.display.findUnique.mockResolvedValue({
+        id: 'device-1',
+        organizationId: 'org-1',
+        isDisabled: false,
+        jwtToken: hashToken('valid-token'),
+      });
 
       // Exhaust the rate limit (11 connections from same IP)
       for (let i = 0; i < 11; i++) {
@@ -513,7 +652,12 @@ describe('DeviceGateway', () => {
         deviceIdentifier: token,
       }));
       mockDatabaseService.display.findUnique.mockImplementation(({ where }: any) =>
-        Promise.resolve({ id: where.id, organizationId: 'org-1', isDisabled: false }),
+        Promise.resolve({
+          id: where.id,
+          organizationId: 'org-1',
+          isDisabled: false,
+          jwtToken: hashToken(where.id),
+        }),
       );
 
       const clients = [];
@@ -628,6 +772,7 @@ describe('DeviceGateway', () => {
         data: {
           deviceId: 'device-1',
           organizationId: 'org-1',
+          deviceTokenHash: hashToken('valid-token'),
           deliveryAckCapable: true,
         },
         emit,
@@ -667,6 +812,7 @@ describe('DeviceGateway', () => {
         data: {
           deviceId: 'device-1',
           organizationId: 'org-1',
+          deviceTokenHash: hashToken('valid-token'),
           deliveryAckCapable: true,
         },
       });
@@ -697,6 +843,7 @@ describe('DeviceGateway', () => {
         data: {
           deviceId: 'device-1',
           organizationId: 'org-1',
+          deviceTokenHash: hashToken('valid-token'),
           deliveryAckCapable: true,
         },
         emit,
@@ -1098,6 +1245,7 @@ describe('DeviceGateway', () => {
         data: {
           deviceId: 'device-1',
           organizationId: 'org-1',
+          deviceTokenHash: hashToken('valid-token'),
           deliveryAckCapable: true,
         },
         emit: pendingClientEmit,
@@ -1165,6 +1313,32 @@ describe('DeviceGateway', () => {
       );
     });
 
+    it('should queue playlist and disconnect a stale active device socket before server push', async () => {
+      const staleSocket = createDeliverySocket('stale-socket', { token: 'stale-device-token' });
+      staleSocket.disconnect = jest.fn();
+      mockDatabaseService.display.findUnique.mockResolvedValueOnce({
+        id: 'device-1',
+        organizationId: 'org-1',
+        isDisabled: false,
+        jwtToken: hashToken('current-device-token'),
+      });
+      (gateway as any).deviceSockets.set('device-1', 'stale-socket');
+      mockServer.in.mockReturnValueOnce({
+        fetchSockets: jest.fn().mockResolvedValue([staleSocket]),
+      });
+
+      const result = await gateway.sendPlaylistUpdate('device-1', { id: 'p-stale', name: 'Stale', items: [] } as any);
+
+      expect(result).toEqual({ delivered: false, reason: 'no_sockets' });
+      expect(staleSocket.emit).toHaveBeenCalledWith('error', { message: 'device_token_stale' });
+      expect(staleSocket.disconnect).toHaveBeenCalledWith(true);
+      expect(staleSocket.emit).not.toHaveBeenCalledWith('playlist:update', expect.anything(), expect.any(Function));
+      expect(mockRedisService.setPendingPlaylist).toHaveBeenCalledWith(
+        'device-1',
+        expect.objectContaining({ id: 'p-stale' }),
+      );
+    });
+
     it('should requeue playlist when the device sends a negative ack', async () => {
       mockRemoteSocket.emit.mockImplementationOnce(
         (_event: string, _data: any, ackCb?: (ack?: { ok: boolean; error?: string }) => void) => {
@@ -1185,7 +1359,12 @@ describe('DeviceGateway', () => {
     it('should treat no-ack legacy sockets as best-effort delivered', async () => {
       const legacySocket = {
         id: 'legacy-socket',
-        data: { deliveryAckCapable: false, deviceId: 'device-1' },
+        data: {
+          deliveryAckCapable: false,
+          deviceId: 'device-1',
+          organizationId: 'org-1',
+          deviceTokenHash: hashToken('valid-token'),
+        },
         emit: jest.fn(),
       };
       (gateway as any).deviceSockets.set('device-1', 'legacy-socket');
@@ -1280,7 +1459,12 @@ describe('DeviceGateway', () => {
     it('should treat no-ack legacy sockets as best-effort delivered for commands', async () => {
       const legacySocket = {
         id: 'legacy-socket',
-        data: { deliveryAckCapable: false, deviceId: 'device-1' },
+        data: {
+          deliveryAckCapable: false,
+          deviceId: 'device-1',
+          organizationId: 'org-1',
+          deviceTokenHash: hashToken('valid-token'),
+        },
         emit: jest.fn(),
       };
       (gateway as any).deviceSockets.set('device-1', 'legacy-socket');
@@ -1298,17 +1482,51 @@ describe('DeviceGateway', () => {
       );
       expect(mockRedisService.addDeviceCommand).not.toHaveBeenCalled();
     });
+
+    it('should queue command and disconnect a stale active device socket before server push', async () => {
+      const staleSocket = createDeliverySocket('stale-socket', { token: 'stale-device-token' });
+      staleSocket.disconnect = jest.fn();
+      mockDatabaseService.display.findUnique.mockResolvedValueOnce({
+        id: 'device-1',
+        organizationId: 'org-1',
+        isDisabled: false,
+        jwtToken: hashToken('current-device-token'),
+      });
+      (gateway as any).deviceSockets.set('device-1', 'stale-socket');
+      mockServer.in.mockReturnValueOnce({
+        fetchSockets: jest.fn().mockResolvedValue([staleSocket]),
+      });
+      const command = { type: 'reload' as any };
+
+      const result = await gateway.sendCommand('device-1', command);
+
+      expect(result).toEqual({ delivered: false, reason: 'no_sockets' });
+      expect(staleSocket.emit).toHaveBeenCalledWith('error', { message: 'device_token_stale' });
+      expect(staleSocket.disconnect).toHaveBeenCalledWith(true);
+      expect(staleSocket.emit).not.toHaveBeenCalledWith('command', expect.anything(), expect.any(Function));
+      expect(mockRedisService.addDeviceCommand).toHaveBeenCalledWith(
+        'device-1',
+        expect.objectContaining({ type: 'reload', timestamp: expect.any(String) }),
+      );
+    });
   });
 
   describe('broadcastToOrganization', () => {
     it('should broadcast event to org room', async () => {
       const data = { message: 'hello' };
+      const dashboardSocket = {
+        id: 'dashboard-1',
+        data: { isDashboard: true, userId: 'user-1', organizationId: 'org-1' },
+        emit: jest.fn(),
+      };
+      mockServer.in.mockReturnValueOnce({
+        fetchSockets: jest.fn().mockResolvedValue([dashboardSocket]),
+      });
 
       await gateway.broadcastToOrganization('org-1', 'announcement', data);
 
-      expect(mockServer.to).toHaveBeenCalledWith('org:org-1');
-      const emitFn = mockServer.to('org:org-1').emit;
-      expect(emitFn).toHaveBeenCalledWith(
+      expect(mockServer.in).toHaveBeenCalledWith('org:org-1');
+      expect(dashboardSocket.emit).toHaveBeenCalledWith(
         'announcement',
         expect.objectContaining({ message: 'hello' }),
       );
@@ -1316,12 +1534,19 @@ describe('DeviceGateway', () => {
 
     it('should pass through event name and include timestamp', async () => {
       const data = { key: 'value' };
+      const dashboardSocket = {
+        id: 'dashboard-2',
+        data: { isDashboard: true, userId: 'user-2', organizationId: 'org-2' },
+        emit: jest.fn(),
+      };
+      mockServer.in.mockReturnValueOnce({
+        fetchSockets: jest.fn().mockResolvedValue([dashboardSocket]),
+      });
 
       await gateway.broadcastToOrganization('org-2', 'custom:event', data);
 
-      expect(mockServer.to).toHaveBeenCalledWith('org:org-2');
-      const emitFn = mockServer.to('org:org-2').emit;
-      expect(emitFn).toHaveBeenCalledWith(
+      expect(mockServer.in).toHaveBeenCalledWith('org:org-2');
+      expect(dashboardSocket.emit).toHaveBeenCalledWith(
         'custom:event',
         expect.objectContaining({
           key: 'value',
@@ -1537,9 +1762,8 @@ describe('DeviceGateway', () => {
 
       await gateway.handleScreenshotResponse(client as any, data as any);
 
-      expect(mockServer.to).toHaveBeenCalledWith('org:org-1');
-      const emitFn = mockServer.to('org:org-1').emit;
-      expect(emitFn).toHaveBeenCalledWith(
+      expect(mockServer.in).toHaveBeenCalledWith('org:org-1');
+      expect(mockRemoteSocket.emit).toHaveBeenCalledWith(
         'screenshot:ready',
         expect.objectContaining({
           deviceId: 'device-1',
@@ -1552,14 +1776,13 @@ describe('DeviceGateway', () => {
   });
 
   describe('sendQrOverlayUpdate', () => {
-    it('should emit qr-overlay:update to device room', async () => {
+    it('should emit qr-overlay:update to the current active device socket', async () => {
       const qrOverlay = { enabled: true, url: 'https://example.com', position: 'bottom-right' };
 
       await gateway.sendQrOverlayUpdate('device-1', qrOverlay);
 
-      expect(mockServer.to).toHaveBeenCalledWith('device:device-1');
-      const emitFn = mockServer.to('device:device-1').emit;
-      expect(emitFn).toHaveBeenCalledWith(
+      expect(mockServer.in).toHaveBeenCalledWith('device:device-1');
+      expect(mockRemoteSocket.emit).toHaveBeenCalledWith(
         'qr-overlay:update',
         expect.objectContaining({ qrOverlay }),
       );
@@ -1567,17 +1790,85 @@ describe('DeviceGateway', () => {
 
     it('should pass through data and include timestamp', async () => {
       const qrOverlay = { enabled: false };
+      const qrSocket = createDeliverySocket('qr-socket', { deviceId: 'device-5' });
+      (gateway as any).deviceSockets.set('device-5', 'qr-socket');
+      mockServer.in.mockReturnValueOnce({
+        fetchSockets: jest.fn().mockResolvedValue([qrSocket]),
+      });
+      mockDatabaseService.display.findUnique.mockResolvedValueOnce({
+        id: 'device-5',
+        organizationId: 'org-1',
+        isDisabled: false,
+        jwtToken: hashToken('valid-token'),
+      });
 
       await gateway.sendQrOverlayUpdate('device-5', qrOverlay);
 
-      expect(mockServer.to).toHaveBeenCalledWith('device:device-5');
-      const emitFn = mockServer.to('device:device-5').emit;
-      expect(emitFn).toHaveBeenCalledWith(
+      expect(mockServer.in).toHaveBeenCalledWith('device:device-5');
+      expect(qrSocket.emit).toHaveBeenCalledWith(
         'qr-overlay:update',
         expect.objectContaining({
           qrOverlay: { enabled: false },
           timestamp: expect.any(String),
         }),
+      );
+    });
+
+    it('should not emit qr-overlay:update to a stale active device socket', async () => {
+      const qrOverlay = { enabled: true };
+      const staleSocket = createDeliverySocket('stale-socket', { token: 'stale-device-token' });
+      staleSocket.disconnect = jest.fn();
+      mockDatabaseService.display.findUnique.mockResolvedValueOnce({
+        id: 'device-1',
+        organizationId: 'org-1',
+        isDisabled: false,
+        jwtToken: hashToken('current-device-token'),
+      });
+      (gateway as any).deviceSockets.set('device-1', 'stale-socket');
+      mockServer.in.mockReturnValueOnce({
+        fetchSockets: jest.fn().mockResolvedValue([staleSocket]),
+      });
+
+      await gateway.sendQrOverlayUpdate('device-1', qrOverlay);
+
+      expect(staleSocket.emit).toHaveBeenCalledWith('error', { message: 'device_token_stale' });
+      expect(staleSocket.disconnect).toHaveBeenCalledWith(true);
+      expect(staleSocket.emit).not.toHaveBeenCalledWith(
+        'qr-overlay:update',
+        expect.objectContaining({ qrOverlay }),
+      );
+    });
+
+    it('should skip stale device sockets in org-room broadcasts', async () => {
+      const dashboardSocket = {
+        id: 'dashboard-1',
+        data: { isDashboard: true, userId: 'user-1', organizationId: 'org-1' },
+        emit: jest.fn(),
+      };
+      const staleDeviceSocket = createDeliverySocket('stale-socket', { token: 'stale-device-token' });
+      staleDeviceSocket.disconnect = jest.fn();
+      mockDatabaseService.display.findUnique.mockResolvedValueOnce({
+        id: 'device-1',
+        organizationId: 'org-1',
+        isDisabled: false,
+        jwtToken: hashToken('current-device-token'),
+      });
+      (gateway as any).deviceSockets.set('device-1', 'stale-socket');
+      mockServer.in.mockReturnValueOnce({
+        fetchSockets: jest.fn().mockResolvedValue([dashboardSocket, staleDeviceSocket]),
+      });
+
+      await gateway.broadcastToOrganization('org-1', 'announcement', { message: 'hello' });
+
+      expect(dashboardSocket.emit).toHaveBeenCalledWith(
+        'announcement',
+        expect.objectContaining({ message: 'hello' }),
+      );
+      expect(staleDeviceSocket.emit).toHaveBeenCalledWith('error', { message: 'device_token_stale' });
+      expect(staleDeviceSocket.disconnect).toHaveBeenCalledWith(true);
+      expect(staleDeviceSocket.emit).not.toHaveBeenCalledWith(
+        'announcement',
+        expect.objectContaining({ message: 'hello' }),
       );
     });
   });

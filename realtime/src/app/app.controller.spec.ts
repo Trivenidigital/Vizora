@@ -30,6 +30,7 @@ describe('AppController', () => {
       } as any,
       sendPlaylistUpdate: jest.fn(),
       sendCommand: jest.fn(),
+      broadcastToOrganization: jest.fn().mockResolvedValue(undefined),
       hasActiveDeviceSocket: jest.fn((deviceId: string) => mockRooms.has(`device:${deviceId}`)),
       disconnectDevice: jest.fn(),
     };
@@ -177,6 +178,29 @@ describe('AppController', () => {
       });
       expect(mockDeviceGateway.disconnectDevice).toHaveBeenCalledWith('dev-a', 'device_disabled');
       expect(mockDeviceGateway.sendCommand).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('broadcastNotification', () => {
+    it('routes notification broadcasts through DeviceGateway filtering', async () => {
+      const notification = { id: 'notif-1', type: 'device_online', message: 'Display online' };
+
+      const result = await controller.broadcastNotification({
+        organizationId: 'org-1',
+        notification,
+      });
+
+      expect(result).toEqual({
+        success: true,
+        message: 'Notification broadcasted to organization',
+      });
+      expect(mockDeviceGateway.broadcastToOrganization).toHaveBeenCalledWith(
+        'org-1',
+        'notification:new',
+        notification,
+      );
+      expect(mockTo).not.toHaveBeenCalled();
+      expect(mockEmit).not.toHaveBeenCalled();
     });
   });
 

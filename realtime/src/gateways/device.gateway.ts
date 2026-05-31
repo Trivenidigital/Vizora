@@ -41,6 +41,7 @@ import { createHash } from 'node:crypto';
 import { WsAllExceptionsFilter } from './filters/ws-exception.filter';
 import { WsAuthGuard, WsDeviceGuard } from './guards/ws-auth.guard';
 import { redactSensitiveTokens } from '../utils/redact-sensitive-url';
+import { hashDeviceToken, isCurrentDeviceToken } from './device-token-hash';
 
 interface DevicePayload {
   sub: string; // device ID
@@ -195,11 +196,94 @@ export class DeviceGateway
     );
   }
 
-  private filterDeliverySockets<T extends { id?: string; data?: Record<string, any> }>(
+  private async isCurrentDeliveryDeviceSocket(
+    client: { id?: string; data?: Record<string, any>; emit?: (...args: any[]) => void; disconnect?: (close?: boolean) => void },
+    deviceId: string,
+  ): Promise<boolean> {
+    if (!this.isDeliveryDeviceSocket(client, deviceId)) {
+      return false;
+    }
+
+    const display = await this.databaseService.display.findUnique({
+      where: { id: deviceId },
+      select: { organizationId: true, isDisabled: true, jwtToken: true },
+    });
+
+    if (
+      display &&
+      display.organizationId === client.data?.organizationId &&
+      !display.isDisabled &&
+      isCurrentDeviceToken(display.jwtToken, client.data?.deviceTokenHash)
+    ) {
+      return true;
+    }
+
+    this.logger.warn(`Skipping delivery to stale device socket ${client.id} for device ${deviceId}`);
+    client.emit?.('error', { message: 'device_token_stale' });
+    client.disconnect?.(true);
+    if (this.isActiveDeviceSocket(client, deviceId)) {
+      this.deviceSockets.delete(deviceId);
+    }
+    return false;
+  }
+
+  private async filterCurrentDeliverySockets<T extends {
+    id?: string;
+    data?: Record<string, any>;
+    emit?: (...args: any[]) => void;
+    disconnect?: (close?: boolean) => void;
+  }>(
     sockets: T[],
     deviceId: string,
-  ): T[] {
-    return sockets.filter((socket) => this.isDeliveryDeviceSocket(socket, deviceId));
+  ): Promise<T[]> {
+    const currentSockets: T[] = [];
+    for (const socket of sockets) {
+      if (await this.isCurrentDeliveryDeviceSocket(socket, deviceId)) {
+        currentSockets.push(socket);
+      }
+    }
+    return currentSockets;
+  }
+
+  private isDashboardSocket(client: { data?: Record<string, any> }): boolean {
+    return client.data?.isDashboard === true || Boolean(client.data?.userId);
+  }
+
+  private async emitToOrganization(
+    organizationId: string,
+    event: string,
+    data: Record<string, any>,
+  ): Promise<number> {
+    const allSockets = await this.server.in(`org:${organizationId}`).fetchSockets();
+    let emitted = 0;
+
+    for (const socket of allSockets as Array<{
+      id?: string;
+      data?: Record<string, any>;
+      emit?: (...args: any[]) => void;
+      disconnect?: (close?: boolean) => void;
+    }>) {
+      if (socket.data?.organizationId !== organizationId) {
+        continue;
+      }
+
+      if (this.isDashboardSocket(socket)) {
+        socket.emit?.(event, data);
+        emitted += 1;
+        continue;
+      }
+
+      const socketDeviceId = socket.data?.deviceId;
+      if (
+        typeof socketDeviceId === 'string' &&
+        await this.isCurrentDeliveryDeviceSocket(socket, socketDeviceId)
+      ) {
+        socket.emit?.(event, data);
+        emitted += 1;
+      }
+    }
+
+    return emitted;
   }
 
   hasActiveDeviceSocket(deviceId: string): boolean {
@@ -669,9 +753,10 @@ export class DeviceGateway
         }
 
         const deviceId = payload.sub;
+        const presentedTokenHash = hashDeviceToken(token);
         const device = await this.databaseService.display.findUnique({
           where: { id: deviceId },
-          select: { id: true, organizationId: true, isDisabled: true },
+          select: { id: true, organizationId: true, isDisabled: true, jwtToken: true },
         });
         if (!device || device.organizationId !== payload.organizationId) {
           this.logger.warn(
@@ -684,6 +769,12 @@ export class DeviceGateway
         if (device.isDisabled) {
           this.logger.warn(`Connection rejected: Device is disabled (id: ${deviceId})`);
           client.emit('error', { message: 'device_disabled' });
+          client.disconnect();
+          return null;
+        }
+        if (!isCurrentDeviceToken(device.jwtToken, presentedTokenHash)) {
+          this.logger.warn(`Connection rejected: Device token is not current (id: ${deviceId})`);
+          client.emit('error', { message: 'device_token_stale' });
           client.disconnect();
           return null;
         }
@@ -705,29 +796,7 @@ export class DeviceGateway
         client.data.deviceIdentifier = payload.deviceIdentifier;
         client.data.capabilities = client.handshake.auth?.capabilities;
         client.data.deliveryAckCapable = this.supportsDeliveryAck(client);
-
-        // Auto-rotate device token if it expires within 14 days.
-        // NOTE: The old token remains valid until natural expiry (stateless JWT limitation).
-        // TODO: For high-security deployments, consider a token blacklist in Redis.
-        // TODO: Rate-limit rotation to once per 24h per device via Redis key 'token_rotated:{deviceId}'
-        if (payload.exp) {
-          const daysUntilExpiry = (payload.exp - Math.floor(Date.now() / 1000)) / 86400;
-          if (daysUntilExpiry < 14) {
-            const newToken = this.jwtService.sign(
-              {
-                sub: payload.sub,
-                deviceIdentifier: payload.deviceIdentifier,
-                organizationId: payload.organizationId,
-                type: 'device',
-              },
-              { secret: process.env.DEVICE_JWT_SECRET, expiresIn: '90d' },
-            );
-            client.emit('token:refresh', { token: newToken });
-            this.logger.log(
-              `Rotated token for device ${payload.deviceIdentifier} (${Math.floor(daysUntilExpiry)} days remaining)`,
-            );
-          }
-        }
+        client.data.deviceTokenHash = presentedTokenHash;
 
         return { kind: 'device', payload };
       }
@@ -979,8 +1048,9 @@ export class DeviceGateway
           deviceName,
           orgId,
         );
-        // Emit notification to dashboard
-        this.server.to(`org:${orgId}`).emit('notification:new', {
+        // Emit notification to current org-room sockets. Stale device
+        // sockets are filtered/disconnected before any payload is sent.
+        await this.emitToOrganization(orgId, 'notification:new', {
           type: 'device_online',
           deviceId,
           deviceName,
@@ -997,7 +1067,7 @@ export class DeviceGateway
 
     // Notify dashboard about device online status
     const now = new Date().toISOString();
-    this.server.to(`org:${orgId}`).emit('device:status', {
+    await this.emitToOrganization(orgId, 'device:status', {
       deviceId,
       status: 'online',
       lastSeen: now,
@@ -1143,14 +1213,12 @@ export class DeviceGateway
           this.metricsService.updateDeviceStatus(deviceId, orgId, 'offline');
 
           const now = new Date().toISOString();
-          this.server
-            .to(`org:${orgId}`)
-            .emit('device:status', {
-              deviceId,
-              status: 'offline',
-              lastSeen: now,
-              timestamp: now,
-            });
+          await this.emitToOrganization(orgId, 'device:status', {
+            deviceId,
+            status: 'offline',
+            lastSeen: now,
+            timestamp: now,
+          });
         }
       }
     } catch (error: unknown) {
@@ -1515,7 +1583,7 @@ export class DeviceGateway
     // Get all sockets in the device room
     const roomName = `device:${deviceId}`;
     const allSockets = await this.server.in(roomName).fetchSockets();
-    const sockets = this.filterDeliverySockets(allSockets as any[], deviceId);
+    const sockets = await this.filterCurrentDeliverySockets(allSockets as any[], deviceId);
 
     if (sockets.length === 0) {
       this.logger.warn(`pushPlaylist: no sockets in room ${roomName} for device ${deviceId} — queuing for reconnect`);
@@ -1558,7 +1626,7 @@ export class DeviceGateway
     const commandWithTimestamp = { ...command, timestamp: new Date().toISOString() };
     const roomName = `device:${deviceId}`;
     const allSockets = await this.server.in(roomName).fetchSockets();
-    const sockets = this.filterDeliverySockets(allSockets as any[], deviceId);
+    const sockets = await this.filterCurrentDeliverySockets(allSockets as any[], deviceId);
 
     if (sockets.length === 0) {
       this.logger.warn(`sendCommand: no sockets for device ${deviceId} — queuing`);
@@ -1592,12 +1660,12 @@ export class DeviceGateway
   }
 
   async broadcastToOrganization(organizationId: string, event: string, data: BroadcastData): Promise<void> {
-    this.server.to(`org:${organizationId}`).emit(event, {
+    const emitted = await this.emitToOrganization(organizationId, event, {
       ...data,
       timestamp: new Date().toISOString(),
     });
 
-    this.logger.log(`Broadcast ${event} to organization: ${organizationId}`);
+    this.logger.log(`Broadcast ${event} to ${emitted} socket(s) in organization: ${organizationId}`);
   }
 
   /**
@@ -1809,7 +1877,7 @@ export class DeviceGateway
       this.logger.log(`Screenshot saved for device ${deviceId}: ${objectKey}`);
 
       // Emit screenshot:ready event to organization room so dashboard can update
-      this.server.to(`org:${organizationId}`).emit('screenshot:ready', {
+      await this.emitToOrganization(organizationId, 'screenshot:ready', {
         deviceId,
         requestId: data.requestId,
         url: presignedUrl,
@@ -1834,11 +1902,17 @@ export class DeviceGateway
    * Send a QR overlay update to a specific device
    */
   async sendQrOverlayUpdate(deviceId: string, qrOverlay: any): Promise<void> {
-    this.server.to(`device:${deviceId}`).emit('qr-overlay:update', {
-      qrOverlay,
-      timestamp: new Date().toISOString(),
-    });
-    this.logger.log(`Sent QR overlay update to device: ${deviceId}`);
+    const roomName = `device:${deviceId}`;
+    const allSockets = await this.server.in(roomName).fetchSockets();
+    const sockets = await this.filterCurrentDeliverySockets(allSockets as any[], deviceId);
+
+    for (const socket of sockets) {
+      socket.emit?.('qr-overlay:update', {
+        qrOverlay,
+        timestamp: new Date().toISOString(),
+      });
+    }
+    this.logger.log(`Sent QR overlay update to ${sockets.length} active socket(s) for device: ${deviceId}`);
   }
 
   /**

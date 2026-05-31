@@ -1,16 +1,21 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
+import { UnauthorizedException } from '@nestjs/common';
 import { DisplaysController } from './displays.controller';
 import { DisplaysService } from './displays.service';
 import { DatabaseService } from '../database/database.service';
+import { createHash } from 'node:crypto';
 
 describe('DisplaysController', () => {
   let controller: DisplaysController;
   let mockDisplaysService: jest.Mocked<DisplaysService>;
   let mockDatabaseService: jest.Mocked<DatabaseService>;
+  let mockJwtService: jest.Mocked<JwtService>;
 
   const organizationId = 'org-123';
+  const hashToken = (token: string) =>
+    createHash('sha256').update(token).digest('hex');
 
   beforeEach(async () => {
     mockDisplaysService = {
@@ -39,6 +44,24 @@ describe('DisplaysController', () => {
           _count: { displays: 5 },
         }),
       },
+      display: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'device-123',
+          organizationId,
+          isDisabled: false,
+          jwtToken: hashToken('valid-device-token'),
+        }),
+      },
+    } as any;
+
+    mockJwtService = {
+      verify: jest.fn().mockReturnValue({
+        type: 'device',
+        deviceIdentifier: 'device-123',
+        sub: 'device-123',
+        organizationId,
+      }),
+      verifyAsync: jest.fn(),
     } as any;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -46,7 +69,7 @@ describe('DisplaysController', () => {
       providers: [
         { provide: DisplaysService, useValue: mockDisplaysService },
         { provide: DatabaseService, useValue: mockDatabaseService },
-        { provide: JwtService, useValue: { verify: jest.fn().mockReturnValue({ type: 'device', deviceIdentifier: 'device-123', sub: 'device-123' }), verifyAsync: jest.fn() } },
+        { provide: JwtService, useValue: mockJwtService },
         Reflector,
       ],
     }).compile();
@@ -156,6 +179,22 @@ describe('DisplaysController', () => {
 
       expect(result).toEqual(expectedResult);
       expect(mockDisplaysService.updateHeartbeat).toHaveBeenCalledWith('device-123');
+    });
+
+    it('should reject a signed heartbeat token that is not the current stored token', async () => {
+      mockDatabaseService.display.findUnique.mockResolvedValueOnce({
+        id: 'device-123',
+        organizationId,
+        isDisabled: false,
+        jwtToken: hashToken('current-device-token'),
+      } as any);
+
+      const mockReq = { headers: { authorization: 'Bearer stale-device-token' } };
+
+      await expect(controller.heartbeat('device-123', mockReq as any)).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(mockDisplaysService.updateHeartbeat).not.toHaveBeenCalled();
     });
 
     it('should work with valid device JWT (public endpoint)', async () => {

@@ -261,9 +261,11 @@ export class AppController {
     // before we reach this body — the prior inline `{organizationId,
     // notification}` type bypassed validation and forced runtime
     // typeof checks that drifted from the documented contract.
-    this.deviceGateway.server
-      .to(`org:${data.organizationId}`)
-      .emit('notification:new', data.notification);
+    await this.deviceGateway.broadcastToOrganization(
+      data.organizationId,
+      'notification:new',
+      data.notification as any,
+    );
     this.logger.log(`Broadcasted notification to org:${data.organizationId}`);
     return {
       success: true,

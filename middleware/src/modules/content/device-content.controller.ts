@@ -20,16 +20,13 @@ import { ContentService } from './content.service';
 import { StorageService } from '../storage/storage.service';
 import { DatabaseService } from '../database/database.service';
 import { pipeline } from 'node:stream/promises';
+import {
+  getDeviceTokenFromRequest,
+  verifyCurrentDeviceToken,
+} from '../common/device-token-auth.util';
 
 const MINIO_URL_PREFIX = 'minio://';
 const MAX_DEVICE_CONTENT_FILE_SIZE = 100 * 1024 * 1024;
-
-interface DeviceJwtPayload {
-  sub: string;
-  deviceIdentifier: string;
-  organizationId: string;
-  type: 'device';
-}
 
 interface ByteRange {
   start: number;
@@ -56,45 +53,6 @@ export class DeviceContentController {
     private readonly jwtService: JwtService,
     private readonly databaseService: DatabaseService,
   ) {}
-
-  /**
-   * Verify a device JWT token from the Authorization header or query parameter.
-   * Query parameter is needed because img.src and video.src cannot send headers.
-   */
-  private verifyDeviceToken(req: Request): DeviceJwtPayload {
-    const authHeader = req.headers.authorization;
-    const queryToken = (req.query as Record<string, string | undefined>)?.token;
-    const token = authHeader?.startsWith('Bearer ')
-      ? authHeader.substring(7)
-      : queryToken;
-    if (!token) {
-      throw new UnauthorizedException('Device authentication required');
-    }
-
-    try {
-      const payload = this.jwtService.verify<DeviceJwtPayload>(token, {
-        secret: process.env.DEVICE_JWT_SECRET,
-        algorithms: ['HS256'],
-      });
-
-      if (
-        payload.type !== 'device' ||
-        typeof payload.sub !== 'string' ||
-        payload.sub.trim() === '' ||
-        typeof payload.deviceIdentifier !== 'string' ||
-        payload.deviceIdentifier.trim() === '' ||
-        typeof payload.organizationId !== 'string' ||
-        payload.organizationId.trim() === ''
-      ) {
-        throw new UnauthorizedException('Invalid token type');
-      }
-
-      return payload;
-    } catch (error) {
-      if (error instanceof UnauthorizedException) throw error;
-      throw new UnauthorizedException('Invalid or expired device token');
-    }
-  }
 
   private parseRangeHeader(rangeHeader: string | undefined, fileSize: number): RangeParseResult {
     if (!rangeHeader) {
@@ -186,15 +144,11 @@ export class DeviceContentController {
     // Device JWT is mandatory — throws UnauthorizedException if missing/invalid.
     // Verify it BEFORE the DB query so an unauth caller can't probe content
     // IDs for existence via timing or DB error patterns.
-    const devicePayload = this.verifyDeviceToken(req);
-
-    const display = await this.databaseService.display.findUnique({
-      where: { id: devicePayload.sub },
-      select: { id: true, organizationId: true, isDisabled: true },
+    const { payload: devicePayload } = await verifyCurrentDeviceToken({
+      jwtService: this.jwtService,
+      databaseService: this.databaseService,
+      token: getDeviceTokenFromRequest(req, { allowQueryToken: true }),
     });
-    if (!display || display.organizationId !== devicePayload.organizationId || display.isDisabled) {
-      throw new UnauthorizedException('Device is not authorized');
-    }
 
     const content = await this.contentService.findByIdForDevice(
       id,

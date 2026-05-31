@@ -4,7 +4,9 @@ import {
   ExecutionContext,
   ForbiddenException,
 } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { DatabaseService } from '../../database/database.service';
+import { IS_PUBLIC_KEY } from '../../auth/decorators/public.decorator';
 
 /**
  * Guards write operations (POST, PUT, PATCH, DELETE) behind active subscription.
@@ -16,9 +18,20 @@ import { DatabaseService } from '../../database/database.service';
  */
 @Injectable()
 export class SubscriptionActiveGuard implements CanActivate {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly reflector: Reflector,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (isPublic) {
+      return true;
+    }
+
     const request = context.switchToHttp().getRequest();
 
     // Allow read-only access (GET/HEAD) regardless of subscription status

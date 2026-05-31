@@ -1,8 +1,77 @@
 # Vizora - Task Tracker
 
-## In Progress: Customer Dashboard UX Hotspots (2026-05-31)
+## In Progress: Device Token Current-Hash Enforcement (2026-05-31)
+
+**Branch:** `feat/customer-performance-review-5`
+
+**Why now:** PR #127 merged and CI is green, but deployment remains blocked by dirty/diverged prod-local work. A fresh realtime/display/code review found a P0 auth-boundary gap: signed display JWTs remain accepted after re-pairing or token rotation because middleware and realtime verify signature claims but do not compare the presented token to the current token hash stored on `Display.jwtToken`.
+
+**New primitives introduced:** one shared middleware device-token helper and one realtime hash helper. Reuse the existing display `jwtToken` hash column, pairing token hash behavior, device JWT model, middleware controllers, realtime gateway, and WebSocket guards.
+
+**Hermes-first analysis:** not applicable; this pass does not add business-agent behavior, MCP tools, Hermes skills, AI provider calls, or spend paths.
+
+**Plan/design:** `docs/plans/2026-05-31-device-token-current-hash-enforcement.md`
+
+**Reviewer synthesis**
+- [x] Customer/UX review: PR #127 fixed pairing-token rendering and bulk upload progress; remaining customer-visible issues include billing redirect shape, stale schedule conflict UI, push-to-device false success, and no-op playlist publish.
+- [x] Performance review: larger follow-ups remain for memory-buffered uploads, authenticated media caching/preload, dashboard list payloads, and folder indexes.
+- [x] Realtime/display review: P0 stale device JWT acceptance selected for this slice; other follow-ups include active-schedule playback, template display rendering, initial playlist ACKs, and direct-playlist clear semantics.
+- [x] Adversarial review: SSRF redirect handling, server-side API cookie/envelope drift, and CSRF mounting remain queued after this auth-boundary slice.
+
+**Plan**
+- [x] Record PR #127 merge/CI/deploy evidence.
+- [x] Drift-check device token storage and validation paths.
+- [x] Write plan/design and checklist.
+- [x] Add failing middleware tests for stale/missing `Display.jwtToken` rejection in device-content streaming.
+- [x] Add failing realtime tests for stale/missing `Display.jwtToken` rejection and rotation persistence.
+- [x] Implement current-hash validation in middleware and realtime.
+- [x] Add connected-socket current-hash revalidation in `WsDeviceGuard`.
+- [x] Add server-push current-hash revalidation for playlist, command, and QR-overlay delivery.
+- [x] Add organization-room broadcast current-hash filtering for stale device sockets.
+- [x] Exempt public device endpoints from subscription guard pre-emption before device JWT validation.
+- [x] Disable unsafe realtime auto-rotation until a grace/ACK-backed rotation design exists.
+- [x] Run focused verification.
+- [x] Run multi-subagent review before broad verification.
+- [x] Run broader affected tests/builds.
+- [ ] PR, CI, merge.
+- [ ] Re-check deployment gate; deploy only if prod checkout and runtime token state are safe.
+
+**Runtime-state gate before deploy**
+- [x] Query prod display token-hash coverage: 15 displays total, 15 with `jwtToken`, 0 missing `jwtToken`, 15 active non-pairing, 0 active non-pairing missing `jwtToken`.
+- [x] Query prod malformed hash coverage: 0 malformed `jwtToken` hashes, 0 active non-pairing malformed hashes.
+- [x] Reconcile any legacy displays without a current hash before deploying fail-closed enforcement: no legacy missing-token or malformed-token displays found in the read-only prod counts.
+- [ ] Reconcile prod `/opt/vizora/app` dirty/diverged checkout before any pull/restart/deploy.
+
+**Focused verification**
+- [x] `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern=device-content.controller` - red first on stale/missing token-hash acceptance, then pass, 26 tests.
+- [x] `pnpm --filter @vizora/realtime test -- --runInBand --testPathPattern=device.gateway` - red first on stale-token acceptance and rotation-without-persist, then pass, 2 suites / 100 tests.
+- [x] Review-fix red run: middleware heartbeat/active schedules and realtime guard tests failed before widening the implementation.
+- [x] `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="displays.controller|schedules.controller|device-content.controller"` - pass, 3 suites / 65 tests.
+- [x] `pnpm --filter @vizora/realtime test -- --runInBand --testPathPattern="device.gateway|ws-auth.guard"` - pass, 3 suites / 102 tests.
+- [x] Second review-fix run: realtime server-push stale-socket tests and subscription public-endpoint test added; `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="subscription-active.guard|displays.controller|schedules.controller|device-content.controller"` - pass, 4 suites / 88 tests.
+- [x] `pnpm --filter @vizora/realtime test -- --runInBand --testPathPattern="device.gateway|ws-auth.guard"` - pass after server-push revalidation, 3 suites / 106 tests.
+- [x] Final review-fix run: malformed-hash tests added, `WsDeviceGuard` cache removed, org-room broadcasts filtered. `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="subscription-active.guard|displays.controller|schedules.controller|device-content.controller"` - pass, 4 suites / 89 tests.
+- [x] `pnpm --filter @vizora/realtime test -- --runInBand --testPathPattern="device.gateway|ws-auth.guard|app.controller"` - pass, 4 suites / 117 tests.
+
+**Review gate**
+- [x] Subagent code-path review: CLEAN for stale device-token enforcement across middleware REST routes, realtime handshakes, guarded socket messages, direct server-push delivery, and org-room broadcasts. Residual risk documented: guarded realtime messages and server-push fanout now hit the DB for current-hash checks.
+- [x] Subagent verification/deploy review: initial gate was not clean until full suites/builds were run; requested broad verification completed below. Deployment remains blocked by prod-local dirty/diverged checkout.
+
+**Broader verification**
+- [x] `pnpm --filter @vizora/middleware test -- --runInBand` - pass, 143 suites / 2796 tests.
+- [x] `pnpm --filter @vizora/realtime test -- --runInBand` - pass, 12 suites / 271 tests.
+- [x] `pnpm --filter @vizora/middleware exec tsc --noEmit --pretty false` - pass.
+- [x] `npx nx build @vizora/realtime` - pass with existing webpack/source-map/optional `ws` warnings.
+- [x] Initial parallel `npx nx build @vizora/middleware` collided with simultaneous `@vizora/database:build` copying into `packages/database/dist/generated` on Windows (`EPIPE`, file in use). Serial rerun completed successfully.
+- [x] `npx nx build @vizora/middleware` - pass with existing webpack warnings.
+- [x] `git diff --check origin/main...HEAD` - pass.
+
+---
+
+## Completed: Customer Dashboard UX Hotspots (2026-05-31)
 
 **Branch:** `fix/customer-dashboard-ux-hotspots`
+**PR / merge commit:** #127 / `c82b1521da7db94ba07caeced4339b8a1b17731a`
 
 **Why now:** PR #126 merged and CI is green, but deployment is blocked by dirty/diverged prod-local work. The next customer-visible repo-side issues are small, testable dashboard defects in existing-device pairing and bulk content upload.
 
@@ -21,8 +90,8 @@
 - [x] Run focused verification.
 - [x] Run multi-subagent review before broad verification.
 - [x] Run broader web verification/build.
-- [ ] PR, CI, merge.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge.
+- [x] Re-check deployment gate; deployment remains blocked by dirty/diverged prod checkout.
 
 **Focused verification**
 - [x] `pnpm --filter @vizora/web test -- --runInBand --testPathPattern="devices-page|content-page"` - red first on missing `pairingToken` rendering and missing bulk `uploadContentWithProgress`, then pass, 2 suites / 30 tests.
@@ -41,6 +110,13 @@
 - [x] Customer/UX reviewer: initial P1 hidden queued files after switching to URL mode fixed with disabled URL option and guarded change handler; P2 modal-close upload state loss fixed by ignoring close while uploading.
 - [x] Performance/concurrency reviewer: no P0/P1; P2 modal-close finding fixed and pairing response type tightened to required backend shape.
 - [x] Post-fix re-review: initial P1 removed-file URL upload path fixed by clearing selected file state when queue items are removed/cleared and by requiring a file upload type before using the file branch.
+
+**Merge / CI / deployment gate**
+- [x] PR #127 merged after GitHub checks passed: lint, audit, test, build, security, and e2e.
+- [x] Open PRs after merge: none.
+- [x] GitHub main after merge: `c82b1521da7db94ba07caeced4339b8a1b17731a`.
+- [x] Production health probe returned `success: true`, database connected at `2026-05-31T13:09:33.049Z`.
+- [x] Production deploy remains blocked: `/opt/vizora/app` is dirty and diverged (`HEAD=bb76aa1838740bff5b58623dfef7a906d44f46a6`, `origin/main=c82b1521da7db94ba07caeced4339b8a1b17731a`, `ahead 17, behind 51`). Do not pull/reset/stash/restart services until prod-local work is reconciled.
 
 ---
 
