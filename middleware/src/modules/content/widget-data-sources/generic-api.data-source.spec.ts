@@ -20,6 +20,15 @@ describe('GenericApiDataSource', () => {
   let circuitBreaker: jest.Mocked<Pick<CircuitBreakerService, 'executeWithFallback'>>;
   const originalFetch = global.fetch;
   const mockLookup = dns.lookup as unknown as jest.Mock;
+  const jsonResponse = (body: unknown, init?: ResponseInit) =>
+    new Response(JSON.stringify(body), {
+      status: 200,
+      headers: {
+        'content-type': 'application/json',
+        ...(init?.headers as Record<string, string> | undefined),
+      },
+      ...init,
+    });
 
   beforeEach(() => {
     // Circuit breaker mock: execute the primary callback directly (skip fallback unless asked)
@@ -133,11 +142,7 @@ describe('GenericApiDataSource', () => {
     });
 
     it('allows public hostnames with non-default ports', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => ({ ok: true }),
-      }) as any;
+      global.fetch = jest.fn().mockResolvedValue(jsonResponse({ ok: true })) as any;
       await expect(
         dataSource.fetchData({ url: 'https://api.example.com:8443/path' }),
       ).resolves.toBeDefined();
@@ -158,11 +163,9 @@ describe('GenericApiDataSource', () => {
       });
       // 302 to an internal address would bypass the SSRF guard if we
       // followed redirects. Verify we reject without ever attempting hop 2.
-      global.fetch = jest.fn().mockResolvedValue({
-        ok: false,
-        status: 302,
-        headers: { get: () => 'http://169.254.169.254/' },
-      }) as any;
+      global.fetch = jest.fn().mockResolvedValue(
+        new Response(null, { status: 302, headers: { location: 'http://169.254.169.254/' } }),
+      ) as any;
       const result = await dataSource.fetchData({ url: 'https://api.example.com/x' });
       // Falls back to sample data (circuit breaker behaviour). Just need
       // to assert we never attempted the redirected URL — fetch was called
@@ -179,11 +182,7 @@ describe('GenericApiDataSource', () => {
   // ---------------------------------------------------------------------------
   describe('fetchData (happy path)', () => {
     it('returns { data, fetchedAt } when the endpoint responds with JSON', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => ({ items: ['a', 'b', 'c'] }),
-      }) as any;
+      global.fetch = jest.fn().mockResolvedValue(jsonResponse({ items: ['a', 'b', 'c'] })) as any;
 
       const result = await dataSource.fetchData({ url: 'https://api.example.com/x' });
       expect(result).toHaveProperty('data', { items: ['a', 'b', 'c'] });
@@ -191,11 +190,9 @@ describe('GenericApiDataSource', () => {
     });
 
     it('applies responseRoot dot-path to extract nested data', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => ({ meta: { ts: 1 }, payload: { items: ['x', 'y'] } }),
-      }) as any;
+      global.fetch = jest.fn().mockResolvedValue(
+        jsonResponse({ meta: { ts: 1 }, payload: { items: ['x', 'y'] } }),
+      ) as any;
 
       const result = await dataSource.fetchData({
         url: 'https://api.example.com/x',
@@ -205,11 +202,7 @@ describe('GenericApiDataSource', () => {
     });
 
     it('responseRoot that misses returns data=undefined (no throw)', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => ({ a: 1 }),
-      }) as any;
+      global.fetch = jest.fn().mockResolvedValue(jsonResponse({ a: 1 })) as any;
 
       const result = await dataSource.fetchData({
         url: 'https://api.example.com/x',
@@ -219,11 +212,7 @@ describe('GenericApiDataSource', () => {
     });
 
     it('forwards custom headers to fetch', async () => {
-      const fetchSpy = jest.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => ({}),
-      });
+      const fetchSpy = jest.fn().mockResolvedValue(jsonResponse({}));
       global.fetch = fetchSpy as any;
 
       await dataSource.fetchData({
@@ -240,11 +229,7 @@ describe('GenericApiDataSource', () => {
 
     // PR-review fix: customer cannot override User-Agent or Accept via headers
     it('customer headers CANNOT override User-Agent or Accept (defense against WAF/rate-limit bypass)', async () => {
-      const fetchSpy = jest.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => ({}),
-      });
+      const fetchSpy = jest.fn().mockResolvedValue(jsonResponse({}));
       global.fetch = fetchSpy as any;
 
       await dataSource.fetchData({
@@ -255,6 +240,52 @@ describe('GenericApiDataSource', () => {
       const fetchOpts = fetchSpy.mock.calls[0][1];
       expect(fetchOpts.headers['User-Agent']).toBe('Vizora-Widget/1.0');
       expect(fetchOpts.headers.Accept).toBe('application/json');
+    });
+  });
+
+  describe('response size limits', () => {
+    it('rejects oversized content-length before reading the body', async () => {
+      const cancel = jest.fn();
+      global.fetch = jest.fn().mockResolvedValue(
+        new Response(
+          new ReadableStream<Uint8Array>({ cancel }),
+          { status: 200, headers: { 'content-length': String(1024 * 1024 + 1) } },
+        ),
+      ) as any;
+
+      await expect(dataSource.fetchData({ url: 'https://api.example.com/x' }))
+        .rejects.toThrow(/response is too large/i);
+      expect(cancel).toHaveBeenCalled();
+    });
+
+    it('rejects chunked responses that exceed the body cap without content-length', async () => {
+      const cancel = jest.fn();
+      const oversizedChunk = new TextEncoder().encode(JSON.stringify({ data: 'x'.repeat(1024 * 1024 + 1) }));
+      global.fetch = jest.fn().mockResolvedValue(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(oversizedChunk);
+            },
+            cancel,
+          }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          },
+        ),
+      ) as any;
+
+      await expect(dataSource.fetchData({ url: 'https://api.example.com/x' }))
+        .rejects.toThrow(/response is too large/i);
+      expect(cancel).toHaveBeenCalled();
+    });
+
+    it('accepts valid under-limit JSON responses', async () => {
+      global.fetch = jest.fn().mockResolvedValue(jsonResponse({ data: ['small'] })) as any;
+
+      await expect(dataSource.fetchData({ url: 'https://api.example.com/x' }))
+        .resolves.toMatchObject({ data: { data: ['small'] } });
     });
   });
 
@@ -275,21 +306,14 @@ describe('GenericApiDataSource', () => {
     });
 
     it('non-200 response → fallback to sample data', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
-        ok: false,
-        status: 500,
-      }) as any;
+      global.fetch = jest.fn().mockResolvedValue(new Response('error', { status: 500 })) as any;
 
       const result = await dataSource.fetchData({ url: 'https://api.example.com/x' });
       expect(result.data).toBeInstanceOf(Array); // sample data shape
     });
 
     it('endpoint returns non-JSON (malformed body) → fallback to sample data', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => { throw new SyntaxError('not json'); },
-      }) as any;
+      global.fetch = jest.fn().mockResolvedValue(new Response('not json', { status: 200 })) as any;
 
       const result = await dataSource.fetchData({ url: 'https://api.example.com/x' });
       expect(result.data).toBeInstanceOf(Array);
@@ -301,6 +325,18 @@ describe('GenericApiDataSource', () => {
         err.name = 'AbortError';
         throw err;
       }) as any;
+
+      const result = await dataSource.fetchData({ url: 'https://api.example.com/x' });
+      expect(result.data).toBeInstanceOf(Array);
+    });
+
+    it('oversized body falls back to sample data when circuit breaker handles the failure', async () => {
+      global.fetch = jest.fn().mockResolvedValue(
+        jsonResponse(
+          { ok: true },
+          { headers: { 'content-length': String(1024 * 1024 + 1) } },
+        ),
+      ) as any;
 
       const result = await dataSource.fetchData({ url: 'https://api.example.com/x' });
       expect(result.data).toBeInstanceOf(Array);

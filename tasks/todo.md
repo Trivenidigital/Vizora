@@ -1,6 +1,96 @@
 # Vizora - Task Tracker
 
-## In Progress: Upload Pressure Readiness Pass 10 (2026-05-31)
+## In Progress: Customer/Performance Readiness Pass 11 (2026-05-31)
+
+**Branch:** `feat/performance-readiness-pass-11`
+
+**Why now:** PR #133 merged the upload-memory-pressure fix and all checks are
+green, but production deploy is still blocked by dirty/diverged prod-local
+state. The next autonomous slice should use fresh customer-dashboard,
+performance, and production-risk reviews to pick repo-side issues that are
+small enough to build, test, review, merge, and safely defer deploy if the prod
+checkout remains unsafe.
+
+**New primitives introduced:** `GenericApiDataSource` bounded response reader
+and local lazy-load guards for modal-only dashboard option data.
+
+**Hermes-first analysis:** not applicable yet. This pass will avoid business
+agent, MCP, Hermes skill, AI/provider, or spend paths unless a reviewer finds a
+specific existing-agent gap that must use the Hermes/MCP substrate.
+
+**Plan**
+- [x] Merge PR #133 after full CI green.
+- [x] Re-check production deploy gate after merge.
+- [x] Start fresh branch from `origin/main`.
+- [x] Run multi-subagent customer, performance, and production-risk scans before
+  selecting a build target.
+- [x] Reconcile reviewer findings with backlog/repo truth and select the
+  smallest high-value buildable bundle.
+- [x] Write/update a short design plan for selected fixes.
+- [x] Add focused failing tests.
+- [x] Implement scoped fixes.
+- [x] Run focused red/green tests, then multi-subagent code review.
+- [x] Run broader affected tests/builds/typecheck.
+- [ ] PR, CI, merge.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Current merge/deploy state**
+- [x] PR #133 merged at
+  `153091861732b5971e76cbff456763a8e2619ef6`; CI green for audit, build,
+  e2e, lint, security, and test.
+- [x] No open GitHub PRs after #133 merge.
+- [x] Prod deploy remains blocked: `/opt/vizora/app` is `ahead 17, behind 73`
+  from `origin/main=153091861732b5971e76cbff456763a8e2619ef6`, with many dirty
+  template/web/script files and untracked operator-approval/docs assets.
+- [x] Prod runtime probe: middleware/web/realtime PM2 processes are online and
+  middleware health is OK; several ops/Hermes cron processes are stopped. No
+  production pull, reset, stash, env edit, service restart, DB mutation, or
+  deploy performed.
+
+**Plan/design:** `docs/plans/2026-05-31-performance-readiness-pass-11.md`
+
+**Selected fix bundle**
+- [x] Cap Generic API widget response bodies before JSON parsing.
+- [x] Lazy-load content push/add-to-playlist modal options instead of loading
+  devices/playlists on content-page mount.
+- [x] Skip redundant devices-page client refetches only when server pagination
+  metadata proves the server props include the complete devices/playlists list.
+
+**Focused verification and review**
+- [x] Focused tests passed:
+  `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern=generic-api.data-source`
+  (35/35) and
+  `pnpm --filter @vizora/web test -- --runInBand --testPathPattern="dashboard/(content|devices)"`
+  (44/44).
+- [x] Middleware reviewer re-review CLEAN after adding stream cancellation on
+  oversized Generic API responses.
+- [x] Dashboard reviewer re-review CLEAN after fixing incomplete first-page
+  devices props, modal lazy-load error states, and playlist option refresh after
+  add-to-playlist.
+- [x] Broader verification passed:
+  middleware full Jest (143 suites / 2846 tests), web full Jest (94 suites /
+  969 tests after review fixes), middleware and web TypeScript checks,
+  `git diff --check`, middleware build, web production build, realtime build,
+  and CI-equivalent middleware/realtime lint. Full ad-hoc web-inclusive ESLint
+  still has a pre-existing repo warning/error backlog outside this branch;
+  changed-file lint exits 0 with warnings only.
+- [x] Final multi-agent review: backend/security/resource review CLEAN; dashboard
+  review low findings fixed and targeted re-review CLEAN.
+
+**Reviewer findings deferred from this slice**
+- [ ] Shared dashboard Socket.IO provider.
+- [ ] Full server-side content-library pagination/search.
+- [ ] Playlist index summary payload.
+- [ ] Template refresh overlap guard and DB-side refresh-enabled scan.
+- [ ] Real dashboard health/quota cards.
+- [ ] API-key customer surface cleanup.
+
+---
+
+## Completed: Upload Pressure Readiness Pass 10 (2026-05-31)
+
+**PR / merge commit:** #133 /
+`153091861732b5971e76cbff456763a8e2619ef6`
 
 **Branch:** `feat/performance-readiness-pass-10`
 
@@ -29,8 +119,8 @@ agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
 - [x] Run focused red/green tests.
 - [x] Run multi-subagent code review before broader tests.
 - [x] Run broader affected tests/builds/typecheck.
-- [ ] PR, CI, merge.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe.
 
 **Deployment gate inherited from pass 9**
 - [x] PR #132 merged at `4383c09b75f3cdbba0d0965ce477fe135d6439d6`; CI green
