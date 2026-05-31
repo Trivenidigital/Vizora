@@ -33,6 +33,27 @@ interface ModerationMetadata {
   reviewNote?: string;
 }
 
+type UploadFormType = 'image' | 'video' | 'pdf' | 'url' | 'html' | 'template';
+type FileUploadType = Extract<UploadFormType, 'image' | 'video' | 'pdf'>;
+type UploadQueueStatus = 'pending' | 'uploading' | 'success' | 'error';
+type UploadQueueItem = {
+ file: File;
+ type: FileUploadType;
+ status: UploadQueueStatus;
+ progress: number;
+ error?: string;
+};
+
+const BULK_UPLOAD_CONCURRENCY = 3;
+const FILE_UPLOAD_TYPES = new Set<UploadFormType>(['image', 'video', 'pdf']);
+
+const isFileUploadType = (type: UploadFormType): type is FileUploadType => FILE_UPLOAD_TYPES.has(type);
+
+const formatUploadType = (type: FileUploadType): string => {
+ if (type === 'pdf') return 'PDF';
+ return type.charAt(0).toUpperCase() + type.slice(1);
+};
+
 export default function ContentClient() {
  const toast = useToast();
  const [content, setContent] = useState<Content[]>([]);
@@ -51,7 +72,7 @@ export default function ContentClient() {
  const [pushDuration, setPushDuration] = useState(5);
  const [uploadForm, setUploadForm] = useState({
  title: '',
- type: 'image' as 'image' | 'video' | 'pdf' | 'url' | 'html' | 'template',
+ type: 'image' as UploadFormType,
  url: '',
  file: null as File | null,
  });
@@ -66,12 +87,7 @@ export default function ContentClient() {
  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
  const [uploadProgress, setUploadProgress] = useState<number>(0);
- const [uploadQueue, setUploadQueue] = useState<Array<{
- file: File;
- status: 'pending' | 'uploading' | 'success' | 'error';
- progress: number;
- error?: string;
- }>>([]);
+ const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([]);
  const [tags] = useState<ContentTag[]>([
  { id: '1', name: 'Marketing', color: 'blue' },
  { id: '2', name: 'Seasonal', color: 'green' },
@@ -297,43 +313,56 @@ export default function ContentClient() {
  }
 
  setActionLoading(true);
+ const uploadTargets = uploadQueue
+ .map((item, index) => ({ item, index }))
+ .filter(({ item }) => item.status !== 'success');
  const results: Array<'success' | 'error'> = [];
+ let nextUploadIndex = 0;
 
- // Upload files sequentially
- for (let i = 0; i < uploadQueue.length; i++) {
- const item = uploadQueue[i];
- 
- // Update status to uploading
- setUploadQueue(prev => prev.map((q, idx) => 
- idx === i ? { ...q, status: 'uploading' as const } : q
+ const uploadOne = async (item: UploadQueueItem, index: number) => {
+ setUploadQueue(prev => prev.map((q, idx) =>
+ idx === index ? { ...q, status: 'uploading' as const, progress: 0, error: undefined } : q
  ));
 
  try {
  const title = item.file.name.replace(/\.[^/.]+$/, '');
 
- // Pass file directly to API - it will handle multipart upload
- const newContent = await apiClient.createContent({
- title,
- type: uploadForm.type,
- file: item.file, // Pass file object instead of blob URL
- });
-
- // Mark as success
+ await apiClient.uploadContentWithProgress(
+ { title, type: item.type, file: item.file },
+ (percent) => {
  setUploadQueue(prev => prev.map((q, idx) =>
- idx === i ? { ...q, status: 'success' as const, progress: 100 } : q
+ idx === index ? { ...q, progress: percent } : q
+ ));
+ },
+ );
+
+ setUploadQueue(prev => prev.map((q, idx) =>
+ idx === index ? { ...q, status: 'success' as const, progress: 100 } : q
  ));
  results.push('success');
  } catch (error: any) {
- // Mark as error
  setUploadQueue(prev => prev.map((q, idx) =>
- idx === i ? { ...q, status: 'error' as const, error: error.message } : q
+ idx === index ? { ...q, status: 'error' as const, error: error.message || 'Upload failed' } : q
  ));
  results.push('error');
  }
+ };
+
+ const worker = async () => {
+ while (nextUploadIndex < uploadTargets.length) {
+ const current = uploadTargets[nextUploadIndex];
+ nextUploadIndex += 1;
+ await uploadOne(current.item, current.index);
+ }
+ };
+
+ try {
+ const workerCount = Math.min(BULK_UPLOAD_CONCURRENCY, uploadTargets.length);
+ await Promise.all(Array.from({ length: workerCount }, () => worker()));
+ } finally {
+ setActionLoading(false);
  }
 
- setActionLoading(false);
- 
  const successCount = results.filter(r => r === 'success').length;
  const errorCount = results.filter(r => r === 'error').length;
  
@@ -347,7 +376,12 @@ export default function ContentClient() {
  setUploadForm({ title: '', type: 'image', url: '', file: null });
  loadContent();
  } else {
+ if (successCount > 0) {
+ loadContent();
+ toast.error(`${successCount} file(s) uploaded, ${errorCount} failed`);
+ } else {
  toast.error(`${errorCount} file(s) failed to upload`);
+ }
  }
  };
 
@@ -707,12 +741,15 @@ export default function ContentClient() {
  const { getRootProps, getInputProps, isDragActive } = useDropzone({
  accept: getAcceptedFileTypes() as any,
  multiple: true, // Enable multiple file selection
- disabled: uploadForm.type === 'url',
+ disabled: actionLoading || !isFileUploadType(uploadForm.type),
  useFsAccessApi: false,
  onDrop: (acceptedFiles) => {
+ if (!isFileUploadType(uploadForm.type)) return;
+ const queuedType = uploadForm.type;
  // Add files to upload queue
  const newQueueItems = acceptedFiles.map(file => ({
  file,
+ type: queuedType,
  status: 'pending' as const,
  progress: 0,
  }));
@@ -1309,8 +1346,9 @@ export default function ContentClient() {
  <select
  value={uploadForm.type}
  onChange={(e) =>
- setUploadForm({ ...uploadForm, type: e.target.value as any })
+ setUploadForm({ ...uploadForm, type: e.target.value as UploadFormType })
  }
+ disabled={actionLoading}
  className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)]"
  >
  <option value="image">Image</option>
@@ -1328,7 +1366,9 @@ export default function ContentClient() {
  </label>
  <div
  {...getRootProps()}
- className={`border-2 border-dashed rounded-lg p-6 text-center transition-all cursor-pointer ${
+ className={`border-2 border-dashed rounded-lg p-6 text-center transition-all ${
+ actionLoading ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'
+ } ${
  isDragActive
  ? 'border-[#00E5A0] bg-[#00E5A0]/5'
  : 'border-[var(--border)] hover:border-[#00E5A0] hover:bg-[var(--surface-hover)]'
@@ -1375,7 +1415,8 @@ export default function ContentClient() {
  </p>
  <button
  onClick={() => setUploadQueue([])}
- className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
+ disabled={actionLoading}
+ className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 disabled:opacity-50 disabled:cursor-not-allowed"
  >
  Clear All
  </button>
@@ -1391,15 +1432,26 @@ export default function ContentClient() {
  {item.file.name}
  </p>
  <p className="text-xs text-[var(--foreground-tertiary)]">
- {(item.file.size / 1024).toFixed(1)} KB
+ {(item.file.size / 1024).toFixed(1)} KB - {formatUploadType(item.type)}
  </p>
+ {item.status === 'uploading' && (
+ <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--border)]">
+ <div
+ className="h-full rounded-full bg-[#00E5A0] transition-all duration-300"
+ style={{ width: `${item.progress}%` }}
+ />
+ </div>
+ )}
  </div>
  <div className="ml-4 flex items-center gap-2">
  {item.status === 'pending' && (
  <span className="text-xs text-[var(--foreground-tertiary)]">Pending</span>
  )}
  {item.status === 'uploading' && (
+ <span className="flex items-center gap-2 text-xs text-[#00E5A0]">
  <LoadingSpinner size="sm" />
+ {item.progress}%
+ </span>
  )}
  {item.status === 'success' && (
  <span className="text-green-600 dark:text-green-400">✓</span>
@@ -1409,7 +1461,9 @@ export default function ContentClient() {
  )}
  <button
  onClick={() => setUploadQueue(prev => prev.filter((_, i) => i !== idx))}
- className="text-[var(--foreground-tertiary)] hover:text-red-600 dark:hover:text-red-400"
+ disabled={actionLoading}
+ aria-label={`Remove ${item.file.name} from upload queue`}
+ className="text-[var(--foreground-tertiary)] hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50 disabled:cursor-not-allowed"
  >
  ×
  </button>

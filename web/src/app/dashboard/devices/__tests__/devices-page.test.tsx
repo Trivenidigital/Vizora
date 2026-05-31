@@ -7,6 +7,7 @@ const mockGetPlaylists = jest.fn();
 const mockGetDisplayGroups = jest.fn();
 const mockDeleteDisplay = jest.fn();
 const mockUpdateDisplay = jest.fn();
+const mockGeneratePairingToken = jest.fn();
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -27,6 +28,7 @@ jest.mock('@/lib/api', () => ({
     getDisplayGroups: (...args: any[]) => mockGetDisplayGroups(...args),
     deleteDisplay: (...args: any[]) => mockDeleteDisplay(...args),
     updateDisplay: (...args: any[]) => mockUpdateDisplay(...args),
+    generatePairingToken: (...args: any[]) => mockGeneratePairingToken(...args),
     getCurrentUser: jest.fn().mockRejectedValue(new Error('401')),
     setAuthenticated: jest.fn(),
     getActiveOverrides: jest.fn().mockResolvedValue([]),
@@ -197,6 +199,12 @@ describe('DevicesClient', () => {
     mockGetDisplayGroups.mockResolvedValue({ data: [] });
     mockDeleteDisplay.mockResolvedValue({});
     mockUpdateDisplay.mockResolvedValue({});
+    mockGeneratePairingToken.mockResolvedValue({
+      pairingToken: 'eyJ.mock.pairing-token',
+      expiresIn: '30d',
+      displayId: 'd1',
+      deviceIdentifier: 'device-d1',
+    });
   });
 
   it('renders and loads data with empty initial props', async () => {
@@ -289,6 +297,24 @@ describe('DevicesClient', () => {
     });
     // Page renders with device management UI
     expect(screen.getAllByText(/device/i).length).toBeGreaterThan(0);
+  });
+
+  it('renders backend pairingToken when pairing an existing device', async () => {
+    mockGetDisplays.mockResolvedValue({ data: sampleDevices, meta: { total: 3 } });
+
+    render(<DevicesClient initialDevices={sampleDevices as any} initialPlaylists={samplePlaylists as any} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Lobby Display')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByText('Pair')[0]);
+
+    await waitFor(() => {
+      expect(mockGeneratePairingToken).toHaveBeenCalledWith('d1');
+      expect(screen.getByText('eyJ.mock.pairing-token')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('N/A')).not.toBeInTheDocument();
   });
 
   it('handles empty device list gracefully', async () => {

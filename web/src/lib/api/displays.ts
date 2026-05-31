@@ -3,6 +3,14 @@
 import type { Display, DisplayOrientation, PaginatedResponse, DisplayGroup, QrOverlayConfig } from '../types';
 import { ApiClient } from './client';
 
+export interface PairingTokenResponse {
+  pairingToken?: string;
+  pairingCode?: string;
+  expiresIn?: string;
+  displayId?: string;
+  deviceIdentifier?: string;
+}
+
 declare module './client' {
   interface ApiClient {
     getDisplays(params?: { page?: number; limit?: number }): Promise<PaginatedResponse<Display>>;
@@ -10,7 +18,7 @@ declare module './client' {
     createDisplay(data: { nickname: string; location?: string }): Promise<Display>;
     updateDisplay(id: string, data: Partial<{ nickname: string; location?: string; currentPlaylistId?: string | null; orientation?: DisplayOrientation }>): Promise<Display>;
     deleteDisplay(id: string): Promise<void>;
-    generatePairingToken(id: string): Promise<{ pairingCode: string }>;
+    generatePairingToken(id: string): Promise<PairingTokenResponse>;
     completePairing(data: { code: string; nickname: string; location?: string }): Promise<Display>;
     pushContentToDisplay(displayId: string, contentId: string, duration?: number): Promise<{ success: boolean; message: string }>;
     requestDeviceScreenshot(displayId: string): Promise<{ requestId: string; status: string }>;
@@ -76,8 +84,8 @@ ApiClient.prototype.deleteDisplay = async function (id: string): Promise<void> {
   });
 };
 
-ApiClient.prototype.generatePairingToken = async function (id: string): Promise<{ pairingCode: string }> {
-  return this.request<{ pairingCode: string }>(`/displays/${id}/pair`, {
+ApiClient.prototype.generatePairingToken = async function (id: string): Promise<PairingTokenResponse> {
+  return this.request<PairingTokenResponse>(`/displays/${id}/pair`, {
     method: 'POST',
   });
 };
