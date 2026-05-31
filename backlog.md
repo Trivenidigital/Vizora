@@ -172,11 +172,11 @@ These are documented + non-blocking for customer-1. Investigations done; impleme
 | M7 | Push-to-group endpoint (single API call) | S (4h) | ✅ DONE | Generalized in **O1** (#65) — tag/group/org targeting via `fleet.service` |
 | M8 | Data retention policy (auto-purge audit logs > 90 days) | S (4h) | ✅ DONE | `common/data-retention.service.ts` + `auditLog.deleteMany` |
 | M9 | Profile editing: avatar upload | S (4h) | ✅ DONE | `POST/DELETE /auth/me/avatar` + settings-page upload/remove UI backed by storage presigned URLs. |
-| M10 | Fix Loki volume mount (logs lost on restart) | XS (1h) | TODO | Docker-compose change |
+| M10 | Fix Loki volume mount (logs lost on restart) | XS (1h) | ✅ DONE | `docker/docker-compose.yml` mounts named volume `loki_data:/loki` and declares `loki_data` under `volumes:`. |
 | M11 | GDPR data export endpoint | M (1d) | ✅ DONE | `POST /users/me/data-export` returns user/org/content/display/playlist/schedule/audit/notification export; settings page downloads JSON. |
 | M12 | Security alert emails (new login, password changed) | S (4h) | 🟡 PARTIAL | Password-changed email shipped (#110, `MailService.sendPasswordChangedEmail`). New-login / unrecognized-device half DEFERRED — needs login IP / device-history schema migration. |
 
-**Remaining P2 repo-side items:** M1, M5, M10, and M12's new-login/unrecognized-device half. M2/M3/M4/M6/M7/M8/M9/M11 shipped.
+**Remaining P2 repo-side items:** M1, M5, and M12's new-login/unrecognized-device half. M2/M3/M4/M6/M7/M8/M9/M10/M11 shipped.
 
 ---
 
@@ -319,7 +319,7 @@ WEEKS 2-3:          Remaining P1
                      +-- UptimeRobot setup only (operator/manual)
 
 MONTH 1:            P2 items
-                     +-- CDN, template expansion, Loki mount, new-login security alert
+                     +-- CDN, template expansion, new-login security alert
 
 QUARTER 1:          P3 items
                      +-- Per-user feature flags, AI Designer, 300+ templates
