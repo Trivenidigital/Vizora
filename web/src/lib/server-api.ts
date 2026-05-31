@@ -2,6 +2,17 @@ import { cookies } from 'next/headers';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
+export class ServerFetchError extends Error {
+  constructor(
+    public statusCode: number,
+    message: string,
+    public body: unknown,
+  ) {
+    super(message);
+    this.name = 'ServerFetchError';
+  }
+}
+
 export async function serverFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const cookieStore = await cookies();
   const token = cookieStore.get('vizora_auth_token')?.value;
@@ -24,7 +35,7 @@ export async function serverFetch<T>(path: string, options?: RequestInit): Promi
       body && typeof body === 'object' && 'message' in body
         ? String((body as { message: unknown }).message)
         : `API error: ${res.status} ${res.statusText}`;
-    throw new Error(message);
+    throw new ServerFetchError(res.status, message, body);
   }
 
   if (body && typeof body === 'object' && 'success' in body && 'data' in body) {

@@ -1,6 +1,8 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import type { ComponentProps } from 'react';
 import DashboardClient from '../page-client';
 import { apiClient } from '@/lib/api';
+import { ApiError } from '@/lib/error-handler';
 
 const mockPush = jest.fn();
 
@@ -20,7 +22,9 @@ jest.mock('@/lib/api', () => ({
   apiClient: {
     getContent: jest.fn().mockResolvedValue({ data: [] }),
     getPlaylists: jest.fn().mockResolvedValue({ data: [] }),
-    getQuotaUsage: jest.fn().mockResolvedValue({ storageUsedBytes: 0, storageQuotaBytes: 1073741824, screenCount: 0, screenQuota: 5 }),
+    getQuotaUsage: jest.fn().mockResolvedValue({ screensUsed: 0, screenQuota: 5, remaining: 5, percentUsed: 0 }),
+    getStorageInfo: jest.fn().mockResolvedValue({ usedBytes: 0, quotaBytes: 1073741824, availableBytes: 1073741824, usagePercent: 0 }),
+    get: jest.fn().mockResolvedValue({ status: 'ok' }),
     setAuthenticated: jest.fn(),
   },
 }));
@@ -49,46 +53,157 @@ jest.mock('@/components/Tooltip', () => ({
   HelpIcon: () => <span>?</span>,
 }));
 
+jest.mock('@/components/UpgradeBanner', () => {
+  return function MockUpgradeBanner() { return <div data-testid="upgrade-banner" />; };
+});
+
+async function renderDashboardClient(props: Partial<ComponentProps<typeof DashboardClient>> = {}) {
+  const view = render(
+    <DashboardClient
+      initialContent={props.initialContent ?? []}
+      initialPlaylists={props.initialPlaylists ?? []}
+      initialContentComplete={props.initialContentComplete}
+      initialPlaylistsComplete={props.initialPlaylistsComplete}
+      initialStorageInfo={props.initialStorageInfo}
+      initialSystemHealth={props.initialSystemHealth}
+    />,
+  );
+  await waitFor(() => {
+    expect(screen.getByText('Healthy')).toBeInTheDocument();
+  });
+  return view;
+}
+
 describe('DashboardClient', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (apiClient.getContent as jest.Mock).mockReset().mockResolvedValue({ data: [] });
+    (apiClient.getPlaylists as jest.Mock).mockReset().mockResolvedValue({ data: [] });
+    (apiClient.getQuotaUsage as jest.Mock)
+      .mockReset()
+      .mockResolvedValue({ screensUsed: 0, screenQuota: 5, remaining: 5, percentUsed: 0 });
+    (apiClient.getStorageInfo as jest.Mock)
+      .mockReset()
+      .mockResolvedValue({
+        usedBytes: 0,
+        quotaBytes: 1073741824,
+        availableBytes: 1073741824,
+        usagePercent: 0,
+      });
+    (apiClient.get as jest.Mock).mockReset().mockResolvedValue({ status: 'ok' });
     mockDeviceStatusContext = {
       deviceStatuses: {},
       isInitialized: true,
     };
   });
 
-  it('renders dashboard overview heading', () => {
-    render(<DashboardClient initialContent={[]} initialPlaylists={[]} />);
+  it('renders dashboard overview heading', async () => {
+    await renderDashboardClient();
     expect(screen.getByText('Dashboard Overview')).toBeInTheDocument();
   });
 
-  it('renders stats cards', () => {
-    render(<DashboardClient initialContent={[]} initialPlaylists={[]} />);
+  it('renders stats cards', async () => {
+    await renderDashboardClient();
     expect(screen.getByText('Total Devices')).toBeInTheDocument();
     expect(screen.getByText('Content Items')).toBeInTheDocument();
     expect(screen.getByText('Playlists')).toBeInTheDocument();
     expect(screen.getByText('System Status')).toBeInTheDocument();
   });
 
-  it('renders quick actions section', () => {
-    render(<DashboardClient initialContent={[]} initialPlaylists={[]} />);
+  it('renders quick actions section', async () => {
+    await renderDashboardClient();
     expect(screen.getByText('Quick Actions')).toBeInTheDocument();
   });
 
-  it('renders recent activity section', () => {
-    render(<DashboardClient initialContent={[]} initialPlaylists={[]} />);
+  it('renders recent activity section', async () => {
+    await renderDashboardClient();
     expect(screen.getByText('Recent Activity')).toBeInTheDocument();
   });
 
-  it('renders storage usage section', () => {
-    render(<DashboardClient initialContent={[]} initialPlaylists={[]} />);
+  it('renders storage usage section', async () => {
+    await renderDashboardClient();
     expect(screen.getByText('Storage Usage')).toBeInTheDocument();
   });
 
-  it('shows getting started guide when no devices', () => {
+  it('renders real storage usage from the organization storage endpoint', async () => {
+    (apiClient.getStorageInfo as jest.Mock).mockResolvedValueOnce({
+      usedBytes: 536870912,
+      quotaBytes: 1073741824,
+      availableBytes: 536870912,
+      usagePercent: 50,
+    });
+
+    render(<DashboardClient initialContent={[{ id: 'c1' }]} initialPlaylists={[]} />);
+
+    await waitFor(() => {
+      expect(apiClient.getStorageInfo).toHaveBeenCalledTimes(1);
+      expect(screen.getByText('512 MB / 1 GB')).toBeInTheDocument();
+      expect(screen.getByText('50.0% used')).toBeInTheDocument();
+    });
+  });
+
+  it('does not show a normal percentage when storage quota is unavailable', async () => {
+    (apiClient.getStorageInfo as jest.Mock).mockResolvedValueOnce({
+      usedBytes: 1048576,
+      quotaBytes: 0,
+      availableBytes: 0,
+      usagePercent: 0,
+    });
+
+    render(<DashboardClient initialContent={[{ id: 'c1' }]} initialPlaylists={[]} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('1 MB / No quota')).toBeInTheDocument();
+      expect(screen.getByText('Quota unavailable')).toBeInTheDocument();
+      expect(screen.queryByText('0.0% used')).not.toBeInTheDocument();
+    });
+  });
+
+  it('renders degraded system readiness instead of a fixed healthy state', async () => {
+    (apiClient.get as jest.Mock).mockResolvedValueOnce({
+      status: 'degraded',
+      message: 'Some dependencies degraded',
+    });
+
     render(<DashboardClient initialContent={[]} initialPlaylists={[]} />);
+
+    await waitFor(() => {
+      expect(apiClient.get).toHaveBeenCalledWith('/health/ready');
+      expect(screen.getByText('Degraded')).toBeInTheDocument();
+      expect(screen.getByText('Some dependencies degraded')).toBeInTheDocument();
+    });
+  });
+
+  it('renders critical system readiness when the readiness endpoint returns unavailable', async () => {
+    (apiClient.get as jest.Mock).mockRejectedValueOnce(
+      new ApiError(503, 'Service unavailable', 'The service is temporarily unavailable.'),
+    );
+
+    render(<DashboardClient initialContent={[]} initialPlaylists={[]} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Critical')).toBeInTheDocument();
+      expect(screen.getByText('Core service needs attention')).toBeInTheDocument();
+    });
+  });
+
+  it('shows getting started guide when no devices', async () => {
+    await renderDashboardClient();
     expect(screen.getByText('Getting Started')).toBeInTheDocument();
+  });
+
+  it('does not refetch content and playlists on mount when server pagination is complete', async () => {
+    await renderDashboardClient({
+      initialContent: [{ id: 'c1' }],
+      initialPlaylists: [{ id: 'p1', items: [{ id: 'item-1' }] }],
+      initialContentComplete: true,
+      initialPlaylistsComplete: true,
+    });
+
+    expect(apiClient.getContent).not.toHaveBeenCalled();
+    expect(apiClient.getPlaylists).not.toHaveBeenCalled();
+    expect(screen.getByText('Content Items').parentElement?.parentElement).toHaveTextContent('1');
+    expect(screen.getByText('Playlists').parentElement?.parentElement).toHaveTextContent('1');
   });
 
   it('refreshes overview counts from all paginated pages on mount', async () => {
@@ -167,7 +282,7 @@ describe('DashboardClient', () => {
       isInitialized: false,
     };
 
-    const { rerender } = render(<DashboardClient initialContent={[]} initialPlaylists={[]} />);
+    const { rerender } = await renderDashboardClient();
 
     expect(screen.getByText('No recent activity yet')).toBeInTheDocument();
 

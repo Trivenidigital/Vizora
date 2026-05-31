@@ -43,10 +43,7 @@ export default function DashboardLayout({
   const brandName = brandConfig?.name || 'Vizora';
   const brandLogo = brandConfig?.logo;
   const brandInitial = brandName.charAt(0).toUpperCase();
-  const [sidebarOpen, setSidebarOpen] = useState(() => {
-    if (typeof window !== 'undefined') return window.innerWidth >= 1024;
-    return true;
-  });
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   // Sync sidebar with viewport — close below lg, open above lg (debounced)

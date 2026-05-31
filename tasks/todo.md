@@ -1355,12 +1355,33 @@ Plan: `docs/plans/2026-05-31-customer-performance-pass-12.md`
 - [x] Run multiple subagent diff reviews before tests.
 - [x] Run focused middleware/realtime tests.
 - [x] Run relevant broader builds/tests and changed-file lint.
+- [x] Open PR, wait for CI, merge if green. PR #135 merged to `origin/main` at `1618f31f9e151ca394f4e0471e457267805415a9`.
+- [ ] Deploy status: blocked unless production dirty/diverged state is resolved or explicitly approved with a reviewed runbook.
+
+## Active Workstream: Customer Dashboard Trust Pass 13 (2026-05-31)
+
+Branch: `feat/customer-dashboard-trust-pass-13`
+Plan: `docs/plans/2026-05-31-customer-dashboard-trust-pass-13.md`
+
+- [x] Document pass 13 design and test plan.
+- [x] Add dashboard storage API client method for the existing organization storage endpoint.
+- [x] Pass server-fetched pagination completeness, storage, and readiness data into the dashboard client.
+- [x] Replace hardcoded dashboard system/storage indicators with real readiness and storage state.
+- [x] Skip redundant mount-time content/playlist fetches when SSR pagination proves the data is complete.
+- [x] Run multiple subagent diff reviews before tests. UI/trust reviewer CLEAN; API/data/performance reviewer CLEAN. Follow-up UI review for the dashboard layout hydration fix CLEAN.
+- [x] Run focused dashboard tests and broader web verification:
+  - `pnpm --filter @vizora/web test -- --runInBand --testPathPattern="dashboard-(page|server-page)"` — 2 suites / 18 tests pass.
+  - `pnpm --filter @vizora/web test -- --runInBand --testPathPattern=server-api` — 1 suite / 3 tests pass.
+  - `pnpm --filter @vizora/web exec tsc --noEmit --pretty false` — pass.
+  - `ESLINT_USE_FLAT_CONFIG=false npx eslint ...changed web files...` — 0 errors, 19 existing `any` warnings.
+  - `npx nx build @vizora/web` — pass.
+  - `pnpm --filter @vizora/web test -- --runInBand` — 95 suites / 977 tests pass; unrelated existing act warnings remain in non-dashboard suites.
+  - Playwright browser smoke against `next start` on `localhost:3001`: desktop and mobile dashboard render with no page errors after the layout hydration fix; screenshots in `logs/dashboard-pass13-{desktop,mobile}.png`.
 - [ ] Open PR, wait for CI, merge if green.
 - [ ] Deploy status: blocked unless production dirty/diverged state is resolved or explicitly approved with a reviewed runbook.
 
 ## Next Up (Not Started)
 
-Continue the ranked customer/performance findings after pass 12: dashboard real
-health/quota, shared dashboard Socket.IO provider, server-side content-library
-search, playlist summary payloads, org broadcast scaling, and template refresh
-scheduling.
+Continue the ranked customer/performance findings after pass 13: shared dashboard
+Socket.IO provider, server-side content-library search, playlist summary payloads,
+org broadcast scaling, and template refresh scheduling.
