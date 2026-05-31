@@ -20,6 +20,7 @@ export class DeviceClient {
   private cachedDeviceIdentifier: string | null = null;
   private previousCpuTimes: { idle: number; total: number } | null = null;
   private overrideState: { previousUrl?: string; revertTimer: any; commandId?: string } | null = null;
+  private deviceToken: string | null = null;
 
   private mainWindow: any = null;
 
@@ -244,6 +245,8 @@ export class DeviceClient {
   }
 
   connect(token: string) {
+    this.deviceToken = token;
+
     // Fix localhost resolution to IPv4 for WebSocket
     const realtimeUrl = this.realtimeUrl.replace(/localhost/g, '127.0.0.1');
     console.log('[DeviceClient] Connecting to realtime gateway:', realtimeUrl);
@@ -276,6 +279,7 @@ export class DeviceClient {
       console.error('[DeviceClient] Connection error:', error.message);
       if (error.message.includes('unauthorized') || error.message.includes('invalid token')) {
         console.log('[DeviceClient] Token rejected, clearing and re-entering pairing');
+        this.deviceToken = null;
         this.store?.delete('deviceToken');
         this.socket?.disconnect();
         this.config.onPairingRequired();
@@ -286,10 +290,41 @@ export class DeviceClient {
       console.log('Received configuration:', config);
     });
 
-    this.socket.on('playlist:update', async (data, ack?: SocketAck) => {
-      console.log('Received playlist update:', data);
+    this.socket.on('token:refresh', (data) => {
+      if (!data?.token || typeof data.token !== 'string') {
+        return;
+      }
+
+      this.deviceToken = data.token;
+      if (this.socket) {
+        const socketWithAuth = this.socket as Socket & {
+          auth?: {
+            token?: string;
+            capabilities?: Record<string, unknown>;
+            [key: string]: unknown;
+          };
+        };
+        socketWithAuth.auth = {
+          ...(socketWithAuth.auth ?? {}),
+          token: data.token,
+          capabilities: {
+            ...(socketWithAuth.auth?.capabilities ?? {}),
+            deliveryAck: true,
+          },
+        };
+      }
       try {
-        await this.config.onPlaylistUpdate(data.playlist);
+        this.store?.set('deviceToken', data.token);
+      } catch (error) {
+        console.error('[DeviceClient] Failed to persist refreshed device token:', error);
+      }
+    });
+
+    this.socket.on('playlist:update', async (data, ack?: SocketAck) => {
+      console.log('Received playlist update:', this.redactDeviceTokenFromLogValue(data));
+      try {
+        const playlist = this.attachDeviceTokenToProtectedUrls(data.playlist);
+        await this.config.onPlaylistUpdate(playlist);
         ack?.({ ok: true });
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to apply playlist';
@@ -300,7 +335,8 @@ export class DeviceClient {
     });
 
     this.socket.on('command', async (data, ack?: SocketAck) => {
-      console.log('Received command:', data);
+      const command = this.attachDeviceTokenToProtectedUrls(data);
+      console.log('Received command:', this.redactDeviceTokenFromLogValue(command));
       let ackSent = false;
       const sendAck = (response: { ok: boolean; error?: string }) => {
         ack?.(response);
@@ -308,15 +344,15 @@ export class DeviceClient {
       };
 
       try {
-        if (this.shouldAckBeforeCommandExecution(data)) {
+        if (this.shouldAckBeforeCommandExecution(command)) {
           sendAck({ ok: true });
           await this.waitForSelfTerminatingCommandAckFlush();
-          await this.handleCommand(data);
+          await this.handleCommand(command);
           return;
         }
 
-        await this.config.onCommand(data);
-        await this.handleCommand(data);
+        await this.config.onCommand(command);
+        await this.handleCommand(command);
         if (!ackSent) {
           sendAck({ ok: true });
         }
@@ -437,6 +473,83 @@ export class DeviceClient {
     await new Promise((resolve) => setTimeout(resolve, SELF_TERMINATING_COMMAND_ACK_FLUSH_MS));
   }
 
+  private attachDeviceTokenToProtectedUrls<T>(value: T): T {
+    if (Array.isArray(value)) {
+      return value.map((item) => this.attachDeviceTokenToProtectedUrls(item)) as T;
+    }
+
+    if (!value || typeof value !== 'object') {
+      return value;
+    }
+
+    const result: Record<string, unknown> = {};
+    for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+      result[key] = key === 'url' && typeof entry === 'string'
+        ? this.appendDeviceTokenToProtectedUrl(entry)
+        : this.attachDeviceTokenToProtectedUrls(entry);
+    }
+
+    return result as T;
+  }
+
+  private appendDeviceTokenToProtectedUrl(rawUrl: string): string {
+    if (!this.deviceToken) {
+      return rawUrl;
+    }
+
+    try {
+      const isAbsolute = /^[a-z][a-z0-9+.-]*:/i.test(rawUrl);
+      const url = new URL(rawUrl, this.apiUrl);
+      const isProtectedDeviceContent =
+        /\/api\/v1\/device-content\/[^/]+\/file$/.test(url.pathname) ||
+        /\/device-content\/[^/]+\/file$/.test(url.pathname);
+      const apiOrigin = new URL(this.apiUrl).origin;
+
+      if (!isProtectedDeviceContent || url.origin !== apiOrigin || url.searchParams.has('token')) {
+        return rawUrl;
+      }
+
+      url.searchParams.set('token', this.deviceToken);
+      return url.toString();
+    } catch {
+      return rawUrl;
+    }
+  }
+
+  private redactDeviceTokenFromLogValue<T>(value: T): T {
+    if (Array.isArray(value)) {
+      return value.map((item) => this.redactDeviceTokenFromLogValue(item)) as T;
+    }
+
+    if (!value || typeof value !== 'object') {
+      return value;
+    }
+
+    const result: Record<string, unknown> = {};
+    for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+      result[key] = key === 'url' && typeof entry === 'string'
+        ? this.redactDeviceTokenFromUrl(entry)
+        : this.redactDeviceTokenFromLogValue(entry);
+    }
+
+    return result as T;
+  }
+
+  private redactDeviceTokenFromUrl(rawUrl: string): string {
+    try {
+      const isAbsolute = /^[a-z][a-z0-9+.-]*:/i.test(rawUrl);
+      const url = new URL(rawUrl, this.apiUrl);
+      if (!url.searchParams.has('token')) {
+        return rawUrl;
+      }
+
+      url.searchParams.set('token', '[redacted]');
+      return isAbsolute ? url.toString() : `${url.pathname}${url.search}${url.hash}`;
+    } catch {
+      return rawUrl;
+    }
+  }
+
   private async handleCommand(command: any): Promise<void> {
     switch (command.type) {
       case 'reload':
@@ -520,7 +633,7 @@ export class DeviceClient {
 
           // Load the pushed content
           await pushWindow.loadURL(content.url);
-          console.log(`[DeviceClient] Override active: loading ${content.url} (commandId: ${commandId})`);
+          console.log(`[DeviceClient] Override active: loading ${this.redactDeviceTokenFromUrl(content.url)} (commandId: ${commandId})`);
 
           // Set auto-revert timer (duration is in minutes)
           const durationMs = (duration || 60) * 60 * 1000;

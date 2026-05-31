@@ -28,6 +28,8 @@ const onlineResult = {
   devicesTargeted: 1,
   devicesOnline: 1,
   devicesQueued: 0,
+  devicesDelivered: 1,
+  devicesFailed: 0,
 };
 
 describe('DeviceControls', () => {
@@ -82,6 +84,7 @@ describe('DeviceControls', () => {
       ...onlineResult,
       devicesOnline: 0,
       devicesQueued: 1,
+      devicesDelivered: 0,
     });
     render(<DeviceControls deviceId="dev-1" />);
 
@@ -102,6 +105,21 @@ describe('DeviceControls', () => {
 
     await waitFor(() =>
       expect(mockError).toHaveBeenCalledWith('network down'),
+    );
+  });
+
+  it('shows an error toast when realtime reports delivery failure', async () => {
+    sendFleetCommand.mockResolvedValueOnce({
+      ...onlineResult,
+      devicesDelivered: 0,
+      devicesFailed: 1,
+    });
+    render(<DeviceControls deviceId="dev-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reload Screen' }));
+
+    await waitFor(() =>
+      expect(mockError).toHaveBeenCalledWith('Reload Screen failed to reach the device'),
     );
   });
 });

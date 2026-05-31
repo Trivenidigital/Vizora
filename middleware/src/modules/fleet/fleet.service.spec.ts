@@ -274,8 +274,41 @@ describe('FleetService', () => {
       expect(result.devicesTargeted).toBe(1);
       expect(result.devicesOnline).toBe(1);
       expect(result.devicesQueued).toBe(0);
+      expect(result.devicesDelivered).toBe(1);
+      expect(result.devicesFailed).toBe(0);
       expect(result.commandId).toBeDefined();
       expect(circuitBreaker.executeWithFallback).toHaveBeenCalled();
+    });
+
+    it('should use gateway delivered queued and failed counts when available', async () => {
+      db.display.findFirst.mockResolvedValue({
+        id: mockDeviceId,
+        nickname: 'Test',
+        organizationId: mockOrgId,
+      });
+      httpService.post.mockReturnValue(of({
+        data: {
+          devicesOnline: 1,
+          delivered: 0,
+          queued: 1,
+          failed: 0,
+        },
+      }) as any);
+
+      const result = await service.sendCommand(
+        mockOrgId,
+        mockUserId,
+        'admin',
+        {
+          command: 'reload' as const,
+          target: { type: 'device' as const, id: mockDeviceId },
+        },
+      );
+
+      expect(result.devicesOnline).toBe(1);
+      expect(result.devicesDelivered).toBe(0);
+      expect(result.devicesQueued).toBe(1);
+      expect(result.devicesFailed).toBe(0);
     });
 
     it('should resolve content from DB and include it in gateway payload for push_content', async () => {

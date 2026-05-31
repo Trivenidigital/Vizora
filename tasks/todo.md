@@ -1,5 +1,55 @@
 # Vizora - Task Tracker
 
+## In Progress: Display Delivery Reliability Follow-up (2026-05-31)
+
+**Branch:** `feat/customer-performance-hardening-2`
+
+**Plan/design:** `docs/plans/2026-05-31-display-delivery-reliability-follow-up.md`
+
+**Why now:** The post-merge customer/realtime review found customer-visible playback and remote-control reliability gaps that are repo-side, testable, and do not need operator secrets or production state changes.
+
+**New primitives introduced:** none. Use existing middleware display command callers, realtime `DeviceGateway`, Redis pending-delivery queues, and Electron display client.
+
+**Hermes-first analysis:** not applicable. This is realtime/device transport and Electron display playback reliability; it does not introduce business agents, MCP tools, AI provider calls, or spend paths.
+
+**Plan**
+- [x] Add failing focused tests for heartbeat-triggered pending playlist/command replay without returning queued commands in the heartbeat response.
+- [x] Route realtime fleet broadcast commands through `DeviceGateway.sendCommand`.
+- [x] Append Electron device JWT query tokens to protected `/device-content/:id/file` URLs before playback/cache and `push_content`.
+- [x] Fix middleware display command callers to send realtime's nested `{ deviceId, command: { type, payload } }` shape.
+- [x] Run focused realtime/display/middleware tests.
+- [x] Run multi-review on the diff before broader tests.
+- [x] Run broader package tests/builds proportional to touched packages.
+- [ ] Open PR, wait for CI, merge if clean.
+
+**Verification so far**
+- `NODE_OPTIONS=--use-system-ca pnpm --dir packages/database exec prisma generate` - pass; needed in fresh worktree before realtime tests could import `@vizora/database`.
+- `npx nx build @vizora/database` - pass.
+- `git diff --check` - pass; line-ending warnings only.
+- `pnpm --filter @vizora/realtime test -- --runInBand --testPathPattern="device.gateway|app.controller|redis.service"` - pass, 4 suites / 112 tests.
+- `pnpm --filter @vizora/display test -- --runInBand --testPathPattern="device-client"` - pass, 1 suite / 46 tests.
+- `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="displays.service|fleet.service"` - pass, 4 suites / 72 tests.
+- `pnpm --filter @vizora/web test -- --runInBand --testPathPattern="DeviceControls"` - pass, 1 suite / 6 tests.
+- `pnpm --filter @vizora/realtime test -- --runInBand` - pass, 11 suites / 242 tests.
+- `pnpm --filter @vizora/display test -- --runInBand` - pass, 5 suites / 115 tests; existing MaxListeners warning remains in full display suite.
+- `pnpm --filter @vizora/middleware test -- --runInBand` - pass, 141 suites / 2761 tests.
+- `pnpm --filter @vizora/web test -- --runInBand` - pass, 82 suites / 882 tests; existing unrelated React `act(...)` warnings remain.
+- `npx nx build @vizora/middleware` - pass with existing webpack warnings.
+- `npx nx build @vizora/realtime` - pass with existing source-map/optional `ws` warnings.
+- `pnpm --filter @vizora/display build` - pass.
+- `NODE_OPTIONS=--max-old-space-size=4096 npx nx build @vizora/web` - pass with existing Next middleware/proxy and missing production API URL warnings.
+
+**Review inputs**
+- Realtime/display reviewer: high findings on negative-ACK replay, broadcast bypassing ACK/queue path, Electron protected media URLs, and middleware single-device command DTO drift.
+- Customer dashboard reviewer: high findings on paginated dashboard datasets, duplicate sockets, and analytics error masking; these are queued after this delivery reliability slice.
+- Middleware performance reviewer: high findings on template/content list payloads and buffered uploads; these are queued after this delivery reliability slice.
+- Deployment/backlog reviewer: prod deployment is blocked by dirty/diverged production checkout; do not pull/reset/deploy until prod-only work is reconciled.
+- Internal API final re-review: CLEAN after preserving `devicesOnline`, whitelisting `commandId`, and checking screenshot gateway `success: false`.
+- Display-client final re-review: CLEAN after refreshing live Socket.IO `auth.token` alongside persisted device token.
+- Realtime final re-review: CLEAN after generation-guarded pending playlist replay, active-socket command replay rechecks, and non-poisoning socket-handoff requeues.
+
+---
+
 ## In Progress: Customer Dashboard + Playback Performance Push (2026-05-31)
 
 **Branch:** `feat/customer-dashboard-performance-push`

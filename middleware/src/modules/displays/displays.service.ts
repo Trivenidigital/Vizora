@@ -671,13 +671,20 @@ export class DisplaysService {
       await this.circuitBreaker.executeWithFallback(
         'realtime-service',
         async () => {
-          await firstValueFrom(
+          const response = await firstValueFrom(
             this.httpService.post(url, {
-              displayId,
-              command: 'screenshot',
-              payload: { requestId },
+              deviceId: displayId,
+              command: {
+                type: 'screenshot',
+                payload: { requestId },
+              },
             }, { headers }),
           );
+          if (response.data?.success === false) {
+            throw new ServiceUnavailableException(
+              response.data?.message || 'Screenshot command was not acknowledged by the realtime service',
+            );
+          }
           this.logger.log(`Screenshot requested for display ${displayId} (requestId: ${requestId})`);
         },
         (error) => {
@@ -824,9 +831,11 @@ export class DisplaysService {
       async () => {
         await firstValueFrom(
           this.httpService.post(url, {
-            displayId,
-            command,
-            payload,
+            deviceId: displayId,
+            command: {
+              type: command,
+              payload,
+            },
           }, { headers }),
         );
         this.logger.log(`Command '${command}' sent to device ${displayId}`);

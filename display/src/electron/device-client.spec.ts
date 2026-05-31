@@ -302,6 +302,7 @@ describe('DeviceClient', () => {
       expect(registeredEvents).toContain('connect');
       expect(registeredEvents).toContain('disconnect');
       expect(registeredEvents).toContain('connect_error');
+      expect(registeredEvents).toContain('token:refresh');
       expect(registeredEvents).toContain('playlist:update');
       expect(registeredEvents).toContain('command');
       expect(registeredEvents).toContain('error');
@@ -320,6 +321,177 @@ describe('DeviceClient', () => {
 
       expect(mockConfig.onPlaylistUpdate).toHaveBeenCalledWith(playlist);
       expect(ack).toHaveBeenCalledWith({ ok: true });
+    });
+
+    it('should append the device token to protected playlist media URLs before rendering', async () => {
+      client.connect('device-token-123');
+
+      const playlistCall = mockSocket.on.mock.calls.find(
+        (call: any[]) => call[0] === 'playlist:update',
+      );
+      const ack = jest.fn();
+      const playlist = {
+        id: 'playlist-1',
+        items: [
+          {
+            id: 'item-1',
+            content: {
+              id: 'content-1',
+              url: 'http://localhost:3000/api/v1/device-content/content-1/file?variant=original',
+            },
+          },
+        ],
+      };
+
+      await playlistCall![1]({ playlist }, ack);
+
+      expect(mockConfig.onPlaylistUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          items: [
+            expect.objectContaining({
+              content: expect.objectContaining({
+                url: 'http://localhost:3000/api/v1/device-content/content-1/file?variant=original&token=device-token-123',
+              }),
+            }),
+          ],
+        }),
+      );
+      expect(playlist.items[0].content.url).toBe(
+        'http://localhost:3000/api/v1/device-content/content-1/file?variant=original',
+      );
+      expect(ack).toHaveBeenCalledWith({ ok: true });
+    });
+
+    it('should not append the device token to attacker-origin device-content lookalike URLs', async () => {
+      client.connect('device-token-123');
+
+      const playlistCall = mockSocket.on.mock.calls.find(
+        (call: any[]) => call[0] === 'playlist:update',
+      );
+      const ack = jest.fn();
+      const playlist = {
+        id: 'playlist-1',
+        items: [
+          {
+            id: 'item-1',
+            content: {
+              id: 'content-1',
+              url: 'https://evil.example/api/v1/device-content/content-1/file',
+            },
+          },
+        ],
+      };
+
+      await playlistCall![1]({ playlist }, ack);
+
+      expect(mockConfig.onPlaylistUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          items: [
+            expect.objectContaining({
+              content: expect.objectContaining({
+                url: 'https://evil.example/api/v1/device-content/content-1/file',
+              }),
+            }),
+          ],
+        }),
+      );
+      expect(ack).toHaveBeenCalledWith({ ok: true });
+    });
+
+    it('should normalize protected relative URLs to absolute API URLs before tokenizing', async () => {
+      client.connect('device-token-123');
+
+      const playlistCall = mockSocket.on.mock.calls.find(
+        (call: any[]) => call[0] === 'playlist:update',
+      );
+      const ack = jest.fn();
+
+      await playlistCall![1]({
+        playlist: {
+          id: 'playlist-1',
+          items: [
+            {
+              id: 'item-1',
+              content: {
+                id: 'content-1',
+                url: '/api/v1/device-content/content-1/file',
+              },
+            },
+          ],
+        },
+      }, ack);
+
+      expect(mockConfig.onPlaylistUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          items: [
+            expect.objectContaining({
+              content: expect.objectContaining({
+                url: 'http://localhost:3000/api/v1/device-content/content-1/file?token=device-token-123',
+              }),
+            }),
+          ],
+        }),
+      );
+      expect(ack).toHaveBeenCalledWith({ ok: true });
+    });
+
+    it('should consume refreshed device tokens for subsequent protected media URLs', async () => {
+      client.connect('old-token');
+
+      const refreshCall = mockSocket.on.mock.calls.find(
+        (call: any[]) => call[0] === 'token:refresh',
+      );
+      refreshCall![1]({ token: 'new-token' });
+
+      const playlistCall = mockSocket.on.mock.calls.find(
+        (call: any[]) => call[0] === 'playlist:update',
+      );
+      await playlistCall![1]({
+        playlist: {
+          id: 'playlist-1',
+          items: [
+            {
+              id: 'item-1',
+              content: {
+                id: 'content-1',
+                url: 'http://localhost:3000/api/v1/device-content/content-1/file',
+              },
+            },
+          ],
+        },
+      }, jest.fn());
+
+      expect(mockStore.set).toHaveBeenCalledWith('deviceToken', 'new-token');
+      expect(mockConfig.onPlaylistUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          items: [
+            expect.objectContaining({
+              content: expect.objectContaining({
+                url: 'http://localhost:3000/api/v1/device-content/content-1/file?token=new-token',
+              }),
+            }),
+          ],
+        }),
+      );
+    });
+
+    it('should update socket auth when a device token is refreshed', () => {
+      client.connect('old-token');
+      mockSocket.auth = {
+        token: 'old-token',
+        capabilities: { deliveryAck: true },
+      };
+
+      const refreshCall = mockSocket.on.mock.calls.find(
+        (call: any[]) => call[0] === 'token:refresh',
+      );
+      refreshCall![1]({ token: 'new-token' });
+
+      expect(mockSocket.auth).toEqual({
+        token: 'new-token',
+        capabilities: { deliveryAck: true },
+      });
+      expect(mockStore.set).toHaveBeenCalledWith('deviceToken', 'new-token');
     });
 
     it('should negative-ack playlist updates when applying fails', async () => {
@@ -444,6 +616,45 @@ describe('DeviceClient', () => {
         ok: false,
         error: 'push_content missing content URL',
       });
+    });
+
+    it('should append the device token before loading protected push_content URLs', async () => {
+      const electron = require('electron');
+      const logSpy = jest.spyOn(console, 'log').mockImplementation(() => undefined);
+      try {
+        const mockWindow = {
+          webContents: {
+            getURL: jest.fn().mockReturnValue('file:///display/index.html'),
+          },
+          loadURL: jest.fn().mockResolvedValue(undefined),
+        };
+        electron.BrowserWindow.getAllWindows.mockReturnValue([mockWindow]);
+        client.connect('device-token-123');
+
+        const commandCall = mockSocket.on.mock.calls.find(
+          (call: any[]) => call[0] === 'command',
+        );
+        const ack = jest.fn();
+
+        await commandCall![1]({
+          type: 'push_content',
+          payload: {
+            content: {
+              id: 'content-1',
+              url: 'http://localhost:3000/api/v1/device-content/content-1/file',
+            },
+            duration: 1,
+          },
+        }, ack);
+
+        expect(mockWindow.loadURL).toHaveBeenCalledWith(
+          'http://localhost:3000/api/v1/device-content/content-1/file?token=device-token-123',
+        );
+        expect(logSpy.mock.calls.flat().join(' ')).not.toContain('device-token-123');
+        expect(ack).toHaveBeenCalledWith({ ok: true });
+      } finally {
+        logSpy.mockRestore();
+      }
     });
 
     it('should start heartbeat on connect event', () => {

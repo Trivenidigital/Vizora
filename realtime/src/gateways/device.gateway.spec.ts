@@ -32,6 +32,7 @@ describe('DeviceGateway', () => {
     getDeviceCommands: jest.fn().mockResolvedValue([]),
     addDeviceCommand: jest.fn().mockResolvedValue(undefined),
     setPendingPlaylist: jest.fn().mockResolvedValue(undefined),
+    deletePendingPlaylist: jest.fn().mockResolvedValue(undefined),
     getPendingPlaylist: jest.fn().mockResolvedValue(null),
     exists: jest.fn().mockResolvedValue(false),
     get: jest.fn().mockResolvedValue(null),
@@ -424,14 +425,131 @@ describe('DeviceGateway', () => {
       expect(mockHeartbeatService.processHeartbeat).toHaveBeenCalled();
     });
 
-    it('should not drain queued commands through heartbeat responses', async () => {
-      const client = createMockSocket();
+    it('should replay pending deliveries after heartbeat without returning command drains', async () => {
+      const emit = jest.fn((_event: string, _payload: any, ackCb?: (ack?: { ok: boolean }) => void) => {
+        ackCb?.({ ok: true });
+      });
+      const client = createMockSocket({
+        connected: true,
+        data: {
+          deviceId: 'device-1',
+          organizationId: 'org-1',
+          deliveryAckCapable: true,
+        },
+        emit,
+      });
+      const pendingPlaylist = { id: 'playlist-pending', items: [] };
+      const pendingCommand = { type: 'reload', timestamp: '2026-05-31T00:00:00.000Z' };
+      mockRedisService.getPendingPlaylist.mockResolvedValueOnce(pendingPlaylist);
+      mockRedisService.getDeviceCommands.mockResolvedValueOnce([pendingCommand]);
+      (gateway as any).deviceSockets.set('device-1', 'socket-1');
 
       const result = await gateway.handleHeartbeat(client as any, {} as any);
+      for (let i = 0; i < 8; i += 1) {
+        await Promise.resolve();
+      }
 
       expect(result.success).toBe(true);
       expect(result.data.commands).toEqual([]);
+      expect(mockRedisService.getPendingPlaylist).toHaveBeenCalledWith('device-1');
+      expect(mockRedisService.getDeviceCommands).toHaveBeenCalledWith('device-1');
+      expect(emit).toHaveBeenCalledWith(
+        'playlist:update',
+        expect.objectContaining({
+          playlist: pendingPlaylist,
+          timestamp: expect.any(String),
+        }),
+        expect.any(Function),
+      );
+      expect(emit).toHaveBeenCalledWith('command', pendingCommand, expect.any(Function));
+      expect(mockRedisService.setPendingPlaylist).not.toHaveBeenCalledWith('device-1', pendingPlaylist);
+      expect(mockRedisService.addDeviceCommand).not.toHaveBeenCalledWith('device-1', pendingCommand);
+    });
+
+    it('should not drain pending deliveries from stale socket heartbeats', async () => {
+      const client = createMockSocket({
+        id: 'socket-old',
+        connected: true,
+        data: {
+          deviceId: 'device-1',
+          organizationId: 'org-1',
+          deliveryAckCapable: true,
+        },
+      });
+      (gateway as any).deviceSockets.set('device-1', 'socket-new');
+
+      const result = await gateway.handleHeartbeat(client as any, {} as any);
+      for (let i = 0; i < 4; i += 1) {
+        await Promise.resolve();
+      }
+
+      expect(result.success).toBe(true);
+      expect(result.data.commands).toEqual([]);
+      expect(mockRedisService.getPendingPlaylist).not.toHaveBeenCalled();
       expect(mockRedisService.getDeviceCommands).not.toHaveBeenCalled();
+    });
+
+    it('should requeue remaining pending commands if the active socket changes during replay', async () => {
+      const pendingCommands = [
+        { type: 'reload', timestamp: '2026-05-31T00:00:00.000Z' },
+        { type: 'clear_cache', timestamp: '2026-05-31T00:00:01.000Z' },
+      ];
+      const emit = jest.fn((_event: string, _payload: any, ackCb?: (ack?: { ok: boolean }) => void) => {
+        ackCb?.({ ok: true });
+        (gateway as any).deviceSockets.set('device-1', 'socket-new');
+      });
+      const client = createMockSocket({
+        connected: true,
+        data: {
+          deviceId: 'device-1',
+          organizationId: 'org-1',
+          deliveryAckCapable: true,
+        },
+        emit,
+      });
+      (gateway as any).deviceSockets.set('device-1', 'socket-1');
+      mockRedisService.getDeviceCommands.mockResolvedValueOnce(pendingCommands);
+
+      const result = await (gateway as any).deliverPendingCommands(client, 'device-1');
+
+      expect(result).toEqual({ delivered: 0, requeued: 2, skipped: false, shouldBackoff: false });
+      expect(emit).toHaveBeenCalledTimes(1);
+      expect(mockRedisService.addDeviceCommand).toHaveBeenCalledWith('device-1', pendingCommands[0]);
+      expect(mockRedisService.addDeviceCommand).toHaveBeenCalledWith('device-1', pendingCommands[1]);
+    });
+
+    it('should back off heartbeat replay after failed pending delivery', async () => {
+      const emit = jest.fn((_event: string, _payload: any, ackCb?: (ack?: { ok: boolean; error?: string }) => void) => {
+        ackCb?.({ ok: false, error: 'renderer failed' });
+      });
+      const client = createMockSocket({
+        connected: true,
+        data: {
+          deviceId: 'device-1',
+          organizationId: 'org-1',
+          deliveryAckCapable: true,
+        },
+        emit,
+      });
+      (gateway as any).deviceSockets.set('device-1', 'socket-1');
+      mockRedisService.getPendingPlaylist.mockResolvedValueOnce({ id: 'playlist-pending', items: [] });
+
+      await gateway.handleHeartbeat(client as any, {} as any);
+      for (let i = 0; i < 8; i += 1) {
+        await Promise.resolve();
+      }
+      expect(mockRedisService.setPendingPlaylist).toHaveBeenCalledWith(
+        'device-1',
+        expect.objectContaining({ id: 'playlist-pending' }),
+      );
+
+      mockRedisService.getPendingPlaylist.mockClear();
+      await gateway.handleHeartbeat(client as any, {} as any);
+      for (let i = 0; i < 4; i += 1) {
+        await Promise.resolve();
+      }
+
+      expect(mockRedisService.getPendingPlaylist).not.toHaveBeenCalled();
     });
 
     it('should not write to DB when status has not changed', async () => {
@@ -730,15 +848,68 @@ describe('DeviceGateway', () => {
       );
     });
 
+    it('should clear stale pending playlist after a newer playlist is acknowledged', async () => {
+      const playlist = { id: 'p-new', name: 'New Playlist', items: [] };
+
+      const result = await gateway.sendPlaylistUpdate('device-1', playlist as any);
+
+      expect(result).toEqual({ delivered: true });
+      expect(mockRedisService.deletePendingPlaylist).toHaveBeenCalledWith('device-1');
+    });
+
+    it('should not replay an already-consumed pending playlist after a newer playlist is acknowledged', async () => {
+      const oldPlaylist = { id: 'p-old', name: 'Old Playlist', items: [] };
+      const newPlaylist = { id: 'p-new', name: 'New Playlist', items: [] };
+      const pendingClientEmit = jest.fn((_event: string, _payload: any, ackCb?: (ack?: { ok: boolean }) => void) => {
+        ackCb?.({ ok: true });
+      });
+      const pendingClient = createMockSocket({
+        connected: true,
+        data: {
+          deviceId: 'device-1',
+          organizationId: 'org-1',
+          deliveryAckCapable: true,
+        },
+        emit: pendingClientEmit,
+      });
+      let resolveDisplay!: (value: any) => void;
+      const displayLookup = new Promise(resolve => {
+        resolveDisplay = resolve;
+      });
+      mockRedisService.getPendingPlaylist.mockResolvedValueOnce(oldPlaylist);
+      mockDatabaseService.display.findUnique.mockReturnValueOnce(displayLookup);
+      (gateway as any).deviceSockets.set('device-1', 'socket-1');
+
+      const replay = (gateway as any).deliverPendingPlaylist(pendingClient, 'device-1');
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const pushResult = await gateway.sendPlaylistUpdate('device-1', newPlaylist as any);
+      resolveDisplay({ metadata: {} });
+      const replayResult = await replay;
+
+      expect(pushResult).toEqual({ delivered: true });
+      expect(replayResult).toBe('skipped');
+      expect(pendingClientEmit).not.toHaveBeenCalledWith(
+        'playlist:update',
+        expect.objectContaining({ playlist: oldPlaylist }),
+        expect.any(Function),
+      );
+      expect(mockRedisService.setPendingPlaylist).not.toHaveBeenCalledWith('device-1', oldPlaylist);
+      expect(mockRedisService.deletePendingPlaylist).toHaveBeenCalledWith('device-1');
+    });
+
     it('should return no_sockets when no devices connected', async () => {
       mockServer.in.mockReturnValueOnce({
         fetchSockets: jest.fn().mockResolvedValue([]),
       });
       const playlist = { id: 'p-1', name: 'Test', items: [] };
+      (gateway as any).heartbeatReplayState.set('device-99', { failures: 5, lastAttemptAt: Date.now() });
 
       const result = await gateway.sendPlaylistUpdate('device-99', playlist as any);
 
       expect(result).toEqual({ delivered: false, reason: 'no_sockets' });
+      expect((gateway as any).heartbeatReplayState.has('device-99')).toBe(false);
     });
 
     it('should requeue playlist when the device sends a negative ack', async () => {
@@ -802,6 +973,7 @@ describe('DeviceGateway', () => {
         fetchSockets: jest.fn().mockResolvedValue([]),
       });
       const command = { type: 'clear_cache' as any, payload: {} };
+      (gateway as any).heartbeatReplayState.set('device-99', { failures: 5, lastAttemptAt: Date.now() });
 
       const result = await gateway.sendCommand('device-99', command);
 
@@ -810,6 +982,7 @@ describe('DeviceGateway', () => {
         'device-99',
         expect.objectContaining({ type: 'clear_cache', timestamp: expect.any(String) }),
       );
+      expect((gateway as any).heartbeatReplayState.has('device-99')).toBe(false);
     });
 
     it('should queue command when the device sends a negative ack', async () => {

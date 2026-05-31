@@ -218,6 +218,11 @@ export class RedisService implements OnModuleDestroy {
     await this.redis.setex(key, 1800, JSON.stringify(playlist)); // 30 minutes
   }
 
+  async deletePendingPlaylist(deviceId: string): Promise<void> {
+    const key = `device:pending-playlist:${deviceId}`;
+    await this.redis.del(key);
+  }
+
   /**
    * Get and consume a pending playlist for a device (atomic read + delete).
    * Returns null if no pending playlist exists.

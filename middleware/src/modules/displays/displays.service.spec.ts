@@ -489,9 +489,11 @@ describe('DisplaysService', () => {
       expect(httpService.post).toHaveBeenCalledWith(
         expect.stringContaining('/internal/command'),
         expect.objectContaining({
-          displayId: mockDisplayId,
-          command: 'screenshot',
-          payload: expect.objectContaining({ requestId: expect.any(String) }),
+          deviceId: mockDisplayId,
+          command: {
+            type: 'screenshot',
+            payload: expect.objectContaining({ requestId: expect.any(String) }),
+          },
         }),
         expect.objectContaining({
           headers: expect.objectContaining({ 'x-internal-api-key': expect.any(String) }),
@@ -542,6 +544,66 @@ describe('DisplaysService', () => {
           process.env.INTERNAL_API_SECRET = previousSecret;
         }
       }
+    });
+
+    it('should throw ServiceUnavailableException when realtime does not acknowledge screenshot delivery', async () => {
+      databaseService.display.findFirst.mockResolvedValue(mockDisplayWithRelations);
+      httpService.post.mockReturnValue(of({
+        data: {
+          success: false,
+          message: 'Command delivery failed: ack_timeout',
+        },
+      }) as any);
+
+      await expect(
+        service.requestScreenshot(mockOrganizationId, mockDisplayId)
+      ).rejects.toThrow(ServiceUnavailableException);
+    });
+  });
+
+  describe('display commands', () => {
+    beforeEach(() => {
+      httpService.post.mockReturnValue(of({ data: { success: true } }) as any);
+    });
+
+    it('should send disable commands using realtime internal command DTO shape', async () => {
+      databaseService.display.updateMany.mockResolvedValue({ count: 1 } as any);
+
+      await service.disableDevice(mockDisplayId, mockOrganizationId);
+
+      expect(httpService.post).toHaveBeenCalledWith(
+        expect.stringContaining('/internal/command'),
+        {
+          deviceId: mockDisplayId,
+          command: {
+            type: 'disable',
+            payload: undefined,
+          },
+        },
+        expect.objectContaining({
+          headers: expect.objectContaining({ 'x-internal-api-key': expect.any(String) }),
+        }),
+      );
+    });
+
+    it('should send enable commands using realtime internal command DTO shape', async () => {
+      databaseService.display.updateMany.mockResolvedValue({ count: 1 } as any);
+
+      await service.enableDevice(mockDisplayId, mockOrganizationId);
+
+      expect(httpService.post).toHaveBeenCalledWith(
+        expect.stringContaining('/internal/command'),
+        {
+          deviceId: mockDisplayId,
+          command: {
+            type: 'enable',
+            payload: undefined,
+          },
+        },
+        expect.objectContaining({
+          headers: expect.objectContaining({ 'x-internal-api-key': expect.any(String) }),
+        }),
+      );
     });
   });
 

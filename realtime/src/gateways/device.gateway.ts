@@ -72,6 +72,19 @@ interface DeliveryResult {
   legacy?: boolean;
 }
 
+type PendingPlaylistDeliveryStatus = 'none' | 'delivered' | 'requeued' | 'deferred' | 'skipped';
+
+type PendingCommandDeliveryResult = {
+  delivered: number;
+  requeued: number;
+  skipped: boolean;
+  shouldBackoff: boolean;
+};
+
+const HEARTBEAT_REPLAY_BASE_DELAY_MS = 15000;
+const HEARTBEAT_REPLAY_MAX_DELAY_MS = 300000;
+const HEARTBEAT_REPLAY_MAX_FAILURES = 5;
+
 @WebSocketGateway({
   cors: {
     origin: process.env.CORS_ORIGIN?.split(',').map(s => s.trim()) || ['http://localhost:3001'],
@@ -112,6 +125,8 @@ export class DeviceGateway
 
   // Per-message rate limiting: socketId -> { count, resetAt }
   private readonly messageRates: Map<string, { count: number; resetAt: number }> = new Map();
+  private readonly heartbeatReplayState: Map<string, { failures: number; lastAttemptAt: number }> = new Map();
+  private readonly pendingPlaylistReplayVersions: Map<string, number> = new Map();
 
   // Interval handles for cleanup (stored for proper teardown)
   private cleanupIntervals: ReturnType<typeof setInterval>[] = [];
@@ -164,6 +179,89 @@ export class DeviceGateway
         reason: message === 'ack_timeout' ? 'ack_timeout' : 'negative_ack',
       };
     }
+  }
+
+  private isActiveDeviceSocket(client: { id?: string }, deviceId: string): boolean {
+    return this.deviceSockets.get(deviceId) === client.id;
+  }
+
+  private shouldAttemptHeartbeatReplay(deviceId: string): boolean {
+    const state = this.heartbeatReplayState.get(deviceId);
+    if (!state) {
+      this.heartbeatReplayState.set(deviceId, { failures: 0, lastAttemptAt: Date.now() });
+      return true;
+    }
+
+    if (state.failures >= HEARTBEAT_REPLAY_MAX_FAILURES) {
+      return false;
+    }
+
+    const delayMs = Math.min(
+      HEARTBEAT_REPLAY_BASE_DELAY_MS * 2 ** state.failures,
+      HEARTBEAT_REPLAY_MAX_DELAY_MS,
+    );
+    if (Date.now() - state.lastAttemptAt < delayMs) {
+      return false;
+    }
+
+    state.lastAttemptAt = Date.now();
+    return true;
+  }
+
+  private recordHeartbeatReplayResult(deviceId: string, hadRequeue: boolean): void {
+    if (!hadRequeue) {
+      this.heartbeatReplayState.delete(deviceId);
+      return;
+    }
+
+    const state = this.heartbeatReplayState.get(deviceId) ?? { failures: 0, lastAttemptAt: Date.now() };
+    this.heartbeatReplayState.set(deviceId, {
+      failures: state.failures + 1,
+      lastAttemptAt: Date.now(),
+    });
+  }
+
+  private resetHeartbeatReplayBackoff(deviceId: string): void {
+    this.heartbeatReplayState.delete(deviceId);
+  }
+
+  private async clearPendingPlaylist(deviceId: string): Promise<void> {
+    this.pendingPlaylistReplayVersions.set(
+      deviceId,
+      (this.pendingPlaylistReplayVersions.get(deviceId) ?? 0) + 1,
+    );
+
+    try {
+      await this.redisService.deletePendingPlaylist(deviceId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Failed to clear pending playlist for device ${deviceId}: ${message}`);
+    }
+  }
+
+  private isPendingPlaylistReplayCurrent(deviceId: string, replayVersion: number): boolean {
+    return (this.pendingPlaylistReplayVersions.get(deviceId) ?? 0) === replayVersion;
+  }
+
+  private async requeuePendingPlaylistIfCurrent(
+    deviceId: string,
+    playlist: Playlist,
+    replayVersion: number,
+    status: PendingPlaylistDeliveryStatus = 'requeued',
+  ): Promise<PendingPlaylistDeliveryStatus> {
+    if (!this.isPendingPlaylistReplayCurrent(deviceId, replayVersion)) {
+      return 'skipped';
+    }
+
+    await this.redisService.setPendingPlaylist(deviceId, playlist);
+    return status;
+  }
+
+  private async requeuePendingCommands(deviceId: string, commands: DeviceCommand[]): Promise<number> {
+    for (const command of commands) {
+      await this.redisService.addDeviceCommand(deviceId, command);
+    }
+    return commands.length;
   }
 
   constructor(
@@ -704,8 +802,8 @@ export class DeviceGateway
       // Check for a pending playlist queued while the device was offline.
       // This takes priority over the DB query since it represents a more
       // recent assignment that the device missed.
-      const delivered = await this.deliverPendingPlaylist(client, deviceId);
-      if (delivered) return;
+      const deliveryStatus = await this.deliverPendingPlaylist(client, deviceId);
+      if (deliveryStatus !== 'none' && deliveryStatus !== 'skipped') return;
 
       this.logger.debug(`Fetching playlist for device: ${deviceId}`);
       const display = await this.databaseService.display.findUnique({
@@ -1066,6 +1164,8 @@ export class DeviceGateway
       const duration = (Date.now() - startTime) / 1000;
       this.metricsService.recordHeartbeat(deviceId, true, duration);
 
+      void this.replayPendingDeliveries(client, deviceId);
+
       return createSuccessResponse({
         nextHeartbeatIn: 15000,
         commands: [],
@@ -1190,17 +1290,22 @@ export class DeviceGateway
    * The pending playlist has pre-resolved content URLs from sendPlaylistUpdate().
    * Returns true if a pending playlist was found and delivered (or re-queued).
    */
-  private async deliverPendingPlaylist(client: Socket, deviceId: string): Promise<boolean> {
+  private async deliverPendingPlaylist(client: Socket, deviceId: string): Promise<PendingPlaylistDeliveryStatus> {
+    if (!this.isActiveDeviceSocket(client, deviceId)) {
+      this.logger.debug(`Skipping pending playlist delivery for stale socket ${client.id} (device ${deviceId})`);
+      return 'skipped';
+    }
+
+    const replayVersion = this.pendingPlaylistReplayVersions.get(deviceId) ?? 0;
     const pendingPlaylist = await this.redisService.getPendingPlaylist(deviceId);
-    if (!pendingPlaylist) return false;
+    if (!pendingPlaylist) return 'none';
 
     this.logger.log(`Delivering pending playlist to device ${deviceId} (queued while offline)`);
 
-    // Re-queue if the client disconnected between Redis read and now
-    if (!client.connected) {
-      this.logger.warn(`Device ${deviceId} disconnected before pending playlist delivery — re-queuing`);
-      await this.redisService.setPendingPlaylist(deviceId, pendingPlaylist);
-      return true;
+    // Re-queue if the active client changed or disconnected after the atomic Redis consume.
+    if (!this.isActiveDeviceSocket(client, deviceId) || !client.connected) {
+      this.logger.warn(`Device ${deviceId} disconnected before pending playlist delivery - re-queuing`);
+      return this.requeuePendingPlaylistIfCurrent(deviceId, pendingPlaylist, replayVersion, 'deferred');
     }
 
     // Fetch display metadata for config (qrOverlay etc.)
@@ -1208,6 +1313,17 @@ export class DeviceGateway
       where: { id: deviceId },
       select: { metadata: true },
     });
+
+    if (!this.isPendingPlaylistReplayCurrent(deviceId, replayVersion)) {
+      this.logger.debug(`Skipping stale pending playlist replay for device ${deviceId}`);
+      return 'skipped';
+    }
+
+    if (!this.isActiveDeviceSocket(client, deviceId) || !client.connected) {
+      this.logger.warn(`Device ${deviceId} disconnected before pending playlist delivery - re-queuing`);
+      return this.requeuePendingPlaylistIfCurrent(deviceId, pendingPlaylist, replayVersion, 'deferred');
+    }
+
     const configMetadata = (displayForConfig?.metadata as Record<string, any>) || {};
     client.emit('config', {
       heartbeatInterval: 15000,
@@ -1216,10 +1332,25 @@ export class DeviceGateway
       qrOverlay: configMetadata.qrOverlay || null,
     });
 
+    if (!this.isPendingPlaylistReplayCurrent(deviceId, replayVersion)) {
+      this.logger.debug(`Skipping stale pending playlist replay for device ${deviceId}`);
+      return 'skipped';
+    }
+
     const result = await this.emitWithDeliveryAck(client, 'playlist:update', {
       playlist: pendingPlaylist,
       timestamp: new Date().toISOString(),
     });
+
+    if (!this.isPendingPlaylistReplayCurrent(deviceId, replayVersion)) {
+      this.logger.debug(`Ignoring stale pending playlist replay result for device ${deviceId}`);
+      return 'skipped';
+    }
+
+    if (!this.isActiveDeviceSocket(client, deviceId) || !client.connected) {
+      this.logger.warn(`Device ${deviceId} changed sockets during pending playlist delivery - re-queuing`);
+      return this.requeuePendingPlaylistIfCurrent(deviceId, pendingPlaylist, replayVersion, 'deferred');
+    }
 
     if (result.delivered) {
       this.logger.log(
@@ -1229,25 +1360,81 @@ export class DeviceGateway
       );
     } else {
       this.logger.warn(`Pending playlist ${result.reason || 'delivery failure'} for device ${deviceId} - re-queuing`);
-      await this.redisService.setPendingPlaylist(deviceId, pendingPlaylist);
+      return this.requeuePendingPlaylistIfCurrent(deviceId, pendingPlaylist, replayVersion);
     }
-    return true;
+    return 'delivered';
   }
 
-  private async deliverPendingCommands(client: Socket, deviceId: string): Promise<void> {
+  private async deliverPendingCommands(client: Socket, deviceId: string): Promise<PendingCommandDeliveryResult> {
+    if (!this.isActiveDeviceSocket(client, deviceId)) {
+      this.logger.debug(`Skipping pending command delivery for stale socket ${client.id} (device ${deviceId})`);
+      return { delivered: 0, requeued: 0, skipped: true, shouldBackoff: false };
+    }
+
     const pendingCommands = await this.redisService.getDeviceCommands(deviceId);
     if (pendingCommands.length === 0) {
-      return;
+      return { delivered: 0, requeued: 0, skipped: false, shouldBackoff: false };
     }
 
     this.logger.log(`Delivering ${pendingCommands.length} pending command(s) to device ${deviceId}`);
-    for (const cmd of pendingCommands) {
+    let delivered = 0;
+    let requeued = 0;
+    for (let index = 0; index < pendingCommands.length; index += 1) {
+      const cmd = pendingCommands[index];
+      if (!this.isActiveDeviceSocket(client, deviceId) || !client.connected) {
+        this.logger.warn(`Device ${deviceId} disconnected before pending command delivery - re-queuing remaining commands`);
+        requeued += await this.requeuePendingCommands(deviceId, pendingCommands.slice(index));
+        return { delivered, requeued, skipped: false, shouldBackoff: false };
+      }
+
       const result = await this.emitWithDeliveryAck(client, 'command', cmd);
+      if (!this.isActiveDeviceSocket(client, deviceId) || !client.connected) {
+        this.logger.warn(`Device ${deviceId} changed sockets during pending command delivery - re-queuing current and remaining commands`);
+        requeued += await this.requeuePendingCommands(deviceId, pendingCommands.slice(index));
+        return { delivered, requeued, skipped: false, shouldBackoff: false };
+      }
+
       if (!result.delivered) {
         this.logger.warn(`Pending command ${cmd.type} ${result.reason || 'delivery failure'} for device ${deviceId} - re-queuing`);
         await this.redisService.addDeviceCommand(deviceId, cmd);
+        requeued += 1;
+      } else {
+        delivered += 1;
       }
     }
+    return { delivered, requeued, skipped: false, shouldBackoff: requeued > 0 };
+  }
+
+  private async replayPendingDeliveries(client: Socket, deviceId: string): Promise<void> {
+    if (!this.isActiveDeviceSocket(client, deviceId)) {
+      this.logger.debug(`Skipping heartbeat pending replay for stale socket ${client.id} (device ${deviceId})`);
+      return;
+    }
+
+    if (!this.shouldAttemptHeartbeatReplay(deviceId)) {
+      return;
+    }
+
+    let hadRequeue = false;
+    try {
+      const playlistResult = await this.deliverPendingPlaylist(client, deviceId);
+      hadRequeue = hadRequeue || playlistResult === 'requeued';
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Failed to replay pending playlist for device ${deviceId}: ${message}`);
+      hadRequeue = true;
+    }
+
+    try {
+      const commandResult = await this.deliverPendingCommands(client, deviceId);
+      hadRequeue = hadRequeue || commandResult.shouldBackoff;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Failed to replay pending commands for device ${deviceId}: ${message}`);
+      hadRequeue = true;
+    }
+
+    this.recordHeartbeatReplayResult(deviceId, hadRequeue);
   }
 
   // Admin methods (called from API)
@@ -1275,6 +1462,7 @@ export class DeviceGateway
     if (sockets.length === 0) {
       this.logger.warn(`pushPlaylist: no sockets in room ${roomName} for device ${deviceId} — queuing for reconnect`);
       await this.redisService.setPendingPlaylist(deviceId, resolvedPlaylist);
+      this.resetHeartbeatReplayBackoff(deviceId);
       return { delivered: false, reason: 'no_sockets' };
     }
 
@@ -1299,10 +1487,12 @@ export class DeviceGateway
     if (!anyAcknowledged) {
       this.logger.warn(`pushPlaylist: all sockets timed out for device ${deviceId} — queuing for reconnect`);
       await this.redisService.setPendingPlaylist(deviceId, resolvedPlaylist);
+      this.resetHeartbeatReplayBackoff(deviceId);
       return { delivered: false, reason: failureReason };
     }
 
     this.logger.log(`Sent playlist update to device: ${deviceId} (acknowledged)`);
+    await this.clearPendingPlaylist(deviceId);
     return { delivered: true };
   }
 
@@ -1314,6 +1504,7 @@ export class DeviceGateway
     if (sockets.length === 0) {
       this.logger.warn(`sendCommand: no sockets for device ${deviceId} — queuing`);
       await this.redisService.addDeviceCommand(deviceId, commandWithTimestamp);
+      this.resetHeartbeatReplayBackoff(deviceId);
       return { delivered: false, reason: 'no_sockets' };
     }
 
@@ -1333,6 +1524,7 @@ export class DeviceGateway
     if (!anyAcknowledged) {
       this.logger.warn(`sendCommand: all sockets timed out for device ${deviceId} — queuing`);
       await this.redisService.addDeviceCommand(deviceId, commandWithTimestamp);
+      this.resetHeartbeatReplayBackoff(deviceId);
       return { delivered: false, reason: failureReason };
     }
 

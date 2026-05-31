@@ -51,10 +51,9 @@ describe('AppController', () => {
   describe('broadcastCommand', () => {
     const baseCommand = { type: 'clear_override', payload: { reason: 'test' }, commandId: 'cmd-1' };
 
-    it('should emit to each device room and return correct devicesOnline count', async () => {
-      // Device A is online (has a room with 1 socket)
+    it('should send each broadcast command through DeviceGateway and return delivery counts', async () => {
+      (mockDeviceGateway.sendCommand as jest.Mock).mockResolvedValue({ delivered: true });
       mockRooms.set('device:dev-a', new Set(['socket-1']));
-      // Device B is also online
       mockRooms.set('device:dev-b', new Set(['socket-2']));
 
       const result = await controller.broadcastCommand({
@@ -62,64 +61,66 @@ describe('AppController', () => {
         command: baseCommand,
       });
 
-      expect(result.devicesOnline).toBe(2);
-      expect(mockTo).toHaveBeenCalledWith('device:dev-a');
-      expect(mockTo).toHaveBeenCalledWith('device:dev-b');
-      expect(mockEmit).toHaveBeenCalledTimes(2);
-      expect(mockEmit).toHaveBeenCalledWith('command', expect.objectContaining({
-        type: 'clear_override',
-        payload: { reason: 'test' },
-        commandId: 'cmd-1',
-        timestamp: expect.any(String),
-      }));
+      expect(result).toEqual({
+        devicesOnline: 2,
+        delivered: 2,
+        queued: 0,
+        failed: 0,
+      });
+      expect(mockDeviceGateway.sendCommand).toHaveBeenCalledWith('dev-a', baseCommand);
+      expect(mockDeviceGateway.sendCommand).toHaveBeenCalledWith('dev-b', baseCommand);
+      expect(mockTo).not.toHaveBeenCalled();
+      expect(mockEmit).not.toHaveBeenCalled();
     });
 
-    it('should queue commands for offline devices via addDeviceCommand', async () => {
-      // Device A is online
+    it('should count gateway-queued commands without writing a parallel queue path', async () => {
+      (mockDeviceGateway.sendCommand as jest.Mock)
+        .mockResolvedValueOnce({ delivered: true })
+        .mockResolvedValueOnce({ delivered: false, reason: 'no_sockets' });
       mockRooms.set('device:dev-a', new Set(['socket-1']));
-      // Device B is offline (no room entry)
 
       const result = await controller.broadcastCommand({
         deviceIds: ['dev-a', 'dev-b'],
         command: baseCommand,
       });
 
-      expect(result.devicesOnline).toBe(1);
-      // Should NOT queue for online device
-      expect(mockRedisService.addDeviceCommand).not.toHaveBeenCalledWith(
-        'dev-a',
-        expect.anything(),
-      );
-      // Should queue for offline device
-      expect(mockRedisService.addDeviceCommand).toHaveBeenCalledWith(
-        'dev-b',
-        expect.objectContaining({
-          type: 'clear_override',
-          timestamp: expect.any(String),
-        }),
-      );
+      expect(result).toEqual({
+        devicesOnline: 1,
+        delivered: 1,
+        queued: 1,
+        failed: 0,
+      });
+      expect(mockRedisService.addDeviceCommand).not.toHaveBeenCalled();
     });
 
-    it('should queue all commands when all devices are offline', async () => {
+    it('should count all offline commands as queued by the gateway', async () => {
+      (mockDeviceGateway.sendCommand as jest.Mock).mockResolvedValue({ delivered: false, reason: 'no_sockets' });
+
       const result = await controller.broadcastCommand({
         deviceIds: ['dev-x', 'dev-y'],
         command: { type: 'reload' },
       });
 
-      expect(result.devicesOnline).toBe(0);
-      expect(mockRedisService.addDeviceCommand).toHaveBeenCalledTimes(2);
+      expect(result).toEqual({
+        devicesOnline: 0,
+        delivered: 0,
+        queued: 2,
+        failed: 0,
+      });
+      expect(mockRedisService.addDeviceCommand).not.toHaveBeenCalled();
     });
 
-    it('should add a timestamp to the command', async () => {
+    it('should leave timestamping to DeviceGateway', async () => {
+      (mockDeviceGateway.sendCommand as jest.Mock).mockResolvedValue({ delivered: true });
+      const command = { type: 'reload' };
+      mockRooms.set('device:dev-a', new Set(['socket-1']));
+
       await controller.broadcastCommand({
         deviceIds: ['dev-a'],
-        command: { type: 'reload' },
+        command,
       });
 
-      expect(mockEmit).toHaveBeenCalledWith(
-        'command',
-        expect.objectContaining({ timestamp: expect.any(String) }),
-      );
+      expect(mockDeviceGateway.sendCommand).toHaveBeenCalledWith('dev-a', command);
     });
 
     it('should handle empty deviceIds array', async () => {
@@ -128,9 +129,34 @@ describe('AppController', () => {
         command: baseCommand,
       });
 
-      expect(result.devicesOnline).toBe(0);
+      expect(result).toEqual({
+        devicesOnline: 0,
+        delivered: 0,
+        queued: 0,
+        failed: 0,
+      });
       expect(mockTo).not.toHaveBeenCalled();
       expect(mockRedisService.addDeviceCommand).not.toHaveBeenCalled();
+    });
+
+    it('should count unexpected gateway errors as failed deliveries', async () => {
+      (mockDeviceGateway.sendCommand as jest.Mock)
+        .mockResolvedValueOnce({ delivered: true })
+        .mockRejectedValueOnce(new Error('gateway unavailable'));
+      mockRooms.set('device:dev-a', new Set(['socket-1']));
+      mockRooms.set('device:dev-b', new Set(['socket-2']));
+
+      const result = await controller.broadcastCommand({
+        deviceIds: ['dev-a', 'dev-b'],
+        command: baseCommand,
+      });
+
+      expect(result).toEqual({
+        devicesOnline: 2,
+        delivered: 1,
+        queued: 0,
+        failed: 1,
+      });
     });
   });
 

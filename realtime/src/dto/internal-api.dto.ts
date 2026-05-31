@@ -31,6 +31,10 @@ export class DeviceCommandDto {
   type!: DeviceCommandType;
 
   @IsOptional()
+  @IsString()
+  commandId?: string;
+
+  @IsOptional()
   @IsObject()
   payload?: Record<string, unknown>;
 }
