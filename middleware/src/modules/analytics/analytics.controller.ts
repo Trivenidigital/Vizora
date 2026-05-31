@@ -67,7 +67,7 @@ export class AnalyticsController {
   }
 
   @Get('summary')
-  @Roles('admin', 'manager')
+  @Roles('admin', 'manager', 'viewer')
   getSummary(
     @CurrentUser('organizationId') organizationId: string,
   ) {

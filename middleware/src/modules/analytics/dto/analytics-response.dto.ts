@@ -46,7 +46,9 @@ export interface AnalyticsSummary {
   totalDevices: number;
   onlineDevices: number;
   totalContent: number;
+  processingContent: number;
   totalPlaylists: number;
+  activePlaylists: number;
   totalContentSize: number;
   uptimePercent: number;
   totalImpressions: number;

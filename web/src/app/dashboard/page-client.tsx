@@ -3,13 +3,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
-import { fetchAllPaginated } from '@/lib/api/pagination';
 import type { StorageInfo } from '@/lib/api/organizations';
 import { useDeviceStatus } from '@/lib/context/DeviceStatusContext';
 import UpgradeBanner from '@/components/UpgradeBanner';
 import { HelpIcon } from '@/components/Tooltip';
 import { isApiError } from '@/lib/error-handler';
 import { Icon, type IconName, iconMap } from '@/theme/icons';
+import type { AnalyticsSummary } from '@/lib/types';
 
 // Helper to ensure valid icon names
 const getValidIconName = (name: string | undefined): IconName => {
@@ -22,8 +22,9 @@ const getValidIconName = (name: string | undefined): IconName => {
 interface DashboardClientProps {
  initialContent: any[];
  initialPlaylists: any[];
- initialContentComplete?: boolean;
- initialPlaylistsComplete?: boolean;
+ initialStats?: DashboardStats | null;
+ initialContentSampleReady?: boolean;
+ initialPlaylistsSampleReady?: boolean;
  initialStorageInfo?: StorageInfo | null;
  initialSystemHealth?: DashboardSystemHealth | null;
 }
@@ -41,10 +42,24 @@ type DashboardListResult = {
  data: any[];
 };
 
+type DashboardStats = {
+ devices: { total: number; online: number };
+ content: { total: number; processing: number };
+ playlists: { total: number; active: number };
+};
+
 const UNKNOWN_HEALTH: DashboardSystemHealth = {
  status: 'unknown',
  message: 'Readiness unavailable',
 };
+
+const EMPTY_STATS: DashboardStats = {
+ devices: { total: 0, online: 0 },
+ content: { total: 0, processing: 0 },
+ playlists: { total: 0, active: 0 },
+};
+
+const DASHBOARD_ACTIVITY_LIMIT = 3;
 
 const formatBytes = (bytes: number): string => {
  if (!Number.isFinite(bytes) || bytes <= 0) {
@@ -137,21 +152,60 @@ const loadSystemHealth = async (): Promise<DashboardSystemHealth> => {
  }
 };
 
+const statsFromSummary = (summary: AnalyticsSummary): DashboardStats => ({
+ devices: {
+ total: summary.totalDevices ?? 0,
+ online: summary.onlineDevices ?? 0,
+ },
+ content: {
+ total: summary.totalContent ?? 0,
+ processing: summary.processingContent ?? 0,
+ },
+ playlists: {
+ total: summary.totalPlaylists ?? 0,
+ active: summary.activePlaylists ?? 0,
+ },
+});
+
+const statsFromDeviceStatuses = (
+ statuses: Record<string, any>,
+ minimumTotal = 0,
+): DashboardStats['devices'] | null => {
+ const devicesList = Object.values(statuses);
+ if (devicesList.length === 0) {
+ return null;
+ }
+
+ return {
+ total: Math.max(minimumTotal, devicesList.length),
+ online: devicesList.filter((d: any) => d.status === 'online').length,
+ };
+};
+
+const statsFromSamples = (content: any[], playlists: any[]): DashboardStats => ({
+ devices: { ...EMPTY_STATS.devices },
+ content: {
+ total: content.length,
+ processing: content.filter((c: any) => c?.status === 'processing').length,
+ },
+ playlists: {
+ total: playlists.length,
+ active: playlists.filter((p: any) => (p?.items?.length || 0) > 0 || p?.isDefault === true).length,
+ },
+});
+
 export default function DashboardClient({
  initialContent,
  initialPlaylists,
- initialContentComplete = false,
- initialPlaylistsComplete = false,
+ initialStats = null,
+ initialContentSampleReady = false,
+ initialPlaylistsSampleReady = false,
  initialStorageInfo = null,
  initialSystemHealth = null,
 }: DashboardClientProps) {
  const router = useRouter();
  const { deviceStatuses, isInitialized } = useDeviceStatus();
- const [stats, setStats] = useState({
- devices: { total: 0, online: 0 },
- content: { total: 0, processing: 0 },
- playlists: { total: 0, active: 0 },
- });
+ const [stats, setStats] = useState<DashboardStats>(() => initialStats ?? statsFromSamples(initialContent, initialPlaylists));
  const [recentActivity, setRecentActivity] = useState<any[]>([]);
  const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(initialStorageInfo);
  const [systemHealth, setSystemHealth] = useState<DashboardSystemHealth | null>(
@@ -172,20 +226,14 @@ export default function DashboardClient({
  activityContentRef.current = content;
  activityPlaylistsRef.current = playlists;
 
- setStats(prev => ({
+ setStats(prev => initialStats ?? {
  ...prev,
- content: {
- total: content.length,
- processing: content.filter((c: any) => c?.status === 'processing').length,
- },
- playlists: {
- total: playlists.length,
- active: playlists.filter((p: any) => (p?.items?.length || 0) > 0 || p?.isDefault === true).length,
- },
- }));
+ ...statsFromSamples(content, playlists),
+ devices: prev.devices,
+ });
 
  buildRecentActivity(content, playlists, deviceStatusesRef.current);
- }, [initialContent, initialPlaylists]);
+ }, [initialContent, initialPlaylists, initialStats]);
 
  useEffect(() => {
  setStorageInfo(initialStorageInfo);
@@ -203,13 +251,15 @@ export default function DashboardClient({
  useEffect(() => {
  if (!isInitialized) return;
 
- const devicesList = Object.values(deviceStatuses);
+ const deviceStats = statsFromDeviceStatuses(deviceStatuses);
+ if (!deviceStats) {
+ buildRecentActivity(activityContentRef.current, activityPlaylistsRef.current, deviceStatuses);
+ return;
+ }
+
  setStats(prev => ({
  ...prev,
- devices: {
- total: devicesList.length,
- online: devicesList.filter(d => d.status === 'online').length,
- },
+ devices: statsFromDeviceStatuses(deviceStatuses, prev.devices.total) ?? prev.devices,
  }));
  buildRecentActivity(activityContentRef.current, activityPlaylistsRef.current, deviceStatuses);
  }, [deviceStatuses, isInitialized]);
@@ -260,34 +310,37 @@ export default function DashboardClient({
  initialRefreshCompleteRef.current = true;
  }
 
- const contentPromise: Promise<DashboardListResult> = isInitialAutoRefresh && initialContentComplete
+ const summaryPromise = apiClient.getAnalyticsSummary();
+ const contentPromise: Promise<DashboardListResult> = isInitialAutoRefresh && initialContentSampleReady
  ? Promise.resolve({ data: activityContentRef.current })
- : fetchAllPaginated((params) => apiClient.getContent(params))
- .then((data) => ({ data }));
- const playlistsPromise: Promise<DashboardListResult> = isInitialAutoRefresh && initialPlaylistsComplete
+ : apiClient.getContent({ page: 1, limit: DASHBOARD_ACTIVITY_LIMIT })
+ .then((response) => ({ data: response.data ?? [] }));
+ const playlistsPromise: Promise<DashboardListResult> = isInitialAutoRefresh && initialPlaylistsSampleReady
  ? Promise.resolve({ data: activityPlaylistsRef.current })
- : fetchAllPaginated((params) => apiClient.getPlaylists(params))
- .then((data) => ({ data }));
+ : apiClient.getPlaylists({ page: 1, limit: DASHBOARD_ACTIVITY_LIMIT })
+ .then((response) => ({ data: response.data ?? [] }));
 
  const results = await Promise.allSettled([
+ summaryPromise,
  contentPromise,
  playlistsPromise,
  apiClient.getStorageInfo(),
  loadSystemHealth(),
  ]);
 
- const content = results[0].status === 'fulfilled' ? results[0].value.data : null;
- const playlists = results[1].status === 'fulfilled' ? results[1].value.data : null;
+ const summary = results[0].status === 'fulfilled' ? results[0].value : null;
+ const content = results[1].status === 'fulfilled' ? results[1].value.data : null;
+ const playlists = results[2].status === 'fulfilled' ? results[2].value.data : null;
  if (content) activityContentRef.current = content;
  if (playlists) activityPlaylistsRef.current = playlists;
- if (results[2].status === 'fulfilled') {
- setStorageInfo(results[2].value);
- }
  if (results[3].status === 'fulfilled') {
- setSystemHealth(results[3].value);
+ setStorageInfo(results[3].value);
+ }
+ if (results[4].status === 'fulfilled') {
+ setSystemHealth(results[4].value);
  }
 
- results.slice(0, 2).forEach((result, index) => {
+ results.slice(0, 3).forEach((result, index) => {
  if (result.status === 'rejected') {
  if (process.env.NODE_ENV === 'development') {
  console.warn(`API call ${index + 1} failed:`, result.reason);
@@ -295,25 +348,15 @@ export default function DashboardClient({
  }
  });
 
- setStats(prev => ({
- ...prev,
- ...(content
- ? {
- content: {
- total: content.length,
- processing: content.filter((c: any) => c?.status === 'processing').length,
- },
+ if (summary) {
+ setStats(() => {
+ const next = statsFromSummary(summary);
+ return {
+ ...next,
+ devices: statsFromDeviceStatuses(deviceStatusesRef.current, next.devices.total) ?? next.devices,
+ };
+ });
  }
- : {}),
- ...(playlists
- ? {
- playlists: {
- total: playlists.length,
- active: playlists.filter((p: any) => (p?.items?.length || 0) > 0 || p?.isDefault === true).length,
- },
- }
- : {}),
- }));
 
  if (content || playlists) {
  buildRecentActivity(
@@ -323,7 +366,7 @@ export default function DashboardClient({
  );
  }
 
- if (results[0].status === 'fulfilled' && results[1].status === 'fulfilled') {
+ if (results[0].status === 'fulfilled' && results[1].status === 'fulfilled' && results[2].status === 'fulfilled') {
  setError(null);
  } else {
  setError('Some dashboard data could not refresh');

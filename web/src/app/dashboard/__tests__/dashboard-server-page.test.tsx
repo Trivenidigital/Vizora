@@ -32,18 +32,27 @@ describe('DashboardPage server data', () => {
     mockedDashboardClient.mockClear();
   });
 
-  it('passes complete pagination flags and initial health/storage to the client', async () => {
+  it('passes analytics summary, bounded activity samples, and health/storage to the client', async () => {
     mockedServerFetch.mockImplementation(async (path) => {
       switch (path) {
-        case '/content?limit=100':
+        case '/analytics/summary':
+          return {
+            totalDevices: 10,
+            onlineDevices: 8,
+            totalContent: 250,
+            processingContent: 7,
+            totalPlaylists: 42,
+            activePlaylists: 31,
+          } as never;
+        case '/content?limit=3':
           return {
             data: [{ id: 'content-1' }],
-            meta: { page: 1, limit: 100, total: 1, totalPages: 1 },
+            meta: { page: 1, limit: 3, total: 250, totalPages: 84 },
           } as never;
-        case '/playlists?limit=100':
+        case '/playlists?limit=3':
           return {
             data: [{ id: 'playlist-1' }],
-            meta: { page: 1, limit: 100, total: 1, totalPages: 1 },
+            meta: { page: 1, limit: 3, total: 42, totalPages: 14 },
           } as never;
         case '/organizations/storage':
           return {
@@ -65,8 +74,13 @@ describe('DashboardPage server data', () => {
     expect(mockedDashboardClient.mock.calls[0][0]).toEqual(expect.objectContaining({
       initialContent: [{ id: 'content-1' }],
       initialPlaylists: [{ id: 'playlist-1' }],
-      initialContentComplete: true,
-      initialPlaylistsComplete: true,
+      initialStats: {
+        devices: { total: 10, online: 8 },
+        content: { total: 250, processing: 7 },
+        playlists: { total: 42, active: 31 },
+      },
+      initialContentSampleReady: true,
+      initialPlaylistsSampleReady: true,
       initialStorageInfo: {
         usedBytes: 1024,
         quotaBytes: 2048,
@@ -77,18 +91,27 @@ describe('DashboardPage server data', () => {
     }));
   });
 
-  it('marks paginated server data incomplete when more pages remain', async () => {
+  it('does not mark paginated server data incomplete when only bounded samples are fetched', async () => {
     mockedServerFetch.mockImplementation(async (path) => {
       switch (path) {
-        case '/content?limit=100':
+        case '/analytics/summary':
+          return {
+            totalDevices: 0,
+            onlineDevices: 0,
+            totalContent: 2,
+            processingContent: 0,
+            totalPlaylists: 2,
+            activePlaylists: 1,
+          } as never;
+        case '/content?limit=3':
           return {
             data: [{ id: 'content-1' }],
-            meta: { page: 1, limit: 100, total: 2, totalPages: 2 },
+            meta: { page: 1, limit: 3, total: 2, totalPages: 1 },
           } as never;
-        case '/playlists?limit=100':
+        case '/playlists?limit=3':
           return {
             data: [{ id: 'playlist-1' }],
-            meta: { page: 1, limit: 100, total: 2, totalPages: 2 },
+            meta: { page: 1, limit: 3, total: 2, totalPages: 1 },
           } as never;
         case '/organizations/storage':
           return null as never;
@@ -102,17 +125,24 @@ describe('DashboardPage server data', () => {
     render(await DashboardPage());
 
     expect(mockedDashboardClient.mock.calls[0][0]).toEqual(expect.objectContaining({
-      initialContentComplete: false,
-      initialPlaylistsComplete: false,
+      initialStats: {
+        devices: { total: 0, online: 0 },
+        content: { total: 2, processing: 0 },
+        playlists: { total: 2, active: 1 },
+      },
+      initialContentSampleReady: true,
+      initialPlaylistsSampleReady: true,
     }));
   });
 
   it('preserves unhealthy readiness from a server-side 503 response', async () => {
     mockedServerFetch.mockImplementation(async (path) => {
       switch (path) {
-        case '/content?limit=100':
-        case '/playlists?limit=100':
-          return { data: [], meta: { page: 1, limit: 100, total: 0, totalPages: 1 } } as never;
+        case '/analytics/summary':
+          return null as never;
+        case '/content?limit=3':
+        case '/playlists?limit=3':
+          return { data: [], meta: { page: 1, limit: 3, total: 0, totalPages: 1 } } as never;
         case '/organizations/storage':
           return null as never;
         case '/health/ready':

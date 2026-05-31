@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import DashboardClient from '../page-client';
 import { apiClient } from '@/lib/api';
@@ -22,6 +22,17 @@ jest.mock('@/lib/api', () => ({
   apiClient: {
     getContent: jest.fn().mockResolvedValue({ data: [] }),
     getPlaylists: jest.fn().mockResolvedValue({ data: [] }),
+    getAnalyticsSummary: jest.fn().mockResolvedValue({
+      totalDevices: 0,
+      onlineDevices: 0,
+      totalContent: 0,
+      processingContent: 0,
+      totalPlaylists: 0,
+      activePlaylists: 0,
+      totalImpressions: 0,
+      totalContentSize: 0,
+      uptimePercent: 0,
+    }),
     getQuotaUsage: jest.fn().mockResolvedValue({ screensUsed: 0, screenQuota: 5, remaining: 5, percentUsed: 0 }),
     getStorageInfo: jest.fn().mockResolvedValue({ usedBytes: 0, quotaBytes: 1073741824, availableBytes: 1073741824, usagePercent: 0 }),
     get: jest.fn().mockResolvedValue({ status: 'ok' }),
@@ -62,8 +73,9 @@ async function renderDashboardClient(props: Partial<ComponentProps<typeof Dashbo
     <DashboardClient
       initialContent={props.initialContent ?? []}
       initialPlaylists={props.initialPlaylists ?? []}
-      initialContentComplete={props.initialContentComplete}
-      initialPlaylistsComplete={props.initialPlaylistsComplete}
+      initialStats={props.initialStats}
+      initialContentSampleReady={props.initialContentSampleReady}
+      initialPlaylistsSampleReady={props.initialPlaylistsSampleReady}
       initialStorageInfo={props.initialStorageInfo}
       initialSystemHealth={props.initialSystemHealth}
     />,
@@ -79,6 +91,17 @@ describe('DashboardClient', () => {
     jest.clearAllMocks();
     (apiClient.getContent as jest.Mock).mockReset().mockResolvedValue({ data: [] });
     (apiClient.getPlaylists as jest.Mock).mockReset().mockResolvedValue({ data: [] });
+    (apiClient.getAnalyticsSummary as jest.Mock).mockReset().mockResolvedValue({
+      totalDevices: 0,
+      onlineDevices: 0,
+      totalContent: 0,
+      processingContent: 0,
+      totalPlaylists: 0,
+      activePlaylists: 0,
+      totalImpressions: 0,
+      totalContentSize: 0,
+      uptimePercent: 0,
+    });
     (apiClient.getQuotaUsage as jest.Mock)
       .mockReset()
       .mockResolvedValue({ screensUsed: 0, screenQuota: 5, remaining: 5, percentUsed: 0 });
@@ -192,69 +215,201 @@ describe('DashboardClient', () => {
     expect(screen.getByText('Getting Started')).toBeInTheDocument();
   });
 
-  it('does not refetch content and playlists on mount when server pagination is complete', async () => {
+  it('does not refetch content and playlists on mount when server summary is present', async () => {
+    (apiClient.getAnalyticsSummary as jest.Mock).mockResolvedValueOnce({
+      totalDevices: 2,
+      onlineDevices: 1,
+      totalContent: 12,
+      processingContent: 3,
+      totalPlaylists: 4,
+      activePlaylists: 2,
+      totalImpressions: 0,
+      totalContentSize: 0,
+      uptimePercent: 0,
+    });
+
     await renderDashboardClient({
       initialContent: [{ id: 'c1' }],
       initialPlaylists: [{ id: 'p1', items: [{ id: 'item-1' }] }],
-      initialContentComplete: true,
-      initialPlaylistsComplete: true,
+      initialStats: {
+        devices: { total: 2, online: 1 },
+        content: { total: 12, processing: 3 },
+        playlists: { total: 4, active: 2 },
+      },
+      initialContentSampleReady: true,
+      initialPlaylistsSampleReady: true,
     });
 
+    expect(apiClient.getAnalyticsSummary).toHaveBeenCalledTimes(1);
     expect(apiClient.getContent).not.toHaveBeenCalled();
     expect(apiClient.getPlaylists).not.toHaveBeenCalled();
-    expect(screen.getByText('Content Items').parentElement?.parentElement).toHaveTextContent('1');
-    expect(screen.getByText('Playlists').parentElement?.parentElement).toHaveTextContent('1');
+    await waitFor(() => {
+      expect(screen.getByText('Total Devices').parentElement?.parentElement).toHaveTextContent('2');
+      expect(screen.getByText('Content Items').parentElement?.parentElement).toHaveTextContent('12');
+      expect(screen.getByText('Playlists').parentElement?.parentElement).toHaveTextContent('4');
+    });
   });
 
-  it('refreshes overview counts from all paginated pages on mount', async () => {
-    (apiClient.getContent as jest.Mock)
-      .mockResolvedValueOnce({
-        data: [{ id: 'c1' }],
-        meta: { page: 1, limit: 100, total: 2, totalPages: 2 },
-      })
-      .mockResolvedValueOnce({
-        data: [{ id: 'c2', status: 'processing' }],
-        meta: { page: 2, limit: 100, total: 2, totalPages: 2 },
-      });
+  it('refreshes overview totals from analytics summary and only samples recent activity', async () => {
+    (apiClient.getAnalyticsSummary as jest.Mock).mockResolvedValueOnce({
+      totalDevices: 10,
+      onlineDevices: 8,
+      totalContent: 250,
+      processingContent: 7,
+      totalPlaylists: 42,
+      activePlaylists: 31,
+      totalImpressions: 1200,
+      totalContentSize: 1024000,
+      uptimePercent: 80,
+    });
+    (apiClient.getContent as jest.Mock).mockResolvedValueOnce({
+      data: [{ id: 'c1', title: 'Fresh Menu', type: 'image', status: 'ready', createdAt: '2026-05-31T12:00:00.000Z' }],
+      meta: { page: 1, limit: 3, total: 250, totalPages: 84 },
+    });
     (apiClient.getPlaylists as jest.Mock).mockResolvedValue({
-      data: [{ id: 'p1', isActive: true }],
-      meta: { page: 1, limit: 100, total: 1, totalPages: 1 },
+      data: [{ id: 'p1', name: 'Lunch Loop', items: [{ id: 'i1' }] }],
+      meta: { page: 1, limit: 3, total: 42, totalPages: 14 },
     });
 
     render(<DashboardClient initialContent={[]} initialPlaylists={[]} />);
 
     await waitFor(() => {
-      expect(apiClient.getContent).toHaveBeenNthCalledWith(1, { page: 1, limit: 100 });
-      expect(apiClient.getContent).toHaveBeenNthCalledWith(2, { page: 2, limit: 100 });
-      expect(apiClient.getPlaylists).toHaveBeenCalledWith({ page: 1, limit: 100 });
+      expect(apiClient.getAnalyticsSummary).toHaveBeenCalledTimes(1);
+      expect(apiClient.getContent).toHaveBeenCalledWith({ page: 1, limit: 3 });
+      expect(apiClient.getPlaylists).toHaveBeenCalledWith({ page: 1, limit: 3 });
+      expect(screen.getByText('Total Devices').parentElement?.parentElement).toHaveTextContent('10');
+      expect(screen.getByText('Content Items').parentElement?.parentElement).toHaveTextContent('250');
+      expect(screen.getByText('Playlists').parentElement?.parentElement).toHaveTextContent('42');
     });
-    expect(screen.getByText('Content Items').parentElement?.parentElement).toHaveTextContent('2');
-    expect(screen.getByText('Playlists').parentElement?.parentElement).toHaveTextContent('1');
+    expect(apiClient.getContent).toHaveBeenCalledTimes(1);
+    expect(apiClient.getPlaylists).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('7 processing')).toBeInTheDocument();
+    expect(screen.getByText('31 ready')).toBeInTheDocument();
+    expect(screen.getByText('Fresh Menu')).toBeInTheDocument();
+    expect(screen.getByText('Lunch Loop')).toBeInTheDocument();
   });
 
-  it('preserves initial overview counts when all-page refresh partially fails', async () => {
-    (apiClient.getContent as jest.Mock).mockRejectedValueOnce(new Error('content unavailable'));
+  it('preserves initial overview counts when summary refresh fails', async () => {
+    (apiClient.getAnalyticsSummary as jest.Mock).mockRejectedValueOnce(new Error('summary unavailable'));
+    (apiClient.getContent as jest.Mock).mockResolvedValueOnce({ data: [] });
     (apiClient.getPlaylists as jest.Mock).mockResolvedValueOnce({
       data: [{ id: 'p1', isActive: true }],
-      meta: { page: 1, limit: 100, total: 1, totalPages: 1 },
+      meta: { page: 1, limit: 3, total: 1, totalPages: 1 },
     });
 
     render(
       <DashboardClient
         initialContent={[{ id: 'c1' }, { id: 'c2' }]}
         initialPlaylists={[{ id: 'p1', isActive: true }]}
+        initialStats={{
+          devices: { total: 0, online: 0 },
+          content: { total: 2, processing: 0 },
+          playlists: { total: 1, active: 1 },
+        }}
       />,
     );
 
     await waitFor(() => {
-      expect(apiClient.getContent).toHaveBeenCalledWith({ page: 1, limit: 100 });
+      expect(apiClient.getAnalyticsSummary).toHaveBeenCalledTimes(1);
       expect(screen.getByText('Some dashboard data could not refresh')).toBeInTheDocument();
     });
     expect(screen.getByText('Content Items').parentElement?.parentElement).toHaveTextContent('2');
     expect(screen.getByText('Playlists').parentElement?.parentElement).toHaveTextContent('1');
   });
 
+  it('retries missing initial activity samples when summary totals indicate data exists', async () => {
+    (apiClient.getAnalyticsSummary as jest.Mock).mockResolvedValueOnce({
+      totalDevices: 0,
+      onlineDevices: 0,
+      totalContent: 5,
+      processingContent: 1,
+      totalPlaylists: 4,
+      activePlaylists: 3,
+      totalImpressions: 0,
+      totalContentSize: 0,
+      uptimePercent: 0,
+    });
+    (apiClient.getContent as jest.Mock).mockResolvedValueOnce({
+      data: [{ id: 'c1', title: 'Recovered Menu', type: 'image', status: 'ready', createdAt: '2026-05-31T12:00:00.000Z' }],
+      meta: { page: 1, limit: 3, total: 5, totalPages: 2 },
+    });
+    (apiClient.getPlaylists as jest.Mock).mockResolvedValueOnce({
+      data: [{ id: 'p1', name: 'Recovered Loop', items: [{ id: 'i1' }] }],
+      meta: { page: 1, limit: 3, total: 4, totalPages: 2 },
+    });
+
+    render(
+      <DashboardClient
+        initialContent={[]}
+        initialPlaylists={[]}
+        initialStats={{
+          devices: { total: 0, online: 0 },
+          content: { total: 5, processing: 1 },
+          playlists: { total: 4, active: 3 },
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(apiClient.getContent).toHaveBeenCalledWith({ page: 1, limit: 3 });
+      expect(apiClient.getPlaylists).toHaveBeenCalledWith({ page: 1, limit: 3 });
+      expect(screen.getByText('Recovered Menu')).toBeInTheDocument();
+      expect(screen.getByText('Recovered Loop')).toBeInTheDocument();
+    });
+  });
+
+  it('keeps live realtime device counts when a summary refresh arrives later', async () => {
+    let resolveSummary: (value: unknown) => void = () => {};
+    (apiClient.getAnalyticsSummary as jest.Mock).mockImplementationOnce(() => new Promise((resolve) => {
+      resolveSummary = resolve;
+    }));
+    mockDeviceStatusContext = {
+      deviceStatuses: {
+        d1: { id: 'd1', status: 'online', metadata: { nickname: 'Lobby Screen' } },
+        d2: { id: 'd2', status: 'offline', metadata: { nickname: 'Kitchen Screen' } },
+      },
+      isInitialized: true,
+    };
+
+    render(<DashboardClient initialContent={[]} initialPlaylists={[]} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Total Devices').parentElement?.parentElement).toHaveTextContent('2');
+      expect(screen.getByText('1 online')).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      resolveSummary({
+        totalDevices: 10,
+        onlineDevices: 0,
+        totalContent: 0,
+        processingContent: 0,
+        totalPlaylists: 0,
+        activePlaylists: 0,
+        totalImpressions: 0,
+        totalContentSize: 0,
+        uptimePercent: 0,
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Total Devices').parentElement?.parentElement).toHaveTextContent('10');
+      expect(screen.getByText('1 online')).toBeInTheDocument();
+    });
+  });
+
   it('refreshes recent activity after a partial content refresh succeeds', async () => {
+    (apiClient.getAnalyticsSummary as jest.Mock).mockResolvedValueOnce({
+      totalDevices: 0,
+      onlineDevices: 0,
+      totalContent: 1,
+      processingContent: 0,
+      totalPlaylists: 0,
+      activePlaylists: 0,
+      totalImpressions: 0,
+      totalContentSize: 0,
+      uptimePercent: 0,
+    });
     (apiClient.getContent as jest.Mock).mockResolvedValueOnce({
       data: [{
         id: 'c-new',
@@ -263,7 +418,7 @@ describe('DashboardClient', () => {
         status: 'ready',
         createdAt: '2026-05-31T12:00:00.000Z',
       }],
-      meta: { page: 1, limit: 100, total: 1, totalPages: 1 },
+      meta: { page: 1, limit: 3, total: 1, totalPages: 1 },
     });
     (apiClient.getPlaylists as jest.Mock).mockRejectedValueOnce(new Error('playlists unavailable'));
 

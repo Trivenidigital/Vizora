@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { Reflector } from '@nestjs/core';
 import { AnalyticsController } from './analytics.controller';
 import { AnalyticsService } from './analytics.service';
 
@@ -114,6 +115,12 @@ describe('AnalyticsController', () => {
 
       expect(result).toEqual(mockData);
       expect(mockAnalyticsService.getSummary).toHaveBeenCalledWith(organizationId);
+    });
+
+    it('allows viewers to read summary metadata', () => {
+      const roles = new Reflector().get<string[]>('roles', controller.getSummary);
+
+      expect(roles).toEqual(expect.arrayContaining(['admin', 'manager', 'viewer']));
     });
   });
 
