@@ -63,9 +63,13 @@ ApiClient.prototype.createCheckout = async function (planId: string, interval: '
     body: JSON.stringify({ planId, interval }),
   });
   const { checkoutUrl, ...rest } = response;
+  const url = response.url ?? checkoutUrl;
+  if (!url) {
+    throw new Error('Billing checkout response did not include a redirect URL');
+  }
   return {
     ...rest,
-    url: response.url ?? checkoutUrl ?? '',
+    url,
   };
 };
 
@@ -83,8 +87,12 @@ ApiClient.prototype.getBillingPortalUrl = async function (returnUrl: string): Pr
   const response = await this.request<BillingPortalResponse & { portalUrl?: string }>(
     `/billing/portal?returnUrl=${encodeURIComponent(returnUrl)}`,
   );
+  const url = response.url ?? response.portalUrl;
+  if (!url) {
+    throw new Error('Billing portal response did not include a redirect URL');
+  }
   return {
-    url: response.url ?? response.portalUrl ?? '',
+    url,
   };
 };
 

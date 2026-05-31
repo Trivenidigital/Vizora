@@ -13,22 +13,38 @@
 **Plan/design:** `docs/plans/2026-05-31-customer-contract-security-performance-pass-6.md`
 
 **Selected fix bundle**
-- [ ] Billing checkout/portal responses normalize backend `{ checkoutUrl }` / `{ portalUrl }` to web `{ url }`.
-- [ ] `serverFetch` reads `vizora_auth_token`, forwards auth correctly, and unwraps response envelopes.
-- [ ] Middleware display push-content surfaces realtime `success:false` as failure instead of returning false success.
-- [ ] RSS preview and URL-thumbnail fetches reject redirects after SSRF validation.
-- [ ] Display media preload uses authenticated `/device-content/...` URLs so cache warmup can actually succeed.
-- [ ] Run focused red/green tests.
-- [ ] Run multi-subagent review before broader tests.
+- [x] Billing checkout/portal responses normalize backend `{ checkoutUrl }` / `{ portalUrl }` to web `{ url }`.
+- [x] `serverFetch` reads `vizora_auth_token`, forwards auth correctly, and unwraps response envelopes.
+- [x] Middleware display push-content surfaces realtime `success:false` as failure instead of returning false success.
+- [x] Bulk playlist assignment rejects mixed-organization display IDs before DB update or realtime notification.
+- [x] Bulk group assignment rejects mixed-organization display IDs before membership creation.
+- [x] RSS preview, template data sources, and URL-thumbnail fetches reject redirects after SSRF validation.
+- [x] Display media preload uses authenticated `/device-content/...` URLs so cache warmup can actually succeed.
+- [x] Run focused red/green tests.
+- [x] Run multi-subagent review before broader tests.
+- [ ] Run post-fix re-review before broader tests.
 - [ ] Run broader affected tests/builds.
 - [ ] PR, CI, merge.
 - [ ] Re-check deployment gate; deploy only if prod checkout is safe.
 
 **Analysis feed**
 - [x] Local drift check confirmed billing response mismatch, `serverFetch` cookie/envelope drift, push-content false success, RSS/thumbnail redirect gap, and unauthenticated display preload path still exist after PR #128.
-- [ ] Customer/dashboard subagent review returned and triaged.
-- [ ] Performance subagent review returned and triaged.
-- [ ] Security/reliability subagent review returned and triaged.
+- [x] Customer/dashboard subagent review returned and triaged. In-scope: billing response drift. Deferred: pairing UX canonicalization, content rename `title`/`name`, overnight schedules, 403 handling, conflict warnings, storage estimates, proof-of-play UI, notification pagination.
+- [x] Performance subagent review returned and triaged. In-scope: authenticated display preload. Deferred: streaming upload/direct-to-storage design, dashboard summary endpoint, dashboard-only realtime rooms, media metadata cache, pairing-key index, summary list endpoints.
+- [x] Security/reliability subagent review returned and triaged. In-scope: cross-tenant bulk playlist/group assignment and template data-source SSRF redirect/DNS guard. Deferred: active schedule playback path and REST heartbeat ID contract.
+
+**Focused verification**
+- [x] Red run: `pnpm --filter @vizora/web test -- --runInBand --testPathPattern="billing|server-api|DisplayClient"` failed on backend-shaped billing responses, missing `serverFetch` auth/envelope unwrap, and unauthenticated display preload.
+- [x] Red run: `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="displays.service|widgets.controller|thumbnail.service|template-rendering.service"` failed on push-content false success, mixed-org bulk operations, and redirect-following SSRF surfaces.
+- [x] Green run: `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="displays.service|widgets.controller|thumbnail.service|template-rendering.service"` - pass, 6 suites / 170 tests.
+- [x] Green run: `pnpm --filter @vizora/web test -- --runInBand --testPathPattern="billing|server-api|DisplayClient"` - pass, 7 suites / 81 tests.
+- [x] Review-fix run: `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="displays.service|widgets.controller|thumbnail.service|template-rendering.service"` - pass, 6 suites / 171 tests.
+- [x] Review-fix run: `pnpm --filter @vizora/web test -- --runInBand --testPathPattern="billing|server-api|DisplayClient"` - pass, 7 suites / 83 tests.
+
+**Review gate**
+- [x] Security/tenant/SSRF reviewer: CLEAN for tenant checks and redirect SSRF guards.
+- [x] Customer/performance reviewer: initial findings fixed by keeping realtime `success:false` outside circuit-failure accounting, rethrowing template redirect policy errors from fallback, failing fast on malformed billing redirect responses, and consolidating thumbnail URL validation to the shared SSRF guard.
+- [ ] Post-fix re-review.
 
 ---
 

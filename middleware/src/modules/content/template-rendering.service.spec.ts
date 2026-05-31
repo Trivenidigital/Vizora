@@ -532,7 +532,13 @@ describe('TemplateRenderingService', () => {
     });
 
     it('should reject redirects instead of following them after SSRF validation', async () => {
-      mockCircuitBreaker.executeWithFallback.mockImplementation(async (_name, fn) => fn());
+      mockCircuitBreaker.executeWithFallback.mockImplementation(async (_name, fn, fallback) => {
+        try {
+          return await fn();
+        } catch (error) {
+          return fallback(error as Error);
+        }
+      });
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 302,

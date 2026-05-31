@@ -5,7 +5,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { of } from 'rxjs';
 import { DisplaysService } from './displays.service';
 import { DatabaseService } from '../database/database.service';
-import { CircuitBreakerService } from '../common/services/circuit-breaker.service';
+import { CircuitBreakerService, CircuitState } from '../common/services/circuit-breaker.service';
 import { StorageService } from '../storage/storage.service';
 import {
   NotFoundException,
@@ -833,6 +833,36 @@ describe('DisplaysService', () => {
       await expect(
         service.pushContent(mockOrganizationId, mockDisplayId, mockContent.id, 5),
       ).rejects.toThrow(ServiceUnavailableException);
+    });
+
+    it('does not open the shared realtime circuit when realtime returns an application-level delivery failure', async () => {
+      const realCircuitBreaker = new CircuitBreakerService();
+      const serviceWithRealCircuit = new DisplaysService(
+        databaseService,
+        {} as any,
+        httpService,
+        realCircuitBreaker,
+        {
+          healthCheck: jest.fn(),
+          getSignedUrl: jest.fn(),
+          resolveUrl: jest.fn().mockImplementation((url) => url),
+        } as any,
+        { emit: jest.fn() } as any,
+      );
+
+      httpService.post.mockReturnValue(
+        of({ data: { success: false, message: 'Content push failed: no_sockets' } } as any),
+      );
+
+      for (let attempt = 0; attempt < 6; attempt++) {
+        await expect(
+          serviceWithRealCircuit.pushContent(mockOrganizationId, mockDisplayId, mockContent.id, 5),
+        ).rejects.toThrow(ServiceUnavailableException);
+      }
+
+      expect(realCircuitBreaker.getCircuitState('realtime-service')).toBe(CircuitState.CLOSED);
+      expect(realCircuitBreaker.getCircuitStats('realtime-service').recentFailures).toBe(0);
+      expect(httpService.post).toHaveBeenCalledTimes(6);
     });
 
     it('throws ServiceUnavailableException when internal realtime auth is not configured', async () => {

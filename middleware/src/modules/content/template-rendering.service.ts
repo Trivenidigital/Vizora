@@ -295,6 +295,9 @@ export class TemplateRenderingService {
           }
         },
         (error) => {
+          if (error?.message === 'Template data source redirects are not allowed') {
+            throw error;
+          }
           this.logger.warn(`Data source fetch failed, using empty data: ${error?.message}`);
           return {};
         },

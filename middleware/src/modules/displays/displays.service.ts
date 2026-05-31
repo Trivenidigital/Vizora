@@ -537,7 +537,7 @@ export class DisplaysService {
     const url = `${this.realtimeUrl}/api/push/content`;
 
     // Use circuit breaker with fallback
-    await this.circuitBreaker.executeWithFallback(
+    const realtimeResult = await this.circuitBreaker.executeWithFallback(
       'realtime-service',
       async () => {
         const response = await firstValueFrom(
@@ -555,12 +555,8 @@ export class DisplaysService {
             duration,
           }, { headers }),
         );
-        if (response.data?.success === false) {
-          throw new ServiceUnavailableException(
-            response.data.message || 'Realtime service did not deliver content push',
-          );
-        }
         this.logger.log(`Pushed content ${contentId} to display ${displayId} for ${duration} min`);
+        return response.data as { success?: boolean; message?: string };
       },
       (error) => {
         if (error) {
@@ -577,6 +573,12 @@ export class DisplaysService {
       },
       REALTIME_CIRCUIT_CONFIG,
     );
+
+    if (realtimeResult?.success === false) {
+      throw new ServiceUnavailableException(
+        realtimeResult.message || 'Realtime service did not deliver content push',
+      );
+    }
 
     return { success: true, message: 'Content pushed to display' };
   }

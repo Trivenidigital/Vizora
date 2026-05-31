@@ -48,4 +48,38 @@ describe('billing api methods', () => {
       url: 'https://billing.stripe.com/session',
     });
   });
+
+  it('throws a clear error when checkout response has no redirect URL', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: {
+          sessionId: 'cs_test_123',
+        },
+      }),
+    });
+
+    const client = new ApiClient('/api/v1');
+
+    await expect(client.createCheckout('basic', 'monthly')).rejects.toThrow(
+      'Billing checkout response did not include a redirect URL',
+    );
+  });
+
+  it('throws a clear error when portal response has no redirect URL', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: {},
+      }),
+    });
+
+    const client = new ApiClient('/api/v1');
+
+    await expect(client.getBillingPortalUrl('https://app.example.test/billing')).rejects.toThrow(
+      'Billing portal response did not include a redirect URL',
+    );
+  });
 });
