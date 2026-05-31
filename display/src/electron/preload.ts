@@ -36,10 +36,42 @@ try {
     ipcRenderer.on('pairing-required', callback),
   onPaired: (callback: (event: any, token: string) => void) =>
     ipcRenderer.on('paired', callback),
-  onPlaylistUpdate: (callback: (event: any, playlist: any) => void) =>
-    ipcRenderer.on('playlist-update', callback),
-  onCommand: (callback: (event: any, command: any) => void) =>
-    ipcRenderer.on('command', callback),
+  onPlaylistUpdate: (callback: (
+    event: any,
+    playlist: any,
+    ack?: (response?: { ok: boolean; error?: string }) => void,
+  ) => void) =>
+    ipcRenderer.on('playlist-update', (event, payload) => {
+      const requestId = payload?.requestId;
+      const playlist = payload?.playlist ?? payload;
+      const ack = (response: { ok: boolean; error?: string } = { ok: true }) => {
+        if (requestId) {
+          ipcRenderer.send('playlist-update-applied', {
+            requestId,
+            ...response,
+          });
+        }
+      };
+      callback(event, playlist, ack);
+    }),
+  onCommand: (callback: (
+    event: any,
+    command: any,
+    ack?: (response?: { ok: boolean; error?: string }) => void,
+  ) => void) =>
+    ipcRenderer.on('command', (event, payload) => {
+      const requestId = payload?.requestId;
+      const command = payload?.command ?? payload;
+      const ack = (response: { ok: boolean; error?: string } = { ok: true }) => {
+        if (requestId) {
+          ipcRenderer.send('command-applied', {
+            requestId,
+            ...response,
+          });
+        }
+      };
+      callback(event, command, ack);
+    }),
   onError: (callback: (event: any, error: any) => void) =>
     ipcRenderer.on('error', callback),
 

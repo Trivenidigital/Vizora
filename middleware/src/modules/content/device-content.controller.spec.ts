@@ -11,11 +11,13 @@ import {
   NotFoundException,
   UnauthorizedException,
   BadRequestException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { DeviceContentController } from './device-content.controller';
 import { ContentService } from './content.service';
 import { StorageService } from '../storage/storage.service';
+import { Readable, Writable } from 'node:stream';
 
 describe('DeviceContentController', () => {
   let controller: DeviceContentController;
@@ -26,6 +28,7 @@ describe('DeviceContentController', () => {
   const organizationId = 'org-123';
   const deviceId = 'device-456';
   const contentId = 'content-789';
+  const objectKey = `${organizationId}/uploads/test-image.jpg`;
 
   const validDevicePayload = {
     sub: deviceId,
@@ -38,7 +41,7 @@ describe('DeviceContentController', () => {
     id: contentId,
     name: 'Test Image',
     type: 'image',
-    url: 'minio://uploads/test-image.jpg',
+    url: `minio://${objectKey}`,
     mimeType: 'image/jpeg',
     organizationId,
     status: 'active',
@@ -52,6 +55,8 @@ describe('DeviceContentController', () => {
     mockStorageService = {
       isMinioAvailable: jest.fn().mockReturnValue(true),
       getObject: jest.fn(),
+      getObjectRange: jest.fn(),
+      getFileMetadata: jest.fn(),
     } as any;
 
     mockJwtService = {
@@ -90,11 +95,18 @@ describe('DeviceContentController', () => {
     };
 
     const createMockResponse = () => {
-      const res: any = {
-        set: jest.fn().mockReturnThis(),
-        end: jest.fn(),
-        redirect: jest.fn(),
-      };
+      const chunks: Buffer[] = [];
+      const res: any = new Writable({
+        write(chunk, _encoding, callback) {
+          chunks.push(Buffer.from(chunk));
+          callback();
+        },
+      });
+      res.set = jest.fn().mockReturnValue(res);
+      res.status = jest.fn().mockReturnValue(res);
+      res.redirect = jest.fn();
+      res.removeHeader = jest.fn();
+      res.getBody = () => Buffer.concat(chunks);
       return res;
     };
 
@@ -105,14 +117,13 @@ describe('DeviceContentController', () => {
       mockContentService.findByIdForDevice.mockResolvedValue(mockContent as any);
       mockJwtService.verify.mockReturnValue(validDevicePayload);
 
-      // Create an async iterable stream mock
       const buffer = Buffer.from('file-content');
-      const stream = {
-        [Symbol.asyncIterator]: async function* () {
-          yield buffer;
-        },
-      };
-      mockStorageService.getObject.mockResolvedValue(stream as any);
+      mockStorageService.getFileMetadata.mockResolvedValue({
+        size: buffer.length,
+        lastModified: new Date('2026-05-31T00:00:00.000Z'),
+        contentType: 'image/jpeg',
+      });
+      mockStorageService.getObject.mockResolvedValue(Readable.from([buffer]));
 
       await controller.serveFile(contentId, req, res);
 
@@ -127,10 +138,13 @@ describe('DeviceContentController', () => {
       expect(res.set).toHaveBeenCalledWith(
         expect.objectContaining({
           'Content-Type': 'image/jpeg',
+          'Accept-Ranges': 'bytes',
           'Content-Length': String(buffer.length),
         }),
       );
-      expect(res.end).toHaveBeenCalledWith(expect.any(Buffer));
+      expect(mockStorageService.getObject).toHaveBeenCalledWith(objectKey);
+      expect(mockStorageService.getObjectRange).not.toHaveBeenCalled();
+      expect(res.getBody().toString()).toBe('file-content');
     });
 
     it('should serve content file with valid device JWT from query parameter', async () => {
@@ -141,12 +155,12 @@ describe('DeviceContentController', () => {
       mockJwtService.verify.mockReturnValue(validDevicePayload);
 
       const buffer = Buffer.from('file-content');
-      const stream = {
-        [Symbol.asyncIterator]: async function* () {
-          yield buffer;
-        },
-      };
-      mockStorageService.getObject.mockResolvedValue(stream as any);
+      mockStorageService.getFileMetadata.mockResolvedValue({
+        size: buffer.length,
+        lastModified: new Date('2026-05-31T00:00:00.000Z'),
+        contentType: 'image/jpeg',
+      });
+      mockStorageService.getObject.mockResolvedValue(Readable.from([buffer]));
 
       await controller.serveFile(contentId, req, res);
 
@@ -154,7 +168,7 @@ describe('DeviceContentController', () => {
         secret: process.env.DEVICE_JWT_SECRET,
         algorithms: ['HS256'],
       });
-      expect(res.end).toHaveBeenCalled();
+      expect(res.getBody().toString()).toBe('file-content');
     });
 
     it('should return 401 when no token is provided', async () => {
@@ -197,6 +211,22 @@ describe('DeviceContentController', () => {
       );
     });
 
+    it('should return 401 when a signed device token is missing organizationId', async () => {
+      const req = createMockRequest('legacy-device-token');
+      const res = createMockResponse();
+
+      mockJwtService.verify.mockReturnValue({
+        sub: deviceId,
+        deviceIdentifier: 'DEVICE-001',
+        type: 'device',
+      });
+
+      await expect(controller.serveFile(contentId, req, res)).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(mockContentService.findByIdForDevice).not.toHaveBeenCalled();
+    });
+
     it('should return 404 when content belongs to a different organization', async () => {
       // After the IDOR hardening, the org filter lives in the query
       // (findByIdForDevice). A device with the wrong org id therefore
@@ -216,6 +246,24 @@ describe('DeviceContentController', () => {
         contentId,
         validDevicePayload.organizationId,
       );
+    });
+
+    it('should return 404 when a MinIO content row points outside the device organization prefix', async () => {
+      const req = createMockRequest('valid-token');
+      const res = createMockResponse();
+
+      mockContentService.findByIdForDevice.mockResolvedValue({
+        ...mockContent,
+        url: 'minio://other-org/uploads/test-image.jpg',
+      } as any);
+      mockJwtService.verify.mockReturnValue(validDevicePayload);
+
+      await expect(controller.serveFile(contentId, req, res)).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(mockStorageService.getFileMetadata).not.toHaveBeenCalled();
+      expect(mockStorageService.getObject).not.toHaveBeenCalled();
+      expect(mockStorageService.getObjectRange).not.toHaveBeenCalled();
     });
 
     it('should return 404 when content does not exist', async () => {
@@ -287,12 +335,12 @@ describe('DeviceContentController', () => {
       mockJwtService.verify.mockReturnValue(validDevicePayload);
 
       const buffer = Buffer.from('binary-data');
-      const stream = {
-        [Symbol.asyncIterator]: async function* () {
-          yield buffer;
-        },
-      };
-      mockStorageService.getObject.mockResolvedValue(stream as any);
+      mockStorageService.getFileMetadata.mockResolvedValue({
+        size: buffer.length,
+        lastModified: new Date('2026-05-31T00:00:00.000Z'),
+        contentType: 'application/octet-stream',
+      });
+      mockStorageService.getObject.mockResolvedValue(Readable.from([buffer]));
 
       await controller.serveFile(contentId, req, res);
 
@@ -301,6 +349,235 @@ describe('DeviceContentController', () => {
           'Content-Type': 'application/octet-stream',
         }),
       );
+    });
+
+    it('should serve a requested byte range with 206 status', async () => {
+      const req = createMockRequest('valid-device-token');
+      req.headers.range = 'bytes=5-8';
+      const res = createMockResponse();
+
+      mockContentService.findByIdForDevice.mockResolvedValue(mockContent as any);
+      mockJwtService.verify.mockReturnValue(validDevicePayload);
+      mockStorageService.getFileMetadata.mockResolvedValue({
+        size: 12,
+        lastModified: new Date('2026-05-31T00:00:00.000Z'),
+        contentType: 'image/jpeg',
+      });
+      mockStorageService.getObjectRange.mockResolvedValue(Readable.from(['rang']));
+
+      await controller.serveFile(contentId, req, res);
+
+      expect(res.status).toHaveBeenCalledWith(206);
+      expect(res.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          'Content-Length': '4',
+          'Content-Range': 'bytes 5-8/12',
+        }),
+      );
+      expect(mockStorageService.getObjectRange).toHaveBeenCalledWith(
+        objectKey,
+        5,
+        4,
+      );
+      expect(mockStorageService.getObject).not.toHaveBeenCalled();
+      expect(res.getBody().toString()).toBe('rang');
+    });
+
+    it('should serve suffix byte ranges', async () => {
+      const req = createMockRequest('valid-device-token');
+      req.headers.range = 'bytes=-4';
+      const res = createMockResponse();
+
+      mockContentService.findByIdForDevice.mockResolvedValue(mockContent as any);
+      mockJwtService.verify.mockReturnValue(validDevicePayload);
+      mockStorageService.getFileMetadata.mockResolvedValue({
+        size: 12,
+        lastModified: new Date('2026-05-31T00:00:00.000Z'),
+        contentType: 'image/jpeg',
+      });
+      mockStorageService.getObjectRange.mockResolvedValue(Readable.from(['tail']));
+
+      await controller.serveFile(contentId, req, res);
+
+      expect(res.status).toHaveBeenCalledWith(206);
+      expect(res.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          'Content-Length': '4',
+          'Content-Range': 'bytes 8-11/12',
+        }),
+      );
+      expect(mockStorageService.getObjectRange).toHaveBeenCalledWith(
+        objectKey,
+        8,
+        4,
+      );
+    });
+
+    it('should return 416 for an unsatisfiable byte range', async () => {
+      const req = createMockRequest('valid-device-token');
+      req.headers.range = 'bytes=99-120';
+      const res = createMockResponse();
+
+      mockContentService.findByIdForDevice.mockResolvedValue(mockContent as any);
+      mockJwtService.verify.mockReturnValue(validDevicePayload);
+      mockStorageService.getFileMetadata.mockResolvedValue({
+        size: 12,
+        lastModified: new Date('2026-05-31T00:00:00.000Z'),
+        contentType: 'image/jpeg',
+      });
+
+      await controller.serveFile(contentId, req, res);
+
+      expect(res.status).toHaveBeenCalledWith(416);
+      expect(res.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          'Content-Range': 'bytes */12',
+          'Cache-Control': 'no-store',
+        }),
+      );
+      expect(res.set).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          'Cache-Control': 'public, max-age=86400',
+        }),
+      );
+      expect(mockStorageService.getObject).not.toHaveBeenCalled();
+      expect(mockStorageService.getObjectRange).not.toHaveBeenCalled();
+    });
+
+    it('should ignore unsupported multi-range headers and stream the full object', async () => {
+      const req = createMockRequest('valid-device-token');
+      req.headers.range = 'bytes=0-2,5-8';
+      const res = createMockResponse();
+
+      mockContentService.findByIdForDevice.mockResolvedValue(mockContent as any);
+      mockJwtService.verify.mockReturnValue(validDevicePayload);
+      mockStorageService.getFileMetadata.mockResolvedValue({
+        size: 12,
+        lastModified: new Date('2026-05-31T00:00:00.000Z'),
+        contentType: 'image/jpeg',
+      });
+      mockStorageService.getObject.mockResolvedValue(Readable.from(['full-response']));
+
+      await controller.serveFile(contentId, req, res);
+
+      expect(res.status).not.toHaveBeenCalledWith(416);
+      expect(mockStorageService.getObjectRange).not.toHaveBeenCalled();
+      expect(mockStorageService.getObject).toHaveBeenCalledWith(objectKey);
+      expect(res.getBody().toString()).toBe('full-response');
+    });
+
+    it('should clear media headers and return 500 when streaming fails before headers are sent', async () => {
+      const req = createMockRequest('valid-device-token');
+      const res = createMockResponse();
+
+      const failingStream = new Readable({
+        read() {
+          this.destroy(new Error('MinIO stream failed'));
+        },
+      });
+
+      mockContentService.findByIdForDevice.mockResolvedValue(mockContent as any);
+      mockJwtService.verify.mockReturnValue(validDevicePayload);
+      mockStorageService.getFileMetadata.mockResolvedValue({
+        size: 12,
+        lastModified: new Date('2026-05-31T00:00:00.000Z'),
+        contentType: 'image/jpeg',
+      });
+      mockStorageService.getObject.mockResolvedValue(failingStream);
+
+      await expect(controller.serveFile(contentId, req, res)).rejects.toThrow(
+        InternalServerErrorException,
+      );
+      expect(res.removeHeader).toHaveBeenCalledWith('Content-Type');
+      expect(res.removeHeader).toHaveBeenCalledWith('Content-Length');
+      expect(res.removeHeader).toHaveBeenCalledWith('Cache-Control');
+      expect(res.removeHeader).toHaveBeenCalledWith('Cross-Origin-Resource-Policy');
+    });
+
+    it('should not set media headers when full-object stream acquisition fails', async () => {
+      const req = createMockRequest('valid-device-token');
+      const res = createMockResponse();
+
+      mockContentService.findByIdForDevice.mockResolvedValue(mockContent as any);
+      mockJwtService.verify.mockReturnValue(validDevicePayload);
+      mockStorageService.getFileMetadata.mockResolvedValue({
+        size: 12,
+        lastModified: new Date('2026-05-31T00:00:00.000Z'),
+        contentType: 'image/jpeg',
+      });
+      mockStorageService.getObject.mockRejectedValue(new Error('MinIO read failed'));
+
+      await expect(controller.serveFile(contentId, req, res)).rejects.toThrow(
+        'MinIO read failed',
+      );
+      expect(res.set).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          'Content-Type': 'image/jpeg',
+        }),
+      );
+      expect(res.set).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          'Content-Length': expect.any(String),
+        }),
+      );
+    });
+
+    it('should not set range headers when range stream acquisition fails', async () => {
+      const req = createMockRequest('valid-device-token');
+      req.headers.range = 'bytes=5-8';
+      const res = createMockResponse();
+
+      mockContentService.findByIdForDevice.mockResolvedValue(mockContent as any);
+      mockJwtService.verify.mockReturnValue(validDevicePayload);
+      mockStorageService.getFileMetadata.mockResolvedValue({
+        size: 12,
+        lastModified: new Date('2026-05-31T00:00:00.000Z'),
+        contentType: 'image/jpeg',
+      });
+      mockStorageService.getObjectRange.mockRejectedValue(new Error('MinIO range failed'));
+
+      await expect(controller.serveFile(contentId, req, res)).rejects.toThrow(
+        'MinIO range failed',
+      );
+      expect(res.status).not.toHaveBeenCalledWith(206);
+      expect(res.set).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          'Content-Range': 'bytes 5-8/12',
+        }),
+      );
+    });
+
+    it('should return 404 when MinIO metadata is missing', async () => {
+      const req = createMockRequest('valid-token');
+      const res = createMockResponse();
+
+      mockContentService.findByIdForDevice.mockResolvedValue(mockContent as any);
+      mockJwtService.verify.mockReturnValue(validDevicePayload);
+      mockStorageService.getFileMetadata.mockResolvedValue(null);
+
+      await expect(controller.serveFile(contentId, req, res)).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(mockStorageService.getObject).not.toHaveBeenCalled();
+    });
+
+    it('should reject content over the maximum file size before opening a stream', async () => {
+      const req = createMockRequest('valid-token');
+      const res = createMockResponse();
+
+      mockContentService.findByIdForDevice.mockResolvedValue(mockContent as any);
+      mockJwtService.verify.mockReturnValue(validDevicePayload);
+      mockStorageService.getFileMetadata.mockResolvedValue({
+        size: 100 * 1024 * 1024 + 1,
+        lastModified: new Date('2026-05-31T00:00:00.000Z'),
+        contentType: 'video/mp4',
+      });
+
+      await expect(controller.serveFile(contentId, req, res)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockStorageService.getObject).not.toHaveBeenCalled();
+      expect(mockStorageService.getObjectRange).not.toHaveBeenCalled();
     });
   });
 });

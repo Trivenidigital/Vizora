@@ -76,6 +76,7 @@
   },
   "dependencies": {
     "electron-store": "^8.1.0",
+    "qrcode": "^1.5.4",
     "socket.io-client": "^4.7.0"
   },
   "devDependencies": {

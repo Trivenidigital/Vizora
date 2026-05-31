@@ -15,6 +15,90 @@ const store = new Store({
 let mainWindow: BrowserWindow | null = null;
 let deviceClient: DeviceClient | null = null;
 let cacheManager: CacheManager | null = null;
+const PLAYLIST_RENDERER_ACK_TIMEOUT_MS = 5000;
+const COMMAND_RENDERER_ACK_TIMEOUT_MS = 5000;
+
+function sendPlaylistToRenderer(playlist: any): Promise<void> {
+  if (!mainWindow) {
+    return Promise.reject(new Error('Renderer window is not available'));
+  }
+
+  const requestId = `playlist-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      clearTimeout(timeout);
+      ipcMain.off('playlist-update-applied', handler);
+    };
+
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error('Renderer did not acknowledge playlist update'));
+    }, PLAYLIST_RENDERER_ACK_TIMEOUT_MS);
+
+    const handler = (_event: unknown, response?: {
+      requestId?: string;
+      ok?: boolean;
+      error?: string;
+    }) => {
+      if (response?.requestId !== requestId) {
+        return;
+      }
+
+      cleanup();
+      if (response.ok === false) {
+        reject(new Error(response.error || 'Renderer rejected playlist update'));
+        return;
+      }
+
+      resolve();
+    };
+
+    ipcMain.on('playlist-update-applied', handler);
+    mainWindow!.webContents.send('playlist-update', { requestId, playlist });
+  });
+}
+
+function sendCommandToRenderer(command: any): Promise<void> {
+  if (!mainWindow) {
+    return Promise.reject(new Error('Renderer window is not available'));
+  }
+
+  const requestId = `command-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      clearTimeout(timeout);
+      ipcMain.off('command-applied', handler);
+    };
+
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error('Renderer did not acknowledge command'));
+    }, COMMAND_RENDERER_ACK_TIMEOUT_MS);
+
+    const handler = (_event: unknown, response?: {
+      requestId?: string;
+      ok?: boolean;
+      error?: string;
+    }) => {
+      if (response?.requestId !== requestId) {
+        return;
+      }
+
+      cleanup();
+      if (response.ok === false) {
+        reject(new Error(response.error || 'Renderer rejected command'));
+        return;
+      }
+
+      resolve();
+    };
+
+    ipcMain.on('command-applied', handler);
+    mainWindow!.webContents.send('command', { requestId, command });
+  });
+}
 
 function createWindow() {
   const primaryDisplay = screen.getPrimaryDisplay();
@@ -133,6 +217,11 @@ function createWindow() {
 }
 
 function initializeDeviceClient() {
+  if (deviceClient) {
+    deviceClient.disconnect();
+    deviceClient = null;
+  }
+
   let deviceToken = store.get('deviceToken') as string | undefined;
 
   // For testing/debugging: allow token from environment variable
@@ -162,13 +251,13 @@ function initializeDeviceClient() {
       mainWindow?.webContents.send('paired', token);
     },
     onPlaylistUpdate: (playlist) => {
-      mainWindow?.webContents.send('playlist-update', playlist);
+      return sendPlaylistToRenderer(playlist);
     },
-    onCommand: (command) => {
+    onCommand: async (command) => {
       if (command.type === 'clear_cache') {
-        cacheManager?.clearCache();
+        await cacheManager?.clearCache();
       }
-      mainWindow?.webContents.send('command', command);
+      await sendCommandToRenderer(command);
     },
     onError: (error) => {
       mainWindow?.webContents.send('error', error);

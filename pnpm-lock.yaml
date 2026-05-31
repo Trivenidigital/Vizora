@@ -184,6 +184,9 @@ importers:
       electron-store:
         specifier: ^8.1.0
         version: 8.2.0
+      qrcode:
+        specifier: ^1.5.4
+        version: 1.5.4
       socket.io-client:
         specifier: ^4.7.0
         version: 4.8.3

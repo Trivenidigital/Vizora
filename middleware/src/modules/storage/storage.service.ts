@@ -214,17 +214,28 @@ export class StorageService implements OnModuleInit {
       return null;
     }
 
-    try {
-      const stat = await this.client.statObject(this.bucket, objectKey);
-      return {
-        size: stat.size,
-        lastModified: stat.lastModified,
-        contentType: stat.metaData?.['content-type'] || 'application/octet-stream',
-      };
-    } catch (error) {
-      this.logger.debug(`File metadata not found for: ${objectKey}`);
-      return null;
-    }
+    return this.circuitBreaker.execute(
+      'minio-stat-object',
+      async () => {
+        try {
+          const stat = await this.client!.statObject(this.bucket, objectKey);
+          return {
+            size: stat.size,
+            lastModified: stat.lastModified,
+            contentType: stat.metaData?.['content-type'] || 'application/octet-stream',
+          };
+        } catch (error) {
+          if (error instanceof Error && error.message.includes('Not Found')) {
+            this.logger.debug(`File metadata not found for: ${objectKey}`);
+            return null;
+          }
+
+          this.logger.error(`Error getting file metadata for ${objectKey}: ${error}`);
+          throw error;
+        }
+      },
+      MINIO_CIRCUIT_CONFIG,
+    );
   }
 
   /**
@@ -247,6 +258,29 @@ export class StorageService implements OnModuleInit {
     return this.circuitBreaker.execute(
       'minio-get-object',
       () => this.client!.getObject(this.bucket, objectKey),
+      MINIO_CIRCUIT_CONFIG,
+    );
+  }
+
+  /**
+   * Get a byte range stream from MinIO.
+   * @param objectKey The key of the object
+   * @param offset Starting byte offset
+   * @param length Number of bytes to read
+   * @returns A readable stream for the requested byte range
+   */
+  async getObjectRange(
+    objectKey: string,
+    offset: number,
+    length: number,
+  ): Promise<NodeJS.ReadableStream> {
+    if (!this.client || !this.available) {
+      throw new Error('MinIO is not available');
+    }
+
+    return this.circuitBreaker.execute(
+      'minio-get-object-range',
+      () => this.client!.getPartialObject(this.bucket, objectKey, offset, length),
       MINIO_CIRCUIT_CONFIG,
     );
   }
