@@ -2,6 +2,7 @@ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CircuitBreakerService } from '../common/services/circuit-breaker.service';
 import * as Minio from 'minio';
+import * as fs from 'fs';
 
 const MINIO_CIRCUIT_CONFIG = {
   failureThreshold: 3,
@@ -122,6 +123,42 @@ export class StorageService implements OnModuleInit {
             'Content-Type': mimeType,
           },
         );
+
+        this.logger.debug(`File uploaded to MinIO: ${objectKey}`);
+        return objectKey;
+      },
+      MINIO_CIRCUIT_CONFIG,
+    );
+  }
+
+  async uploadFileFromPath(
+    filePath: string,
+    objectKey: string,
+    mimeType: string,
+    size: number,
+  ): Promise<string> {
+    if (!this.client || !this.available) {
+      throw new Error('MinIO is not available');
+    }
+
+    return this.circuitBreaker.execute(
+      'minio-upload',
+      async () => {
+        const stream = fs.createReadStream(filePath);
+        try {
+          await this.client!.putObject(
+            this.bucket,
+            objectKey,
+            stream,
+            size,
+            {
+              'Content-Type': mimeType,
+            },
+          );
+        } catch (error) {
+          stream.destroy();
+          throw error;
+        }
 
         this.logger.debug(`File uploaded to MinIO: ${objectKey}`);
         return objectKey;

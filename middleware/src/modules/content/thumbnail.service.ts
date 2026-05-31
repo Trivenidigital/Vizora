@@ -72,6 +72,41 @@ export class ThumbnailService {
     }
   }
 
+  async generateThumbnailFromPath(
+    contentId: string,
+    imagePath: string,
+    mimeType: string,
+  ): Promise<string> {
+    try {
+      const stat = await fs.stat(imagePath);
+      if (stat.size > this.MAX_FILE_SIZE) {
+        this.logger.warn(`Image too large for thumbnail: ${contentId} (${stat.size} bytes)`);
+        throw new Error(`Image exceeds maximum size for thumbnail generation (${this.MAX_FILE_SIZE / 1024 / 1024}MB)`);
+      }
+
+      const ext = this.getExtensionFromMime(mimeType);
+      const safeId = contentId.replace(/[^a-zA-Z0-9_-]/g, '');
+      if (!safeId) throw new Error('Invalid content ID');
+      const filename = `${safeId}.${ext}`;
+      const filepath = join(this.THUMBNAIL_DIR, filename);
+
+      await sharp(imagePath)
+        .resize(this.MAX_SIZE, this.MAX_SIZE, {
+          fit: 'inside',
+          withoutEnlargement: true,
+        })
+        .toFile(filepath);
+
+      return `/static/thumbnails/${filename}`;
+    } catch (error) {
+      this.logger.error(
+        `Failed to generate thumbnail for ${contentId}`,
+        error
+      );
+      throw error;
+    }
+  }
+
   /**
    * Generate thumbnail from URL (for already uploaded content).
    * Validates the URL against SSRF before fetching.
