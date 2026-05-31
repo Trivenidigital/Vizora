@@ -619,6 +619,106 @@ export class DeviceContentController {
     return Math.floor(validators.lastModifiedTime / 1000) * 1000 <= sinceTime;
   }
 
+  private withRevalidatedMetadata(
+    resolved: ResolvedMinioContent,
+    metadata: ObjectMetadata,
+    req: Request,
+  ): ResolvedMinioContent {
+    const oldMetadataMimeType = resolved.metadata.contentType || 'application/octet-stream';
+    const nextMetadataMimeType = metadata.contentType || 'application/octet-stream';
+
+    return {
+      ...resolved,
+      metadata,
+      metadataCacheHit: false,
+      mimeType: resolved.mimeType === oldMetadataMimeType
+        ? nextMetadataMimeType
+        : resolved.mimeType,
+      range: this.parseRangeHeader(req.headers.range, metadata.size),
+    };
+  }
+
+  private async revalidateCachedMetadata(
+    resolved: ResolvedMinioContent,
+    req: Request,
+  ): Promise<ResolvedMinioContent | null> {
+    const metadata = await this.storageService.getFileMetadata(resolved.objectKey);
+    if (!metadata) {
+      return null;
+    }
+
+    if (metadata.size > MAX_DEVICE_CONTENT_FILE_SIZE) {
+      this.invalidateCachedMediaContext(resolved);
+      throw new BadRequestException('Content file exceeds maximum size limit (100MB)');
+    }
+
+    this.setCacheValue(
+      this.objectMetadataCache,
+      resolved.metadataCacheKey,
+      metadata,
+      Date.now() + DEVICE_OBJECT_METADATA_CACHE_TTL_MS,
+      DEVICE_OBJECT_METADATA_CACHE_MAX_ENTRIES,
+    );
+
+    return this.withRevalidatedMetadata(resolved, metadata, req);
+  }
+
+  private async writeNotModifiedIfClientCacheFresh(
+    id: string,
+    organizationId: string,
+    req: Request,
+    resolved: ResolvedMinioContent,
+    res: Response,
+  ): Promise<{ handled: true } | { handled: false; resolved: ResolvedDeviceContent }> {
+    if (resolved.range.kind === 'unsatisfiable' || !this.isClientCacheFresh(req, resolved)) {
+      return { handled: false, resolved };
+    }
+
+    let current: ResolvedMinioContent = resolved;
+
+    if (current.contentCacheHit) {
+      this.contentCache.delete(current.contentCacheKey);
+      const refreshed = await this.resolveDeviceContent(id, organizationId, req);
+      if (refreshed.kind !== 'minio') {
+        return { handled: false, resolved: refreshed };
+      }
+      current = refreshed;
+      if (current.range.kind === 'unsatisfiable' || !this.isClientCacheFresh(req, current)) {
+        return { handled: false, resolved: current };
+      }
+    }
+
+    if (current.metadataCacheHit) {
+      let revalidated: ResolvedMinioContent | null;
+      try {
+        revalidated = await this.revalidateCachedMetadata(current, req);
+      } catch (error) {
+        if (!this.isLikelyMissingObjectError(error)) {
+          throw error;
+        }
+        revalidated = null;
+      }
+
+      if (!revalidated) {
+        this.invalidateCachedMediaContext(current);
+        return {
+          handled: false,
+          resolved: await this.resolveDeviceContent(id, organizationId, req),
+        };
+      }
+
+      if (!this.isClientCacheFresh(req, revalidated)) {
+        return { handled: false, resolved: revalidated };
+      }
+
+      this.writeNotModified(revalidated, res);
+      return { handled: true };
+    }
+
+    this.writeNotModified(current, res);
+    return { handled: true };
+  }
+
   private writeNotModified(resolved: ResolvedMinioContent, res: Response): void {
     const validators = this.getMediaValidators(resolved);
     res.status(304);
@@ -679,15 +779,18 @@ export class DeviceContentController {
     );
     let stream: NodeJS.ReadableStream | null = null;
 
-    if (
-      resolved.kind === 'minio' &&
-      resolved.range.kind !== 'unsatisfiable' &&
-      !resolved.contentCacheHit &&
-      !resolved.metadataCacheHit &&
-      this.isClientCacheFresh(req, resolved)
-    ) {
-      this.writeNotModified(resolved, res);
-      return;
+    if (resolved.kind === 'minio') {
+      const notModifiedResult = await this.writeNotModifiedIfClientCacheFresh(
+        id,
+        deviceAuth.payload.organizationId,
+        req,
+        resolved,
+        res,
+      );
+      if (notModifiedResult.handled) {
+        return;
+      }
+      resolved = notModifiedResult.resolved;
     }
 
     if (resolved.kind === 'minio' && resolved.range.kind !== 'unsatisfiable') {

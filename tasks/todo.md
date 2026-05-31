@@ -1341,6 +1341,26 @@ Hermes skills, AI provider calls, or spend paths.
 
 ---
 
+## Active Workstream: Customer Performance Pass 12 (2026-05-31)
+
+Branch: `feat/customer-performance-pass-12`
+Plan: `docs/plans/2026-05-31-customer-performance-pass-12.md`
+
+- [x] Collect customer-dashboard and performance read-only reviews.
+- [x] Pick a small backend performance slice that is repo-side and testable.
+- [x] Document pass 12 design and test plan.
+- [x] Share bounded JSON response reader between Generic API widgets and legacy template data sources.
+- [x] Return cached media 304s without opening MinIO object streams while preserving stale-object recovery.
+- [x] Skip realtime impression display lookup when authenticated socket organization context is available.
+- [x] Run multiple subagent diff reviews before tests.
+- [x] Run focused middleware/realtime tests.
+- [x] Run relevant broader builds/tests and changed-file lint.
+- [ ] Open PR, wait for CI, merge if green.
+- [ ] Deploy status: blocked unless production dirty/diverged state is resolved or explicitly approved with a reviewed runbook.
+
 ## Next Up (Not Started)
 
-_No active tasks. Pick from deferred items above or start a new feature/sprint._
+Continue the ranked customer/performance findings after pass 12: dashboard real
+health/quota, shared dashboard Socket.IO provider, server-side content-library
+search, playlist summary payloads, org broadcast scaling, and template refresh
+scheduling.

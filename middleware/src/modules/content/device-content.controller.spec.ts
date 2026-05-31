@@ -995,6 +995,107 @@ describe('DeviceContentController', () => {
       expect(mockStorageService.getObjectRange).not.toHaveBeenCalled();
     });
 
+    it('should return 304 from cached validators without opening a second MinIO stream', async () => {
+      const now = 3_750_000;
+      jest.spyOn(Date, 'now').mockReturnValue(now);
+      const lastModified = new Date('2026-05-31T00:00:00.000Z');
+      const etag = `W/"${createHash('sha256')
+        .update(`${objectKey}:12:${lastModified.getTime()}`)
+        .digest('base64url')}"`;
+      const firstReq = createMockRequest('valid-device-token');
+      const firstRes = createMockResponse();
+      const secondReq = createMockRequest('valid-device-token');
+      secondReq.headers['if-none-match'] = etag;
+      const secondRes = createMockResponse();
+
+      mockJwtService.verify.mockReturnValue(validDevicePayload);
+      mockContentService.findByIdForDevice.mockResolvedValue(mockContent as any);
+      mockStorageService.getFileMetadata.mockResolvedValue({
+        size: 12,
+        lastModified,
+        contentType: 'image/jpeg',
+      });
+      mockStorageService.getObject.mockResolvedValue(Readable.from(['first-stream']));
+
+      await controller.serveFile(contentId, firstReq, firstRes);
+      await controller.serveFile(contentId, secondReq, secondRes);
+
+      expect(secondRes.status).toHaveBeenCalledWith(304);
+      expect(mockContentService.findByIdForDevice).toHaveBeenCalledTimes(2);
+      expect(mockStorageService.getFileMetadata).toHaveBeenCalledTimes(2);
+      expect(mockStorageService.getObject).toHaveBeenCalledTimes(1);
+      expect(mockStorageService.getObjectRange).not.toHaveBeenCalled();
+      expect(secondRes.getBody().toString()).toBe('');
+    });
+
+    it('should reject oversized media discovered during cached metadata revalidation', async () => {
+      const now = 3_850_000;
+      jest.spyOn(Date, 'now').mockReturnValue(now);
+      const lastModified = new Date('2026-05-31T00:00:00.000Z');
+      const etag = `W/"${createHash('sha256')
+        .update(`${objectKey}:12:${lastModified.getTime()}`)
+        .digest('base64url')}"`;
+      const firstReq = createMockRequest('valid-device-token');
+      const firstRes = createMockResponse();
+      const secondReq = createMockRequest('valid-device-token');
+      secondReq.headers['if-none-match'] = etag;
+      const secondRes = createMockResponse();
+      const thirdReq = createMockRequest('valid-device-token');
+      const thirdRes = createMockResponse();
+      const oversizedMetadata = {
+        size: 100 * 1024 * 1024 + 1,
+        lastModified,
+        contentType: 'image/jpeg',
+      };
+
+      mockJwtService.verify.mockReturnValue(validDevicePayload);
+      mockContentService.findByIdForDevice.mockResolvedValue(mockContent as any);
+      mockStorageService.getFileMetadata
+        .mockResolvedValueOnce({
+          size: 12,
+          lastModified,
+          contentType: 'image/jpeg',
+        })
+        .mockResolvedValue(oversizedMetadata);
+      mockStorageService.getObject.mockResolvedValue(Readable.from(['first-stream']));
+
+      await controller.serveFile(contentId, firstReq, firstRes);
+      await expect(controller.serveFile(contentId, secondReq, secondRes)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(controller.serveFile(contentId, thirdReq, thirdRes)).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(mockStorageService.getObject).toHaveBeenCalledTimes(1);
+      expect(secondRes.status).not.toHaveBeenCalledWith(304);
+    });
+
+    it('should return 304 for a satisfiable range request with a matching validator', async () => {
+      const lastModified = new Date('2026-05-31T00:00:00.000Z');
+      const etag = `W/"${createHash('sha256')
+        .update(`${objectKey}:12:${lastModified.getTime()}`)
+        .digest('base64url')}"`;
+      const req = createMockRequest('valid-device-token');
+      req.headers.range = 'bytes=0-3';
+      req.headers['if-none-match'] = etag;
+      const res = createMockResponse();
+
+      mockContentService.findByIdForDevice.mockResolvedValue(mockContent as any);
+      mockJwtService.verify.mockReturnValue(validDevicePayload);
+      mockStorageService.getFileMetadata.mockResolvedValue({
+        size: 12,
+        lastModified,
+        contentType: 'image/jpeg',
+      });
+
+      await controller.serveFile(contentId, req, res);
+
+      expect(res.status).toHaveBeenCalledWith(304);
+      expect(mockStorageService.getObject).not.toHaveBeenCalled();
+      expect(mockStorageService.getObjectRange).not.toHaveBeenCalled();
+    });
+
     it('should refresh stale cached objects instead of returning 304 from cached validators', async () => {
       const now = 4_000_000;
       jest.spyOn(Date, 'now').mockReturnValue(now);
@@ -1030,7 +1131,6 @@ describe('DeviceContentController', () => {
         });
       mockStorageService.getObject
         .mockResolvedValueOnce(Readable.from(['old']))
-        .mockRejectedValueOnce(new Error('Not Found'))
         .mockResolvedValueOnce(Readable.from(['new']));
 
       await controller.serveFile(contentId, firstReq, firstRes);
@@ -1038,8 +1138,8 @@ describe('DeviceContentController', () => {
 
       expect(secondRes.status).not.toHaveBeenCalledWith(304);
       expect(mockContentService.findByIdForDevice).toHaveBeenCalledTimes(2);
-      expect(mockStorageService.getObject).toHaveBeenNthCalledWith(2, objectKey);
-      expect(mockStorageService.getObject).toHaveBeenNthCalledWith(3, replacementObjectKey);
+      expect(mockStorageService.getObject).toHaveBeenNthCalledWith(1, objectKey);
+      expect(mockStorageService.getObject).toHaveBeenNthCalledWith(2, replacementObjectKey);
       expect(secondRes.getBody().toString()).toBe('new');
     });
 
