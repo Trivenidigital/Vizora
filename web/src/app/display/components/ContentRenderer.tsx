@@ -57,10 +57,15 @@ function useBlobUrl(url: string, enabled: boolean) {
   return { blobUrl, error };
 }
 
+function shouldFetchImageAsBlob(url: string): boolean {
+  return url.includes('/device-content/') && url.includes('/file');
+}
+
 export function ContentRenderer({ type, url, name, metadata, onEnded, onError }: ContentRendererProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const isImage = type === 'image';
-  const { blobUrl, error: fetchError } = useBlobUrl(url, isImage);
+  const shouldFetchBlob = isImage && shouldFetchImageAsBlob(url);
+  const { blobUrl, error: fetchError } = useBlobUrl(url, shouldFetchBlob);
 
   // Attempt autoplay when video mounts
   useEffect(() => {
@@ -84,6 +89,19 @@ export function ContentRenderer({ type, url, name, metadata, onEnded, onError }:
 
   switch (type) {
     case 'image':
+      if (!shouldFetchBlob) {
+        return (
+          <img
+            src={url}
+            alt={name || 'Display content'}
+            style={styles.image}
+            onError={() => {
+              onError?.('load_error', `Image failed to load: ${url}`);
+              onEnded?.();
+            }}
+          />
+        );
+      }
       if (fetchError) {
         return (
           <div style={{ ...styles.image, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ff6b6b', fontSize: '14px', padding: '20px', textAlign: 'center' as const }}>

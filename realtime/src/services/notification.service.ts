@@ -1,5 +1,4 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import { RedisService } from './redis.service';
 import { DatabaseService } from '../database/database.service';
 
@@ -17,6 +16,7 @@ export class NotificationService implements OnModuleInit, OnModuleDestroy {
   private readonly OFFLINE_DELAY_MS = 120000; // 2 minutes
   private readonly REDIS_KEY_PREFIX = 'notify:offline:';
   private intervalId: NodeJS.Timeout | null = null;
+  private isCheckingPendingNotifications = false;
 
   constructor(
     private readonly redisService: RedisService,
@@ -115,6 +115,12 @@ export class NotificationService implements OnModuleInit, OnModuleDestroy {
    * Periodically check for pending offline notifications and create them
    */
   async checkPendingNotifications(): Promise<void> {
+    if (this.isCheckingPendingNotifications) {
+      this.logger.warn('Skipping overlapping pending notification check');
+      return;
+    }
+
+    this.isCheckingPendingNotifications = true;
     const now = Date.now();
 
     // Scan for all pending offline notification keys
@@ -145,11 +151,41 @@ export class NotificationService implements OnModuleInit, OnModuleDestroy {
             );
           }
         } catch (error) {
-          this.logger.error(`Error processing notification key ${key}:`, error);
+          const err = error as {
+            code?: string;
+            meta?: { field_name?: string; constraint?: string; modelName?: string };
+          };
+          const fieldName = err?.meta?.field_name ?? '';
+          const constraint = err?.meta?.constraint ?? '';
+          const isOrgFkViolation =
+            err?.code === 'P2003' &&
+            (fieldName.toLowerCase().includes('organization') ||
+              constraint.toLowerCase().includes('organization'));
+
+          if (isOrgFkViolation) {
+            try {
+              await this.redisService.delete(key);
+              this.logger.warn(
+                `Dropped orphaned notification key ${key} (P2003 on ${fieldName || constraint || 'organizationId'}; referenced org deleted)`,
+              );
+            } catch (deleteError) {
+              this.logger.error(
+                `Failed to delete orphan notification key ${key} after organization P2003:`,
+                deleteError,
+              );
+            }
+          } else {
+            this.logger.error(
+              `Error processing notification key ${key} (code=${err?.code ?? 'none'}, field=${fieldName || 'none'}):`,
+              error,
+            );
+          }
         }
       }
     } catch (error) {
       this.logger.error('Error scanning for pending notifications:', error);
+    } finally {
+      this.isCheckingPendingNotifications = false;
     }
   }
 

@@ -28,6 +28,7 @@ import {
 } from './lib/state.js';
 import { login, OpsApiClient } from './lib/api-client.js';
 import { log, sendInlineAlert } from './lib/alerting.js';
+import { classifyArchiveError } from './lib/archive-error.js';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -59,17 +60,24 @@ interface Playlist {
   items?: { contentId: string }[];
 }
 
+type ContentLifecycleCounters = {
+  issuesFound: number;
+  issuesFixed: number;
+  issuesEscalated: number;
+  fatalDetected: boolean;
+};
+
 // ─── Check: Expired Content ──────────────────────────────────────────────────
 
 /**
  * Find active content with an expiresAt date in the past.
- * Auto-fix: archive each expired item via PATCH.
+ * Auto-fix: archive each expired item via POST /content/:id/archive.
  */
 async function checkExpiredContent(
   api: OpsApiClient,
   content: ContentItem[],
   incidents: Incident[],
-  state: { issuesFound: number; issuesFixed: number },
+  state: ContentLifecycleCounters,
 ): Promise<void> {
   const now = new Date();
   const expired = content.filter(c => {
@@ -93,7 +101,7 @@ async function checkExpiredContent(
     log(AGENT, `Archiving expired content: ${label} (expired ${item.expiresAt})`);
 
     try {
-      await api.patch(`/content/${item.id}`, { status: 'archived' }, {
+      await api.post(`/content/${item.id}/archive`, {}, {
         target: 'content',
         targetId: item.id,
         action: `Archive expired content "${label}"`,
@@ -109,7 +117,7 @@ async function checkExpiredContent(
         targetId: item.id,
         detected: new Date().toISOString(),
         message: `Content "${label}" expired on ${item.expiresAt} — auto-archived`,
-        remediation: `PATCH /content/${item.id} { status: "archived" }`,
+        remediation: `POST /content/${item.id}/archive`,
         status: 'resolved',
         attempts: 1,
         resolvedAt: new Date().toISOString(),
@@ -127,22 +135,48 @@ async function checkExpiredContent(
         `Content id ${item.id} reached its expiresAt (${item.expiresAt}) and was archived. If still needed, restore via the content library and update the expiry date.`,
       );
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      log(AGENT, `Failed to archive expired content ${label}: ${errorMsg}`);
+      const classified = classifyArchiveError(err);
+
+      if (classified.kind === 'already_archived' || classified.kind === 'not_found') {
+        incidents.push({
+          id: incidentId,
+          agent: AGENT,
+          type: 'expired_content',
+          severity: 'warning',
+          target: 'content',
+          targetId: item.id,
+          detected: new Date().toISOString(),
+          message: `Content "${label}" expired - ${classified.kind === 'not_found' ? 'no longer found' : 'already archived'}`,
+          remediation: `POST /content/${item.id}/archive`,
+          status: 'resolved',
+          attempts: 1,
+          resolvedAt: new Date().toISOString(),
+        });
+        state.issuesFixed++;
+        log(AGENT, `Expired content ${classified.kind === 'not_found' ? 'no longer found' : 'already archived'}: ${label}`);
+        continue;
+      }
+
+      if (classified.kind === 'fatal') {
+        state.fatalDetected = true;
+        log(AGENT, `FATAL: archive endpoint returned ${classified.status} for ${label}: ${classified.message}`);
+      } else {
+        log(AGENT, `Failed to archive expired content ${label}: ${classified.message}`);
+      }
 
       incidents.push({
         id: incidentId,
         agent: AGENT,
         type: 'expired_content',
-        severity: 'warning',
+        severity: classified.kind === 'fatal' ? 'critical' : 'warning',
         target: 'content',
         targetId: item.id,
         detected: new Date().toISOString(),
-        message: `Content "${label}" expired on ${item.expiresAt} — archive failed`,
-        remediation: `PATCH /content/${item.id} { status: "archived" }`,
+        message: `Content "${label}" expired on ${item.expiresAt} - archive failed (${classified.kind})`,
+        remediation: `POST /content/${item.id}/archive`,
         status: 'open',
         attempts: 1,
-        error: errorMsg,
+        error: classified.message,
       });
     }
   }
@@ -153,14 +187,14 @@ async function checkExpiredContent(
 /**
  * Find content that is not referenced by any playlist, is older than
  * ORPHAN_AGE_DAYS, and is not of type "layout" (layouts are structural).
- * Auto-fix: archive each orphaned item via PATCH.
+ * Auto-fix: archive each orphaned item via POST /content/:id/archive.
  */
 async function checkOrphanedContent(
   api: OpsApiClient,
   content: ContentItem[],
   playlists: Playlist[],
   incidents: Incident[],
-  state: { issuesFound: number; issuesFixed: number },
+  state: ContentLifecycleCounters,
 ): Promise<void> {
   // Build a set of all content IDs referenced by any playlist
   const referencedIds = new Set<string>();
@@ -204,7 +238,7 @@ async function checkOrphanedContent(
     log(AGENT, `Archiving orphaned content: ${label} (created ${item.createdAt})`);
 
     try {
-      await api.patch(`/content/${item.id}`, { status: 'archived' }, {
+      await api.post(`/content/${item.id}/archive`, {}, {
         target: 'content',
         targetId: item.id,
         action: `Archive orphaned content "${label}"`,
@@ -220,7 +254,7 @@ async function checkOrphanedContent(
         targetId: item.id,
         detected: new Date().toISOString(),
         message: `Content "${label}" not in any playlist and older than ${ORPHAN_AGE_DAYS} days — auto-archived`,
-        remediation: `PATCH /content/${item.id} { status: "archived" }`,
+        remediation: `POST /content/${item.id}/archive`,
         status: 'resolved',
         attempts: 1,
         resolvedAt: new Date().toISOString(),
@@ -239,22 +273,48 @@ async function checkOrphanedContent(
         `Content id ${item.id} was not referenced by any playlist and was older than ${ORPHAN_AGE_DAYS} days. Archived automatically. Restore via the content library if you still need it.`,
       );
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      log(AGENT, `Failed to archive orphaned content ${label}: ${errorMsg}`);
+      const classified = classifyArchiveError(err);
+
+      if (classified.kind === 'already_archived' || classified.kind === 'not_found') {
+        incidents.push({
+          id: incidentId,
+          agent: AGENT,
+          type: 'orphaned_content',
+          severity: 'info',
+          target: 'content',
+          targetId: item.id,
+          detected: new Date().toISOString(),
+          message: `Content "${label}" is orphaned - ${classified.kind === 'not_found' ? 'no longer found' : 'already archived'}`,
+          remediation: `POST /content/${item.id}/archive`,
+          status: 'resolved',
+          attempts: 1,
+          resolvedAt: new Date().toISOString(),
+        });
+        state.issuesFixed++;
+        log(AGENT, `Orphaned content ${classified.kind === 'not_found' ? 'no longer found' : 'already archived'}: ${label}`);
+        continue;
+      }
+
+      if (classified.kind === 'fatal') {
+        state.fatalDetected = true;
+        log(AGENT, `FATAL: archive endpoint returned ${classified.status} for ${label}: ${classified.message}`);
+      } else {
+        log(AGENT, `Failed to archive orphaned content ${label}: ${classified.message}`);
+      }
 
       incidents.push({
         id: incidentId,
         agent: AGENT,
         type: 'orphaned_content',
-        severity: 'info',
+        severity: classified.kind === 'fatal' ? 'critical' : 'info',
         target: 'content',
         targetId: item.id,
         detected: new Date().toISOString(),
-        message: `Content "${label}" is orphaned — archive failed`,
-        remediation: `PATCH /content/${item.id} { status: "archived" }`,
+        message: `Content "${label}" is orphaned - archive failed (${classified.kind})`,
+        remediation: `POST /content/${item.id}/archive`,
         status: 'open',
         attempts: 1,
-        error: errorMsg,
+        error: classified.message,
       });
     }
   }
@@ -272,7 +332,7 @@ async function checkOrphanedContent(
 async function checkStorageUsage(
   api: OpsApiClient,
   incidents: Incident[],
-  state: { issuesFound: number; issuesEscalated: number },
+  state: ContentLifecycleCounters,
 ): Promise<void> {
   try {
     const health = await api.get<Record<string, unknown>>('/health');
@@ -348,9 +408,23 @@ async function checkStorageUsage(
       log(AGENT, `Storage usage healthy: ${usagePct.toFixed(1)}%`);
     }
   } catch (err) {
-    // Gracefully handle — storage monitoring is best-effort
     const errorMsg = err instanceof Error ? err.message : String(err);
-    log(AGENT, `Storage check failed (non-fatal): ${errorMsg}`);
+    log(AGENT, `Storage check failed: ${errorMsg}`);
+    state.issuesFound++;
+    incidents.push({
+      id: makeIncidentId(AGENT, 'storage_check_failed', 'system'),
+      agent: AGENT,
+      type: 'storage_check_failed',
+      severity: 'warning',
+      target: 'storage',
+      targetId: 'system',
+      detected: new Date().toISOString(),
+      message: `Storage monitoring could not run - ${errorMsg}`,
+      remediation: 'Check /health endpoint and storage subsystem',
+      status: 'open',
+      attempts: 1,
+      error: errorMsg,
+    });
   }
 }
 
@@ -404,9 +478,13 @@ async function main(): Promise<void> {
 
   // ─── 3. Run Checks ───────────────────────────────────────────────────────
 
-  const opsState = readOpsState();
   const incidents: Incident[] = [];
-  const counters = { issuesFound: 0, issuesFixed: 0, issuesEscalated: 0 };
+  const counters: ContentLifecycleCounters = {
+    issuesFound: 0,
+    issuesFixed: 0,
+    issuesEscalated: 0,
+    fatalDetected: false,
+  };
 
   // 3a. Expired content
   await checkExpiredContent(api, content, incidents, counters);
@@ -431,19 +509,24 @@ async function main(): Promise<void> {
     incidents,
   };
 
-  recordAgentRun(opsState, result);
+  const opsState = readOpsState();
+  try {
+    recordAgentRun(opsState, result);
 
-  for (const r of api.auditLog) {
-    addRemediation(opsState, r);
+    for (const r of api.auditLog) {
+      addRemediation(opsState, r);
+    }
+  } finally {
+    writeOpsState(opsState);
   }
-
-  writeOpsState(opsState);
 
   // ─── 5. Summary ───────────────────────────────────────────────────────────
 
-  log(AGENT, `Cycle complete in ${durationMs}ms — found: ${counters.issuesFound}, fixed: ${counters.issuesFixed}, escalated: ${counters.issuesEscalated}`);
+  log(AGENT, `Cycle complete in ${durationMs}ms — found: ${counters.issuesFound}, fixed: ${counters.issuesFixed}, escalated: ${counters.issuesEscalated}${counters.fatalDetected ? ', FATAL API drift detected' : ''}`);
 
-  if (counters.issuesFound > 0 && counters.issuesFixed < counters.issuesFound) {
+  if (counters.fatalDetected) {
+    process.exitCode = 2;
+  } else if (counters.issuesFound > 0 && counters.issuesFixed < counters.issuesFound) {
     process.exitCode = 1;
   } else {
     process.exitCode = 0;

@@ -90,7 +90,6 @@ describe('NotificationService', () => {
     });
 
     it('should schedule notification for 2 minutes in the future', async () => {
-      const before = Date.now();
       await service.scheduleOfflineNotification('device-1', 'Test', 'org-1');
 
       const storedData = JSON.parse(mockRedisService.set.mock.calls[0][1]);
@@ -234,6 +233,69 @@ describe('NotificationService', () => {
       mockRedisService.get.mockResolvedValueOnce('invalid json{{{');
 
       await expect(service.checkPendingNotifications()).resolves.not.toThrow();
+    });
+
+    it('should delete an orphaned pending notification when the organization FK is gone', async () => {
+      const data = {
+        deviceId: 'device-1',
+        deviceName: 'Test Device',
+        organizationId: 'deleted-org',
+        scheduledFor: Date.now() - 1000,
+        disconnectedAt: Date.now() - 121000,
+      };
+      mockRedisService.getRedis.mockReturnValue({
+        scan: jest.fn().mockResolvedValue(['0', ['notify:offline:device-1']]),
+      });
+      mockRedisService.get.mockResolvedValueOnce(JSON.stringify(data));
+      mockDatabaseService.notification.create.mockRejectedValueOnce({
+        code: 'P2003',
+        meta: { field_name: 'Notification_organizationId_fkey' },
+      });
+
+      await expect(service.checkPendingNotifications()).resolves.not.toThrow();
+
+      expect(mockRedisService.delete).toHaveBeenCalledWith('notify:offline:device-1');
+    });
+
+    it('should not delete pending notifications for non-organization FK failures', async () => {
+      const data = {
+        deviceId: 'device-1',
+        deviceName: 'Test Device',
+        organizationId: 'org-1',
+        scheduledFor: Date.now() - 1000,
+        disconnectedAt: Date.now() - 121000,
+      };
+      mockRedisService.getRedis.mockReturnValue({
+        scan: jest.fn().mockResolvedValue(['0', ['notify:offline:device-1']]),
+      });
+      mockRedisService.get.mockResolvedValueOnce(JSON.stringify(data));
+      mockDatabaseService.notification.create.mockRejectedValueOnce({
+        code: 'P2003',
+        meta: { field_name: 'Notification_deviceId_fkey' },
+      });
+
+      await expect(service.checkPendingNotifications()).resolves.not.toThrow();
+
+      expect(mockRedisService.delete).not.toHaveBeenCalled();
+    });
+
+    it('should skip overlapping pending-notification sweeps', async () => {
+      let finishScan!: () => void;
+      const scan = jest.fn().mockImplementation(
+        () => new Promise(resolve => {
+          finishScan = () => resolve(['0', []]);
+        }),
+      );
+      mockRedisService.getRedis.mockReturnValue({ scan });
+
+      const firstSweep = service.checkPendingNotifications();
+      const secondSweep = service.checkPendingNotifications();
+
+      await secondSweep;
+      expect(scan).toHaveBeenCalledTimes(1);
+
+      finishScan();
+      await firstSweep;
     });
   });
 

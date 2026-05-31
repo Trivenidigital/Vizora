@@ -24,6 +24,7 @@ import { join } from 'path';
 import helmet from 'helmet';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
+import * as Sentry from '@sentry/nestjs';
 import { AppModule } from './app/app.module';
 import { SanitizeInterceptor } from './modules/common/interceptors/sanitize.interceptor';
 import { LoggingInterceptor } from './modules/common/interceptors/logging.interceptor';
@@ -225,9 +226,16 @@ async function bootstrap() {
       }
     }
   } catch (error) {
-    Logger.error(`❌ FATAL: Cannot bind to port ${port}`);
-    Logger.error(`Another process is using port ${port}. Stop it first.`);
-    Logger.error(`Run: netstat -ano | findstr :${port}`);
+    const code = (error as NodeJS.ErrnoException)?.code;
+    Logger.error(`❌ FATAL: Cannot bind to port ${port} (code=${code || 'unknown'})`);
+    if (code === 'EADDRINUSE') {
+      Logger.error(`Another process is using port ${port}. Stop it first.`);
+      Logger.error(`Run: netstat -ano | findstr :${port}`);
+    } else if (code === 'EACCES') {
+      Logger.error(`Permission denied binding to port ${port}. Ports below 1024 require elevated privileges.`);
+    } else {
+      Logger.error(`Underlying error: ${(error as Error)?.message || error}`);
+    }
     process.exit(1);
   }
 }
@@ -237,9 +245,10 @@ bootstrap().catch((err) => {
   process.exit(1);
 });
 
-// Catch unhandled rejections — log but don't exit; let PM2 handle restarts if needed
+// Catch unhandled rejections: log and capture for alerting, but don't exit.
 process.on('unhandledRejection', (reason, promise) => {
   Logger.error('🚨 Unhandled Rejection at:', promise, 'reason:', reason);
+  Sentry.captureException(reason instanceof Error ? reason : new Error(String(reason)));
 });
 
 // Catch uncaught exceptions

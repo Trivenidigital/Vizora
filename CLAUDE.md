@@ -103,6 +103,7 @@ DATABASE_URL            # PostgreSQL connection string
 REDIS_URL               # Redis connection URL
 NODE_ENV                # development | production
 PORT, MIDDLEWARE_PORT, WEB_PORT, REALTIME_PORT  # Service ports (3000 / 3001 / 3002 / 3002)
+TRUST_PROXY_HOPS        # Trusted reverse-proxy hop count for Express req.ip/rate-limit keys (default 1)
 CORS_ORIGIN             # Comma-separated allowed origins
 ```
 

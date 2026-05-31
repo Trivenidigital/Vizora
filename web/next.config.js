@@ -6,6 +6,12 @@ const { composePlugins, withNx } = require('@nx/next');
 const withBundleAnalyzer = require('@next/bundle-analyzer')({
   enabled: process.env.ANALYZE === 'true',
 });
+const {
+  buildSecurityHeaderRoutes,
+  parseOriginSafe,
+} = require('./next.config.security');
+
+const apiOrigin = parseOriginSafe('NEXT_PUBLIC_API_URL');
 
 /**
  * @type {import('@nx/next/plugins/with-nx').WithNxOptions}
@@ -18,10 +24,11 @@ const nextConfig = {
     ignoreBuildErrors: false,
   },
   productionBrowserSourceMaps: false,
+  poweredByHeader: false,
   // Allow Server Actions from production and dev origins.
   // The actual fix for "Failed to find Server Action" errors on rebuild
   // is the NEXT_SERVER_ACTIONS_ENCRYPTION_KEY env var (read automatically
-  // by Next.js at build time) — set it to a stable value in production .env.
+  // by Next.js at build time) - set it to a stable value in production .env.
   experimental: {
     turbopackUseSystemTlsCerts: true,
     serverActions: {
@@ -42,21 +49,30 @@ const nextConfig = {
         port: '3000',
         pathname: '/uploads/**',
       },
-      // Production: parse hostname from NEXT_PUBLIC_API_URL
-      ...(process.env.NEXT_PUBLIC_API_URL ? [{
-        protocol: new URL(process.env.NEXT_PUBLIC_API_URL).protocol.replace(':', ''),
-        hostname: new URL(process.env.NEXT_PUBLIC_API_URL).hostname,
-        pathname: '/static/**',
-      }, {
-        protocol: new URL(process.env.NEXT_PUBLIC_API_URL).protocol.replace(':', ''),
-        hostname: new URL(process.env.NEXT_PUBLIC_API_URL).hostname,
-        pathname: '/api/**',
-      }] : []),
+      ...(apiOrigin
+        ? [
+            {
+              protocol: new URL(apiOrigin).protocol.replace(':', ''),
+              hostname: new URL(apiOrigin).hostname,
+              pathname: '/static/**',
+            },
+            {
+              protocol: new URL(apiOrigin).protocol.replace(':', ''),
+              hostname: new URL(apiOrigin).hostname,
+              pathname: '/api/**',
+            },
+          ]
+        : []),
     ],
   },
   webpack: (config) => {
     config.devtool = false;
     return config;
+  },
+  async redirects() {
+    return [
+      { source: '/pricing', destination: '/#pricing', permanent: false },
+    ];
   },
   // Proxy API requests through Next.js to the backend.
   // This makes cookies same-origin (both on port 3001) so httpOnly auth
@@ -90,59 +106,8 @@ const nextConfig = {
       },
     ];
   },
-  // Security headers
   async headers() {
-    const cspBackendUrl = process.env.BACKEND_URL || 'http://localhost:3000';
-    const realtimeUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3002';
-    return [
-      // Relaxed CSP for /display route — needs iframes, external media, WebSocket
-      {
-        source: '/display',
-        headers: [
-          {
-            key: 'Content-Security-Policy',
-            value: `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: ${cspBackendUrl} https: http:; font-src 'self' data:; connect-src 'self' ${cspBackendUrl} ${realtimeUrl} ws: wss: https: http:; media-src 'self' blob: ${cspBackendUrl} https: http:; frame-src 'self' https: http:;`,
-          },
-          {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff',
-          },
-          {
-            key: 'X-XSS-Protection',
-            value: '1; mode=block',
-          },
-          {
-            key: 'Referrer-Policy',
-            value: 'strict-origin-when-cross-origin',
-          },
-        ],
-      },
-      {
-        source: '/((?!display).*)',
-        headers: [
-          {
-            key: 'Content-Security-Policy',
-            value: `default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; img-src 'self' data: ${cspBackendUrl} https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' ${cspBackendUrl} https://accounts.google.com ws: wss: https:; frame-src 'self' https://accounts.google.com; media-src 'self' ${cspBackendUrl};`,
-          },
-          {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff',
-          },
-          {
-            key: 'X-Frame-Options',
-            value: 'SAMEORIGIN',
-          },
-          {
-            key: 'X-XSS-Protection',
-            value: '1; mode=block',
-          },
-          {
-            key: 'Referrer-Policy',
-            value: 'strict-origin-when-cross-origin',
-          },
-        ],
-      },
-    ];
+    return buildSecurityHeaderRoutes();
   },
 };
 
