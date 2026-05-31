@@ -1,8 +1,35 @@
 # Vizora - Task Tracker
 
-## In Progress: Customer Dashboard + Performance Pass 4 (2026-05-31)
+## In Progress: Customer Dashboard UX Hotspots (2026-05-31)
+
+**Branch:** `fix/customer-dashboard-ux-hotspots`
+
+**Why now:** PR #126 merged and CI is green, but deployment is blocked by dirty/diverged prod-local work. The next customer-visible repo-side issues are small, testable dashboard defects in existing-device pairing and bulk content upload.
+
+**New primitives introduced:** none. Reuse existing dashboard pages, `ApiClient`, `/content/upload`, XHR upload progress, and `/displays/:id/pair`.
+
+**Hermes-first analysis:** not applicable; this pass does not add business-agent behavior, MCP tools, Hermes skills, AI provider calls, or spend paths.
+
+**Plan/design:** `docs/plans/2026-05-31-customer-dashboard-ux-hotspots.md`
+
+**Plan**
+- [x] Drift-check pairing and bulk upload against repo truth.
+- [x] Write plan/design and checklist.
+- [ ] Add failing tests for pairing-token rendering and bulk-upload behavior.
+- [ ] Implement pairing contract and copy alignment.
+- [ ] Implement per-file upload type, progress, bounded concurrency, and upload-while-running locks.
+- [ ] Run focused verification.
+- [ ] Run multi-subagent review before broad verification.
+- [ ] Run broader web verification/build.
+- [ ] PR, CI, merge.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+---
+
+## Completed: Customer Dashboard + Performance Pass 4 (2026-05-31)
 
 **Branch:** `feat/customer-dashboard-performance-pass`
+**PR / merge commit:** #126 / `cd978e4d8474393c85e0e4342218b4cbd708585f`
 
 **Why now:** PRs #123-#125 are merged and CI-green, but production deploy is blocked by dirty/diverged prod-local work. Fresh customer, performance, and adversarial scans found several repo-side issues that directly affect customer-1 readiness without requiring operator-only actions.
 
@@ -19,9 +46,9 @@
 - [x] Display content-error messages redact device JWT query params before UI, Redis, or Sentry.
 - [x] Critical smoke pairing-complete parsing handles enveloped `data.display.id`.
 - [x] Run multi-subagent review before broad verification.
-- [ ] Run focused/broad verification.
-- [ ] PR, CI, merge.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] Run focused/broad verification.
+- [x] PR, CI, merge.
+- [x] Re-check deployment gate; deployment remains blocked by dirty/diverged prod checkout.
 
 **Review gate**
 - [x] Subagent runtime/security review: CLEAN.
@@ -47,6 +74,12 @@
 - [x] `npx nx build @vizora/realtime` - pass with existing source-map / optional `ws` warnings.
 - [x] `NODE_OPTIONS=--max-old-space-size=4096 NEXT_PUBLIC_SOCKET_URL=http://localhost:3002 NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1 BACKEND_URL=http://localhost:3000 npx nx build @vizora/web` - pass with existing Next middleware deprecation and TypeScript project-reference warnings.
 - [x] `pnpm --filter @vizora/display build` - pass.
+
+**Current deployment gate**
+- GitHub main: `cd978e4d8474393c85e0e4342218b4cbd708585f` after PR #126.
+- Open PRs: none after merging PR #126.
+- Production health: `/api/v1/health` returned `success: true`, database connected at `2026-05-31T12:24:48.285Z`.
+- Production deploy is blocked: `/opt/vizora/app` is dirty, local `HEAD=bb76aa1838740bff5b58623dfef7a906d44f46a6`, and after fetch is `ahead 17, behind 45` relative to `origin/main=cd978e4d8474393c85e0e4342218b4cbd708585f`. Do not pull/reset/stash/restart services until prod-local work is reconciled.
 
 ---
 
