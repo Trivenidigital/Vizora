@@ -1,13 +1,28 @@
 # Vizora Backlog
 
-**Last updated:** 2026-05-11
+**Last updated:** 2026-05-31 (main at `7ecd6f3`)
 **Production readiness:** ~75% — three operator-driven launch blockers open (see P0 below); technical foundation strongest on record
 **Tests:** 124 middleware suites / 2335 tests, 10 realtime suites / 212 tests, 79 web suites / 864 tests — ALL PASSING (zero failures). Playwright 24 specs at >90% pass post-2026-05-09 refresh. Verified by autonomous pass `docs/plans/2026-05-09-test-results.md`.
 **Customer-1 launch target:** 2026-05-13 (T-2 from today) — **status unconfirmed**; operator must confirm before T-2 prep work continues.
 
+**Security/realtime hardening wave (#107–#114, merged through 2026-05-31, main `7ecd6f3`):** session invalidation now spans REST + WebSocket — password-change / account-deactivation force-logout across all devices (REST `#111`, WS connect-time `#112`, WS mid-session 60s sweep `#114`). Launch-week and first-month rows shipped across the #63–#114 waves; M12 half-shipped. P1/P2 tables below reconciled to match.
+
 ---
 
 ## COMPLETED (Since Last Backlog Update — 2026-03-18 → 2026-05-11)
+
+### Security & realtime hardening wave (2026-05-30 → 2026-05-31, PRs #107–#114)
+
+| # | Item | PR / commit |
+|---|------|-------------|
+| H1 | Real-time notification emission gap — device-offline alert bypassed the realtime broadcast (surfaced only on poll) | #107 (`b860100`) |
+| H2 | Per-device remote control on device detail page (reload / restart / clear_cache) | #108 (`875d2fe`) |
+| H3 | generic-api widget always-400 + webpack shipped zero `.hbs` (every widget type broke in prod) | #109 (`5059bfe`) |
+| H4 | Password-changed security email (`MailService.sendPasswordChangedEmail`) | #110 (`7c2d089`) |
+| H5 | Session invalidation — REST: `pwd_changed:`/`user_revoked:` Redis keys + `JwtStrategy.validate` reject (strict `iat <`) | #111 (`82c5c01`) |
+| H6 | Session invalidation — WS connect-time handshake consults both keys | #112 (`277a6eb`) |
+| H7 | Backlog reconciliation (OptiSigns O-series) | #113 (`6cf99a6`) |
+| H8 | Session invalidation — WS mid-session 60s sweep (`sweepInvalidatedSessions`) closes the #112 connect-time-only residual | #114 (`7ecd6f3`) |
 
 ### Agent Platform Redesign (2026-05-08 → 2026-05-09)
 Triggered by 2026-05-06 OpenRouter credit drain. PR #62 (merged `801b517` on 2026-05-09) + 5 hotfix commits on main bring cost defense to 4 layers (provider cap → app daily cap → per-firing Hermes hard-stop → cross-firing breaker designed for P4).
@@ -130,17 +145,17 @@ These are documented + non-blocking for customer-1. Investigations done; impleme
 
 | # | Item | Effort | Status | Notes |
 |---|------|--------|--------|-------|
-| L1 | Device offline email notification to customers | S (4h) | TODO | Ops agent detects offline but doesn't email customer |
+| L1 | Device offline email notification to customers | S (4h) | ✅ DONE | Superseded by **O7** (#63) — `alert-rules` evaluator dispatches in_app/email/slack on device-offline per tag/group with custom recipients. |
 | L2 | Set up UptimeRobot monitoring for health endpoints | XS (1h) | TODO | Manual: create account, add monitors |
-| L3 | Custom error pages (branded 404, 500) | S (4h) | TODO | Currently default/unstyled |
-| L4 | Basic knowledge base / help docs page | M (1d) | TODO | FAQ + getting started guide |
-| L5 | Proof-of-play tracking (log content displayed per device) | M (1d) | TODO | Advertisers need this. **Expanded scope in O2 below** (saved views, scheduled email, tag filters, exports). |
-| L6 | Emergency content override (push urgent to all devices) | S (4h) | TODO | Critical for corporate/healthcare |
-| L7 | Device remote reload command via WebSocket | S (2h) | TODO | Remote restart already missing too |
-| L8 | Wire real-time notification emission on creation | S (2h) | TODO | Currently polling, not real-time |
-| L9 | Reduce notification polling (25s -> 60s or WebSocket) | XS (1h) | TODO | Performance improvement |
+| L3 | Custom error pages (branded 404, 500) | S (4h) | ✅ DONE | `web/src/app/{not-found,error,global-error}.tsx` + 7 per-route error boundaries (shipped in #92–#106 wave). |
+| L4 | Basic knowledge base / help docs page | M (1d) | ✅ DONE | `web/src/app/dashboard/help/page.tsx` ships searchable FAQ categories + getting-started/device/content/playlists/security articles. |
+| L5 | Proof-of-play tracking (log content displayed per device) | M (1d) | ✅ DONE | Core shipped as **O2** (#67) — `analytics/proof-of-play.service.ts` + CSV export. Secondary (scheduled-email/PDF/saved-views) lean-cut; verify before claiming gap. |
+| L6 | Emergency content override (push urgent to all devices) | S (4h) | ✅ DONE | Full stack: `EmergencyOverrideModal` + `ActiveOverrideBanner` on devices page + `fleet.service` create/clear + Electron push_content/clear_override + crash-recovery. |
+| L7 | Device remote reload command via WebSocket | S (2h) | ✅ DONE | reload/restart/clear_cache stack (realtime command enum + `fleet POST /commands` + Electron handlers); per-device control `DeviceControls.tsx` on device detail page (#108). Covers M6 (restart) too. |
+| L8 | Wire real-time notification emission on creation | S (2h) | ✅ DONE | `NotificationsService.create()` → `/api/notifications/broadcast` realtime emit. Device-offline alert path that bypassed the broadcast fixed in #107. |
+| L9 | Reduce notification polling (25s -> 60s or WebSocket) | XS (1h) | ✅ DONE | `useNotifications` defaults `pollInterval=300000` (5min), unread-count only, plus WebSocket `notification:new`. |
 
-**Total effort: ~7 dev-days**
+**Remaining P1: L2 (UptimeRobot) only — L1/L3/L4/L5/L6/L7/L8/L9 shipped.**
 
 ---
 
@@ -149,19 +164,19 @@ These are documented + non-blocking for customer-1. Investigations done; impleme
 | # | Item | Effort | Status | Notes |
 |---|------|--------|--------|-------|
 | M1 | CloudFlare CDN + DDoS protection | S (4h) | TODO | Static assets served directly now |
-| M2 | Weather widget (OpenWeatherMap free API) | M (1d) | TODO | Top customer request for signage |
+| M2 | Weather widget (OpenWeatherMap free API) | M (1d) | ✅ DONE | `WeatherDataSource` + `WeatherWidget` + widget-create UI; requires `OPENWEATHER_API_KEY` for live data. |
 | M3 | Google Sheets data source integration | L (3d) | ✅ DONE | `content/widget-data-sources/google-sheets.data-source.ts` |
-| M4 | Content moderation workflow (flag -> review -> approve) | M (2d) | TODO | Today's `content.service.ts:712-843` is a moderation flag, not an approval pipeline. **Expanded to proposer→approver→publish in O10 below.** |
+| M4 | Content moderation workflow (flag -> review -> approve) | M (2d) | ✅ DONE | Superseded by **O10** (#69): submit-for-approval→approve/reject-from-approval pipeline in `content.controller.ts` + `content.service.ts`, tested in `content-approval.service.spec.ts`. |
 | M5 | Expand template library to 150 templates | M (2d) | TODO | Currently 78 |
-| M6 | Device remote restart command | S (4h) | TODO | |
+| M6 | Device remote restart command | S (4h) | ✅ DONE | Part of the L7 fleet command stack (#108) — `restart` in the realtime command enum + Electron handler. |
 | M7 | Push-to-group endpoint (single API call) | S (4h) | ✅ DONE | Generalized in **O1** (#65) — tag/group/org targeting via `fleet.service` |
 | M8 | Data retention policy (auto-purge audit logs > 90 days) | S (4h) | ✅ DONE | `common/data-retention.service.ts` + `auditLog.deleteMany` |
-| M9 | Profile editing: avatar upload | S (4h) | TODO | Name editing done, avatar missing |
-| M10 | Fix Loki volume mount (logs lost on restart) | XS (1h) | TODO | Docker-compose change |
-| M11 | GDPR data export endpoint | M (1d) | TODO | Subject Access Request |
-| M12 | Security alert emails (new login, password changed) | S (4h) | TODO | |
+| M9 | Profile editing: avatar upload | S (4h) | ✅ DONE | `POST/DELETE /auth/me/avatar` + settings-page upload/remove UI backed by storage presigned URLs. |
+| M10 | Fix Loki volume mount (logs lost on restart) | XS (1h) | ✅ DONE | `docker/docker-compose.yml` mounts named volume `loki_data:/loki` and declares `loki_data` under `volumes:`. |
+| M11 | GDPR data export endpoint | M (1d) | ✅ DONE | `POST /users/me/data-export` returns user/org/content/display/playlist/schedule/audit/notification export; settings page downloads JSON. |
+| M12 | Security alert emails (new login, password changed) | S (4h) | 🟡 PARTIAL | Password-changed email shipped (#110, `MailService.sendPasswordChangedEmail`). New-login / unrecognized-device half DEFERRED — needs login IP / device-history schema migration. |
 
-**Total effort: ~15 dev-days**
+**Remaining P2 repo-side items:** M1, M5, and M12's new-login/unrecognized-device half. M2/M3/M4/M6/M7/M8/M9/M10/M11 shipped.
 
 ---
 
@@ -182,7 +197,7 @@ Items the audit listed but we are NOT pursuing live (Engage/kiosk, live remote v
 | O7 | ✅ DONE (#63) — **Configurable downtime alert rules** — per tag/group with custom recipients | S (1d) | `notifications/alert-rules/` rule table + `alert-rule.evaluator` (in_app/email/slack dispatch). Supersedes L1. | P1 #6 |
 | O8 | ✅ DONE (#66/#109) — **Generic API-to-screen data source** (JSON, v1) | M (3d) | `content/widget-data-sources/generic-api.data-source.ts` + `widget-templates/generic-api.hbs` (backend). Web create-UI exposure deprioritized per operator. XML/CSV deferred. | P0 #3 |
 | O9 | TODO — **Teams + folder-level access control + custom roles** — `Team`, `FolderPermission` (read/write/admin per folder), `Role`/`Permission` models | L (5d) | Confirmed NOT built — no `Team`/`FolderPermission` model in `schema.prisma` (count 0). One of two remaining O-items. | P0 #5 |
-| O10 | ✅ DONE (#69) — **Content proposal/approval pipeline** — proposer/approver roles, draft→publish | M (3d) | `content/content-approval.service.ts` + `content/dto/approval.dto.ts`. **Supersedes M4 + Q7.** | P0 #5 |
+| O10 | ✅ DONE (#69) — **Content proposal/approval pipeline** — proposer/approver roles, draft→publish | M (3d) | `content.controller.ts` submit/approve/reject endpoints + `content.service.ts` approval methods + `content/dto/approval.dto.ts`. **Supersedes M4 + Q7.** | P0 #5 |
 
 **Status (reconciled 2026-05-31): 8 of 10 OptiSigns items SHIPPED** (O1/O2/O4/O5/O6/O7/O8/O10 — PRs #63–#71 + #109). **Only O3 (Designer depth) and O9 (Teams/folder-ACL) remain**, both L (5d) and not yet started. Several shipped items were "lean MVP / lean cut" — secondary sub-features (O2 scheduled-email/PDF, O5 SDK/OpenAPI-export, O6 bulk-CSV) may be partial; verify against the specific sub-feature before claiming a gap.
 
@@ -192,18 +207,18 @@ Items the audit listed but we are NOT pursuing live (Engage/kiosk, live remote v
 
 | # | Item | Effort | Status | Notes |
 |---|------|--------|--------|-------|
-| Q1 | OAuth / social login (Google) | M (2d) | TODO | |
-| Q2 | Per-user/org feature flags | M (2d) | TODO | Currently plan-level only |
-| Q3 | RSS/news feed widget | M (1d) | TODO | |
-| Q4 | Social media feed widget (Instagram) | M (2d) | TODO | |
-| Q5 | Clock/countdown widget | S (4h) | TODO | |
+| Q1 | OAuth / social login (Google) | M (2d) | ✅ DONE | `POST /auth/google` verifies Google ID tokens via `google-auth-library`; login/register pages render GSI when configured. |
+| Q2 | Per-user/org feature flags | M (2d) | 🟡 PARTIAL | Per-org flags shipped (`organizations/feature-flags.service.ts` + settings UI). Per-user flag overrides are not built. |
+| Q3 | RSS/news feed widget | M (1d) | ✅ DONE | `RssDataSource`, RSS parser/proxy, `RssWidget`, and dashboard widget-create UI. |
+| Q4 | Social media feed widget (Instagram) | M (2d) | ✅ DONE | URL/post-list `SocialFeedWidget` covers multiple platforms by hostname. Backend Instagram/Twitter/Facebook data sources are stubs returning sample data; real Graph/API integration is deferred. |
+| Q5 | Clock/countdown widget | S (4h) | ✅ DONE | `ClockWidget` supports clock and countdown modes; dashboard widget UI exposes both. |
 | Q6 | AI Template Designer (integrate Claude/OpenAI) | L (5d) | TODO | API costs — need revenue first |
-| Q7 | Content approval workflow | M (2d) | TODO | **Superseded by O10 below.** |
-| Q8 | Custom branding per organization | M (2d) | TODO | |
-| Q9 | Return policy page + SLA page | S (4h) | TODO | Legal |
+| Q7 | Content approval workflow | M (2d) | ✅ DONE | Superseded by **O10** (#69): content proposal/approval pipeline. |
+| Q8 | Custom branding per organization | M (2d) | ✅ DONE | Organization branding endpoints, logo upload, `CustomizationProvider`, and dashboard customization/settings UI. |
+| Q9 | Return policy page + SLA page | S (4h) | ✅ DONE | `/refund` and `/sla` pages exist and are linked from the public footer. |
 | Q10 | Expand template library to 300+ | L (5d) | TODO | |
 
-**Total effort: ~20 dev-days**
+**Remaining P3:** Q2 per-user overrides, Q6, Q10. Q1/Q3/Q4/Q5/Q7/Q8/Q9 shipped.
 
 ---
 
@@ -300,14 +315,14 @@ WEEK 1 (NOW):       P0 Blockers — SMTP, Billing, Smoke Test
 SOFT LAUNCH:         After P0 cleared
                      +-- Invite 5-10 beta users (restaurants, small businesses)
 
-WEEKS 2-3:          P1 Launch Week items
-                     +-- Offline alerts, monitoring, error pages, help docs, proof-of-play
+WEEKS 2-3:          Remaining P1
+                     +-- UptimeRobot setup only (operator/manual)
 
 MONTH 1:            P2 items
-                     +-- Weather widget, Google Sheets, CDN, more templates, GDPR export
+                     +-- CDN, template expansion, new-login security alert
 
 QUARTER 1:          P3 items
-                     +-- OAuth, AI Designer, RSS, social feeds, approval workflows
+                     +-- Per-user feature flags, AI Designer, 300+ templates
 
 FUTURE:             P4 items
                      +-- 2FA, SSO, Fire TV, Chromecast, kiosk mode, video wall
