@@ -75,6 +75,7 @@ Awesome-Hermes-agent ecosystem check: not applicable; this pass does not introdu
 - `pnpm --filter @vizora/middleware exec tsc --noEmit --pretty false` - pass.
 - `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/vizora pnpm --filter @vizora/database exec prisma validate` - pass.
 - `pnpm --filter @vizora/realtime test -- --runInBand` - pass, 11 suites / 256 tests.
+- Post-PR E2E fixture follow-up: `pnpm --filter @vizora/realtime test -- device.gateway.spec.ts --runInBand` - pass, 1 suite / 85 tests. Local realtime E2E is blocked in this worktree by generated `realtime/dist/package.json` Jest haste collision plus missing local E2E `DATABASE_URL`/Redis setup; GitHub CI is the authoritative E2E verifier.
 - `pnpm --filter @vizora/web test -- --runInBand` - pass, 89 suites / 925 tests; existing React `act(...)` and jsdom navigation warnings remain.
 - `pnpm --filter @vizora/display test -- --runInBand` - pass, 5 suites / 116 tests; expected negative-path logs and existing MaxListeners warning remain.
 - `pnpm --filter @vizora/web exec tsc --noEmit --pretty false` - pass.

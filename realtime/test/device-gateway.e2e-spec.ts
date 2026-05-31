@@ -16,6 +16,7 @@ describe('DeviceGateway (E2E)', () => {
   let serverUrl: string;
   let deviceToken: string;
   let deviceId: string;
+  let deviceIdentifier: string;
   let organizationId: string;
 
   beforeAll(async () => {
@@ -38,11 +39,12 @@ describe('DeviceGateway (E2E)', () => {
 
     // Generate test device token
     deviceId = 'test-device-001';
+    deviceIdentifier = `TEST-DEVICE-001-${Date.now()}`;
     organizationId = 'test-org-001';
     deviceToken = jwtService.sign(
       {
         sub: deviceId,
-        deviceIdentifier: 'TEST-DEVICE-001',
+        deviceIdentifier,
         organizationId,
         type: 'device',
       },
@@ -72,11 +74,11 @@ describe('DeviceGateway (E2E)', () => {
       create: {
         id: deviceId,
         nickname: 'E2E Test Device',
-        deviceIdentifier: `TEST-DEVICE-001-${Date.now()}`,
+        deviceIdentifier,
         organizationId,
         status: 'offline',
       },
-      update: { organizationId, status: 'offline' },
+      update: { deviceIdentifier, organizationId, status: 'offline' },
     });
   });
 

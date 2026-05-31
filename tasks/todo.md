@@ -51,6 +51,7 @@
 - [x] `pnpm --filter @vizora/middleware exec tsc --noEmit --pretty false` - pass.
 - [x] `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/vizora pnpm --filter @vizora/database exec prisma validate` - pass.
 - [x] `pnpm --filter @vizora/realtime test -- --runInBand` - pass, 11 suites / 256 tests.
+- [x] Post-PR E2E fixture follow-up: `pnpm --filter @vizora/realtime test -- device.gateway.spec.ts --runInBand` - pass, 1 suite / 85 tests. Local realtime E2E run is blocked in this worktree by generated `realtime/dist/package.json` Jest haste collision plus missing local E2E `DATABASE_URL`/Redis setup; GitHub CI is the authoritative E2E verifier.
 - [x] `pnpm --filter @vizora/web test -- --runInBand` - pass, 89 suites / 925 tests; existing React `act(...)` and jsdom navigation warnings remain.
 - [x] `pnpm --filter @vizora/display test -- --runInBand` - pass, 5 suites / 116 tests; expected negative-path logs and existing MaxListeners warning remain.
 - [x] `pnpm --filter @vizora/web exec tsc --noEmit --pretty false` - pass.
