@@ -1,8 +1,48 @@
 # Vizora - Task Tracker
 
-## In Progress: Customer Dashboard UX Hotspots (2026-05-31)
+## In Progress: Device Token Current-Hash Enforcement (2026-05-31)
+
+**Branch:** `feat/customer-performance-review-5`
+
+**Why now:** PR #127 merged and CI is green, but deployment remains blocked by dirty/diverged prod-local work. A fresh realtime/display/code review found a P0 auth-boundary gap: signed display JWTs remain accepted after re-pairing or token rotation because middleware and realtime verify signature claims but do not compare the presented token to the current token hash stored on `Display.jwtToken`.
+
+**New primitives introduced:** none. Reuse the existing display `jwtToken` hash column, pairing token hash behavior, device JWT model, middleware device-content controller, and realtime gateway.
+
+**Hermes-first analysis:** not applicable; this pass does not add business-agent behavior, MCP tools, Hermes skills, AI provider calls, or spend paths.
+
+**Plan/design:** `docs/plans/2026-05-31-device-token-current-hash-enforcement.md`
+
+**Reviewer synthesis**
+- [x] Customer/UX review: PR #127 fixed pairing-token rendering and bulk upload progress; remaining customer-visible issues include billing redirect shape, stale schedule conflict UI, push-to-device false success, and no-op playlist publish.
+- [x] Performance review: larger follow-ups remain for memory-buffered uploads, authenticated media caching/preload, dashboard list payloads, and folder indexes.
+- [x] Realtime/display review: P0 stale device JWT acceptance selected for this slice; other follow-ups include active-schedule playback, template display rendering, initial playlist ACKs, and direct-playlist clear semantics.
+- [x] Adversarial review: SSRF redirect handling, server-side API cookie/envelope drift, and CSRF mounting remain queued after this auth-boundary slice.
+
+**Plan**
+- [x] Record PR #127 merge/CI/deploy evidence.
+- [x] Drift-check device token storage and validation paths.
+- [x] Write plan/design and checklist.
+- [ ] Add failing middleware tests for stale/missing `Display.jwtToken` rejection in device-content streaming.
+- [ ] Add failing realtime tests for stale/missing `Display.jwtToken` rejection and rotation persistence.
+- [ ] Implement current-hash validation in middleware and realtime.
+- [ ] Persist new token hash before realtime emits `token:refresh`.
+- [ ] Run focused verification.
+- [ ] Run multi-subagent review before broad verification.
+- [ ] Run broader affected tests/builds.
+- [ ] PR, CI, merge.
+- [ ] Re-check deployment gate; deploy only if prod checkout and runtime token state are safe.
+
+**Runtime-state gate before deploy**
+- [x] Query prod display token-hash coverage: 15 displays total, 15 with `jwtToken`, 0 missing `jwtToken`, 15 active non-pairing, 0 active non-pairing missing `jwtToken`.
+- [x] Reconcile any legacy displays without a current hash before deploying fail-closed enforcement: no legacy missing-token displays found in the read-only prod count.
+- [ ] Reconcile prod `/opt/vizora/app` dirty/diverged checkout before any pull/restart/deploy.
+
+---
+
+## Completed: Customer Dashboard UX Hotspots (2026-05-31)
 
 **Branch:** `fix/customer-dashboard-ux-hotspots`
+**PR / merge commit:** #127 / `c82b1521da7db94ba07caeced4339b8a1b17731a`
 
 **Why now:** PR #126 merged and CI is green, but deployment is blocked by dirty/diverged prod-local work. The next customer-visible repo-side issues are small, testable dashboard defects in existing-device pairing and bulk content upload.
 
@@ -21,8 +61,8 @@
 - [x] Run focused verification.
 - [x] Run multi-subagent review before broad verification.
 - [x] Run broader web verification/build.
-- [ ] PR, CI, merge.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge.
+- [x] Re-check deployment gate; deployment remains blocked by dirty/diverged prod checkout.
 
 **Focused verification**
 - [x] `pnpm --filter @vizora/web test -- --runInBand --testPathPattern="devices-page|content-page"` - red first on missing `pairingToken` rendering and missing bulk `uploadContentWithProgress`, then pass, 2 suites / 30 tests.
@@ -41,6 +81,13 @@
 - [x] Customer/UX reviewer: initial P1 hidden queued files after switching to URL mode fixed with disabled URL option and guarded change handler; P2 modal-close upload state loss fixed by ignoring close while uploading.
 - [x] Performance/concurrency reviewer: no P0/P1; P2 modal-close finding fixed and pairing response type tightened to required backend shape.
 - [x] Post-fix re-review: initial P1 removed-file URL upload path fixed by clearing selected file state when queue items are removed/cleared and by requiring a file upload type before using the file branch.
+
+**Merge / CI / deployment gate**
+- [x] PR #127 merged after GitHub checks passed: lint, audit, test, build, security, and e2e.
+- [x] Open PRs after merge: none.
+- [x] GitHub main after merge: `c82b1521da7db94ba07caeced4339b8a1b17731a`.
+- [x] Production health probe returned `success: true`, database connected at `2026-05-31T13:09:33.049Z`.
+- [x] Production deploy remains blocked: `/opt/vizora/app` is dirty and diverged (`HEAD=bb76aa1838740bff5b58623dfef7a906d44f46a6`, `origin/main=c82b1521da7db94ba07caeced4339b8a1b17731a`, `ahead 17, behind 51`). Do not pull/reset/stash/restart services until prod-local work is reconciled.
 
 ---
 
