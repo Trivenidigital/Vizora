@@ -18,8 +18,8 @@ import { FoldersService } from './folders.service';
 import { CreateFolderDto } from './dto/create-folder.dto';
 import { UpdateFolderDto } from './dto/update-folder.dto';
 import { MoveContentDto } from './dto/move-content.dto';
-import { PaginationDto } from '../common/dto/pagination.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { ContentQueryDto } from '../content/dto/content-query.dto';
 
 @UseGuards(RolesGuard)
 @Controller('folders')
@@ -88,8 +88,16 @@ export class FoldersController {
   getContents(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id', ParseIdPipe) id: string,
-    @Query() pagination: PaginationDto,
+    @Query() query: ContentQueryDto,
   ) {
-    return this.foldersService.getContents(organizationId, id, pagination);
+    const { type, status, templateOrientation, search, dateRange, tagNames, ...pagination } = query;
+    return this.foldersService.getContents(organizationId, id, pagination, {
+      type,
+      status,
+      templateOrientation,
+      search,
+      dateRange,
+      tagNames,
+    });
   }
 }

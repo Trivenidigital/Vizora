@@ -19,6 +19,10 @@ describe('ContentQueryDto', () => {
     'flagged',
     'rejected',
     'pending_approval',
+    'expired',
+    'ready',
+    'processing',
+    'error',
   ])('accepts status=%s', async (status) => {
     const errors = await validateStatus(status);
     expect(errors).toEqual([]);
@@ -28,5 +32,54 @@ describe('ContentQueryDto', () => {
     const errors = await validateStatus('not-a-real-status');
     expect(errors.length).toBeGreaterThan(0);
     expect(errors[0].constraints).toHaveProperty('isIn');
+  });
+
+  it.each(['image', 'video', 'url', 'html', 'pdf', 'template', 'layout', 'widget'])(
+    'accepts type=%s',
+    async (type) => {
+      const dto = plainToInstance(ContentQueryDto, { type });
+      await expect(validate(dto)).resolves.toEqual([]);
+    },
+  );
+
+  it('accepts bounded server-side search and date range filters', async () => {
+    const dto = plainToInstance(ContentQueryDto, {
+      search: '  lunch menu  ',
+      dateRange: '30days',
+    });
+
+    const errors = await validate(dto);
+
+    expect(errors).toEqual([]);
+    expect(dto.search).toBe('lunch menu');
+  });
+
+  it('rejects oversized search terms', async () => {
+    const dto = plainToInstance(ContentQueryDto, { search: 'a'.repeat(121) });
+
+    const errors = await validate(dto);
+
+    expect(errors.some((error) => error.property === 'search')).toBe(true);
+  });
+
+  it('normalizes comma-separated tag names', async () => {
+    const dto = plainToInstance(ContentQueryDto, {
+      tagNames: 'Marketing, Seasonal, ',
+    });
+
+    const errors = await validate(dto);
+
+    expect(errors).toEqual([]);
+    expect(dto.tagNames).toEqual(['Marketing', 'Seasonal']);
+  });
+
+  it('rejects too many tag names', async () => {
+    const dto = plainToInstance(ContentQueryDto, {
+      tagNames: Array.from({ length: 21 }, (_, index) => `tag-${index}`),
+    });
+
+    const errors = await validate(dto);
+
+    expect(errors.some((error) => error.property === 'tagNames')).toBe(true);
   });
 });

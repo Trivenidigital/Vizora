@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useDropzone, type FileRejection } from 'react-dropzone';
 import { apiClient } from '@/lib/api';
+import type { ContentListParams } from '@/lib/api/content';
 import { fetchAllPaginated } from '@/lib/api/pagination';
 import { Content, Display, Playlist, ContentFolder } from '@/lib/types';
 import FolderTree from '@/components/FolderTree';
@@ -47,9 +48,22 @@ type UploadRejectedItem = {
  fileName: string;
  reason: string;
 };
+type ContentPageMeta = {
+ page: number;
+ limit: number;
+ total: number;
+ totalPages: number;
+};
 
 const BULK_UPLOAD_CONCURRENCY = 3;
 const MAX_UPLOAD_QUEUE_ITEMS = 10;
+const CONTENT_PAGE_SIZE = 50;
+const EMPTY_CONTENT_META: ContentPageMeta = {
+ page: 1,
+ limit: CONTENT_PAGE_SIZE,
+ total: 0,
+ totalPages: 0,
+};
 const FILE_UPLOAD_LIMITS: Record<FileUploadType, number> = {
  image: 10 * 1024 * 1024,
  video: 100 * 1024 * 1024,
@@ -79,7 +93,10 @@ const getUploadButtonLabel = (queue: UploadQueueItem[]): string => {
 
 export default function ContentClient() {
  const toast = useToast();
+ const { showToast } = toast;
  const [content, setContent] = useState<Content[]>([]);
+ const [contentMeta, setContentMeta] = useState<ContentPageMeta>(EMPTY_CONTENT_META);
+ const [contentPage, setContentPage] = useState(1);
  const [loading, setLoading] = useState(true);
  const [selectedContent, setSelectedContent] = useState<Content | null>(null);
  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -143,12 +160,12 @@ export default function ContentClient() {
 
  // Real-time event handling
  const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
- const hasHandledInitialFolderLoadRef = useRef(false);
  const loadContentRequestRef = useRef(0);
  const devicesLoadedRef = useRef(false);
  const playlistsLoadedRef = useRef(false);
  const devicesLoadPromiseRef = useRef<Promise<void> | null>(null);
  const playlistsLoadPromiseRef = useRef<Promise<void> | null>(null);
+ const lastContentFilterKeyRef = useRef('');
  useEffect(() => {
    return () => {
      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
@@ -198,60 +215,71 @@ export default function ContentClient() {
  },
  });
 
- useEffect(() => {
- loadContent();
- loadFolders();
- }, []);
+ const selectedTagNames = useMemo(() => tags
+ .filter(tag => selectedTags.includes(tag.id))
+ .map(tag => tag.name), [tags, selectedTags]);
 
- // Reload content when folder selection changes
- useEffect(() => {
- if (!hasHandledInitialFolderLoadRef.current) {
- hasHandledInitialFolderLoadRef.current = true;
+ const buildContentListParams = useCallback((): ContentListParams => ({
+ page: contentPage,
+ limit: CONTENT_PAGE_SIZE,
+ ...(filterType !== 'all' ? { type: filterType } : {}),
+ ...(filterStatus !== 'all' ? { status: filterStatus } : {}),
+ ...(filterDateRange !== 'all' ? { dateRange: filterDateRange } : {}),
+ ...(debouncedSearch.trim() ? { search: debouncedSearch.trim() } : {}),
+ ...(selectedTagNames.length > 0 ? { tagNames: selectedTagNames } : {}),
+ }), [contentPage, debouncedSearch, filterDateRange, filterStatus, filterType, selectedTagNames]);
+ const contentFilterKey = `${selectedFolderId ?? 'root'}|${filterType}|${filterStatus}|${filterDateRange}|${debouncedSearch.trim()}|${selectedTagNames.join(',')}`;
+
+ const loadContent = useCallback(async () => {
+ if (lastContentFilterKeyRef.current && lastContentFilterKeyRef.current !== contentFilterKey && contentPage !== 1) {
+ setContentPage(1);
  return;
  }
- loadContent();
- }, [selectedFolderId]);
+ lastContentFilterKeyRef.current = contentFilterKey;
 
- // ESC key handler for preview modal
- useEffect(() => {
- const handleEscape = (e: KeyboardEvent) => {
- if (e.key === 'Escape' && isPreviewModalOpen) {
- setIsPreviewModalOpen(false);
- }
- };
- 
- window.addEventListener('keydown', handleEscape);
- return () => window.removeEventListener('keydown', handleEscape);
- }, [isPreviewModalOpen]);
-
- const loadContent = async () => {
  const requestId = ++loadContentRequestRef.current;
  const folderId = selectedFolderId;
  try {
  setLoading(true);
- let items: Content[];
- if (folderId) {
- items = await fetchAllPaginated((params) => apiClient.getFolderContent(folderId, params));
- } else {
- items = await fetchAllPaginated((params) => apiClient.getContent(params));
- }
+ const params = buildContentListParams();
+ const response = folderId
+ ? await apiClient.getFolderContent(folderId, params)
+ : await apiClient.getContent(params);
+ const items = response.data ?? [];
+ const limit = response.meta?.limit ?? params.limit ?? CONTENT_PAGE_SIZE;
+ const total = response.meta?.total ?? items.length;
+ const meta = {
+ page: response.meta?.page ?? params.page ?? 1,
+ limit,
+ total,
+ totalPages: response.meta?.totalPages ?? (total > 0 ? Math.ceil(total / limit) : 0),
+ };
  if (requestId !== loadContentRequestRef.current) {
  return;
  }
+ if (meta.totalPages > 0 && meta.page > meta.totalPages) {
+ setContentPage(meta.totalPages);
+ return;
+ }
  setContent(items);
+ setContentMeta(meta);
+ setSelectedItems(previous => {
+ const visibleIds = new Set(items.map(item => item.id));
+ return new Set(Array.from(previous).filter(id => visibleIds.has(id)));
+ });
  } catch (error: any) {
  if (requestId !== loadContentRequestRef.current) {
  return;
  }
-  toast.error(error.message || 'Failed to load content');
+  showToast(error.message || 'Failed to load content', 'error');
   } finally {
  if (requestId === loadContentRequestRef.current) {
  setLoading(false);
   }
   }
-  };
+  }, [buildContentListParams, contentFilterKey, contentPage, selectedFolderId, showToast]);
 
- const loadFolders = async () => {
+ const loadFolders = useCallback(async () => {
  try {
  const folderList = await apiClient.getFolders({ format: 'tree' });
  setFolders(folderList || []);
@@ -260,7 +288,7 @@ export default function ContentClient() {
   console.error('[ContentPage] Failed to load folders:', error);
  }
  }
- };
+ }, []);
 
  const handleCreateFolder = async () => {
  if (!newFolderName.trim()) {
@@ -323,6 +351,26 @@ export default function ContentClient() {
  setDevicesLoading(false);
  }
  };
+
+ useEffect(() => {
+ loadFolders();
+ }, [loadFolders]);
+
+ useEffect(() => {
+ loadContent();
+ }, [loadContent]);
+
+ // ESC key handler for preview modal
+ useEffect(() => {
+ const handleEscape = (e: KeyboardEvent) => {
+ if (e.key === 'Escape' && isPreviewModalOpen) {
+ setIsPreviewModalOpen(false);
+ }
+ };
+
+ window.addEventListener('keydown', handleEscape);
+ return () => window.removeEventListener('keydown', handleEscape);
+ }, [isPreviewModalOpen]);
 
  const loadPlaylists = async () => {
  try {
@@ -489,16 +537,15 @@ export default function ContentClient() {
  setActionLoading(true);
  setUploadProgress(0);
 
- let newContent;
  if (uploadForm.file && isFileUploadType(uploadForm.type)) {
  // Use progress-tracking upload for file uploads
- newContent = await apiClient.uploadContentWithProgress(
+ await apiClient.uploadContentWithProgress(
  { title: uploadForm.title, type: uploadForm.type, file: uploadForm.file },
  (percent) => setUploadProgress(percent),
  );
  } else {
  // URL-based content creation
- newContent = await apiClient.createContent({
+ await apiClient.createContent({
  title: uploadForm.title,
  type: uploadForm.type,
  url: uploadForm.url,
@@ -624,7 +671,13 @@ export default function ContentClient() {
  () => {
  // Commit optimistic deletion and update rendered state
  commitOptimistic(deleteId);
+ const wasOnlyVisibleItem = content.length <= 1;
  setContent(prev => prev.filter(item => item.id !== deletedContentId));
+ if (wasOnlyVisibleItem && contentPage > 1) {
+ setContentPage(page => Math.max(1, page - 1));
+ } else {
+ void loadContent();
+ }
  toast.success('Content deleted successfully');
  setIsDeleteModalOpen(false);
  setSelectedContent(null);
@@ -880,42 +933,7 @@ export default function ContentClient() {
  },
  });
 
- // Filter by type and search query
- const filteredContent = content.filter((c) => {
- // Type filter
- const matchesType = filterType === 'all' || c.type === filterType;
-
- // Search filter
- const matchesSearch = !debouncedSearch ||
- c.title.toLowerCase().includes(debouncedSearch.toLowerCase());
-
- // Status filter
- const matchesStatus = filterStatus === 'all' || c.status === filterStatus;
-
- // Date range filter
- let matchesDate = true;
- if (filterDateRange !== 'all' && c.createdAt) {
- const contentDate = new Date(c.createdAt);
- const now = new Date();
- const daysAgo = {
- '7days': 7,
- '30days': 30,
- '90days': 90,
- }[filterDateRange] || 0;
- const cutoffDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
- matchesDate = contentDate >= cutoffDate;
- }
-
- // Tag filter — matches content whose metadata.tags array includes any selected tag name
- let matchesTags = true;
- if (selectedTags.length > 0) {
- const selectedTagNames = tags.filter(t => selectedTags.includes(t.id)).map(t => t.name.toLowerCase());
- const contentTags: string[] = Array.isArray((c as any).tags) ? (c as any).tags : (c.metadata?.tags || []);
- matchesTags = contentTags.some(ct => selectedTagNames.includes(String(ct).toLowerCase()));
- }
-
- return matchesType && matchesSearch && matchesStatus && matchesDate && matchesTags;
- });
+ const filteredContent = content;
 
  const clearAllFilters = () => {
  setFilterType('all');
@@ -923,6 +941,8 @@ export default function ContentClient() {
  setFilterDateRange('all');
  setSearchQuery('');
  setSelectedTags([]);
+ setSelectedItems(new Set());
+ setContentPage(1);
  };
 
  const hasActiveFilters = filterType !== 'all' || filterStatus !== 'all' || filterDateRange !== 'all' || searchQuery !== '' || selectedTags.length > 0;
@@ -933,6 +953,17 @@ export default function ContentClient() {
  : devicesLoadError
  ? 'Select Devices'
  : `Select Devices (${onlineDeviceCount} online)`;
+ const totalContentItems = contentMeta.total;
+ const currentPageStart = totalContentItems === 0 ? 0 : (contentMeta.page - 1) * contentMeta.limit + 1;
+ const currentPageEnd = totalContentItems === 0 ? 0 : Math.min(currentPageStart + content.length - 1, totalContentItems);
+ const canGoToPreviousPage = contentMeta.page > 1;
+ const canGoToNextPage = contentMeta.page < contentMeta.totalPages;
+ const goToPreviousPage = () => {
+ if (canGoToPreviousPage) setContentPage(page => Math.max(1, page - 1));
+ };
+ const goToNextPage = () => {
+ if (canGoToNextPage) setContentPage(page => page + 1);
+ };
 
  return (
  <div className="flex h-full">
@@ -941,7 +972,11 @@ export default function ContentClient() {
  <FolderTree
  folders={folders}
  selectedFolderId={selectedFolderId}
- onSelectFolder={setSelectedFolderId}
+ onSelectFolder={(folderId) => {
+ setSelectedFolderId(folderId);
+ setSelectedItems(new Set());
+ setContentPage(1);
+ }}
  onCreateFolder={() => setIsCreateFolderModalOpen(true)}
  />
  </div>
@@ -954,7 +989,7 @@ export default function ContentClient() {
  <div>
  <h2 className="eh-dash-title text-2xl">Content Library</h2>
  <p className="mt-1 text-sm text-[var(--foreground-secondary)] flex items-center gap-2">
- {content.length} items
+ {totalContentItems} items
  {realtimeStatus === 'connected' && (
  <span className="inline-flex items-center gap-1" title="Real-time sync enabled">
  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
@@ -992,7 +1027,10 @@ export default function ContentClient() {
  <div className="flex-1 min-w-[200px]">
  <SearchFilter
  value={searchQuery}
- onChange={setSearchQuery}
+ onChange={(value) => {
+ setSearchQuery(value);
+ setSelectedItems(new Set());
+ }}
  placeholder="Search content by title..."
  />
  </div>
@@ -1002,7 +1040,11 @@ export default function ContentClient() {
  {['all', 'image', 'video', 'pdf', 'url'].map((type) => (
  <button
  key={type}
- onClick={() => setFilterType(type)}
+ onClick={() => {
+ setFilterType(type);
+ setSelectedItems(new Set());
+ setContentPage(1);
+ }}
  className={filterType === type ? 'eh-filter-pill eh-filter-pill-active' : 'eh-filter-pill'}
  >
  {type.charAt(0).toUpperCase() + type.slice(1)}
@@ -1046,11 +1088,19 @@ export default function ContentClient() {
  <ContentTagger
  tags={tags}
  selectedTags={selectedTags}
- onChange={setSelectedTags}
+ onChange={(tagIds) => {
+ setSelectedTags(tagIds);
+ setSelectedItems(new Set());
+ setContentPage(1);
+ }}
  />
  {selectedTags.length > 0 && (
  <button
- onClick={() => setSelectedTags([])}
+ onClick={() => {
+ setSelectedTags([]);
+ setSelectedItems(new Set());
+ setContentPage(1);
+ }}
  className="mt-3 text-sm text-[var(--primary)] hover:underline"
  >
  Clear tag filters
@@ -1065,17 +1115,31 @@ export default function ContentClient() {
  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
  <div>
  <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">Status</label>
- <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="eh-select">
+ <select value={filterStatus} onChange={(e) => {
+ setFilterStatus(e.target.value);
+ setSelectedItems(new Set());
+ setContentPage(1);
+ }} className="eh-select">
  <option value="all">All Statuses</option>
+ <option value="active">Active</option>
  <option value="ready">Ready</option>
  <option value="processing">Processing</option>
  <option value="error">Error</option>
+ <option value="draft">Draft</option>
  <option value="flagged">Flagged</option>
+ <option value="pending_approval">Pending Approval</option>
+ <option value="rejected">Rejected</option>
+ <option value="archived">Archived</option>
+ <option value="expired">Expired</option>
  </select>
  </div>
  <div>
  <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">Upload Date</label>
- <select value={filterDateRange} onChange={(e) => setFilterDateRange(e.target.value as any)} className="eh-select">
+ <select value={filterDateRange} onChange={(e) => {
+ setFilterDateRange(e.target.value as 'all' | '7days' | '30days' | '90days');
+ setSelectedItems(new Set());
+ setContentPage(1);
+ }} className="eh-select">
  <option value="all">All Time</option>
  <option value="7days">Last 7 days</option>
  <option value="30days">Last 30 days</option>
@@ -1100,7 +1164,7 @@ export default function ContentClient() {
  {/* Search results count */}
  {debouncedSearch && (
  <p className="text-sm text-[var(--foreground-secondary)]">
- {filteredContent.length} {filteredContent.length === 1 ? 'result' : 'results'} found
+ {totalContentItems} {totalContentItems === 1 ? 'result' : 'results'} found
  </p>
  )}
 
@@ -1108,7 +1172,11 @@ export default function ContentClient() {
  <FolderBreadcrumb
  folders={folders}
  currentFolderId={selectedFolderId}
- onNavigate={setSelectedFolderId}
+ onNavigate={(folderId) => {
+ setSelectedFolderId(folderId);
+ setSelectedItems(new Set());
+ setContentPage(1);
+ }}
  />
 
  {/* Bulk Actions Toolbar */}
@@ -1147,6 +1215,37 @@ export default function ContentClient() {
  </div>
  )}
 
+ {!loading && totalContentItems > 0 && (
+ <div className="flex flex-col gap-3 text-sm text-[var(--foreground-secondary)] sm:flex-row sm:items-center sm:justify-between">
+ <span>
+ {currentPageStart}-{currentPageEnd} of {totalContentItems} items
+ </span>
+ <div className="flex flex-wrap items-center gap-2">
+ <button
+ type="button"
+ aria-label="Previous page"
+ onClick={goToPreviousPage}
+ disabled={!canGoToPreviousPage}
+ className="eh-btn-secondary px-3 py-1.5 text-sm disabled:opacity-50"
+ >
+ Previous
+ </button>
+ <span className="text-xs text-[var(--foreground-tertiary)]">
+ Page {contentMeta.page} of {Math.max(contentMeta.totalPages, 1)}
+ </span>
+ <button
+ type="button"
+ aria-label="Next page"
+ onClick={goToNextPage}
+ disabled={!canGoToNextPage}
+ className="eh-btn-secondary px-3 py-1.5 text-sm disabled:opacity-50"
+ >
+ Next
+ </button>
+ </div>
+ </div>
+ )}
+
  {/* Content Grid */}
  {loading ? (
  <div className="eh-dash-card p-12">
@@ -1155,8 +1254,8 @@ export default function ContentClient() {
  ) : filteredContent.length === 0 ? (
  <EmptyState
  icon="folder"
- title="No content yet"
- description="Start by uploading your first media file"
+ title={hasActiveFilters ? 'No matching content' : 'No content yet'}
+ description={hasActiveFilters ? 'Try changing or clearing your filters' : 'Start by uploading your first media file'}
  action={{
  label: 'Upload Content',
  onClick: () => setIsUploadModalOpen(true),

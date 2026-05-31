@@ -1,6 +1,104 @@
 # Vizora - Task Tracker
 
-## In Progress: Customer/Performance Readiness Pass 11 (2026-05-31)
+## In Progress: Content Library Performance Pass 14 (2026-05-31)
+
+**Branch:** `feat/customer-performance-pass-14`
+
+**Why now:** PR #136 merged the real dashboard health/storage trust pass and CI
+was green, but production deployment remains blocked by dirty/diverged prod
+state. The next buildable customer-performance gap is the content library:
+it still loads all content rows and filters client-side, which can become slow
+or hit the pagination safety cap for real customer libraries.
+
+**New primitives introduced:** bounded `search`, `dateRange`, and `tagNames`
+content-list query parameters plus paged content-library dashboard state.
+
+**Hermes-first analysis:** not applicable. This pass does not add business
+agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
+
+**Plan**
+- [x] Merge PR #136 after full CI green.
+- [x] Re-check production deploy gate after merge.
+- [x] Start fresh branch from `origin/main`.
+- [x] Write scoped plan/design for content-library server filtering and
+  pagination.
+- [x] Run multi-subagent pre-implementation review/analysis.
+- [x] Add focused failing tests.
+- [x] Implement backend query filters and web paged loading.
+- [x] Run multi-subagent code review before broader tests.
+- [x] Run focused and broader affected verification.
+- [ ] PR, CI, merge.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Current merge/deploy state**
+- [x] PR #136 merged at
+  `35609734a185366f981efc47246e46229836f22d`; CI green for audit, build, e2e,
+  lint, security, and test.
+- [x] No open GitHub PRs after #136 merge.
+- [x] Prod deploy remains blocked: `/opt/vizora/app` is dirty and
+  ahead/behind stale prod `origin/main`, with many local template/web/script
+  changes and untracked operator/docs assets. No production pull, reset, stash,
+  env edit, service restart, DB mutation, or deploy performed.
+
+**Plan/design:**
+`docs/plans/2026-05-31-content-library-server-filter-pagination-pass-14.md`
+
+**Selected fix bundle**
+- [x] Added tenant-scoped server filters for content library lists:
+  `search`, `dateRange`, and `tagNames` now share the middleware DTO and
+  Prisma where-builder for root and folder-scoped content.
+- [x] Added a folder/content list index:
+  `Content(organizationId, folderId, createdAt DESC)`.
+- [x] Updated the dashboard content library to request bounded pages instead
+  of fetching every content row before client-side filtering.
+- [x] Preserved modal-only lazy loading for push/add-to-playlist option data.
+
+**Review**
+- [x] Pre-implementation review:
+  customer/UX and backend/API reviewers confirmed the highest-value small
+  gap was content-library server-side filtering/pagination. The UX reviewer
+  inspected the main checkout instead of this worktree, so its comments were
+  treated as directional and reconciled against local code truth.
+- [x] Backend/API/data code review CLEAN. Residual risk accepted:
+  legacy `metadata.tags` JSON fallback is exact-case while relation-backed
+  tag filtering is case-insensitive.
+- [x] Dashboard UX/performance review found and fixes landed for an unstable
+  toast dependency refetch loop, stale pagination after deleting the only item
+  on a later page, stale page/search fetch sequencing, and mobile paginator
+  wrapping.
+- [x] Targeted re-review CLEAN after the dashboard fixes.
+
+**Verification**
+- [x] Focused middleware tests passed:
+  `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="content-query.dto|content.service|content.controller|folders.service|folders.controller"`
+  (10 suites / 352 tests).
+- [x] Focused web content tests passed after final cleanup:
+  `pnpm --filter @vizora/web test -- --runInBand --testPathPattern="dashboard/content"`
+  (1 suite / 35 tests).
+- [x] Full middleware Jest passed:
+  `pnpm --filter @vizora/middleware test -- --runInBand`
+  (143 suites / 2873 tests).
+- [x] Full web Jest passed:
+  `pnpm --filter @vizora/web test -- --runInBand`
+  (95 suites / 980 tests). Existing unrelated React `act(...)` and jsdom
+  navigation warnings remain in the broader suite.
+- [x] Prisma validate passed for `packages/database/prisma/schema.prisma`.
+- [x] TypeScript checks passed for middleware and web.
+- [x] Production builds passed with required local verification env:
+  `NEXT_PUBLIC_SOCKET_URL=http://localhost:3002`,
+  `NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1`,
+  `BACKEND_URL=http://localhost:3000`.
+- [x] `git diff --check` passed; Windows CRLF conversion warnings only.
+
+**Residual risks / deploy gate**
+- [ ] CI pending until PR is opened.
+- [ ] Production deploy still blocked by the dirty/diverged prod checkout.
+  No production pull, reset, stash, env edit, service restart, DB mutation, or
+  deploy performed.
+
+---
+
+## Completed: Customer/Performance Readiness Pass 11 (2026-05-31)
 
 **Branch:** `feat/performance-readiness-pass-11`
 

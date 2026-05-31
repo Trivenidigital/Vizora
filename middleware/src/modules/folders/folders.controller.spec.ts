@@ -217,6 +217,46 @@ describe('FoldersController', () => {
         organizationId,
         'folder-123',
         pagination,
+        {
+          type: undefined,
+          status: undefined,
+          templateOrientation: undefined,
+          search: undefined,
+          dateRange: undefined,
+          tagNames: undefined,
+        },
+      );
+    });
+
+    it('should pass server-side content filters to the folder service', async () => {
+      const query = {
+        page: 1,
+        limit: 10,
+        search: 'menu',
+        type: 'image',
+        status: 'active',
+        dateRange: '30days',
+        tagNames: ['Marketing'],
+      };
+      mockFoldersService.getContents.mockResolvedValue({
+        data: [],
+        meta: { total: 0, page: 1, limit: 10, totalPages: 0 },
+      } as any);
+
+      await controller.getContents(organizationId, 'folder-123', query as any);
+
+      expect(mockFoldersService.getContents).toHaveBeenCalledWith(
+        organizationId,
+        'folder-123',
+        { page: 1, limit: 10 },
+        {
+          search: 'menu',
+          type: 'image',
+          status: 'active',
+          dateRange: '30days',
+          tagNames: ['Marketing'],
+          templateOrientation: undefined,
+        },
       );
     });
 

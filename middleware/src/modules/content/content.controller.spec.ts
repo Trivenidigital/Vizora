@@ -457,6 +457,30 @@ describe('ContentController', () => {
         { type: 'image', status: 'active', templateOrientation: undefined },
       );
     });
+
+    it('should pass server-side library filters without mixing them into pagination', async () => {
+      mockContentService.findAll.mockResolvedValue({ data: [], total: 0 } as any);
+
+      await controller.findAll(organizationId, {
+        ...pagination,
+        search: 'menu',
+        dateRange: '7days',
+        tagNames: ['Marketing', 'Seasonal'],
+      } as any);
+
+      expect(mockContentService.findAll).toHaveBeenCalledWith(
+        organizationId,
+        pagination,
+        {
+          type: undefined,
+          status: undefined,
+          templateOrientation: undefined,
+          search: 'menu',
+          dateRange: '7days',
+          tagNames: ['Marketing', 'Seasonal'],
+        },
+      );
+    });
   });
 
   describe('findOne', () => {
