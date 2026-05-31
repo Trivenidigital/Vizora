@@ -1,8 +1,59 @@
 # Vizora - Task Tracker
 
-## In Progress: Display Runtime Reliability (2026-05-31)
+## In Progress: Customer Dashboard + Performance Pass 4 (2026-05-31)
+
+**Branch:** `feat/customer-dashboard-performance-pass`
+
+**Why now:** PRs #123-#125 are merged and CI-green, but production deploy is blocked by dirty/diverged prod-local work. Fresh customer, performance, and adversarial scans found several repo-side issues that directly affect customer-1 readiness without requiring operator-only actions.
+
+**New primitives introduced:** none. Reuse existing Electron display client, NestJS controllers/services, realtime gateway, display web components, response envelope, and critical smoke script.
+
+**Hermes-first analysis:** not applicable; this pass does not add business-agent behavior, MCP tools, Hermes skills, AI provider calls, or spend paths.
+
+**Plan/design:** `docs/plans/2026-05-31-customer-dashboard-performance-pass-4.md`
+
+**Selected fix bundle**
+- [x] Electron pairing unwraps the middleware response envelope.
+- [x] Active schedule endpoint rejects device JWTs whose subject does not match the requested display.
+- [x] Active schedule lookup rejects missing/disabled displays before returning schedules.
+- [x] Display content-error messages redact device JWT query params before UI, Redis, or Sentry.
+- [x] Critical smoke pairing-complete parsing handles enveloped `data.display.id`.
+- [x] Run multi-subagent review before broad verification.
+- [ ] Run focused/broad verification.
+- [ ] PR, CI, merge.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Review gate**
+- [x] Subagent runtime/security review: CLEAN.
+- [x] Subagent customer/performance review: initial untracked-helper CI-safety finding fixed by staging the full intended patch; re-review CLEAN.
+
+**Local verification**
+- [x] `pnpm exec prisma generate --schema prisma/schema.prisma` in `packages/database` - pass; generated local Prisma client needed before realtime tests in this worktree.
+- [x] `npx nx build @vizora/database` - pass.
+- [x] `pnpm --filter @vizora/display test -- --runInBand --testPathPattern=device-client` - pass, 47 tests.
+- [x] `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="schedules.controller|schedules.service"` - pass, 51 tests.
+- [x] `pnpm --filter @vizora/web test -- --runInBand --testPathPattern=ContentRenderer` - pass, 3 tests.
+- [x] `pnpm --filter @vizora/realtime test -- --runInBand --testPathPattern="device.gateway|heartbeat.service"` - pass, 3 suites / 124 tests.
+- [x] `git diff --check --cached` - pass.
+- [x] `C:\Program Files\Git\bin\bash.exe -n scripts/smoke/api-critical-path.sh` - pass.
+- [x] `pnpm --filter @vizora/display test:ci` - pass, 6 suites / 124 tests.
+- [x] `pnpm --filter @vizora/display typecheck` - pass.
+- [x] `pnpm --filter @vizora/middleware test -- --runInBand` - pass, 143 suites / 2790 tests.
+- [x] `pnpm --filter @vizora/realtime test -- --runInBand` - pass, 11 suites / 258 tests.
+- [x] `pnpm --filter @vizora/web test -- --runInBand` - pass, 89 suites / 927 tests; existing React `act(...)` and jsdom navigation warnings remain.
+- [x] `pnpm --filter @vizora/middleware exec tsc --noEmit --pretty false` - pass.
+- [x] `pnpm --filter @vizora/web exec tsc --noEmit --pretty false` - pass.
+- [x] `npx nx build @vizora/middleware` - pass with existing webpack warnings.
+- [x] `npx nx build @vizora/realtime` - pass with existing source-map / optional `ws` warnings.
+- [x] `NODE_OPTIONS=--max-old-space-size=4096 NEXT_PUBLIC_SOCKET_URL=http://localhost:3002 NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1 BACKEND_URL=http://localhost:3000 npx nx build @vizora/web` - pass with existing Next middleware deprecation and TypeScript project-reference warnings.
+- [x] `pnpm --filter @vizora/display build` - pass.
+
+---
+
+## Completed: Display Runtime Reliability (2026-05-31)
 
 **Branch:** `fix/display-runtime-reliability`
+**PR / merge commit:** #125 / `0a509cb0c1ee03f2fda558a7be38247c19bc8f3a`
 
 **Why now:** PR #124 merged critical upload/streaming smoke coverage, and production deploy remains blocked by dirty/diverged prod-local work. The next repo-side customer-1 reliability gap is unattended display runtime behavior: after reboot/screensaver/power policy changes, displays must come back and continue emitting reliable proof-of-play signals.
 
@@ -21,8 +72,8 @@
 - [x] Gate display renderer/main typecheck and display build in CI.
 - [x] Run multi-subagent review before broad verification.
 - [x] Run focused/broad verification.
-- [ ] PR, CI, merge.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge.
+- [x] Re-check deployment gate; deployment remains blocked by dirty/diverged prod checkout.
 
 **Review gate**
 - [x] Electron runtime reviewer: initial packaged-guard and process-listener findings fixed; final re-review CLEAN.
@@ -37,9 +88,10 @@
 
 ---
 
-## In Progress: Critical Smoke Upload + Streaming Coverage (2026-05-31)
+## Completed: Critical Smoke Upload + Streaming Coverage (2026-05-31)
 
 **Branch:** `feat/customer-readiness-next`
+**PR / merge commit:** #124 / `81e5cd25da6c2030d339b3d48866f40bba15a4c7`
 
 **Why now:** PR #123 merged the customer-readiness hot-path hardening, but the operator smoke still proves URL content creation rather than real multipart upload and authenticated media streaming. Customer-1 go-live needs the smoke to exercise the path displays actually use for uploaded assets.
 
@@ -57,8 +109,8 @@
 - [x] Add uploaded-object cleanup so production smoke runs do not leave MinIO objects behind.
 - [x] Run subagent review before broad verification.
 - [x] Run focused verification; full smoke blocked because Docker/local services are unavailable.
-- [ ] PR, CI, merge.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge.
+- [x] Re-check deployment gate; deployment remains blocked by dirty/diverged prod checkout.
 
 **Review gate**
 - [x] Bash/operator-safety reviewer: initial run-ID, range-validation, and interrupt-handling notes fixed; final re-review CLEAN.

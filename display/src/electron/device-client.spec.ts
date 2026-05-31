@@ -134,7 +134,10 @@ describe('DeviceClient', () => {
         cb(mockResponse);
         // Simulate async data
         Promise.resolve().then(() => {
-          dataCallback(JSON.stringify({ code: 'ABC123', qrCode: 'data:image/png;base64,...' }));
+          dataCallback(JSON.stringify({
+            success: true,
+            data: { code: 'ABC123', qrCode: 'data:image/png;base64,...' },
+          }));
           endCallback();
         });
         return mockReq;
@@ -237,7 +240,10 @@ describe('DeviceClient', () => {
         requestedUrl = url.toString();
         cb(mockResponse);
         Promise.resolve().then(() => {
-          dataCallback(JSON.stringify({ status: 'paired', deviceToken: 'jwt-token-123' }));
+          dataCallback(JSON.stringify({
+            success: true,
+            data: { status: 'paired', deviceToken: 'jwt-token-123' },
+          }));
           endCallback();
         });
         return mockReq;

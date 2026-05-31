@@ -342,7 +342,7 @@ describe('SchedulesService', () => {
         },
       ];
 
-      databaseService.display.findFirst.mockResolvedValue({ timezone: 'UTC' } as any);
+      databaseService.display.findFirst.mockResolvedValue({ timezone: 'UTC', isDisabled: false } as any);
       databaseService.schedule.findMany.mockResolvedValue(mockActiveSchedules);
 
       const result = await service.findActiveSchedules(mockDisplayId, mockOrganizationId);
@@ -352,7 +352,7 @@ describe('SchedulesService', () => {
     });
 
     it('should filter by current date, time, day of week, and organizationId', async () => {
-      databaseService.display.findFirst.mockResolvedValue({ timezone: 'UTC' } as any);
+      databaseService.display.findFirst.mockResolvedValue({ timezone: 'UTC', isDisabled: false } as any);
       databaseService.schedule.findMany.mockResolvedValue([]);
 
       await service.findActiveSchedules(mockDisplayId, mockOrganizationId);
@@ -363,6 +363,22 @@ describe('SchedulesService', () => {
       expect(callArgs.where.startDate).toHaveProperty('lte');
       expect(callArgs.where.daysOfWeek).toHaveProperty('has');
       expect(callArgs.orderBy).toEqual({ priority: 'desc' });
+    });
+
+    it('should reject missing displays before querying schedules', async () => {
+      databaseService.display.findFirst.mockResolvedValue(null);
+
+      await expect(service.findActiveSchedules(mockDisplayId, mockOrganizationId))
+        .rejects.toThrow(NotFoundException);
+      expect(databaseService.schedule.findMany).not.toHaveBeenCalled();
+    });
+
+    it('should reject disabled displays before querying schedules', async () => {
+      databaseService.display.findFirst.mockResolvedValue({ timezone: 'UTC', isDisabled: true } as any);
+
+      await expect(service.findActiveSchedules(mockDisplayId, mockOrganizationId))
+        .rejects.toThrow(NotFoundException);
+      expect(databaseService.schedule.findMany).not.toHaveBeenCalled();
     });
   });
 

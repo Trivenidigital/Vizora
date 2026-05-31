@@ -908,6 +908,42 @@ describe('DeviceGateway', () => {
       );
     });
 
+    it('should redact device tokens before storing or reporting content errors', async () => {
+      const Sentry = require('@sentry/nestjs');
+      const client = createMockSocket();
+      const data = {
+        contentId: 'content-1',
+        errorType: 'network_error',
+        errorMessage: 'failed http://localhost:3000/api/v1/device-content/content-1/file?token=device-jwt',
+        context: {
+          url: 'http://localhost:3000/api/v1/device-content/content-1/file?variant=original&token=device-jwt',
+        },
+      };
+
+      await gateway.handleContentError(client as any, data as any);
+
+      expect(mockHeartbeatService.logError).toHaveBeenCalledWith(
+        'device-1',
+        expect.objectContaining({
+          errorMessage: 'failed http://localhost:3000/api/v1/device-content/content-1/file?token=[redacted]',
+          context: {
+            url: 'http://localhost:3000/api/v1/device-content/content-1/file?variant=original&token=[redacted]',
+          },
+        }),
+      );
+      expect(Sentry.captureMessage).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          extra: expect.objectContaining({
+            errorMessage: 'failed http://localhost:3000/api/v1/device-content/content-1/file?token=[redacted]',
+            context: {
+              url: 'http://localhost:3000/api/v1/device-content/content-1/file?variant=original&token=[redacted]',
+            },
+          }),
+        }),
+      );
+    });
+
     it('should record content error metrics', async () => {
       const client = createMockSocket();
       const data = { contentId: 'content-1', errorType: 'decode_error' };

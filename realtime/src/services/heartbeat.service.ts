@@ -8,6 +8,7 @@ import {
   DeviceMetrics,
   CurrentContentState,
 } from '../types';
+import { redactSensitiveTokens } from '../utils/redact-sensitive-url';
 
 interface StoredHeartbeat {
   deviceId: string;
@@ -127,9 +128,10 @@ export class HeartbeatService {
    */
   async logError(deviceId: string, data: ContentErrorData): Promise<void> {
     try {
+      const sanitizedData = redactSensitiveTokens(data);
       const errorLog: StoredError = {
         deviceId,
-        ...data,
+        ...sanitizedData,
         timestamp: Date.now(),
       };
 

@@ -11,6 +11,7 @@ import { PairingScreen } from './components/PairingScreen';
 import { ContentScreen } from './components/ContentScreen';
 import { StatusBar } from './components/StatusBar';
 import { FullscreenButton } from './components/FullscreenButton';
+import { redactSensitiveUrl } from './lib/redact-sensitive-url';
 
 export function DisplayClient() {
   const [state, setState] = useState<DisplayState>('LOADING');
@@ -152,7 +153,7 @@ export function DisplayClient() {
     connection.emitContentError({
       contentId,
       errorType,
-      errorMessage: errMsg,
+      errorMessage: redactSensitiveUrl(errMsg),
       timestamp: Date.now(),
     });
   }, [connection]);

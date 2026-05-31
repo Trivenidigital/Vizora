@@ -13,6 +13,13 @@ interface DeviceClientConfig {
 type SocketAck = (response?: { ok: boolean; error?: string }) => void;
 const SELF_TERMINATING_COMMAND_ACK_FLUSH_MS = 500;
 
+function unwrapResponseEnvelope<T>(parsed: T | { data?: T }): T {
+  if (parsed && typeof parsed === 'object' && 'data' in parsed && (parsed as any).data !== undefined) {
+    return (parsed as any).data as T;
+  }
+  return parsed as T;
+}
+
 export class DeviceClient {
   private socket: Socket | null = null;
   private heartbeatInterval: NodeJS.Timeout | null = null;
@@ -118,7 +125,7 @@ export class DeviceClient {
             console.log('[DeviceClient] Response data length:', data.length);
             if (res.statusCode === 200 || res.statusCode === 201) {
               try {
-                const result = JSON.parse(data);
+                const result = unwrapResponseEnvelope<any>(JSON.parse(data));
                 console.log('[DeviceClient] ✅ Pairing code received successfully:', result.code);
                 console.log('[DeviceClient] QR Code present:', !!result.qrCode);
                 if (result.qrCode) {
@@ -192,7 +199,7 @@ export class DeviceClient {
           res.on('end', () => {
             try {
               if (res.statusCode === 200) {
-                const result = JSON.parse(data) as { status?: string; deviceToken?: string };
+                const result = unwrapResponseEnvelope<{ status?: string; deviceToken?: string }>(JSON.parse(data));
 
                 if (result.status === 'paired' && result.deviceToken) {
                   console.log('[DeviceClient] ✅ ✅ ✅ DEVICE PAIRED! Token received');

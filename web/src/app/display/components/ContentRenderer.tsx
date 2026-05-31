@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ContentType } from '../lib/types';
 import { LayoutRenderer } from './LayoutRenderer';
 import type { LayoutMetadata } from '../lib/types';
+import { redactSensitiveUrl } from '../lib/redact-sensitive-url';
 
 interface ContentRendererProps {
   type: ContentType;
@@ -65,6 +66,7 @@ function shouldFetchImageAsBlob(url: string): boolean {
 export function ContentRenderer({ type, url, name, metadata, authenticateUrl, onEnded, onError }: ContentRendererProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const renderedUrl = authenticateUrl ? authenticateUrl(url) : url;
+  const safeRenderedUrl = redactSensitiveUrl(renderedUrl);
   const isImage = type === 'image';
   const shouldFetchBlob = isImage && shouldFetchImageAsBlob(renderedUrl);
   const { blobUrl, error: fetchError } = useBlobUrl(renderedUrl, shouldFetchBlob);
@@ -85,9 +87,9 @@ export function ContentRenderer({ type, url, name, metadata, authenticateUrl, on
   // Report fetch errors for images
   useEffect(() => {
     if (isImage && fetchError) {
-      onError?.('load_error', `Image fetch failed: ${fetchError} (url: ${renderedUrl})`);
+      onError?.('load_error', `Image fetch failed: ${fetchError} (url: ${safeRenderedUrl})`);
     }
-  }, [isImage, fetchError, renderedUrl, onError]);
+  }, [isImage, fetchError, safeRenderedUrl, onError]);
 
   switch (type) {
     case 'image':
@@ -98,7 +100,7 @@ export function ContentRenderer({ type, url, name, metadata, authenticateUrl, on
             alt={name || 'Display content'}
             style={styles.image}
             onError={() => {
-              onError?.('load_error', `Image failed to load: ${renderedUrl}`);
+              onError?.('load_error', `Image failed to load: ${safeRenderedUrl}`);
               onEnded?.();
             }}
           />
@@ -107,7 +109,7 @@ export function ContentRenderer({ type, url, name, metadata, authenticateUrl, on
       if (fetchError) {
         return (
           <div style={{ ...styles.image, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ff6b6b', fontSize: '14px', padding: '20px', textAlign: 'center' as const }}>
-            Image load error: {fetchError}<br />URL: {renderedUrl?.substring(0, 80)}...
+            Image load error: {fetchError}<br />URL: {safeRenderedUrl?.substring(0, 80)}...
           </div>
         );
       }
@@ -141,7 +143,7 @@ export function ContentRenderer({ type, url, name, metadata, authenticateUrl, on
           style={styles.video}
           onEnded={onEnded}
           onError={() => {
-            onError?.('load_error', `Video failed to load: ${renderedUrl}`);
+            onError?.('load_error', `Video failed to load: ${safeRenderedUrl}`);
             onEnded?.();
           }}
         />
@@ -156,7 +158,7 @@ export function ContentRenderer({ type, url, name, metadata, authenticateUrl, on
           allow="autoplay; fullscreen"
           title={name || 'Web content'}
           onError={() => {
-            onError?.('load_error', `Webpage failed to load: ${renderedUrl}`);
+            onError?.('load_error', `Webpage failed to load: ${safeRenderedUrl}`);
             onEnded?.();
           }}
         />
