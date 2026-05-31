@@ -471,6 +471,41 @@ describe('ContentClient', () => {
     expect(screen.queryByPlaceholderText('https://example.com/page')).not.toBeInTheDocument();
   });
 
+  it('does not upload a removed queued file when switching to URL content', async () => {
+    mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
+    render(<ContentClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+
+    fireEvent.click(screen.getAllByText('Upload Content')[0]);
+    const removedFile = new File(['image-bytes'], 'removed.png', { type: 'image/png' });
+
+    await act(async () => {
+      lastDropzoneOptions.onDrop([removedFile]);
+    });
+
+    fireEvent.click(screen.getByLabelText(/remove removed.png from upload queue/i));
+    fireEvent.change(screen.getByDisplayValue('Image'), { target: { value: 'url' } });
+    fireEvent.change(screen.getByPlaceholderText('https://example.com/page'), {
+      target: { value: 'https://example.com/menu' },
+    });
+
+    const submitButtons = screen.getAllByRole('button', { name: 'Upload Content' });
+    fireEvent.click(submitButtons[submitButtons.length - 1]);
+
+    await waitFor(() => {
+      expect(mockCreateContent).toHaveBeenCalledWith({
+        title: 'removed',
+        type: 'url',
+        url: 'https://example.com/menu',
+      });
+    });
+    expect(mockUploadContentWithProgress).not.toHaveBeenCalled();
+  });
+
   it('locks queued bulk upload controls while files are uploading', async () => {
     mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
     let resolveUpload: (content: any) => void = () => {};

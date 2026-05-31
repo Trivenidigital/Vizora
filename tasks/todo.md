@@ -19,7 +19,7 @@
 - [x] Implement pairing contract and copy alignment.
 - [x] Implement per-file upload type, progress, bounded concurrency, and upload-while-running locks.
 - [x] Run focused verification.
-- [ ] Run multi-subagent review before broad verification.
+- [x] Run multi-subagent review before broad verification.
 - [ ] Run broader web verification/build.
 - [ ] PR, CI, merge.
 - [ ] Re-check deployment gate; deploy only if prod checkout is safe.
@@ -27,13 +27,14 @@
 **Focused verification**
 - [x] `pnpm --filter @vizora/web test -- --runInBand --testPathPattern="devices-page|content-page"` - red first on missing `pairingToken` rendering and missing bulk `uploadContentWithProgress`, then pass, 2 suites / 30 tests.
 - [x] Post-review regression run for hidden URL-mode queue and modal-close upload lock - red first, then pass, 2 suites / 32 tests.
+- [x] Re-review regression for removed-file URL upload - red first, then pass, content page 21 tests; combined focused suite now 2 suites / 33 tests.
 - [x] `pnpm --filter @vizora/web exec tsc --noEmit --pretty false` - pass.
 - [x] `git diff --check` - pass; line-ending warnings only.
 
 **Review gate**
 - [x] Customer/UX reviewer: initial P1 hidden queued files after switching to URL mode fixed with disabled URL option and guarded change handler; P2 modal-close upload state loss fixed by ignoring close while uploading.
 - [x] Performance/concurrency reviewer: no P0/P1; P2 modal-close finding fixed and pairing response type tightened to required backend shape.
-- [ ] Post-fix re-review.
+- [x] Post-fix re-review: initial P1 removed-file URL upload path fixed by clearing selected file state when queue items are removed/cleared and by requiring a file upload type before using the file branch.
 
 ---
 

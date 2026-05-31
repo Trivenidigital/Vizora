@@ -385,6 +385,30 @@ export default function ContentClient() {
  }
  };
 
+ const clearSelectedUploadFile = () => {
+ if (uploadForm.url.startsWith('blob:')) {
+ URL.revokeObjectURL(uploadForm.url);
+ }
+ setUploadForm(prev => ({
+ ...prev,
+ file: null,
+ url: prev.url.startsWith('blob:') ? '' : prev.url,
+ }));
+ };
+
+ const clearUploadQueue = () => {
+ setUploadQueue([]);
+ clearSelectedUploadFile();
+ };
+
+ const removeUploadQueueItem = (index: number) => {
+ const removedItem = uploadQueue[index];
+ setUploadQueue(prev => prev.filter((_, i) => i !== index));
+ if (removedItem && uploadForm.file === removedItem.file) {
+ clearSelectedUploadFile();
+ }
+ };
+
  const handleUpload = async () => {
  // If queue has files, use bulk upload
  if (uploadQueue.length > 0) {
@@ -405,7 +429,7 @@ export default function ContentClient() {
  setUploadProgress(0);
 
  let newContent;
- if (uploadForm.file) {
+ if (uploadForm.file && isFileUploadType(uploadForm.type)) {
  // Use progress-tracking upload for file uploads
  newContent = await apiClient.uploadContentWithProgress(
  { title: uploadForm.title, type: uploadForm.type, file: uploadForm.file },
@@ -1302,7 +1326,7 @@ export default function ContentClient() {
  URL.revokeObjectURL(uploadForm.url);
  }
  setUploadForm({ title: '', type: 'image', url: '', file: null });
- setUploadQueue([]);
+ clearUploadQueue();
  setIsUploadModalOpen(false);
  }}
  title="Upload Content"
@@ -1417,7 +1441,7 @@ export default function ContentClient() {
  Upload Queue ({uploadQueue.length} file{uploadQueue.length > 1 ? 's' : ''})
  </p>
  <button
- onClick={() => setUploadQueue([])}
+ onClick={clearUploadQueue}
  disabled={actionLoading}
  className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 disabled:opacity-50 disabled:cursor-not-allowed"
  >
@@ -1463,7 +1487,7 @@ export default function ContentClient() {
  <span className="text-red-600 dark:text-red-400" title={item.error}>✗</span>
  )}
  <button
- onClick={() => setUploadQueue(prev => prev.filter((_, i) => i !== idx))}
+ onClick={() => removeUploadQueueItem(idx)}
  disabled={actionLoading}
  aria-label={`Remove ${item.file.name} from upload queue`}
  className="text-[var(--foreground-tertiary)] hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1535,7 +1559,7 @@ export default function ContentClient() {
  URL.revokeObjectURL(uploadForm.url);
  }
  setUploadForm({ title: '', type: 'image', url: '', file: null });
- setUploadQueue([]);
+ clearUploadQueue();
  setUploadProgress(0);
  setIsUploadModalOpen(false);
  }}
