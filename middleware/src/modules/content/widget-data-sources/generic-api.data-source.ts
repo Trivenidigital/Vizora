@@ -2,6 +2,7 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { CircuitBreakerService } from '../../common/services/circuit-breaker.service';
 import { assertUrlIsPublic, SsrfError } from '../../common/utils/ssrf-guard';
 import { WidgetDataSource } from './widget-data-source.interface';
+import { readJsonResponseBodyWithLimit } from '../utils/bounded-json-response';
 
 /**
  * O8 — Generic HTTP-poll widget data source.
@@ -28,8 +29,6 @@ export class GenericApiDataSource implements WidgetDataSource {
   readonly type = 'generic-api';
 
   private readonly REQUEST_TIMEOUT = 15_000;
-  private readonly MAX_RESPONSE_BYTES = 1024 * 1024;
-
   constructor(private readonly circuitBreaker: CircuitBreakerService) {}
 
   async fetchData(config: Record<string, unknown>): Promise<Record<string, unknown>> {
@@ -103,7 +102,7 @@ export class GenericApiDataSource implements WidgetDataSource {
 
           let json: unknown;
           try {
-            json = JSON.parse(await this.readJsonBodyWithLimit(res));
+            json = JSON.parse(await readJsonResponseBodyWithLimit(res));
           } catch (err) {
             throw new Error(
               `Endpoint did not return valid JSON: ${err instanceof Error ? err.message : 'unknown'}`,
@@ -122,63 +121,6 @@ export class GenericApiDataSource implements WidgetDataSource {
         return this.getSampleData();
       },
     );
-  }
-
-  private async readJsonBodyWithLimit(res: Response): Promise<string> {
-    const contentLength = res.headers.get('content-length');
-    if (contentLength) {
-      const declaredBytes = Number(contentLength);
-      if (Number.isFinite(declaredBytes) && declaredBytes > this.MAX_RESPONSE_BYTES) {
-        await this.cancelResponseBody(res);
-        throw new Error(`Endpoint response is too large; maximum is ${this.MAX_RESPONSE_BYTES} bytes`);
-      }
-    }
-
-    if (!res.body) {
-      const text = await res.text();
-      if (Buffer.byteLength(text, 'utf8') > this.MAX_RESPONSE_BYTES) {
-        throw new Error(`Endpoint response is too large; maximum is ${this.MAX_RESPONSE_BYTES} bytes`);
-      }
-      return text;
-    }
-
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let receivedBytes = 0;
-    let text = '';
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        receivedBytes += value.byteLength;
-        if (receivedBytes > this.MAX_RESPONSE_BYTES) {
-          await this.cancelReader(reader);
-          throw new Error(`Endpoint response is too large; maximum is ${this.MAX_RESPONSE_BYTES} bytes`);
-        }
-        text += decoder.decode(value, { stream: true });
-      }
-      text += decoder.decode();
-      return text;
-    } finally {
-      reader.releaseLock();
-    }
-  }
-
-  private async cancelResponseBody(res: Response): Promise<void> {
-    try {
-      await res.body?.cancel();
-    } catch {
-      // The size rejection is the important error; body cancellation is cleanup.
-    }
-  }
-
-  private async cancelReader(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<void> {
-    try {
-      await reader.cancel();
-    } catch {
-      // Preserve the response-size error even if stream cancellation fails.
-    }
   }
 
   /**

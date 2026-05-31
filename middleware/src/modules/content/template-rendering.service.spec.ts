@@ -541,20 +541,16 @@ describe('TemplateRenderingService', () => {
       });
       const redirectedData = { items: [{ name: 'Redirected Item' }] };
       mockFetch
-        .mockResolvedValueOnce({
-          ok: false,
+        .mockResolvedValueOnce(new Response(null, {
           status: 302,
           statusText: 'Found',
-          headers: { get: jest.fn((name: string) => (name.toLowerCase() === 'location' ? 'https://api2.example.com/final' : null)) },
-          json: jest.fn(),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
+          headers: { Location: 'https://api2.example.com/final' },
+        }))
+        .mockResolvedValueOnce(new Response(JSON.stringify(redirectedData), {
           status: 200,
           statusText: 'OK',
-          headers: { get: jest.fn() },
-          json: jest.fn().mockResolvedValue(redirectedData),
-        });
+          headers: { 'Content-Type': 'application/json' },
+        }));
       const dataSource: DataSourceDto = {
         type: 'rest_api',
         url: 'https://api.example.com/data',
@@ -580,6 +576,82 @@ describe('TemplateRenderingService', () => {
           },
         }),
       );
+    });
+
+    it('should return fallback without reading an oversized declared JSON response', async () => {
+      mockCircuitBreaker.executeWithFallback.mockImplementation(async (_name, fn, fallback) => {
+        try {
+          return await fn();
+        } catch (error) {
+          return fallback(error as Error);
+        }
+      });
+      mockFetch.mockResolvedValueOnce(new Response('{"ok":true}', {
+        status: 200,
+        statusText: 'OK',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': String(1024 * 1024 + 1),
+        },
+      }));
+      const dataSource: DataSourceDto = {
+        type: 'rest_api',
+        url: 'https://api.example.com/data',
+      };
+
+      await expect(service.fetchDataFromSource(dataSource)).resolves.toEqual({});
+    });
+
+    it('should return fallback when a chunked JSON response exceeds the body cap', async () => {
+      mockCircuitBreaker.executeWithFallback.mockImplementation(async (_name, fn, fallback) => {
+        try {
+          return await fn();
+        } catch (error) {
+          return fallback(error as Error);
+        }
+      });
+      const chunk = new Uint8Array(1024 * 1024 + 1);
+      chunk.fill(0x20);
+      mockFetch.mockResolvedValueOnce(new Response(new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('{"items":['));
+          controller.enqueue(chunk);
+          controller.close();
+        },
+      }), {
+        status: 200,
+        statusText: 'OK',
+        headers: { 'Content-Type': 'application/json' },
+      }));
+      const dataSource: DataSourceDto = {
+        type: 'json_url',
+        url: 'https://api.example.com/large',
+      };
+
+      await expect(service.fetchDataFromSource(dataSource)).resolves.toEqual({});
+    });
+
+    it('should parse under-limit JSON responses with the shared bounded reader', async () => {
+      mockCircuitBreaker.executeWithFallback.mockImplementation(async (_name, fn, fallback) => {
+        try {
+          return await fn();
+        } catch (error) {
+          return fallback(error as Error);
+        }
+      });
+      mockFetch.mockResolvedValueOnce(new Response(JSON.stringify({ items: ['A', 'B'] }), {
+        status: 200,
+        statusText: 'OK',
+        headers: { 'Content-Type': 'application/json' },
+      }));
+      const dataSource: DataSourceDto = {
+        type: 'rest_api',
+        url: 'https://api.example.com/menu',
+      };
+
+      await expect(service.fetchDataFromSource(dataSource)).resolves.toEqual({
+        items: ['A', 'B'],
+      });
     });
 
     it('should reject private redirect targets before fetching them', async () => {

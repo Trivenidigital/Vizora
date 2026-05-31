@@ -1033,7 +1033,7 @@ describe('DeviceGateway', () => {
       const result = await gateway.handleContentImpression(client as any, data as any);
 
       expect(result.success).toBe(true);
-      expect(mockHeartbeatService.logImpression).toHaveBeenCalledWith('device-1', data);
+      expect(mockHeartbeatService.logImpression).toHaveBeenCalledWith('device-1', data, 'org-1');
     });
 
     it('should call heartbeat service logImpression with device ID', async () => {
@@ -1042,7 +1042,20 @@ describe('DeviceGateway', () => {
 
       await gateway.handleContentImpression(client as any, data as any);
 
-      expect(mockHeartbeatService.logImpression).toHaveBeenCalledWith('device-99', data);
+      expect(mockHeartbeatService.logImpression).toHaveBeenCalledWith('device-99', data, 'org-1');
+    });
+
+    it('should omit organization context when the socket lacks one', async () => {
+      const client = createMockSocket({ data: { deviceId: 'device-99', organizationId: undefined } });
+      const data = { contentId: 'content-5' };
+
+      await gateway.handleContentImpression(client as any, data as any);
+
+      expect(mockHeartbeatService.logImpression).toHaveBeenCalledWith(
+        'device-99',
+        data,
+        undefined,
+      );
     });
 
     it('should record impression metrics', async () => {

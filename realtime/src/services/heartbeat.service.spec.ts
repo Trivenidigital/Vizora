@@ -122,6 +122,25 @@ describe('HeartbeatService', () => {
       });
     });
 
+    it('should persist impression without display lookup when organization context is provided', async () => {
+      const data = {
+        contentId: 'c-1',
+        playlistId: 'p-1',
+      };
+
+      await service.logImpression('device-1', data as any, 'org-from-socket');
+
+      expect(mockDatabaseService.display.findUnique).not.toHaveBeenCalled();
+      expect(mockDatabaseService.contentImpression.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          organizationId: 'org-from-socket',
+          contentId: 'c-1',
+          displayId: 'device-1',
+          playlistId: 'p-1',
+        }),
+      });
+    });
+
     it('should not persist impression when device not found', async () => {
       mockDatabaseService.display.findUnique.mockResolvedValueOnce(null);
 

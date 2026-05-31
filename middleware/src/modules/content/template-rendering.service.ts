@@ -4,6 +4,7 @@ import DOMPurify from 'isomorphic-dompurify';
 import { CircuitBreakerService } from '../common/services/circuit-breaker.service';
 import { DataSourceDto } from './dto/create-template.dto';
 import { assertUrlIsPublic, fetchWithSsrfGuard, SsrfError } from '../common/utils/ssrf-guard';
+import { readJsonResponseBodyWithLimit } from './utils/bounded-json-response';
 
 /**
  * Result of template validation
@@ -288,8 +289,7 @@ export class TemplateRenderingService {
               throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
-            const json = await response.json();
-            return json;
+            return JSON.parse(await readJsonResponseBodyWithLimit(response));
           } finally {
             clearTimeout(timeoutId);
           }

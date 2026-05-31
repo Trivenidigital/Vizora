@@ -83,7 +83,11 @@ export class HeartbeatService {
   /**
    * Log content impression
    */
-  async logImpression(deviceId: string, data: ImpressionPayload): Promise<void> {
+  async logImpression(
+    deviceId: string,
+    data: ImpressionPayload,
+    organizationId?: string,
+  ): Promise<void> {
     try {
       // Store in Redis for quick daily counters
       await this.redisService.increment(
@@ -94,15 +98,20 @@ export class HeartbeatService {
       // Persist to PostgreSQL
       try {
         const now = new Date();
-        const device = await this.db.display.findUnique({
-          where: { id: deviceId },
-          select: { organizationId: true },
-        });
+        let resolvedOrganizationId = organizationId;
 
-        if (device) {
+        if (!resolvedOrganizationId) {
+          const device = await this.db.display.findUnique({
+            where: { id: deviceId },
+            select: { organizationId: true },
+          });
+          resolvedOrganizationId = device?.organizationId;
+        }
+
+        if (resolvedOrganizationId) {
           await this.db.contentImpression.create({
             data: {
-              organizationId: device.organizationId,
+              organizationId: resolvedOrganizationId,
               contentId: data.contentId,
               displayId: deviceId,
               playlistId: data.playlistId || null,

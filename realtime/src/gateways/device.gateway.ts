@@ -1344,10 +1344,13 @@ export class DeviceGateway
   ) {
     if (!this.checkMessageRateLimit(client)) return createErrorResponse('rate_limited');
     const deviceId = client.data.deviceId;
+    const organizationId = typeof client.data.organizationId === 'string'
+      ? client.data.organizationId
+      : undefined;
 
     try {
       // Log impression for analytics
-      await this.heartbeatService.logImpression(deviceId, data);
+      await this.heartbeatService.logImpression(deviceId, data, organizationId);
 
       // Record metrics
       this.metricsService.recordImpression(deviceId, data.contentId);
