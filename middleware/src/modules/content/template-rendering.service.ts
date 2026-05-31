@@ -3,6 +3,7 @@ import * as Handlebars from 'handlebars';
 import DOMPurify from 'isomorphic-dompurify';
 import { CircuitBreakerService } from '../common/services/circuit-breaker.service';
 import { DataSourceDto } from './dto/create-template.dto';
+import { assertUrlIsPublic, SsrfError } from '../common/utils/ssrf-guard';
 
 /**
  * Result of template validation
@@ -246,7 +247,7 @@ export class TemplateRenderingService {
     }
 
     // Block private/internal IPs
-    this.validateExternalUrl(dataSource.url);
+    await this.validateExternalUrl(dataSource.url);
 
     const circuitName = `template-data-${url.hostname}`;
 
@@ -275,8 +276,13 @@ export class TemplateRenderingService {
                 'User-Agent': 'Vizora-Template-Service/1.0',
                 ...safeHeaders,
               },
+              redirect: 'manual',
               signal: controller.signal,
             });
+
+            if (response.status >= 300 && response.status < 400) {
+              throw new Error('Template data source redirects are not allowed');
+            }
 
             if (!response.ok) {
               throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -338,7 +344,7 @@ export class TemplateRenderingService {
   /**
    * Validate URL is not pointing to internal/private resources
    */
-  private validateExternalUrl(urlString: string): void {
+  private async validateExternalUrl(urlString: string): Promise<void> {
     const url = new URL(urlString);
     const hostname = url.hostname.toLowerCase();
 
@@ -386,6 +392,15 @@ export class TemplateRenderingService {
 
     if (metadataHostnames.includes(hostname)) {
       throw new BadRequestException('Cloud metadata endpoints are not allowed');
+    }
+
+    try {
+      await assertUrlIsPublic(urlString, { allowHttp: true });
+    } catch (error) {
+      if (error instanceof SsrfError) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
     }
   }
 

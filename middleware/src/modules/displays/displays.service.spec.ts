@@ -54,6 +54,9 @@ describe('DisplaysService', () => {
         delete: jest.fn(),
         deleteMany: jest.fn(),
       },
+      content: {
+        findFirst: jest.fn(),
+      },
     };
 
     const mockJwtService = {
@@ -792,6 +795,53 @@ describe('DisplaysService', () => {
       await service.resetStalePairingDevices();
 
       expect(databaseService.display.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('pushContent', () => {
+    const mockContent = {
+      id: 'content-123',
+      name: 'Lunch Specials',
+      type: 'image',
+      url: 'minio://org/content.jpg',
+      thumbnail: 'https://example.com/thumb.jpg',
+      mimeType: 'image/jpeg',
+      duration: 10,
+      organizationId: mockOrganizationId,
+    };
+
+    beforeEach(() => {
+      databaseService.display.findFirst.mockResolvedValue(mockDisplay as any);
+      (databaseService as any).content.findFirst.mockResolvedValue(mockContent);
+    });
+
+    it('returns success when realtime accepts the content push', async () => {
+      httpService.post.mockReturnValue(
+        of({ data: { success: true, message: 'Content pushed to device' } } as any),
+      );
+
+      await expect(
+        service.pushContent(mockOrganizationId, mockDisplayId, mockContent.id, 5),
+      ).resolves.toEqual({ success: true, message: 'Content pushed to display' });
+    });
+
+    it('throws ServiceUnavailableException when realtime reports delivery failure', async () => {
+      httpService.post.mockReturnValue(
+        of({ data: { success: false, message: 'Content push failed: no_sockets' } } as any),
+      );
+
+      await expect(
+        service.pushContent(mockOrganizationId, mockDisplayId, mockContent.id, 5),
+      ).rejects.toThrow(ServiceUnavailableException);
+    });
+
+    it('throws ServiceUnavailableException when internal realtime auth is not configured', async () => {
+      delete process.env.INTERNAL_API_SECRET;
+
+      await expect(
+        service.pushContent(mockOrganizationId, mockDisplayId, mockContent.id, 5),
+      ).rejects.toThrow(ServiceUnavailableException);
+      expect(httpService.post).not.toHaveBeenCalled();
     });
   });
 });

@@ -69,6 +69,7 @@ describe('DisplaysService - Bulk Operations', () => {
   describe('bulkAssignPlaylist', () => {
     it('should assign playlist to multiple displays and notify realtime', async () => {
       mockDb.playlist.findFirst.mockResolvedValue({ id: 'p1', organizationId: 'org-1', items: [] });
+      mockDb.display.count.mockResolvedValue(2);
       mockDb.display.updateMany.mockResolvedValue({ count: 2 });
 
       const result = await service.bulkAssignPlaylist('org-1', ['d1', 'd2'], 'p1');
@@ -87,11 +88,25 @@ describe('DisplaysService - Bulk Operations', () => {
         service.bulkAssignPlaylist('org-1', ['d1'], 'bad-playlist')
       ).rejects.toThrow(NotFoundException);
     });
+
+    it('rejects mixed-organization display IDs before updating or notifying realtime', async () => {
+      mockDb.playlist.findFirst.mockResolvedValue({ id: 'p1', organizationId: 'org-1', items: [] });
+      mockDb.display.count.mockResolvedValue(1);
+      const notifySpy = jest.spyOn(service as any, 'notifyPlaylistUpdate').mockResolvedValue(undefined);
+
+      await expect(
+        service.bulkAssignPlaylist('org-1', ['d1', 'foreign-display'], 'p1')
+      ).rejects.toThrow(NotFoundException);
+
+      expect(mockDb.display.updateMany).not.toHaveBeenCalled();
+      expect(notifySpy).not.toHaveBeenCalled();
+    });
   });
 
   describe('bulkAssignGroup', () => {
     it('should add displays to group', async () => {
       mockDb.displayGroup.findFirst.mockResolvedValue({ id: 'g1', organizationId: 'org-1' });
+      mockDb.display.count.mockResolvedValue(2);
       mockDb.displayGroupMember.createMany.mockResolvedValue({ count: 2 });
 
       const result = await service.bulkAssignGroup('org-1', ['d1', 'd2'], 'g1');
@@ -112,6 +127,17 @@ describe('DisplaysService - Bulk Operations', () => {
       await expect(
         service.bulkAssignGroup('org-1', ['d1'], 'bad-group')
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('rejects mixed-organization display IDs before creating group memberships', async () => {
+      mockDb.displayGroup.findFirst.mockResolvedValue({ id: 'g1', organizationId: 'org-1' });
+      mockDb.display.count.mockResolvedValue(1);
+
+      await expect(
+        service.bulkAssignGroup('org-1', ['d1', 'foreign-display'], 'g1')
+      ).rejects.toThrow(NotFoundException);
+
+      expect(mockDb.displayGroupMember.createMany).not.toHaveBeenCalled();
     });
   });
 });

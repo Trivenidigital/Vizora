@@ -3,6 +3,7 @@ import sharp from 'sharp';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { lookup } from 'dns/promises';
+import { assertUrlIsPublic } from '../common/utils/ssrf-guard';
 
 @Injectable()
 export class ThumbnailService {
@@ -33,6 +34,8 @@ export class ThumbnailService {
    * Only allows http/https, blocks private IP ranges and internal hostnames.
    */
   private async validateUrl(imageUrl: string): Promise<void> {
+    await assertUrlIsPublic(imageUrl, { allowHttp: true });
+
     let parsed: URL;
     try {
       parsed = new URL(imageUrl);
@@ -187,7 +190,10 @@ export class ThumbnailService {
 
     try {
       // Fetch image from URL with streaming size check
-      const response = await fetch(imageUrl);
+      const response = await fetch(imageUrl, { redirect: 'manual' });
+      if (response.status >= 300 && response.status < 400) {
+        throw new Error('Thumbnail source redirects are not allowed');
+      }
       const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
       if (contentLength > this.MAX_FILE_SIZE) {
         throw new Error('Image too large for thumbnail generation');

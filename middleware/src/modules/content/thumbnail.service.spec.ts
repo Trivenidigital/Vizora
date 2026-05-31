@@ -24,6 +24,10 @@ jest.mock('fs', () => ({
   },
 }));
 
+jest.mock('dns/promises', () => ({
+  lookup: jest.fn().mockResolvedValue([{ address: '93.184.216.34', family: 4 }]),
+}));
+
 // Now import the service
 import { ThumbnailService } from './thumbnail.service';
 import sharp from 'sharp';
@@ -140,7 +144,7 @@ describe('ThumbnailService', () => {
     it('should fetch image from URL and generate thumbnail', async () => {
       const result = await service.generateThumbnailFromUrl(contentId, imageUrl);
 
-      expect(global.fetch).toHaveBeenCalledWith(imageUrl);
+      expect(global.fetch).toHaveBeenCalledWith(imageUrl, expect.objectContaining({ redirect: 'manual' }));
       expect(result).toBe(`/static/thumbnails/${contentId}.jpg`);
     });
 
@@ -176,6 +180,19 @@ describe('ThumbnailService', () => {
       await expect(
         service.generateThumbnailFromUrl(contentId, imageUrl),
       ).rejects.toThrow('Network error');
+    });
+
+    it('should reject redirects instead of following them after SSRF validation', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        status: 302,
+        headers: {
+          get: jest.fn((name: string) => (name.toLowerCase() === 'location' ? 'http://127.0.0.1/image.jpg' : null)),
+        },
+      });
+
+      await expect(
+        service.generateThumbnailFromUrl(contentId, imageUrl),
+      ).rejects.toThrow('Thumbnail source redirects are not allowed');
     });
   });
 

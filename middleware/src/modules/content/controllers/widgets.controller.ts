@@ -21,6 +21,7 @@ import { CreateWidgetDto } from '../dto/create-widget.dto';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { parseRssFeed, extractFeedTitle } from '../rss-parser';
+import { assertUrlIsPublic, SsrfError } from '../../common/utils/ssrf-guard';
 
 /** Maximum response body size from Google Sheets (2 MB). */
 const MAX_SHEET_RESPONSE_BYTES = 2 * 1024 * 1024;
@@ -179,23 +180,13 @@ export class WidgetsController {
       throw new BadRequestException('Only http/https URLs are supported');
     }
 
-    // Block private/reserved IP ranges (SSRF prevention)
-    const { hostname } = parsed;
-    const blockedPatterns = [
-      /^localhost$/i,
-      /^127\./,
-      /^10\./,
-      /^172\.(1[6-9]|2\d|3[01])\./,
-      /^192\.168\./,
-      /^169\.254\./,
-      /^0\./,
-      /^\[::1\]/,
-      /^\[fc/i,
-      /^\[fd/i,
-      /^\[fe80/i,
-    ];
-    if (blockedPatterns.some(p => p.test(hostname))) {
-      throw new BadRequestException('Private or reserved IP addresses are not allowed');
+    try {
+      await assertUrlIsPublic(feedUrl, { allowHttp: true });
+    } catch (error) {
+      if (error instanceof SsrfError) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
     }
 
     const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 50);
@@ -204,10 +195,15 @@ export class WidgetsController {
     try {
       response = await fetch(feedUrl, {
         signal: AbortSignal.timeout(10000),
+        redirect: 'manual',
         headers: { 'User-Agent': 'Vizora/1.0 Digital Signage RSS Reader' },
       });
     } catch (err: any) {
       throw new NotFoundException(`Failed to fetch RSS feed: ${err.message || 'timeout or network error'}`);
+    }
+
+    if (response.status >= 300 && response.status < 400) {
+      throw new BadRequestException('RSS feed redirects are not allowed');
     }
 
     if (!response.ok) {

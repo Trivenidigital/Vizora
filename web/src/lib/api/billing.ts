@@ -58,10 +58,15 @@ ApiClient.prototype.getQuotaUsage = async function (): Promise<QuotaUsage> {
 };
 
 ApiClient.prototype.createCheckout = async function (planId: string, interval: 'monthly' | 'yearly'): Promise<CheckoutResponse> {
-  return this.request<CheckoutResponse>('/billing/checkout', {
+  const response = await this.request<CheckoutResponse & { checkoutUrl?: string }>('/billing/checkout', {
     method: 'POST',
     body: JSON.stringify({ planId, interval }),
   });
+  const { checkoutUrl, ...rest } = response;
+  return {
+    ...rest,
+    url: response.url ?? checkoutUrl ?? '',
+  };
 };
 
 ApiClient.prototype.cancelSubscription = async function (immediately = false): Promise<void> {
@@ -75,7 +80,12 @@ ApiClient.prototype.reactivateSubscription = async function (): Promise<void> {
 };
 
 ApiClient.prototype.getBillingPortalUrl = async function (returnUrl: string): Promise<BillingPortalResponse> {
-  return this.request<BillingPortalResponse>(`/billing/portal?returnUrl=${encodeURIComponent(returnUrl)}`);
+  const response = await this.request<BillingPortalResponse & { portalUrl?: string }>(
+    `/billing/portal?returnUrl=${encodeURIComponent(returnUrl)}`,
+  );
+  return {
+    url: response.url ?? response.portalUrl ?? '',
+  };
 };
 
 ApiClient.prototype.getInvoices = async function (limit?: number): Promise<Invoice[]> {

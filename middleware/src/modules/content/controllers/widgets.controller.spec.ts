@@ -5,6 +5,10 @@ jest.mock('isomorphic-dompurify', () => ({
   },
 }));
 
+jest.mock('dns/promises', () => ({
+  lookup: jest.fn().mockResolvedValue([{ address: '93.184.216.34', family: 4 }]),
+}));
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { WidgetsController } from './widgets.controller';
 import { ContentService } from '../content.service';
@@ -462,6 +466,23 @@ describe('WidgetsController', () => {
       await expect(
         controller.getRssFeed('https://example.com/rss', '10'),
       ).rejects.toThrow('Failed to fetch RSS feed: HTTP 404');
+    });
+
+    it('should reject redirects instead of following them after SSRF validation', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        status: 302,
+        headers: new Map([['location', 'http://127.0.0.1/rss']]),
+      });
+
+      await expect(
+        controller.getRssFeed('https://example.com/rss', '10'),
+      ).rejects.toThrow('RSS feed redirects are not allowed');
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://example.com/rss',
+        expect.objectContaining({ redirect: 'manual' }),
+      );
     });
 
     it('should throw NotFoundException on network error', async () => {
