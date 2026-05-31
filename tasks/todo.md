@@ -1,5 +1,38 @@
 # Vizora - Task Tracker
 
+## Active: Customer-1 Smoke Hardening (2026-05-31)
+
+**Branch:** `feat/customer1-smoke-hardening`
+
+**Why now:** `backlog.md` still gates customer-1 on C4/B16 smoke evidence. The existing `scripts/smoke/api-critical-path.sh` is useful, but it stops at auth, pairing-code generation, and list endpoints; it does not prove pair-complete, playlist creation, schedule assignment, or the device-side active-schedule read path.
+
+**New primitives introduced:** none. This extends the existing smoke script/runbook only.
+
+**Hermes-first analysis:** not applicable. This task is a repo-local launch-readiness smoke harness, not a business-agent/Hermes workflow, MCP tool, or AI/provider spend path.
+
+**Plan**
+- [x] Drift-check existing smoke/runbook coverage against current controllers.
+- [x] Extend `scripts/smoke/api-critical-path.sh` with full customer path probes.
+- [x] Update runbook wording so operators know the script now creates disposable smoke content/playlist/schedule/display rows.
+- [x] Verify shell syntax and focused script behavior where local runtime permits.
+- [x] Run Claude Code review before PR/merge decision.
+- [x] Record tests, CI, residual runtime/operator risks.
+
+**Review notes**
+- Local Claude Code CLI hung/returned empty output twice; fallback subagent reviewer found three issues.
+- Fixed blocking temp-file issue by using `umask 077` + private `mktemp -d` directory for cookie/token-bearing JSON and headers.
+- Fixed prod-ingress runbook false-negative by removing direct public `:3002` HTTPS guidance. Realtime script health remains local to the VPS; public WebSocket ingress remains a real-device/manual walkthrough item.
+- Residual: full real-stack smoke not run locally because Docker/services are unavailable in this environment, and prod smoke writes timestamped rows so it needs operator approval.
+
+**Verification so far**
+- `C:\Program Files\Git\bin\bash.exe -n scripts/smoke/api-critical-path.sh` — pass.
+- Strict mocked success path with cookie + CSRF + device-token enforcement — pass, `ALL 23 CRITICAL-PATH CHECKS PASSED`.
+- Unreachable-service failure-mode run — expected fail, 23 numbered failures, no missing temp-file noise.
+- `git diff --check` — pass; line-ending warnings only.
+- `shellcheck` unavailable in this environment.
+
+---
+
 ## Current Status: Pilot Readiness Sprint COMPLETE (2026-02-09)
 
 69/69 findings fixed + 32/32 remaining items addressed. 13 items intentionally deferred. All builds verified, all critical tests passing.
