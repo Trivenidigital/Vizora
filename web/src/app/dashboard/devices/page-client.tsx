@@ -268,7 +268,7 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  try {
  setActionLoading(true);
  const response = await apiClient.generatePairingToken(device.id);
- setPairingCode(response.pairingToken || response.pairingCode || 'N/A');
+ setPairingCode(response.pairingToken);
  setPairingExpiresIn(response.expiresIn || '5 minutes');
  setSelectedDevice(device);
  setIsPairingModalOpen(true);

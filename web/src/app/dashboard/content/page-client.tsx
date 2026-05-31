@@ -1297,6 +1297,7 @@ export default function ContentClient() {
  <Modal
  isOpen={isUploadModalOpen}
  onClose={() => {
+ if (actionLoading) return;
  if (uploadForm.url.startsWith('blob:')) {
  URL.revokeObjectURL(uploadForm.url);
  }
@@ -1345,16 +1346,18 @@ export default function ContentClient() {
  </label>
  <select
  value={uploadForm.type}
- onChange={(e) =>
- setUploadForm({ ...uploadForm, type: e.target.value as UploadFormType })
- }
+ onChange={(e) => {
+ const nextType = e.target.value as UploadFormType;
+ if (uploadQueue.length > 0 && !isFileUploadType(nextType)) return;
+ setUploadForm({ ...uploadForm, type: nextType });
+ }}
  disabled={actionLoading}
  className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)]"
  >
  <option value="image">Image</option>
  <option value="video">Video</option>
  <option value="pdf">PDF</option>
- <option value="url">URL/Web Page</option>
+ <option value="url" disabled={uploadQueue.length > 0}>URL/Web Page</option>
  </select>
  </div>
  

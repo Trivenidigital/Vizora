@@ -4,11 +4,10 @@ import type { Display, DisplayOrientation, PaginatedResponse, DisplayGroup, QrOv
 import { ApiClient } from './client';
 
 export interface PairingTokenResponse {
-  pairingToken?: string;
-  pairingCode?: string;
-  expiresIn?: string;
-  displayId?: string;
-  deviceIdentifier?: string;
+  pairingToken: string;
+  expiresIn: string;
+  displayId: string;
+  deviceIdentifier: string;
 }
 
 declare module './client' {

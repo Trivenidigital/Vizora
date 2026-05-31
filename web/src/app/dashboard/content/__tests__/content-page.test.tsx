@@ -80,8 +80,14 @@ jest.mock('@/components/EmptyState', () => {
 });
 
 jest.mock('@/components/Modal', () => {
-  return function MockModal({ isOpen, children, title }: any) {
-    return isOpen ? <div data-testid="modal"><h2>{title}</h2>{children}</div> : null;
+  return function MockModal({ isOpen, children, title, onClose }: any) {
+    return isOpen ? (
+      <div data-testid="modal">
+        <h2>{title}</h2>
+        <button type="button" aria-label="Close modal" onClick={onClose}>Close</button>
+        {children}
+      </div>
+    ) : null;
   };
 });
 
@@ -439,6 +445,32 @@ describe('ContentClient', () => {
     expect(mockCreateContent).not.toHaveBeenCalledWith(expect.objectContaining({ file: imageFile }));
   });
 
+  it('keeps queued files visible by blocking URL mode until the queue is cleared', async () => {
+    mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
+    render(<ContentClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+
+    fireEvent.click(screen.getAllByText('Upload Content')[0]);
+    const imageFile = new File(['image-bytes'], 'queued.png', { type: 'image/png' });
+
+    await act(async () => {
+      lastDropzoneOptions.onDrop([imageFile]);
+    });
+
+    expect(screen.getByText('queued.png')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'URL/Web Page' })).toBeDisabled();
+
+    fireEvent.change(screen.getByDisplayValue('Image'), { target: { value: 'url' } });
+
+    expect(screen.getByDisplayValue('Image')).toBeInTheDocument();
+    expect(screen.getByText('queued.png')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('https://example.com/page')).not.toBeInTheDocument();
+  });
+
   it('locks queued bulk upload controls while files are uploading', async () => {
     mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
     let resolveUpload: (content: any) => void = () => {};
@@ -472,6 +504,46 @@ describe('ContentClient', () => {
 
     await act(async () => {
       resolveUpload({ id: 'new-1', title: 'Locked' });
+    });
+  });
+
+  it('does not close or clear queued upload progress while files are uploading', async () => {
+    mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
+    let resolveUpload: (content: any) => void = () => {};
+    mockUploadContentWithProgress.mockImplementation((_data, onProgress) => {
+      onProgress?.(42);
+      return new Promise((resolve) => {
+        resolveUpload = resolve;
+      });
+    });
+
+    render(<ContentClient />);
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+
+    fireEvent.click(screen.getAllByText('Upload Content')[0]);
+    const imageFile = new File(['image-bytes'], 'in-flight.png', { type: 'image/png' });
+
+    await act(async () => {
+      lastDropzoneOptions.onDrop([imageFile]);
+    });
+
+    fireEvent.click(screen.getByText('Upload 1 File'));
+
+    await waitFor(() => {
+      expect(screen.getByText('in-flight.png')).toBeInTheDocument();
+      expect(screen.getByText('42%')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByLabelText('Close modal'));
+
+    expect(screen.getByText('in-flight.png')).toBeInTheDocument();
+    expect(screen.getByText('42%')).toBeInTheDocument();
+
+    await act(async () => {
+      resolveUpload({ id: 'new-1', title: 'In Flight' });
     });
   });
 
