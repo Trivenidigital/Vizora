@@ -12,12 +12,33 @@ interface DeviceClientConfig {
 
 type SocketAck = (response?: { ok: boolean; error?: string }) => void;
 const SELF_TERMINATING_COMMAND_ACK_FLUSH_MS = 500;
+const TERMINAL_DEVICE_AUTH_ERRORS = [
+  'unauthorized',
+  'invalid token',
+  'device_token_stale',
+  'device_not_found',
+];
 
 function unwrapResponseEnvelope<T>(parsed: T | { data?: T }): T {
   if (parsed && typeof parsed === 'object' && 'data' in parsed && (parsed as any).data !== undefined) {
     return (parsed as any).data as T;
   }
   return parsed as T;
+}
+
+function getErrorMessage(error: unknown): string {
+  if (typeof error === 'string') {
+    return error;
+  }
+  if (error && typeof error === 'object' && 'message' in error) {
+    return String((error as { message?: unknown }).message ?? '');
+  }
+  return '';
+}
+
+function isTerminalDeviceAuthError(error: unknown): boolean {
+  const message = getErrorMessage(error).toLowerCase();
+  return TERMINAL_DEVICE_AUTH_ERRORS.some((term) => message.includes(term));
 }
 
 export class DeviceClient {
@@ -86,6 +107,14 @@ export class DeviceClient {
         fs.unlinkSync(stateFile);
       } catch {}
     }
+  }
+
+  private clearTokenAndRequestPairing(reason: string): void {
+    console.log(`[DeviceClient] Token rejected (${reason}), clearing and re-entering pairing`);
+    this.deviceToken = null;
+    this.store?.delete('deviceToken');
+    this.socket?.disconnect();
+    this.config.onPairingRequired();
   }
 
   async requestPairingCode(): Promise<any> {
@@ -284,12 +313,8 @@ export class DeviceClient {
 
     this.socket.on('connect_error', (error) => {
       console.error('[DeviceClient] Connection error:', error.message);
-      if (error.message.includes('unauthorized') || error.message.includes('invalid token')) {
-        console.log('[DeviceClient] Token rejected, clearing and re-entering pairing');
-        this.deviceToken = null;
-        this.store?.delete('deviceToken');
-        this.socket?.disconnect();
-        this.config.onPairingRequired();
+      if (isTerminalDeviceAuthError(error)) {
+        this.clearTokenAndRequestPairing(getErrorMessage(error));
       }
     });
 
@@ -382,6 +407,10 @@ export class DeviceClient {
 
     this.socket.on('error', (error) => {
       console.error('[DeviceClient] Socket error:', error);
+      if (isTerminalDeviceAuthError(error)) {
+        this.clearTokenAndRequestPairing(getErrorMessage(error));
+        return;
+      }
       this.config.onError(error);
     });
   }

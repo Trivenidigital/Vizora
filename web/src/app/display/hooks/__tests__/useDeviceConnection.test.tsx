@@ -39,6 +39,11 @@ describe('useDeviceConnection', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     localStorage.clear();
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('acknowledges playlist updates after applying them', () => {
@@ -204,5 +209,38 @@ describe('useDeviceConnection', () => {
     expect(JSON.parse(localStorage.getItem('vizora_display_credentials') || '{}')).toEqual({
       deviceToken: 'new-token',
     });
+  });
+
+  it('resets pairing when connect_error reports a stale device token', () => {
+    const socket = createSocket();
+    (io as jest.Mock).mockReturnValue(socket);
+
+    const handlers = renderConnection();
+    const errorHandler = socket.on.mock.calls.find(
+      (call: any[]) => call[0] === 'connect_error',
+    )?.[1];
+
+    act(() => {
+      errorHandler({ message: 'device_token_stale' });
+    });
+
+    expect(handlers.onUnauthorized).toHaveBeenCalledTimes(1);
+  });
+
+  it('disconnects and resets pairing when socket error reports a missing device', () => {
+    const socket = createSocket();
+    (io as jest.Mock).mockReturnValue(socket);
+
+    const handlers = renderConnection();
+    const errorHandler = socket.on.mock.calls.find(
+      (call: any[]) => call[0] === 'error',
+    )?.[1];
+
+    act(() => {
+      errorHandler({ message: 'device_not_found' });
+    });
+
+    expect(socket.disconnect).toHaveBeenCalledTimes(1);
+    expect(handlers.onUnauthorized).toHaveBeenCalledTimes(1);
   });
 });

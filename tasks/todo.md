@@ -1,8 +1,126 @@
 # Vizora - Task Tracker
 
-## In Progress: Dashboard Contract Readiness Pass 8 (2026-05-31)
+## In Progress: Performance Readiness Review Pass 9 (2026-05-31)
+
+**Branch:** `feat/performance-readiness-pass-9`
+
+**Why now:** PR #131 merged the bounded dashboard contract fixes. The next
+autonomous slice is a comprehensive repo-side performance/code-review pass over
+customer-critical flows: content upload, pairing, content streaming/playback,
+middleware hot paths, and dashboard workflows. Production deploy remains blocked
+by dirty/diverged prod-local state, so this pass stays inside buildable,
+testable repo work.
+
+**New primitives introduced:** none planned. Prefer existing NestJS modules,
+Prisma models, storage services, realtime gateway, web API client, and dashboard
+patterns.
+
+**Hermes-first analysis:** not applicable unless a selected fix touches
+business agents, MCP tools, Hermes skills, or AI/provider spend paths.
+
+**Plan**
+- [x] Start fresh branch from merged `origin/main`.
+- [x] Re-check production deploy gate after PR #131 merge.
+- [x] Run multi-subagent performance/code-review analysis.
+- [x] Write plan/design for selected buildable fixes.
+- [x] Add focused failing tests/benchmarks where practical.
+- [x] Implement bounded performance/readiness fixes.
+- [x] Run multi-subagent code review before broader tests.
+- [x] Run focused and broader tests/builds/browser checks.
+- [ ] PR, CI, merge.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Deployment gate after PR #131**
+- [x] PR #131 merged at `58df1a276b8252dba7145c75705ae4deabde431f` with CI green.
+- [x] Prod deploy blocked: `/opt/vizora/app` is still `ahead 17, behind 66`, has
+  many modified/untracked prod-local files, and prod `origin/main` is stale while
+  remote `main` is `58df1a276b8252dba7145c75705ae4deabde431f`.
+- [x] Prod core services health check is OK; no deploy/restart performed.
+
+**Analysis feed**
+- [x] Middleware/storage reviewer prioritized streaming-upload memory pressure,
+  unsupported multi-range playback behavior, missing authenticated media validators,
+  unbounded template data-source fetches, and template refresh overlap risk.
+- [x] Pairing/realtime reviewer prioritized false offline status from stale Postgres
+  heartbeat writes, browser-display `clear_cache` deleting credentials, and display
+  clients not recovering from stale-token socket errors.
+- [x] Frontend/dashboard reviewer prioritized content-library all-fetch/render caps,
+  bulk-upload pressure, duplicate dashboard sockets, playlist index eager builder load,
+  dashboard overview list fan-out, and pairing help copy drift.
+
+**Plan/design:** `docs/plans/2026-05-31-performance-readiness-pass-9.md`
+
+**Selected fix bundle**
+- [x] Reject unsupported device-content multi-range requests instead of streaming the
+  full object.
+- [x] Add authenticated `ETag` / `Last-Modified` validators and `304` revalidation
+  path before MinIO stream acquisition.
+- [x] Keep successful protected media cacheable only by revalidation (`private, no-cache`).
+- [x] Refresh display `lastHeartbeat` in Postgres on a throttle and fix stale-status
+  cleanup to use active device IDs.
+- [x] Make browser-display `clear_cache` clear media cache without unpairing.
+- [x] Reset browser/Electron displays on terminal stale-token / missing-device socket errors.
+
+**Focused verification**
+- [x] Red run: middleware device-content, realtime device gateway, web display, and
+  Electron display-client suites failed on the expected missing behaviors.
+- [x] Green run:
+  `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern=device-content.controller` -
+  pass, 1 suite / 37 tests after review fixes.
+- [x] Green run:
+  `pnpm --filter @vizora/realtime test -- --runInBand --testPathPattern=device.gateway` -
+  pass, 2 suites / 105 tests after review fixes.
+- [x] Green run:
+  `pnpm --filter @vizora/web test -- --runInBand --testPathPattern="display"` -
+  pass, 6 suites / 20 tests.
+- [x] Green run:
+  `pnpm --filter @vizora/display test -- --runInBand device-client.spec.ts` -
+  pass, 1 suite / 49 tests.
+
+**Broader verification**
+- [x] `pnpm --filter @vizora/realtime test -- --runInBand` - pass, 12 suites / 273 tests.
+- [x] `pnpm --filter @vizora/display test -- --runInBand` - pass, 6 suites / 126 tests.
+- [x] `pnpm --filter @vizora/middleware test -- --runInBand` - pass, 143 suites / 2827 tests.
+- [x] `pnpm --filter @vizora/web test -- --runInBand` - pass, 94 suites / 956 tests with
+  existing React `act(...)` and jsdom navigation warnings only.
+- [x] TypeScript: middleware, realtime, and web `tsc --noEmit --pretty false` pass;
+  display `pnpm --filter @vizora/display run typecheck` passes.
+- [x] Builds:
+  `npx nx build @vizora/middleware` - pass with existing webpack warnings;
+  `npx nx build @vizora/realtime` - pass with existing source-map / optional `ws` warnings;
+  `pnpm --filter @vizora/display run build` - pass;
+  `$env:NODE_OPTIONS='--max-old-space-size=4096'; npx nx build @vizora/web` - pass with
+  existing Next middleware/proxy deprecation and TS project-reference warnings.
+- [x] `git diff --check` - pass with expected LF-to-CRLF warnings only.
+
+**Review gate**
+- [x] Display-client reviewer: CLEAN.
+- [x] Realtime reviewer found stale socket heartbeats could still write Redis/Postgres
+  and cleanup trusted `deviceSockets` entries without checking live Socket.IO state;
+  fixed with an active-socket guard before heartbeat persistence and live-socket pruning.
+- [x] Middleware reviewer found weak ETags on `206`, `304` from cached stale validators,
+  and missing validator cleanup on stream errors; fixed by omitting ETag on partial
+  responses, limiting `304` to fresh-resolved media contexts, and clearing validators
+  on pre-header stream failure.
+- [x] Middleware/realtime re-review after fixes: both CLEAN.
+
+**Deferred follow-ups**
+- [ ] Disk-backed/streaming upload pipeline and per-type frontend upload caps.
+- [ ] Server-backed content-library pagination/search plus thumbnail lazy/virtualized rendering.
+- [ ] Shared dashboard realtime socket provider for status, notifications, and route events.
+- [ ] Playlist index summary payload and removal of dead builder-modal code.
+- [ ] Dashboard overview summary/read-model endpoint.
+- [ ] Pairing help copy update.
+- [ ] Template/widget data-source response caps and template refresh overlap guard.
+- [ ] Single-display queued push response contract.
+- [ ] Electron cache invalidation for replaced media.
+
+---
+
+## Completed: Dashboard Contract Readiness Pass 8 (2026-05-31)
 
 **Branch:** `feat/customer-dashboard-improvements-8`
+**PR / merge commit:** #131 / `58df1a276b8252dba7145c75705ae4deabde431f`
 
 **Why now:** After PR #130 merged, the next highest-value repo-side customer
 readiness work is a bounded set of dashboard contract defects found by the
@@ -28,8 +146,8 @@ behavior, MCP tools, Hermes skills, AI provider calls, or spend paths.
 - [x] Run focused web/middleware tests.
 - [x] Run multi-subagent code review before broader tests.
 - [x] Run broader affected tests/builds/typecheck.
-- [ ] PR, CI, merge.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe.
 
 **Analysis feed**
 - [x] Customer UX review prioritized billing display/trial correctness, pairing guidance,

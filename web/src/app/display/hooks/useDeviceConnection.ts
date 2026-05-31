@@ -27,6 +27,21 @@ interface UseDeviceConnectionOptions {
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3002';
 const CREDENTIALS_KEY = 'vizora_display_credentials';
+const TERMINAL_DEVICE_AUTH_ERRORS = [
+  'unauthorized',
+  'invalid token',
+  'device_token_stale',
+  'device_not_found',
+];
+
+function isTerminalDeviceAuthError(message: unknown): boolean {
+  if (typeof message !== 'string') {
+    return false;
+  }
+
+  const normalized = message.toLowerCase();
+  return TERMINAL_DEVICE_AUTH_ERRORS.some((term) => normalized.includes(term));
+}
 
 export function useDeviceConnection({
   credentials,
@@ -141,7 +156,7 @@ export function useDeviceConnection({
       setStatus('error');
       stopHeartbeat();
 
-      if (err.message.includes('unauthorized') || err.message.includes('invalid token')) {
+      if (isTerminalDeviceAuthError(err.message)) {
         onUnauthorized();
       }
     });
@@ -214,6 +229,10 @@ export function useDeviceConnection({
 
     socket.on('error', (err: { message: string }) => {
       console.error('[Vizora Display] Socket error:', err.message);
+      if (isTerminalDeviceAuthError(err.message)) {
+        socket.disconnect();
+        onUnauthorized();
+      }
     });
 
     return () => {

@@ -181,7 +181,9 @@ describe('DeviceContentController', () => {
           'Content-Type': 'image/jpeg',
           'Accept-Ranges': 'bytes',
           'Content-Length': String(buffer.length),
-          'Cache-Control': 'private, no-store',
+          'Cache-Control': 'private, no-cache',
+          ETag: expect.stringMatching(/^W\/".+"$/),
+          'Last-Modified': 'Sun, 31 May 2026 00:00:00 GMT',
         }),
       );
       expect(mockStorageService.getObject).toHaveBeenCalledWith(objectKey);
@@ -488,7 +490,13 @@ describe('DeviceContentController', () => {
         expect.objectContaining({
           'Content-Length': '4',
           'Content-Range': 'bytes 5-8/12',
-          'Cache-Control': 'private, no-store',
+          'Cache-Control': 'private, no-cache',
+          'Last-Modified': 'Sun, 31 May 2026 00:00:00 GMT',
+        }),
+      );
+      expect(res.set).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          ETag: expect.any(String),
         }),
       );
       expect(mockStorageService.getObjectRange).toHaveBeenCalledWith(
@@ -686,7 +694,7 @@ describe('DeviceContentController', () => {
         expect.objectContaining({
           'Content-Length': '3',
           'Content-Range': 'bytes 0-2/9',
-          'Cache-Control': 'private, no-store',
+          'Cache-Control': 'private, no-cache',
         }),
       );
       expect(firstRes.getBody().toString()).toBe('old!');
@@ -893,16 +901,14 @@ describe('DeviceContentController', () => {
           'Cache-Control': 'no-store',
         }),
       );
-      expect(res.set).not.toHaveBeenCalledWith(
-        expect.objectContaining({
-          'Cache-Control': 'private, no-store',
-        }),
-      );
+      expect(res.set).not.toHaveBeenCalledWith(expect.objectContaining({
+        'Cache-Control': 'private, no-cache',
+      }));
       expect(mockStorageService.getObject).not.toHaveBeenCalled();
       expect(mockStorageService.getObjectRange).not.toHaveBeenCalled();
     });
 
-    it('should ignore unsupported multi-range headers and stream the full object', async () => {
+    it('should reject unsupported multi-range headers without opening a stream', async () => {
       const req = createMockRequest('valid-device-token');
       req.headers.range = 'bytes=0-2,5-8';
       const res = createMockResponse();
@@ -914,14 +920,127 @@ describe('DeviceContentController', () => {
         lastModified: new Date('2026-05-31T00:00:00.000Z'),
         contentType: 'image/jpeg',
       });
-      mockStorageService.getObject.mockResolvedValue(Readable.from(['full-response']));
 
       await controller.serveFile(contentId, req, res);
 
-      expect(res.status).not.toHaveBeenCalledWith(416);
+      expect(res.status).toHaveBeenCalledWith(416);
+      expect(res.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          'Accept-Ranges': 'bytes',
+          'Content-Range': 'bytes */12',
+          'Cache-Control': 'no-store',
+        }),
+      );
       expect(mockStorageService.getObjectRange).not.toHaveBeenCalled();
-      expect(mockStorageService.getObject).toHaveBeenCalledWith(objectKey);
-      expect(res.getBody().toString()).toBe('full-response');
+      expect(mockStorageService.getObject).not.toHaveBeenCalled();
+      expect(res.getBody().toString()).toBe('');
+    });
+
+    it('should return 304 for a matching If-None-Match before opening MinIO stream', async () => {
+      const lastModified = new Date('2026-05-31T00:00:00.000Z');
+      const etag = `W/"${createHash('sha256')
+        .update(`${objectKey}:12:${lastModified.getTime()}`)
+        .digest('base64url')}"`;
+      const req = createMockRequest('valid-device-token');
+      req.headers['if-none-match'] = etag;
+      const res = createMockResponse();
+
+      mockContentService.findByIdForDevice.mockResolvedValue(mockContent as any);
+      mockJwtService.verify.mockReturnValue(validDevicePayload);
+      mockStorageService.getFileMetadata.mockResolvedValue({
+        size: 12,
+        lastModified,
+        contentType: 'image/jpeg',
+      });
+
+      await controller.serveFile(contentId, req, res);
+
+      expect(res.status).toHaveBeenCalledWith(304);
+      expect(res.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ETag: etag,
+          'Last-Modified': 'Sun, 31 May 2026 00:00:00 GMT',
+          'Cache-Control': 'private, no-cache',
+          'Accept-Ranges': 'bytes',
+        }),
+      );
+      expect(mockStorageService.getObject).not.toHaveBeenCalled();
+      expect(mockStorageService.getObjectRange).not.toHaveBeenCalled();
+      expect(res.getBody().toString()).toBe('');
+    });
+
+    it('should return 304 for an unchanged If-Modified-Since before opening MinIO stream', async () => {
+      const req = createMockRequest('valid-device-token');
+      req.headers['if-modified-since'] = 'Sun, 31 May 2026 00:00:30 GMT';
+      const res = createMockResponse();
+
+      mockContentService.findByIdForDevice.mockResolvedValue(mockContent as any);
+      mockJwtService.verify.mockReturnValue(validDevicePayload);
+      mockStorageService.getFileMetadata.mockResolvedValue({
+        size: 12,
+        lastModified: new Date('2026-05-31T00:00:00.000Z'),
+        contentType: 'image/jpeg',
+      });
+
+      await controller.serveFile(contentId, req, res);
+
+      expect(res.status).toHaveBeenCalledWith(304);
+      expect(res.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          'Last-Modified': 'Sun, 31 May 2026 00:00:00 GMT',
+          'Cache-Control': 'private, no-cache',
+        }),
+      );
+      expect(mockStorageService.getObject).not.toHaveBeenCalled();
+      expect(mockStorageService.getObjectRange).not.toHaveBeenCalled();
+    });
+
+    it('should refresh stale cached objects instead of returning 304 from cached validators', async () => {
+      const now = 4_000_000;
+      jest.spyOn(Date, 'now').mockReturnValue(now);
+
+      const firstReq = createMockRequest('valid-device-token');
+      const firstRes = createMockResponse();
+      const firstLastModified = new Date('2026-05-31T00:00:00.000Z');
+      const firstEtag = `W/"${createHash('sha256')
+        .update(`${objectKey}:12:${firstLastModified.getTime()}`)
+        .digest('base64url')}"`;
+      const secondReq = createMockRequest('valid-device-token');
+      secondReq.headers['if-none-match'] = firstEtag;
+      const secondRes = createMockResponse();
+      const replacementObjectKey = `${organizationId}/uploads/replacement-image.jpg`;
+
+      mockJwtService.verify.mockReturnValue(validDevicePayload);
+      mockContentService.findByIdForDevice
+        .mockResolvedValueOnce(mockContent as any)
+        .mockResolvedValueOnce({
+          ...mockContent,
+          url: `minio://${replacementObjectKey}`,
+        } as any);
+      mockStorageService.getFileMetadata
+        .mockResolvedValueOnce({
+          size: 12,
+          lastModified: firstLastModified,
+          contentType: 'image/jpeg',
+        })
+        .mockResolvedValueOnce({
+          size: 9,
+          lastModified: new Date('2026-05-31T00:00:10.000Z'),
+          contentType: 'image/jpeg',
+        });
+      mockStorageService.getObject
+        .mockResolvedValueOnce(Readable.from(['old']))
+        .mockRejectedValueOnce(new Error('Not Found'))
+        .mockResolvedValueOnce(Readable.from(['new']));
+
+      await controller.serveFile(contentId, firstReq, firstRes);
+      await controller.serveFile(contentId, secondReq, secondRes);
+
+      expect(secondRes.status).not.toHaveBeenCalledWith(304);
+      expect(mockContentService.findByIdForDevice).toHaveBeenCalledTimes(2);
+      expect(mockStorageService.getObject).toHaveBeenNthCalledWith(2, objectKey);
+      expect(mockStorageService.getObject).toHaveBeenNthCalledWith(3, replacementObjectKey);
+      expect(secondRes.getBody().toString()).toBe('new');
     });
 
     it('should clear media headers and return 500 when streaming fails before headers are sent', async () => {
@@ -949,6 +1068,8 @@ describe('DeviceContentController', () => {
       expect(res.removeHeader).toHaveBeenCalledWith('Content-Type');
       expect(res.removeHeader).toHaveBeenCalledWith('Content-Length');
       expect(res.removeHeader).toHaveBeenCalledWith('Cache-Control');
+      expect(res.removeHeader).toHaveBeenCalledWith('ETag');
+      expect(res.removeHeader).toHaveBeenCalledWith('Last-Modified');
       expect(res.removeHeader).toHaveBeenCalledWith('Cross-Origin-Resource-Policy');
     });
 

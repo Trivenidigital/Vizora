@@ -2,12 +2,15 @@ import { render, waitFor } from '@testing-library/react';
 import { DisplayClient } from '../DisplayClient';
 import type { Playlist } from '../lib/types';
 
-const preloadItems = jest.fn();
+var mockPreloadItems = jest.fn();
+var mockClearCache = jest.fn().mockResolvedValue(undefined);
+var mockClearCredentials = jest.fn();
 const updatePlaylist = jest.fn();
 let capturedPlaylistUpdate: ((playlist: Playlist) => void) | undefined;
+let capturedCommand: ((command: { type: string }) => void) | undefined;
 
 jest.mock('../hooks/useBrowserCache', () => ({
-  useBrowserCache: () => ({ preloadItems }),
+  useBrowserCache: () => ({ preloadItems: mockPreloadItems, clearCache: mockClearCache }),
 }));
 
 jest.mock('../hooks/usePairing', () => ({
@@ -25,12 +28,13 @@ jest.mock('../hooks/usePairing', () => ({
     resetPairing: jest.fn(),
     updateDeviceToken: jest.fn(),
   }),
-  clearCredentials: jest.fn(),
+  clearCredentials: () => mockClearCredentials(),
 }));
 
 jest.mock('../hooks/useDeviceConnection', () => ({
   useDeviceConnection: (options: any) => {
     capturedPlaylistUpdate = options.onPlaylistUpdate;
+    capturedCommand = options.onCommand;
     return {
       status: 'connected',
       emitImpression: jest.fn(),
@@ -70,11 +74,19 @@ jest.mock('../components/FullscreenButton', () => ({
 }));
 
 describe('DisplayClient', () => {
+  let reload: jest.Mock;
+
   beforeEach(() => {
     jest.clearAllMocks();
     capturedPlaylistUpdate = undefined;
+    capturedCommand = undefined;
+    reload = jest.fn();
+    const location = new URL('https://display.example.test/display') as URL & {
+      reload: jest.Mock;
+    };
+    location.reload = reload;
     Object.defineProperty(window, 'location', {
-      value: new URL('https://display.example.test/display'),
+      value: location,
       writable: true,
     });
   });
@@ -104,8 +116,20 @@ describe('DisplayClient', () => {
     });
 
     expect(updatePlaylist).toHaveBeenCalled();
-    expect(preloadItems).toHaveBeenCalledWith([
+    expect(mockPreloadItems).toHaveBeenCalledWith([
       '/api/v1/device-content/content-1/file?token=device-token-123',
     ]);
+  });
+
+  it('clears browser media cache without deleting pairing credentials', async () => {
+    render(<DisplayClient />);
+
+    await waitFor(() => expect(capturedCommand).toBeDefined());
+
+    capturedCommand?.({ type: 'clear_cache' });
+
+    await waitFor(() => expect(mockClearCache).toHaveBeenCalledTimes(1));
+    expect(mockClearCredentials).not.toHaveBeenCalled();
+    expect(reload).toHaveBeenCalledTimes(1);
   });
 });

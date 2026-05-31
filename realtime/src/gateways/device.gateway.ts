@@ -87,6 +87,7 @@ type PendingCommandDeliveryResult = {
 const HEARTBEAT_REPLAY_BASE_DELAY_MS = 15000;
 const HEARTBEAT_REPLAY_MAX_DELAY_MS = 300000;
 const HEARTBEAT_REPLAY_MAX_FAILURES = 5;
+const HEARTBEAT_DB_REFRESH_INTERVAL_MS = 60_000;
 
 @WebSocketGateway({
   cors: {
@@ -110,6 +111,7 @@ export class DeviceGateway
 
   // 2.1: In-memory device status cache to avoid redundant DB writes
   private readonly deviceStatusCache: Map<string, string> = new Map();
+  private readonly lastHeartbeatDbWrites: Map<string, number> = new Map();
 
   // 2.4: Connection rate limiting per IP
   private readonly connectionAttempts: Map<string, { count: number; resetAt: number }> = new Map();
@@ -223,6 +225,7 @@ export class DeviceGateway
     client.disconnect?.(true);
     if (this.isActiveDeviceSocket(client, deviceId)) {
       this.deviceSockets.delete(deviceId);
+      this.lastHeartbeatDbWrites.delete(deviceId);
     }
     return false;
   }
@@ -300,6 +303,7 @@ export class DeviceGateway
     const socket = this.server?.sockets?.sockets?.get(socketId);
     if (!socket) {
       this.deviceSockets.delete(deviceId);
+      this.lastHeartbeatDbWrites.delete(deviceId);
       return false;
     }
 
@@ -510,14 +514,19 @@ export class DeviceGateway
    */
   private cleanupStaleEntries(): void {
     const activeDeviceIds = new Set<string>();
-    for (const [, deviceId] of this.deviceSockets) {
-      activeDeviceIds.add(deviceId);
+    for (const [deviceId, socketId] of this.deviceSockets) {
+      if (this.server?.sockets?.sockets?.has(socketId)) {
+        activeDeviceIds.add(deviceId);
+      } else {
+        this.deviceSockets.delete(deviceId);
+      }
     }
 
     let cleaned = 0;
     for (const deviceId of this.deviceStatusCache.keys()) {
       if (!activeDeviceIds.has(deviceId)) {
         this.deviceStatusCache.delete(deviceId);
+        this.lastHeartbeatDbWrites.delete(deviceId);
         cleaned++;
       }
     }
@@ -895,6 +904,7 @@ export class DeviceGateway
             lastHeartbeat: new Date(),
           },
         });
+        this.lastHeartbeatDbWrites.set(deviceId, Date.now());
       } catch (dbError: unknown) {
         const errorMessage = dbError instanceof Error ? dbError.message : 'Unknown error';
         this.logger.warn(`Failed to update database for device ${deviceId}: ${errorMessage}`);
@@ -1154,6 +1164,7 @@ export class DeviceGateway
           return;
         }
         this.deviceSockets.delete(deviceId);
+        this.lastHeartbeatDbWrites.delete(deviceId);
 
         // Update status in Redis
         await this.redisService.setDeviceStatus(deviceId, {
@@ -1239,6 +1250,13 @@ export class DeviceGateway
     const startTime = Date.now();
 
     try {
+      if (!this.isActiveDeviceSocket(client, deviceId)) {
+        return createSuccessResponse({
+          nextHeartbeatIn: 15000,
+          commands: [],
+        });
+      }
+
       // Update heartbeat in Redis (cheap, always do this)
       await this.redisService.setDeviceStatus(deviceId, {
         status: 'online',
@@ -1249,9 +1267,15 @@ export class DeviceGateway
         currentContent: data.currentContent,
       });
 
-      // 2.1: Only write to DB when status transitions (e.g., offline -> online)
+      // Keep Redis as the fast heartbeat path, but refresh Postgres often
+      // enough that middleware's offline scanner does not see live devices as stale.
       const previousStatus = this.deviceStatusCache.get(deviceId);
-      if (previousStatus !== 'online') {
+      const lastHeartbeatDbWrite = this.lastHeartbeatDbWrites.get(deviceId) ?? 0;
+      const shouldWriteHeartbeatToDb =
+        previousStatus !== 'online' ||
+        Date.now() - lastHeartbeatDbWrite >= HEARTBEAT_DB_REFRESH_INTERVAL_MS;
+
+      if (shouldWriteHeartbeatToDb) {
         try {
           // updateMany — silently no-ops if the row was deleted between
           // the device's JWT issuance and this heartbeat (test sockets,
@@ -1264,6 +1288,7 @@ export class DeviceGateway
               lastHeartbeat: new Date(),
             },
           });
+          this.lastHeartbeatDbWrites.set(deviceId, Date.now());
         } catch (dbError: unknown) {
           const errorMessage = dbError instanceof Error ? dbError.message : 'Unknown error';
           this.logger.warn(`Failed to update database for device ${deviceId}: ${errorMessage}`);
