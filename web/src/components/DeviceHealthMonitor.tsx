@@ -4,12 +4,12 @@ import { Icon } from '@/theme/icons';
 
 export interface DeviceHealth {
   deviceId: string;
-  cpuUsage: number;       // 0-100%
-  memoryUsage: number;    // 0-100%
-  storageUsage: number;   // 0-100%
-  temperature: number;    // °C
-  uptime: number;         // hours
-  lastHeartbeat: Date;
+  cpuUsage: number | null;       // 0-100%, null when device telemetry is unavailable
+  memoryUsage: number | null;    // 0-100%, null when device telemetry is unavailable
+  storageUsage: number | null;   // 0-100%, null when device telemetry is unavailable
+  temperature: number | null;    // °C, null when device telemetry is unavailable
+  uptime: number | null;         // hours, null when device telemetry is unavailable
+  lastHeartbeat: Date | null;
   score: number;          // 0-100 health score
 }
 
@@ -39,13 +39,13 @@ const MetricBar = ({ label, value, unit, thresholds }: any) => (
     <div className="flex justify-between text-xs">
       <span className="font-medium text-[var(--foreground-secondary)]">{label}</span>
       <span className="text-[var(--foreground-secondary)]">
-        {value.toFixed(1)}{unit}
+        {typeof value === 'number' ? `${value.toFixed(1)}${unit}` : 'Not reported'}
       </span>
     </div>
     <div className="w-full h-2 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
       <div
-        className={`h-full ${getMetricStatus(value, thresholds)} transition-all`}
-        style={{ width: `${Math.min(value, 100)}%` }}
+        className={`h-full ${typeof value === 'number' ? getMetricStatus(value, thresholds) : 'bg-[var(--foreground-tertiary)]/30'} transition-all`}
+        style={{ width: `${typeof value === 'number' ? Math.min(value, 100) : 0}%` }}
       />
     </div>
   </div>
@@ -78,7 +78,9 @@ export default function DeviceHealthMonitor({
       <div className="flex items-start justify-between">
         <div>
           <h3 className="text-sm font-semibold text-[var(--foreground)]">Device Health</h3>
-          <p className="text-xs text-[var(--foreground-tertiary)] mt-1">Updated {new Date(health.lastHeartbeat).toLocaleTimeString()}</p>
+          <p className="text-xs text-[var(--foreground-tertiary)] mt-1">
+            {health.lastHeartbeat ? `Updated ${new Date(health.lastHeartbeat).toLocaleTimeString()}` : 'No heartbeat reported'}
+          </p>
         </div>
         <div className={`text-right ${healthStatus.color}`}>
           <div className="text-2xl font-bold">{health.score}%</div>
@@ -137,7 +139,9 @@ export default function DeviceHealthMonitor({
           <div className="flex items-center justify-between text-sm">
             <span className="text-[var(--foreground-secondary)]">Uptime</span>
             <span className="font-semibold text-[var(--foreground)]">
-              {health.uptime >= 24
+              {typeof health.uptime !== 'number'
+                ? 'Not reported'
+                : health.uptime >= 24
                 ? `${(health.uptime / 24).toFixed(1)} days`
                 : `${health.uptime.toFixed(1)} hours`}
             </span>

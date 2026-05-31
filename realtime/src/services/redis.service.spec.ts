@@ -10,6 +10,7 @@ const mockRedis = {
   incr: jest.fn().mockResolvedValue(1),
   expire: jest.fn().mockResolvedValue(1),
   lpush: jest.fn().mockResolvedValue(1),
+  rpush: jest.fn().mockResolvedValue(1),
   lrange: jest.fn().mockResolvedValue([]),
   multi: jest.fn().mockReturnValue({
     lrange: jest.fn().mockReturnThis(),
@@ -136,6 +137,39 @@ describe('RedisService', () => {
     it('should get device commands', async () => {
       const commands = await service.getDeviceCommands('device-1');
       expect(Array.isArray(commands)).toBe(true);
+    });
+
+    it('stores and replays queued commands in FIFO order', async () => {
+      const first = { type: 'clear_cache' as any, payload: { order: 1 } };
+      const second = { type: 'reload' as any, payload: { order: 2 } };
+
+      await service.addDeviceCommand('device-1', first);
+      await service.addDeviceCommand('device-1', second);
+
+      expect((service as any).redis.rpush).toHaveBeenNthCalledWith(
+        1,
+        'device:commands:device-1',
+        JSON.stringify(first),
+      );
+      expect((service as any).redis.rpush).toHaveBeenNthCalledWith(
+        2,
+        'device:commands:device-1',
+        JSON.stringify(second),
+      );
+
+      (service as any).redis.multi.mockReturnValueOnce({
+        lrange: jest.fn().mockReturnThis(),
+        del: jest.fn().mockReturnThis(),
+        exec: jest.fn().mockResolvedValue([
+          [null, [JSON.stringify(first), JSON.stringify(second)]],
+          [null, 1],
+        ]),
+      });
+
+      await expect(service.getDeviceCommands('device-1')).resolves.toEqual([
+        first,
+        second,
+      ]);
     });
   });
 

@@ -67,7 +67,7 @@ jest.mock('@/components/DeviceHealthMonitor', () => {
   };
 });
 
-import HealthMonitoringClient from '../page-client';
+import HealthMonitoringClient, { deriveDeviceHealthFromDisplay } from '../page-client';
 import { apiClient } from '@/lib/api';
 
 const mockDevices = [
@@ -155,6 +155,25 @@ describe('HealthMonitoringClient', () => {
     await waitFor(() => {
       expect(screen.getByText('Sort by Health')).toBeInTheDocument();
     });
+    expect(screen.getByText('Sort by Status')).toBeInTheDocument();
+    expect(screen.queryByText('Sort by CPU')).not.toBeInTheDocument();
+    expect(screen.queryByText('Sort by Memory')).not.toBeInTheDocument();
+  });
+
+  it('uses a slower background refresh cadence for all-page health polling', async () => {
+    render(<HealthMonitoringClient />);
+
+    await waitFor(() => {
+      expect(apiClient.getDisplays).toHaveBeenCalledTimes(1);
+    });
+
+    jest.advanceTimersByTime(10000);
+    expect(apiClient.getDisplays).toHaveBeenCalledTimes(1);
+
+    jest.advanceTimersByTime(20000);
+    await waitFor(() => {
+      expect(apiClient.getDisplays).toHaveBeenCalledTimes(2);
+    });
   });
 
   it('shows empty state when no devices', async () => {
@@ -185,5 +204,37 @@ describe('HealthMonitoringClient', () => {
       expect(screen.getByText('Lobby Screen')).toBeInTheDocument();
       expect(screen.getByText('Meeting Room')).toBeInTheDocument();
     });
+  });
+
+  it('derives stable health from real display status and heartbeat data', () => {
+    const device = {
+      ...mockDevices[0],
+      status: 'online',
+      lastHeartbeat: '2026-05-31T12:00:00.000Z',
+    };
+
+    const first = deriveDeviceHealthFromDisplay(device as any, Date.parse('2026-05-31T12:00:30.000Z'));
+    const second = deriveDeviceHealthFromDisplay(device as any, Date.parse('2026-05-31T12:00:30.000Z'));
+
+    expect(first).toEqual(second);
+    expect(first.score).toBe(100);
+    expect(first.lastHeartbeat?.toISOString()).toBe('2026-05-31T12:00:00.000Z');
+    expect(first.cpuUsage).toBeNull();
+    expect(first.memoryUsage).toBeNull();
+    expect(first.storageUsage).toBeNull();
+    expect(first.temperature).toBeNull();
+    expect(first.uptime).toBeNull();
+  });
+
+  it('marks stale offline devices as critical instead of random healthy', () => {
+    const device = {
+      ...mockDevices[1],
+      status: 'offline',
+      lastHeartbeat: '2026-05-31T11:00:00.000Z',
+    };
+
+    const health = deriveDeviceHealthFromDisplay(device as any, Date.parse('2026-05-31T12:00:00.000Z'));
+
+    expect(health.score).toBe(25);
   });
 });

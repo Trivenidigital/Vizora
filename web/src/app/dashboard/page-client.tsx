@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
+import { fetchAllPaginated } from '@/lib/api/pagination';
 import { useDeviceStatus } from '@/lib/context/DeviceStatusContext';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import UpgradeBanner from '@/components/UpgradeBanner';
@@ -53,6 +54,10 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
 
  buildRecentActivity(content, playlists);
  }, [initialContent, initialPlaylists]);
+
+ useEffect(() => {
+ loadStats(false);
+ }, []);
 
  // Update device stats from context (real-time)
  useEffect(() => {
@@ -106,24 +111,16 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  setRecentActivity(activity);
  };
 
- const loadStats = async () => {
+ const loadStats = async (showLoading = true) => {
  try {
- setLoading(true);
+ if (showLoading) setLoading(true);
  const results = await Promise.allSettled([
- apiClient.getContent(),
- apiClient.getPlaylists(),
+ fetchAllPaginated((params) => apiClient.getContent(params)),
+ fetchAllPaginated((params) => apiClient.getPlaylists(params)),
  ]);
 
- const content = results[0].status === 'fulfilled'
- ? Array.isArray(results[0].value?.data) ? results[0].value.data
- : Array.isArray(results[0].value) ? results[0].value
- : []
- : [];
- const playlists = results[1].status === 'fulfilled'
- ? Array.isArray(results[1].value?.data) ? results[1].value.data
- : Array.isArray(results[1].value) ? results[1].value
- : []
- : [];
+ const content = results[0].status === 'fulfilled' ? results[0].value : null;
+ const playlists = results[1].status === 'fulfilled' ? results[1].value : null;
 
  results.forEach((result, index) => {
  if (result.status === 'rejected') {
@@ -135,25 +132,37 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
 
  setStats(prev => ({
  ...prev,
+ ...(content
+ ? {
  content: {
  total: content.length,
  processing: content.filter((c: any) => c?.status === 'processing').length,
  },
+ }
+ : {}),
+ ...(playlists
+ ? {
  playlists: {
  total: playlists.length,
  active: playlists.filter((p: any) => p?.isActive === true).length,
  },
+ }
+ : {}),
  }));
 
+ if (content && playlists) {
  buildRecentActivity(content, playlists);
  setError(null);
+ } else {
+ setError('Some dashboard data could not refresh');
+ }
  } catch (error) {
  if (process.env.NODE_ENV === 'development') {
   console.error('Failed to load stats:', error);
  }
  setError(error instanceof Error ? error.message : 'Failed to load dashboard data');
  } finally {
- setLoading(false);
+ if (showLoading) setLoading(false);
  }
  };
 
@@ -210,7 +219,7 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  </h3>
  <p className="text-sm text-red-700 dark:text-red-300 mt-1">{error}</p>
  <button
- onClick={loadStats}
+ onClick={() => loadStats()}
  className="mt-3 text-sm font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 underline"
  >
  Try again

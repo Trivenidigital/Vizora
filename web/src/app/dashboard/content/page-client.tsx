@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { apiClient } from '@/lib/api';
+import { fetchAllPaginated } from '@/lib/api/pagination';
 import { Content, Display, Playlist, ContentFolder } from '@/lib/types';
 import FolderTree from '@/components/FolderTree';
 import FolderBreadcrumb from '@/components/FolderBreadcrumb';
@@ -182,16 +183,15 @@ export default function ContentClient() {
  const folderId = selectedFolderId;
  try {
  setLoading(true);
- let response;
+ let items: Content[];
  if (folderId) {
- response = await apiClient.getFolderContent(folderId);
+ items = await fetchAllPaginated((params) => apiClient.getFolderContent(folderId, params));
  } else {
- response = await apiClient.getContent();
+ items = await fetchAllPaginated((params) => apiClient.getContent(params));
  }
  if (requestId !== loadContentRequestRef.current) {
  return;
  }
- const items = response.data || response || [];
  setContent(items);
  } catch (error: any) {
  if (requestId !== loadContentRequestRef.current) {
@@ -262,8 +262,8 @@ export default function ContentClient() {
 
  const loadDevices = async () => {
  try {
- const response = await apiClient.getDisplays();
- setDevices(response.data || response || []);
+ const devicesList = await fetchAllPaginated((params) => apiClient.getDisplays(params));
+ setDevices(devicesList);
  } catch (error: any) {
  if (process.env.NODE_ENV === 'development') {
   console.error('[ContentPage] Failed to load devices:', error);
@@ -277,8 +277,8 @@ export default function ContentClient() {
 
  const loadPlaylists = async () => {
  try {
- const response = await apiClient.getPlaylists();
- setPlaylists(response.data || response || []);
+ const playlistList = await fetchAllPaginated((params) => apiClient.getPlaylists(params));
+ setPlaylists(playlistList);
  } catch (error: any) {
  if (process.env.NODE_ENV === 'development') {
   console.error('[ContentPage] Failed to load playlists:', error);
@@ -317,15 +317,6 @@ export default function ContentClient() {
  type: uploadForm.type,
  file: item.file, // Pass file object instead of blob URL
  });
-
- // Generate thumbnail for images
- if (uploadForm.type === 'image' && newContent.id) {
- try {
- await apiClient.generateThumbnail(newContent.id);
- } catch (thumbnailError) {
- console.warn('Thumbnail generation failed:', thumbnailError);
- }
- }
 
  // Mark as success
  setUploadQueue(prev => prev.map((q, idx) =>
@@ -790,9 +781,10 @@ export default function ContentClient() {
  setFilterStatus('all');
  setFilterDateRange('all');
  setSearchQuery('');
+ setSelectedTags([]);
  };
 
- const hasActiveFilters = filterType !== 'all' || filterStatus !== 'all' || filterDateRange !== 'all' || searchQuery !== '';
+ const hasActiveFilters = filterType !== 'all' || filterStatus !== 'all' || filterDateRange !== 'all' || searchQuery !== '' || selectedTags.length > 0;
 
  return (
  <div className="flex h-full">

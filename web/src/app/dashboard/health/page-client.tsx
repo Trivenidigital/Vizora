@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { apiClient } from '@/lib/api';
+import { fetchAllPaginated } from '@/lib/api/pagination';
 import { Display } from '@/lib/types';
 import DeviceHealthMonitor, { DeviceHealth } from '@/components/DeviceHealthMonitor';
 import LoadingSpinner from '@/components/LoadingSpinner';
@@ -12,18 +13,48 @@ import { useDebounce } from '@/lib/hooks/useDebounce';
 import { useRealtimeEvents } from '@/lib/hooks';
 import { Icon } from '@/theme/icons';
 
-// Mock device health data generator
-const generateMockDeviceHealth = (deviceId: string, _deviceName: string): DeviceHealth => {
- const baseScore = Math.random() * 40 + 60; // 60-100
+const parseDisplayHeartbeat = (device: Display): Date | null => {
+ const raw = device.lastHeartbeat ?? device.lastSeen ?? null;
+ if (!raw) return null;
+ const parsed = new Date(raw);
+ return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const HEALTH_REFRESH_INTERVAL_MS = 30000;
+
+export const deriveDeviceHealthFromDisplay = (
+ device: Display,
+ nowMs: number = Date.now(),
+): DeviceHealth => {
+ const lastHeartbeat = parseDisplayHeartbeat(device);
+ const ageMs = lastHeartbeat ? Math.max(0, nowMs - lastHeartbeat.getTime()) : null;
+ const ageMinutes = ageMs == null ? null : ageMs / 60000;
+ const status = String(device.status ?? 'offline').toLowerCase();
+
+ let score = 25;
+ if (status === 'online') {
+ if (ageMinutes == null) score = 70;
+ else if (ageMinutes <= 2) score = 100;
+ else if (ageMinutes <= 5) score = 85;
+ else if (ageMinutes <= 15) score = 70;
+ else score = 55;
+ } else if (status === 'pairing') {
+ score = 65;
+ } else if (status === 'error') {
+ score = 35;
+ } else {
+ score = ageMinutes != null && ageMinutes <= 15 ? 45 : 25;
+ }
+
  return {
- deviceId,
- cpuUsage: Math.floor(Math.random() * 80),
- memoryUsage: Math.floor(Math.random() * 75),
- storageUsage: Math.floor(Math.random() * 60),
- temperature: Math.floor(Math.random() * 30 + 35),
- uptime: Math.floor(Math.random() * 720), // Up to 30 days
- lastHeartbeat: new Date(Date.now() - Math.random() * 300000),
- score: Math.floor(baseScore),
+ deviceId: device.id,
+ cpuUsage: null,
+ memoryUsage: null,
+ storageUsage: null,
+ temperature: null,
+ uptime: null,
+ lastHeartbeat,
+ score,
  };
 };
 
@@ -32,9 +63,10 @@ export default function HealthMonitoringClient() {
  const [devices, setDevices] = useState<Display[]>([]);
  const [deviceHealthData, setDeviceHealthData] = useState<Record<string, DeviceHealth>>({});
  const [loading, setLoading] = useState(true);
+ const refreshInFlightRef = useRef(false);
  const [searchQuery, setSearchQuery] = useState('');
  const debouncedSearch = useDebounce(searchQuery, 300);
- const [sortBy, setSortBy] = useState<'name' | 'health' | 'cpu' | 'memory'>('health');
+ const [sortBy, setSortBy] = useState<'name' | 'health' | 'status'>('health');
  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline' | 'error'>('offline');
  const [activeAlerts, setActiveAlerts] = useState<Record<string, any>>({});
@@ -51,31 +83,32 @@ export default function HealthMonitoringClient() {
  loadDevicesAndHealth();
  }, []);
 
- // Auto-refresh health data every 10 seconds
+ // Auto-refresh health data without replacing the page with a loading spinner.
  useEffect(() => {
  const interval = setInterval(() => {
- loadDevicesAndHealth();
- }, 10000);
+ loadDevicesAndHealth(false);
+ }, HEALTH_REFRESH_INTERVAL_MS);
  return () => clearInterval(interval);
  }, []);
 
- const loadDevicesAndHealth = async () => {
+ const loadDevicesAndHealth = async (showLoading = true) => {
+ if (refreshInFlightRef.current) return;
+ refreshInFlightRef.current = true;
  try {
- setLoading(true);
- const response = await apiClient.getDisplays();
- const displayDevices = response.data || response || [];
+ if (showLoading) setLoading(true);
+ const displayDevices = await fetchAllPaginated((params) => apiClient.getDisplays(params), undefined, 100, 5);
  setDevices(displayDevices);
 
- // Generate mock health data for each device
  const healthData: Record<string, DeviceHealth> = {};
  displayDevices.forEach((device: Display) => {
- healthData[device.id] = generateMockDeviceHealth(device.id, device.nickname);
+ healthData[device.id] = deriveDeviceHealthFromDisplay(device);
  });
  setDeviceHealthData(healthData);
  } catch (error: any) {
  toast.error(error.message || 'Failed to load device health');
  } finally {
- setLoading(false);
+ if (showLoading) setLoading(false);
+ refreshInFlightRef.current = false;
  }
  };
 
@@ -110,14 +143,11 @@ export default function HealthMonitoringClient() {
  case 'name':
  compareValue = (a.nickname || '').localeCompare(b.nickname || '');
  break;
+ case 'status':
+ compareValue = String(a.status || '').localeCompare(String(b.status || ''));
+ break;
  case 'health':
  compareValue = (healthA?.score || 0) - (healthB?.score || 0);
- break;
- case 'cpu':
- compareValue = (healthA?.cpuUsage || 0) - (healthB?.cpuUsage || 0);
- break;
- case 'memory':
- compareValue = (healthA?.memoryUsage || 0) - (healthB?.memoryUsage || 0);
  break;
  default:
  compareValue = 0;
@@ -161,7 +191,7 @@ export default function HealthMonitoringClient() {
  </p>
  </div>
  <button
- onClick={loadDevicesAndHealth}
+ onClick={() => loadDevicesAndHealth()}
  className="bg-[#00E5A0] text-[#061A21] px-6 py-3 rounded-lg hover:bg-[#00CC8E] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
  >
  <Icon name="download" size="lg" className="text-white" />
@@ -237,8 +267,7 @@ export default function HealthMonitoringClient() {
  >
  <option value="health">Sort by Health</option>
  <option value="name">Sort by Name</option>
- <option value="cpu">Sort by CPU</option>
- <option value="memory">Sort by Memory</option>
+ <option value="status">Sort by Status</option>
  </select>
  <button
  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
@@ -309,19 +338,19 @@ export default function HealthMonitoringClient() {
  <div className="bg-[var(--surface)]/50/50 p-2 rounded">
  <p className="text-[var(--foreground-secondary)] text-xs">Uptime</p>
  <p className="font-medium text-[var(--foreground)]">
- {Math.floor(health.uptime / 24)}d {health.uptime % 24}h
+ {typeof health.uptime === 'number' ? `${Math.floor(health.uptime / 24)}d ${health.uptime % 24}h` : 'Not reported'}
  </p>
  </div>
  <div className="bg-[var(--surface)]/50/50 p-2 rounded">
  <p className="text-[var(--foreground-secondary)] text-xs">Temp</p>
  <p className="font-medium text-[var(--foreground)]">
- {health.temperature}°C
+ {typeof health.temperature === 'number' ? `${health.temperature}°C` : 'Not reported'}
  </p>
  </div>
  <div className="bg-[var(--surface)]/50/50 p-2 rounded col-span-2">
  <p className="text-[var(--foreground-secondary)] text-xs mb-1">Last Heartbeat</p>
  <p className="font-medium text-[var(--foreground)] text-xs">
- {Math.round((Date.now() - health.lastHeartbeat.getTime()) / 1000)}s ago
+ {health.lastHeartbeat ? `${Math.round((Date.now() - health.lastHeartbeat.getTime()) / 1000)}s ago` : 'Never'}
  </p>
  </div>
  </div>

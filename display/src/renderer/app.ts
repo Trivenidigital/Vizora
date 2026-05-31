@@ -341,7 +341,7 @@ class DisplayApp {
           console.log('[App] Attempting recovery after unexpected errors...');
         }
       }
-    }, 2000); // Check every 2 seconds
+    }, 8000); // Stay under the pairing status endpoint's 10/min throttle
 
     this.pairingCheckInterval = pollInterval;
   }

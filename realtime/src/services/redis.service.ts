@@ -168,7 +168,7 @@ export class RedisService implements OnModuleDestroy {
    */
   async addDeviceCommand(deviceId: string, command: DeviceCommand): Promise<void> {
     const key = `device:commands:${deviceId}`;
-    await this.redis.lpush(key, JSON.stringify(command));
+    await this.redis.rpush(key, JSON.stringify(command));
     await this.redis.expire(key, 300); // 5 minutes
   }
 

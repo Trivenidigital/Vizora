@@ -162,7 +162,7 @@ export function useDeviceConnection({
       try {
         if (command.type === 'push_content' && command.payload && onContentPush) {
           const content = command.payload.content as unknown as PushContent;
-          const duration = (command.payload.duration as number) || 30;
+          const duration = (command.payload.duration as number) || 5;
           onContentPush(content, duration);
         } else {
           onCommand(command);

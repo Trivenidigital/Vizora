@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
+import { fetchAllPaginated } from '@/lib/api/pagination';
 import { Display, Playlist } from '@/lib/types';
 import Modal from '@/components/Modal';
 import ConfirmDialog from '@/components/ConfirmDialog';
@@ -130,14 +131,16 @@ export default function SchedulesClient() {
  try {
  setLoading(true);
  const [schedulesRes, devicesRes, playlistsRes, groupsRes] = await Promise.allSettled([
- apiClient.getSchedules(),
- apiClient.getDisplays(),
- apiClient.getPlaylists(),
- apiClient.getDisplayGroups?.() ?? Promise.resolve({ data: [] }),
+ fetchAllPaginated((params) => apiClient.getSchedules(params)),
+ fetchAllPaginated((params) => apiClient.getDisplays(params)),
+ fetchAllPaginated((params) => apiClient.getPlaylists(params)),
+ apiClient.getDisplayGroups
+ ? fetchAllPaginated((params) => apiClient.getDisplayGroups(params))
+ : Promise.resolve([]),
  ]);
 
  if (schedulesRes.status === 'fulfilled') {
- const scheduleData = schedulesRes.value.data || schedulesRes.value || [];
+ const scheduleData = schedulesRes.value || [];
  // Transform backend data to UI format
  const transformedSchedules = (scheduleData as any[]).map((s: any) => ({
  ...s,
@@ -155,15 +158,15 @@ export default function SchedulesClient() {
  setSchedules(transformedSchedules as Schedule[]);
  }
  if (devicesRes.status === 'fulfilled') {
- const deviceData = devicesRes.value.data || devicesRes.value || [];
+ const deviceData = devicesRes.value || [];
  setDevices(deviceData as unknown as Display[]);
  }
  if (playlistsRes.status === 'fulfilled') {
- const playlistData = playlistsRes.value.data || playlistsRes.value || [];
+ const playlistData = playlistsRes.value || [];
  setPlaylists(playlistData as unknown as Playlist[]);
  }
  if (groupsRes?.status === 'fulfilled') {
- setDisplayGroups((groupsRes.value as any)?.data || []);
+ setDisplayGroups(groupsRes.value || []);
  }
  } catch (error: any) {
  toast.error(error.message || 'Failed to load data');

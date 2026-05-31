@@ -110,7 +110,7 @@ export function usePlaylistPlayer({ onImpression }: UsePlaylistPlayerOptions = {
     }
   }, [clearTimer, advanceToNext]);
 
-  const pushContent = useCallback((content: PushContent, duration: number) => {
+  const pushContent = useCallback((content: PushContent, durationMinutes: number) => {
     // Save current state
     if (playlistRef.current && !temporaryContent) {
       savedStateRef.current = {
@@ -123,7 +123,8 @@ export function usePlaylistPlayer({ onImpression }: UsePlaylistPlayerOptions = {
     setTemporaryContent(content);
     contentStartRef.current = Date.now();
 
-    // Resume after duration
+    // Resume after the push-content duration. Fleet/display command durations are minutes.
+    const durationMs = Math.max(1, durationMinutes || 5) * 60 * 1000;
     timerRef.current = setTimeout(() => {
       setTemporaryContent(null);
       if (savedStateRef.current) {
@@ -142,7 +143,7 @@ export function usePlaylistPlayer({ onImpression }: UsePlaylistPlayerOptions = {
           timerRef.current = setTimeout(advanceToNext, dur);
         }
       }
-    }, duration * 1000);
+    }, durationMs);
   }, [clearTimer, advanceToNext, temporaryContent]);
 
   // Cleanup on unmount

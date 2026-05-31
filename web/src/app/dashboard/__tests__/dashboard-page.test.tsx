@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import DashboardClient from '../page-client';
+import { apiClient } from '@/lib/api';
 
 const mockPush = jest.fn();
 
@@ -81,5 +82,53 @@ describe('DashboardClient', () => {
   it('shows getting started guide when no devices', () => {
     render(<DashboardClient initialContent={[]} initialPlaylists={[]} />);
     expect(screen.getByText('Getting Started')).toBeInTheDocument();
+  });
+
+  it('refreshes overview counts from all paginated pages on mount', async () => {
+    (apiClient.getContent as jest.Mock)
+      .mockResolvedValueOnce({
+        data: [{ id: 'c1' }],
+        meta: { page: 1, limit: 100, total: 2, totalPages: 2 },
+      })
+      .mockResolvedValueOnce({
+        data: [{ id: 'c2', status: 'processing' }],
+        meta: { page: 2, limit: 100, total: 2, totalPages: 2 },
+      });
+    (apiClient.getPlaylists as jest.Mock).mockResolvedValue({
+      data: [{ id: 'p1', isActive: true }],
+      meta: { page: 1, limit: 100, total: 1, totalPages: 1 },
+    });
+
+    render(<DashboardClient initialContent={[]} initialPlaylists={[]} />);
+
+    await waitFor(() => {
+      expect(apiClient.getContent).toHaveBeenNthCalledWith(1, { page: 1, limit: 100 });
+      expect(apiClient.getContent).toHaveBeenNthCalledWith(2, { page: 2, limit: 100 });
+      expect(apiClient.getPlaylists).toHaveBeenCalledWith({ page: 1, limit: 100 });
+    });
+    expect(screen.getByText('Content Items').parentElement?.parentElement).toHaveTextContent('2');
+    expect(screen.getByText('Playlists').parentElement?.parentElement).toHaveTextContent('1');
+  });
+
+  it('preserves initial overview counts when all-page refresh partially fails', async () => {
+    (apiClient.getContent as jest.Mock).mockRejectedValueOnce(new Error('content unavailable'));
+    (apiClient.getPlaylists as jest.Mock).mockResolvedValueOnce({
+      data: [{ id: 'p1', isActive: true }],
+      meta: { page: 1, limit: 100, total: 1, totalPages: 1 },
+    });
+
+    render(
+      <DashboardClient
+        initialContent={[{ id: 'c1' }, { id: 'c2' }]}
+        initialPlaylists={[{ id: 'p1', isActive: true }]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(apiClient.getContent).toHaveBeenCalledWith({ page: 1, limit: 100 });
+      expect(screen.getByText('Some dashboard data could not refresh')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Content Items').parentElement?.parentElement).toHaveTextContent('2');
+    expect(screen.getByText('Playlists').parentElement?.parentElement).toHaveTextContent('1');
   });
 });

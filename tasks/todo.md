@@ -1,8 +1,75 @@
 # Vizora - Task Tracker
 
-## In Progress: Display Delivery Reliability Follow-up (2026-05-31)
+## In Progress: Customer Dashboard Quality + Performance Pass (2026-05-31)
+
+**Branch:** `feat/customer-dashboard-quality-pass`
+
+**Why now:** After PR #120 closed the display-delivery reliability slice, the next customer-facing gaps are dashboard quality and middleware/display performance bottlenecks that are repo-side, testable, and do not need production secrets or hardware.
+
+**New primitives introduced:** small web formatting/pagination helpers only. Prefer existing Next dashboard components/API clients, NestJS modules/services/DTOs, Prisma query patterns, and the existing `/api/v1` response envelope.
+
+**Hermes-first analysis:** not applicable unless the selected fix involves business agents, MCP tools, or AI/provider spend. This pass is dashboard UX, middleware performance, content upload/pairing/streaming, and critical-path reliability.
+**Plan/design:** `docs/plans/2026-05-31-customer-dashboard-quality-performance-pass.md`
+
+**Plan**
+- [x] Merge PR #120 after CI green.
+- [x] Re-check deploy gate after merge.
+- [x] Run parallel customer-dashboard, middleware-performance, and customer-1 readiness analyses.
+- [x] Select the highest-value buildable repo-side fixes with file/line evidence.
+- [x] Write/update a short plan/design before code.
+- [x] Implement fixes with focused tests.
+- [x] Run multi-subagent review before broader tests.
+- [x] Run focused and broader verification.
+- [ ] Open PR, wait for CI, merge if clean.
+
+**First scoped bundle selected from subagent reviews**
+- [x] SMTP env parity: `MailService` must accept `SMTP_PASS` as documented/health-checked.
+- [x] Display layout zones: emit/read `resolvedPlaylist` / `resolvedContent` so layout content renders.
+- [x] Realtime command replay: preserve FIFO order for queued offline commands.
+- [x] Fleet push content: map Prisma `Content.name` / `thumbnail`, not non-existent `title` / `thumbnailUrl`.
+- [x] Fleet UI command results: report delivered/queued/failed honestly.
+- [x] Health dashboard: remove random/fabricated metrics and derive stable health from real display status/heartbeat.
+- [x] Content library: clear tag filters with Clear all and stop duplicate post-upload thumbnail generation.
+- [x] Pairing clients: slow polling enough to respect the current status endpoint throttle, with basic 429 handling where feasible.
+- [x] Dashboard list/picker pagination: fetch all pages for content, devices, playlists, schedules, health, status context, overview stats, and emergency override picker instead of truncating at the backend default page.
+
+**Focused verification**
+- [x] `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="mail.service|fleet.service|content.service"` - pass, 3 suites / 126 tests.
+- [x] `pnpm --filter @vizora/realtime test -- --runInBand --testPathPattern="redis.service|device.gateway"` - pass, 3 suites / 107 tests.
+- [x] `pnpm --filter @vizora/web test -- --runInBand --testPathPattern="dashboard/health|FleetCommandDropdown|EmergencyOverrideModal|content-page|usePairing|DeviceHealthMonitor"` - pass, 6 suites / 49 tests; existing React `act(...)` warnings remain in `EmergencyOverrideModal` tests.
+- [x] `pnpm --filter @vizora/web test -- --runInBand --testPathPattern="pagination|dashboard/content|dashboard/devices|dashboard/playlists|dashboard/schedules|dashboard/health|dashboard/__tests__|EmergencyOverrideModal|FleetCommandDropdown|usePairing|DeviceHealthMonitor"` - pass, 11 suites / 93 tests; existing React `act(...)` warnings remain in schedule, emergency modal, and upgrade banner tests.
+- [x] Review follow-up `pnpm --filter @vizora/web test -- --runInBand --testPathPattern="pagination|dashboard/__tests__|dashboard/health"` - pass, 3 suites / 25 tests; existing React `act(...)` warnings remain in dashboard/upgrade banner tests.
+- [x] Review follow-up `pnpm --filter @vizora/web test -- --runInBand --testPathPattern="pagination|dashboard/content|dashboard/devices|dashboard/playlists|dashboard/schedules|dashboard/health|dashboard/__tests__|EmergencyOverrideModal|FleetCommandDropdown|commandResultMessage|useDeviceConnection|usePlaylistPlayer|usePairing|DeviceHealthMonitor"` - pass, 14 suites / 106 tests; existing React `act(...)` warnings and intentional negative-path console errors remain.
+- [x] `git diff --check` - pass; line-ending warnings only.
+
+**Broad verification**
+- [x] `pnpm --filter @vizora/middleware test -- --runInBand` - pass, 141 suites / 2763 tests.
+- [x] `pnpm --filter @vizora/realtime test -- --runInBand` - pass, 11 suites / 245 tests.
+- [x] `pnpm --filter @vizora/display test -- --runInBand` - pass, 5 suites / 115 tests; known MaxListeners warning and expected negative-path logs remain.
+- [x] `pnpm --filter @vizora/web test -- --runInBand` - pass, 86 suites / 905 tests; existing React `act(...)` warnings and expected negative-path logs remain.
+- [x] `npx nx build @vizora/middleware` - pass with existing webpack warnings.
+- [x] `npx nx build @vizora/realtime` - pass with existing source-map / optional `ws` warnings.
+- [x] `pnpm --filter @vizora/display build` - pass.
+- [x] `NODE_OPTIONS=--max-old-space-size=4096 npx nx build @vizora/web` - pass with existing Next middleware/proxy and missing production API URL warnings.
+- [x] Direct ESLint equivalent (`ESLINT_USE_FLAT_CONFIG=false eslint "middleware/src/**/*.ts" "realtime/src/**/*.ts"`) - exit 0, 187 warnings, no errors. Local `pnpm lint` wrapper is Windows-incompatible because the script uses Unix-style env assignment.
+- [x] Final `git diff --check` - pass; line-ending warnings only.
+
+**Review gate**
+- [x] Backend/realtime reviewer: initial high/medium findings fixed; final re-review CLEAN.
+- [x] Frontend/customer UX reviewer: initial and follow-up findings fixed; final re-review CLEAN.
+- [x] Performance/readiness reviewer: initial and follow-up findings fixed; final re-review CLEAN.
+
+**Current deployment gate**
+- GitHub main: `70285350105ba46e457fdf702ea9fe33279efc19` after PR #120.
+- Production runtime health: `/api/v1/health` returned `success: true`, database connected at 2026-05-31T06:11:55Z.
+- Production deploy is blocked: `/opt/vizora/app` is dirty, local `HEAD=bb76aa1838740bff5b58623dfef7a906d44f46a6`, and after fetch is `ahead 17, behind 36` relative to `origin/main=70285350105ba46e457fdf702ea9fe33279efc19`. Do not pull/reset/stash/restart services until prod-local work is reconciled.
+
+---
+
+## Completed: Display Delivery Reliability Follow-up (2026-05-31)
 
 **Branch:** `feat/customer-performance-hardening-2`
+**PR / merge commit:** #120 / `70285350105ba46e457fdf702ea9fe33279efc19`
 
 **Plan/design:** `docs/plans/2026-05-31-display-delivery-reliability-follow-up.md`
 
@@ -20,7 +87,7 @@
 - [x] Run focused realtime/display/middleware tests.
 - [x] Run multi-review on the diff before broader tests.
 - [x] Run broader package tests/builds proportional to touched packages.
-- [ ] Open PR, wait for CI, merge if clean.
+- [x] Open PR, wait for CI, merge if clean.
 
 **Verification so far**
 - `NODE_OPTIONS=--use-system-ca pnpm --dir packages/database exec prisma generate` - pass; needed in fresh worktree before realtime tests could import `@vizora/database`.
@@ -38,6 +105,8 @@
 - `npx nx build @vizora/realtime` - pass with existing source-map/optional `ws` warnings.
 - `pnpm --filter @vizora/display build` - pass.
 - `NODE_OPTIONS=--max-old-space-size=4096 npx nx build @vizora/web` - pass with existing Next middleware/proxy and missing production API URL warnings.
+- PR #120 CI - pass: audit, build, lint, security, test, and e2e.
+- Deploy status - not deployed; blocked by dirty/diverged production checkout.
 
 **Review inputs**
 - Realtime/display reviewer: high findings on negative-ACK replay, broadcast bypassing ACK/queue path, Electron protected media URLs, and middleware single-device command DTO drift.

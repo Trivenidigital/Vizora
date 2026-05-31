@@ -2,7 +2,6 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-  ForbiddenException,
   BadRequestException,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -106,10 +105,10 @@ export class FleetService {
       gatewayPayload = {
         content: {
           id: resolvedContent.id,
-          title: resolvedContent.title,
+          name: resolvedContent.name,
           type: resolvedContent.type,
           url: resolvedUrl,
-          thumbnailUrl: resolvedContent.thumbnailUrl,
+          thumbnail: resolvedContent.thumbnail,
         },
         duration,
         priority: dto.payload.priority || 'normal',
@@ -138,7 +137,7 @@ export class FleetService {
         orgId,
         commandId,
         dto.payload.contentId,
-        resolvedContent?.title || 'Emergency content',
+        resolvedContent?.name || 'Emergency content',
         dto.target.type,
         dto.target.id,
         targetName,

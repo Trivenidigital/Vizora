@@ -102,7 +102,16 @@ jest.mock('@/components/SearchFilter', () => {
 });
 
 jest.mock('@/components/ContentTagger', () => {
-  return function MockTagger() { return null; };
+  return function MockTagger({ selectedTags, onChange }: any) {
+    return (
+      <div data-testid="content-tagger">
+        <button type="button" onClick={() => onChange(['1'])}>
+          Select Marketing Tag
+        </button>
+        <span data-testid="selected-tags">{selectedTags.join(',')}</span>
+      </div>
+    );
+  };
 });
 
 jest.mock('@/components/FolderTree', () => {
@@ -141,6 +150,7 @@ const sampleContent = [
     url: '/uploads/banner.png',
     thumbnailUrl: '/thumbs/banner.png',
     fileSize: 1024000,
+    metadata: { tags: ['Marketing'] },
     createdAt: '2026-01-15T10:00:00Z',
     updatedAt: '2026-01-15T10:00:00Z',
   },
@@ -272,6 +282,28 @@ describe('ContentClient', () => {
     expect(screen.getByText('Menu PDF')).toBeInTheDocument();
   });
 
+  it('renders content from every paginated page', async () => {
+    mockGetContent
+      .mockResolvedValueOnce({
+        data: [sampleContent[0]],
+        meta: { page: 1, limit: 100, total: 2, totalPages: 2 },
+      })
+      .mockResolvedValueOnce({
+        data: [sampleContent[1]],
+        meta: { page: 2, limit: 100, total: 2, totalPages: 2 },
+      });
+
+    render(<ContentClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+      expect(screen.getByText('Promo Video')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+    expect(mockGetContent).toHaveBeenNthCalledWith(1, { page: 1, limit: 100 });
+    expect(mockGetContent).toHaveBeenNthCalledWith(2, { page: 2, limit: 100 });
+  });
+
   it('shows error toast on fetch failure', async () => {
     mockGetContent.mockRejectedValue(new Error('Network error'));
     render(<ContentClient />);
@@ -326,6 +358,33 @@ describe('ContentClient', () => {
     await waitForAuxiliaryRequestsToSettle();
 
     expect(mockGenerateThumbnail).not.toHaveBeenCalled();
+  });
+
+  it('clears selected tag filters when Clear all is clicked', async () => {
+    mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
+
+    render(<ContentClient />);
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+      expect(screen.getByText('Promo Video')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+
+    fireEvent.click(screen.getByText(/Tags/));
+    fireEvent.click(screen.getByText('Select Marketing Tag'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+      expect(screen.queryByText('Promo Video')).not.toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Clear all'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+      expect(screen.getByText('Promo Video')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('selected-tags')).toHaveTextContent('');
   });
 
   it('also fetches displays and playlists for push/add features', async () => {

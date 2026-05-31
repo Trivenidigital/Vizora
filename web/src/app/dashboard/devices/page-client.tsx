@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
+import { fetchAllPaginated } from '@/lib/api/pagination';
 import { Display, Playlist, DisplayGroup } from '@/lib/types';
 import Modal from '@/components/Modal';
 import ConfirmDialog from '@/components/ConfirmDialog';
@@ -114,23 +115,18 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  });
 
  useEffect(() => {
- if (initialDevices.length === 0) {
- loadDevices();
- }
- if (initialPlaylists.length === 0) {
+ loadDevices(initialDevices.length === 0);
  loadPlaylists();
- }
  loadGroups();
  }, []);
 
- const loadDevices = async () => {
+ const loadDevices = async (showLoading = true) => {
  try {
- setLoading(true);
+ if (showLoading) setLoading(true);
  await retry(
  'loadDevices',
  async () => {
- const response = await apiClient.getDisplays();
- const devicesList = response.data || response || [];
+ const devicesList = await fetchAllPaginated((params) => apiClient.getDisplays(params));
  setDevices(devicesList);
  clearError('loadDevices');
  return devicesList;
@@ -143,14 +139,14 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  } catch (error: any) {
  recordError('loadDevices', error, 'warning');
  } finally {
- setLoading(false);
+ if (showLoading) setLoading(false);
  }
  };
 
  const loadPlaylists = async () => {
  try {
- const response = await apiClient.getPlaylists();
- setPlaylists(response.data || response || []);
+ const playlistList = await fetchAllPaginated((params) => apiClient.getPlaylists(params));
+ setPlaylists(playlistList);
  } catch (error) {
  toast.error('Failed to load playlists');
  }
@@ -158,8 +154,7 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
 
  const loadGroups = async () => {
  try {
- const response = await apiClient.getDisplayGroups();
- const groups = response.data || [];
+ const groups = await fetchAllPaginated((params) => apiClient.getDisplayGroups(params));
  setDeviceGroups(groups.map((g: any) => ({
  id: g.id,
  name: g.name,

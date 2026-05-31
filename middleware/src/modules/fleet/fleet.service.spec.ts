@@ -319,10 +319,10 @@ describe('FleetService', () => {
       });
       db.content.findFirst.mockResolvedValue({
         id: 'content-1',
-        title: 'Promo Video',
+        name: 'Promo Video',
         type: 'video',
         url: 'https://cdn.example.com/video.mp4',
-        thumbnailUrl: 'https://cdn.example.com/thumb.jpg',
+        thumbnail: 'https://cdn.example.com/thumb.jpg',
         organizationId: mockOrgId,
       });
 
@@ -347,9 +347,10 @@ describe('FleetService', () => {
           payload: expect.objectContaining({
             content: expect.objectContaining({
               id: 'content-1',
-              title: 'Promo Video',
+              name: 'Promo Video',
               type: 'video',
               url: 'https://cdn.example.com/video.mp4',
+              thumbnail: 'https://cdn.example.com/thumb.jpg',
             }),
             duration: 30,
             priority: 'normal',
@@ -403,10 +404,10 @@ describe('FleetService', () => {
       });
       db.content.findFirst.mockResolvedValue({
         id: 'content-2',
-        title: 'Uploaded Image',
+        name: 'Uploaded Image',
         type: 'image',
         url: 'minio://vizora-content/images/photo.png',
-        thumbnailUrl: null,
+        thumbnail: '/static/thumbnails/content-2.jpg',
         organizationId: mockOrgId,
       });
 
@@ -423,6 +424,10 @@ describe('FleetService', () => {
       expect(body.command.payload.content.url).toBe(
         'http://localhost:3000/api/v1/device-content/content-2/file',
       );
+      expect(body.command.payload.content.name).toBe('Uploaded Image');
+      expect(body.command.payload.content.thumbnail).toBe('/static/thumbnails/content-2.jpg');
+      expect(body.command.payload.content.title).toBeUndefined();
+      expect(body.command.payload.content.thumbnailUrl).toBeUndefined();
     });
   });
 

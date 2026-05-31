@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
+import { fetchAllPaginated } from '@/lib/api/pagination';
 import { useToast } from '@/lib/hooks/useToast';
 import Modal from '@/components/Modal';
+import { toastFleetCommandResult } from './commandResultMessage';
 
 interface EmergencyOverrideModalProps {
   isOpen: boolean;
@@ -13,7 +15,8 @@ interface EmergencyOverrideModalProps {
 
 interface ContentItem {
   id: string;
-  name: string;
+  name?: string;
+  title?: string;
   type: string;
 }
 
@@ -55,16 +58,13 @@ export default function EmergencyOverrideModal({ isOpen, onClose, organizationId
   const loadData = async () => {
     try {
       const [contentRes, displaysRes, groupsRes] = await Promise.all([
-        apiClient.getContent(),
-        apiClient.getDisplays(),
-        apiClient.getDisplayGroups(),
+        fetchAllPaginated((params) => apiClient.getContent(params)),
+        fetchAllPaginated((params) => apiClient.getDisplays(params)),
+        fetchAllPaginated((params) => apiClient.getDisplayGroups(params)),
       ]);
-      const cData = (contentRes as any)?.data ?? contentRes ?? [];
-      const dData = (displaysRes as any)?.data ?? displaysRes ?? [];
-      const gData = (groupsRes as any)?.data ?? groupsRes ?? [];
-      setContentList(cData as ContentItem[]);
-      setDisplays(dData as DisplayItem[]);
-      setGroups(gData as GroupItem[]);
+      setContentList(contentRes);
+      setDisplays(displaysRes as DisplayItem[]);
+      setGroups(groupsRes as GroupItem[]);
     } catch (error: any) {
       toast.error('Failed to load data');
     }
@@ -90,11 +90,11 @@ export default function EmergencyOverrideModal({ isOpen, onClose, organizationId
         },
       });
 
-      toast.success(
-        `Emergency content pushed to ${result.devicesTargeted} devices (${result.devicesOnline} online, ${result.devicesQueued} queued)`
-      );
-      onClose();
-      resetForm();
+      const message = toastFleetCommandResult(toast, 'Emergency content', result);
+      if (message.kind !== 'error') {
+        onClose();
+        resetForm();
+      }
     } catch (error: any) {
       toast.error(error.message || 'Failed to push emergency content');
     } finally {
@@ -117,10 +117,11 @@ export default function EmergencyOverrideModal({ isOpen, onClose, organizationId
       <div className="space-y-6">
         {/* Content Picker */}
         <div>
-          <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
+          <label htmlFor="emergency-content-id" className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
             Content to Push
           </label>
           <select
+            id="emergency-content-id"
             value={selectedContentId}
             onChange={(e) => setSelectedContentId(e.target.value)}
             className="eh-select w-full"
@@ -128,7 +129,7 @@ export default function EmergencyOverrideModal({ isOpen, onClose, organizationId
             <option value="">Select content...</option>
             {contentList.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.name} ({c.type})
+                {c.name || c.title || 'Untitled'} ({c.type})
               </option>
             ))}
           </select>
