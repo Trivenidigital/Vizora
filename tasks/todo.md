@@ -22,8 +22,8 @@
 - [x] Display media preload uses authenticated `/device-content/...` URLs so cache warmup can actually succeed.
 - [x] Run focused red/green tests.
 - [x] Run multi-subagent review before broader tests.
-- [ ] Run post-fix re-review before broader tests.
-- [ ] Run broader affected tests/builds.
+- [x] Run post-fix re-review before broader tests.
+- [x] Run broader affected tests/builds.
 - [ ] PR, CI, merge.
 - [ ] Re-check deployment gate; deploy only if prod checkout is safe.
 
@@ -48,7 +48,17 @@
 - [x] Customer/performance reviewer: initial findings fixed by keeping realtime `success:false` outside circuit-failure accounting, rethrowing template redirect policy errors from fallback, failing fast on malformed billing redirect responses, and consolidating thumbnail URL validation to the shared SSRF guard.
 - [x] Customer/performance post-fix reviewer found P2 customer breakage from blanket redirect rejection; fixed with bounded redirect following that validates every hop through the shared SSRF guard.
 - [x] Security post-fix reviewer found P2 template redirect downgrade/header-leak risk; fixed by enforcing production HTTPS on redirected template URLs and dropping non-safe headers on cross-origin redirects.
-- [ ] Post-fix re-review.
+- [x] Post-fix security re-review: CLEAN. Residual risks: documented DNS lookup-to-fetch TOCTOU remains, and billing redirect URLs still trust middleware/provider responses.
+- [x] Post-fix customer/performance re-review: CLEAN. Residual risk: template APIs that require custom headers after cross-origin redirects must use the final URL directly or a same-origin redirect.
+
+**Broader verification**
+- [x] `pnpm --filter @vizora/middleware test -- --runInBand` - pass, 143 suites / 2813 tests.
+- [x] `pnpm --filter @vizora/web test -- --runInBand` - pass, 92 suites / 942 tests; existing React `act(...)`, jsdom navigation, and intentional negative-path console warnings remain.
+- [x] `pnpm --filter @vizora/middleware exec tsc --noEmit --pretty false` - pass.
+- [x] `pnpm --filter @vizora/web exec tsc --noEmit --pretty false` - pass.
+- [x] `npx nx build @vizora/middleware` - pass with existing webpack warnings.
+- [x] `NODE_OPTIONS=--max-old-space-size=4096 NEXT_PUBLIC_SOCKET_URL=http://localhost:3002 NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1 BACKEND_URL=http://localhost:3000 npx nx build @vizora/web` - pass with existing Next middleware/proxy deprecation and TS project-reference warnings.
+- [x] `git diff --check origin/main...HEAD` - pass.
 
 ---
 
