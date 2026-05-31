@@ -105,7 +105,7 @@ export class ContentService {
 
     // Validate filter values - only allow whitelisted values
     const validTypes = ['image', 'video', 'url', 'html', 'pdf', 'template', 'layout', 'widget'];
-    const validStatuses = ['active', 'archived', 'draft', 'flagged', 'rejected'];
+    const validStatuses = ['active', 'archived', 'draft', 'flagged', 'rejected', 'pending_approval'];
     const validOrientations = ['landscape', 'portrait', 'both'];
 
     const where: Prisma.ContentWhereInput = { organizationId };
@@ -195,11 +195,17 @@ export class ContentService {
   }
 
   /**
-   * Find content by ID without org filter (for device content serving)
+   * Find content for device serving. The org filter is applied in the
+   * query (not after the fetch) so an attacker who guesses a content
+   * ID from another org gets a uniform NotFoundException without the
+   * service ever having loaded that org's record into memory.
+   *
+   * Callers MUST verify the device JWT before calling this and pass
+   * the device's organizationId from the verified payload.
    */
-  async findById(id: string) {
+  async findByIdForDevice(id: string, organizationId: string) {
     const content = await this.db.content.findFirst({
-      where: { id },
+      where: { id, organizationId },
     });
     return content;
   }
@@ -416,8 +422,22 @@ export class ContentService {
       },
     });
 
+    // Collect (playlistId, organizationId) pairs that need a device-fleet
+    // push after the transaction commits — without this, device clients
+    // continue serving the expired content (or the now-deleted playlist
+    // slot) until they reconnect, sometimes hours later.
+    const affectedPlaylists: Array<{ playlistId: string; organizationId: string }> = [];
+
     for (const content of expiredContent) {
       await this.db.$transaction(async (tx) => {
+        // Snapshot playlistIds BEFORE the updateMany / deleteMany — we
+        // can't read them after the contentId rewrite or row deletion.
+        const items = await tx.playlistItem.findMany({
+          where: { contentId: content.id },
+          select: { playlistId: true },
+        });
+        const distinctPlaylistIds = Array.from(new Set(items.map((i) => i.playlistId)));
+
         if (content.replacementContentId) {
           // Validate replacement content belongs to same organization
           const replacement = await tx.content.findFirst({
@@ -451,10 +471,40 @@ export class ContentService {
           where: { id: content.id },
           data: { status: 'expired' },
         });
+
+        for (const playlistId of distinctPlaylistIds) {
+          affectedPlaylists.push({
+            playlistId,
+            organizationId: content.organizationId,
+          });
+        }
       });
     }
 
-    return { processed: expiredContent.length };
+    // Notify device fleet AFTER the transactions commit so the realtime
+    // gateway pushes the up-to-date playlist (with replacement content
+    // swapped in OR with the expired slot removed). De-dup by playlistId
+    // — a single playlist with N expired items only needs one push.
+    const distinctAffected = new Map<string, string>();
+    for (const a of affectedPlaylists) {
+      distinctAffected.set(a.playlistId, a.organizationId);
+    }
+    for (const [playlistId, organizationId] of distinctAffected) {
+      // playlist.updated is already listened-to by PlaylistsService's
+      // notifyDisplaysOfPlaylistUpdate plumbing (via the @OnEvent
+      // handler that triggers off this event), so the device push
+      // pipeline is reused exactly. action='expired_content_replaced'
+      // tags the event so downstream consumers (audit log, ops
+      // dashboards) can distinguish a system-driven push from an
+      // operator-driven edit.
+      this.eventEmitter.emit('playlist.updated', {
+        entityId: playlistId,
+        organizationId,
+        action: 'expired_content_replaced',
+      });
+    }
+
+    return { processed: expiredContent.length, playlistsRefreshed: distinctAffected.size };
   }
 
 
@@ -587,42 +637,69 @@ export class ContentService {
 
   async bulkDelete(organizationId: string, dto: BulkDeleteDto) {
     const { ids } = dto;
+    const uniqueIds = Array.from(new Set(ids));
 
     // Fetch items with file info for storage cleanup
     const items = await this.db.content.findMany({
-      where: { id: { in: ids }, organizationId },
+      where: { id: { in: uniqueIds }, organizationId },
       select: { id: true, fileSize: true, url: true },
     });
 
-    if (items.length !== ids.length) {
+    if (items.length !== uniqueIds.length) {
       throw new BadRequestException('Some content items not found or not accessible');
     }
 
-    // Delete files from storage with error collection
-    const deletionResults = await Promise.allSettled(
+    // Delete files from storage, tracking which items succeeded.
+    //
+    // Previously the function ran Promise.allSettled, logged failures,
+    // then deleteMany'd ALL DB rows — leaving the failed-MinIO files
+    // ORPHANED forever (consuming quota with no DB row pointing to
+    // them, no operator visibility). The new shape only deletes the DB
+    // rows whose storage file actually went away; failures stay in the
+    // DB so the operator (or a retry cron) can re-attempt the delete
+    // later. Quota decrement matches the same successful-only set.
+    const deletableIds: string[] = [];
+    const failedIds: string[] = [];
+    await Promise.all(
       items.map(async (item) => {
-        const objectKey = item.url?.startsWith('minio://') ? item.url.substring('minio://'.length) : null;
-        if (objectKey) {
+        const objectKey = item.url?.startsWith('minio://')
+          ? item.url.substring('minio://'.length)
+          : null;
+        if (!objectKey) {
+          // No file to delete (e.g., url-type content) — safe to drop DB row.
+          deletableIds.push(item.id);
+          return;
+        }
+        try {
           await this.storageService.deleteFile(objectKey);
+          deletableIds.push(item.id);
+        } catch (err) {
+          failedIds.push(item.id);
+          this.logger.warn(
+            `Bulk delete: storage delete failed for content ${item.id} (key=${objectKey}): ${
+              err instanceof Error ? err.message : err
+            }. DB row retained for retry.`,
+          );
         }
       }),
     );
-    const failures = deletionResults.filter(r => r.status === 'rejected');
-    if (failures.length > 0) {
-      this.logger.warn(`Bulk delete: ${failures.length}/${items.length} storage file(s) failed to delete`);
+
+    let deleted = 0;
+    if (deletableIds.length > 0) {
+      const result = await this.db.content.deleteMany({
+        where: { id: { in: deletableIds }, organizationId },
+      });
+      deleted = result.count;
+
+      const successfulBytes = items
+        .filter((i) => deletableIds.includes(i.id))
+        .reduce((sum, i) => sum + (i.fileSize || 0), 0);
+      if (successfulBytes > 0) {
+        await this.storageQuotaService.decrementUsage(organizationId, successfulBytes);
+      }
     }
 
-    const result = await this.db.content.deleteMany({
-      where: { id: { in: ids }, organizationId },
-    });
-
-    // Decrement storage quota for total file sizes
-    const totalBytes = items.reduce((sum, item) => sum + (item.fileSize || 0), 0);
-    if (totalBytes > 0) {
-      await this.storageQuotaService.decrementUsage(organizationId, totalBytes);
-    }
-
-    return { deleted: result.count };
+    return { deleted, failed: failedIds.length, failedIds };
   }
 
   async bulkAddTags(organizationId: string, dto: BulkTagDto) {
@@ -637,12 +714,31 @@ export class ContentService {
       throw new BadRequestException('Some content items not found or not accessible');
     }
 
+    // Dedupe both arrays before the org-scope checks. Prisma's
+    // `id: { in: [...] }` collapses duplicates internally, so
+    // comparing the count against the RAW length would falsely
+    // reject a request where the client posted the same tag id
+    // twice (same false-positive that PR #73 fixed for playlists).
+    const uniqueContentIds = Array.from(new Set(contentIds));
+    const uniqueTagIds = Array.from(new Set(tagIds));
+
+    if (uniqueContentIds.length !== contentIds.length) {
+      // Re-check the org-scope count against the unique set so the
+      // cardinality comparison is apples-to-apples.
+      const recheck = await this.db.content.count({
+        where: { id: { in: uniqueContentIds }, organizationId },
+      });
+      if (recheck !== uniqueContentIds.length) {
+        throw new BadRequestException('Some content items not found or not accessible');
+      }
+    }
+
     // Verify all tags belong to organization
     const tagCount = await this.db.tag.count({
-      where: { id: { in: tagIds }, organizationId },
+      where: { id: { in: uniqueTagIds }, organizationId },
     });
 
-    if (tagCount !== tagIds.length) {
+    if (tagCount !== uniqueTagIds.length) {
       throw new BadRequestException('Some tags not found or not accessible');
     }
 
@@ -1572,5 +1668,199 @@ export class ContentService {
       this.logger.error(`Failed to load widget template "${templateName}": ${error}`);
       throw new BadRequestException(`Widget template "${templateName}" not found`);
     }
+  }
+
+  // ===========================================================================
+  // O10 — Content approval pipeline
+  //
+  // Distinct from the existing moderation/flag flow (flagContent /
+  // reviewContent). The flag flow is "any user can flag suspect content for
+  // admin review." The approval pipeline is "proposer → approver" — any user
+  // can submit content for approval; admins/managers gate publication.
+  //
+  // States:
+  //   draft → submitForApproval() → pending_approval → approve() → active
+  //                                                  → reject(reason) → rejected
+  //
+  // The two flows share the Content.status field and the metadata JSON;
+  // they don't interact (moderation flags a previously-active piece; the
+  // approval pipeline gates the initial publication).
+  // ===========================================================================
+
+  /**
+   * Proposer step. Move content from `draft` to `pending_approval`. Any
+   * authenticated user in the org can submit; cross-org guard via findOne.
+   */
+  async submitForApproval(
+    organizationId: string,
+    id: string,
+    submittedBy: string,
+    note?: string,
+  ) {
+    const content = await this.findOne(organizationId, id);
+
+    if (content.status !== 'draft') {
+      throw new BadRequestException(
+        `Only draft content can be submitted for approval (current status: ${content.status})`,
+      );
+    }
+
+    const existingMetadata = (content.metadata || {}) as Record<string, unknown>;
+    const approvalMetadata = {
+      ...existingMetadata,
+      approval: {
+        ...((existingMetadata.approval as Record<string, unknown>) || {}),
+        submittedBy,
+        submittedAt: new Date().toISOString(),
+        submissionNote: note || null,
+      },
+    };
+
+    const result = await this.db.content.updateMany({
+      where: { id, organizationId, status: 'draft' },              // optimistic predicate
+      data: {
+        status: 'pending_approval',
+        metadata: approvalMetadata as Prisma.InputJsonValue,
+      },
+    });
+
+    if (result.count === 0) {
+      // Either gone OR status changed (e.g. concurrent submission). Re-fetch
+      // and surface the actual reason instead of pretending it's still draft.
+      throw new BadRequestException(
+        'Content could not be submitted — status may have changed concurrently',
+      );
+    }
+
+    this.eventEmitter.emit('content.approval.submitted', {
+      organizationId,
+      contentId: id,
+      submittedBy,
+    });
+
+    return this.mapContentResponse(await this.db.content.findUnique({ where: { id } }));
+  }
+
+  /**
+   * Approver step. Move content from `pending_approval` to `active`.
+   * RBAC enforced at the controller (@Roles('admin', 'manager')).
+   * Self-approval guard: the approver MUST NOT be the same user who submitted —
+   * matches enterprise approval norms.
+   */
+  async approveContent(
+    organizationId: string,
+    id: string,
+    approvedBy: string,
+    note?: string,
+  ) {
+    const content = await this.findOne(organizationId, id);
+
+    if (content.status !== 'pending_approval') {
+      throw new BadRequestException(
+        `Only pending_approval content can be approved (current status: ${content.status})`,
+      );
+    }
+
+    const existingMetadata = (content.metadata || {}) as Record<string, unknown>;
+    const existingApproval = (existingMetadata.approval as Record<string, unknown>) || {};
+
+    if (existingApproval.submittedBy === approvedBy) {
+      throw new BadRequestException(
+        'Self-approval is not allowed — content must be reviewed by a different user',
+      );
+    }
+
+    const approvalMetadata = {
+      ...existingMetadata,
+      approval: {
+        ...existingApproval,
+        approvedBy,
+        approvedAt: new Date().toISOString(),
+        approvalNote: note || null,
+        decision: 'approved',
+      },
+    };
+
+    const result = await this.db.content.updateMany({
+      where: { id, organizationId, status: 'pending_approval' },
+      data: {
+        status: 'active',
+        metadata: approvalMetadata as Prisma.InputJsonValue,
+      },
+    });
+
+    if (result.count === 0) {
+      throw new BadRequestException(
+        'Content could not be approved — status may have changed concurrently',
+      );
+    }
+
+    this.eventEmitter.emit('content.approval.approved', {
+      organizationId,
+      contentId: id,
+      approvedBy,
+    });
+
+    return this.mapContentResponse(await this.db.content.findUnique({ where: { id } }));
+  }
+
+  /**
+   * Approver step. Reject `pending_approval` content; sets status to
+   * `rejected` and records the reason. Self-rejection IS allowed (the
+   * submitter can withdraw their own pending content). RBAC at controller.
+   */
+  async rejectFromApproval(
+    organizationId: string,
+    id: string,
+    rejectedBy: string,
+    reason: string,
+  ) {
+    if (!reason || reason.trim().length === 0) {
+      throw new BadRequestException('Rejection reason is required');
+    }
+
+    const content = await this.findOne(organizationId, id);
+
+    if (content.status !== 'pending_approval') {
+      throw new BadRequestException(
+        `Only pending_approval content can be rejected (current status: ${content.status})`,
+      );
+    }
+
+    const existingMetadata = (content.metadata || {}) as Record<string, unknown>;
+    const existingApproval = (existingMetadata.approval as Record<string, unknown>) || {};
+
+    const approvalMetadata = {
+      ...existingMetadata,
+      approval: {
+        ...existingApproval,
+        rejectedBy,
+        rejectedAt: new Date().toISOString(),
+        rejectionReason: reason,
+        decision: 'rejected',
+      },
+    };
+
+    const result = await this.db.content.updateMany({
+      where: { id, organizationId, status: 'pending_approval' },
+      data: {
+        status: 'rejected',
+        metadata: approvalMetadata as Prisma.InputJsonValue,
+      },
+    });
+
+    if (result.count === 0) {
+      throw new BadRequestException(
+        'Content could not be rejected — status may have changed concurrently',
+      );
+    }
+
+    this.eventEmitter.emit('content.approval.rejected', {
+      organizationId,
+      contentId: id,
+      rejectedBy,
+    });
+
+    return this.mapContentResponse(await this.db.content.findUnique({ where: { id } }));
   }
 }

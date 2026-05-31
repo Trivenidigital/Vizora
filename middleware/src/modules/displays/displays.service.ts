@@ -1,4 +1,11 @@
-import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  InternalServerErrorException,
+  ServiceUnavailableException,
+  Logger,
+} from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma } from '@vizora/database';
@@ -86,13 +93,27 @@ export class DisplaysService {
     this.eventEmitter.emit(`display.${action}`, { action, entityType: 'display', entityId, organizationId });
   }
 
-  async findAll(organizationId: string, pagination: PaginationDto) {
+  /**
+   * @param filters Optional filters applied DB-side. `status` lets MCP
+   *   tools (and future REST callers) filter without bringing the
+   *   filter client-side and breaking pagination totals — the
+   *   reported `total` always matches the filtered result set.
+   */
+  async findAll(
+    organizationId: string,
+    pagination: PaginationDto,
+    filters?: { status?: 'online' | 'offline' | 'pairing' | 'error' },
+  ) {
     const { page = 1, limit = 10 } = pagination;
     const skip = (page - 1) * limit;
+    const where = {
+      organizationId,
+      ...(filters?.status ? { status: filters.status } : {}),
+    };
 
     const [data, total] = await Promise.all([
       this.db.display.findMany({
-        where: { organizationId },
+        where,
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
@@ -104,7 +125,7 @@ export class DisplaysService {
           },
         },
       }),
-      this.db.display.count({ where: { organizationId } }),
+      this.db.display.count({ where }),
     ]);
 
     return new PaginatedResponse(data, total, page, limit);
@@ -317,13 +338,63 @@ export class DisplaysService {
     this.logger.log(`Marked ${staleDevices.length} device(s) as offline (stale heartbeat)`);
   }
 
+  /**
+   * Reset displays stuck in 'pairing' state. A device gets status='pairing'
+   * when generatePairingToken() fires (operator started pairing) but
+   * transitions to 'online' only when the device makes its first WebSocket
+   * connection. If the device loses power or network in between — or the
+   * QR code never gets scanned — the row stays 'pairing' forever, which
+   * confuses dashboards and prevents the operator from re-pairing the same
+   * deviceIdentifier (the existing-display check throws "already paired").
+   *
+   * Threshold is 30 minutes — generous compared to the 5-min pairing-token
+   * TTL but tolerant of legitimate slow first-connect (cold cache, slow
+   * 3G, captive portal handshake). Past the threshold we drop status back
+   * to 'offline' so the device can be re-paired without operator action.
+   *
+   * Runs hourly — not every minute, because pairing is a low-frequency
+   * operator action and the cost of a 30-60min delay on cleanup is
+   * trivial.
+   */
+  @Cron(CronExpression.EVERY_HOUR)
+  async resetStalePairingDevices(): Promise<void> {
+    const threshold = new Date(Date.now() - 30 * 60 * 1000); // 30 minutes ago
+    const stale = await this.db.display.findMany({
+      where: {
+        status: 'pairing',
+        // Use updatedAt — that's when generatePairingToken touched the row.
+        // lastHeartbeat is the wrong field here because a pairing-state
+        // device by definition has never heartbeated.
+        updatedAt: { lt: threshold },
+      },
+      select: { id: true, nickname: true, deviceIdentifier: true, organizationId: true },
+    });
+
+    if (stale.length === 0) return;
+
+    await this.db.display.updateMany({
+      where: { id: { in: stale.map((d) => d.id) } },
+      data: { status: 'offline' },
+    });
+
+    this.logger.log(
+      `Reset ${stale.length} stale 'pairing'-state device(s) to 'offline' (>30min in pairing)`,
+    );
+  }
+
   async generatePairingToken(organizationId: string, id: string) {
     const display = await this.findOne(organizationId, id);
 
     // Generate device JWT token using DEVICE_JWT_SECRET (not the user JWT_SECRET)
     const deviceSecret = process.env.DEVICE_JWT_SECRET;
     if (!deviceSecret || deviceSecret.length < 32) {
-      throw new Error('DEVICE_JWT_SECRET must be set and be at least 32 characters');
+      // Server-side misconfiguration — surface to the client as 500 so
+      // ops sees it in error tracking without hiding behind a generic
+      // unhandled exception (which the global filter would turn into
+      // an empty 500 with no useful message in the audit log).
+      throw new InternalServerErrorException(
+        'DEVICE_JWT_SECRET must be set and be at least 32 characters',
+      );
     }
 
     const pairingToken = this.jwtService.sign(
@@ -405,6 +476,10 @@ export class DisplaysService {
     );
 
     const results = await Promise.all(createPromises);
+
+    // O4: notify tag-rule evaluator that this display's tag set changed.
+    this.eventEmitter.emit('display.tags.changed', { organizationId, displayId });
+
     return results.map((dt) => dt.tag);
   }
 
@@ -417,6 +492,9 @@ export class DisplaysService {
         tagId: { in: tagIds },
       },
     });
+
+    // O4: notify tag-rule evaluator that this display's tag set changed.
+    this.eventEmitter.emit('display.tags.changed', { organizationId, displayId });
 
     return { success: true, removed: tagIds.length };
   }
@@ -448,7 +526,12 @@ export class DisplaysService {
 
     const headers = this.getInternalApiHeaders();
     if (!headers) {
-      throw new Error('INTERNAL_API_SECRET is not configured — cannot push content to display');
+      // Service-to-service auth is unconfigured — the client can't fix
+      // this, but 503 is the right signal (we're temporarily unable
+      // to fulfil the request) and clients/dashboards will back off.
+      throw new ServiceUnavailableException(
+        'INTERNAL_API_SECRET is not configured — cannot push content to display',
+      );
     }
 
     const url = `${this.realtimeUrl}/api/push/content`;
@@ -484,7 +567,7 @@ export class DisplaysService {
           this.logger.warn(
             `Realtime service circuit is open, cannot push content to display ${displayId}`,
           );
-          throw new Error('Realtime service temporarily unavailable');
+          throw new ServiceUnavailableException('Realtime service temporarily unavailable');
         }
       },
       REALTIME_CIRCUIT_CONFIG,
@@ -577,7 +660,9 @@ export class DisplaysService {
     // Send command to realtime service
     const headers = this.getInternalApiHeaders();
     if (!headers) {
-      throw new Error('INTERNAL_API_SECRET is not configured — cannot send commands to display');
+      throw new ServiceUnavailableException(
+        'INTERNAL_API_SECRET is not configured — cannot send commands to display',
+      );
     }
 
     const url = `${this.realtimeUrl}/api/internal/command`;
@@ -605,15 +690,21 @@ export class DisplaysService {
             this.logger.warn(
               `Realtime service circuit is open, cannot send screenshot command to display ${displayId}`,
             );
-            throw new Error('Realtime service temporarily unavailable');
+            throw new ServiceUnavailableException('Realtime service temporarily unavailable');
           }
         },
         REALTIME_CIRCUIT_CONFIG,
       );
     } catch (error) {
+      // If the downstream already threw a NestJS HttpException
+      // (e.g., the ServiceUnavailableException above), let it propagate
+      // so the original status code reaches the client. Wrap unknown
+      // errors as 503 (the realtime gateway is the dependency that
+      // failed, so we're temporarily unable to satisfy the request).
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Failed to request screenshot: ${errorMessage}`);
-      throw new Error('Failed to send screenshot request to device');
+      if (error instanceof ServiceUnavailableException) throw error;
+      throw new ServiceUnavailableException('Failed to send screenshot request to device');
     }
 
     return { requestId };

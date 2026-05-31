@@ -98,6 +98,8 @@ export default function ContentClient() {
 
  // Real-time event handling
  const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
+ const hasHandledInitialFolderLoadRef = useRef(false);
+ const loadContentRequestRef = useRef(0);
  useEffect(() => {
    return () => {
      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
@@ -156,6 +158,10 @@ export default function ContentClient() {
 
  // Reload content when folder selection changes
  useEffect(() => {
+ if (!hasHandledInitialFolderLoadRef.current) {
+ hasHandledInitialFolderLoadRef.current = true;
+ return;
+ }
  loadContent();
  }, [selectedFolderId]);
 
@@ -172,36 +178,30 @@ export default function ContentClient() {
  }, [isPreviewModalOpen]);
 
  const loadContent = async () => {
+ const requestId = ++loadContentRequestRef.current;
+ const folderId = selectedFolderId;
  try {
  setLoading(true);
  let response;
- if (selectedFolderId) {
- response = await apiClient.getFolderContent(selectedFolderId);
+ if (folderId) {
+ response = await apiClient.getFolderContent(folderId);
  } else {
  response = await apiClient.getContent();
  }
+ if (requestId !== loadContentRequestRef.current) {
+ return;
+ }
  const items = response.data || response || [];
  setContent(items);
-
- // Auto-generate missing thumbnails for image content in the background
- const imageMissingThumbnails = items.filter(
-   (item: Content) => item.type === 'image' && !item.thumbnailUrl && item.id
- );
- if (imageMissingThumbnails.length > 0) {
-   Promise.allSettled(
-     imageMissingThumbnails.map((item: Content) =>
-       apiClient.generateThumbnail(item.id).catch(() => {})
-     )
-   ).then(() => {
-     // Reload to pick up newly generated thumbnails
-     apiClient.getContent().then(refreshed => {
-       setContent(refreshed.data || refreshed || []);
-     }).catch(() => {});
-   });
- }
  } catch (error: any) {
+ if (requestId !== loadContentRequestRef.current) {
+ return;
+ }
  toast.error(error.message || 'Failed to load content');
  } finally {
+ if (requestId !== loadContentRequestRef.current) {
+ return;
+ }
  setLoading(false);
  }
  };
@@ -1030,6 +1030,7 @@ export default function ContentClient() {
  <th className="eh-th">
  <input
  type="checkbox"
+ aria-label="Select all content items"
  checked={selectedItems.size === filteredContent.length && filteredContent.length > 0}
  onChange={toggleSelectAll}
  className="rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
@@ -1048,6 +1049,7 @@ export default function ContentClient() {
  <td className="eh-td">
  <input
  type="checkbox"
+ aria-label={`Select ${item.title}`}
  checked={selectedItems.has(item.id)}
  onChange={() => toggleSelectItem(item.id)}
  className="rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
@@ -1055,7 +1057,19 @@ export default function ContentClient() {
  />
  </td>
  <td className="eh-td">
- <div className="flex items-center gap-3 cursor-pointer" onClick={() => handlePreview(item)}>
+ <div
+ role="button"
+ tabIndex={0}
+ aria-label={`Preview ${item.title}`}
+ className="flex items-center gap-3 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--primary)] rounded"
+ onClick={() => handlePreview(item)}
+ onKeyDown={(e) => {
+ if (e.key === 'Enter' || e.key === ' ') {
+ e.preventDefault();
+ handlePreview(item);
+ }
+ }}
+ >
  <div className="w-12 h-12 bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] rounded flex items-center justify-center flex-shrink-0 overflow-hidden">
  {item.thumbnailUrl ? (
  <img src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />

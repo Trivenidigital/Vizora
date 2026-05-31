@@ -54,7 +54,14 @@ export class TemplatesController {
   @Post('validate')
   @Roles('admin', 'manager')
   @HttpCode(HttpStatus.OK)
+  @SkipOutputSanitize()
   validateTemplate(@Body('templateHtml') templateHtml: string) {
+    // SkipOutputSanitize: this endpoint's whole job is to surface the
+    // exact offending tag/attribute back to the operator (e.g.
+    // "Forbidden tag found: <script>"). Without the skip, the global
+    // SanitizeInterceptor strips the `<script>` substring from the
+    // error message, turning the diagnostic into useless gibberish.
+    // R10 E2E scout #2.
     return this.contentService.validateTemplateHtml(templateHtml);
   }
 

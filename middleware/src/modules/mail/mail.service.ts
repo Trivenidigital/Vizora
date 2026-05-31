@@ -141,8 +141,14 @@ export class MailService {
     trialDaysRemaining: number,
   ): Promise<void> {
     const subject = 'Welcome to Vizora!';
+    // Escape user-supplied firstName before interpolating into the HTML
+    // body. RegisterDto validates the shape but doesn't reject HTML, so
+    // an unusual signup name like `<img src=x onerror=...>` would land
+    // raw in the rendered email. Most modern clients sanitize, but the
+    // server should not rely on that.
+    const safeFirstName = MailService.escapeHtml(firstName);
     const html = this.wrapInTemplate(`
-          <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">Welcome to Vizora, ${firstName}!</h1>
+          <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">Welcome to Vizora, ${safeFirstName}!</h1>
           <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
             Your account is ready. You have <strong style="color:#00E5A0;">${trialDaysRemaining} days</strong> of full access
             on your free trial — no credit card required.
@@ -169,10 +175,11 @@ export class MailService {
   ): Promise<void> {
     const urgency = daysRemaining <= 2 ? 'expires very soon' : 'is ending soon';
     const subject = `Your Vizora trial ${urgency} — ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} left`;
+    const safeFirstName = MailService.escapeHtml(firstName);
     const html = this.wrapInTemplate(`
           <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">Your trial ${urgency}</h1>
           <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
-            Hi ${firstName},<br><br>
+            Hi ${safeFirstName},<br><br>
             You have <strong style="color:#00E5A0;">${daysRemaining} day${daysRemaining === 1 ? '' : 's'}</strong> remaining on your
             Vizora free trial. After that, you'll lose access to premium features including multi-display management and advanced scheduling.
           </p>
@@ -199,7 +206,7 @@ export class MailService {
     const html = this.wrapInTemplate(`
           <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">Your trial has ended</h1>
           <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
-            Hi ${firstName},<br><br>
+            Hi ${MailService.escapeHtml(firstName)},<br><br>
             Your Vizora free trial has expired. Your account is still active, but premium features — including
             multi-display management, advanced scheduling, and priority support — are now limited.
           </p>
@@ -228,7 +235,7 @@ export class MailService {
     const html = this.wrapInTemplate(`
           <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">Payment received</h1>
           <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
-            Hi ${firstName},<br><br>
+            Hi ${MailService.escapeHtml(firstName)},<br><br>
             We've received your payment. Here's a summary:
           </p>
           <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px 0;">
@@ -261,7 +268,7 @@ export class MailService {
     const html = this.wrapInTemplate(`
           <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">Payment failed</h1>
           <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
-            Hi ${firstName},<br><br>
+            Hi ${MailService.escapeHtml(firstName)},<br><br>
             We were unable to process your latest payment for your Vizora subscription.
             Please update your payment method to avoid service interruption.
           </p>
@@ -286,7 +293,7 @@ export class MailService {
     const html = this.wrapInTemplate(`
           <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">Plan updated</h1>
           <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
-            Hi ${firstName},<br><br>
+            Hi ${MailService.escapeHtml(firstName)},<br><br>
             Your Vizora subscription has been changed:
           </p>
           <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px 0;">
@@ -321,7 +328,7 @@ export class MailService {
     const html = this.wrapInTemplate(`
           <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">Subscription canceled</h1>
           <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
-            Hi ${firstName},<br><br>
+            Hi ${MailService.escapeHtml(firstName)},<br><br>
             Your Vizora subscription has been canceled as requested. You'll continue to have full access to
             premium features until <strong style="color:#F0ECE8;">${accessUntil}</strong>.
           </p>
@@ -341,6 +348,57 @@ export class MailService {
   // Auth emails
   // ---------------------------------------------------------------------------
 
+  // ---------------------------------------------------------------------------
+  // Alert emails (O7 — configurable downtime alert rules)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Sends a "device offline" alert to a single recipient. Called per-recipient
+   * by AlertRuleEvaluator when a rule matches a device.offline event. The
+   * deviceName is user-controlled and is escaped before interpolation.
+   */
+  async sendDeviceOfflineAlertEmail(to: string, deviceName: string): Promise<void> {
+    const safeName = MailService.escapeHtml(deviceName);
+    // Subject MUST also be escaped — some email clients render HTML entities
+    // in subjects, and a deviceName containing < or " can break logging /
+    // monitoring tools that consume the subject line. PR review found this.
+    const subject = `Device offline: ${safeName}`;
+    const html = this.wrapInTemplate(`
+          <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">Device offline</h1>
+          <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
+            The display <strong style="color:#F0ECE8;">${safeName}</strong> is currently offline.
+            You're receiving this because an alert rule on your Vizora account matches this device.
+          </p>
+          ${this.ctaButton('View Devices', `${this.appUrl}/dashboard/devices`)}
+          <p style="color:#5A6B73;font-size:12px;line-height:1.5;margin:16px 0 0 0;">
+            Manage your alert rules in Settings &rarr; Alerts.
+          </p>
+    `);
+    await this.sendMail(to, subject, html, 'Device offline alert', 'noreply');
+  }
+
+  /**
+   * Escape HTML-special characters so user-controlled input (e.g. device
+   * nickname) cannot break out of the surrounding markup or inject script.
+   * Defensive — the email is sent to internal operators, but a hostile org
+   * admin could otherwise plant XSS targeting their own users.
+   *
+   * Static so it can be called from contexts that haven't instantiated
+   * MailService (tests, callers that just want to sanitize).
+   */
+  static escapeHtml(input: string): string {
+    return input
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Auth emails (continued)
+  // ---------------------------------------------------------------------------
+
   async sendPasswordResetEmail(
     to: string,
     firstName: string,
@@ -350,7 +408,7 @@ export class MailService {
     const html = this.wrapInTemplate(`
           <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">Reset your password</h1>
           <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
-            Hi ${firstName},<br><br>
+            Hi ${MailService.escapeHtml(firstName)},<br><br>
             You requested a password reset for your Vizora account. Click the button below to create a new password.
           </p>
           ${this.ctaButton('Reset Password', resetUrl)}
@@ -369,5 +427,77 @@ export class MailService {
     }
 
     await this.sendMail(to, subject, html, 'Password reset', 'auth');
+  }
+
+  /**
+   * Security notification sent after a user's password is changed (M12).
+   * Confirms the change and gives the user a recovery path if it wasn't them.
+   * Contains no secrets — only the display name + static copy. firstName is
+   * user-controlled, so it's escaped before interpolation.
+   */
+  async sendPasswordChangedEmail(to: string, firstName: string): Promise<void> {
+    const subject = 'Your Vizora password was changed';
+    const html = this.wrapInTemplate(`
+          <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">Your password was changed</h1>
+          <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
+            Hi ${MailService.escapeHtml(firstName)},<br><br>
+            This is a confirmation that the password for your Vizora account was just changed.
+            If you made this change, no further action is needed.
+          </p>
+          ${this.ctaButton('Go to Dashboard', this.dashboardUrl)}
+          <p style="color:#5A6B73;font-size:12px;line-height:1.5;margin:16px 0 0 0;">
+            If you did <strong style="color:#F0ECE8;">not</strong> change your password, reset it immediately
+            and contact support@vizora.cloud — your account may be compromised.
+          </p>
+    `);
+    await this.sendMail(to, subject, html, 'Password changed', 'auth');
+  }
+
+  /**
+   * Security notification sent after a successful login from a new context.
+   * This is intentionally framed as "new login context" rather than a durable
+   * trusted-device system: IPs and browser User-Agent strings can legitimately
+   * change. All caller-supplied values are escaped before interpolation.
+   */
+  async sendUnrecognizedLoginEmail(
+    to: string,
+    firstName: string,
+    details: { ipAddress: string; userAgent: string; occurredAt: Date },
+  ): Promise<void> {
+    const subject = 'New login to your Vizora account';
+    const html = this.wrapInTemplate(`
+          <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">New login detected</h1>
+          <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
+            Hi ${MailService.escapeHtml(firstName)},<br><br>
+            We noticed a successful login to your Vizora account from a new login context.
+            If this was you, no action is needed.
+          </p>
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px 0;">
+            <tr>
+              <td style="padding:12px 16px;background:#0A1E26;border-radius:8px 8px 0 0;border-bottom:1px solid #1B3D47;">
+                <span style="color:#5A6B73;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">Time</span><br>
+                <span style="color:#F0ECE8;font-size:14px;">${MailService.escapeHtml(details.occurredAt.toISOString())}</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:12px 16px;background:#0A1E26;border-bottom:1px solid #1B3D47;">
+                <span style="color:#5A6B73;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">IP address</span><br>
+                <span style="color:#F0ECE8;font-size:14px;">${MailService.escapeHtml(details.ipAddress)}</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:12px 16px;background:#0A1E26;border-radius:0 0 8px 8px;">
+                <span style="color:#5A6B73;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">Browser</span><br>
+                <span style="color:#F0ECE8;font-size:14px;word-break:break-word;">${MailService.escapeHtml(details.userAgent)}</span>
+              </td>
+            </tr>
+          </table>
+          ${this.ctaButton('Review Account', `${this.appUrl}/dashboard/settings`)}
+          <p style="color:#5A6B73;font-size:12px;line-height:1.5;margin:16px 0 0 0;">
+            If you do <strong style="color:#F0ECE8;">not</strong> recognize this login,
+            change your password immediately and contact support@vizora.cloud.
+          </p>
+    `);
+    await this.sendMail(to, subject, html, 'Unrecognized login', 'auth');
   }
 }

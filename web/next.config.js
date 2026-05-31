@@ -23,6 +23,7 @@ const nextConfig = {
   // is the NEXT_SERVER_ACTIONS_ENCRYPTION_KEY env var (read automatically
   // by Next.js at build time) — set it to a stable value in production .env.
   experimental: {
+    turbopackUseSystemTlsCerts: true,
     serverActions: {
       allowedOrigins: ['vizora.cloud', 'www.vizora.cloud', 'localhost:3001'],
     },

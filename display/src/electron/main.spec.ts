@@ -1,9 +1,12 @@
 // Mock electron-store before anything else
+const mockStoreGet = jest.fn().mockReturnValue(null);
+const mockStoreSet = jest.fn();
+const mockStoreDelete = jest.fn();
 jest.mock('electron-store', () => {
   return jest.fn().mockImplementation(() => ({
-    get: jest.fn().mockReturnValue(null),
-    set: jest.fn(),
-    delete: jest.fn(),
+    get: mockStoreGet,
+    set: mockStoreSet,
+    delete: mockStoreDelete,
   }));
 }, { virtual: true });
 
@@ -34,6 +37,7 @@ jest.mock('./device-client', () => ({
 
 // Capture handlers registered via ipcMain.handle and app event listeners
 const ipcHandlers: Record<string, Function> = {};
+const ipcListeners: Record<string, Function[]> = {};
 const appEventListeners: Record<string, Function[]> = {};
 const webContentsListeners: Record<string, Function[]> = {};
 let onHeadersReceivedCallback: Function | null = null;
@@ -83,6 +87,13 @@ jest.mock('electron', () => ({
     handle: jest.fn().mockImplementation((channel: string, handler: Function) => {
       ipcHandlers[channel] = handler;
     }),
+    on: jest.fn().mockImplementation((channel: string, listener: Function) => {
+      if (!ipcListeners[channel]) ipcListeners[channel] = [];
+      ipcListeners[channel].push(listener);
+    }),
+    off: jest.fn().mockImplementation((channel: string, listener: Function) => {
+      ipcListeners[channel] = (ipcListeners[channel] || []).filter((l) => l !== listener);
+    }),
   },
   screen: {
     getPrimaryDisplay: jest.fn().mockReturnValue({
@@ -101,9 +112,11 @@ jest.mock('path', () => ({
 }));
 
 // Clear module cache to force fresh require of main.ts
-beforeEach(() => {
-  jest.clearAllMocks();
-  Object.keys(ipcHandlers).forEach((k) => delete ipcHandlers[k]);
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockStoreGet.mockReturnValue(null);
+    Object.keys(ipcHandlers).forEach((k) => delete ipcHandlers[k]);
+  Object.keys(ipcListeners).forEach((k) => delete ipcListeners[k]);
   Object.keys(appEventListeners).forEach((k) => delete appEventListeners[k]);
   Object.keys(webContentsListeners).forEach((k) => delete webContentsListeners[k]);
   onHeadersReceivedCallback = null;
@@ -194,6 +207,25 @@ describe('main.ts - Electron main process', () => {
     it('should register before-quit handler', () => {
       expect(appEventListeners['before-quit']).toBeDefined();
       expect(appEventListeners['before-quit'].length).toBeGreaterThan(0);
+    });
+
+    it('disconnects an existing device client before reinitializing after renderer reload', () => {
+      jest.useFakeTimers();
+      mockStoreGet.mockImplementation((key: string) => (key === 'deviceToken' ? 'device-token' : null));
+
+      const thenMock = (app.whenReady as jest.Mock).mock.results[0].value.then;
+      const createWindowCallback = thenMock.mock.calls[0][0];
+      createWindowCallback();
+
+      const didFinishLoad = webContentsListeners['did-finish-load'][0];
+      didFinishLoad();
+      jest.advanceTimersByTime(500);
+      didFinishLoad();
+      jest.advanceTimersByTime(500);
+
+      expect(mockDeviceClient.connect).toHaveBeenCalledTimes(2);
+      expect(mockDeviceClient.disconnect).toHaveBeenCalledTimes(1);
+      jest.useRealTimers();
     });
   });
 

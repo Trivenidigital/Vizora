@@ -17,9 +17,11 @@ import { CreateTemplateDto } from './dto/create-template.dto';
 describe('ContentService', () => {
   let service: ContentService;
   let mockDatabaseService: any;
+  let mockEventEmitter: { emit: jest.Mock };
   let mockTemplateRendering: jest.Mocked<TemplateRenderingService>;
   let mockDataSourceRegistry: jest.Mocked<DataSourceRegistryService>;
   let mockStorageQuotaService: jest.Mocked<StorageQuotaService>;
+  let mockStorageService: { deleteFile: jest.Mock; isMinioAvailable: jest.Mock };
 
   const mockContent = {
     id: 'content-123',
@@ -77,6 +79,7 @@ describe('ContentService', () => {
       playlistItem: {
         updateMany: jest.fn(),
         deleteMany: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
       },
       tag: {
         count: jest.fn(),
@@ -123,12 +126,12 @@ describe('ContentService', () => {
       recalculateUsage: jest.fn(),
     } as any;
 
-    const mockStorageService = {
+    mockStorageService = {
       deleteFile: jest.fn().mockResolvedValue(undefined),
       isMinioAvailable: jest.fn().mockReturnValue(false),
-    } as any;
+    };
 
-    const mockEventEmitter = { emit: jest.fn() };
+    mockEventEmitter = { emit: jest.fn() };
     const mockNotificationsService = { create: jest.fn().mockResolvedValue({}) };
     service = new ContentService(
       mockDatabaseService as DatabaseService,
@@ -1186,6 +1189,53 @@ describe('ContentService', () => {
       expect(result.processed).toBe(0);
     });
 
+    it('emits playlist.updated for each distinct affected playlist (device fleet refresh)', async () => {
+      // Regression: when content expires, devices used to keep
+      // serving the old/expired item until they reconnected — sometimes
+      // hours later. checkExpiredContent now emits playlist.updated
+      // with action='expired_content_replaced' so PlaylistsService's
+      // @OnEvent listener can push refreshes via realtime.
+      const expiredContent = {
+        ...mockContent,
+        id: 'content-exp',
+        expiresAt: new Date('2020-01-01'),
+        replacementContentId: 'replacement-x',
+        status: 'active',
+      };
+      mockDatabaseService.content.findMany.mockResolvedValue([expiredContent]);
+      mockDatabaseService.content.findFirst.mockResolvedValue({
+        id: 'replacement-x',
+        organizationId: 'org-123',
+      });
+      // Two distinct playlists contain this content (e.g. content
+      // shared across playlists). De-dup should collapse them.
+      mockDatabaseService.playlistItem.findMany.mockResolvedValue([
+        { playlistId: 'pl-a' },
+        { playlistId: 'pl-b' },
+        { playlistId: 'pl-a' }, // duplicate of pl-a — only one event expected
+      ]);
+      mockDatabaseService.playlistItem.updateMany.mockResolvedValue({ count: 3 });
+      mockDatabaseService.content.update.mockResolvedValue({
+        ...expiredContent,
+        status: 'expired',
+      });
+
+      const result = await service.checkExpiredContent();
+
+      expect(result.processed).toBe(1);
+      expect(result.playlistsRefreshed).toBe(2);
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith('playlist.updated', {
+        entityId: 'pl-a',
+        organizationId: 'org-123',
+        action: 'expired_content_replaced',
+      });
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith('playlist.updated', {
+        entityId: 'pl-b',
+        organizationId: 'org-123',
+        action: 'expired_content_replaced',
+      });
+    });
+
     it('should only find active expired content', async () => {
       mockDatabaseService.content.findMany.mockResolvedValue([]);
 
@@ -1355,6 +1405,34 @@ describe('ContentService', () => {
         service.bulkDelete('org-123', { ids: ['id-1', 'id-2', 'id-3'] }),
       ).rejects.toThrow(BadRequestException);
     });
+
+    it('retains the DB row when MinIO delete fails so the file is not orphaned', async () => {
+      // Regression: previously the function logged storage-delete
+      // failures, then ran deleteMany on EVERY id. The MinIO file
+      // remained, the DB row was gone — quota counted, no operator
+      // visibility. Now only successful-MinIO ids get DB-deleted.
+      mockDatabaseService.content.findMany.mockResolvedValue([
+        { id: 'good-1', fileSize: 1000, url: 'minio://o/good-1.png' },
+        { id: 'bad-1', fileSize: 2000, url: 'minio://o/bad-1.png' },
+      ]);
+      mockStorageService.deleteFile.mockImplementation(async (key: string) => {
+        if (key === 'o/bad-1.png') throw new Error('connection refused');
+      });
+      mockDatabaseService.content.deleteMany.mockResolvedValue({ count: 1 });
+
+      const result = await service.bulkDelete('org-123', { ids: ['good-1', 'bad-1'] });
+
+      // Only the successful id is in the deleteMany WHERE.
+      expect(mockDatabaseService.content.deleteMany).toHaveBeenCalledWith({
+        where: { id: { in: ['good-1'] }, organizationId: 'org-123' },
+      });
+      // Result surfaces both counts so the caller can act on failures.
+      expect(result.deleted).toBe(1);
+      expect(result.failed).toBe(1);
+      expect(result.failedIds).toEqual(['bad-1']);
+      // Quota decrement is for the SUCCESSFUL bytes only (1000), not 3000.
+      expect(mockStorageQuotaService.decrementUsage).toHaveBeenCalledWith('org-123', 1000);
+    });
   });
 
   describe('bulkAddTags', () => {
@@ -1455,6 +1533,29 @@ describe('ContentService', () => {
           tagIds: ['tag-1', 'tag-2'],
         }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should accept duplicate tagIds (deduped before the cardinality check)', async () => {
+      // Regression: previously a request with the same tag id listed
+      // twice would fail with "Some tags not found" because Prisma's
+      // `id: { in: [...] }` collapses duplicates internally so the
+      // count came back lower than the raw length. Same fix shape as
+      // PR #73 for playlists.
+      mockDatabaseService.content.count.mockResolvedValue(2);
+      mockDatabaseService.tag.count.mockResolvedValue(1);
+      mockDatabaseService.contentTag.createMany.mockResolvedValue({ count: 2 });
+
+      await expect(
+        service.bulkAddTags('org-123', {
+          contentIds: ['content-1', 'content-2'],
+          tagIds: ['tag-1', 'tag-1'], // duplicate
+        }),
+      ).resolves.toBeDefined();
+
+      // Tag count check should have been against the unique set (1 id).
+      expect(mockDatabaseService.tag.count).toHaveBeenCalledWith({
+        where: { id: { in: ['tag-1'] }, organizationId: 'org-123' },
+      });
     });
   });
 

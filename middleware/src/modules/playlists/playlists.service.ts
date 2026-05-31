@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { DatabaseService } from '../database/database.service';
@@ -41,20 +41,26 @@ export class PlaylistsService {
   async create(organizationId: string, createPlaylistDto: CreatePlaylistDto) {
     const { items, ...playlistData } = createPlaylistDto;
 
-    // Validate all content items exist and belong to organization
+    // Validate all content items exist and belong to organization.
+    // Dedupe contentIds before the cardinality check — a playlist that
+    // reuses the same content multiple times is valid, but findMany
+    // returns each match once, so comparing lengths against the raw
+    // contentIds array would falsely reject legitimate playlists with
+    // a misleading "missing: " (empty) error message.
     if (items && items.length > 0) {
       const contentIds = items.map(item => item.contentId);
+      const uniqueContentIds = Array.from(new Set(contentIds));
       const contents = await this.db.content.findMany({
         where: {
-          id: { in: contentIds },
+          id: { in: uniqueContentIds },
           organizationId,
         },
         select: { id: true },
       });
 
-      if (contents.length !== contentIds.length) {
-        const foundIds = contents.map(c => c.id);
-        const missingIds = contentIds.filter(id => !foundIds.includes(id));
+      if (contents.length !== uniqueContentIds.length) {
+        const foundIds = new Set(contents.map(c => c.id));
+        const missingIds = uniqueContentIds.filter(id => !foundIds.has(id));
         throw new NotFoundException(
           `Content item(s) not found or do not belong to your organization: ${missingIds.join(', ')}`
         );
@@ -443,6 +449,57 @@ export class PlaylistsService {
     });
     this.eventEmitter.emit('playlist.deleted', { entityId: id, organizationId });
     return result;
+  }
+
+  /**
+   * @OnEvent listener: any time a `playlist.updated` event is emitted
+   * (CRUD edit, addItem, removeItem, OR content-expiration-driven swap
+   * from ContentService.checkExpiredContent), refresh the affected
+   * device fleet.
+   *
+   * The CRUD methods on this service already call
+   * notifyDisplaysOfPlaylistUpdate directly with the freshly-loaded
+   * playlist, so this listener only acts on events from OTHER services
+   * (where the emitter doesn't have the playlist in hand). It re-loads
+   * the playlist by id from the DB to make sure the realtime push
+   * carries the latest item set, not stale in-memory state.
+   *
+   * Filtering: only handle events with `action='expired_content_replaced'`
+   * to avoid double-pushing CRUD edits (where the direct call already
+   * fired). The action tag was introduced in the content-expiration
+   * PR specifically to make this discrimination cheap.
+   */
+  @OnEvent('playlist.updated', { async: true })
+  async handlePlaylistUpdatedEvent(payload: {
+    entityId: string;
+    organizationId: string;
+    action?: string;
+  }): Promise<void> {
+    if (payload.action !== 'expired_content_replaced') return;
+    try {
+      const playlist = await this.db.playlist.findFirst({
+        where: { id: payload.entityId, organizationId: payload.organizationId },
+        include: {
+          items: {
+            include: { content: true },
+            orderBy: { order: 'asc' },
+          },
+        },
+      });
+      if (!playlist) {
+        this.logger.warn(
+          `playlist.updated event for missing playlist ${payload.entityId} (org ${payload.organizationId}) — skipping push`,
+        );
+        return;
+      }
+      await this.notifyDisplaysOfPlaylistUpdate(payload.entityId, playlist);
+    } catch (err) {
+      this.logger.error(
+        `Failed to notify displays of expired-content playlist refresh for ${payload.entityId}: ${
+          err instanceof Error ? err.message : err
+        }`,
+      );
+    }
   }
 
   /**

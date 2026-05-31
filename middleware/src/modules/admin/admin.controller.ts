@@ -11,6 +11,7 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ParseIdPipe } from '../common/pipes/parse-id.pipe';
 import { Request } from 'express';
@@ -579,6 +580,18 @@ export class AdminController {
     @CurrentUser('userId') adminId: string,
     @Req() req: Request,
   ) {
+    // Block self-elevation. SuperAdminGuard guarantees the caller is
+    // already a super-admin (so grant-on-self is technically a no-op),
+    // but the audit row would then show "I granted myself" with no
+    // human in the loop — and downstream privilege-escalation reviews
+    // get harder. Force the grant to flow through a SECOND super-admin
+    // so every elevation has a peer witness.
+    if (id === adminId) {
+      throw new ForbiddenException(
+        'Cannot grant super-admin to yourself — ask another super-admin to perform the elevation',
+      );
+    }
+
     const user = await this.usersAdminService.grantSuperAdmin(id);
 
     await this.adminAuditService.log({

@@ -1,5 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { NotificationsService } from './notifications.service';
 import { DatabaseService } from '../database/database.service';
 
@@ -141,6 +141,68 @@ describe('NotificationsService', () => {
           userId: 'user-123',
         }),
       });
+    });
+
+    it('broadcasts the new notification to the realtime gateway', async () => {
+      const created = { id: 'notif-1', title: 'Test', organizationId };
+      db.notification.create.mockResolvedValue(created);
+
+      const prevSecret = process.env.INTERNAL_API_SECRET;
+      process.env.INTERNAL_API_SECRET = 'test-internal-secret';
+      try {
+        await service.create({ title: 'Test', message: 'Hello', organizationId });
+      } finally {
+        if (prevSecret === undefined) {
+          delete process.env.INTERNAL_API_SECRET;
+        } else {
+          process.env.INTERNAL_API_SECRET = prevSecret;
+        }
+      }
+
+      expect(mockHttpService.post).toHaveBeenCalledWith(
+        expect.stringContaining('/api/notifications/broadcast'),
+        { organizationId, notification: created },
+        expect.objectContaining({
+          headers: { 'x-internal-api-key': 'test-internal-secret' },
+        }),
+      );
+    });
+
+    it('does not broadcast when INTERNAL_API_SECRET is unset', async () => {
+      db.notification.create.mockResolvedValue({ id: 'notif-1' });
+
+      const prevSecret = process.env.INTERNAL_API_SECRET;
+      delete process.env.INTERNAL_API_SECRET;
+      try {
+        await service.create({ title: 'Test', message: 'Hello', organizationId });
+      } finally {
+        if (prevSecret !== undefined) {
+          process.env.INTERNAL_API_SECRET = prevSecret;
+        }
+      }
+
+      expect(mockHttpService.post).not.toHaveBeenCalled();
+    });
+
+    it('does not throw when the realtime broadcast fails (fire-and-forget)', async () => {
+      db.notification.create.mockResolvedValue({ id: 'notif-1' });
+      // The realtime call is firstValueFrom(httpService.post(...)); model the
+      // real failure mode as a rejected observable, not a synchronous throw.
+      mockHttpService.post.mockReturnValue(throwError(() => new Error('realtime down')));
+
+      const prevSecret = process.env.INTERNAL_API_SECRET;
+      process.env.INTERNAL_API_SECRET = 'test-internal-secret';
+      try {
+        await expect(
+          service.create({ title: 'Test', message: 'Hello', organizationId }),
+        ).resolves.toEqual({ id: 'notif-1' });
+      } finally {
+        if (prevSecret === undefined) {
+          delete process.env.INTERNAL_API_SECRET;
+        } else {
+          process.env.INTERNAL_API_SECRET = prevSecret;
+        }
+      }
     });
   });
 
@@ -366,36 +428,10 @@ describe('NotificationsService', () => {
     });
   });
 
-  describe('createDeviceOfflineNotification', () => {
-    it('should create a device offline notification', async () => {
-      db.notification.create.mockResolvedValue({
-        id: 'notif-offline',
-        title: 'Device Offline',
-        message: 'Device "Lobby Screen" has gone offline.',
-        type: 'device_offline',
-        severity: 'warning',
-        metadata: { deviceId: 'device-123', deviceName: 'Lobby Screen' },
-        organizationId,
-      });
+  // createDeviceOfflineNotification test removed in O7 — the helper itself
+  // was deleted; offline notifications now flow through AlertRuleEvaluator
+  // (covered by middleware/src/modules/notifications/alert-rules/alert-rule.evaluator.spec.ts).
 
-      const result = await service.createDeviceOfflineNotification(
-        'device-123',
-        'Lobby Screen',
-        organizationId,
-      );
-
-      expect(result.type).toBe('device_offline');
-      expect(result.severity).toBe('warning');
-      expect(db.notification.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          title: 'Device Offline',
-          type: 'device_offline',
-          severity: 'warning',
-          metadata: { deviceId: 'device-123', deviceName: 'Lobby Screen' },
-        }),
-      });
-    });
-  });
 
   describe('createDeviceOnlineNotification', () => {
     it('should create a device online notification', async () => {
@@ -494,25 +530,33 @@ describe('NotificationsService', () => {
   });
 
   describe('cleanupOldNotifications', () => {
-    it('should delete old dismissed notifications', async () => {
+    it('should delete old dismissed notifications scoped to one org', async () => {
       db.notification.deleteMany.mockResolvedValue({ count: 50 });
 
-      const result = await service.cleanupOldNotifications(30);
+      const result = await service.cleanupOldNotifications('org-123', 30);
 
       expect(result.deleted).toBe(50);
       expect(db.notification.deleteMany).toHaveBeenCalledWith({
         where: {
+          organizationId: 'org-123',
           dismissedAt: { not: null, lt: expect.any(Date) },
         },
       });
     });
 
-    it('should use default days parameter', async () => {
+    it('should use default days parameter when only orgId provided', async () => {
       db.notification.deleteMany.mockResolvedValue({ count: 0 });
 
-      await service.cleanupOldNotifications();
+      await service.cleanupOldNotifications('org-123');
 
       expect(db.notification.deleteMany).toHaveBeenCalled();
+    });
+
+    it('throws when organizationId is missing — prevents cross-tenant wipe', async () => {
+      await expect(
+        service.cleanupOldNotifications('' as string, 30),
+      ).rejects.toThrow(/requires an organizationId/);
+      expect(db.notification.deleteMany).not.toHaveBeenCalled();
     });
   });
 });

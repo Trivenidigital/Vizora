@@ -53,7 +53,7 @@ export class LoggingInterceptor implements NestInterceptor {
     const metadata: LogMetadata = {
       requestId,
       method: request.method,
-      url: request.url,
+      url: LoggingInterceptor.redactUrl(request.url),
       ip: request.ip || request.socket?.remoteAddress || 'unknown',
       userAgent: request.headers['user-agent'] || 'unknown',
       userId: request.user?.id,
@@ -119,5 +119,44 @@ export class LoggingInterceptor implements NestInterceptor {
 
   private generateRequestId(): string {
     return crypto.randomUUID();
+  }
+
+  /**
+   * Redact sensitive query-string parameters from a logged URL.
+   *
+   * The previous code logged `request.url` verbatim — anything in the
+   * query string (api_key, token, password-reset token, code, etc.)
+   * landed in plain text in HTTP logs, which then flow to log scrapers
+   * and Sentry breadcrumbs. The reset-password GET path is the most
+   * obvious surface but the rule is general: don't trust the caller
+   * to keep secrets out of the URL.
+   *
+   * Strategy: keep the path, scan the query string, replace any
+   * value whose KEY matches a known-sensitive pattern with REDACTED.
+   * Unknown keys (page, limit, filter, etc.) pass through unchanged
+   * so the log keeps debugging utility.
+   *
+   * Exported as a static so tests can pin the exact behavior without
+   * spinning up the full interceptor.
+   */
+  static redactUrl(url: string): string {
+    const qIdx = url.indexOf('?');
+    if (qIdx === -1) return url;
+    const path = url.slice(0, qIdx);
+    const query = url.slice(qIdx + 1);
+    const SENSITIVE = /^(token|api[_-]?key|apikey|password|secret|code|jwt|bearer|access[_-]?token|refresh[_-]?token|auth)$/i;
+    const redacted = query
+      .split('&')
+      .map((pair) => {
+        const eq = pair.indexOf('=');
+        if (eq === -1) return pair;
+        const key = pair.slice(0, eq);
+        if (SENSITIVE.test(decodeURIComponent(key))) {
+          return `${key}=REDACTED`;
+        }
+        return pair;
+      })
+      .join('&');
+    return `${path}?${redacted}`;
   }
 }

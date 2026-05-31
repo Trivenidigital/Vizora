@@ -9,6 +9,20 @@ export class MetricsService implements OnModuleInit {
   readonly httpRequestDuration: client.Histogram<string>;
   readonly httpErrorsTotal: client.Counter<string>;
 
+  // Webhook delivery audit — see WebhooksService.recordAttempt.
+  // Two counters by design:
+  //   - webhookDeliveriesTotal — every attempted dispatch, labeled by
+  //     status (success | failure | blocked) and event. Used for
+  //     dashboards + as a freshness signal: if this counter stalls
+  //     while customers have active webhooks, dispatch is broken.
+  //   - webhookAuditFailuresTotal — audit row insert failed (table
+  //     missing, FK drift, transient DB issue). Recorded separately
+  //     so the operator can alert on ANY non-zero value (per the
+  //     CLAUDE.md §12 silent-failure prevention rule — audit losing
+  //     rows must surface immediately).
+  readonly webhookDeliveriesTotal: client.Counter<string>;
+  readonly webhookAuditFailuresTotal: client.Counter<string>;
+
   constructor() {
     this.register = new client.Registry();
 
@@ -33,6 +47,20 @@ export class MetricsService implements OnModuleInit {
       name: 'vizora_http_errors_total',
       help: 'Total number of HTTP error responses (4xx + 5xx)',
       labelNames: ['method', 'path', 'status'],
+      registers: [this.register],
+    });
+
+    this.webhookDeliveriesTotal = new client.Counter({
+      name: 'vizora_webhook_deliveries_total',
+      help: 'Webhook delivery attempts, by outcome status and event name',
+      labelNames: ['status', 'event'],
+      registers: [this.register],
+    });
+
+    this.webhookAuditFailuresTotal = new client.Counter({
+      name: 'vizora_webhook_audit_failures_total',
+      help: 'Webhook delivery audit row insert failed — alert on any non-zero value (silent-failure prevention)',
+      labelNames: ['event'],
       registers: [this.register],
     });
   }

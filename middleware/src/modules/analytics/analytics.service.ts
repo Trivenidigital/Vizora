@@ -525,4 +525,224 @@ export class AnalyticsService {
       playlistPerformance,
     };
   }
+
+  // ===========================================================================
+  // O2 — Proof-of-play reports (raw impression rows + CSV export)
+  // ===========================================================================
+
+  /**
+   * Paginated query over the ContentImpression table with optional filters.
+   * All filters are AND-combined. Cross-org guard is the `organizationId`
+   * predicate; FKs (contentId, displayId, playlistId) inside the same org
+   * are safe by schema construction.
+   *
+   * `displayTagId` joins through DisplayTag — find impressions whose Display
+   * carries the given tag.
+   */
+  async getProofOfPlay(
+    organizationId: string,
+    filters: {
+      dateFrom?: string;
+      dateTo?: string;
+      contentId?: string;
+      displayId?: string;
+      playlistId?: string;
+      displayTagId?: string;
+      page?: number;
+      limit?: number;
+    },
+  ) {
+    const page = Math.max(1, filters.page ?? 1);
+    const limit = Math.min(500, Math.max(1, filters.limit ?? 50));
+
+    const where = this.buildProofOfPlayWhere(organizationId, filters);
+
+    const [data, total] = await Promise.all([
+      this.db.contentImpression.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { timestamp: 'desc' },
+        include: {
+          content: { select: { id: true, name: true } },
+          display: { select: { id: true, nickname: true, deviceIdentifier: true } },
+        },
+      }),
+      this.db.contentImpression.count({ where }),
+    ]);
+
+    return {
+      data,
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  /**
+   * Streaming CSV export. Yields the header row first, then batches of 1000
+   * impression rows. Capped at 100,000 rows total to defend against
+   * unbounded memory use; operators wanting larger exports can iterate the
+   * paginated query directly.
+   */
+  async *streamProofOfPlayCsv(
+    organizationId: string,
+    filters: {
+      dateFrom?: string;
+      dateTo?: string;
+      contentId?: string;
+      displayId?: string;
+      playlistId?: string;
+      displayTagId?: string;
+      /**
+       * IANA timezone (e.g. 'America/New_York', 'Asia/Kolkata') used to
+       * format the timestamp column. Defaults to UTC. Without this,
+       * an operator in EST exporting a 15:00 UTC impression sees
+       * `2026-05-24T15:00:00.000Z` in the spreadsheet, has to
+       * mentally subtract 5h every row, and downstream consumers
+       * (NDA partners, retail HQ reports) get the wrong day for
+       * impressions near midnight.
+       */
+      tz?: string;
+    },
+  ): AsyncGenerator<string> {
+    const where = this.buildProofOfPlayWhere(organizationId, filters);
+    const tz = this.normalizeTimezone(filters.tz);
+
+    // Header stays stable across tz values so downstream parsers don't
+    // break — the cell content carries the tz suffix for non-UTC rows
+    // (e.g. "2026-05-24 11:00:00 America/New_York"). UTC rows keep
+    // ISO format so the CSV is byte-identical to the pre-tz version
+    // when `tz` is unspecified.
+    yield 'timestamp,contentId,contentName,displayId,displayName,playlistId,duration_sec,completion_percent\n';
+
+    const BATCH = 1000;
+    const MAX_ROWS = 100_000;
+    let skip = 0;
+    let emitted = 0;
+
+    while (emitted < MAX_ROWS) {
+      const batch = await this.db.contentImpression.findMany({
+        where,
+        skip,
+        take: BATCH,
+        orderBy: { timestamp: 'asc' }, // ascending so the CSV is chronological
+        include: {
+          content: { select: { id: true, name: true } },
+          display: { select: { id: true, nickname: true, deviceIdentifier: true } },
+        },
+      });
+      if (batch.length === 0) break;
+
+      for (const r of batch) {
+        if (emitted >= MAX_ROWS) break;
+        yield this.formatProofOfPlayCsvRow(r, tz);
+        emitted++;
+      }
+      skip += BATCH;
+    }
+  }
+
+  /**
+   * Validate operator-supplied IANA timezone via Intl. An invalid
+   * string (typo, language) silently falls back to UTC rather than
+   * throwing — the CSV export shouldn't 500 because the operator
+   * picked a wrong drop-down value. The header column name records
+   * the actual tz used so the spreadsheet's recipient can see what
+   * was applied.
+   */
+  private normalizeTimezone(tz: string | undefined): string {
+    if (!tz) return 'UTC';
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: tz });
+      return tz;
+    } catch {
+      return 'UTC';
+    }
+  }
+
+  private buildProofOfPlayWhere(orgId: string, f: {
+    dateFrom?: string; dateTo?: string;
+    contentId?: string; displayId?: string; playlistId?: string;
+    displayTagId?: string;
+  }) {
+    const where: Record<string, unknown> = { organizationId: orgId };
+
+    if (f.dateFrom || f.dateTo) {
+      where.date = {
+        ...(f.dateFrom ? { gte: new Date(f.dateFrom) } : {}),
+        ...(f.dateTo ? { lte: new Date(f.dateTo) } : {}),
+      };
+    }
+    if (f.contentId) where.contentId = f.contentId;
+    if (f.displayId) where.displayId = f.displayId;
+    if (f.playlistId) where.playlistId = f.playlistId;
+    if (f.displayTagId) {
+      where.display = { tags: { some: { tagId: f.displayTagId } } };
+    }
+
+    return where;
+  }
+
+  /**
+   * Format one impression row as CSV. Applies Excel-injection neutralization:
+   * any cell starting with =, +, -, @ gets a leading single-quote so Excel
+   * does NOT evaluate it as a formula.
+   */
+  private formatProofOfPlayCsvRow(r: {
+    timestamp: Date;
+    contentId: string;
+    displayId: string;
+    playlistId: string | null;
+    duration: number | null;
+    completionPercentage: number | null;
+    content: { name: string };
+    display: { nickname: string | null; deviceIdentifier: string };
+  }, tz: string = 'UTC'): string {
+    const cells = [
+      // UTC fast-path uses native toISOString (well-tested, deterministic).
+      // Non-UTC formats via Intl with sortable yyyy-MM-dd HH:mm:ss shape
+      // so spreadsheets sort the column correctly without column-type fuss.
+      tz === 'UTC' ? r.timestamp.toISOString() : this.formatInTz(r.timestamp, tz),
+      r.contentId,
+      r.content.name,
+      r.displayId,
+      r.display.nickname ?? r.display.deviceIdentifier,
+      r.playlistId ?? '',
+      r.duration?.toString() ?? '',
+      r.completionPercentage?.toString() ?? '',
+    ];
+    return cells.map((c) => this.csvEscape(c)).join(',') + '\n';
+  }
+
+  /**
+   * Format a Date in the given IANA timezone as `yyyy-MM-dd HH:mm:ss tz`.
+   * Intl returns parts unordered; assemble manually so the column is
+   * sortable as a plain string in spreadsheets.
+   */
+  private formatInTz(d: Date, tz: string): string {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }).formatToParts(d);
+    const pick = (t: string) => parts.find((p) => p.type === t)?.value ?? '00';
+    return `${pick('year')}-${pick('month')}-${pick('day')} ${pick('hour')}:${pick('minute')}:${pick('second')} ${tz}`;
+  }
+
+  private csvEscape(value: string): string {
+    // RFC 4180 + Excel-injection neutralizer.
+    // PR-review on PR #67: also neutralize leading Tab (\t) which legacy
+    // Excel versions can treat as a formula delimiter, and ensure Tab
+    // inside cells triggers RFC 4180 quoting.
+    let v = value;
+    if (/^[=+\-@\t]/.test(v)) v = `'${v}`;
+    if (/[",\n\r\t]/.test(v)) {
+      v = `"${v.replace(/"/g, '""')}"`;
+    }
+    return v;
+  }
 }

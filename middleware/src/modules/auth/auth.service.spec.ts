@@ -53,6 +53,8 @@ function mockGoogleFailure(message: string) {
   mockVerifyIdToken.mockRejectedValue(new Error(message));
 }
 
+const flushLoginAlertTasks = () => new Promise<void>((resolve) => setImmediate(resolve));
+
 // Mock bcryptjs
 jest.mock('bcryptjs', () => ({
   hash: jest.fn(),
@@ -72,6 +74,7 @@ describe('AuthService', () => {
   let mockRedisService: any;
   let mockMailService: any;
   let mockGeoService: any;
+  let mockAlertRulesService: any;
 
   const mockUser = {
     id: 'user-123',
@@ -112,7 +115,13 @@ describe('AuthService', () => {
         create: jest.fn(),
       },
       auditLog: {
-        create: jest.fn(),
+        create: jest.fn().mockResolvedValue({ id: 'audit-current' }),
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      passwordResetToken: {
+        findUnique: jest.fn(),
+        update: jest.fn(),
       },
       // Mock $transaction to execute the callback with the same mock database
       $transaction: jest.fn().mockImplementation(async (callback) => {
@@ -137,6 +146,8 @@ describe('AuthService', () => {
     mockMailService = {
       sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
       sendWelcomeEmail: jest.fn().mockResolvedValue(undefined),
+      sendPasswordChangedEmail: jest.fn().mockResolvedValue(undefined),
+      sendUnrecognizedLoginEmail: jest.fn().mockResolvedValue(undefined),
     };
 
     mockGeoService = {
@@ -156,6 +167,10 @@ describe('AuthService', () => {
 
     const mockEventEmitter = { emit: jest.fn() };
 
+    mockAlertRulesService = {
+      seedDefaultRuleForOrg: jest.fn().mockResolvedValue(undefined),
+    };
+
     // Directly instantiate the service with mocked dependencies
     service = new AuthService(
       mockDatabaseService as DatabaseService,
@@ -166,6 +181,7 @@ describe('AuthService', () => {
       mockBillingService as any,
       mockStorageService as any,
       mockEventEmitter as any,
+      mockAlertRulesService as any,
     );
     
     // Reset bcrypt mocks
@@ -206,6 +222,39 @@ describe('AuthService', () => {
       });
       // Default bcrypt rounds is 12 (matches env validation default)
       expect(bcrypt.hash).toHaveBeenCalledWith(registerDto.password, 12);
+    });
+
+    it('seeds the default downtime alert rule for the new org (PR-review fix)', async () => {
+      // The original O7 PR removed the hard-coded device.offline notification
+      // path. The seed script handles existing orgs at deploy time, but new
+      // orgs created post-deploy would silently lose offline alerts. This
+      // test pins the registration-time seed call.
+      mockDatabaseService.user.findUnique.mockResolvedValue(null);
+      mockDatabaseService.organization.findUnique.mockResolvedValue(null);
+      mockDatabaseService.organization.create.mockResolvedValue(mockOrganization);
+      mockDatabaseService.user.create.mockResolvedValue(mockUser);
+      mockDatabaseService.auditLog.create.mockResolvedValue({});
+      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-password');
+
+      await service.register(registerDto);
+
+      expect(mockAlertRulesService.seedDefaultRuleForOrg).toHaveBeenCalledWith(
+        mockOrganization.id,
+        [mockUser.id],
+      );
+    });
+
+    it('does not block registration if the seed fails (fire-and-forget with warn)', async () => {
+      mockDatabaseService.user.findUnique.mockResolvedValue(null);
+      mockDatabaseService.organization.findUnique.mockResolvedValue(null);
+      mockDatabaseService.organization.create.mockResolvedValue(mockOrganization);
+      mockDatabaseService.user.create.mockResolvedValue(mockUser);
+      mockDatabaseService.auditLog.create.mockResolvedValue({});
+      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-password');
+      mockAlertRulesService.seedDefaultRuleForOrg.mockRejectedValue(new Error('DB temporarily down'));
+
+      // Registration must still succeed — the seed is a best-effort follow-up.
+      await expect(service.register(registerDto)).resolves.toHaveProperty('token');
     });
 
     it('should throw ConflictException if email already exists', async () => {
@@ -255,6 +304,32 @@ describe('AuthService', () => {
           entityType: 'user',
         }),
       });
+    });
+
+    it('should seed initial login context on registration without sending an alert', async () => {
+      mockDatabaseService.user.findUnique.mockResolvedValue(null);
+      mockDatabaseService.organization.findUnique.mockResolvedValue(null);
+      mockDatabaseService.organization.create.mockResolvedValue(mockOrganization);
+      mockDatabaseService.user.create.mockResolvedValue(mockUser);
+      mockDatabaseService.auditLog.create.mockResolvedValue({});
+      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-password');
+
+      await service.register(
+        registerDto,
+        '198.51.100.10',
+        'Mozilla/5.0 Chrome/126.0',
+      );
+
+      expect(mockDatabaseService.auditLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          action: 'user_login',
+          entityType: 'user',
+          changes: { reason: 'registration' },
+          ipAddress: '198.51.100.10',
+          userAgent: 'Mozilla/5.0 Chrome/126.0',
+        }),
+      });
+      expect(mockMailService.sendUnrecognizedLoginEmail).not.toHaveBeenCalled();
     });
 
     it('should set first user as admin', async () => {
@@ -319,6 +394,14 @@ describe('AuthService', () => {
     const loginDto = {
       email: 'test@example.com',
       password: 'SecurePass123!',
+    };
+    const loginContext = {
+      ipAddress: '203.0.113.10',
+      userAgent: 'Mozilla/5.0 Chrome/125.0.6422.112 Safari/537.36',
+    };
+    const loginAuditLog = {
+      id: 'audit-current',
+      createdAt: new Date('2026-05-31T12:00:00.000Z'),
     };
 
     it('should successfully login a user', async () => {
@@ -483,6 +566,329 @@ describe('AuthService', () => {
         }),
       });
     });
+
+    it('should include login request metadata in the audit log entry', async () => {
+      mockDatabaseService.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        organization: mockOrganization,
+      });
+      mockDatabaseService.user.update.mockResolvedValue(mockUser);
+      mockDatabaseService.auditLog.create.mockResolvedValue(loginAuditLog);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      await service.login(loginDto, loginContext);
+
+      expect(mockDatabaseService.auditLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          ipAddress: loginContext.ipAddress,
+          userAgent: loginContext.userAgent,
+        }),
+      });
+    });
+
+    it('should not send unrecognized-login email for the first metadata-bearing login', async () => {
+      mockDatabaseService.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        organization: mockOrganization,
+      });
+      mockDatabaseService.user.update.mockResolvedValue(mockUser);
+      mockDatabaseService.auditLog.findFirst.mockResolvedValue(null);
+      mockDatabaseService.auditLog.create.mockResolvedValue(loginAuditLog);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      await service.login(loginDto, loginContext);
+      await flushLoginAlertTasks();
+
+      expect(mockDatabaseService.auditLog.findFirst).toHaveBeenCalledWith({
+        where: expect.objectContaining({
+          organizationId: mockUser.organizationId,
+          userId: mockUser.id,
+          action: 'user_login',
+          entityType: 'user',
+          id: { not: 'audit-current' },
+          createdAt: { lt: loginAuditLog.createdAt },
+          ipAddress: { not: null },
+          userAgent: { not: null },
+        }),
+        select: {
+          id: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      expect(mockDatabaseService.auditLog.findMany).not.toHaveBeenCalled();
+      expect(mockMailService.sendUnrecognizedLoginEmail).not.toHaveBeenCalled();
+    });
+
+    it('should not send unrecognized-login email when the login context was seen before', async () => {
+      mockDatabaseService.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        organization: mockOrganization,
+      });
+      mockDatabaseService.user.update.mockResolvedValue(mockUser);
+      mockDatabaseService.auditLog.findFirst.mockResolvedValue({ id: 'audit-1' });
+      mockDatabaseService.auditLog.findMany.mockResolvedValue([
+        {
+          userAgent: loginContext.userAgent,
+        },
+      ]);
+      mockDatabaseService.auditLog.create.mockResolvedValue(loginAuditLog);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      await service.login(loginDto, loginContext);
+      await flushLoginAlertTasks();
+
+      expect(mockDatabaseService.auditLog.findMany).toHaveBeenCalledWith({
+        where: expect.objectContaining({
+          organizationId: mockUser.organizationId,
+          userId: mockUser.id,
+          action: 'user_login',
+          entityType: 'user',
+          id: { not: 'audit-current' },
+          createdAt: { lt: loginAuditLog.createdAt },
+          ipAddress: loginContext.ipAddress,
+          userAgent: { not: null },
+        }),
+        select: {
+          userAgent: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 500,
+      });
+      expect(mockMailService.sendUnrecognizedLoginEmail).not.toHaveBeenCalled();
+    });
+
+    it('should treat browser patch-version changes as the same login context', async () => {
+      mockDatabaseService.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        organization: mockOrganization,
+      });
+      mockDatabaseService.user.update.mockResolvedValue(mockUser);
+      mockDatabaseService.auditLog.findFirst.mockResolvedValue({ id: 'audit-1' });
+      mockDatabaseService.auditLog.findMany.mockResolvedValue([
+        {
+          userAgent: 'Mozilla/5.0 Chrome/125.0.6422.111 Safari/537.36',
+        },
+      ]);
+      mockDatabaseService.auditLog.create.mockResolvedValue(loginAuditLog);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      await service.login(loginDto, loginContext);
+      await flushLoginAlertTasks();
+
+      expect(mockMailService.sendUnrecognizedLoginEmail).not.toHaveBeenCalled();
+    });
+
+    it('should treat Firefox rv and browser version changes as the same login context', async () => {
+      const currentFirefoxContext = {
+        ...loginContext,
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:127.0) Gecko/20100101 Firefox/127.0',
+      };
+      mockDatabaseService.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        organization: mockOrganization,
+      });
+      mockDatabaseService.user.update.mockResolvedValue(mockUser);
+      mockDatabaseService.auditLog.findFirst.mockResolvedValue({ id: 'audit-1' });
+      mockDatabaseService.auditLog.findMany.mockResolvedValue([
+        {
+          userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0',
+        },
+      ]);
+      mockDatabaseService.auditLog.create.mockResolvedValue(loginAuditLog);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      await service.login(loginDto, currentFirefoxContext);
+      await flushLoginAlertTasks();
+
+      expect(mockMailService.sendUnrecognizedLoginEmail).not.toHaveBeenCalled();
+    });
+
+    it('should treat mobile Edge browser version changes as the same login context', async () => {
+      const currentMobileEdgeContext = {
+        ...loginContext,
+        userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36 EdgA/126.0.2592.56',
+      };
+      mockDatabaseService.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        organization: mockOrganization,
+      });
+      mockDatabaseService.user.update.mockResolvedValue(mockUser);
+      mockDatabaseService.auditLog.findFirst.mockResolvedValue({ id: 'audit-1' });
+      mockDatabaseService.auditLog.findMany.mockResolvedValue([
+        {
+          userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36 EdgA/125.0.2535.67',
+        },
+      ]);
+      mockDatabaseService.auditLog.create.mockResolvedValue(loginAuditLog);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      await service.login(loginDto, currentMobileEdgeContext);
+      await flushLoginAlertTasks();
+
+      expect(mockMailService.sendUnrecognizedLoginEmail).not.toHaveBeenCalled();
+    });
+
+    it('should send unrecognized-login email when prior metadata exists but no context matches', async () => {
+      mockDatabaseService.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        organization: mockOrganization,
+      });
+      mockDatabaseService.user.update.mockResolvedValue(mockUser);
+      mockDatabaseService.auditLog.findFirst.mockResolvedValue({ id: 'audit-1' });
+      mockDatabaseService.auditLog.findMany.mockResolvedValue([
+        {
+          userAgent: 'Mozilla/5.0 Firefox/124.0',
+        },
+      ]);
+      mockDatabaseService.auditLog.create.mockResolvedValue(loginAuditLog);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      await service.login(loginDto, loginContext);
+      await flushLoginAlertTasks();
+
+      expect(mockMailService.sendUnrecognizedLoginEmail).toHaveBeenCalledWith(
+        mockUser.email,
+        mockUser.firstName,
+        expect.objectContaining({
+          ipAddress: loginContext.ipAddress,
+          userAgent: loginContext.userAgent,
+          occurredAt: expect.any(Date),
+        }),
+      );
+    });
+
+    it('should alert when the first post-registration login differs from the seeded signup context', async () => {
+      mockDatabaseService.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        organization: mockOrganization,
+      });
+      mockDatabaseService.user.update.mockResolvedValue(mockUser);
+      mockDatabaseService.auditLog.findFirst.mockResolvedValue({ id: 'registration-login' });
+      mockDatabaseService.auditLog.findMany.mockResolvedValue([
+        {
+          userAgent: 'Mozilla/5.0 Chrome/126.0',
+        },
+      ]);
+      mockDatabaseService.auditLog.create.mockResolvedValue(loginAuditLog);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      await service.login(loginDto, {
+        ipAddress: '203.0.113.55',
+        userAgent: 'Mozilla/5.0 Firefox/127.0',
+      });
+      await flushLoginAlertTasks();
+
+      expect(mockMailService.sendUnrecognizedLoginEmail).toHaveBeenCalledWith(
+        mockUser.email,
+        mockUser.firstName,
+        expect.objectContaining({
+          ipAddress: '203.0.113.55',
+          userAgent: 'Mozilla/5.0 Firefox/127.0',
+        }),
+      );
+    });
+
+    it('should not fail login when unrecognized-login email sending fails', async () => {
+      mockDatabaseService.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        organization: mockOrganization,
+      });
+      mockDatabaseService.user.update.mockResolvedValue(mockUser);
+      mockDatabaseService.auditLog.findFirst.mockResolvedValue({ id: 'audit-1' });
+      mockDatabaseService.auditLog.findMany.mockResolvedValue([
+        {
+          userAgent: 'Mozilla/5.0 Firefox/124.0',
+        },
+      ]);
+      mockDatabaseService.auditLog.create.mockResolvedValue(loginAuditLog);
+      mockMailService.sendUnrecognizedLoginEmail.mockRejectedValue(new Error('smtp down'));
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      const result = await service.login(loginDto, loginContext);
+      await flushLoginAlertTasks();
+
+      expect(result).toHaveProperty('token', 'mock-jwt-token');
+      expect(mockMailService.sendUnrecognizedLoginEmail).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return login response without waiting for alert-history lookup', async () => {
+      mockDatabaseService.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        organization: mockOrganization,
+      });
+      mockDatabaseService.user.update.mockResolvedValue(mockUser);
+      mockDatabaseService.auditLog.create.mockResolvedValue(loginAuditLog);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      let resolveHistory!: (value: null) => void;
+      const pendingHistory = new Promise<null>((resolve) => {
+        resolveHistory = resolve;
+      });
+      mockDatabaseService.auditLog.findFirst.mockReturnValue(pendingHistory);
+
+      const loginPromise = service.login(loginDto, loginContext);
+      const raceResult = await Promise.race([
+        loginPromise.then(() => 'resolved'),
+        new Promise((resolve) => setTimeout(() => resolve('timed-out'), 25)),
+      ]);
+
+      resolveHistory(null);
+      await pendingHistory;
+      await flushLoginAlertTasks();
+
+      expect(raceResult).toBe('resolved');
+      await expect(loginPromise).resolves.toHaveProperty('token', 'mock-jwt-token');
+      expect(mockMailService.sendUnrecognizedLoginEmail).not.toHaveBeenCalled();
+    });
+
+    it('should not fail login when alert-history lookup fails', async () => {
+      mockDatabaseService.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        organization: mockOrganization,
+      });
+      mockDatabaseService.user.update.mockResolvedValue(mockUser);
+      mockDatabaseService.auditLog.create.mockResolvedValue(loginAuditLog);
+      mockDatabaseService.auditLog.findFirst.mockRejectedValue(new Error('audit down'));
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      const result = await service.login(loginDto, loginContext);
+      await flushLoginAlertTasks();
+
+      expect(result).toHaveProperty('token', 'mock-jwt-token');
+      expect(mockMailService.sendUnrecognizedLoginEmail).not.toHaveBeenCalled();
+    });
+
+    it('should return login response without waiting for unrecognized-login email delivery', async () => {
+      mockDatabaseService.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        organization: mockOrganization,
+      });
+      mockDatabaseService.user.update.mockResolvedValue(mockUser);
+      mockDatabaseService.auditLog.findFirst.mockResolvedValue({ id: 'audit-1' });
+      mockDatabaseService.auditLog.findMany.mockResolvedValue([]);
+      mockDatabaseService.auditLog.create.mockResolvedValue(loginAuditLog);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      let resolveMail!: () => void;
+      const pendingMail = new Promise<void>((resolve) => {
+        resolveMail = resolve;
+      });
+      mockMailService.sendUnrecognizedLoginEmail.mockReturnValue(pendingMail);
+
+      const loginPromise = service.login(loginDto, loginContext);
+      const raceResult = await Promise.race([
+        loginPromise.then(() => 'resolved'),
+        new Promise((resolve) => setTimeout(() => resolve('timed-out'), 25)),
+      ]);
+
+      resolveMail();
+      await pendingMail;
+      await flushLoginAlertTasks();
+
+      expect(raceResult).toBe('resolved');
+      await expect(loginPromise).resolves.toHaveProperty('token', 'mock-jwt-token');
+      expect(mockMailService.sendUnrecognizedLoginEmail).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('refresh', () => {
@@ -636,6 +1042,14 @@ describe('AuthService', () => {
   describe('googleLogin', () => {
     const originalEnv = process.env;
     const FAKE_TOKEN = 'opaque-google-id-token-string';
+    const googleLoginContext = {
+      ipAddress: '203.0.113.30',
+      userAgent: 'Mozilla/5.0 Firefox/127.0',
+    };
+    const googleLoginAuditLog = {
+      id: 'google-login-audit',
+      createdAt: new Date('2026-05-31T13:00:00.000Z'),
+    };
 
     beforeEach(() => {
       process.env = { ...originalEnv, GOOGLE_CLIENT_ID: 'test-google-client-id' };
@@ -655,9 +1069,10 @@ describe('AuthService', () => {
       };
       mockDatabaseService.user.findUnique.mockResolvedValue(oauthUser);
       mockDatabaseService.user.update.mockResolvedValue(oauthUser);
-      mockDatabaseService.auditLog.create.mockResolvedValue({});
+      mockDatabaseService.auditLog.create.mockResolvedValue(googleLoginAuditLog);
 
-      const result = await service.googleLogin(FAKE_TOKEN);
+      const result = await service.googleLogin(FAKE_TOKEN, googleLoginContext);
+      await flushLoginAlertTasks();
 
       expect(result).toHaveProperty('token', 'mock-jwt-token');
       expect(result).toHaveProperty('user');
@@ -666,6 +1081,58 @@ describe('AuthService', () => {
         idToken: FAKE_TOKEN,
         audience: 'test-google-client-id',
       });
+      expect(mockDatabaseService.auditLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          action: 'user_login',
+          entityType: 'user',
+          changes: { provider: 'google' },
+          ipAddress: googleLoginContext.ipAddress,
+          userAgent: googleLoginContext.userAgent,
+        }),
+      });
+      expect(mockDatabaseService.auditLog.findFirst).toHaveBeenCalledWith({
+        where: expect.objectContaining({
+          organizationId: mockUser.organizationId,
+          userId: mockUser.id,
+          action: 'user_login',
+          entityType: 'user',
+          id: { not: 'google-login-audit' },
+          createdAt: { lt: googleLoginAuditLog.createdAt },
+          ipAddress: { not: null },
+          userAgent: { not: null },
+        }),
+        select: {
+          id: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    });
+
+    it('should send unrecognized-login email for an existing Google user from a new context', async () => {
+      mockGoogleSuccess(buildGooglePayload());
+      const oauthUser = {
+        ...mockUser,
+        passwordHash: '',
+        organization: mockOrganization,
+      };
+      mockDatabaseService.user.findUnique.mockResolvedValue(oauthUser);
+      mockDatabaseService.user.update.mockResolvedValue(oauthUser);
+      mockDatabaseService.auditLog.create.mockResolvedValue(googleLoginAuditLog);
+      mockDatabaseService.auditLog.findFirst.mockResolvedValue({ id: 'prior-login' });
+      mockDatabaseService.auditLog.findMany.mockResolvedValue([]);
+
+      await service.googleLogin(FAKE_TOKEN, googleLoginContext);
+      await flushLoginAlertTasks();
+
+      expect(mockMailService.sendUnrecognizedLoginEmail).toHaveBeenCalledWith(
+        mockUser.email,
+        mockUser.firstName,
+        expect.objectContaining({
+          ipAddress: googleLoginContext.ipAddress,
+          userAgent: googleLoginContext.userAgent,
+          occurredAt: expect.any(Date),
+        }),
+      );
     });
 
     it('should throw UnauthorizedException when google-auth-library rejects (expired/invalid signature)', async () => {
@@ -728,7 +1195,7 @@ describe('AuthService', () => {
       mockDatabaseService.auditLog.create.mockResolvedValue({});
       mockDatabaseService.user.update.mockResolvedValue(newUser);
 
-      const result = await service.googleLogin(FAKE_TOKEN);
+      const result = await service.googleLogin(FAKE_TOKEN, googleLoginContext);
 
       expect(result.isNewUser).toBe(true);
       expect(result).toHaveProperty('token');
@@ -742,6 +1209,16 @@ describe('AuthService', () => {
           include: { organization: true },
         }),
       );
+      expect(mockDatabaseService.auditLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          action: 'user_login',
+          entityType: 'user',
+          changes: { provider: 'google', reason: 'registration' },
+          ipAddress: googleLoginContext.ipAddress,
+          userAgent: googleLoginContext.userAgent,
+        }),
+      });
+      expect(mockMailService.sendUnrecognizedLoginEmail).not.toHaveBeenCalled();
     });
 
     it('should throw UnauthorizedException when payload is missing (verifyIdToken returns empty)', async () => {
@@ -756,6 +1233,93 @@ describe('AuthService', () => {
 
       await expect(service.googleLogin('malformed')).rejects.toThrow(UnauthorizedException);
       await expect(service.googleLogin('malformed')).rejects.toThrow('Invalid Google token');
+    });
+  });
+
+  describe('changePassword', () => {
+    it('changes the password, invalidates the cache, and sends the security email (M12)', async () => {
+      mockDatabaseService.user.findUnique.mockResolvedValue(mockUser);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      (bcrypt.hash as jest.Mock).mockResolvedValue('new-hashed-password');
+      mockDatabaseService.user.update.mockResolvedValue({ ...mockUser });
+
+      await service.changePassword('user-123', 'current-pw', 'new-pw');
+
+      expect(mockDatabaseService.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-123' },
+        data: { passwordHash: 'new-hashed-password' },
+      });
+      expect(mockRedisService.del).toHaveBeenCalledWith('user_auth:user-123');
+      // Session invalidation: writes the pwd_changed marker so pre-change
+      // tokens (other devices / stolen) are rejected by JwtStrategy.validate.
+      expect(mockRedisService.set).toHaveBeenCalledWith(
+        'pwd_changed:user-123',
+        expect.any(String),
+        expect.any(Number),
+      );
+      // Security alert: the user is emailed that their password changed.
+      expect(mockMailService.sendPasswordChangedEmail).toHaveBeenCalledWith(
+        mockUser.email,
+        mockUser.firstName,
+      );
+    });
+
+    it('throws and does NOT email when the current password is wrong', async () => {
+      mockDatabaseService.user.findUnique.mockResolvedValue(mockUser);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+
+      await expect(
+        service.changePassword('user-123', 'wrong-pw', 'new-pw'),
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(mockDatabaseService.user.update).not.toHaveBeenCalled();
+      expect(mockMailService.sendPasswordChangedEmail).not.toHaveBeenCalled();
+    });
+
+    it('still succeeds when the security email fails (non-blocking)', async () => {
+      mockDatabaseService.user.findUnique.mockResolvedValue(mockUser);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      (bcrypt.hash as jest.Mock).mockResolvedValue('new-hashed-password');
+      mockDatabaseService.user.update.mockResolvedValue({ ...mockUser });
+      mockMailService.sendPasswordChangedEmail.mockRejectedValue(new Error('smtp down'));
+
+      await expect(
+        service.changePassword('user-123', 'current-pw', 'new-pw'),
+      ).resolves.toBeUndefined();
+
+      expect(mockDatabaseService.user.update).toHaveBeenCalled();
+    });
+  });
+
+  describe('resetPassword', () => {
+    it('writes the pwd_changed marker so the reset kills pre-reset sessions (takeover defense)', async () => {
+      // forgot-password reset is the primary account-takeover case: an attacker
+      // who resets a stolen-email account must invalidate the legit user's
+      // live sessions. Reset returns no token; the user logs in afterward.
+      mockDatabaseService.passwordResetToken.findUnique.mockResolvedValue({
+        id: 'tok-1',
+        userId: 'user-123',
+        token: 'hashed',
+        usedAt: null,
+        expiresAt: new Date(Date.now() + 60_000),
+        user: { id: 'user-123', email: 'test@example.com', organizationId: 'org-123' },
+      });
+      mockDatabaseService.user.update.mockResolvedValue({ id: 'user-123' });
+      mockDatabaseService.passwordResetToken.update.mockResolvedValue({ id: 'tok-1' });
+      (bcrypt.hash as jest.Mock).mockResolvedValue('new-hashed-password');
+
+      await service.resetPassword('raw-token', 'new-pw');
+
+      expect(mockDatabaseService.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-123' },
+        data: { passwordHash: 'new-hashed-password' },
+      });
+      expect(mockRedisService.del).toHaveBeenCalledWith('user_auth:user-123');
+      expect(mockRedisService.set).toHaveBeenCalledWith(
+        'pwd_changed:user-123',
+        expect.any(String),
+        expect.any(Number),
+      );
     });
   });
 });

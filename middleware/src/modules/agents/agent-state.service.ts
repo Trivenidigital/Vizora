@@ -2,6 +2,7 @@ import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { promises as fs } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
+import { validateFamilyState } from './agent-state.schema';
 
 /**
  * Reads and aggregates per-family agent state files from
@@ -76,9 +77,10 @@ export class AgentStateService {
 
   private async readFamilyFile(family: string): Promise<unknown> {
     const file = join(this.stateDir, `${family}.json`);
+    let parsed: unknown;
     try {
       const raw = await fs.readFile(file, 'utf-8');
-      return JSON.parse(raw);
+      parsed = JSON.parse(raw);
     } catch (err: unknown) {
       const code = (err as NodeJS.ErrnoException)?.code;
       if (code === 'ENOENT') return null;
@@ -102,6 +104,21 @@ export class AgentStateService {
       );
       return null;
     }
+    // Schema validation at the read boundary: ensures a malformed file
+    // (e.g. an agent script crashed mid-write, a manual edit went wrong,
+    // a future schema change rolled out one process behind another) does
+    // not surface as a partially-correct payload to API/MCP consumers.
+    // Fail-soft like ENOENT — log the issues and return null so the
+    // calling endpoint sees "no state for this family yet" rather than a
+    // payload with the wrong shape.
+    const result = validateFamilyState(parsed);
+    if (!result.ok) {
+      this.logger.warn(
+        `state file '${family}' failed schema validation: ${result.issues.join('; ')}`,
+      );
+      return null;
+    }
+    return result.value;
   }
 
   async aggregateStatus(page = 1, limit = 10) {

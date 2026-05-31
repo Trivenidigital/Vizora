@@ -48,23 +48,73 @@ export class CsrfMiddleware implements NestMiddleware {
       return next();
     }
 
-    // Skip CSRF for public endpoints that don't require cookies
-    // These use other protections (rate limiting)
-    // Use endsWith() for exact suffix matching to prevent path traversal bypasses
+    // Skip CSRF for public endpoints that don't require cookies.
+    // Different paths use different protections:
+    //   - /auth/*: rate-limited (5/min in prod) per @Throttle decorator
+    //   - /devices/pairing/*: device-scoped pairing tokens with 5-min TTL
+    //   - /webhooks/*: provider signature verification. Stripe and
+    //     Razorpay sign the payload with a shared secret and the
+    //     receiving controller validates X-Stripe-Signature /
+    //     X-Razorpay-Signature headers before processing — CSRF would
+    //     be redundant since browsers aren't the caller.
+    //
+    // ANCHORED exact-path match. The previous shape used endsWith()
+    // on the full URL, which would have matched any path that happened
+    // to end with `/webhooks/stripe` — including bogus prefixes like
+    // `/api/v1/internal/evil/webhooks/stripe`. The internal-secret
+    // guard would still reject the request, but the CSRF exemption
+    // reason ("provider signs the payload") doesn't apply on internal
+    // paths, so the exemption should not be granted at all. Each
+    // exempt path is now enumerated with its full prefix.
     const fullPath = req.originalUrl || req.url || req.path;
-    const csrfExemptSuffixes = [
-      '/auth/login',
-      '/auth/register',
-      '/auth/forgot-password',
-      '/auth/reset-password',
-      '/devices/pairing/request',
-      '/devices/pairing/status',
-      '/webhooks/stripe',
-      '/webhooks/razorpay',
-    ];
+    const pathname = fullPath.split('?')[0];
+    // Both prefixes accepted: production runs `/api/v1/*` after the
+    // NestJS global prefix, but the test harness and nginx legacy
+    // rewrites also produce `/api/*`. Enumerate both forms rather
+    // than risk a startsWith/endsWith bypass.
+    const csrfExemptExactPaths = new Set([
+      '/api/v1/auth/login',
+      '/api/v1/auth/register',
+      '/api/v1/auth/forgot-password',
+      '/api/v1/auth/reset-password',
+      '/api/v1/devices/pairing/request',
+      '/api/v1/devices/pairing/status',
+      '/api/v1/webhooks/stripe', // Validates X-Stripe-Signature
+      '/api/v1/webhooks/razorpay', // Validates X-Razorpay-Signature
+      '/api/auth/login',
+      '/api/auth/register',
+      '/api/auth/forgot-password',
+      '/api/auth/reset-password',
+      '/api/devices/pairing/request',
+      '/api/devices/pairing/status',
+      '/api/webhooks/stripe',
+      '/api/webhooks/razorpay',
+    ]);
 
-    const isExempt = csrfExemptSuffixes.some(suffix => fullPath.endsWith(suffix))
-      || fullPath.match(/\/devices\/pairing\/status\/[A-Za-z0-9]+$/);
+    // MCP endpoints use bearer-token auth (not cookies) and are called
+    // server-to-server by agents (no browser, no CSRF surface). Exempt
+    // the /api/v1/mcp tree from CSRF validation. Auth on these routes
+    // is enforced by McpAuthGuard.
+    //
+    // Match `/api/v1/mcp` exactly OR `/api/v1/mcp/*` — bare startsWith
+    // would also exempt sibling routes like `/api/v1/mcp-admin` or
+    // `/api/v1/mcpwhatever` if they ever exist. Query string is
+    // stripped so a manipulated `?` parameter cannot match.
+    const isMcpRoute =
+      pathname === '/api/v1/mcp' || pathname.startsWith('/api/v1/mcp/');
+
+    // /api/v1/internal/* endpoints (PR-review R2 C7): server-to-server
+    // calls from the runner script, sidecar, and ops scripts. Auth is
+    // enforced by InternalSecretGuard (x-internal-api-key + caller +
+    // loopback-only). No browser, no cookies, no CSRF surface.
+    // Same exact-match-or-prefix-with-slash discipline as MCP above.
+    const isInternalRoute =
+      pathname === '/api/v1/internal' || pathname.startsWith('/api/v1/internal/');
+
+    const isExempt = csrfExemptExactPaths.has(pathname)
+      || pathname.match(/^\/api(\/v1)?\/devices\/pairing\/status\/[A-Za-z0-9]+$/)
+      || isMcpRoute
+      || isInternalRoute;
 
     if (isExempt) {
       return next();

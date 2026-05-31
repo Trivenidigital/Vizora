@@ -442,6 +442,19 @@ describe('AdminController', () => {
       );
     });
 
+    it('REJECTS self-grant of super-admin (peer-witness requirement)', async () => {
+      // Regression: super-admin elevation must flow through a second
+      // super-admin so every privilege escalation has a human peer in
+      // the audit chain. Self-elevation would log "I granted myself"
+      // and bypass that control.
+      await expect(
+        controller.grantSuperAdmin(adminId, adminId, mockRequest),
+      ).rejects.toThrow(/Cannot grant super-admin to yourself/);
+
+      expect(mockUsersAdminService.grantSuperAdmin).not.toHaveBeenCalled();
+      expect(mockAdminAuditService.log).not.toHaveBeenCalled();
+    });
+
     it('should revoke super admin privileges', async () => {
       mockUsersAdminService.revokeSuperAdmin.mockResolvedValue({ ...mockUser, isSuperAdmin: false } as any);
 

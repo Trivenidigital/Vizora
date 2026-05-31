@@ -1,0 +1,139 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "title": "Vizora — Agent Cost & Health",
+  "uid": "agents-cost",
+  "tags": ["vizora", "agents", "cost", "hermes"],
+  "timezone": "",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-24h", "to": "now" },
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Today's spend (USD)",
+      "description": "Sum of costMicrodollars for current UTC day, in dollars. Hard cap is $2/day at OpenRouter; soft cap is $1 enforced by runner pre-flight.",
+      "type": "stat",
+      "datasource": { "type": "postgres", "uid": "vizora-postgres" },
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 4,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.5 },
+              { "color": "red", "value": 1.0 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT COALESCE(SUM(\"costMicrodollars\"), 0) / 1000000.0 AS today_spend_usd FROM agent_runs WHERE \"startedAt\" >= date_trunc('day', NOW() AT TIME ZONE 'UTC')",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Cost per skill — last 24h",
+      "description": "Sum of costMicrodollars per agent skill over the dashboard time window.",
+      "type": "barchart",
+      "datasource": { "type": "postgres", "uid": "vizora-postgres" },
+      "gridPos": { "h": 6, "w": 12, "x": 6, "y": 0 },
+      "fieldConfig": {
+        "defaults": { "unit": "currencyUSD", "decimals": 4 }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT \"skillName\" AS skill, COALESCE(SUM(\"costMicrodollars\"), 0) / 1000000.0 AS cost_usd FROM agent_runs WHERE $__timeFilter(\"startedAt\") GROUP BY \"skillName\" ORDER BY cost_usd DESC",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "P95 firing latency (ms) — last 24h",
+      "description": "P50 and P95 wall-clock duration per skill. Targets: support-triage ≤60s, customer-lifecycle ≤120s.",
+      "type": "timeseries",
+      "datasource": { "type": "postgres", "uid": "vizora-postgres" },
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT \"startedAt\" AS time, \"skillName\" AS metric, \"durationMs\" AS value FROM agent_runs WHERE $__timeFilter(\"startedAt\") AND \"durationMs\" IS NOT NULL ORDER BY \"startedAt\"",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Outcome distribution — last 24h",
+      "description": "Mutual-exclusive outcome counts per skill. Healthy = mostly success/no_work. Alarming = any tool_error/api_error/timeout/budget_aborted/runner_crash sustained.",
+      "type": "piechart",
+      "datasource": { "type": "postgres", "uid": "vizora-postgres" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "options": {
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "pieType": "pie",
+        "tooltip": { "mode": "single" },
+        "legend": { "displayMode": "list", "placement": "right", "showLegend": true }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT outcome AS metric, COUNT(*)::int AS value FROM agent_runs WHERE $__timeFilter(\"startedAt\") GROUP BY outcome ORDER BY value DESC",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Cost per firing — last 24h (anomaly hunt)",
+      "description": "Each dot is one firing. Per-firing alert threshold $0.05 (50000 microdollars). Cluster threshold $0.20 sum per skill per hour.",
+      "type": "scatter",
+      "datasource": { "type": "postgres", "uid": "vizora-postgres" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "fieldConfig": { "defaults": { "unit": "currencyUSD", "decimals": 6 } },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT \"startedAt\" AS time, \"skillName\" AS metric, \"costMicrodollars\" / 1000000.0 AS value FROM agent_runs WHERE $__timeFilter(\"startedAt\") AND \"costMicrodollars\" IS NOT NULL ORDER BY \"startedAt\"",
+          "format": "time_series"
+        }
+      ]
+    }
+  ]
+}

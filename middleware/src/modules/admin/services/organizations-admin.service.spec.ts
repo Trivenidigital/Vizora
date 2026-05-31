@@ -161,7 +161,7 @@ describe('OrganizationsAdminService', () => {
 
   describe('extendTrial', () => {
     it('should extend trial by specified days', async () => {
-      const orgWithTrial = { ...mockOrganization, trialEndsAt: new Date() };
+      const orgWithTrial = { ...mockOrganization, trialEndsAt: new Date(), createdAt: new Date() };
       mockDb.organization.findUnique.mockResolvedValue(orgWithTrial);
       mockDb.organization.update.mockResolvedValue({ ...orgWithTrial, subscriptionStatus: 'trial' });
 
@@ -180,6 +180,32 @@ describe('OrganizationsAdminService', () => {
     it('should throw BadRequestException for non-positive days', async () => {
       await expect(service.extendTrial('org-123', 0)).rejects.toThrow(BadRequestException);
       await expect(service.extendTrial('org-123', -5)).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw if extension would exceed 90 days from signup', async () => {
+      const ageMs = (days: number) => Date.now() - days * 24 * 60 * 60 * 1000;
+      // Org is 80 days old, already in trial; another 30 days would push past 90.
+      const orgStaleTrial = {
+        ...mockOrganization,
+        createdAt: new Date(ageMs(80)),
+        trialEndsAt: new Date(ageMs(-10)), // trial ends 10d from now (~90d total)
+      };
+      mockDb.organization.findUnique.mockResolvedValue(orgStaleTrial);
+
+      await expect(service.extendTrial('org-123', 30)).rejects.toThrow(/cannot exceed 90 days/);
+    });
+
+    it('should allow extension that stays within 90 days from signup', async () => {
+      const ageMs = (days: number) => Date.now() - days * 24 * 60 * 60 * 1000;
+      const orgYoung = {
+        ...mockOrganization,
+        createdAt: new Date(ageMs(15)),
+        trialEndsAt: new Date(ageMs(-15)), // trial ends 15d from now (~30d total)
+      };
+      mockDb.organization.findUnique.mockResolvedValue(orgYoung);
+      mockDb.organization.update.mockResolvedValue({ ...orgYoung, subscriptionStatus: 'trial' });
+
+      await expect(service.extendTrial('org-123', 30)).resolves.toBeDefined();
     });
   });
 

@@ -77,7 +77,7 @@ test.describe('Content Management', () => {
     const contentTypes = ['image', 'video'];
     
     for (const type of contentTypes) {
-      await authenticatedPage.request.post('http://localhost:3000/api/content', {
+      await authenticatedPage.request.post('http://localhost:3000/api/v1/content', {
         headers: { Authorization: `Bearer ${token}` },
         data: {
           name: `Test ${type} ${Date.now()}`,
@@ -111,7 +111,7 @@ test.describe('Content Management', () => {
 
   test('should delete content', async ({ authenticatedPage, token }) => {
     // Create content via API
-    const contentRes = await authenticatedPage.request.post('http://localhost:3000/api/content', {
+    const contentRes = await authenticatedPage.request.post('http://localhost:3000/api/v1/content', {
       headers: { Authorization: `Bearer ${token}` },
       data: {
         name: `Test Content ${Date.now()}`,

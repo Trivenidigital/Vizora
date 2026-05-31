@@ -74,10 +74,10 @@ export default function HeroSection({ heroRef }: HeroSectionProps) {
               Start Free — 5 Minutes to Live <ArrowRight size={16} />
             </Link>
             <button
-              onClick={() => scrollTo('how-it-works')}
+              onClick={() => scrollTo('features')}
               className="eh-btn-ghost inline-flex items-center gap-2 px-7 py-3.5 rounded-lg text-[0.9rem]"
             >
-              <Play size={14} /> See How It Works
+              <Play size={14} /> Explore Features
             </button>
           </div>
 

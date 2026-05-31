@@ -1,24 +1,44 @@
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import PlaylistPreview from '../PlaylistPreview';
+import type { PlaylistItem } from '@/lib/types';
 
 jest.mock('@/theme/icons', () => ({
   Icon: ({ name }: { name: string }) => <span data-testid={`icon-${name}`}>{name}</span>,
 }));
 
-const mockItems = [
+// Satisfy the PlaylistItem interface (and the nested Content shape it
+// references) so `tsc --noEmit` doesn't flag the fixture. The runtime
+// component only reads id/title/type/thumbnailUrl, but the type
+// requires the full Content contract.
+const mockItems: PlaylistItem[] = [
   {
     id: 'item-1',
     contentId: 'c1',
     duration: 10,
     order: 0,
-    content: { id: 'c1', title: 'Slide 1', type: 'image', thumbnailUrl: 'https://example.com/thumb1.jpg' },
+    content: {
+      id: 'c1',
+      title: 'Slide 1',
+      type: 'image',
+      thumbnailUrl: 'https://example.com/thumb1.jpg',
+      status: 'ready',
+      createdAt: '2024-01-01',
+      updatedAt: '2024-01-01',
+    },
   },
   {
     id: 'item-2',
     contentId: 'c2',
     duration: 15,
     order: 1,
-    content: { id: 'c2', title: 'Slide 2', type: 'video' },
+    content: {
+      id: 'c2',
+      title: 'Slide 2',
+      type: 'video',
+      status: 'ready',
+      createdAt: '2024-01-01',
+      updatedAt: '2024-01-01',
+    },
   },
 ];
 

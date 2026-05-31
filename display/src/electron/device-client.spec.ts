@@ -45,6 +45,11 @@ jest.mock('electron', () => ({
       clearCache: jest.fn().mockResolvedValue(undefined),
     },
   },
+  app: {
+    relaunch: jest.fn(),
+    exit: jest.fn(),
+    getPath: jest.fn().mockReturnValue('/tmp/vizora-test'),
+  },
 }), { virtual: true });
 
 import { DeviceClient } from './device-client';
@@ -63,6 +68,7 @@ describe('DeviceClient', () => {
     on: jest.fn(),
     emit: jest.fn(),
     disconnect: jest.fn(),
+    connect: jest.fn(),
     connected: true,
   });
 
@@ -279,7 +285,10 @@ describe('DeviceClient', () => {
       expect(io).toHaveBeenCalledWith(
         expect.stringContaining('127.0.0.1'),
         expect.objectContaining({
-          auth: { token: 'test-jwt-token' },
+          auth: {
+            token: 'test-jwt-token',
+            capabilities: { deliveryAck: true },
+          },
           transports: ['websocket', 'polling'],
           reconnection: true,
         }),
@@ -296,6 +305,145 @@ describe('DeviceClient', () => {
       expect(registeredEvents).toContain('playlist:update');
       expect(registeredEvents).toContain('command');
       expect(registeredEvents).toContain('error');
+    });
+
+    it('should acknowledge playlist updates after applying them', async () => {
+      client.connect('test-token');
+
+      const playlistCall = mockSocket.on.mock.calls.find(
+        (call: any[]) => call[0] === 'playlist:update',
+      );
+      const ack = jest.fn();
+      const playlist = { id: 'playlist-1', name: 'Menu Loop' };
+
+      await playlistCall![1]({ playlist }, ack);
+
+      expect(mockConfig.onPlaylistUpdate).toHaveBeenCalledWith(playlist);
+      expect(ack).toHaveBeenCalledWith({ ok: true });
+    });
+
+    it('should negative-ack playlist updates when applying fails', async () => {
+      client.connect('test-token');
+      mockConfig.onPlaylistUpdate.mockImplementation(() => {
+        throw new Error('renderer failed');
+      });
+
+      const playlistCall = mockSocket.on.mock.calls.find(
+        (call: any[]) => call[0] === 'playlist:update',
+      );
+      const ack = jest.fn();
+
+      await playlistCall![1]({ playlist: { id: 'playlist-1' } }, ack);
+
+      expect(ack).toHaveBeenCalledWith({
+        ok: false,
+        error: 'renderer failed',
+      });
+    });
+
+    it('should negative-ack playlist updates when renderer acknowledgement rejects', async () => {
+      client.connect('test-token');
+      mockConfig.onPlaylistUpdate.mockRejectedValue(new Error('renderer timeout'));
+
+      const playlistCall = mockSocket.on.mock.calls.find(
+        (call: any[]) => call[0] === 'playlist:update',
+      );
+      const ack = jest.fn();
+
+      await playlistCall![1]({ playlist: { id: 'playlist-1' } }, ack);
+
+      expect(ack).toHaveBeenCalledWith({
+        ok: false,
+        error: 'renderer timeout',
+      });
+      expect(mockSocket.disconnect).toHaveBeenCalled();
+      jest.advanceTimersByTime(250);
+      expect(mockSocket.connect).toHaveBeenCalled();
+    });
+
+    it('should acknowledge commands after applying them', async () => {
+      client.connect('test-token');
+
+      const commandCall = mockSocket.on.mock.calls.find(
+        (call: any[]) => call[0] === 'command',
+      );
+      const ack = jest.fn();
+      const command = { type: 'clear_cache' };
+
+      await commandCall![1](command, ack);
+
+      expect(mockConfig.onCommand).toHaveBeenCalledWith(command);
+      expect(ack).toHaveBeenCalledWith({ ok: true });
+    });
+
+    it('should acknowledge restart before exiting so realtime does not requeue it', async () => {
+      const electron = require('electron');
+      client.connect('test-token');
+
+      const commandCall = mockSocket.on.mock.calls.find(
+        (call: any[]) => call[0] === 'command',
+      );
+      const ack = jest.fn();
+
+      const commandPromise = commandCall![1]({ type: 'restart' }, ack);
+      await Promise.resolve();
+
+      expect(ack).toHaveBeenCalledWith({ ok: true });
+      expect(electron.app.relaunch).not.toHaveBeenCalled();
+      expect(electron.app.exit).not.toHaveBeenCalled();
+
+      jest.advanceTimersByTime(499);
+      await Promise.resolve();
+      expect(electron.app.exit).not.toHaveBeenCalled();
+
+      jest.advanceTimersByTime(1);
+      await commandPromise;
+
+      expect(electron.app.relaunch).toHaveBeenCalled();
+      expect(electron.app.exit).toHaveBeenCalledWith(0);
+      expect(ack.mock.invocationCallOrder[0]).toBeLessThan(
+        electron.app.exit.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('should restart even when the renderer command path is unavailable', async () => {
+      const electron = require('electron');
+      mockConfig.onCommand.mockRejectedValue(new Error('renderer hung'));
+      client.connect('test-token');
+
+      const commandCall = mockSocket.on.mock.calls.find(
+        (call: any[]) => call[0] === 'command',
+      );
+      const ack = jest.fn();
+
+      const commandPromise = commandCall![1]({ type: 'restart' }, ack);
+      await Promise.resolve();
+
+      expect(mockConfig.onCommand).not.toHaveBeenCalled();
+      expect(ack).toHaveBeenCalledWith({ ok: true });
+      expect(electron.app.exit).not.toHaveBeenCalled();
+
+      jest.advanceTimersByTime(500);
+      await commandPromise;
+
+      expect(electron.app.relaunch).toHaveBeenCalled();
+      expect(electron.app.exit).toHaveBeenCalledWith(0);
+    });
+
+    it('should negative-ack push_content when the command cannot be applied', async () => {
+      client.connect('test-token');
+
+      const commandCall = mockSocket.on.mock.calls.find(
+        (call: any[]) => call[0] === 'command',
+      );
+      const ack = jest.fn();
+
+      await commandCall![1]({ type: 'push_content', payload: {} }, ack);
+
+      expect(ack).toHaveBeenCalledWith({
+        ok: false,
+        error: 'push_content missing content URL',
+      });
     });
 
     it('should start heartbeat on connect event', () => {
@@ -463,24 +611,24 @@ describe('DeviceClient', () => {
   });
 
   describe('handleCommand', () => {
-    it('should invoke onCommand callback with the command data', () => {
+    it('should invoke onCommand callback with the command data', async () => {
       client.connect('token');
 
       const commandCall = mockSocket.on.mock.calls.find((call: any[]) => call[0] === 'command');
       expect(commandCall).toBeDefined();
 
       // Trigger a command
-      commandCall![1]({ type: 'reload' });
-      expect(mockConfig.onCommand).toHaveBeenCalledWith({ type: 'reload' });
+      await commandCall![1]({ type: 'unknown_command' });
+      expect(mockConfig.onCommand).toHaveBeenCalledWith({ type: 'unknown_command' });
     });
 
-    it('should handle unknown command types without crashing', () => {
+    it('should handle unknown command types without crashing', async () => {
       client.connect('token');
 
       const commandCall = mockSocket.on.mock.calls.find((call: any[]) => call[0] === 'command');
 
       // Unknown command should not throw (it just logs a warning)
-      commandCall![1]({ type: 'unknown_command' });
+      await commandCall![1]({ type: 'unknown_command' });
       expect(mockConfig.onCommand).toHaveBeenCalledWith({ type: 'unknown_command' });
     });
   });

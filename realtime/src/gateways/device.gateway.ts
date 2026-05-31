@@ -54,11 +54,23 @@ interface UserPayload {
   organizationId: string;
   type?: string;
   jti?: string;
+  iat?: number; // issued-at (epoch seconds), set by jsonwebtoken — used for password-change session invalidation
 }
 
 type AuthPayload =
   | { kind: 'device'; payload: DevicePayload }
   | { kind: 'user'; payload: UserPayload };
+
+interface DeliveryAck {
+  ok?: boolean;
+  error?: string;
+}
+
+interface DeliveryResult {
+  delivered: boolean;
+  reason?: string;
+  legacy?: boolean;
+}
 
 @WebSocketGateway({
   cors: {
@@ -89,11 +101,70 @@ export class DeviceGateway
   // 2.5: Device socket deduplication (deviceId -> socketId)
   private readonly deviceSockets: Map<string, string> = new Map();
 
+  // Dashboard (user) sockets: userId -> set of socketIds. Lets the periodic
+  // session-invalidation sweep target ONLY dashboard sockets (not the device
+  // fleet) and disconnect a specific user's live sockets mid-session — closing
+  // the connect-time-only residual from PR #112.
+  private readonly dashboardSockets: Map<string, Set<string>> = new Map();
+
+  // Reentrancy guard so a slow sweep (Redis latency) can't overlap itself.
+  private sweepRunning = false;
+
   // Per-message rate limiting: socketId -> { count, resetAt }
   private readonly messageRates: Map<string, { count: number; resetAt: number }> = new Map();
 
   // Interval handles for cleanup (stored for proper teardown)
   private cleanupIntervals: ReturnType<typeof setInterval>[] = [];
+
+  private getAckError(ack?: DeliveryAck): string | null {
+    return ack?.ok === false ? ack.error || 'negative_ack' : null;
+  }
+
+  private supportsDeliveryAck(client: { data?: Record<string, any>; handshake?: { auth?: any } }): boolean {
+    if (client.data?.deliveryAckCapable === true) {
+      return true;
+    }
+
+    const capabilities = client.data?.capabilities ?? client.handshake?.auth?.capabilities;
+    if (Array.isArray(capabilities)) {
+      return capabilities.includes('deliveryAck');
+    }
+
+    return capabilities?.deliveryAck === true;
+  }
+
+  private async emitWithDeliveryAck(
+    socket: { id?: string; data?: Record<string, any>; emit: Function },
+    event: 'playlist:update' | 'command',
+    payload: unknown,
+  ): Promise<DeliveryResult> {
+    if (!this.supportsDeliveryAck(socket)) {
+      socket.emit(event, payload);
+      return { delivered: true, legacy: true };
+    }
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('ack_timeout')), 10000);
+        socket.emit(event, payload, (ack?: DeliveryAck) => {
+          clearTimeout(timeout);
+          const ackError = this.getAckError(ack);
+          if (ackError) {
+            reject(new Error(ackError));
+            return;
+          }
+          resolve();
+        });
+      });
+      return { delivered: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'ack_timeout';
+      return {
+        delivered: false,
+        reason: message === 'ack_timeout' ? 'ack_timeout' : 'negative_ack',
+      };
+    }
+  }
 
   constructor(
     private jwtService: JwtService,
@@ -117,6 +188,9 @@ export class DeviceGateway
     this.cleanupIntervals.push(setInterval(() => this.cleanupMessageRateLimits(), 60000));
     // Periodically clean up stale deviceStatusCache entries (every 5 min)
     this.cleanupIntervals.push(setInterval(() => this.cleanupStaleEntries(), 5 * 60 * 1000));
+    // Periodically tear down dashboard sockets whose session was invalidated
+    // mid-connection (password change / deactivation) — see sweepInvalidatedSessions.
+    this.cleanupIntervals.push(setInterval(() => this.sweepInvalidatedSessions(), 60000));
   }
 
   async onModuleDestroy() {
@@ -227,6 +301,88 @@ export class DeviceGateway
     }
   }
 
+  /**
+   * Periodically tear down dashboard sockets whose session was invalidated AFTER
+   * they connected. PR #112 added these checks at connect-time only; a socket
+   * established before a password change / account deactivation otherwise keeps
+   * streaming until it reconnects. This re-applies the handshake checks to the
+   * in-memory `dashboardSockets` map (dashboard sockets only — never devices).
+   *
+   * Per distinct user: one `exists(user_revoked:)` + one `get(pwd_changed:)`.
+   * - user_revoked → disconnect ALL that user's sockets (no iat needed).
+   * - pwd_changed  → per-socket: disconnect only sockets whose token iat predates
+   *                  the change (strict `<`, matching the connect-time guard, so a
+   *                  fresh post-change login's socket survives). Sockets without a
+   *                  stored tokenIat are fail-open here (same as the connect-time
+   *                  guard) but still caught by the user_revoked branch.
+   *
+   * Reentrancy-guarded (first async cleanup interval — a slow Redis cycle must not
+   * overlap itself); per-user try/catch so one user's Redis error never aborts the
+   * sweep; whole body wrapped so an unexpected throw can't leak out of setInterval.
+   */
+  private async sweepInvalidatedSessions(): Promise<void> {
+    if (this.sweepRunning || this.dashboardSockets.size === 0) {
+      return;
+    }
+    this.sweepRunning = true;
+    try {
+      // Snapshot userIds so concurrent connect/disconnect can't mutate mid-iteration.
+      for (const userId of Array.from(this.dashboardSockets.keys())) {
+        try {
+          const socketIds = this.dashboardSockets.get(userId);
+          if (!socketIds || socketIds.size === 0) {
+            continue;
+          }
+
+          const revoked = await this.redisService.exists(`user_revoked:${userId}`);
+          let pwdChangedAt: number | null = null;
+          if (!revoked) {
+            const pc = await this.redisService.get(`pwd_changed:${userId}`);
+            pwdChangedAt = pc ? Number(pc) : null;
+            if (pwdChangedAt === null) {
+              continue; // Nothing to enforce for this user this cycle.
+            }
+          }
+
+          for (const socketId of Array.from(socketIds)) {
+            const socket = this.server.sockets.sockets.get(socketId);
+            if (!socket) {
+              // Socket already gone; drop the stale entry defensively.
+              socketIds.delete(socketId);
+              continue;
+            }
+            const tokenIat = socket.data?.tokenIat;
+            const expiredByPwd =
+              typeof tokenIat === 'number' &&
+              pwdChangedAt !== null &&
+              tokenIat < pwdChangedAt;
+            if (revoked || expiredByPwd) {
+              const reason = revoked ? 'revoked' : 'password_changed';
+              // Emit before the forced disconnect so the dashboard can show a
+              // "signed out" state instead of a silent drop. handleDisconnect
+              // owns removing the socketId from dashboardSockets.
+              socket.emit('session:expired', { reason });
+              socket.disconnect(true);
+              this.logger.log(
+                `Session sweep: disconnected dashboard socket ${socketId} (user: ${userId}, reason: ${reason})`,
+              );
+            }
+          }
+        } catch (err) {
+          this.logger.warn(
+            `Session sweep failed for user ${userId}: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Session sweep aborted: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    } finally {
+      this.sweepRunning = false;
+    }
+  }
+
   async handleConnection(client: Socket) {
     try {
       // Step 1: Rate limiting
@@ -243,8 +399,25 @@ export class DeviceGateway
       // User/dashboard connections: join org room and send current device statuses
       if (authResult.kind === 'user') {
         const orgId = authResult.payload.organizationId;
+        const userId = authResult.payload.sub;
         await client.join(`org:${orgId}`);
-        this.logger.log(`Dashboard client joined org:${orgId} (user: ${authResult.payload.sub}, socket: ${client.id})`);
+
+        // Store the token's iat + register this dashboard socket so the periodic
+        // sweep can invalidate it mid-session if the user's password changes or
+        // their account is deactivated after they connected (PR #112 only checked
+        // at connect-time). iat is per-socket so two tabs (pre/post change) are
+        // torn down independently.
+        client.data.userId = userId;
+        client.data.isDashboard = true;
+        client.data.tokenIat = authResult.payload.iat;
+        let userSockets = this.dashboardSockets.get(userId);
+        if (!userSockets) {
+          userSockets = new Set();
+          this.dashboardSockets.set(userId, userSockets);
+        }
+        userSockets.add(client.id);
+
+        this.logger.log(`Dashboard client joined org:${orgId} (user: ${userId}, socket: ${client.id})`);
 
         // Send current device statuses so dashboard has accurate state on connect
         await this.sendDeviceStatusCatchUp(client, orgId);
@@ -379,6 +552,8 @@ export class DeviceGateway
         client.data.deviceId = deviceId;
         client.data.organizationId = payload.organizationId;
         client.data.deviceIdentifier = payload.deviceIdentifier;
+        client.data.capabilities = client.handshake.auth?.capabilities;
+        client.data.deliveryAckCapable = this.supportsDeliveryAck(client);
 
         // Auto-rotate device token if it expires within 14 days.
         // NOTE: The old token remains valid until natural expiry (stateless JWT limitation).
@@ -427,6 +602,34 @@ export class DeviceGateway
           }
         }
 
+        // Mirror the REST JwtStrategy.validate session checks (PR #111) for the
+        // dashboard WebSocket handshake, which authenticates separately and
+        // previously only checked per-token revocation. The middleware writes
+        // these keys to the SAME Redis instance, so a stolen/other-device
+        // dashboard socket can't keep streaming after the account is
+        // deactivated or its password changed.
+        //
+        // (1) User-wide revocation — admin deactivation / self-delete.
+        const isUserRevoked = await this.redisService.exists(`user_revoked:${userPayload.sub}`);
+        if (isUserRevoked) {
+          this.logger.warn(`Connection rejected: user revoked (sub: ${userPayload.sub})`);
+          client.disconnect();
+          return null;
+        }
+
+        // (2) Password-change session invalidation — reject tokens minted
+        // before the last password change. Strict `<` so a fresh post-change
+        // login (iat >= marker) connects. Fail-open if the token has no iat
+        // (every middleware-issued token carries one — see JwtStrategy note).
+        if (userPayload.iat) {
+          const pwdChangedAt = await this.redisService.get(`pwd_changed:${userPayload.sub}`);
+          if (pwdChangedAt && userPayload.iat < Number(pwdChangedAt)) {
+            this.logger.warn(`Connection rejected: session expired by password change (sub: ${userPayload.sub})`);
+            client.disconnect();
+            return null;
+          }
+        }
+
         // Store user info in socket data
         client.data.userId = userPayload.sub;
         client.data.organizationId = userPayload.organizationId;
@@ -465,7 +668,7 @@ export class DeviceGateway
     const previousStatus = this.deviceStatusCache.get(deviceId);
     if (previousStatus !== 'online') {
       try {
-        await this.databaseService.display.update({
+        await this.databaseService.display.updateMany({
           where: { id: deviceId },
           data: {
             status: 'online',
@@ -597,13 +800,7 @@ export class DeviceGateway
 
     // Deliver any commands that were queued while the device was offline
     try {
-      const pendingCommands = await this.redisService.getDeviceCommands(deviceId);
-      if (pendingCommands.length > 0) {
-        this.logger.log(`Delivering ${pendingCommands.length} pending command(s) to device ${deviceId}`);
-        for (const cmd of pendingCommands) {
-          client.emit('command', cmd);
-        }
-      }
+      await this.deliverPendingCommands(client, deviceId);
     } catch (cmdError: unknown) {
       const cmdErrorMsg = cmdError instanceof Error ? cmdError.message : 'Unknown error';
       this.logger.error(`Failed to deliver pending commands to device ${deviceId}: ${cmdErrorMsg}`);
@@ -661,16 +858,31 @@ export class DeviceGateway
    * Send current device statuses to a newly connected dashboard client.
    * This ensures the dashboard has accurate online/offline state immediately,
    * even if the devices connected before the dashboard did.
+   *
+   * Capped at CATCH_UP_DEVICE_CAP devices per call. For larger fleets the
+   * dashboard can paginate via REST and rely on incremental status updates
+   * from then on. Without this cap, a single dashboard reconnect for a
+   * 10k-device org would load the entire fleet into memory and emit 10k
+   * events to one socket on the connection-handling path — which is what
+   * the "stale-org outage" follow-up was about.
    */
+  private static readonly CATCH_UP_DEVICE_CAP = 500;
+
   private async sendDeviceStatusCatchUp(client: Socket, orgId: string): Promise<void> {
     try {
+      const cap = DeviceGateway.CATCH_UP_DEVICE_CAP;
       const devices = await this.databaseService.display.findMany({
         where: { organizationId: orgId },
         select: { id: true, status: true, lastHeartbeat: true },
+        orderBy: { lastHeartbeat: 'desc' },
+        take: cap + 1, // peek one past the cap so we know if more exist
       });
 
+      const truncated = devices.length > cap;
+      const toSend = truncated ? devices.slice(0, cap) : devices;
+
       const now = new Date().toISOString();
-      for (const device of devices) {
+      for (const device of toSend) {
         // Check in-memory cache first (most accurate for connected devices)
         const cachedStatus = this.deviceStatusCache.get(device.id);
         const status = cachedStatus || device.status || 'offline';
@@ -682,7 +894,13 @@ export class DeviceGateway
         });
       }
 
-      this.logger.debug(`Sent status catch-up for ${devices.length} devices to dashboard (org: ${orgId})`);
+      if (truncated) {
+        this.logger.warn(
+          `Device catch-up truncated at ${cap} for org ${orgId}; dashboard should paginate the remainder via REST and rely on incremental events afterwards`,
+        );
+      } else {
+        this.logger.debug(`Sent status catch-up for ${toSend.length} devices to dashboard (org: ${orgId})`);
+      }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.warn(`Failed to send device status catch-up: ${errorMessage}`);
@@ -693,6 +911,16 @@ export class DeviceGateway
     // Clean up per-message rate limit entry for this socket
     this.messageRates.delete(client.id);
 
+    // Deregister dashboard (user) sockets from the sweep map. Pure in-memory
+    // bookkeeping (no I/O), so kept outside the try below.
+    const dashUserId = client.data?.userId;
+    if (dashUserId && client.data?.isDashboard) {
+      const set = this.dashboardSockets.get(dashUserId);
+      if (set) {
+        set.delete(client.id);
+        if (set.size === 0) this.dashboardSockets.delete(dashUserId);
+      }
+    }
 
     try {
       const deviceId = client.data?.deviceId;
@@ -718,15 +946,26 @@ export class DeviceGateway
         this.deviceStatusCache.delete(deviceId);
         let deviceName = deviceId;
         try {
-          const device = await this.databaseService.display.update({
+          // updateMany (vs update) silently no-ops when the device row
+          // no longer exists — happens during device deletion races and
+          // for ephemeral test sockets. Prevents the noisy P2025 Prisma
+          // log that disconnect.update used to produce on every stale
+          // session. Read nickname/identifier in a separate findUnique
+          // so the absent-row case stays log-free.
+          const updated = await this.databaseService.display.updateMany({
             where: { id: deviceId },
             data: {
               status: 'offline',
               lastHeartbeat: new Date(),
             },
-            select: { nickname: true, deviceIdentifier: true },
           });
-          deviceName = device?.nickname || device?.deviceIdentifier || deviceId;
+          if (updated.count > 0) {
+            const device = await this.databaseService.display.findUnique({
+              where: { id: deviceId },
+              select: { nickname: true, deviceIdentifier: true },
+            });
+            deviceName = device?.nickname || device?.deviceIdentifier || deviceId;
+          }
         } catch (dbError: unknown) {
           const errorMessage = dbError instanceof Error ? dbError.message : 'Unknown error';
           this.logger.warn(`Failed to update database for device ${deviceId}: ${errorMessage}`);
@@ -793,7 +1032,11 @@ export class DeviceGateway
       const previousStatus = this.deviceStatusCache.get(deviceId);
       if (previousStatus !== 'online') {
         try {
-          await this.databaseService.display.update({
+          // updateMany — silently no-ops if the row was deleted between
+          // the device's JWT issuance and this heartbeat (test sockets,
+          // mid-flight device deletion). Avoids P2025 log noise without
+          // losing the status-write semantics.
+          await this.databaseService.display.updateMany({
             where: { id: deviceId },
             data: {
               status: 'online',
@@ -819,16 +1062,13 @@ export class DeviceGateway
         );
       }
 
-      // Check for pending commands
-      const commands = await this.redisService.getDeviceCommands(deviceId);
-
       // Record successful heartbeat with duration
       const duration = (Date.now() - startTime) / 1000;
       this.metricsService.recordHeartbeat(deviceId, true, duration);
 
       return createSuccessResponse({
         nextHeartbeatIn: 15000,
-        commands: commands || [],
+        commands: [],
       });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -976,23 +1216,38 @@ export class DeviceGateway
       qrOverlay: configMetadata.qrOverlay || null,
     });
 
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('ack_timeout')), 10000);
-        client.emit('playlist:update', {
-          playlist: pendingPlaylist,
-          timestamp: new Date().toISOString(),
-        }, () => {
-          clearTimeout(timeout);
-          resolve();
-        });
-      });
-      this.logger.log(`Pending playlist delivered to device ${deviceId} (acknowledged)`);
-    } catch {
-      this.logger.warn(`Pending playlist ack timeout for device ${deviceId} — re-queuing`);
+    const result = await this.emitWithDeliveryAck(client, 'playlist:update', {
+      playlist: pendingPlaylist,
+      timestamp: new Date().toISOString(),
+    });
+
+    if (result.delivered) {
+      this.logger.log(
+        result.legacy
+          ? `Pending playlist delivered to legacy device ${deviceId} (best-effort)`
+          : `Pending playlist delivered to device ${deviceId} (acknowledged)`,
+      );
+    } else {
+      this.logger.warn(`Pending playlist ${result.reason || 'delivery failure'} for device ${deviceId} - re-queuing`);
       await this.redisService.setPendingPlaylist(deviceId, pendingPlaylist);
     }
     return true;
+  }
+
+  private async deliverPendingCommands(client: Socket, deviceId: string): Promise<void> {
+    const pendingCommands = await this.redisService.getDeviceCommands(deviceId);
+    if (pendingCommands.length === 0) {
+      return;
+    }
+
+    this.logger.log(`Delivering ${pendingCommands.length} pending command(s) to device ${deviceId}`);
+    for (const cmd of pendingCommands) {
+      const result = await this.emitWithDeliveryAck(client, 'command', cmd);
+      if (!result.delivered) {
+        this.logger.warn(`Pending command ${cmd.type} ${result.reason || 'delivery failure'} for device ${deviceId} - re-queuing`);
+        await this.redisService.addDeviceCommand(deviceId, cmd);
+      }
+    }
   }
 
   // Admin methods (called from API)
@@ -1026,28 +1281,25 @@ export class DeviceGateway
     // Use Socket.IO acknowledgment with 10s timeout — try all sockets,
     // succeed if at least one acknowledges
     let anyAcknowledged = false;
+    let failureReason = 'ack_timeout';
     for (const socket of sockets) {
-      try {
-        await new Promise<void>((resolve, reject) => {
-          const timeout = setTimeout(() => reject(new Error('ack_timeout')), 10000);
-          socket.emit('playlist:update', {
-            playlist: resolvedPlaylist,
-            timestamp: new Date().toISOString(),
-          }, () => {
-            clearTimeout(timeout);
-            resolve();
-          });
-        });
+      const result = await this.emitWithDeliveryAck(socket as any, 'playlist:update', {
+        playlist: resolvedPlaylist,
+        timestamp: new Date().toISOString(),
+      });
+      if (result.delivered) {
         anyAcknowledged = true;
-      } catch {
-        this.logger.warn(`pushPlaylist: ack timeout for socket ${socket.id} on device ${deviceId}`);
+        continue;
       }
+
+      failureReason = result.reason || 'ack_timeout';
+      this.logger.warn(`pushPlaylist: ${failureReason} for socket ${socket.id} on device ${deviceId}`);
     }
 
     if (!anyAcknowledged) {
       this.logger.warn(`pushPlaylist: all sockets timed out for device ${deviceId} — queuing for reconnect`);
       await this.redisService.setPendingPlaylist(deviceId, resolvedPlaylist);
-      return { delivered: false, reason: 'ack_timeout' };
+      return { delivered: false, reason: failureReason };
     }
 
     this.logger.log(`Sent playlist update to device: ${deviceId} (acknowledged)`);
@@ -1066,25 +1318,22 @@ export class DeviceGateway
     }
 
     let anyAcknowledged = false;
+    let failureReason = 'ack_timeout';
     for (const socket of sockets) {
-      try {
-        await new Promise<void>((resolve, reject) => {
-          const timeout = setTimeout(() => reject(new Error('ack_timeout')), 10000);
-          socket.emit('command', commandWithTimestamp, () => {
-            clearTimeout(timeout);
-            resolve();
-          });
-        });
+      const result = await this.emitWithDeliveryAck(socket as any, 'command', commandWithTimestamp);
+      if (result.delivered) {
         anyAcknowledged = true;
-      } catch {
-        this.logger.warn(`sendCommand: ack timeout for socket ${socket.id} on device ${deviceId}`);
+        continue;
       }
+
+      failureReason = result.reason || 'ack_timeout';
+      this.logger.warn(`sendCommand: ${failureReason} for socket ${socket.id} on device ${deviceId}`);
     }
 
     if (!anyAcknowledged) {
       this.logger.warn(`sendCommand: all sockets timed out for device ${deviceId} — queuing`);
       await this.redisService.addDeviceCommand(deviceId, commandWithTimestamp);
-      return { delivered: false, reason: 'ack_timeout' };
+      return { delivered: false, reason: failureReason };
     }
 
     this.logger.log(`Sent command ${command.type} to device: ${deviceId} (acknowledged)`);
@@ -1239,6 +1488,7 @@ export class DeviceGateway
    * Device sends base64-encoded image data which we upload to MinIO
    */
   @SubscribeMessage('screenshot:response')
+  @UseGuards(WsDeviceGuard)
   @UsePipes(new WsValidationPipe())
   async handleScreenshotResponse(
     @ConnectedSocket() client: Socket,

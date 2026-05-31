@@ -311,12 +311,14 @@ describe('Auth (e2e)', () => {
 
   describe('Security Headers', () => {
     it('should include security headers in response', () => {
+      // Helmet headers must be on EVERY response — assert against a
+      // public endpoint instead of /api/auth/me, which uses cookie auth
+      // (not Bearer headers) and would 401 in this test setup. The
+      // header guarantee is independent of auth, so a public route is
+      // both simpler and more representative of what the test asserts.
       return request(app.getHttpServer())
-        .get('/api/auth/me')
-        .set('Authorization', `Bearer ${authToken}`)
-        .expect(200)
+        .get('/api/v1/health')
         .expect((res) => {
-          // Helmet should add security headers
           expect(res.headers).toHaveProperty('x-content-type-options');
           expect(res.headers['x-content-type-options']).toBe('nosniff');
         });

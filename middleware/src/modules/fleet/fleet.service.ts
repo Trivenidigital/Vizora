@@ -200,6 +200,41 @@ export class FleetService {
           targetName: 'All Devices',
         };
       }
+      case 'tag': {
+        // O1 — Tag-based push targeting. Cross-org guard: the tag MUST belong
+        // to the caller's org. `findFirst` (not `findUnique`) so a cross-org
+        // id returns null → NotFound, never leaking existence.
+        const tag = await this.db.tag.findFirst({
+          where: { id: target.id, organizationId: orgId },
+        });
+        if (!tag) {
+          throw new NotFoundException(`Tag ${target.id} not found in organization`);
+        }
+
+        // Resolve tagged displays in this org. The `display.organizationId`
+        // predicate is belt-and-braces: the tag check above already implies
+        // org membership via the FK chain, but a hand-crafted DisplayTag row
+        // pointing at a Display in another org (impossible via Vizora APIs
+        // but possible via direct DB write) is filtered out here.
+        //
+        // Intentionally NOT filtering on `isDisabled: false` — matches the
+        // existing 'organization' branch's semantics (push to every member
+        // regardless of disabled state). Disabled displays will receive the
+        // command; the realtime gateway is the canonical place to refuse
+        // delivery to a disabled device if that's the desired behavior.
+        const tagged = await this.db.displayTag.findMany({
+          where: {
+            tagId: target.id,
+            display: { organizationId: orgId },
+          },
+          select: { displayId: true },
+        });
+
+        return {
+          deviceIds: tagged.map((t: { displayId: string }) => t.displayId),
+          targetName: `tag: ${tag.name}`,
+        };
+      }
       default:
         throw new NotFoundException(`Unknown target type: ${target.type}`);
     }

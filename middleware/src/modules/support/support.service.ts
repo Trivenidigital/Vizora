@@ -191,9 +191,202 @@ export class SupportService {
   }
 
   /**
-   * Get a single support request with messages
+   * List open support requests as TRIAGE CANDIDATES — returns precomputed
+   * structural signals only (word count, has-attachment, message count,
+   * age, org tier). The description body and any user PII NEVER cross
+   * this method's return boundary, so a downstream LLM-driven agent
+   * (Hermes / MCP tool) can safely consume the output without violating
+   * D13 (no raw user data into LLM prompts — see scripts/agents/lib/
+   * types.ts for the original constraint).
+   *
+   * Different from `findAll`:
+   *  - Always scoped to one orgId (no super-admin escape; MCP tokens are
+   *    per-org-scoped at issuance, this method matches that contract).
+   *  - Default WHERE excludes any request that already has an
+   *    `authorType='agent'` message (D7 reply-loop prevention) — the
+   *    same exclusion the existing `support-triage` cron uses.
+   *  - Returns NO `description`, NO `consoleErrors`, NO user joins.
+   *  - Word count + has_attachment computed server-side.
+   */
+  async listTriageCandidates(
+    organizationId: string,
+    options: {
+      page?: number;
+      limit?: number;
+      includeAlreadyTriaged?: boolean;
+    } = {},
+  ) {
+    const { page = 1, limit = 20, includeAlreadyTriaged = false } = options;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.SupportRequestWhereInput = {
+      organizationId,
+      status: 'open',
+    };
+    if (!includeAlreadyTriaged) {
+      where.messages = { none: { authorType: 'agent' } };
+    }
+
+    const [rows, total] = await Promise.all([
+      this.db.supportRequest.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          organizationId: true,
+          status: true,
+          priority: true,
+          category: true,
+          aiCategory: true,
+          createdAt: true,
+          // Selected purely to compute structural signals server-side —
+          // these fields are stripped before returning.
+          description: true,
+          consoleErrors: true,
+          organization: { select: { subscriptionTier: true } },
+          _count: { select: { messages: true } },
+        },
+      }),
+      this.db.supportRequest.count({ where }),
+    ]);
+
+    const now = Date.now();
+    const data = rows.map((r) => ({
+      id: r.id,
+      organizationId: r.organizationId,
+      status: r.status,
+      priority: r.priority,
+      category: r.category,
+      aiCategory: r.aiCategory,
+      createdAt: r.createdAt,
+      ageMinutes: Math.floor((now - r.createdAt.getTime()) / 60_000),
+      // Structural signals only — body never on the wire.
+      wordCount: (r.description ?? '').trim().split(/\s+/).filter(Boolean)
+        .length,
+      hasAttachment: Boolean(r.consoleErrors && r.consoleErrors.length > 0),
+      messageCount: r._count.messages,
+      orgTier: r.organization?.subscriptionTier ?? 'free',
+    }));
+
+    return {
+      data,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  /**
+   * Set the `priority` of a support request — agent-driven path.
+   *
+   * Used by Hermes (and the legacy PM2 cron) to escalate or de-escalate
+   * tickets after triage scoring. Cross-org guard via `updateMany`'s
+   * compound where (id + organizationId) ensures a token scoped to one
+   * org cannot mutate a request belonging to another org even if it
+   * gets the id wrong.
+   *
+   * Returns true if exactly one row was updated, false if no row
+   * matched (deleted, wrong org, etc).
+   */
+  async setRequestPriority(
+    organizationId: string,
+    requestId: string,
+    priority: 'urgent' | 'high' | 'normal' | 'low',
+  ): Promise<boolean> {
+    const res = await this.db.supportRequest.updateMany({
+      where: { id: requestId, organizationId },
+      data: { priority },
+    });
+    return res.count === 1;
+  }
+
+  /**
+   * Set the `aiCategory` (V2 taxonomy slug) of a support request.
+   * Idempotent for the same value — Prisma treats no-change updates
+   * as 1-row updates. This matches the existing PM2 cron's behavior.
+   */
+  async setRequestAiCategory(
+    organizationId: string,
+    requestId: string,
+    aiCategory: string,
+  ): Promise<boolean> {
+    const res = await this.db.supportRequest.updateMany({
+      where: { id: requestId, organizationId },
+      data: { aiCategory },
+    });
+    return res.count === 1;
+  }
+
+  /**
+   * Append an agent-authored message to a support request's thread.
+   *
+   * `userId` is the original submitter (kept for attribution + access
+   * control on the messages API). The agent identity rides on
+   * `authorType='agent'`. The MCP tool layer passes the agent name
+   * from the bearer-token context for audit purposes; we do NOT
+   * persist that here — the audit trail lives in `mcp_audit_log`.
+   *
+   * Refuses to write if the request doesn't belong to the named org
+   * (cross-org guard).
+   */
+  async createAgentMessage(
+    organizationId: string,
+    requestId: string,
+    content: string,
+  ): Promise<{ id: string; createdAt: Date } | null> {
+    const req = await this.db.supportRequest.findFirst({
+      where: { id: requestId, organizationId },
+      select: { id: true, userId: true },
+    });
+    if (!req) return null;
+
+    const created = await this.db.supportMessage.create({
+      data: {
+        requestId: req.id,
+        organizationId,
+        userId: req.userId,
+        role: 'assistant',
+        authorType: 'agent',
+        content,
+      },
+      select: { id: true, createdAt: true },
+    });
+    return created;
+  }
+
+  /**
+   * Get a single support request with messages.
+   *
+   * Two-step fetch: a shallow access check (id + organizationId +
+   * userId only) runs before the full include load. The unauthorized
+   * paths therefore never load other orgs' user PII, message bodies,
+   * or resolution notes — only the access fields. The Forbidden vs.
+   * NotFound signal is preserved for callers that depend on it.
    */
   async findOne(id: string, user: UserInfo) {
+    const access = await this.db.supportRequest.findUnique({
+      where: { id },
+      select: { id: true, organizationId: true, userId: true },
+    });
+
+    if (!access) {
+      throw new NotFoundException('Support request not found');
+    }
+
+    if (!user.isSuperAdmin) {
+      if (access.organizationId !== user.organizationId) {
+        throw new ForbiddenException('Access denied');
+      }
+      if (user.role !== 'admin' && access.userId !== user.id) {
+        throw new ForbiddenException('Access denied');
+      }
+    }
+
     const request = await this.db.supportRequest.findUnique({
       where: { id },
       include: {
@@ -210,17 +403,9 @@ export class SupportService {
     });
 
     if (!request) {
+      // The row existed in the access check above but got deleted before
+      // the full fetch. Race window is microseconds; surface as 404.
       throw new NotFoundException('Support request not found');
-    }
-
-    // Access control
-    if (!user.isSuperAdmin) {
-      if (request.organizationId !== user.organizationId) {
-        throw new ForbiddenException('Access denied');
-      }
-      if (user.role !== 'admin' && request.userId !== user.id) {
-        throw new ForbiddenException('Access denied');
-      }
     }
 
     return {

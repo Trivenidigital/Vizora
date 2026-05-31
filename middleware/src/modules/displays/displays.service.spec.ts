@@ -7,7 +7,11 @@ import { DisplaysService } from './displays.service';
 import { DatabaseService } from '../database/database.service';
 import { CircuitBreakerService } from '../common/services/circuit-breaker.service';
 import { StorageService } from '../storage/storage.service';
-import { NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  NotFoundException,
+  ConflictException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { CreateDisplayDto } from './dto/create-display.dto';
 import { UpdateDisplayDto } from './dto/update-display.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
@@ -521,6 +525,24 @@ describe('DisplaysService', () => {
         service.requestScreenshot('different-org', mockDisplayId)
       ).rejects.toThrow(NotFoundException);
     });
+
+    it('should throw ServiceUnavailableException when INTERNAL_API_SECRET is missing', async () => {
+      // Regression: previously threw a generic Error → unhandled by the
+      // NestJS HTTP layer → the user got a bare 500 with no useful
+      // message in error tracking. Now mapped to 503.
+      const previousSecret = process.env.INTERNAL_API_SECRET;
+      delete process.env.INTERNAL_API_SECRET;
+      try {
+        databaseService.display.findFirst.mockResolvedValue(mockDisplayWithRelations);
+        await expect(
+          service.requestScreenshot(mockOrganizationId, mockDisplayId)
+        ).rejects.toThrow(ServiceUnavailableException);
+      } finally {
+        if (previousSecret !== undefined) {
+          process.env.INTERNAL_API_SECRET = previousSecret;
+        }
+      }
+    });
   });
 
   describe('getLastScreenshot', () => {
@@ -667,6 +689,45 @@ describe('DisplaysService', () => {
       databaseService.display.findMany.mockResolvedValue([]);
 
       await service.detectOfflineDevices();
+
+      expect(databaseService.display.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('resetStalePairingDevices', () => {
+    it('resets displays stuck in status=pairing for >30 min back to offline', async () => {
+      // Devices that were paired but never made first WebSocket connection
+      // (device lost power / network / QR code never scanned). Stay in
+      // 'pairing' forever and block re-pairing of the same deviceIdentifier
+      // until the operator manually intervenes.
+      const stalePairing = [
+        { id: 'dev-stale-1', nickname: 'Foyer', deviceIdentifier: 'mac-1', organizationId: 'org-1' },
+        { id: 'dev-stale-2', nickname: null, deviceIdentifier: 'mac-2', organizationId: 'org-1' },
+      ];
+      databaseService.display.findMany.mockResolvedValue(stalePairing as any);
+      databaseService.display.updateMany.mockResolvedValue({ count: 2 });
+
+      await service.resetStalePairingDevices();
+
+      // Query uses updatedAt (not lastHeartbeat — pairing devices haven't
+      // heartbeated yet by definition).
+      expect(databaseService.display.findMany).toHaveBeenCalledWith({
+        where: {
+          status: 'pairing',
+          updatedAt: { lt: expect.any(Date) },
+        },
+        select: { id: true, nickname: true, deviceIdentifier: true, organizationId: true },
+      });
+      expect(databaseService.display.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ['dev-stale-1', 'dev-stale-2'] } },
+        data: { status: 'offline' },
+      });
+    });
+
+    it('no-ops when no stale pairing devices found', async () => {
+      databaseService.display.findMany.mockResolvedValue([]);
+
+      await service.resetStalePairingDevices();
 
       expect(databaseService.display.updateMany).not.toHaveBeenCalled();
     });

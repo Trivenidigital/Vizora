@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **Keep this file current.** When you add a new module, env var, agent, or PM2 process — update the corresponding section here in the same PR. The file is read into every Claude Code session and stale entries get treated as ground truth.
+
 ## Overview
 
 Vizora is a digital signage management platform. Businesses manage and distribute content to display screens across locations via an admin dashboard, with real-time updates over WebSocket.
@@ -92,33 +94,145 @@ Playwright runs sequentially (1 worker) to avoid DB race conditions. Retries: 2 
 
 ## Environment Variables
 
+> Source of truth for every supported var is `.env.example`. The list below is the curated subset that matters for understanding the system. **When adding a new env var: add it to `.env.example`, the relevant section here, AND any docstring/JSDoc that consumes it.**
+
+### Core
+
 ```
 DATABASE_URL            # PostgreSQL connection string
-JWT_SECRET              # User auth JWT secret (min 32 chars)
-DEVICE_JWT_SECRET       # Device auth JWT secret (min 32 chars)
 REDIS_URL               # Redis connection URL
+NODE_ENV                # development | production
+PORT, MIDDLEWARE_PORT, WEB_PORT, REALTIME_PORT  # Service ports (3000 / 3001 / 3002 / 3002)
+CORS_ORIGIN             # Comma-separated allowed origins
+```
+
+### Auth
+
+```
+JWT_SECRET              # User auth JWT secret (min 32 chars)
+JWT_EXPIRES_IN          # Token lifetime, default 7d
+DEVICE_JWT_SECRET       # Device auth JWT secret (min 32 chars; separate from JWT_SECRET)
+INTERNAL_API_SECRET     # Required in prod — service-to-service auth (middleware ↔ realtime)
+BCRYPT_ROUNDS           # Password hashing rounds (10-15, default 12)
+GOOGLE_CLIENT_ID        # Optional — Google OAuth client ID
+NEXT_PUBLIC_GOOGLE_CLIENT_ID  # Same value, exposed to frontend for GSI button (rebuild web on change)
+NEXT_SERVER_ACTIONS_ENCRYPTION_KEY  # Stable Next.js Server-Action key — KEEP CONSTANT across deploys
+```
+
+### Web frontend (NEXT_PUBLIC_*)
+
+```
 NEXT_PUBLIC_API_URL     # Backend API URL for web frontend
 NEXT_PUBLIC_SOCKET_URL  # Realtime gateway URL for web frontend
-BCRYPT_ROUNDS           # Password hashing rounds (10-15, default 12)
-GRAFANA_ADMIN_USER      # Required — Grafana admin username (no insecure default)
-GRAFANA_ADMIN_PASSWORD  # Required — Grafana admin password (no insecure default)
+BACKEND_URL             # Server-side API URL (used by next.config proxy)
+```
+
+### Storage / S3 / MinIO
+
+```
+MINIO_ENDPOINT, MINIO_PORT, MINIO_BUCKET, MINIO_USE_SSL
+MINIO_ACCESS_KEY, MINIO_SECRET_KEY
+AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY  # Used by S3 SDK paths (e.g. backup S3)
 BACKUP_S3_BUCKET        # Optional — S3 bucket for off-site DB backups
+BACKUP_DIR              # Local backup dir (default /var/backups/vizora)
+BACKUP_RETENTION_DAYS   # Daily backup retention (default 7)
+```
+
+### Billing
+
+```
+RAZORPAY_KEY_ID, RAZORPAY_BASIC_PLAN_ID, RAZORPAY_PRO_PLAN_ID
+```
+
+### Observability
+
+```
+SENTRY_DSN              # Sentry error tracking (optional)
+SENTRY_RELEASE          # Release tag for Sentry
+GRAFANA_ADMIN_USER      # Required — Grafana admin username (no insecure default)
+GRAFANA_ADMIN_PASSWORD  # Required — Grafana admin password
+METRICS_TOKEN           # Optional — Bearer token for /internal/metrics from non-localhost
+```
+
+### Email + alerts
+
+```
+SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM, SMTP_TO
+SLACK_WEBHOOK_URL       # Slack incoming webhook for ops status changes
+HEALTHCHECKS_HEALTH_GUARDIAN_URL  # External heartbeat for the ops dead-man (see "Autonomous Operations")
+EMAIL_FROM              # Default sender for transactional mail
+```
+
+### MCP Server (see also `docs/agents-mcp-server-design.md`)
+
+```
+MCP_TOKEN_TTL_DAYS                # Max issuance TTL in days. Default 90. Min 1.
+MCP_RATE_LIMIT_PER_MIN            # Per-token per-minute cap. Default 60.
+MCP_RATE_LIMIT_PER_DAY            # Per-token per-day cap. Default 1000.
+MCP_RATE_LIMIT_BUCKET_CAP         # Max distinct tokens tracked in the in-memory bucket Map. Default 10000. Older buckets are evicted when the cap is hit (warn log when this happens).
+```
+
+### Agent System (business agents — see also `docs/agents-architecture.md`)
+
+```
+AGENT_STATE_DIR         # Override state-file directory (default: <cwd>/logs/agent-state)
+AGENT_AI_PROVIDER       # heuristic | openai | anthropic (heuristic is default + always available)
+AGENT_ORCHESTRATOR_ENABLED        # Feature flag — orchestrator agent
+BILLING_REVENUE_ENABLED           # Feature flag — billing-revenue agent
+CONTENT_INTELLIGENCE_ENABLED      # Feature flag — content-intelligence agent
+SCREEN_HEALTH_CUSTOMER_ENABLED    # Feature flag — screen-health agent
+LIFECYCLE_LIVE          # Customer-lifecycle: actually send emails (default false)
+LIFECYCLE_TEST_EMAILS   # Comma-separated allowlist of email recipients in test mode
+OPENAI_API_KEY          # Required when AGENT_AI_PROVIDER=openai
+ANTHROPIC_API_KEY       # Required when AGENT_AI_PROVIDER=anthropic
+```
+
+### Operations (PM2 cron-managed agents)
+
+```
+OPS_EMAIL, OPS_PASSWORD # Service-account credentials used by ops scripts
+OPS_ALERT_EMAIL         # Preferred ops alert recipient. When set, ops alerts go here; otherwise falls back to SMTP_TO. Use to send ops alerts to a different mailbox than transactional mail.
+REALTIME_URL            # Realtime gateway base URL (default http://localhost:3002)
+WEB_URL                 # Web frontend base URL (default http://localhost:3001)
+VALIDATOR_BASE_URL      # Middleware base URL for ops scripts (default http://localhost:3000)
+RETENTION_DAYS          # Audit/log retention used by db-maintainer
+```
+
+### Third-party
+
+```
 OPENWEATHER_API_KEY     # Optional — OpenWeatherMap API key for weather widget
-GOOGLE_CLIENT_ID        # Optional — Google OAuth client ID (enables Google Sign-In)
-NEXT_PUBLIC_GOOGLE_CLIENT_ID  # Optional — Same value, exposed to frontend for GSI button
 ```
 
 ## Project Structure Highlights
 
 ```
-middleware/src/modules/    # NestJS modules: auth, content, displays, playlists, schedules, organizations, health, users, redis, database, config, common, billing, metrics, template-library
+middleware/src/modules/    # NestJS modules:
+                           #   admin, agents, analytics, api-keys, auth, billing,
+                           #   common, config, content, database, display-groups,
+                           #   displays, fleet, folders, health, mail, mcp, metrics,
+                           #   notifications, organizations, playlists, redis,
+                           #   schedules, storage, support, template-library, users
+middleware/src/modules/agents/  # Business-agent infrastructure (PR #32, 2026-04-19):
+                                #   AgentStateService, agent-state.schema, controllers
+                                #   for /api/v1/agents/* — see docs/agents-architecture.md
+middleware/src/modules/mcp/     # Model Context Protocol server — read-only tool surface
+                                # for agents (Vizora-internal + future Hermes sidecar).
+                                # See docs/agents-mcp-server-design.md and the "MCP
+                                # Server" section below.
 middleware/src/modules/common/  # Shared guards (csrf), interceptors (logging, sanitize, response-envelope), middleware (csrf)
 middleware/test/           # E2E test specs (*.e2e-spec.ts)
-packages/database/prisma/schema.prisma  # Data model: Organization, User, Display, Content, Playlist, Schedule, DisplayGroup, Tag
-web/src/app/               # Next.js App Router: (auth)/, dashboard/, api/
+packages/database/prisma/schema.prisma  # Data model: Organization, User, Display, Content, Playlist, Schedule, DisplayGroup, Tag, AuditLog, AdminAuditLog, McpToken, McpAuditLog, ContentRecommendation, CustomerIncident, ...
+web/src/app/               # Next.js App Router: (auth)/, dashboard/, api/, product/
 web/src/lib/hooks/          # useSocket, useRealtimeEvents for WebSocket integration
 realtime/src/gateways/     # device.gateway.ts — main WebSocket handler
+scripts/agents/            # Business agents (cron + on-demand): customer-lifecycle, support-triage, etc.
+scripts/ops/               # Autonomous ops agents (PM2 cron) — see "Autonomous Operations"
 e2e-tests/                 # 15 Playwright spec files (01-auth through 15-comprehensive-integration)
+docs/agents-architecture.md          # Discipline patterns extracted from shift-agent
+docs/agents-mcp-server-design.md     # MCP server module sketch (read-only v1)
+tasks/feature-backlog.md   # Long-lived parking lot for evaluated/deferred ideas
+backlog.md                 # P0-P4 active backlog with status + effort estimates
 ```
 
 ## Display Clients
@@ -139,11 +253,18 @@ Available at `http://localhost:3000/api/v1/docs` in development mode only.
 
 ## Known Test State
 
-- **Middleware**: ~1460 tests pass. 3 pre-existing failures (auth.controller, pairing.service) — not regressions
-- **Realtime**: 28 tests pass. 1 suite fails (Prisma generate issue in test env)
-- **Web**: 40+ suites pass. 2 admin test suites fail (async Client Component in jsdom — tied to RSC migration deferral)
-- **Display**: No test coverage yet
-- **Builds**: All 3 services compile via `npx nx build @vizora/{middleware,web,realtime}`
+> Numbers below were validated 2026-05-09 by a full autonomous test pass. **Verify with a fresh run before relying on a specific number** — the codebase is actively gaining tests. See `docs/plans/2026-05-09-test-results.md` for the full report.
+
+- **Middleware**: **2335 / 2367 tests pass** across **121 / 124 suites** (32 skipped, 0 fail). 124 spec files. Historical pre-existing failures (auth.controller, pairing.service) NO LONGER REPRODUCE.
+- **Realtime**: **212 / 212 tests pass** across **10 / 10 suites**. 10 spec files. The historical Prisma-generate-in-test-env issue NO LONGER REPRODUCES.
+- **Web**: **864 / 864 tests pass** across **79 / 79 suites**. 79 test files. The 2 admin RSC failures were resolved in `b712211` and remain green.
+- **Aggregate**: 3411 unit/integration tests passing, **ZERO failures** across all 3 services.
+- **TypeScript**: middleware `tsc --noEmit` exit 0; realtime + web pass via ts-jest (no separate type-check needed).
+- **Playwright (E2E)**: 24 spec files in `e2e-tests/`. Post-2026-05-09 fix (mass `/api/` → `/api/v1/` + h1 copy regex updates), estimated >90% pass rate. ~26 remaining failures concentrated in 9 specs (heaviest: 16-billing); see `docs/plans/2026-05-09-playwright-results.md`. Critical-path flows verified.
+- **Display**: No test coverage yet (Electron testing framework not wired). Rely on real-device walkthrough per release.
+- **Builds**: All 3 services compile via `npx nx build @vizora/{middleware,web,realtime}`. `web` may need `NODE_OPTIONS="--max-old-space-size=4096"` on memory-constrained dev machines.
+
+**API smoke test**: `bash scripts/smoke/api-critical-path.sh` probes 12 critical endpoints in <30 seconds; verified 12/12 pass against local stack 2026-05-09.
 
 ## Support Agent System
 
@@ -179,29 +300,224 @@ Automated deployment readiness checker. Runs 30 validation rules across content,
 
 ## Autonomous Operations System
 
-6 PM2 cron-managed agents providing 24/7 monitoring, auto-remediation, and alerting.
+7 PM2 cron-managed agents providing 24/7 monitoring, auto-remediation, alerting, and a dead-man triad.
 
-**Scripts:** `scripts/ops/` — 6 agent scripts + shared library in `scripts/ops/lib/`
+> **Keep this table aligned with `ecosystem.config.js`** when adding/removing PM2 entries under the `ops-*` namespace.
+
+**Scripts:** `scripts/ops/` — agent scripts + shared library in `scripts/ops/lib/` (state, alerting, types, api-client)
 
 | Agent | Schedule | Responsibility |
 |-------|----------|---------------|
-| health-guardian | Every 5min | Service health, PM2 restarts, memory monitoring |
+| health-guardian | Every 5min | Service health, PM2 restarts, memory monitoring; pings `HEALTHCHECKS_HEALTH_GUARDIAN_URL` on success (external dead-man) |
 | content-lifecycle | Every 15min | Archive expired/orphaned content, storage monitoring |
 | fleet-manager | Every 10min | Offline display detection, ping reconnect, error reset |
 | schedule-doctor | Every 15min | Deactivate broken schedules, coverage gaps |
 | ops-reporter | Every 30min | Aggregate status, Slack/email alerts, dashboard update |
+| ops-watchdog | Every 15min | Detects when other ops agents stop firing past per-agent SLA (3× cron interval). Slack alert on stale. Internal dead-man — catches what `HEALTHCHECKS_HEALTH_GUARDIAN_URL` can't (one-agent-stuck vs whole-VPS-down). |
 | db-maintainer | Daily 3am | PostgreSQL vacuum, Redis cleanup, log rotation |
 
-**State:** `logs/ops-state.json` — shared state file with incidents and remediation audit trail
+**State:** `logs/ops-state.json` — shared state file with incidents and remediation audit trail. Read/write through `scripts/ops/lib/state.ts` (file-locked: `readOpsState` acquires, `writeOpsState` releases — every reader MUST pair with a writer).
 
-**Dashboard:** `GET /api/v1/health/ops-status` — Redis-cached ops status for web dashboard at `/dashboard/ops`
-
-**New environment variables:**
-```
-SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS  # Email alerts (optional)
-OPS_ALERT_EMAIL                               # Alert recipient email (optional)
-REALTIME_URL                                  # Realtime gateway (default: http://localhost:3002)
-WEB_URL                                       # Web dashboard (default: http://localhost:3001)
-```
+**Dashboard:** `GET /api/v1/health/ops-status` — Redis-cached ops status for web dashboard at `/dashboard/ops`. Prefer this over reading `ops-state.json` directly from new callers.
 
 **Design:** `docs/plans/2026-02-28-autonomous-ops-design.md`
+
+## MCP Server
+
+`middleware/src/modules/mcp/` — Vizora's Model Context Protocol server. Read-only tool surface that agents (Vizora-internal cron, Claude Code subagents, future Hermes sidecar, eventually customer integrations) call instead of hitting per-domain REST endpoints.
+
+**Endpoints:**
+- `POST /api/v1/mcp` — MCP transport (JSON-RPC over HTTP). Bearer-token auth.
+- `GET  /api/v1/mcp` — MCP transport SSE leg.
+- `POST /api/v1/admin/mcp-tokens` — issue token (super-admin only). Returns plaintext bearer ONCE.
+- `GET  /api/v1/admin/mcp-tokens` — list tokens (no plaintext).
+- `DELETE /api/v1/admin/mcp-tokens/:id` — revoke (idempotent).
+
+**Tools today:**
+- `list_displays` — paginated, scope `displays:read`, optional status filter. (PR #42)
+- `list_open_support_requests` — paginated, scope `support:read`, returns triage candidates as **structural signals only** (word_count, has_attachment, message_count, age_minutes, priority, category, ai_category, org_tier). Body and PII NEVER cross the wire. Default WHERE excludes already-triaged requests (D7 reply-loop prevention).
+- `update_support_request_priority` — scope `support:write`, sets priority on one request (cross-org guard via compound where).
+- `update_support_request_ai_category` — scope `support:write`, sets V2 taxonomy slug. Zod-constrained to the V2 enum.
+- `create_support_message` — scope `support:write`, posts an agent-authored comment. Author identity comes from the bearer-token context, content capped at 2000 chars.
+- `list_onboarding_candidates` — **platform-scope** read tool, scope `customer:read`. Returns onboarding candidates across ALL orgs as structural signals only (tier, days_since_signup, milestone_flags, nudges_sent). NEVER returns org name, admin email, or billing detail. Requires a platform-scope token (`organizationId IS NULL` in `mcp_tokens`); per-org tokens are rejected with INVALID_INPUT. Used by the customer-lifecycle Hermes shadow skill.
+- `mark_onboarding_nudge_sent` — **platform-scope** write tool, scope `customer:write`. Sets `dayN_NudgeSentAt` on one org's onboarding row. Use this only if the nudge was sent through some path other than `send_lifecycle_nudge_email`.
+- `auto_complete_org_onboarding` — **platform-scope** write tool, scope `customer:write`. Closes the lifecycle nudge loop for stale (>30d) signups. Idempotent.
+- `send_lifecycle_nudge_email` — **platform-scope** write tool, scope `customer:write`. Sends a templated nudge email to one org's admin. Server picks subject + body from a hardcoded table — agent supplies only `nudge_key`. Server-gated by `LIFECYCLE_LIVE` / `LIFECYCLE_TEST_EMAILS`; defaults to dry-run. Pre-checks `dayN_NudgeSentAt` for dedup; marks-sent on success. Recipient addresses NEVER appear in the response or audit log in plaintext (sha256 hashes only).
+- `log_shadow_row` — **platform-scope** write tool, scope `shadow:write`. Server-side safe append for Hermes shadow agents' JSONL audit logs. Replaces the previous shell `echo >> file` pattern that smaller LLMs misused (truncated with `>` instead of `>>`, hallucinated timestamps, pasted placeholder run_ids). Agent supplies `log_name` (allowlisted enum: `vizora-{support-triage,customer-lifecycle}-{shadow,live}`) and `fields` (JSON object); server prepends `timestamp` + `run_id` and atomic-appends. Max 4096 bytes per row (PIPE_BUF). Path-traversal-safe via Zod enum + service-side allowlist + normalize() check.
+
+**Token shapes:**
+- **Per-org token** (`organizationId` is a real org id) — for agents that operate on one org's data. Used by all the `displays:*` and `support:*` tools. The data-access methods compound their WHERE clauses with the token's org id, so the token can never see other orgs' data.
+- **Platform-scope token** (`organizationId IS NULL`) — for cross-org agents like customer-lifecycle and the future agent-orchestrator. Per-org tools reject these with INVALID_INPUT (`requireOrgScope` helper). Platform-scope tools require these (the inverse check in the tool handler). Issued via `McpTokenService.issue({ organizationId: null, ... })`.
+
+**Hermes Agent runtime (prod VPS):**
+- Installed at `/usr/local/lib/hermes-agent`, command at `/usr/local/bin/hermes`.
+- Config: `/root/.hermes/config.yaml` (mcp_servers.vizora pointing at `https://vizora.cloud/api/v1/mcp`).
+- Secrets: `/root/.hermes/.env` (chmod 600) — `OPENROUTER_API_KEY`, `VIZORA_MCP_TOKEN`, `VIZORA_MCP_BASE_URL`.
+- Gateway: `systemd` unit `hermes-gateway.service` (active) — required for cron jobs to fire.
+- Skills repo: `hermes-skills/<skill-name>/SKILL.md` — git-tracked, scp'd to `/root/.hermes/skills/` on deploy.
+
+**Hermes-driven agents (state):**
+- `vizora-support-triage` — **shadow mode** in cron `*/5 * * * *`. Reads via MCP, scores, appends `/var/log/hermes/vizora-support-triage-shadow.jsonl`. Live-mode skill (`SKILL-live.md`) is built and committed but NOT deployed; cutover is a one-line SCP after the gate below clears.
+- `vizora-customer-lifecycle` — **shadow mode** in cron `*/30 * * * *`. Calls `list_onboarding_candidates` (platform-scope), picks template per org via heuristic-matching prompt, appends `/var/log/hermes/vizora-customer-lifecycle-shadow.jsonl`. PM2 cron `agent-customer-lifecycle` is the source of truth (currently dry-run because `LIFECYCLE_LIVE` is unset on prod). Live-mode skill (`SKILL-live.md`) is built and committed but NOT deployed; cutover is a multi-step procedure documented below.
+
+**Agent migration roadmap (Hermes-first rule)**
+
+Inventory of `scripts/agents/*.ts` and their migration status:
+
+| Agent | Lines | State | Migration plan |
+|-------|-------|-------|----------------|
+| support-triage | 306 | LIVE (PM2 cron, every 5 min) | **Migrated to Hermes shadow.** Cutover gated on shadow-data review. |
+| customer-lifecycle | 463 | LIVE (PM2 cron, every 30 min). Currently dry-run on prod (`LIFECYCLE_LIVE` unset). | **Migrated to Hermes shadow + write tools shipped.** Read tool: `list_onboarding_candidates`. Write tools: `mark_onboarding_nudge_sent`, `auto_complete_org_onboarding`, `send_lifecycle_nudge_email`. Live skill: `SKILL-live.md` written, NOT deployed. Cutover playbook documented above (multi-step: scp + token-scope + PM2 stop + LIFECYCLE_LIVE flip). |
+| billing-revenue | DELETED | Scaffold removed; never implemented. | When implemented, build as `hermes-skills/vizora-billing-revenue/SKILL.md` per Hermes-first rule. |
+| content-intelligence | DELETED | Scaffold removed; never implemented. | When implemented, build as `hermes-skills/vizora-content-intelligence/SKILL.md`. |
+| screen-health-customer | DELETED | Scaffold removed; never implemented. | When implemented, build as `hermes-skills/vizora-screen-health/SKILL.md`. The `list_displays` MCP tool already exists; only `create_customer_incident` write tool needed. |
+| agent-orchestrator | DELETED | Scaffold removed; never implemented. | **Hermes IS the orchestrator runtime** — use its built-in `delegate_task` tool to coordinate per-family skills, don't write a custom loop. |
+
+The four scaffolds above were gated-off no-op shells that registered idle PM2 cron processes on every deploy; they were deleted as part of the Hermes-first cleanup. Their PM2 entries are gone from `ecosystem.config.js`. If any of these capabilities is intentionally chosen to be built without Hermes, re-add the file + PM2 entry alongside an ADR explaining why the Hermes-first default was overridden.
+
+**Cutover playbook for support-triage (Hermes shadow → live)**
+
+Gate before swapping `SKILL.md`:
+1. ≥ 7 days of shadow data accumulated in the JSONL.
+2. Run `npx tsx scripts/agents/compare-hermes-vs-heuristic.ts` from the VPS. Require:
+   - ≥ 50 tickets scored
+   - ≥ 80% priority agreement vs DB priority
+   - Avg disagreement rank-distance ≤ 1.0
+3. Sign-off from Sri (the Hermes-first rule applies; the cutover decision still goes through him).
+
+Cutover (when gate clears):
+```bash
+# Promote live skill on VPS
+scp hermes-skills/vizora-support-triage/SKILL-live.md \
+    root@vizora.cloud:/root/.hermes/skills/vizora-support-triage/SKILL.md
+# Hermes auto-reloads skill content on each cron firing — no daemon restart needed
+```
+
+Rollback (if anything goes wrong):
+```bash
+scp hermes-skills/vizora-support-triage/SKILL.md \
+    root@vizora.cloud:/root/.hermes/skills/vizora-support-triage/SKILL.md
+```
+
+The PM2 cron `agent-support-triage` continues to run as a safety net throughout — decommission it (`pm2 delete agent-support-triage`) only after Hermes-live has run for ≥ 14 days without incident.
+
+**Cutover playbook for customer-lifecycle (Hermes shadow → live)**
+
+This cutover is more involved than support-triage because it touches the outbound email path. **Customer-visible.** Don't proceed without explicit Sri sign-off.
+
+Gate before swapping `SKILL.md`:
+1. ≥ 7 days of shadow data accumulated in `vizora-customer-lifecycle-shadow.jsonl`.
+2. Run `npx tsx scripts/agents/compare-lifecycle-hermes-vs-heuristic.ts` from the VPS. Require:
+   - ≥ 50 per-org decisions logged
+   - ≥ 80% template agreement vs PM2 mark-sent records (acknowledging the script's "PM2 mark-sent reflects sent, not suggested" caveat)
+   - Zero malformed JSONL rows
+3. Sri sign-off on the comparison report.
+4. Independent confirmation from the user that prod's SMTP setup (Resend) and `EMAIL_FROM` / `APP_URL` env vars are set correctly — Hermes inherits them via the MCP server side, but a misconfigured From: address will go out to real customers.
+
+Cutover sequence (run AS A SINGLE BLOCK — do not pause between steps):
+
+```bash
+# 1. Promote live skill on VPS
+scp hermes-skills/vizora-customer-lifecycle/SKILL-live.md \
+    root@vizora.cloud:/root/.hermes/skills/vizora-customer-lifecycle/SKILL.md
+
+# 2. Expand the shadow token's scope to include customer:write
+ssh root@vizora.cloud 'docker exec -i vizora-postgres psql -U postgres -d vizora <<SQL
+UPDATE mcp_tokens
+SET scopes = ARRAY[\$\$customer:read\$\$, \$\$customer:write\$\$]
+WHERE name = \$\$hermes-customer-lifecycle-shadow\$\$ AND "revokedAt" IS NULL;
+SQL'
+
+# 3. Stop the PM2 cron (Hermes is now the writer; PM2 staying on would race the dedup)
+ssh root@vizora.cloud 'pm2 stop agent-customer-lifecycle && pm2 save'
+
+# 4. Flip LIFECYCLE_LIVE on (server-side gate that until now kept emails dry-run)
+ssh root@vizora.cloud 'echo "LIFECYCLE_LIVE=true" >> /opt/vizora/app/.env && pm2 reload vizora-middleware --update-env'
+```
+
+After cutover, watch the next 2-3 cron firings closely:
+- `tail -F /var/log/hermes/vizora-customer-lifecycle-live.jsonl` — every entry should have a `tool_result` for nudge/auto-complete actions.
+- `docker exec vizora-postgres psql -U postgres -d vizora -c "SELECT \"agentName\", tool, status, \"errorCode\" FROM mcp_audit_log WHERE \"agentName\" = 'hermes-customer-lifecycle' ORDER BY \"createdAt\" DESC LIMIT 20;"` — `status='success'` for every row.
+- Watch the Resend dashboard for actual delivery — the first hour is when SMTP issues surface.
+
+Rollback (one-line emergency revert if anything goes wrong):
+
+```bash
+# Restore shadow skill — Hermes stops writing immediately on next firing
+scp hermes-skills/vizora-customer-lifecycle/SKILL.md \
+    root@vizora.cloud:/root/.hermes/skills/vizora-customer-lifecycle/SKILL.md
+
+# Stop emails immediately
+ssh root@vizora.cloud 'sed -i "/^LIFECYCLE_LIVE=/d" /opt/vizora/app/.env && pm2 reload vizora-middleware --update-env'
+
+# Re-enable PM2 cron as the safety net
+ssh root@vizora.cloud 'pm2 start ecosystem.config.js --only agent-customer-lifecycle && pm2 save'
+
+# Optionally revoke the customer:write scope
+# (server-side enforcement — even if the SKILL was wrong, this stops writes)
+ssh root@vizora.cloud 'docker exec -i vizora-postgres psql -U postgres -d vizora -c \
+  "UPDATE mcp_tokens SET scopes = ARRAY[\$\$customer:read\$\$] WHERE name = \$\$hermes-customer-lifecycle-shadow\$\$;"'
+```
+
+The MCP server's dedup row prevents the PM2 cron from re-sending nudges Hermes already sent during the live window — no duplicate emails.
+
+Decommission of the PM2 cron (`pm2 delete agent-customer-lifecycle`) only after Hermes-live has run for ≥ 14 days without incident.
+
+**Pending PRs:**
+- PR-B — remaining 12 tools (display detail, content, playlists, schedules, organizations, audit).
+- PR-C — Hermes sidecar `vizora_mcp_client.py` + first agent migration (`support-triage`).
+
+**Key behaviors to know:**
+- Bearer tokens are sha256-hashed; plaintext shown once at issuance, never persisted.
+- `@SkipEnvelope()` on every MCP endpoint — global response envelope is bypassed so MCP JSON-RPC reaches the wire unwrapped.
+- CSRF middleware exempts the entire `/api/v1/mcp` tree (bearer auth, no cookie surface).
+- Per-token rate limit (default 60/min, 1000/day). In-memory; ~2× effective limit in PM2 cluster mode (documented in code).
+- Audit row written to `mcp_audit_log` for every tool call (success or error). Inputs redacted via the same anchored regex `AgentStateService` uses.
+- Errors map to MCP-spec codes: `NOT_FOUND` (resource missing), `INVALID_INPUT` (params bad), `UNAUTHORIZED` (token issue), `FORBIDDEN` (scope), `RATE_LIMITED`, `INTERNAL`. **Distinction matters** — `NOT_FOUND` tells agents to back off, `INVALID_INPUT` invites retry.
+
+**Design doc:** `docs/agents-mcp-server-design.md`.
+
+## Agent Architecture (business agents)
+
+Reference docs added 2026-05-03 from a review of the sister project `shift-agent` (Hermes Agent runtime, 15 agents in production). Read these before designing or maintaining a Vizora business agent:
+
+- **`docs/agents-architecture.md`** — discipline patterns: the 8 hard rules (dispatcher-first routing, identity-by-metadata, fail-closed, helper-scripts-own-IDs, templates-not-LLM-text, input sanitization, dual-source audit, hardened outbound), per-agent file shape, `safe_io` pattern, required out-of-band alerts, build order, testing stages, security posture.
+- **`docs/agents-mcp-server-design.md`** — proposed Vizora MCP server module (`middleware/src/modules/mcp/`). Read-only v1 with 13 tools, token-based auth, rate limiting, audit, observability. Design only — implementation gated on a real consumer (see `tasks/feature-backlog.md`).
+
+**Existing agent state code:** `middleware/src/modules/agents/agent-state.service.ts` (PR #32, merged 2026-04-19) — anchored secret/PII redaction, file-locking with timeout, known-family path safety, async fs/promises, manual-run enqueue. Use this for new agent state I/O — don't reimplement.
+
+## Review Discipline
+
+Vizora's pre-proposal sequence (drift-check + Hermes-first) is in this
+CLAUDE.md under "Agent Architecture (business agents)" and "MCP Server"
+— and the consolidated cross-project statement is in global
+`~/.claude/CLAUDE.md §7`. For post-proposal review + ship stages, see
+global §8-9.
+
+**Vizora-specific instantiations** when global §8-9 fire:
+
+### §8 vectors that matter
+- **Hermes runtime behavior** — live skill invocation matches the
+  documented contract (e.g. shadow-mode SKILL vs SKILL-live.md on the
+  prod VPS at `/root/.hermes/skills/`).
+- **MCP token scope** — per-org vs platform-scope. A scope inversion
+  leaks cross-tenant data; verify `requireOrgScope` / platform-only
+  guards on every new tool.
+- **Prisma migration state** — `prisma migrate status` on prod, pending
+  migrations, schema.prisma drift between branch and `main`.
+- **Razorpay config** — live vs test key id, webhook subscription state
+  in `mcp_audit_log` + Razorpay dashboard.
+- **Email path** — SMTP / Resend sender verification, `EMAIL_FROM`
+  matches verified domain, `LIFECYCLE_LIVE` gate state on prod.
+
+### §9 runtime-state assumptions cluster around
+Hermes skill files on `/root/.hermes/skills/`, MCP-token scope rows in
+`mcp_tokens`, PM2 process state for `hermes-vizora-*` and ops agents,
+prod `.env` values for `LIFECYCLE_LIVE` / `INTERNAL_API_SECRET` /
+SMTP creds, Redis-cached pairing codes (5-min TTL).
+
+## Backlog locations
+
+- **`backlog.md`** (root) — active P0–P4 backlog with status, effort estimates, and roadmap
+- **`tasks/feature-backlog.md`** — long-lived parking lot for evaluated/deferred ideas (each with **what / why deferred / trigger to revisit**)
+- **`tasks/hermes-backlog.md`** — Hermes/Path B taxonomy-v2 backlog with the 2026-05-24 measurement gate

@@ -57,7 +57,7 @@ test.describe('Playlist Management', () => {
 
   test('should add content to playlist', async ({ authenticatedPage, token }) => {
     // Create content and playlist via API
-    const contentRes = await authenticatedPage.request.post('http://localhost:3000/api/content', {
+    const contentRes = await authenticatedPage.request.post('http://localhost:3000/api/v1/content', {
       headers: { Authorization: `Bearer ${token}` },
       data: {
         name: `Test Content ${Date.now()}`,
@@ -75,7 +75,7 @@ test.describe('Playlist Management', () => {
     }
     const content = await contentRes.json();
 
-    const playlistRes = await authenticatedPage.request.post('http://localhost:3000/api/playlists', {
+    const playlistRes = await authenticatedPage.request.post('http://localhost:3000/api/v1/playlists', {
       headers: { Authorization: `Bearer ${token}` },
       data: {
         name: `Test Playlist ${Date.now()}`,
@@ -123,7 +123,7 @@ test.describe('Playlist Management', () => {
 
   test('should reorder playlist items', async ({ authenticatedPage, token }) => {
     // Create playlist with multiple items via API
-    const playlistRes = await authenticatedPage.request.post('http://localhost:3000/api/playlists', {
+    const playlistRes = await authenticatedPage.request.post('http://localhost:3000/api/v1/playlists', {
       headers: { Authorization: `Bearer ${token}` },
       data: {
         name: `Test Playlist ${Date.now()}`,
@@ -141,7 +141,7 @@ test.describe('Playlist Management', () => {
     // Try to add content items (ignore failures)
     for (let i = 0; i < 2; i++) {
       try {
-        const contentRes = await authenticatedPage.request.post('http://localhost:3000/api/content', {
+        const contentRes = await authenticatedPage.request.post('http://localhost:3000/api/v1/content', {
           headers: { Authorization: `Bearer ${token}` },
           data: {
             name: `Test Content ${i} ${Date.now()}`,
@@ -151,7 +151,7 @@ test.describe('Playlist Management', () => {
         });
         if (contentRes.ok()) {
           const content = await contentRes.json();
-          await authenticatedPage.request.post(`http://localhost:3000/api/playlists/${playlist.id}/items`, {
+          await authenticatedPage.request.post(`http://localhost:3000/api/v1/playlists/${playlist.id}/items`, {
             headers: { Authorization: `Bearer ${token}` },
             data: {
               contentId: content.id,
@@ -174,7 +174,7 @@ test.describe('Playlist Management', () => {
 
   test('should assign playlist to display', async ({ authenticatedPage, token }) => {
     // Create display and playlist
-    const displayRes = await authenticatedPage.request.post('http://localhost:3000/api/displays', {
+    const displayRes = await authenticatedPage.request.post('http://localhost:3000/api/v1/displays', {
       headers: { Authorization: `Bearer ${token}` },
       data: {
         nickname: `Test Display ${Date.now()}`,
@@ -192,7 +192,7 @@ test.describe('Playlist Management', () => {
     
     const display = await displayRes.json();
     
-    const playlistRes = await authenticatedPage.request.post('http://localhost:3000/api/playlists', {
+    const playlistRes = await authenticatedPage.request.post('http://localhost:3000/api/v1/playlists', {
       headers: { Authorization: `Bearer ${token}` },
       data: {
         name: `Test Playlist ${Date.now()}`,
@@ -242,7 +242,7 @@ test.describe('Playlist Management', () => {
 
   test('should delete playlist', async ({ authenticatedPage, token }) => {
     // Create playlist
-    const playlistRes = await authenticatedPage.request.post('http://localhost:3000/api/playlists', {
+    const playlistRes = await authenticatedPage.request.post('http://localhost:3000/api/v1/playlists', {
       headers: { Authorization: `Bearer ${token}` },
       data: {
         name: `Test Playlist ${Date.now()}`,

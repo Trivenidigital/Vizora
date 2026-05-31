@@ -34,6 +34,7 @@ describe('DeviceGateway', () => {
     setPendingPlaylist: jest.fn().mockResolvedValue(undefined),
     getPendingPlaylist: jest.fn().mockResolvedValue(null),
     exists: jest.fn().mockResolvedValue(false),
+    get: jest.fn().mockResolvedValue(null),
     getCachedPlaylist: jest.fn().mockResolvedValue(null),
     cachePlaylist: jest.fn().mockResolvedValue(undefined),
   };
@@ -67,7 +68,9 @@ describe('DeviceGateway', () => {
   const mockDatabaseService = {
     display: {
       update: jest.fn().mockResolvedValue({ nickname: 'Test Device', deviceIdentifier: 'test-id' }),
-      findUnique: jest.fn().mockResolvedValue(null),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      findUnique: jest.fn().mockResolvedValue({ nickname: 'Test Device', deviceIdentifier: 'test-id' }),
+      findMany: jest.fn().mockResolvedValue([]),
     },
     playlist: {
       findUnique: jest.fn().mockResolvedValue(null),
@@ -86,6 +89,8 @@ describe('DeviceGateway', () => {
 
   // Mock socket that auto-invokes ack callbacks on emit
   const mockRemoteSocket = {
+    id: 'remote-socket-1',
+    data: { deliveryAckCapable: true },
     emit: jest.fn((_event: string, _data: any, ackCb?: () => void) => {
       if (ackCb) ackCb();
     }),
@@ -264,6 +269,80 @@ describe('DeviceGateway', () => {
       expect(client.disconnect).toHaveBeenCalled();
     });
 
+    // Dashboard-user session invalidation — mirrors the REST JwtStrategy
+    // checks (PR #111) on the realtime handshake, reading the shared Redis
+    // keys middleware writes: user_revoked:${sub} and pwd_changed:${sub}.
+    it('should reject a dashboard user whose account was revoked (user_revoked:)', async () => {
+      mockJwtService.verify
+        .mockImplementationOnce(() => { throw new Error('invalid device token'); })
+        .mockReturnValueOnce({
+          sub: 'user-1',
+          email: 'test@example.com',
+          organizationId: 'org-1',
+          type: 'user',
+          jti: 'jti-1',
+        });
+      mockRedisService.exists.mockImplementation((key: string) =>
+        Promise.resolve(key === 'user_revoked:user-1'),
+      );
+
+      const client = createMockSocket();
+
+      await gateway.handleConnection(client as any);
+      expect(client.disconnect).toHaveBeenCalled();
+      expect(client.join).not.toHaveBeenCalledWith('org:org-1');
+    });
+
+    it('should reject a dashboard user token minted before the last password change (pwd_changed:)', async () => {
+      mockJwtService.verify
+        .mockImplementationOnce(() => { throw new Error('invalid device token'); })
+        .mockReturnValueOnce({
+          sub: 'user-1',
+          email: 'test@example.com',
+          organizationId: 'org-1',
+          type: 'user',
+          jti: 'jti-1',
+          iat: 1_999_999,
+        });
+      mockRedisService.exists.mockResolvedValue(false); // not revoked
+      mockRedisService.get.mockImplementation((key: string) =>
+        Promise.resolve(key === 'pwd_changed:user-1' ? '2000000' : null),
+      );
+
+      const client = createMockSocket();
+
+      await gateway.handleConnection(client as any);
+      expect(client.disconnect).toHaveBeenCalled();
+      expect(client.join).not.toHaveBeenCalledWith('org:org-1');
+    });
+
+    it('should accept a dashboard user token minted after the last password change', async () => {
+      mockJwtService.verify
+        .mockImplementationOnce(() => { throw new Error('invalid device token'); })
+        .mockReturnValueOnce({
+          sub: 'user-1',
+          email: 'test@example.com',
+          organizationId: 'org-1',
+          type: 'user',
+          jti: 'jti-1',
+          iat: 2_000_001,
+        });
+      mockRedisService.exists.mockResolvedValue(false);
+      mockRedisService.get.mockImplementation((key: string) =>
+        Promise.resolve(key === 'pwd_changed:user-1' ? '2000000' : null),
+      );
+
+      const client = createMockSocket();
+
+      await gateway.handleConnection(client as any);
+      // Assert the pwd_changed key was actually queried — without this, the
+      // test would stay green even if the whole check were deleted (a fresh
+      // login always connects). This makes it a real positive sentinel.
+      expect(mockRedisService.get).toHaveBeenCalledWith('pwd_changed:user-1');
+      expect(client.join).toHaveBeenCalledWith('org:org-1');
+      expect(client.disconnect).not.toHaveBeenCalled();
+    });
+
     it('should rate limit excessive connections from same IP', async () => {
       mockJwtService.verify.mockReturnValue({
         sub: 'device-1',
@@ -304,7 +383,7 @@ describe('DeviceGateway', () => {
       expect(mockRedisService.setDeviceStatus).toHaveBeenCalledWith('device-1', expect.objectContaining({
         status: 'offline',
       }));
-      expect(mockDatabaseService.display.update).toHaveBeenCalled();
+      expect(mockDatabaseService.display.updateMany).toHaveBeenCalled();
       expect(mockMetricsService.recordConnection).toHaveBeenCalledWith('org-1', 'disconnected');
     });
 
@@ -345,6 +424,16 @@ describe('DeviceGateway', () => {
       expect(mockHeartbeatService.processHeartbeat).toHaveBeenCalled();
     });
 
+    it('should not drain queued commands through heartbeat responses', async () => {
+      const client = createMockSocket();
+
+      const result = await gateway.handleHeartbeat(client as any, {} as any);
+
+      expect(result.success).toBe(true);
+      expect(result.data.commands).toEqual([]);
+      expect(mockRedisService.getDeviceCommands).not.toHaveBeenCalled();
+    });
+
     it('should not write to DB when status has not changed', async () => {
       // Pre-set the status cache to 'online'
       (gateway as any).deviceStatusCache.set('device-1', 'online');
@@ -355,7 +444,7 @@ describe('DeviceGateway', () => {
       await gateway.handleHeartbeat(client as any, data as any);
 
       // DB update should NOT be called since status hasn't changed
-      expect(mockDatabaseService.display.update).not.toHaveBeenCalled();
+      expect(mockDatabaseService.display.updateMany).not.toHaveBeenCalled();
     });
 
     it('should write to DB when status transitions from offline to online', async () => {
@@ -368,7 +457,7 @@ describe('DeviceGateway', () => {
       await gateway.handleHeartbeat(client as any, data as any);
 
       // DB update SHOULD be called because status changed
-      expect(mockDatabaseService.display.update).toHaveBeenCalled();
+      expect(mockDatabaseService.display.updateMany).toHaveBeenCalled();
     });
 
     it('should return error response on failure', async () => {
@@ -651,6 +740,46 @@ describe('DeviceGateway', () => {
 
       expect(result).toEqual({ delivered: false, reason: 'no_sockets' });
     });
+
+    it('should requeue playlist when the device sends a negative ack', async () => {
+      mockRemoteSocket.emit.mockImplementationOnce(
+        (_event: string, _data: any, ackCb?: (ack?: { ok: boolean; error?: string }) => void) => {
+          ackCb?.({ ok: false, error: 'renderer failed' });
+        },
+      );
+      const playlist = { id: 'p-1', name: 'Test', items: [] };
+
+      const result = await gateway.sendPlaylistUpdate('device-1', playlist as any);
+
+      expect(result).toEqual({ delivered: false, reason: 'negative_ack' });
+      expect(mockRedisService.setPendingPlaylist).toHaveBeenCalledWith(
+        'device-1',
+        expect.objectContaining({ id: 'p-1' }),
+      );
+    });
+
+    it('should treat no-ack legacy sockets as best-effort delivered', async () => {
+      const legacySocket = {
+        id: 'legacy-socket',
+        data: { deliveryAckCapable: false },
+        emit: jest.fn(),
+      };
+      mockServer.in.mockReturnValueOnce({
+        fetchSockets: jest.fn().mockResolvedValue([legacySocket]),
+      });
+      const playlist = { id: 'p-legacy', name: 'Legacy', items: [] };
+
+      const result = await gateway.sendPlaylistUpdate('device-1', playlist as any);
+
+      expect(result).toEqual({ delivered: true });
+      expect(legacySocket.emit).toHaveBeenCalledWith(
+        'playlist:update',
+        expect.objectContaining({
+          playlist: expect.objectContaining({ id: 'p-legacy' }),
+        }),
+      );
+      expect(mockRedisService.setPendingPlaylist).not.toHaveBeenCalled();
+    });
   });
 
   describe('sendCommand', () => {
@@ -681,6 +810,44 @@ describe('DeviceGateway', () => {
         'device-99',
         expect.objectContaining({ type: 'clear_cache', timestamp: expect.any(String) }),
       );
+    });
+
+    it('should queue command when the device sends a negative ack', async () => {
+      mockRemoteSocket.emit.mockImplementationOnce(
+        (_event: string, _data: any, ackCb?: (ack?: { ok: boolean; error?: string }) => void) => {
+          ackCb?.({ ok: false, error: 'command failed' });
+        },
+      );
+      const command = { type: 'reload' as any };
+
+      const result = await gateway.sendCommand('device-1', command);
+
+      expect(result).toEqual({ delivered: false, reason: 'negative_ack' });
+      expect(mockRedisService.addDeviceCommand).toHaveBeenCalledWith(
+        'device-1',
+        expect.objectContaining({ type: 'reload', timestamp: expect.any(String) }),
+      );
+    });
+
+    it('should treat no-ack legacy sockets as best-effort delivered for commands', async () => {
+      const legacySocket = {
+        id: 'legacy-socket',
+        data: { deliveryAckCapable: false },
+        emit: jest.fn(),
+      };
+      mockServer.in.mockReturnValueOnce({
+        fetchSockets: jest.fn().mockResolvedValue([legacySocket]),
+      });
+      const command = { type: 'reload' as any };
+
+      const result = await gateway.sendCommand('device-1', command);
+
+      expect(result).toEqual({ delivered: true });
+      expect(legacySocket.emit).toHaveBeenCalledWith(
+        'command',
+        expect.objectContaining({ type: 'reload', timestamp: expect.any(String) }),
+      );
+      expect(mockRedisService.addDeviceCommand).not.toHaveBeenCalled();
     });
   });
 
@@ -755,6 +922,48 @@ describe('DeviceGateway', () => {
       await gateway.handleJoinOrganization(client as any, data as any);
 
       expect(client.data.isDashboard).toBe(true);
+    });
+  });
+
+  describe('sendDeviceStatusCatchUp (catch-up cap)', () => {
+    it('should cap a large fleet at 500 devices and warn about truncation', async () => {
+      const client = createMockSocket();
+      // Simulate 501 devices for one org — the cap is 500, so the
+      // query should request take=501 (cap + 1 peek) and the function
+      // should emit only the first 500 + a warning.
+      const fleet = Array.from({ length: 501 }, (_, i) => ({
+        id: `dev-${i}`,
+        status: 'offline',
+        lastHeartbeat: new Date(Date.now() - i * 1000),
+      }));
+      databaseService.display.findMany.mockResolvedValue(fleet as any);
+
+      const warnSpy = jest.spyOn((gateway as any).logger, 'warn');
+
+      await (gateway as any).sendDeviceStatusCatchUp(client, 'org-big');
+
+      expect(databaseService.display.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { organizationId: 'org-big' },
+          take: 501,
+        }),
+      );
+      expect(client.emit).toHaveBeenCalledTimes(500);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('truncated at 500'));
+    });
+
+    it('should send all devices when fleet is under the cap', async () => {
+      const client = createMockSocket();
+      const fleet = Array.from({ length: 7 }, (_, i) => ({
+        id: `dev-${i}`,
+        status: 'offline',
+        lastHeartbeat: new Date(),
+      }));
+      databaseService.display.findMany.mockResolvedValue(fleet as any);
+
+      await (gateway as any).sendDeviceStatusCatchUp(client, 'org-small');
+
+      expect(client.emit).toHaveBeenCalledTimes(7);
     });
   });
 
@@ -1008,7 +1217,7 @@ describe('DeviceGateway', () => {
 
       // None of the disconnect side effects should have happened
       expect(mockRedisService.setDeviceStatus).not.toHaveBeenCalled();
-      expect(mockDatabaseService.display.update).not.toHaveBeenCalled();
+      expect(mockDatabaseService.display.updateMany).not.toHaveBeenCalled();
       expect(mockMetricsService.recordConnection).not.toHaveBeenCalled();
     });
   });

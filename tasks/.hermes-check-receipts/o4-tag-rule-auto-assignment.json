@@ -1,0 +1,17 @@
+{
+  "topic": "o4-tag-rule-auto-assignment",
+  "task_text": "O4 — Tag-rule auto-assignment engine: if a Display has Tag X (DisplayTag join) then auto-assign Playlist Y as that display's currentPlaylist. Rule model is per-org. Evaluator runs on tag-change events + new-display events. CRUD API admin-gated on mutations.",
+  "completed_at": "2026-05-19T13:30:00Z",
+  "drift_check_tag": "extends-Hermes",
+  "net_new_step_count": 11,
+  "hermes_step_count": 0,
+  "files_to_read_first": [
+    "packages/database/prisma/schema.prisma",
+    "middleware/src/modules/displays/displays.service.ts",
+    "middleware/src/modules/displays/displays.controller.ts",
+    "middleware/src/modules/notifications/alert-rules/alert-rules.service.ts",
+    "middleware/src/modules/playlists/playlists.service.ts",
+    "middleware/src/app/app.module.ts"
+  ],
+  "verdict": "All 11 steps net-new from Hermes substrate POV — same disposition as O7. Tag-rule engine is Vizora middleware/Prisma/NestJS work; Hermes agent runtime doesn't own DisplayTag joins, currentPlaylist mutation, or domain events. Pattern reference: O7 (PR #63) shipped first rule-driven evaluator in this codebase — reuse the @OnEvent + service + controller + RBAC pattern from there."
+}

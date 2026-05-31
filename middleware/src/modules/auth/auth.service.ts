@@ -8,6 +8,8 @@ import {
   HttpException,
   HttpStatus,
   ServiceUnavailableException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -22,10 +24,17 @@ import { AUTH_CONSTANTS } from './constants/auth.constants';
 import { GeoService } from '../common/services/geo.service';
 import { BillingService } from '../billing/billing.service';
 import { StorageService } from '../storage/storage.service';
+import { AlertRulesService } from '../notifications/alert-rules/alert-rules.service';
 
 // Account lockout constants
 const MAX_LOGIN_ATTEMPTS = 10;
 const LOCKOUT_TTL_SECONDS = 15 * 60; // 15 minutes
+const MAX_LOGIN_CONTEXT_USER_AGENTS = 500;
+
+interface LoginContext {
+  ipAddress?: string;
+  userAgent?: string | string[];
+}
 
 @Injectable()
 export class AuthService {
@@ -42,9 +51,11 @@ export class AuthService {
     private billingService: BillingService,
     private storageService: StorageService,
     private events: EventEmitter2,
+    @Inject(forwardRef(() => AlertRulesService))
+    private alertRulesService: AlertRulesService,
   ) {}
 
-  async register(dto: RegisterDto, clientIp?: string) {
+  async register(dto: RegisterDto, clientIp?: string, userAgent?: string | string[]) {
     // Check if email already exists
     const existingUser = await this.databaseService.user.findUnique({
       where: { email: dto.email },
@@ -122,10 +133,35 @@ export class AuthService {
         },
       });
 
+      await tx.auditLog.create({
+        data: {
+          organizationId: organization.id,
+          userId: user.id,
+          action: 'user_login',
+          entityType: 'user',
+          entityId: user.id,
+          changes: { reason: 'registration' },
+          ipAddress: clientIp || undefined,
+          userAgent: this.normalizeHeaderValue(userAgent),
+        },
+      });
+
       return { organization, user };
     });
 
     const { organization, user } = result;
+
+    // Seed the default device-offline alert rule for this new org. Without
+    // this, new orgs created post-O7 have NO default rule and silently lose
+    // device-offline alerts (the old hard-coded handler was removed).
+    // Idempotent + retry-safe: re-runs are no-ops via the (organizationId,
+    // name) unique index. Errors are logged but never propagated — a failed
+    // seed must not block registration.
+    this.alertRulesService.seedDefaultRuleForOrg(organization.id, [user.id]).catch((err) => {
+      this.logger.warn(
+        `Failed to seed default alert rule for new org ${organization.id}: ${err instanceof Error ? err.message : 'unknown'}`,
+      );
+    });
 
     // Generate JWT token
     const token = this.generateToken(user, organization);
@@ -157,7 +193,7 @@ export class AuthService {
     };
   }
 
-  async googleLogin(credential: string) {
+  async googleLogin(credential: string, context: LoginContext = {}) {
     // C2: Audience must be configured — fail closed if missing.
     const clientId = process.env.GOOGLE_CLIENT_ID;
     if (!clientId) {
@@ -260,6 +296,19 @@ export class AuthService {
           },
         });
 
+        await tx.auditLog.create({
+          data: {
+            organizationId: organization.id,
+            userId: newUser.id,
+            action: 'user_login',
+            entityType: 'user',
+            entityId: newUser.id,
+            changes: { provider: 'google', reason: 'registration' },
+            ipAddress: this.normalizeHeaderValue(context.ipAddress),
+            userAgent: this.normalizeHeaderValue(context.userAgent),
+          },
+        });
+
         return newUser;
       });
 
@@ -287,18 +336,8 @@ export class AuthService {
     // Generate JWT token
     const token = this.generateToken(user, user.organization);
 
-    // Log audit event for login
     if (!isNewUser) {
-      await this.databaseService.auditLog.create({
-        data: {
-          organizationId: user.organizationId,
-          userId: user.id,
-          action: 'user_login',
-          entityType: 'user',
-          entityId: user.id,
-          changes: { provider: 'google' },
-        },
-      });
+      await this.createLoginAuditAndCheckUnrecognizedLogin(user, context, { provider: 'google' });
     }
 
     return {
@@ -315,7 +354,141 @@ export class AuthService {
     };
   }
 
-  async login(dto: LoginDto) {
+  private normalizeHeaderValue(value?: string | string[]): string | undefined {
+    if (Array.isArray(value)) {
+      return value.find(Boolean);
+    }
+    return value || undefined;
+  }
+
+  private normalizeUserAgentForLoginContext(userAgent: string): string {
+    return userAgent
+      .replace(/\brv:[\d.]+/gi, 'rv')
+      .replace(/\b(AppleWebKit|Chrome|Chromium|Firefox|Version|Safari|EdgA|EdgiOS|Edg|OPR|CriOS|FxiOS|SamsungBrowser)\/[\d.]+/gi, '$1')
+      .replace(/\bMobile\/[A-Za-z0-9.]+/gi, 'Mobile')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private hasRecognizedLoginContextUserAgent(
+    currentUserAgent: string,
+    priorLoginsFromSameIp: Array<{ userAgent: string | null }>,
+  ): boolean {
+    const normalizedCurrentUserAgent = this.normalizeUserAgentForLoginContext(currentUserAgent);
+
+    return priorLoginsFromSameIp.some((login) => {
+      if (!login.userAgent) {
+        return false;
+      }
+      return this.normalizeUserAgentForLoginContext(login.userAgent) === normalizedCurrentUserAgent;
+    });
+  }
+
+  private async sendUnrecognizedLoginEmailIfNeeded(
+    user: { id: string; organizationId: string; email: string; firstName: string },
+    currentAuditLogId: string,
+    currentAuditLogCreatedAt: Date,
+    details: { ipAddress: string; userAgent: string; occurredAt: Date },
+  ): Promise<void> {
+    const loginHistoryWhere = {
+      organizationId: user.organizationId,
+      userId: user.id,
+      action: 'user_login',
+      entityType: 'user',
+      id: { not: currentAuditLogId },
+      createdAt: { lt: currentAuditLogCreatedAt },
+      ipAddress: { not: null },
+      userAgent: { not: null },
+    };
+
+    const priorMetadataLogin = await this.databaseService.auditLog.findFirst({
+      where: loginHistoryWhere,
+      select: {
+        id: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!priorMetadataLogin) {
+      return;
+    }
+
+    const priorLoginsFromSameIp = await this.databaseService.auditLog.findMany({
+      where: {
+        ...loginHistoryWhere,
+        ipAddress: details.ipAddress,
+      },
+      select: {
+        userAgent: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: MAX_LOGIN_CONTEXT_USER_AGENTS,
+    });
+
+    const isRecognizedLoginContext = this.hasRecognizedLoginContextUserAgent(
+      details.userAgent,
+      priorLoginsFromSameIp,
+    );
+
+    if (isRecognizedLoginContext) {
+      return;
+    }
+
+    await this.mailService.sendUnrecognizedLoginEmail(user.email, user.firstName, details);
+  }
+
+  private checkUnrecognizedLoginInBackground(
+    user: { id: string; organizationId: string; email: string; firstName: string },
+    currentAuditLogId: string,
+    currentAuditLogCreatedAt: Date,
+    details: { ipAddress: string; userAgent: string; occurredAt: Date },
+  ): void {
+    void this.sendUnrecognizedLoginEmailIfNeeded(user, currentAuditLogId, currentAuditLogCreatedAt, details)
+      .catch((err) => {
+        this.logger.warn(
+          `Failed to process unrecognized-login alert for user ${user.id}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      });
+  }
+
+  private async createLoginAuditAndCheckUnrecognizedLogin(
+    user: { id: string; organizationId: string; email: string; firstName: string },
+    context: LoginContext,
+    changes?: Record<string, unknown>,
+  ): Promise<void> {
+    const ipAddress = this.normalizeHeaderValue(context.ipAddress);
+    const userAgent = this.normalizeHeaderValue(context.userAgent);
+
+    const loginAuditLog = await this.databaseService.auditLog.create({
+      data: {
+        organizationId: user.organizationId,
+        userId: user.id,
+        action: 'user_login',
+        entityType: 'user',
+        entityId: user.id,
+        changes,
+        ipAddress,
+        userAgent,
+      },
+    });
+
+    // M12: alert on a successful login from a previously unseen login context.
+    // Use the existing audit log as the history source so we don't introduce a
+    // parallel device-history table. Run the history lookup after the required
+    // audit write, in the background, and only compare against rows older than
+    // this row so concurrent duplicate logins cannot mutually self-suppress.
+    // Lookup/mail failures fail open: a security notification must not block a
+    // successful login.
+    if (ipAddress && userAgent) {
+      this.checkUnrecognizedLoginInBackground(user, loginAuditLog.id, loginAuditLog.createdAt, {
+        ipAddress,
+        userAgent,
+        occurredAt: new Date(),
+      });
+    }
+  }
+
+  async login(dto: LoginDto, context: LoginContext = {}) {
     // Check account lockout — fail CLOSED if Redis is unreachable
     const lockoutKey = `login_attempts:${dto.email}`;
     let attempts = 0;
@@ -378,16 +551,8 @@ export class AuthService {
     // Generate JWT token
     const token = this.generateToken(user, user.organization);
 
-    // Log audit event
-    await this.databaseService.auditLog.create({
-      data: {
-        organizationId: user.organizationId,
-        userId: user.id,
-        action: 'user_login',
-        entityType: 'user',
-        entityId: user.id,
-      },
-    });
+    // Log audit event and run the M12 unrecognized-login alert check.
+    await this.createLoginAuditAndCheckUnrecognizedLogin(user, context);
 
     return {
       user: {
@@ -584,6 +749,40 @@ export class AuthService {
 
     // Clear login attempt counter for this user
     await this.redisService.del(`login_attempts:${tokenRecord.user.email}`);
+
+    // Invalidate user cache + kill all sessions issued before this reset. This
+    // is the primary account-takeover case: an attacker who resets a stolen
+    // account must not leave the legitimate user's live sessions valid.
+    await this.redisService.del(`user_auth:${tokenRecord.userId}`);
+    await this.markPasswordChanged(tokenRecord.userId);
+  }
+
+  /**
+   * Record the moment a user's password changed so JwtStrategy.validate can
+   * reject any token minted before it (session invalidation). Stored as a
+   * Redis epoch-seconds timestamp under `pwd_changed:${userId}` with the same
+   * 7-day TTL as the token lifetime — by expiry, every pre-change token is
+   * already dead, so the key self-cleans.
+   *
+   * Non-blocking: a Redis failure must never fail the password change. The
+   * worst case on failure is the status quo (old tokens survive to natural
+   * expiry), so we log and continue rather than throw.
+   *
+   * Uses `<` (strict) in the validate-side comparison, so the user's fresh
+   * post-change login (iat >= this timestamp) is never rejected.
+   */
+  private async markPasswordChanged(userId: string): Promise<void> {
+    try {
+      await this.redisService.set(
+        `pwd_changed:${userId}`,
+        String(Math.floor(Date.now() / 1000)),
+        AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS,
+      );
+    } catch (err) {
+      this.logger.warn(
+        `Failed to write pwd_changed marker for user ${userId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   async changePassword(userId: string, currentPassword: string, newPassword: string) {
@@ -610,6 +809,23 @@ export class AuthService {
 
     // Invalidate user cache so next auth uses fresh data
     await this.redisService.del(`user_auth:${userId}`);
+
+    // Kill all sessions issued before this change (other devices / a stolen
+    // session). JwtStrategy.validate rejects tokens with iat < this timestamp;
+    // the user's fresh re-login passes.
+    await this.markPasswordChanged(userId);
+
+    // Security notification (M12): tell the user their password changed, so an
+    // unauthorized change is noticed. Non-blocking — sendMail already swallows
+    // its own errors, but guard here too so a mail-layer throw can never fail
+    // the password change itself.
+    try {
+      await this.mailService.sendPasswordChangedEmail(user.email, user.firstName);
+    } catch (err) {
+      this.logger.warn(
+        `Failed to send password-changed email for user ${userId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   async updateProfile(userId: string, data: { firstName?: string; lastName?: string }) {
@@ -889,8 +1105,14 @@ export class AuthService {
       this.logger.warn(`Failed to send account deletion email to ${originalEmail}: ${err instanceof Error ? err.message : 'Unknown'}`);
     }
 
-    // 9. Invalidate all JWT tokens for this user via Redis
+    // 9. Invalidate all JWT tokens for this user via Redis. Uses the
+    // shared `user_revoked:` key that JwtStrategy.validate now checks
+    // on every request. Also write the legacy `user_deleted:` key so
+    // any third-party tooling still reading it keeps working during a
+    // transition window (safe to remove once external consumers move
+    // to the canonical key).
     try {
+      await this.redisService.set(`user_revoked:${userId}`, '1', AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS);
       await this.redisService.set(`user_deleted:${userId}`, '1', AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS);
       await this.redisService.del(`user_auth:${userId}`);
     } catch (err) {

@@ -92,8 +92,28 @@ function emptyState(): OpsState {
 
 /**
  * Read the ops state file. Returns an empty state if the file does not
- * exist or cannot be parsed. Acquires file lock to prevent concurrent
- * read-modify-write races between agents.
+ * exist or cannot be parsed.
+ *
+ * **LOCK CONTRACT (must read before calling):** This function acquires
+ * an exclusive file lock and DOES NOT RELEASE IT. Every caller MUST
+ * pair the read with a writeOpsState() to release the lock. The
+ * canonical shape is:
+ *
+ * ```ts
+ * const state = readOpsState();
+ * try {
+ *   // mutate state ...
+ * } finally {
+ *   writeOpsState(state);  // releases lock, even on throw above
+ * }
+ * ```
+ *
+ * Calling readOpsState() twice without a writeOpsState() between them
+ * will deadlock on LOCK_TIMEOUT_MS (5s) and the second read will then
+ * proceed without a lock — silently breaking the atomicity guarantee
+ * for any concurrent agent. If you only need a snapshot for reporting,
+ * call readOpsState() then immediately call writeOpsState(state)
+ * unchanged to release the lock cleanly.
  */
 export function readOpsState(): OpsState {
   acquireLock();
@@ -120,7 +140,12 @@ export function readOpsState(): OpsState {
 /**
  * Write ops state to disk and release the file lock. Trims incidents
  * to MAX_INCIDENTS and remediations to MAX_REMEDIATIONS (keeping most recent).
- * Must be called after readOpsState() to release the lock.
+ *
+ * **Must be called after every readOpsState()**, including on the error
+ * path, otherwise the lock leaks until the OS releases the .lock file's
+ * mtime past LOCK_STALE_MS (30s) — during which window every other
+ * agent's read silently degrades to a busy-wait. Pair the two calls
+ * in a try/finally per the readOpsState() JSDoc example.
  */
 export function writeOpsState(state: OpsState): void {
   try {

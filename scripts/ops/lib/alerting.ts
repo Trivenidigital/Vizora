@@ -1,18 +1,35 @@
 /**
  * Vizora Autonomous Operations — Alerting & Notifications
  *
- * Provides logging, Slack alerts, email notifications, and dashboard
- * status updates. All notification channels are optional — they no-op
- * if the required environment variables are missing.
+ * Provides logging, Slack alerts, email notifications, dashboard
+ * status updates, and external heartbeat ping. All notification
+ * channels are optional — they no-op if the required environment
+ * variables are missing.
  *
  * Environment variables:
- *   SLACK_WEBHOOK_URL  — Slack incoming webhook URL
- *   SMTP_HOST          — SMTP server hostname
- *   SMTP_PORT          — SMTP port (default: 587)
- *   SMTP_USER          — SMTP username
- *   SMTP_PASS          — SMTP password
- *   SMTP_FROM          — Sender email address
- *   SMTP_TO            — Recipient email address(es), comma-separated
+ *   SLACK_WEBHOOK_URL                  — Slack incoming webhook URL
+ *   SMTP_HOST                          — SMTP server hostname
+ *   SMTP_PORT                          — SMTP port (default: 587)
+ *   SMTP_USER                          — SMTP username
+ *   SMTP_PASS                          — SMTP password
+ *   SMTP_FROM                          — Sender email address
+ *   SMTP_TO                            — Generic SMTP envelope recipient,
+ *                                        comma-separated. Used as the
+ *                                        fallback for ops alerts when
+ *                                        OPS_ALERT_EMAIL is not set.
+ *   OPS_ALERT_EMAIL                    — Preferred ops alert recipient(s),
+ *                                        comma-separated. Distinct from
+ *                                        SMTP_TO so transactional mail
+ *                                        and ops alerts can target
+ *                                        different mailboxes.
+ *   HEALTHCHECKS_HEALTH_GUARDIAN_URL   — healthchecks.io ping URL for the
+ *                                        health-guardian heartbeat. When set,
+ *                                        a successful health-guardian run POSTs
+ *                                        to this URL. If pings stop arriving,
+ *                                        healthchecks.io alerts independently
+ *                                        — the external dead-man that detects
+ *                                        cron-on-VPS failures the watchdog
+ *                                        cannot.
  */
 
 import type { SystemStatus, Incident, RemediationAction } from './types.js';
@@ -26,6 +43,54 @@ import type { SystemStatus, Incident, RemediationAction } from './types.js';
 export function log(agent: string, msg: string): void {
   const ts = new Date().toISOString();
   process.stdout.write(`[${ts}] [${agent}] ${msg}\n`);
+}
+
+// ─── External heartbeat (healthchecks.io) ───────────────────────────────────
+
+/**
+ * Send an external heartbeat ping. healthchecks.io and compatible services
+ * accept a simple `POST` (or `GET`) to a per-check URL. When the agent stops
+ * pinging, healthchecks.io fires its own alert (Slack/email/SMS configurable
+ * on their side) — this is the external dead-man that survives the entire
+ * VPS being down.
+ *
+ * No-op if `pingUrl` is empty/undefined. Network errors are logged but never
+ * thrown — a missed ping is not worse than a noisy crash.
+ *
+ * @param agent      Agent name for log attribution
+ * @param pingUrl    The healthchecks.io URL (or any compatible HTTP endpoint)
+ * @param status     'success' (default) or 'fail'. Failure pings POST to
+ *                   `${pingUrl}/fail` per healthchecks.io's API; this lets us
+ *                   distinguish "agent ran and said it's broken" from
+ *                   "agent never ran."
+ */
+export async function pingHeartbeat(
+  agent: string,
+  pingUrl: string | undefined,
+  status: 'success' | 'fail' = 'success',
+): Promise<void> {
+  if (!pingUrl) return;
+  const url = status === 'fail' ? `${pingUrl}/fail` : pingUrl;
+  const controller = new AbortController();
+  // clearTimeout MUST happen on every exit path, including thrown fetches
+  // (DNS failures, ECONNREFUSED, etc.) — otherwise a pending 5 s timer keeps
+  // Node's event loop alive past the script's intended exit, drifting cron
+  // by ~5 s per failed ping. The previous `clearTimeout(timer)` inside the
+  // try-block only ran on the success path.
+  const timer = setTimeout(() => controller.abort(), 5_000);
+  try {
+    const res = await fetch(url, { method: 'POST', signal: controller.signal });
+    if (!res.ok) {
+      log(agent, `heartbeat ping returned ${res.status} (url=${url.replace(/[^/]+$/, '...')})`);
+    }
+  } catch (err) {
+    log(
+      agent,
+      `heartbeat ping failed: ${err instanceof Error ? err.message : err}`,
+    );
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // ─── Slack ──────────────────────────────────────────────────────────────────
@@ -80,7 +145,7 @@ export async function sendSlackAlert(
   if (criticals.length > 0) {
     const list = criticals
       .slice(0, 5)
-      .map(i => `* *${i.type}*: ${i.message}`)
+      .map(i => `* *${escapeMrkdwn(i.type)}*: ${escapeMrkdwn(i.message)}`)
       .join('\n');
     blocks.push({
       type: 'section',
@@ -96,7 +161,7 @@ export async function sendSlackAlert(
   if (warnings.length > 0 && criticals.length === 0) {
     const list = warnings
       .slice(0, 3)
-      .map(i => `* *${i.type}*: ${i.message}`)
+      .map(i => `* *${escapeMrkdwn(i.type)}*: ${escapeMrkdwn(i.message)}`)
       .join('\n');
     blocks.push({
       type: 'section',
@@ -161,10 +226,14 @@ export async function sendEmailAlert(
   const user = process.env.SMTP_USER || '';
   const pass = process.env.SMTP_PASS || '';
   const from = process.env.SMTP_FROM || 'vizora-ops@vizora.cloud';
-  const to = process.env.SMTP_TO || '';
+  // Prefer the ops-specific recipient if configured. Falls back to SMTP_TO
+  // so existing deployments without OPS_ALERT_EMAIL continue to work, but
+  // operators who want ops alerts going to a different mailbox than
+  // transactional mail can now configure that without touching SMTP_TO.
+  const to = process.env.OPS_ALERT_EMAIL || process.env.SMTP_TO || '';
 
   if (!to) {
-    log('alerting', 'SMTP_TO not set — skipping email alert');
+    log('alerting', 'OPS_ALERT_EMAIL and SMTP_TO are both unset — skipping email alert');
     return;
   }
 
@@ -283,6 +352,78 @@ export async function updateDashboard(
   }
 }
 
+// ─── Per-event inline alert (§12b) ──────────────────────────────────────────
+
+/**
+ * Fire an immediate Slack alert for a single automated state-reversal
+ * event. Use this from ops agents at the WRITE site (right next to
+ * the auto-disable / auto-archive / kill-switch flip) so the operator
+ * sees "we just turned off the thing you set up, here's why"
+ * within seconds instead of waiting for the next 30-min ops-reporter
+ * cycle.
+ *
+ * Implements the global CLAUDE.md §12b silent-failure prevention rule
+ * for the schedule-doctor + content-lifecycle auto-remediation paths.
+ * Each fire is independent of the aggregate sendSlackAlert flow.
+ *
+ * @param agent      Agent name for log attribution (e.g. "schedule-doctor")
+ * @param severity   "critical" | "warning" — drives the emoji + section header
+ * @param summary    One-line headline, will be bolded
+ * @param details    Optional multi-line body shown below the summary
+ *
+ * No-op if SLACK_WEBHOOK_URL is unset. Errors are logged but never thrown.
+ */
+export async function sendInlineAlert(
+  agent: string,
+  severity: 'critical' | 'warning',
+  summary: string,
+  details?: string,
+): Promise<void> {
+  const webhookUrl = process.env.SLACK_WEBHOOK_URL || '';
+  if (!webhookUrl) return;
+
+  const emoji = severity === 'critical' ? ':red_circle:' : ':large_yellow_circle:';
+  const headerText = severity === 'critical' ? 'CRITICAL' : 'WARNING';
+
+  const blocks: Record<string, unknown>[] = [
+    {
+      type: 'header',
+      text: { type: 'plain_text', text: `${emoji} Vizora Ops: ${headerText} (${agent})` },
+    },
+    {
+      type: 'section',
+      text: { type: 'mrkdwn', text: `*${escapeMrkdwn(summary)}*` },
+    },
+  ];
+
+  if (details) {
+    blocks.push({
+      type: 'section',
+      text: { type: 'mrkdwn', text: escapeMrkdwn(details) },
+    });
+  }
+
+  blocks.push({
+    type: 'context',
+    elements: [
+      { type: 'mrkdwn', text: `Vizora Ops | ${agent} | ${new Date().toISOString()}` },
+    ],
+  });
+
+  try {
+    const res = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ blocks }),
+    });
+    if (!res.ok) {
+      log(agent, `Inline Slack alert returned ${res.status}`);
+    }
+  } catch (err) {
+    log(agent, `Inline Slack alert failed: ${err instanceof Error ? err.message : err}`);
+  }
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function escapeHtml(text: string): string {
@@ -292,4 +433,33 @@ function escapeHtml(text: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+/**
+ * Escape characters that Slack mrkdwn treats as formatting markers.
+ * Without this, an incident type like `device_offline_long` renders as
+ * `device` italic `offline` italic `long` — operators see a mangled
+ * message and don't recognise it as a real alert. Per the §12b
+ * silent-failure rule (global CLAUDE.md), automated alerts that
+ * silently mis-format are as bad as alerts that don't fire.
+ *
+ * Escapes: _ * ` ~ < >
+ *
+ * The angle-bracket pair is Slack mrkdwn's auto-link trigger: a
+ * free-form incident `message` containing `<http://x>` (or even
+ * `<...>` around a hostname) renders as a clickable link. That's
+ * a click-bait surface in operator inboxes that we should not
+ * delegate to whatever string an automated ops agent generates.
+ * Escaping to `\<http://x\>` makes the angle brackets render as
+ * plain text.
+ */
+function escapeMrkdwn(text: string): string {
+  return text
+    .replace(/\\/g, '\\\\')
+    .replace(/_/g, '\\_')
+    .replace(/\*/g, '\\*')
+    .replace(/`/g, '\\`')
+    .replace(/~/g, '\\~')
+    .replace(/</g, '\\<')
+    .replace(/>/g, '\\>');
 }

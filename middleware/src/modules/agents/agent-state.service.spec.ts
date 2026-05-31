@@ -21,8 +21,24 @@ describe('AgentStateService', () => {
     rmSync(stateDir, { recursive: true, force: true });
   });
 
-  const write = (family: string, data: unknown) => {
-    writeFileSync(join(stateDir, `${family}.json`), JSON.stringify(data));
+  // Every test fixture is wrapped in a valid AgentFamilyState envelope so
+  // the Zod validation in readFamilyFile() doesn't reject these synthetic
+  // payloads. Tests that want to verify sanitization on a specific key
+  // simply pass that key in `extras` — the .passthrough() schema lets
+  // arbitrary additional fields through.
+  const baseEnvelope = (): Record<string, unknown> => ({
+    systemStatus: 'HEALTHY',
+    lastUpdated: '2026-05-03T12:00:00.000Z',
+    lastRun: {},
+    incidents: [],
+    recentRemediations: [],
+    agentResults: {},
+  });
+  const write = (family: string, extras: Record<string, unknown> = {}) => {
+    writeFileSync(
+      join(stateDir, `${family}.json`),
+      JSON.stringify({ ...baseEnvelope(), ...extras }),
+    );
   };
 
   describe('sanitize / FORBIDDEN_KEY_REGEX (D9 + R2 + R4-HIGH1 anchored)', () => {

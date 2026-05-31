@@ -14,6 +14,16 @@ export const SKIP_OUTPUT_SANITIZE_KEY = 'skipOutputSanitize';
 export const SkipOutputSanitize = () => SetMetadata(SKIP_OUTPUT_SANITIZE_KEY, true);
 
 /**
+ * Skip *input* sanitization on this handler/controller. Use when the
+ * incoming body is not a string-bag-of-form-fields and the
+ * sanitize-html pass would corrupt structured data — e.g. MCP's
+ * JSON-RPC envelope where `params` carries typed tool inputs that
+ * are validated by Zod, not sanitized as HTML.
+ */
+export const SKIP_INPUT_SANITIZE_KEY = 'skipInputSanitize';
+export const SkipInputSanitize = () => SetMetadata(SKIP_INPUT_SANITIZE_KEY, true);
+
+/**
  * Interceptor to sanitize all string inputs in request body
  * and all string outputs in response data.
  * Prevents XSS attacks by stripping dangerous HTML.
@@ -68,22 +78,29 @@ export class SanitizeInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const request = context.switchToHttp().getRequest();
 
-    if (request.body && typeof request.body === 'object') {
-      request.body = this.sanitizeObject(request.body);
-    }
+    const skipInput = this.reflector?.getAllAndOverride<boolean>(
+      SKIP_INPUT_SANITIZE_KEY,
+      [context.getHandler(), context.getClass()],
+    );
 
-    if (request.query && typeof request.query === 'object') {
-      const sanitizedQuery = this.sanitizeObject(request.query);
-      Object.keys(sanitizedQuery).forEach(key => {
-        request.query[key] = sanitizedQuery[key];
-      });
-    }
+    if (!skipInput) {
+      if (request.body && typeof request.body === 'object') {
+        request.body = this.sanitizeObject(request.body);
+      }
 
-    if (request.params && typeof request.params === 'object') {
-      const sanitizedParams = this.sanitizeObject(request.params);
-      Object.keys(sanitizedParams).forEach(key => {
-        request.params[key] = sanitizedParams[key];
-      });
+      if (request.query && typeof request.query === 'object') {
+        const sanitizedQuery = this.sanitizeObject(request.query);
+        Object.keys(sanitizedQuery).forEach(key => {
+          request.query[key] = sanitizedQuery[key];
+        });
+      }
+
+      if (request.params && typeof request.params === 'object') {
+        const sanitizedParams = this.sanitizeObject(request.params);
+        Object.keys(sanitizedParams).forEach(key => {
+          request.params[key] = sanitizedParams[key];
+        });
+      }
     }
 
     // Check if output sanitization should be skipped
@@ -132,11 +149,25 @@ export class SanitizeInterceptor implements NestInterceptor {
         if (key.toLowerCase().includes('password')) {
           sanitized[key] = value;
         } else if (this.templateHtmlFields.includes(key)) {
-          // Apply limited sanitization for template HTML fields:
-          // strips <script>, on* handlers, javascript: URIs while preserving HTML/CSS
-          sanitized[key] = typeof value === 'string'
-            ? this.sanitizeTemplateHtml(value)
-            : value;
+          // Template HTML fields:
+          // - INPUT side (decodeEntities=false): pass through untouched.
+          //   Mutating input here would silently strip <script>/on*/javascript:
+          //   from the request body BEFORE the service-layer validator
+          //   (TemplateRenderingService.validateTemplate) could run — the
+          //   operator's "create template with <script>" would then succeed
+          //   with the script silently removed. Let the validator reject
+          //   bad templates with a 400 instead. R10 E2E scout finding #2.
+          // - OUTPUT side (decodeEntities=true): apply limited sanitization
+          //   (strip <script>, on* handlers, javascript: URIs while
+          //   preserving HTML/CSS) — defense-in-depth against any DB row
+          //   that historically slipped through.
+          if (decodeEntities) {
+            sanitized[key] = typeof value === 'string'
+              ? this.sanitizeTemplateHtml(value)
+              : value;
+          } else {
+            sanitized[key] = value;
+          }
         } else {
           sanitized[key] = this.sanitizeObject(value, decodeEntities);
         }

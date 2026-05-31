@@ -53,6 +53,16 @@ export const envSchema = z.object({
   
   // Logging
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+
+  // Internal service-to-service auth (runner script, sidecar, ops scripts).
+  // Required in production for the agent-platform-redesign /api/v1/internal/*
+  // endpoints. Without this, ConfigService.get('INTERNAL_API_SECRET') returns
+  // undefined (Zod strips unknown keys) → InternalSecretGuard fails closed
+  // → every internal call returns 401.
+  INTERNAL_API_SECRET: z.string().min(32, {
+    message: 'INTERNAL_API_SECRET must be at least 32 characters for security',
+  }).optional(),
+  INTERNAL_API_LOOPBACK_ONLY: z.string().default('true'),
 }).superRefine((data, ctx) => {
   // In production, MinIO credentials must be set and not be the default 'minioadmin'
   if (data.NODE_ENV === 'production') {
@@ -68,6 +78,22 @@ export const envSchema = z.object({
         code: z.ZodIssueCode.custom,
         message: 'MINIO_SECRET_KEY must be set and not equal to "minioadmin" in production',
         path: ['MINIO_SECRET_KEY'],
+      });
+    }
+    // INTERNAL_API_SECRET is optional in the base schema (dev + test
+    // don't require it for the ops scripts to spin up against an empty
+    // env), but it is REQUIRED in production. Without it, every call
+    // to /api/v1/internal/* — ops agents writing back state, the
+    // realtime gateway pushing content, the in-process MCP audit
+    // hooks — returns 401, and the failure mode is silent because
+    // those calls fire-and-forget.
+    if (!data.INTERNAL_API_SECRET) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'INTERNAL_API_SECRET must be set in production (min 32 chars). ' +
+          'Used for service-to-service auth between middleware, realtime, and ops scripts.',
+        path: ['INTERNAL_API_SECRET'],
       });
     }
   }

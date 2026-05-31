@@ -1,6 +1,5 @@
 /** @type {import('tailwindcss').Config} */
-const { semanticColors } = require('./src/theme/colors');
-const { tokens } = require('./src/theme/tokens');
+const { semanticColors, tokens } = require('./tailwind.theme.cjs');
 
 module.exports = {
   content: [

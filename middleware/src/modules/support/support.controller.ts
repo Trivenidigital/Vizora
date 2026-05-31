@@ -9,6 +9,7 @@ import {
   UseGuards,
   ParseUUIDPipe,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -27,10 +28,21 @@ export class SupportController {
   constructor(private readonly supportService: SupportService) {}
 
   /**
-   * Create a new support request
-   * Any authenticated user can create a request
+   * Create a new support request.
+   * Any authenticated user can create a request. Throttled to prevent
+   * a single user from spamming the admin queue: 5 per minute in
+   * production, 1000/min in dev/test. R7 support scout flagged the
+   * absence of this throttle — without it, a hostile user (or a
+   * buggy client retry loop) could flood the admin's queue and
+   * gate-keep tickets behind hours of triage noise.
    */
   @Post('requests')
+  @Throttle({
+    default: {
+      limit: process.env.NODE_ENV === 'production' ? 5 : 1000,
+      ttl: 60_000,
+    },
+  })
   @ApiOperation({ summary: 'Create a new support request' })
   async createRequest(
     @CurrentUser('id') userId: string,

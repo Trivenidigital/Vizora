@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { DatabaseService } from '../database/database.service';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
@@ -60,6 +61,454 @@ export class OrganizationsService {
     ]);
 
     return new PaginatedResponse(data.map(org => this.sanitizeOrg(org)), total, page, limit);
+  }
+
+  /**
+   * List onboarding candidates for the customer-lifecycle agent — orgs
+   * created within the last `lookbackDays` whose onboarding hasn't
+   * completed yet.
+   *
+   * Returns precomputed STRUCTURAL SIGNALS ONLY: org id, tier, days
+   * since signup, and a milestone-flags map (booleans for welcomed /
+   * screenPaired / contentUploaded / playlistCreated / scheduleCreated).
+   * NO org name, NO admin email, NO billing detail. The structural-only
+   * contract is enforced here so an LLM-driven downstream agent (Hermes
+   * customer-lifecycle skill) can safely consume the output without
+   * violating D13 (no raw user data into LLM prompts).
+   *
+   * Cross-org by design — this method takes no org filter. The MCP tool
+   * layer guards this with a platform-scope-only token check.
+   */
+  async listOnboardingCandidates(
+    options: { lookbackDays?: number; limit?: number } = {},
+  ) {
+    const { lookbackDays = 30, limit = 200 } = options;
+    const since = new Date();
+    since.setDate(since.getDate() - lookbackDays);
+
+    const rows = await this.db.organization.findMany({
+      where: {
+        createdAt: { gte: since },
+        OR: [
+          { onboarding: null },
+          { onboarding: { completedAt: null } },
+        ],
+      },
+      orderBy: { createdAt: 'asc' },
+      take: limit,
+      select: {
+        id: true,
+        subscriptionTier: true,
+        createdAt: true,
+        onboarding: {
+          select: {
+            welcomeEmailSentAt: true,
+            firstScreenPairedAt: true,
+            firstContentUploadedAt: true,
+            firstPlaylistCreatedAt: true,
+            firstScheduleCreatedAt: true,
+            day1NudgeSentAt: true,
+            day3NudgeSentAt: true,
+            day7NudgeSentAt: true,
+            completedAt: true,
+          },
+        },
+      },
+    });
+
+    const now = Date.now();
+    return rows.map((org) => {
+      const ob = org.onboarding;
+      return {
+        organizationId: org.id,
+        tier: this.coerceTier(org.subscriptionTier),
+        daysSinceSignup: Math.floor(
+          (now - org.createdAt.getTime()) / (24 * 60 * 60 * 1000),
+        ),
+        milestoneFlags: {
+          welcomed: ob?.welcomeEmailSentAt != null,
+          screenPaired: ob?.firstScreenPairedAt != null,
+          contentUploaded: ob?.firstContentUploadedAt != null,
+          playlistCreated: ob?.firstPlaylistCreatedAt != null,
+          scheduleCreated: ob?.firstScheduleCreatedAt != null,
+        },
+        nudgesSent: {
+          day1: ob?.day1NudgeSentAt != null,
+          day3: ob?.day3NudgeSentAt != null,
+          day7: ob?.day7NudgeSentAt != null,
+        },
+      };
+    });
+  }
+
+  /**
+   * Same coercion the customer-lifecycle PM2 cron uses. Kept inline so
+   * this service doesn't depend on agent-side types.
+   */
+  private coerceTier(tier: string | null | undefined): 'free' | 'starter' | 'pro' | 'enterprise' {
+    const v = (tier ?? '').toLowerCase();
+    if (v === 'starter' || v === 'pro' || v === 'enterprise') return v;
+    return 'free';
+  }
+
+  // ── Onboarding-nudge write methods (customer-lifecycle Hermes migration) ──
+  //
+  // The PM2 cron `agent-customer-lifecycle` (scripts/agents/customer-
+  // lifecycle.ts) currently owns the writes. These methods mirror its
+  // exact behaviour so a Hermes-driven agent can call them via MCP
+  // without changing customer-visible semantics. Safeguards are
+  // server-side — the agent picks a `nudge_key`, this service decides
+  // whether SMTP fires (LIFECYCLE_LIVE), against which addresses
+  // (LIFECYCLE_TEST_EMAILS), and whether dedup blocks (existing
+  // dayN_NudgeSentAt).
+
+  static readonly NUDGE_COLUMN = {
+    'day1-pair-screen': 'day1NudgeSentAt',
+    'day3-upload-content': 'day3NudgeSentAt',
+    'day7-create-schedule': 'day7NudgeSentAt',
+  } as const;
+
+  static readonly NUDGE_SUBJECT = {
+    'day1-pair-screen': 'Pair your first screen with Vizora',
+    'day3-upload-content': 'Upload your first piece of content',
+    'day7-create-schedule': 'Schedule your content for automatic playback',
+  } as const;
+
+  /**
+   * Set the dayN_NudgeSentAt column. Idempotent — re-calling with the
+   * same nudgeKey on an already-sent row returns true (the row is
+   * unchanged). Returns false if the org has no onboarding row at all
+   * (caller's responsibility to upsert first via auto-complete or
+   * sendOnboardingNudge's internal upsert).
+   */
+  async setOnboardingNudgeSent(
+    organizationId: string,
+    nudgeKey: keyof typeof OrganizationsService.NUDGE_COLUMN,
+  ): Promise<boolean> {
+    const col = OrganizationsService.NUDGE_COLUMN[nudgeKey];
+    const res = await this.db.organizationOnboarding.upsert({
+      where: { organizationId },
+      create: { organizationId, [col]: new Date() },
+      update: { [col]: new Date() },
+      select: { organizationId: true },
+    });
+    return res.organizationId === organizationId;
+  }
+
+  /**
+   * Mark an org's onboarding as completed. Used by the auto-complete
+   * path for stale (>30d) signups that never finish. Idempotent —
+   * re-calling on an already-completed row updates the timestamp,
+   * which is fine.
+   *
+   * R7 onboarding scout: server-side enforces the ">= 30 days old"
+   * contract documented in the MCP tool description. Without this
+   * guard, a buggy or hostile agent with `customer:write` could call
+   * auto-complete on a 1-day-old signup and silently skip every
+   * lifecycle nudge they were supposed to receive — the agent's
+   * client-side check is necessary but not sufficient.
+   */
+  async setOnboardingCompleted(organizationId: string): Promise<boolean> {
+    const MIN_AGE_DAYS = 30;
+    const org = await this.db.organization.findUnique({
+      where: { id: organizationId },
+      select: { createdAt: true },
+    });
+    if (!org) return false;
+    const ageMs = Date.now() - org.createdAt.getTime();
+    if (ageMs < MIN_AGE_DAYS * 24 * 60 * 60 * 1000) {
+      // Refuse — caller is trying to force-skip nudges. Returning false
+      // (vs throwing) keeps idempotent semantics for the MCP tool:
+      // result.completed === false means "no change was made", same
+      // shape as a re-call on an already-completed row.
+      this.logger.warn(
+        `Refusing setOnboardingCompleted for ${organizationId}: org age ${Math.round(ageMs / 86400000)}d < ${MIN_AGE_DAYS}d`,
+      );
+      return false;
+    }
+    const res = await this.db.organizationOnboarding.upsert({
+      where: { organizationId },
+      create: { organizationId, completedAt: new Date() },
+      update: { completedAt: new Date() },
+      select: { organizationId: true },
+    });
+    return res.organizationId === organizationId;
+  }
+
+  /**
+   * Send a templated onboarding nudge. THE TEMPLATE IS HARDCODED
+   * SERVER-SIDE — the caller picks a `nudgeKey` and the server picks
+   * the subject + body. This is the D6 hardened-outbound rule: agent
+   * input never reaches the wire as email content.
+   *
+   * Resolution rules (mirrors `scripts/agents/customer-lifecycle.ts`):
+   * - LIFECYCLE_TEST_EMAILS set → all mail goes to those addresses
+   *   (regardless of LIFECYCLE_LIVE). Real admin email is NOT used.
+   * - LIFECYCLE_LIVE=true (and TEST_EMAILS empty) → real admin email.
+   * - Otherwise → dry-run, no SMTP call.
+   *
+   * Dedup safety: pre-checks `dayN_NudgeSentAt`. If already set,
+   * returns `{ sent: false, reason: 'already_sent' }` WITHOUT firing
+   * SMTP. After a successful send, marks the column inside the same
+   * call (mirrors the PM2 cron's "send + mark in one logical step"
+   * pattern, which is the duplicate-email mitigation).
+   *
+   * Logging: recipient addresses are sha256-hashed (`maskEmail`) and
+   * NEVER logged in plaintext, error messages, or the audit row.
+   */
+  async sendOnboardingNudge(
+    organizationId: string,
+    nudgeKey: keyof typeof OrganizationsService.NUDGE_COLUMN,
+  ): Promise<{
+    sent: boolean;
+    recipientCount: number;
+    recipientHashes: string[];
+    reason:
+      | 'sent'
+      | 'dry_run'
+      | 'already_sent'
+      | 'no_admin'
+      | 'no_smtp_configured'
+      | 'smtp_error';
+  }> {
+    const col = OrganizationsService.NUDGE_COLUMN[nudgeKey];
+    const subject = OrganizationsService.NUDGE_SUBJECT[nudgeKey];
+
+    // Atomic claim instead of pre-check-then-mark. Two concurrent cron
+    // firings for the same org used to both observe `dayN_NudgeSentAt
+    // == null`, both pass the pre-check, and both send the email —
+    // customer receives duplicates and the row finally landed with one
+    // of the two timestamps (depending on which mark-sent won the
+    // write race).
+    //
+    // The fix: try to write the column with `updateMany WHERE col IS
+    // NULL`. If count=0, either the row doesn't exist OR another caller
+    // already claimed. We disambiguate with a shallow existence probe
+    // (no PII fields) — present + null impossible at this point
+    // (updateMany would have matched), so present means "already
+    // sent." Missing means we need to create the row with the column
+    // set in one shot.
+    //
+    // On send failure further down, we roll back the claim so the
+    // nudge can be re-tried on the next cron firing. Worst-case race
+    // collapses to "we send 0 or 1 email per (org, nudgeKey) per
+    // cron-tick window."
+    const claim = await this.db.organizationOnboarding.updateMany({
+      where: { organizationId, [col]: null },
+      data: { [col]: new Date() },
+    });
+
+    if (claim.count === 0) {
+      const exists = await this.db.organizationOnboarding.findUnique({
+        where: { organizationId },
+        select: { id: true },
+      });
+      if (exists) {
+        return {
+          sent: false,
+          recipientCount: 0,
+          recipientHashes: [],
+          reason: 'already_sent',
+        };
+      }
+      // No row at all — create it with the column set so the claim is
+      // visible to concurrent callers immediately. If create throws on
+      // P2002 (another caller created in the meantime), back off.
+      try {
+        await this.db.organizationOnboarding.create({
+          data: { organizationId, [col]: new Date() },
+        });
+      } catch (err) {
+        if ((err as { code?: string })?.code === 'P2002') {
+          return {
+            sent: false,
+            recipientCount: 0,
+            recipientHashes: [],
+            reason: 'already_sent',
+          };
+        }
+        throw err;
+      }
+    }
+
+    // From here on, the claim is OUR responsibility. If we fail to send,
+    // we MUST roll back the column so a later cron can retry.
+    const rollbackClaim = async () => {
+      try {
+        await this.db.organizationOnboarding.update({
+          where: { organizationId },
+          data: { [col]: null },
+        });
+      } catch (err) {
+        this.logger.warn(
+          `lifecycle nudge rollback FAILED org=${organizationId} key=${nudgeKey}: ${
+            err instanceof Error ? err.message : err
+          }. Operator must manually clear ${col} for retry.`,
+        );
+      }
+    };
+
+    // Find admin recipient (the actual customer-facing address)
+    const admin = await this.db.user.findFirst({
+      where: {
+        organizationId,
+        role: { in: ['admin', 'manager'] },
+        isActive: true,
+      },
+      orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
+      select: { email: true },
+    });
+    if (!admin?.email) {
+      await rollbackClaim();
+      return { sent: false, recipientCount: 0, recipientHashes: [], reason: 'no_admin' };
+    }
+
+    // Resolve recipients per the LIFECYCLE_LIVE / LIFECYCLE_TEST_EMAILS rules.
+    // Cap the test recipient list defensively — a misconfigured .env with
+    // thousands of addresses would otherwise fan out one nudge into a
+    // thousand real SMTP sends per agent firing. The cap is generous
+    // (any legitimate test-recipient list is single-digits) but bounded.
+    const MAX_TEST_RECIPIENTS = 10;
+    const testEmailsRaw = process.env.LIFECYCLE_TEST_EMAILS || '';
+    const testEmails = testEmailsRaw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, MAX_TEST_RECIPIENTS);
+    const live = process.env.LIFECYCLE_LIVE === 'true';
+    const recipients =
+      testEmails.length > 0 ? [...testEmails] : live ? [admin.email] : [];
+
+    const recipientHashes = recipients.map((e) => OrganizationsService.maskEmail(e));
+
+    if (recipients.length === 0) {
+      await rollbackClaim();
+      return { sent: false, recipientCount: 0, recipientHashes: [], reason: 'dry_run' };
+    }
+
+    // Build SMTP transporter on demand. Cached on the service instance
+    // after first build to avoid re-handshaking per send within the
+    // same process lifetime.
+    const transporter = await this.getLifecycleTransporter();
+    if (!transporter) {
+      await rollbackClaim();
+      return {
+        sent: false,
+        recipientCount: 0,
+        recipientHashes: [],
+        reason: 'no_smtp_configured',
+      };
+    }
+
+    const appUrl =
+      process.env.APP_URL || process.env.WEB_URL || 'https://vizora.cloud';
+    const body = `Hi,\n\n${subject}.\n\nOpen your dashboard: ${appUrl}/dashboard\n\n— Vizora`;
+    const from = process.env.EMAIL_FROM || 'Vizora <noreply@mail.vizora.cloud>';
+
+    let sent = 0;
+    for (const to of recipients) {
+      try {
+        await transporter.sendMail({ from, to, subject, text: body });
+        sent++;
+      } catch (err) {
+        // Mask recipient — DO NOT log raw `to` or raw err.message,
+        // nodemailer DSN payloads frequently embed the recipient.
+        const code = (err as { code?: string })?.code ?? 'UNKNOWN';
+        this.logger.warn(
+          `lifecycle nudge send failed org=${organizationId} recipient=${OrganizationsService.maskEmail(to)} code=${code}`,
+        );
+      }
+    }
+
+    if (sent === 0) {
+      await rollbackClaim();
+      return {
+        sent: false,
+        recipientCount: 0,
+        recipientHashes,
+        reason: 'smtp_error',
+      };
+    }
+
+    // The claim is already persisted from the atomic upsert above —
+    // no need for a separate setOnboardingNudgeSent call. The previous
+    // shape risked a third race window between the send and the mark;
+    // the claim-first pattern removes it.
+
+    return {
+      sent: true,
+      recipientCount: sent,
+      recipientHashes,
+      reason: 'sent',
+    };
+  }
+
+  /**
+   * Lazy transporter — only built when actually needed, then cached.
+   * Returns null if SMTP isn't configured (dev environments).
+   */
+  private lifecycleTransporter:
+    | {
+        sendMail: (opts: Record<string, unknown>) => Promise<unknown>;
+        close?: () => void;
+      }
+    | null
+    | undefined = undefined;
+
+  private async getLifecycleTransporter() {
+    if (this.lifecycleTransporter !== undefined) return this.lifecycleTransporter;
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS ?? process.env.SMTP_PASSWORD;
+    const smtpHost = process.env.SMTP_HOST;
+    if (!smtpHost || (smtpUser && !smtpPass)) {
+      this.lifecycleTransporter = null;
+      return null;
+    }
+    const { default: nodemailer } = await import('nodemailer');
+    this.lifecycleTransporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: parseInt(process.env.SMTP_PORT || '587', 10),
+      secure: (process.env.SMTP_PORT || '587') === '465',
+      auth: smtpUser && smtpPass ? { user: smtpUser, pass: smtpPass } : undefined,
+    });
+    return this.lifecycleTransporter;
+  }
+
+  /**
+   * NestJS lifecycle hook — close the cached nodemailer transporter
+   * pool when the app shuts down (SIGTERM from PM2 reload or upgrade).
+   * Without this, the pool's TCP keep-alives leak into the OS until
+   * the process is killed, and rapid PM2 reloads can exhaust file
+   * descriptors on the SMTP host. R7 support+onboarding scout
+   * finding #11.
+   *
+   * enableShutdownHooks() in main.ts is what wires this method to
+   * SIGTERM / SIGINT — no extra setup needed here.
+   */
+  async onApplicationShutdown(): Promise<void> {
+    if (this.lifecycleTransporter && typeof this.lifecycleTransporter.close === 'function') {
+      try {
+        this.lifecycleTransporter.close();
+        this.logger.log('lifecycle SMTP transporter pool closed on shutdown');
+      } catch (err) {
+        this.logger.warn(
+          `lifecycle SMTP transporter close failed on shutdown: ${
+            err instanceof Error ? err.message : err
+          }`,
+        );
+      }
+    }
+    this.lifecycleTransporter = undefined;
+  }
+
+  /**
+   * Sha256-hash an email so it can appear in audit logs / wire payloads
+   * without leaking the plaintext. Same hashing the PM2 cron's
+   * `lib/alerting.maskEmail` uses (deterministic — the same address
+   * always hashes the same).
+   */
+  private static maskEmail(email: string): string {
+    return createHash('sha256').update(email.trim().toLowerCase()).digest('hex').slice(0, 16);
   }
 
   async findOne(id: string) {

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { DatabaseService } from '../database/database.service';
 import { CreateApiKeyDto } from './dto/create-api-key.dto';
@@ -71,13 +71,20 @@ export class ApiKeysService {
   }
 
   /**
-   * Revoke an API key
+   * Revoke an API key. Throws NotFoundException if the key doesn't exist
+   * in the caller's organization — callers were previously getting a
+   * silent {count: 0} success on bad keyIds and reporting it as revoked
+   * to the user.
    */
   async revoke(organizationId: string, keyId: string) {
-    return this.db.apiKey.updateMany({
+    const result = await this.db.apiKey.updateMany({
       where: { id: keyId, organizationId },
       data: { revokedAt: new Date() },
     });
+    if (result.count === 0) {
+      throw new NotFoundException('API key not found');
+    }
+    return result;
   }
 
   /**

@@ -142,19 +142,34 @@ export class OrganizationsAdminService {
   }
 
   /**
-   * Extend trial period by specified number of days
+   * Extend trial period by specified number of days.
+   *
+   * R9 admin scout: caps total trial duration at MAX_TRIAL_DAYS days
+   * from the org's creation date. Without this cap an admin could
+   * repeatedly call extendTrial and push trialEndsAt arbitrarily far
+   * into the future — turning a "trial" customer into a perpetual
+   * free-of-charge enterprise user with no audit-visible threshold
+   * for what crossed the line into abuse.
    */
   async extendTrial(id: string, days: number) {
     if (days <= 0) {
       throw new BadRequestException('Days must be positive');
     }
+    const MAX_TRIAL_DAYS = 90;
 
     const org = await this.findOne(id);
 
-    // Calculate new trial end date
     const currentEnd = org.trialEndsAt ? new Date(org.trialEndsAt) : new Date();
     const newEnd = new Date(currentEnd);
     newEnd.setDate(newEnd.getDate() + days);
+
+    const totalTrialMs = newEnd.getTime() - org.createdAt.getTime();
+    const totalTrialDays = totalTrialMs / (24 * 60 * 60 * 1000);
+    if (totalTrialDays > MAX_TRIAL_DAYS) {
+      throw new BadRequestException(
+        `Trial cannot exceed ${MAX_TRIAL_DAYS} days from signup (would be ${Math.round(totalTrialDays)}). Convert to paid plan or extend a shorter window.`,
+      );
+    }
 
     const updated = await this.db.organization.update({
       where: { id },

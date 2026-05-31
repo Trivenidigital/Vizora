@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { DatabaseService } from '../database/database.service';
 import { MailService } from '../mail/mail.service';
+import { PLAN_TIERS } from './constants/plans';
 
 @Injectable()
 export class BillingLifecycleService {
@@ -11,6 +12,23 @@ export class BillingLifecycleService {
     private readonly db: DatabaseService,
     private readonly mailService: MailService,
   ) {}
+
+  /**
+   * Derive entry-tier display pricing from PLAN_TIERS instead of
+   * hardcoding "$6 / ₹399" in email templates. Previously prices
+   * here drifted from the actual paid-tier pricing whenever the
+   * basic tier changed — customers got a reminder email quoting
+   * the wrong number. R9 billing scout.
+   */
+  private getDisplayPricing(country: string | null): { amount: string; currency: string } {
+    const basic = PLAN_TIERS.basic;
+    if (country === 'IN') {
+      const rupees = Math.round(basic.prices.inr.monthly / 100);
+      return { amount: `₹${rupees}`, currency: 'INR' };
+    }
+    const dollars = Math.round(basic.prices.usd.monthly / 100);
+    return { amount: `$${dollars}`, currency: 'USD' };
+  }
 
   /**
    * Daily job: expire trials and send reminders
@@ -67,9 +85,7 @@ export class BillingLifecycleService {
         // Send trial expired email
         const admin = org.users[0];
         if (admin?.email) {
-          const pricing = org.country === 'IN'
-            ? { amount: '\u20B9399', currency: 'INR' }
-            : { amount: '$6', currency: 'USD' };
+          const pricing = this.getDisplayPricing(org.country);
           await this.mailService.sendTrialExpiredEmail(
             admin.email,
             admin.firstName || admin.email.split('@')[0],
@@ -125,9 +141,7 @@ export class BillingLifecycleService {
       try {
         const admin = org.users[0];
         if (admin?.email) {
-          const pricing = org.country === 'IN'
-            ? { amount: '\u20B9399', currency: 'INR' }
-            : { amount: '$6', currency: 'USD' };
+          const pricing = this.getDisplayPricing(org.country);
           await this.mailService.sendTrialReminderEmail(
             admin.email,
             admin.firstName || admin.email.split('@')[0],

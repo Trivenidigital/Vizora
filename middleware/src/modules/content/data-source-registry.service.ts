@@ -5,6 +5,7 @@ import {
   InstagramDataSource,
   TwitterDataSource,
   FacebookDataSource,
+  GenericApiDataSource,
 } from './widget-data-sources';
 import type { WidgetDataSource } from './widget-data-sources';
 
@@ -18,12 +19,14 @@ export class DataSourceRegistryService {
     private readonly instagramDataSource: InstagramDataSource,
     private readonly twitterDataSource: TwitterDataSource,
     private readonly facebookDataSource: FacebookDataSource,
+    private readonly genericApiDataSource: GenericApiDataSource,
   ) {
     this.registry.set(this.weatherDataSource.type, this.weatherDataSource);
     this.registry.set(this.rssDataSource.type, this.rssDataSource);
     this.registry.set(this.instagramDataSource.type, this.instagramDataSource);
     this.registry.set(this.twitterDataSource.type, this.twitterDataSource);
     this.registry.set(this.facebookDataSource.type, this.facebookDataSource);
+    this.registry.set(this.genericApiDataSource.type, this.genericApiDataSource);
   }
 
   get(type: string): WidgetDataSource {

@@ -33,12 +33,17 @@ export class QuotaGuard implements CanActivate {
       throw new ForbiddenException('Organization not found');
     }
 
+    // Exclude disabled displays from the quota count — a customer who
+    // disables a screen should be able to reclaim that quota slot.
+    // R9 admin scout: previously `_count: { displays: true }` counted
+    // every row including disabled ones, so disabling didn't free up
+    // the slot and the customer remained gated until hard-delete.
     const org = await this.db.organization.findUnique({
       where: { id: organizationId },
       select: {
         screenQuota: true,
         _count: {
-          select: { displays: true },
+          select: { displays: { where: { isDisabled: false } } },
         },
       },
     });

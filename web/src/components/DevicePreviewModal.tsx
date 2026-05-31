@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Modal from './Modal';
 import LoadingSpinner from './LoadingSpinner';
 import { Display, ScreenshotResponse } from '@/lib/types';
@@ -21,10 +21,30 @@ export default function DevicePreviewModal({ device, isOpen, onClose }: DevicePr
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentRequestId, setCurrentRequestId] = useState<string | null>(null);
+  const currentRequestIdRef = useRef<string | null>(null);
+  const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isOpenRef = useRef(isOpen);
+  const deviceIdRef = useRef(device.id);
+  const loadRequestEpochRef = useRef(0);
+  const refreshRequestEpochRef = useRef(0);
 
   // Setup WebSocket listener for screenshot:ready events
   const { socket } = useSocket();
+
+  useEffect(() => {
+    isOpenRef.current = isOpen;
+  }, [isOpen]);
+
+  useEffect(() => {
+    deviceIdRef.current = device.id;
+  }, [device.id]);
+
+  const clearRefreshTimeout = useCallback(() => {
+    if (refreshTimeoutRef.current) {
+      clearTimeout(refreshTimeoutRef.current);
+      refreshTimeoutRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     if (!socket || !isOpen) return;
@@ -38,7 +58,9 @@ export default function DevicePreviewModal({ device, isOpen, onClose }: DevicePr
       capturedAt: string;
     }) => {
       // Only update if this is for our device and matches our current request
-      if (data.deviceId === device.id && data.requestId === currentRequestId) {
+      if (data.deviceId === device.id && data.requestId === currentRequestIdRef.current) {
+        clearRefreshTimeout();
+        currentRequestIdRef.current = null;
         setScreenshot({
           url: data.url,
           capturedAt: data.capturedAt,
@@ -56,30 +78,64 @@ export default function DevicePreviewModal({ device, isOpen, onClose }: DevicePr
     return () => {
       socket.off('screenshot:ready', handleScreenshotReady);
     };
-  }, [socket, device.id, currentRequestId, isOpen, toast]);
+  }, [socket, device.id, isOpen, toast, clearRefreshTimeout]);
 
   // Load screenshot when modal opens
   useEffect(() => {
     if (isOpen) {
+      clearRefreshTimeout();
+      refreshRequestEpochRef.current += 1;
+      currentRequestIdRef.current = null;
+      setScreenshot(null);
+      setError(null);
+      setRefreshing(false);
       loadScreenshot();
     } else {
       // Reset state when modal closes
+      clearRefreshTimeout();
+      loadRequestEpochRef.current += 1;
+      refreshRequestEpochRef.current += 1;
       setScreenshot(null);
       setError(null);
-      setCurrentRequestId(null);
+      setLoading(false);
+      setRefreshing(false);
+      currentRequestIdRef.current = null;
     }
-  }, [isOpen, device.id]);
+  }, [isOpen, device.id, clearRefreshTimeout]);
+
+  useEffect(() => {
+    return () => {
+      clearRefreshTimeout();
+    };
+  }, [clearRefreshTimeout]);
 
   const loadScreenshot = async () => {
+    const requestDeviceId = device.id;
+    const requestEpoch = loadRequestEpochRef.current + 1;
+    loadRequestEpochRef.current = requestEpoch;
+
+    const isCurrentRequest = () =>
+      isOpenRef.current &&
+      deviceIdRef.current === requestDeviceId &&
+      loadRequestEpochRef.current === requestEpoch;
+
     try {
       setLoading(true);
       setError(null);
       const result = await apiClient.getDeviceScreenshot(device.id);
+      if (!isCurrentRequest()) {
+        return;
+      }
       setScreenshot(result);
     } catch (err: any) {
+      if (!isCurrentRequest()) {
+        return;
+      }
       setError(err.message || 'Failed to load screenshot');
     } finally {
-      setLoading(false);
+      if (isCurrentRequest()) {
+        setLoading(false);
+      }
     }
   };
 
@@ -89,21 +145,40 @@ export default function DevicePreviewModal({ device, isOpen, onClose }: DevicePr
       return;
     }
 
+    const requestDeviceId = device.id;
+    const requestEpoch = refreshRequestEpochRef.current + 1;
+    refreshRequestEpochRef.current = requestEpoch;
+    const isCurrentRequest = () =>
+      isOpenRef.current &&
+      deviceIdRef.current === requestDeviceId &&
+      refreshRequestEpochRef.current === requestEpoch;
+
     try {
       setRefreshing(true);
       setError(null);
       const response = await apiClient.requestDeviceScreenshot(device.id);
-      setCurrentRequestId(response.requestId);
+      if (!isCurrentRequest()) {
+        return;
+      }
+      currentRequestIdRef.current = response.requestId;
       toast.info('Screenshot request sent to device...');
 
       // Set a timeout in case the device doesn't respond
-      setTimeout(() => {
-        if (refreshing) {
+      clearRefreshTimeout();
+      refreshTimeoutRef.current = setTimeout(() => {
+        if (isCurrentRequest() && currentRequestIdRef.current === response.requestId) {
+          currentRequestIdRef.current = null;
+          refreshTimeoutRef.current = null;
           setRefreshing(false);
           setError('Screenshot request timed out. Device may be offline or unresponsive.');
         }
       }, 30000); // 30 second timeout
     } catch (err: any) {
+      if (!isCurrentRequest()) {
+        return;
+      }
+      currentRequestIdRef.current = null;
+      clearRefreshTimeout();
       setRefreshing(false);
       setError(err.message || 'Failed to request screenshot');
       toast.error('Failed to request screenshot');

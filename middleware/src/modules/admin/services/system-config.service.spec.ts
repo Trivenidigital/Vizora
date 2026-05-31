@@ -153,6 +153,23 @@ describe('SystemConfigService', () => {
         })
       );
     });
+
+    it('rejects keys outside the namespace allowlist', async () => {
+      await expect(
+        service.set('arbitrary_key', true, 'admin-123'),
+      ).rejects.toThrow(/not in the allowlist/);
+      await expect(
+        service.set('DISABLE_RATE_LIMITS', true, 'admin-123'),
+      ).rejects.toThrow(/not in the allowlist/);
+      expect(mockDb.systemConfig.upsert).not.toHaveBeenCalled();
+    });
+
+    it('accepts namespaced keys (feature.*, announcement.*, etc.)', async () => {
+      mockDb.systemConfig.upsert.mockResolvedValue(mockConfig);
+      await expect(service.set('feature.new_dashboard', true, 'admin-123')).resolves.toBeDefined();
+      await expect(service.set('announcement.maintenance', 'down 2h', 'admin-123')).resolves.toBeDefined();
+      await expect(service.set('limit.daily_uploads', 100, 'admin-123')).resolves.toBeDefined();
+    });
   });
 
   describe('delete', () => {

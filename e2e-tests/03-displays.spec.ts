@@ -36,7 +36,7 @@ test.describe('Display Management', () => {
 
   test('should create new display', async ({ authenticatedPage, token }) => {
     // Try to create a pairing request via API
-    const pairingRes = await authenticatedPage.request.post('http://localhost:3000/api/devices/pairing/request', {
+    const pairingRes = await authenticatedPage.request.post('http://localhost:3000/api/v1/devices/pairing/request', {
       headers: { Authorization: `Bearer ${token}` },
     }).catch(() => null);
     
@@ -69,7 +69,7 @@ test.describe('Display Management', () => {
 
   test('should show pairing code for display', async ({ authenticatedPage, token }) => {
     // Create display via API
-    const displayRes = await authenticatedPage.request.post('http://localhost:3000/api/displays', {
+    const displayRes = await authenticatedPage.request.post('http://localhost:3000/api/v1/displays', {
       headers: { Authorization: `Bearer ${token}` },
       data: {
         nickname: `Test Display ${Date.now()}`,
@@ -113,7 +113,7 @@ test.describe('Display Management', () => {
 
   test('should delete display', async ({ authenticatedPage, token }) => {
     // Create display via API
-    const displayRes = await authenticatedPage.request.post('http://localhost:3000/api/displays', {
+    const displayRes = await authenticatedPage.request.post('http://localhost:3000/api/v1/displays', {
       headers: { Authorization: `Bearer ${token}` },
       data: {
         nickname: `Test Display ${Date.now()}`,

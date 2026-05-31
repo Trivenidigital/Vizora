@@ -1,8 +1,16 @@
-import { Injectable, BadRequestException, NotFoundException, OnModuleDestroy, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  InternalServerErrorException,
+  OnModuleDestroy,
+  Logger,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DatabaseService } from '../database/database.service';
 import { RedisService } from '../redis/redis.service';
+import { ProvisioningTemplatesService } from '../provisioning-templates/provisioning-templates.service';
 import { RequestPairingDto } from './dto/request-pairing.dto';
 import { CompletePairingDto } from './dto/complete-pairing.dto';
 import * as crypto from 'crypto';
@@ -34,6 +42,7 @@ export class PairingService implements OnModuleDestroy {
     private readonly jwtService: JwtService,
     private readonly redisService: RedisService,
     private readonly events: EventEmitter2,
+    private readonly provisioningTemplatesService: ProvisioningTemplatesService,
   ) {
     // Cleanup interval as safety net — Redis TTL handles most expiration,
     // but this catches edge cases if Redis is temporarily unavailable.
@@ -211,7 +220,7 @@ export class PairingService implements OnModuleDestroy {
     userId: string,
     completeDto: CompletePairingDto,
   ) {
-    const { code, nickname } = completeDto;
+    const { code, nickname, provisioningTemplateId } = completeDto;
 
     const request = await this.getPairingRequest(code);
 
@@ -224,6 +233,17 @@ export class PairingService implements OnModuleDestroy {
       await this.deletePairingRequest(code);
       throw new BadRequestException('Pairing code has expired');
     }
+
+    // O6 — Resolve provisioning-template defaults if the operator specified
+    // one. Cross-org guard lives inside resolveForPairing (throws NotFound
+    // if the template belongs to another org). If unspecified, this resolves
+    // to undefined and the Display falls back to Vizora-level defaults.
+    const provisioningDefaults = provisioningTemplateId
+      ? await this.provisioningTemplatesService.resolveForPairing(
+          organizationId,
+          provisioningTemplateId,
+        )
+      : undefined;
 
     // Check if device already exists
     let display = await this.db.display.findUnique({
@@ -240,7 +260,12 @@ export class PairingService implements OnModuleDestroy {
 
     const deviceSecret = process.env.DEVICE_JWT_SECRET;
     if (!deviceSecret || deviceSecret.length < 32) {
-      throw new Error('DEVICE_JWT_SECRET must be set and be at least 32 characters');
+      // Server-side misconfiguration — surface as 500 with a clear
+      // message so ops sees the cause in error tracking rather than
+      // an empty 500 from a swallowed generic Error.
+      throw new InternalServerErrorException(
+        'DEVICE_JWT_SECRET must be set and be at least 32 characters',
+      );
     }
 
     const jwtToken = this.jwtService.sign(devicePayload, {
@@ -266,6 +291,9 @@ export class PairingService implements OnModuleDestroy {
           lastHeartbeat: new Date(),
           status: 'pairing',
           location: completeDto.location || display.location,
+          // O6 — apply provisioning-template defaults. Spread last so they
+          // override the Vizora-level defaults but NOT explicit fields above.
+          ...(provisioningDefaults ?? {}),
         },
       });
     } else {
@@ -283,6 +311,10 @@ export class PairingService implements OnModuleDestroy {
           status: 'pairing',
           location: request.metadata?.hostname || null,
           metadata: request.metadata,
+          // O6 — apply provisioning-template defaults. Spread last so they
+          // override the Display model's Prisma defaults (orientation=
+          // 'landscape', timezone='UTC') with the operator's preference.
+          ...(provisioningDefaults ?? {}),
         },
       });
     }

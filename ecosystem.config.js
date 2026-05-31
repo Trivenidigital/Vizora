@@ -109,8 +109,10 @@ module.exports = {
           } catch { return {}; }
         })(),
       },
-      // Graceful shutdown
-      kill_timeout: 10000,
+      // Graceful shutdown — Next.js needs more time than the API services
+      // to drain in-flight SSR + RSC streams cleanly; 10s was occasionally
+      // truncating responses on PM2 reload. Match the middleware budget.
+      kill_timeout: 30000,
       // Logging
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       max_size: '50M',
@@ -121,6 +123,36 @@ module.exports = {
       exp_backoff_restart_delay: 100,
       max_restarts: 10,
       min_uptime: '10s',
+    },
+    {
+      // ContentImpression retention cleanup — runs daily at 3:30am
+      // (offset from db-maintainer's 3am window so the two long-running
+      // jobs don't lock-contend on the same tables). Default 90-day
+      // retention; tune via RETENTION_DAYS env var. R6 analytics scout
+      // flagged this as manual-only previously — at 12k rows/day/org
+      // the table grew unbounded between operator-triggered cleanups.
+      name: 'cleanup-impressions',
+      script: 'npx',
+      args: 'tsx scripts/cleanup-impressions.ts',
+      instances: 1,
+      exec_mode: 'fork',
+      cron_restart: '30 3 * * *', // Daily at 3:30am
+      autorestart: false,
+      watch: false,
+      max_memory_restart: '256M',
+      env: {
+        NODE_ENV: 'development',
+        RETENTION_DAYS: '90',
+      },
+      env_production: {
+        NODE_ENV: 'production',
+        RETENTION_DAYS: '90',
+      },
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      max_size: '10M',
+      error_file: './logs/cleanup-impressions-error.log',
+      out_file: './logs/cleanup-impressions-out.log',
+      merge_logs: true,
     },
     {
       name: 'vizora-validator',
@@ -273,6 +305,29 @@ module.exports = {
       merge_logs: true,
     },
     {
+      name: 'ops-watchdog',
+      script: 'npx',
+      args: 'tsx scripts/ops/ops-watchdog.ts',
+      instances: 1,
+      exec_mode: 'fork',
+      cron_restart: '*/15 * * * *', // Run every 15 minutes
+      autorestart: false, // Don't restart on exit — cron handles scheduling
+      watch: false,
+      max_memory_restart: '128M',
+      env: {
+        NODE_ENV: 'development',
+      },
+      env_production: {
+        NODE_ENV: 'production',
+      },
+      // Logging
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      max_size: '10M',
+      error_file: './logs/ops-watchdog-error.log',
+      out_file: './logs/ops-watchdog-out.log',
+      merge_logs: true,
+    },
+    {
       name: 'ops-db-maintainer',
       script: 'npx',
       args: 'tsx scripts/ops/db-maintainer.ts',
@@ -352,112 +407,111 @@ module.exports = {
       out_file: './logs/agent-support-triage-out.log',
       merge_logs: true,
     },
-    // Scaffold agents below — gated OFF by default. Flip the corresponding
-    // *_ENABLED env var to true to activate once implementation lands.
+    // -------- Hermes-driven shadow agents --------
+    // PM2 fires the runner script which invokes `hermes -z` with an explicit
+    // action prompt. We previously used `hermes cron` directly but the model
+    // produced different (worse) behavior in cron-firing context vs `-z`
+    // invocation: probe loops on get_prompt/read_resource and chat-text
+    // outputs instead of MCP tool calls. The runner+`-z` path
+    // demonstrably works end-to-end (audit log + JSONL both populate).
+    //
+    // The corresponding `hermes cron` jobs MUST be removed at deploy time
+    // to prevent duplicate firings:
+    //   ssh root@vizora.cloud 'hermes cron list | grep -B1 vizora-* | head'
+    //   hermes cron remove <id-customer-lifecycle>
+    //   hermes cron remove <id-support-triage>
     {
-      name: 'agent-screen-health-customer',
-      script: 'npx',
-      args: 'tsx scripts/agents/screen-health-customer.ts',
-      instances: 1,
-      exec_mode: 'fork',
-      cron_restart: '*/10 * * * *',
-      autorestart: false,
-      watch: false,
-      max_memory_restart: '256M',
-      env: {
-        NODE_ENV: 'development',
-        VALIDATOR_BASE_URL: 'http://localhost:3000',
-        SCREEN_HEALTH_CUSTOMER_ENABLED: 'false',
-      },
-      env_production: {
-        NODE_ENV: 'production',
-        VALIDATOR_BASE_URL: 'http://localhost:3000',
-        SCREEN_HEALTH_CUSTOMER_ENABLED: 'false',
-      },
-      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      max_size: '10M',
-      error_file: './logs/agent-screen-health-customer-error.log',
-      out_file: './logs/agent-screen-health-customer-out.log',
-      merge_logs: true,
-    },
-    {
-      name: 'agent-billing-revenue',
-      script: 'npx',
-      args: 'tsx scripts/agents/billing-revenue.ts',
-      instances: 1,
-      exec_mode: 'fork',
-      cron_restart: '*/15 * * * *',
-      autorestart: false,
-      watch: false,
-      max_memory_restart: '256M',
-      env: {
-        NODE_ENV: 'development',
-        VALIDATOR_BASE_URL: 'http://localhost:3000',
-        BILLING_REVENUE_ENABLED: 'false',
-      },
-      env_production: {
-        NODE_ENV: 'production',
-        VALIDATOR_BASE_URL: 'http://localhost:3000',
-        BILLING_REVENUE_ENABLED: 'false',
-      },
-      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      max_size: '10M',
-      error_file: './logs/agent-billing-revenue-error.log',
-      out_file: './logs/agent-billing-revenue-out.log',
-      merge_logs: true,
-    },
-    {
-      name: 'agent-content-intelligence',
-      script: 'npx',
-      args: 'tsx scripts/agents/content-intelligence.ts',
-      instances: 1,
-      exec_mode: 'fork',
-      cron_restart: '0 * * * *', // hourly
-      autorestart: false,
-      watch: false,
-      max_memory_restart: '256M',
-      env: {
-        NODE_ENV: 'development',
-        VALIDATOR_BASE_URL: 'http://localhost:3000',
-        CONTENT_INTELLIGENCE_ENABLED: 'false',
-      },
-      env_production: {
-        NODE_ENV: 'production',
-        VALIDATOR_BASE_URL: 'http://localhost:3000',
-        CONTENT_INTELLIGENCE_ENABLED: 'false',
-      },
-      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      max_size: '10M',
-      error_file: './logs/agent-content-intelligence-error.log',
-      out_file: './logs/agent-content-intelligence-out.log',
-      merge_logs: true,
-    },
-    {
-      name: 'agent-orchestrator',
-      script: 'npx',
-      args: 'tsx scripts/agents/agent-orchestrator.ts',
+      name: 'hermes-vizora-customer-lifecycle',
+      script: 'bash',
+      args: [
+        '/opt/vizora/app/scripts/agents/hermes/run-hermes-skill.sh',
+        'vizora-customer-lifecycle',
+        // The exact prompt that worked end-to-end via `hermes -z`. Keeping
+        // it here (vs in the SKILL) is intentional — the SKILL is the
+        // SYSTEM-prompt-equivalent, this is the USER-prompt-equivalent
+        // that actually triggers execution. Leaving it null produces
+        // "discuss the task" behavior in cron context.
+        'Run the vizora-customer-lifecycle skill end-to-end now. Follow every step in SKILL.md exactly. Step 1: invoke list_onboarding_candidates on the vizora-platform MCP server. Step 2: for each candidate, invoke log_shadow_row on the vizora-platform server with the per-org decision (or one heartbeat invocation if zero candidates). End silently — no chat output.',
+        // P1.2 (2026-05-08): toolset filter — currently empty (no -t flag).
+        // The runner supports passing this through; the right value depends
+        // on Hermes' actual `-t TOOLSETS` semantics (category names like
+        // 'mcp' / individual tool ids / preset names — not yet verified
+        // post-credit-add). P1.3 smoke-test should attempt:
+        //   1. -t mcp (most likely correct — restricts to MCP toolset only)
+        //   2. -t mcp_vizora_list_onboarding_candidates,mcp_vizora_log_shadow_row,...
+        //      (per-tool filter; may or may not be supported)
+        // Until verified, model-side filtering is best-effort. The MCP
+        // server's token-scope check (P1.1) is the load-bearing backstop —
+        // FORBIDDEN responses prevent any unauthorized tool execution.
+        '',
+      ],
       instances: 1,
       exec_mode: 'fork',
       cron_restart: '*/30 * * * *',
       autorestart: false,
       watch: false,
       max_memory_restart: '256M',
-      env: {
-        NODE_ENV: 'development',
-        VALIDATOR_BASE_URL: 'http://localhost:3000',
-        AGENT_ORCHESTRATOR_ENABLED: 'false',
-      },
-      env_production: {
-        NODE_ENV: 'production',
-        VALIDATOR_BASE_URL: 'http://localhost:3000',
-        AGENT_ORCHESTRATOR_ENABLED: 'false',
-      },
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       max_size: '10M',
-      error_file: './logs/agent-orchestrator-error.log',
-      out_file: './logs/agent-orchestrator-out.log',
+      error_file: './logs/hermes-vizora-customer-lifecycle-error.log',
+      out_file: './logs/hermes-vizora-customer-lifecycle-out.log',
       merge_logs: true,
     },
+    {
+      name: 'hermes-vizora-support-triage',
+      script: 'bash',
+      args: [
+        '/opt/vizora/app/scripts/agents/hermes/run-hermes-skill.sh',
+        'vizora-support-triage',
+        'Run the vizora-support-triage skill end-to-end now. Follow every step in SKILL.md exactly. Step 1: invoke list_open_support_requests on the vizora MCP server. Step 4: for each ticket, invoke log_shadow_row on the vizora server with the per-ticket score (or one heartbeat invocation if zero tickets). End silently — no chat output.',
+        // P1.2 (2026-05-08): toolset filter — see customer-lifecycle entry above
+        // for the smoke-test plan. Empty for now; runner handles it as a no-op.
+        '',
+      ],
+      instances: 1,
+      exec_mode: 'fork',
+      cron_restart: '*/15 * * * *',
+      autorestart: false,
+      watch: false,
+      max_memory_restart: '256M',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      max_size: '10M',
+      error_file: './logs/hermes-vizora-support-triage-error.log',
+      out_file: './logs/hermes-vizora-support-triage-out.log',
+      merge_logs: true,
+    },
+    // ---------------------------------------------------------------------
+    // Hermes insights-poller sidecar (P0.5 — agent-platform-redesign).
+    //
+    // Polls `hermes insights --days 1 --source cli` every 5 min and
+    // back-fills cost / token data onto agent_runs rows. Also sweeps
+    // orphan rows and refines outcomes via mcp_audit_log join on
+    // agentRunId. See: docs/plans/2026-05-08-agent-platform-redesign-design.md
+    //
+    // Runs even when no Hermes agents are firing — handles the
+    // "no rows to enrich" path cleanly with zero cost.
+    {
+      name: 'hermes-insights-poller',
+      script: 'npx',
+      args: 'tsx scripts/agents/hermes/poll-insights.ts',
+      instances: 1,
+      exec_mode: 'fork',
+      cron_restart: '*/5 * * * *',
+      autorestart: false,
+      watch: false,
+      max_memory_restart: '256M',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      max_size: '10M',
+      error_file: './logs/hermes-insights-poller-error.log',
+      out_file: './logs/hermes-insights-poller-out.log',
+      merge_logs: true,
+    },
+    // Hermes-first scaffolds previously lived here (billing-revenue,
+    // content-intelligence, screen-health-customer, agent-orchestrator).
+    // They were no-op shells; per CLAUDE.md "Agent migration roadmap" each
+    // should be implemented as a Hermes skill, not a TypeScript agent —
+    // registering them in PM2 served no purpose. Re-add only if a
+    // non-Hermes implementation is intentionally chosen.
   ],
 
   // Deployment configuration (optional)

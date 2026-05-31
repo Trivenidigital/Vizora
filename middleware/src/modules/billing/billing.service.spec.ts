@@ -160,6 +160,67 @@ describe('BillingService', () => {
     expect(service).toBeDefined();
   });
 
+  describe('onModuleInit (price-ID startup validation)', () => {
+    const KEYS = [
+      'STRIPE_BASIC_MONTHLY_PRICE_ID',
+      'STRIPE_BASIC_YEARLY_PRICE_ID',
+      'RAZORPAY_BASIC_PLAN_ID',
+      'STRIPE_PRO_MONTHLY_PRICE_ID',
+      'STRIPE_PRO_YEARLY_PRICE_ID',
+      'RAZORPAY_PRO_PLAN_ID',
+      'STRIPE_ENTERPRISE_MONTHLY_PRICE_ID',
+      'STRIPE_ENTERPRISE_YEARLY_PRICE_ID',
+      'RAZORPAY_ENTERPRISE_PLAN_ID',
+    ];
+    let savedEnv: Record<string, string | undefined>;
+    let savedStrict: string | undefined;
+
+    beforeEach(() => {
+      savedEnv = {};
+      KEYS.forEach((k) => {
+        savedEnv[k] = process.env[k];
+        delete process.env[k];
+      });
+      savedStrict = process.env.BILLING_VALIDATION_STRICT;
+      delete process.env.BILLING_VALIDATION_STRICT;
+    });
+
+    afterEach(() => {
+      KEYS.forEach((k) => {
+        if (savedEnv[k] === undefined) delete process.env[k];
+        else process.env[k] = savedEnv[k];
+      });
+      if (savedStrict === undefined) delete process.env.BILLING_VALIDATION_STRICT;
+      else process.env.BILLING_VALIDATION_STRICT = savedStrict;
+    });
+
+    it('throws when STRICT mode is on and a paid-tier env var is missing', () => {
+      process.env.BILLING_VALIDATION_STRICT = 'true';
+      expect(() => service.onModuleInit()).toThrow(/Missing billing price/);
+    });
+
+    it('does NOT throw when STRICT is unset (default warn-only behavior)', () => {
+      expect(() => service.onModuleInit()).not.toThrow();
+    });
+
+    it('does NOT throw when STRICT mode is on AND all paid-tier env vars are set', () => {
+      process.env.BILLING_VALIDATION_STRICT = 'true';
+      KEYS.forEach((k) => {
+        process.env[k] = `${k}_VALUE`;
+      });
+      expect(() => service.onModuleInit()).not.toThrow();
+    });
+
+    it('does not require env vars for the free tier', () => {
+      process.env.BILLING_VALIDATION_STRICT = 'true';
+      KEYS.forEach((k) => {
+        process.env[k] = `${k}_VALUE`;
+      });
+      // Free tier env vars NOT set, but validation should pass — free has no price.
+      expect(() => service.onModuleInit()).not.toThrow();
+    });
+  });
+
   describe('getSubscriptionStatus', () => {
     it('should return subscription status for an organization', async () => {
       mockDatabaseService.organization.findUnique.mockResolvedValue(mockOrganization);

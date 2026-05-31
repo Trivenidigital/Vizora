@@ -95,7 +95,9 @@ describe('TemplateLibraryService', () => {
 
       expect(mockDb.content.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ templateOrientation: 'landscape' }),
+          where: expect.objectContaining({
+            AND: expect.arrayContaining([{ templateOrientation: 'landscape' }]),
+          }),
         }),
       );
     });
@@ -109,7 +111,9 @@ describe('TemplateLibraryService', () => {
       expect(mockDb.content.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            metadata: expect.objectContaining({ path: ['category'], equals: 'retail' }),
+            AND: expect.arrayContaining([
+              { metadata: { path: ['category'], equals: 'retail' } },
+            ]),
           }),
         }),
       );
@@ -124,10 +128,41 @@ describe('TemplateLibraryService', () => {
       expect(mockDb.content.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            OR: [
-              { name: { contains: 'promo', mode: 'insensitive' } },
-              { description: { contains: 'promo', mode: 'insensitive' } },
-            ],
+            AND: expect.arrayContaining([
+              {
+                OR: [
+                  { name: { contains: 'promo', mode: 'insensitive' } },
+                  { description: { contains: 'promo', mode: 'insensitive' } },
+                ],
+              },
+            ]),
+          }),
+        }),
+      );
+    });
+
+    it('should combine category + search via AND[] so both filters compose', async () => {
+      // Regression: previously these two filters were set as top-level
+      // sibling keys on the where object. The Prisma SQL it produced for
+      // JSON path + sibling OR returned an empty result set when both
+      // were active. AND[] forces the predicates to compose properly.
+      mockDb.content.findMany.mockResolvedValue([]);
+      mockDb.content.count.mockResolvedValue(0);
+
+      await service.search({ category: 'retail', search: 'sale' });
+
+      expect(mockDb.content.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            AND: expect.arrayContaining([
+              { metadata: { path: ['category'], equals: 'retail' } },
+              {
+                OR: [
+                  { name: { contains: 'sale', mode: 'insensitive' } },
+                  { description: { contains: 'sale', mode: 'insensitive' } },
+                ],
+              },
+            ]),
           }),
         }),
       );
@@ -241,7 +276,7 @@ describe('TemplateLibraryService', () => {
       const template = makeTemplate();
       mockDb.content.findFirst.mockResolvedValue(template);
 
-      const result = await service.findOne('tmpl-1');
+      const result = await service.findOne('tmpl-1', 'org-1');
 
       expect(result.id).toBe('tmpl-1');
       expect(result.name).toBe('Test Template');
@@ -250,14 +285,14 @@ describe('TemplateLibraryService', () => {
     it('should throw NotFoundException when template not found', async () => {
       mockDb.content.findFirst.mockResolvedValue(null);
 
-      await expect(service.findOne('nonexistent')).rejects.toThrow(NotFoundException);
+      await expect(service.findOne('nonexistent', 'org-1')).rejects.toThrow(NotFoundException);
     });
 
     it('should map metadata fields correctly', async () => {
       const template = makeTemplate();
       mockDb.content.findFirst.mockResolvedValue(template);
 
-      const result = await service.findOne('tmpl-1');
+      const result = await service.findOne('tmpl-1', 'org-1');
 
       expect(result.category).toBe('retail');
       expect(result.libraryTags).toEqual(['promo', 'sale']);
@@ -269,7 +304,7 @@ describe('TemplateLibraryService', () => {
       const template = makeTemplate({ metadata: {} });
       mockDb.content.findFirst.mockResolvedValue(template);
 
-      const result = await service.findOne('tmpl-1');
+      const result = await service.findOne('tmpl-1', 'org-1');
 
       expect(result.category).toBe('general');
       expect(result.libraryTags).toEqual([]);
@@ -281,7 +316,7 @@ describe('TemplateLibraryService', () => {
       const template = makeTemplate({ metadata: null });
       mockDb.content.findFirst.mockResolvedValue(template);
 
-      const result = await service.findOne('tmpl-1');
+      const result = await service.findOne('tmpl-1', 'org-1');
 
       expect(result.category).toBe('general');
     });
@@ -292,7 +327,7 @@ describe('TemplateLibraryService', () => {
       const template = makeTemplate();
       mockDb.content.findFirst.mockResolvedValue(template);
 
-      const result = await service.getPreview('tmpl-1');
+      const result = await service.getPreview('tmpl-1', 'org-1');
 
       expect(result.html).toBe('<h1>{{title}}</h1>');
       // Should NOT call processTemplate — raw HTML preserves data-editable attrs
@@ -311,7 +346,7 @@ describe('TemplateLibraryService', () => {
       });
       mockDb.content.findFirst.mockResolvedValue(template);
 
-      const result = await service.getPreview('tmpl-1');
+      const result = await service.getPreview('tmpl-1', 'org-1');
 
       expect(result.html).toBe('<p>No preview available</p>');
     });
@@ -687,7 +722,7 @@ describe('TemplateLibraryService', () => {
   });
 
   describe('saveUserTemplate', () => {
-    it('should save a user-owned template with org verification', async () => {
+    it('should save a user-owned non-global template via an org-scoped query', async () => {
       const template = makeTemplate({ isGlobal: false, organizationId: 'org-1' });
       mockDb.content.findFirst.mockResolvedValue(template);
       const updated = makeTemplate({ isGlobal: false, organizationId: 'org-1', name: 'New Name' });
@@ -695,8 +730,9 @@ describe('TemplateLibraryService', () => {
 
       const result = await service.saveUserTemplate('tmpl-1', { name: 'New Name' }, 'org-1');
 
+      // Org-scope + non-global must be IN the query, not a post-fetch check.
       expect(mockDb.content.findFirst).toHaveBeenCalledWith({
-        where: { id: 'tmpl-1', type: 'template' },
+        where: { id: 'tmpl-1', type: 'template', isGlobal: false, organizationId: 'org-1' },
       });
       expect(mockDb.content.update).toHaveBeenCalledWith({
         where: { id: 'tmpl-1' },
@@ -705,23 +741,27 @@ describe('TemplateLibraryService', () => {
       expect(result.id).toBe('tmpl-1');
     });
 
-    it('should reject when org does not match', async () => {
-      const template = makeTemplate({ isGlobal: false, organizationId: 'org-other' });
-      mockDb.content.findFirst.mockResolvedValue(template);
+    it('should reject when the template belongs to another org (NotFoundException, no existence leak)', async () => {
+      // The new query embeds `organizationId`, so a cross-org template
+      // doesn't match — findFirst returns null and we throw NotFound.
+      mockDb.content.findFirst.mockResolvedValue(null);
 
       await expect(
         service.saveUserTemplate('tmpl-1', { name: 'Hack' }, 'org-1'),
       ).rejects.toThrow(NotFoundException);
+      expect(mockDb.content.update).not.toHaveBeenCalled();
     });
 
-    it('should allow saving global templates', async () => {
-      const template = makeTemplate({ isGlobal: true });
-      mockDb.content.findFirst.mockResolvedValue(template);
-      mockDb.content.update.mockResolvedValue(template);
+    it('REFUSES to save a global library template even via id-guess (regression: previously mutable)', async () => {
+      // Previously, the fetch was unscoped and the post-fetch guard's AND
+      // short-circuited when isGlobal=true — so any org user could PATCH
+      // the shared library content. Now the query requires isGlobal=false.
+      mockDb.content.findFirst.mockResolvedValue(null);
 
-      const result = await service.saveUserTemplate('tmpl-1', { templateHtml: '<p>new</p>' }, 'org-1');
-
-      expect(result.id).toBe('tmpl-1');
+      await expect(
+        service.saveUserTemplate('tmpl-1', { templateHtml: '<p>hacked</p>' }, 'org-1'),
+      ).rejects.toThrow(NotFoundException);
+      expect(mockDb.content.update).not.toHaveBeenCalled();
     });
 
     it('should throw NotFoundException for missing template', async () => {

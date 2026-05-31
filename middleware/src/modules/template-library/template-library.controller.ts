@@ -91,15 +91,21 @@ export class TemplateLibraryController {
 
   @Get(':id')
   @Roles('admin', 'manager', 'viewer')
-  findOne(@Param('id', ParseIdPipe) id: string) {
-    return this.templateLibraryService.findOne(id);
+  findOne(
+    @Param('id', ParseIdPipe) id: string,
+    @CurrentUser('organizationId') organizationId: string,
+  ) {
+    return this.templateLibraryService.findOne(id, organizationId);
   }
 
   @Get(':id/preview')
   @Roles('admin', 'manager', 'viewer')
   @SkipOutputSanitize()
-  getPreview(@Param('id', ParseIdPipe) id: string) {
-    return this.templateLibraryService.getPreview(id);
+  getPreview(
+    @Param('id', ParseIdPipe) id: string,
+    @CurrentUser('organizationId') organizationId: string,
+  ) {
+    return this.templateLibraryService.getPreview(id, organizationId);
   }
 
   @Post(':id/clone')

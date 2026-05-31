@@ -19,6 +19,21 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { AUTH_CONSTANTS } from './constants/auth.constants';
 import { AuthenticatedUser } from './strategies/jwt.strategy';
 
+/**
+ * Auth endpoint rate-limit tiers. STRICT in production (per-minute caps
+ * chosen to block credential-stuffing / token-enumeration), RELAXED in
+ * dev/test so local development + CI don't trip throttles.
+ *
+ * Extracted as named constants so new public auth routes can't silently
+ * inherit a 1000-limit by copy-paste of the dev pattern. If you're
+ * adding a new public auth route, pick STRICT for sensitive operations
+ * (register, credentials, account modification) and STANDARD for
+ * lookup/validation operations.
+ */
+const RATE_LIMIT_STRICT = process.env.NODE_ENV === 'production' ? 3 : 1000;
+const RATE_LIMIT_STANDARD = process.env.NODE_ENV === 'production' ? 5 : 1000;
+const RATE_LIMIT_TTL_MS = 60_000;
+
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
@@ -88,8 +103,8 @@ export class AuthController {
   @Post('register')
   @Throttle({
     default: {
-      limit: process.env.NODE_ENV === 'production' ? 3 : 1000,
-      ttl: 60000
+      limit: RATE_LIMIT_STRICT,
+      ttl: RATE_LIMIT_TTL_MS
     }
   })
   async register(
@@ -98,7 +113,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const clientIp = req.ip || req.socket?.remoteAddress || '';
-    const result = await this.authService.register(dto, clientIp);
+    const result = await this.authService.register(dto, clientIp, req.headers?.['user-agent']);
 
     // Set httpOnly cookie with JWT token
     this.setAuthCookie(res, result.token);
@@ -128,15 +143,19 @@ export class AuthController {
   @Post('login')
   @Throttle({
     default: {
-      limit: process.env.NODE_ENV === 'production' ? 5 : 1000,
-      ttl: 60000
+      limit: RATE_LIMIT_STANDARD,
+      ttl: RATE_LIMIT_TTL_MS
     }
   })
   async login(
     @Body() dto: LoginDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.authService.login(dto);
+    const result = await this.authService.login(dto, {
+      ipAddress: req.ip || req.socket?.remoteAddress || '',
+      userAgent: req.headers?.['user-agent'],
+    });
 
     // Set httpOnly cookie with JWT token
     this.setAuthCookie(res, result.token);
@@ -163,15 +182,19 @@ export class AuthController {
   @Post('google')
   @Throttle({
     default: {
-      limit: process.env.NODE_ENV === 'production' ? 3 : 1000,
-      ttl: 60000,
+      limit: RATE_LIMIT_STRICT,
+      ttl: RATE_LIMIT_TTL_MS,
     },
   })
   async googleLogin(
     @Body() dto: GoogleLoginDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.authService.googleLogin(dto.credential);
+    const result = await this.authService.googleLogin(dto.credential, {
+      ipAddress: req.ip || req.socket?.remoteAddress || '',
+      userAgent: req.headers?.['user-agent'],
+    });
 
     // Set httpOnly cookie with JWT token
     this.setAuthCookie(res, result.token);
@@ -358,8 +381,8 @@ export class AuthController {
   @Post('forgot-password')
   @Throttle({
     default: {
-      limit: process.env.NODE_ENV === 'production' ? 5 : 1000,
-      ttl: 60000,
+      limit: RATE_LIMIT_STANDARD,
+      ttl: RATE_LIMIT_TTL_MS,
     },
   })
   async forgotPassword(@Body() dto: ForgotPasswordDto) {
@@ -377,6 +400,16 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Token validation result.' })
   @Public()
   @Get('validate-reset-token')
+  @Throttle({
+    // Match the reset-password POST cap. Without a throttle here an
+    // attacker could brute-force the token via the GET (no body, no
+    // CSRF, public endpoint) — and the responses are deterministic
+    // enough to oracle (200 + {valid:true|false}).
+    default: {
+      limit: RATE_LIMIT_STANDARD,
+      ttl: RATE_LIMIT_TTL_MS,
+    },
+  })
   async validateResetToken(@Req() req: Request) {
     const token = req.query.token as string;
     if (!token) {
@@ -400,8 +433,8 @@ export class AuthController {
   @Post('reset-password')
   @Throttle({
     default: {
-      limit: process.env.NODE_ENV === 'production' ? 5 : 1000,
-      ttl: 60000,
+      limit: RATE_LIMIT_STANDARD,
+      ttl: RATE_LIMIT_TTL_MS,
     },
   })
   async resetPassword(@Body() dto: ResetPasswordDto) {
@@ -425,8 +458,8 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Throttle({
     default: {
-      limit: process.env.NODE_ENV === 'production' ? 3 : 1000,
-      ttl: 60000,
+      limit: RATE_LIMIT_STRICT,
+      ttl: RATE_LIMIT_TTL_MS,
     },
   })
   async deleteAccount(

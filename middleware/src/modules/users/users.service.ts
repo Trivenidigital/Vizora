@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, ConflictException }
 import { Prisma } from '@vizora/database';
 import { DatabaseService } from '../database/database.service';
 import { RedisService } from '../redis/redis.service';
+import { AUTH_CONSTANTS } from '../auth/constants/auth.constants';
 import { InviteUserDto } from './dto/invite-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
@@ -203,7 +204,18 @@ export class UsersService {
       },
     });
 
-    // Invalidate auth cache so deactivation takes effect immediately
+    // Invalidate auth cache + set the user_revoked: flag so any
+    // OUTSTANDING JWT for this user is rejected on its next request,
+    // not just after the 60s user_auth: cache expires. JwtStrategy.
+    // validate reads this key on every request.
+    //
+    // Lifetime matches max token expiry so the flag naturally cleans
+    // up once no live token could still reference it.
+    await this.redisService.set(
+      `user_revoked:${id}`,
+      '1',
+      AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS,
+    );
     await this.redisService.del(`user_auth:${id}`);
 
     // Log audit event

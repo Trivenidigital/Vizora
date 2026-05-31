@@ -77,6 +77,10 @@ Thumbs.db
 uploads/
 **/uploads/
 /storage/
+# Generated content thumbnails (runtime artifacts of dev uploads).
+# Keep the directory structure but ignore the generated PNGs/JPGs.
+middleware/static/thumbnails/*
+!middleware/static/thumbnails/.gitkeep
 
 # Docker
 docker-compose.override.yml

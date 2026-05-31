@@ -3,6 +3,7 @@ import {
   Logger,
   BadRequestException,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DatabaseService } from '../database/database.service';
@@ -38,7 +39,7 @@ interface WebhookData {
 }
 
 @Injectable()
-export class BillingService {
+export class BillingService implements OnModuleInit {
   private readonly logger = new Logger(BillingService.name);
 
   constructor(
@@ -49,6 +50,52 @@ export class BillingService {
     private readonly mailService: MailService,
     private readonly redisService: RedisService,
   ) {}
+
+  /**
+   * Validate at startup that price/plan IDs are configured for every
+   * paid tier in PLAN_TIERS. Default behavior: warn. Hard-fail only
+   * when `BILLING_VALIDATION_STRICT=true` — that's a deliberate opt-in
+   * for environments that actually have paid plans wired up (Stripe/
+   * Razorpay products created, customers actively subscribing).
+   *
+   * Hotfix rationale: an earlier version of this method threw in any
+   * `NODE_ENV=production` boot, which crashed prod the moment the
+   * commit landed — prod was running free-tier-only at the time and
+   * had never needed the env vars. The validation is still useful
+   * (catches misconfig before a customer hits checkout), but the
+   * blast radius of forced-fail-at-boot is too large to default to.
+   * Opt in once the org's billing path is live.
+   */
+  onModuleInit(): void {
+    const missing: string[] = [];
+    for (const [tierId, tier] of Object.entries(PLAN_TIERS)) {
+      const isPaidTier =
+        tier.prices.usd.monthly > 0 || tier.prices.inr.monthly > 0;
+      if (!isPaidTier) continue;
+      for (const interval of ['monthly', 'yearly'] as const) {
+        const stripeKey = `STRIPE_${tierId.toUpperCase()}_${interval.toUpperCase()}_PRICE_ID`;
+        if (!process.env[stripeKey]) missing.push(stripeKey);
+      }
+      const razorpayKey = `RAZORPAY_${tierId.toUpperCase()}_PLAN_ID`;
+      if (!process.env[razorpayKey]) missing.push(razorpayKey);
+    }
+
+    if (missing.length === 0) {
+      this.logger.log(
+        `Billing price IDs validated for ${Object.keys(PLAN_TIERS).length} tier(s)`,
+      );
+      return;
+    }
+
+    const summary = `Missing billing price/plan env vars: ${missing.join(', ')}`;
+    if (process.env.BILLING_VALIDATION_STRICT === 'true') {
+      this.logger.error(summary);
+      throw new Error(summary);
+    }
+    this.logger.warn(
+      `${summary} (warn-only; set BILLING_VALIDATION_STRICT=true to fail boot)`,
+    );
+  }
 
   /**
    * Get the appropriate payment provider for an organization

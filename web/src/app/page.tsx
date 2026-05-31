@@ -4,14 +4,10 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import {
   NavigationSection,
   HeroSection,
-  DemoVideoSection,
   StatsSection,
   AIFeaturesSection,
-  HowItWorksSection,
   FeatureShowcasesSection,
-  MidPageCTASection,
   SolutionsSection,
-  TestimonialsSection,
   SecuritySection,
   PricingSection,
   FAQSection,
@@ -125,14 +121,10 @@ export default function Index() {
     >
       <NavigationSection scrolled={scrolled} menuOpen={menuOpen} setMenuOpen={setMenuOpen} nav={nav} />
       <HeroSection heroRef={heroRef} />
-      <DemoVideoSection />
       <StatsSection />
       <AIFeaturesSection />
-      <HowItWorksSection />
       <FeatureShowcasesSection activeFeatureTab={activeFeatureTab} />
-      <MidPageCTASection />
       <SolutionsSection />
-      <TestimonialsSection />
       <SecuritySection />
       <PricingSection billingCycle={billingCycle} setBillingCycle={setBillingCycle} pricing={pricing} setPricing={setPricing} />
       <FAQSection />

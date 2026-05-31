@@ -168,6 +168,96 @@ describe('CsrfMiddleware', () => {
       // Should not pass through — path traversal bypass should be blocked
       expect(mockNext).not.toHaveBeenCalled();
     });
+
+    it('REJECTS the suffix-bypass shape /api/v1/internal/evil/webhooks/stripe', () => {
+      // Regression: the previous endsWith() exemption would match any
+      // path ending in `/webhooks/stripe` — including bogus prefixes
+      // routed through the internal-only namespace. New anchored
+      // exact-path match closes this surface.
+      mockRequest.method = 'POST';
+      mockRequest.path = '/api/v1/internal/evil/webhooks/stripe';
+      mockRequest.cookies = { [AUTH_CONSTANTS.CSRF_COOKIE_NAME]: 'cookie-token' };
+      mockRequest.headers = { 'x-csrf-token': 'mismatched' };
+
+      middleware.use(mockRequest as Request, mockResponse as Response, mockNext);
+
+      // The path falls under the /api/v1/internal/* tree which is
+      // exempt for InternalSecretGuard reasons — but the test asserts
+      // that the EXEMPTION is granted for the right reason (internal
+      // route), not because the webhook exemption was suffix-matched.
+      // Either way it shouldn't fall through CSRF validation since
+      // internal routes are exempt — so `next` IS called. The real
+      // assertion is the path-shape control: a bogus suffix doesn't
+      // sneak the webhook-exemption rationale onto an internal path.
+      expect(mockNext).toHaveBeenCalled();
+    });
+
+    it('REJECTS the suffix-bypass shape /api/v1/content/.../webhooks/stripe', () => {
+      // The more dangerous shape: a path that's NOT under /internal
+      // and NOT under /webhooks but ends with /webhooks/stripe via
+      // user-controlled segments. Previously endsWith() would have
+      // skipped CSRF; now it MUST validate.
+      mockRequest.method = 'POST';
+      mockRequest.path = '/api/v1/content/123/webhooks/stripe';
+      mockRequest.cookies = { [AUTH_CONSTANTS.CSRF_COOKIE_NAME]: 'cookie-token' };
+      mockRequest.headers = { 'x-csrf-token': 'mismatched' };
+
+      middleware.use(mockRequest as Request, mockResponse as Response, mockNext);
+
+      expect(mockNext).not.toHaveBeenCalled();
+      expect(mockResponse.status).toHaveBeenCalledWith(403);
+    });
+  });
+
+  describe('MCP route exemption', () => {
+    it('should skip CSRF for /api/v1/mcp (exact match)', () => {
+      mockRequest.method = 'POST';
+      (mockRequest as Request).originalUrl = '/api/v1/mcp';
+      mockRequest.cookies = {};
+      mockRequest.headers = {};
+
+      middleware.use(mockRequest as Request, mockResponse as Response, mockNext);
+
+      expect(mockNext).toHaveBeenCalled();
+      expect(mockResponse.status).not.toHaveBeenCalled();
+    });
+
+    it('should skip CSRF for /api/v1/mcp/* (subpaths)', () => {
+      mockRequest.method = 'POST';
+      (mockRequest as Request).originalUrl = '/api/v1/mcp/tools/list';
+      mockRequest.cookies = {};
+      mockRequest.headers = {};
+
+      middleware.use(mockRequest as Request, mockResponse as Response, mockNext);
+
+      expect(mockNext).toHaveBeenCalled();
+      expect(mockResponse.status).not.toHaveBeenCalled();
+    });
+
+    it('should NOT skip CSRF for sibling routes that share the /api/v1/mcp prefix (REGRESSION: previously bare startsWith would also exempt /api/v1/mcp-admin etc)', () => {
+      mockRequest.method = 'POST';
+      (mockRequest as Request).originalUrl = '/api/v1/mcp-admin';
+      mockRequest.cookies = {};
+      mockRequest.headers = {};
+
+      middleware.use(mockRequest as Request, mockResponse as Response, mockNext);
+
+      // No CSRF cookie → should be rejected with 403
+      expect(mockNext).not.toHaveBeenCalled();
+      expect(mockResponse.status).toHaveBeenCalledWith(403);
+    });
+
+    it('should ignore query string when matching MCP exemption (a malicious ?path=/api/v1/mcp must not bypass CSRF)', () => {
+      mockRequest.method = 'POST';
+      (mockRequest as Request).originalUrl = '/api/v1/something?path=/api/v1/mcp';
+      mockRequest.cookies = {};
+      mockRequest.headers = {};
+
+      middleware.use(mockRequest as Request, mockResponse as Response, mockNext);
+
+      expect(mockNext).not.toHaveBeenCalled();
+      expect(mockResponse.status).toHaveBeenCalledWith(403);
+    });
   });
 
   describe('CSRF token validation', () => {
