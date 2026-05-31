@@ -1,10 +1,12 @@
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { SubscriptionActiveGuard } from './subscription-active.guard';
 import { DatabaseService } from '../../database/database.service';
 
 describe('SubscriptionActiveGuard', () => {
   let guard: SubscriptionActiveGuard;
   let mockDatabaseService: jest.Mocked<DatabaseService>;
+  let mockReflector: jest.Mocked<Reflector>;
   let mockExecutionContext: jest.Mocked<ExecutionContext>;
   let mockRequest: any;
 
@@ -13,6 +15,9 @@ describe('SubscriptionActiveGuard', () => {
       organization: {
         findUnique: jest.fn(),
       },
+    } as any;
+    mockReflector = {
+      getAllAndOverride: jest.fn().mockReturnValue(false),
     } as any;
 
     mockRequest = {
@@ -27,9 +32,11 @@ describe('SubscriptionActiveGuard', () => {
       switchToHttp: jest.fn().mockReturnValue({
         getRequest: jest.fn().mockReturnValue(mockRequest),
       }),
+      getHandler: jest.fn().mockReturnValue(function handler() {}),
+      getClass: jest.fn().mockReturnValue(class TestController {}),
     } as any;
 
-    guard = new SubscriptionActiveGuard(mockDatabaseService);
+    guard = new SubscriptionActiveGuard(mockDatabaseService, mockReflector);
   });
 
   it('should be defined', () => {
@@ -64,6 +71,17 @@ describe('SubscriptionActiveGuard', () => {
         } as any);
 
         await expect(guard.canActivate(mockExecutionContext)).rejects.toThrow(ForbiddenException);
+      });
+
+      it('should allow public POST device endpoints without a dashboard user', async () => {
+        mockRequest.method = 'POST';
+        mockRequest.user = undefined;
+        mockReflector.getAllAndOverride.mockReturnValueOnce(true);
+
+        const result = await guard.canActivate(mockExecutionContext);
+
+        expect(result).toBe(true);
+        expect(mockDatabaseService.organization.findUnique).not.toHaveBeenCalled();
       });
 
       it('should block PATCH requests with expired subscription', async () => {

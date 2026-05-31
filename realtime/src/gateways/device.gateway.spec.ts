@@ -102,14 +102,30 @@ describe('DeviceGateway', () => {
     getPresignedUrl: jest.fn().mockResolvedValue('https://storage/test.png'),
   };
 
-  // Mock socket that auto-invokes ack callbacks on emit
-  const mockRemoteSocket = {
-    id: 'remote-socket-1',
-    data: { deliveryAckCapable: true, deviceId: 'device-1' },
-    emit: jest.fn((_event: string, _data: any, ackCb?: () => void) => {
+  const createDeliverySocket = (
+    id: string,
+    options: {
+      token?: string;
+      deviceId?: string;
+      organizationId?: string;
+      deliveryAckCapable?: boolean;
+      emit?: jest.Mock;
+    } = {},
+  ) => ({
+    id,
+    data: {
+      deliveryAckCapable: options.deliveryAckCapable ?? true,
+      deviceId: options.deviceId ?? 'device-1',
+      organizationId: options.organizationId ?? 'org-1',
+      deviceTokenHash: hashToken(options.token ?? 'valid-token'),
+    },
+    emit: options.emit ?? jest.fn((_event: string, _data: any, ackCb?: () => void) => {
       if (ackCb) ackCb();
     }),
-  };
+  });
+
+  // Mock socket that auto-invokes ack callbacks on emit
+  const mockRemoteSocket = createDeliverySocket('remote-socket-1');
 
   const mockServer = {
     to: jest.fn().mockReturnValue({
@@ -144,6 +160,26 @@ describe('DeviceGateway', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockRemoteSocket.emit.mockImplementation((_event: string, _data: any, ackCb?: () => void) => {
+      if (ackCb) ackCb();
+    });
+    mockDatabaseService.display.findUnique.mockResolvedValue({
+      id: 'device-1',
+      organizationId: 'org-1',
+      isDisabled: false,
+      nickname: 'Test Device',
+      deviceIdentifier: 'test-id',
+      jwtToken: hashToken('valid-token'),
+    });
+    mockDatabaseService.display.update.mockResolvedValue({
+      nickname: 'Test Device',
+      deviceIdentifier: 'test-id',
+    });
+    mockDatabaseService.display.updateMany.mockResolvedValue({ count: 1 });
+    mockDatabaseService.display.findMany.mockResolvedValue([]);
+    mockServer.in.mockReturnValue({
+      fetchSockets: jest.fn().mockResolvedValue([mockRemoteSocket]),
+    });
     // Use fake timers to prevent setInterval leaks
     jest.useFakeTimers();
 
@@ -736,6 +772,7 @@ describe('DeviceGateway', () => {
         data: {
           deviceId: 'device-1',
           organizationId: 'org-1',
+          deviceTokenHash: hashToken('valid-token'),
           deliveryAckCapable: true,
         },
         emit,
@@ -775,6 +812,7 @@ describe('DeviceGateway', () => {
         data: {
           deviceId: 'device-1',
           organizationId: 'org-1',
+          deviceTokenHash: hashToken('valid-token'),
           deliveryAckCapable: true,
         },
       });
@@ -805,6 +843,7 @@ describe('DeviceGateway', () => {
         data: {
           deviceId: 'device-1',
           organizationId: 'org-1',
+          deviceTokenHash: hashToken('valid-token'),
           deliveryAckCapable: true,
         },
         emit,
@@ -1206,6 +1245,7 @@ describe('DeviceGateway', () => {
         data: {
           deviceId: 'device-1',
           organizationId: 'org-1',
+          deviceTokenHash: hashToken('valid-token'),
           deliveryAckCapable: true,
         },
         emit: pendingClientEmit,
@@ -1273,6 +1313,32 @@ describe('DeviceGateway', () => {
       );
     });
 
+    it('should queue playlist and disconnect a stale active device socket before server push', async () => {
+      const staleSocket = createDeliverySocket('stale-socket', { token: 'stale-device-token' });
+      staleSocket.disconnect = jest.fn();
+      mockDatabaseService.display.findUnique.mockResolvedValueOnce({
+        id: 'device-1',
+        organizationId: 'org-1',
+        isDisabled: false,
+        jwtToken: hashToken('current-device-token'),
+      });
+      (gateway as any).deviceSockets.set('device-1', 'stale-socket');
+      mockServer.in.mockReturnValueOnce({
+        fetchSockets: jest.fn().mockResolvedValue([staleSocket]),
+      });
+
+      const result = await gateway.sendPlaylistUpdate('device-1', { id: 'p-stale', name: 'Stale', items: [] } as any);
+
+      expect(result).toEqual({ delivered: false, reason: 'no_sockets' });
+      expect(staleSocket.emit).toHaveBeenCalledWith('error', { message: 'device_token_stale' });
+      expect(staleSocket.disconnect).toHaveBeenCalledWith(true);
+      expect(staleSocket.emit).not.toHaveBeenCalledWith('playlist:update', expect.anything(), expect.any(Function));
+      expect(mockRedisService.setPendingPlaylist).toHaveBeenCalledWith(
+        'device-1',
+        expect.objectContaining({ id: 'p-stale' }),
+      );
+    });
+
     it('should requeue playlist when the device sends a negative ack', async () => {
       mockRemoteSocket.emit.mockImplementationOnce(
         (_event: string, _data: any, ackCb?: (ack?: { ok: boolean; error?: string }) => void) => {
@@ -1293,7 +1359,12 @@ describe('DeviceGateway', () => {
     it('should treat no-ack legacy sockets as best-effort delivered', async () => {
       const legacySocket = {
         id: 'legacy-socket',
-        data: { deliveryAckCapable: false, deviceId: 'device-1' },
+        data: {
+          deliveryAckCapable: false,
+          deviceId: 'device-1',
+          organizationId: 'org-1',
+          deviceTokenHash: hashToken('valid-token'),
+        },
         emit: jest.fn(),
       };
       (gateway as any).deviceSockets.set('device-1', 'legacy-socket');
@@ -1388,7 +1459,12 @@ describe('DeviceGateway', () => {
     it('should treat no-ack legacy sockets as best-effort delivered for commands', async () => {
       const legacySocket = {
         id: 'legacy-socket',
-        data: { deliveryAckCapable: false, deviceId: 'device-1' },
+        data: {
+          deliveryAckCapable: false,
+          deviceId: 'device-1',
+          organizationId: 'org-1',
+          deviceTokenHash: hashToken('valid-token'),
+        },
         emit: jest.fn(),
       };
       (gateway as any).deviceSockets.set('device-1', 'legacy-socket');
@@ -1405,6 +1481,33 @@ describe('DeviceGateway', () => {
         expect.objectContaining({ type: 'reload', timestamp: expect.any(String) }),
       );
       expect(mockRedisService.addDeviceCommand).not.toHaveBeenCalled();
+    });
+
+    it('should queue command and disconnect a stale active device socket before server push', async () => {
+      const staleSocket = createDeliverySocket('stale-socket', { token: 'stale-device-token' });
+      staleSocket.disconnect = jest.fn();
+      mockDatabaseService.display.findUnique.mockResolvedValueOnce({
+        id: 'device-1',
+        organizationId: 'org-1',
+        isDisabled: false,
+        jwtToken: hashToken('current-device-token'),
+      });
+      (gateway as any).deviceSockets.set('device-1', 'stale-socket');
+      mockServer.in.mockReturnValueOnce({
+        fetchSockets: jest.fn().mockResolvedValue([staleSocket]),
+      });
+      const command = { type: 'reload' as any };
+
+      const result = await gateway.sendCommand('device-1', command);
+
+      expect(result).toEqual({ delivered: false, reason: 'no_sockets' });
+      expect(staleSocket.emit).toHaveBeenCalledWith('error', { message: 'device_token_stale' });
+      expect(staleSocket.disconnect).toHaveBeenCalledWith(true);
+      expect(staleSocket.emit).not.toHaveBeenCalledWith('command', expect.anything(), expect.any(Function));
+      expect(mockRedisService.addDeviceCommand).toHaveBeenCalledWith(
+        'device-1',
+        expect.objectContaining({ type: 'reload', timestamp: expect.any(String) }),
+      );
     });
   });
 
@@ -1660,14 +1763,13 @@ describe('DeviceGateway', () => {
   });
 
   describe('sendQrOverlayUpdate', () => {
-    it('should emit qr-overlay:update to device room', async () => {
+    it('should emit qr-overlay:update to the current active device socket', async () => {
       const qrOverlay = { enabled: true, url: 'https://example.com', position: 'bottom-right' };
 
       await gateway.sendQrOverlayUpdate('device-1', qrOverlay);
 
-      expect(mockServer.to).toHaveBeenCalledWith('device:device-1');
-      const emitFn = mockServer.to('device:device-1').emit;
-      expect(emitFn).toHaveBeenCalledWith(
+      expect(mockServer.in).toHaveBeenCalledWith('device:device-1');
+      expect(mockRemoteSocket.emit).toHaveBeenCalledWith(
         'qr-overlay:update',
         expect.objectContaining({ qrOverlay }),
       );
@@ -1675,17 +1777,52 @@ describe('DeviceGateway', () => {
 
     it('should pass through data and include timestamp', async () => {
       const qrOverlay = { enabled: false };
+      const qrSocket = createDeliverySocket('qr-socket', { deviceId: 'device-5' });
+      (gateway as any).deviceSockets.set('device-5', 'qr-socket');
+      mockServer.in.mockReturnValueOnce({
+        fetchSockets: jest.fn().mockResolvedValue([qrSocket]),
+      });
+      mockDatabaseService.display.findUnique.mockResolvedValueOnce({
+        id: 'device-5',
+        organizationId: 'org-1',
+        isDisabled: false,
+        jwtToken: hashToken('valid-token'),
+      });
 
       await gateway.sendQrOverlayUpdate('device-5', qrOverlay);
 
-      expect(mockServer.to).toHaveBeenCalledWith('device:device-5');
-      const emitFn = mockServer.to('device:device-5').emit;
-      expect(emitFn).toHaveBeenCalledWith(
+      expect(mockServer.in).toHaveBeenCalledWith('device:device-5');
+      expect(qrSocket.emit).toHaveBeenCalledWith(
         'qr-overlay:update',
         expect.objectContaining({
           qrOverlay: { enabled: false },
           timestamp: expect.any(String),
         }),
+      );
+    });
+
+    it('should not emit qr-overlay:update to a stale active device socket', async () => {
+      const qrOverlay = { enabled: true };
+      const staleSocket = createDeliverySocket('stale-socket', { token: 'stale-device-token' });
+      staleSocket.disconnect = jest.fn();
+      mockDatabaseService.display.findUnique.mockResolvedValueOnce({
+        id: 'device-1',
+        organizationId: 'org-1',
+        isDisabled: false,
+        jwtToken: hashToken('current-device-token'),
+      });
+      (gateway as any).deviceSockets.set('device-1', 'stale-socket');
+      mockServer.in.mockReturnValueOnce({
+        fetchSockets: jest.fn().mockResolvedValue([staleSocket]),
+      });
+
+      await gateway.sendQrOverlayUpdate('device-1', qrOverlay);
+
+      expect(staleSocket.emit).toHaveBeenCalledWith('error', { message: 'device_token_stale' });
+      expect(staleSocket.disconnect).toHaveBeenCalledWith(true);
+      expect(staleSocket.emit).not.toHaveBeenCalledWith(
+        'qr-overlay:update',
+        expect.objectContaining({ qrOverlay }),
       );
     });
   });

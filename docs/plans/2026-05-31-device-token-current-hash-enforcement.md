@@ -48,11 +48,13 @@ Awesome-hermes-agent ecosystem check: not applicable; this is a local auth-bound
    - Preserve user-token handshake behavior.
    - Store the authenticated token hash on `client.data`.
    - Revalidate `client.data.deviceTokenHash` against the DB-current `Display.jwtToken` in `WsDeviceGuard` so already-connected sockets fail closed after re-pair.
+   - Revalidate server-to-device delivery sockets before playlist, command, and QR-overlay pushes so idle stale sockets cannot receive payloads after re-pair.
    - Disable automatic token rotation until a future design supports grace tokens or an ACK-backed two-phase rotation flow.
+   - Keep the guard revalidation cache very short; this reduces burst duplicate checks but does not weaken server-push enforcement.
 
 3. Tests
    - Middleware: stale signed device token is rejected before content lookup, heartbeat write, or schedule lookup; missing stored token hash is rejected; matching hash still streams.
-   - Realtime: stale signed device token is rejected before room join/status update; matching hash connects; connected device sockets are rejected by guard if their token hash is no longer current; near-expiry tokens do not auto-rotate.
+   - Realtime: stale signed device token is rejected before room join/status update; matching hash connects; connected device sockets are rejected by guard if their token hash is no longer current; server-push delivery skips stale sockets; near-expiry tokens do not auto-rotate.
 
 ## Runtime-State Verification
 
@@ -66,6 +68,7 @@ Before any deployment of fail-closed token-hash enforcement:
 
 - `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="displays.controller|schedules.controller|device-content.controller"`
 - `pnpm --filter @vizora/realtime test -- --runInBand --testPathPattern="device.gateway|ws-auth.guard"`
+- `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="subscription-active.guard|displays.controller|schedules.controller|device-content.controller"`
 - `pnpm --filter @vizora/middleware exec tsc --noEmit --pretty false`
 - `npx nx build @vizora/realtime`
 - Multi-agent review before broader affected tests.

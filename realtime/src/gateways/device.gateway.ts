@@ -196,11 +196,53 @@ export class DeviceGateway
     );
   }
 
-  private filterDeliverySockets<T extends { id?: string; data?: Record<string, any> }>(
+  private async isCurrentDeliveryDeviceSocket(
+    client: { id?: string; data?: Record<string, any>; emit?: (...args: any[]) => void; disconnect?: (close?: boolean) => void },
+    deviceId: string,
+  ): Promise<boolean> {
+    if (!this.isDeliveryDeviceSocket(client, deviceId)) {
+      return false;
+    }
+
+    const display = await this.databaseService.display.findUnique({
+      where: { id: deviceId },
+      select: { organizationId: true, isDisabled: true, jwtToken: true },
+    });
+
+    if (
+      display &&
+      display.organizationId === client.data?.organizationId &&
+      !display.isDisabled &&
+      isCurrentDeviceToken(display.jwtToken, client.data?.deviceTokenHash)
+    ) {
+      return true;
+    }
+
+    this.logger.warn(`Skipping delivery to stale device socket ${client.id} for device ${deviceId}`);
+    client.emit?.('error', { message: 'device_token_stale' });
+    client.disconnect?.(true);
+    if (this.isActiveDeviceSocket(client, deviceId)) {
+      this.deviceSockets.delete(deviceId);
+    }
+    return false;
+  }
+
+  private async filterCurrentDeliverySockets<T extends {
+    id?: string;
+    data?: Record<string, any>;
+    emit?: (...args: any[]) => void;
+    disconnect?: (close?: boolean) => void;
+  }>(
     sockets: T[],
     deviceId: string,
-  ): T[] {
-    return sockets.filter((socket) => this.isDeliveryDeviceSocket(socket, deviceId));
+  ): Promise<T[]> {
+    const currentSockets: T[] = [];
+    for (const socket of sockets) {
+      if (await this.isCurrentDeliveryDeviceSocket(socket, deviceId)) {
+        currentSockets.push(socket);
+      }
+    }
+    return currentSockets;
   }
 
   hasActiveDeviceSocket(deviceId: string): boolean {
@@ -1501,7 +1543,7 @@ export class DeviceGateway
     // Get all sockets in the device room
     const roomName = `device:${deviceId}`;
     const allSockets = await this.server.in(roomName).fetchSockets();
-    const sockets = this.filterDeliverySockets(allSockets as any[], deviceId);
+    const sockets = await this.filterCurrentDeliverySockets(allSockets as any[], deviceId);
 
     if (sockets.length === 0) {
       this.logger.warn(`pushPlaylist: no sockets in room ${roomName} for device ${deviceId} — queuing for reconnect`);
@@ -1544,7 +1586,7 @@ export class DeviceGateway
     const commandWithTimestamp = { ...command, timestamp: new Date().toISOString() };
     const roomName = `device:${deviceId}`;
     const allSockets = await this.server.in(roomName).fetchSockets();
-    const sockets = this.filterDeliverySockets(allSockets as any[], deviceId);
+    const sockets = await this.filterCurrentDeliverySockets(allSockets as any[], deviceId);
 
     if (sockets.length === 0) {
       this.logger.warn(`sendCommand: no sockets for device ${deviceId} — queuing`);
@@ -1820,11 +1862,17 @@ export class DeviceGateway
    * Send a QR overlay update to a specific device
    */
   async sendQrOverlayUpdate(deviceId: string, qrOverlay: any): Promise<void> {
-    this.server.to(`device:${deviceId}`).emit('qr-overlay:update', {
-      qrOverlay,
-      timestamp: new Date().toISOString(),
-    });
-    this.logger.log(`Sent QR overlay update to device: ${deviceId}`);
+    const roomName = `device:${deviceId}`;
+    const allSockets = await this.server.in(roomName).fetchSockets();
+    const sockets = await this.filterCurrentDeliverySockets(allSockets as any[], deviceId);
+
+    for (const socket of sockets) {
+      socket.emit?.('qr-overlay:update', {
+        qrOverlay,
+        timestamp: new Date().toISOString(),
+      });
+    }
+    this.logger.log(`Sent QR overlay update to ${sockets.length} active socket(s) for device: ${deviceId}`);
   }
 
   /**

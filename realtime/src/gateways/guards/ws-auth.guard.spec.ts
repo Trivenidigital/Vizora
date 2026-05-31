@@ -75,5 +75,26 @@ describe('WebSocket auth guards', () => {
       await expect(guard.canActivate(createContext(client))).resolves.toBe(true);
       expect(client.disconnect).not.toHaveBeenCalled();
     });
+
+    it('should reuse a fresh token validation within the short guard cache window', async () => {
+      jest.spyOn(Date, 'now').mockReturnValue(1_000);
+      const guard = new WsDeviceGuard(databaseService);
+      const client = {
+        id: 'socket-1',
+        data: {
+          deviceId: 'device-1',
+          organizationId: 'org-1',
+          deviceTokenHash: hashToken('valid-token'),
+        },
+        emit: jest.fn(),
+        disconnect: jest.fn(),
+      };
+
+      await expect(guard.canActivate(createContext(client))).resolves.toBe(true);
+      await expect(guard.canActivate(createContext(client))).resolves.toBe(true);
+
+      expect(databaseService.display.findUnique).toHaveBeenCalledTimes(1);
+      jest.restoreAllMocks();
+    });
   });
 });
