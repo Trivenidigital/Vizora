@@ -1,5 +1,47 @@
 # Vizora - Task Tracker
 
+## In Progress: PR #34 Readiness Residuals (2026-05-31)
+
+**Branch:** `fix/readiness-pr34-residual`
+
+**Why now:** PR #34 is the only remaining open PR, but it is stale, dirty against main, and has failing April checks. Current main already absorbed part of it (`TRUST_PROXY_HOPS`), while web CSP hardening, realtime orphan notification cleanup, and content lifecycle archive endpoint fixes still have residual gaps.
+
+**New primitives introduced:** none. This ports stale PR behavior into existing Vizora modules/scripts.
+
+**Hermes-first analysis:** not applicable. This task is repository runtime hardening in existing web/middleware/realtime/ops paths, not a business-agent workflow, MCP tool, or AI/provider spend path.
+
+**Plan/design:** `docs/plans/2026-05-31-pr34-readiness-residuals.md`
+
+**Plan**
+- [x] Classify PR #34 diff against current `origin/main`.
+- [x] Port only residual web security header/CSP fixes.
+- [x] Port middleware unhandled-rejection and bind-error diagnostics without replacing current `TRUST_PROXY_HOPS`.
+- [x] Port realtime orphan Redis notification cleanup with tests.
+- [x] Port content-lifecycle archive endpoint and failure-classification fixes while preserving current inline operator alerts.
+- [x] Update env/docs for `TRUST_PROXY_HOPS` and CI web build env.
+- [x] Run focused tests/builds, review, PR, CI, merge.
+- [ ] Close or supersede stale PR #34 after replacement is merged.
+
+**Evidence**
+- Replacement PR branch: `fix/readiness-pr34-residual`; stale PR #34 is not mergeable on current main and is superseded by this branch.
+- Security/runtime reviewer: initial CSP and external image findings fixed; final re-review CLEAN.
+- Ops/realtime reviewer: initial lock-scope, CI wiring, overlap, and archive-error findings fixed; final re-review CLEAN.
+- `pnpm --filter @vizora/realtime test -- --runInBand --testPathPattern=notification.service` - pass, 24 tests.
+- `pnpm --filter @vizora/web test -- --runInBand --testPathPattern=next.config.security` - pass, 4 tests.
+- `pnpm --filter @vizora/web test -- --runInBand --testPathPattern="ContentRenderer|next.config.security"` - pass, 2 suites / 5 tests.
+- `pnpm test:ops` - pass, 5 tests.
+- `pnpm --filter @vizora/realtime test -- --runInBand` - pass, 11 suites / 248 tests.
+- `pnpm --filter @vizora/web test -- --runInBand` - pass, 88 suites / 910 tests.
+- `pnpm --filter @vizora/middleware test -- --runInBand` - pass, 141 suites / 2763 tests.
+- `npx nx build @vizora/middleware` - pass with existing webpack warnings.
+- `npx nx build @vizora/realtime` - pass with existing source-map / optional `ws` warnings.
+- `NODE_OPTIONS=--max-old-space-size=4096 NEXT_PUBLIC_API_URL=http://localhost:3000 NEXT_PUBLIC_SOCKET_URL=http://localhost:3002 BACKEND_URL=http://localhost:3000 npx nx build @vizora/web` - pass with existing Next middleware/proxy deprecation and TypeScript reference warnings.
+- Direct ESLint equivalent (`ESLINT_USE_FLAT_CONFIG=false eslint "middleware/src/**/*.ts" "realtime/src/**/*.ts"`) - exit 0, 186 warnings, no errors. Local `pnpm lint` wrapper is Windows-incompatible because the script uses Unix-style env assignment.
+- Ops TypeScript check (`tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --types node scripts/ops/content-lifecycle.ts scripts/ops/lib/archive-error.ts`) - pass.
+- `git diff --check` - pass; line-ending warnings only.
+
+---
+
 ## In Progress: Customer Dashboard Quality + Performance Pass (2026-05-31)
 
 **Branch:** `feat/customer-dashboard-quality-pass`
