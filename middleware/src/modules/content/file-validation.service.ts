@@ -1,11 +1,22 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import * as crypto from 'crypto';
+import * as fs from 'fs';
 import { lookup } from 'dns/promises';
+
+type MagicNumberSignature = Buffer | Array<{ offset: number; bytes: Buffer }>;
+
+interface AllowedFileType {
+  extensions: string[];
+  maxSize: number;
+  magicNumbers: MagicNumberSignature[];
+}
 
 @Injectable()
 export class FileValidationService {
+  private readonly SUSPICIOUS_SCAN_BYTES = 10_000;
+
   // Allowed MIME types with their magic number signatures
-  private readonly allowedTypes = {
+  private readonly allowedTypes: Record<string, AllowedFileType> = {
     // Images
     'image/jpeg': {
       extensions: ['.jpg', '.jpeg'],
@@ -33,7 +44,10 @@ export class FileValidationService {
       extensions: ['.webp'],
       maxSize: 10 * 1024 * 1024,
       magicNumbers: [
-        Buffer.from([0x52, 0x49, 0x46, 0x46]), // RIFF (WebP container)
+        [
+          { offset: 0, bytes: Buffer.from([0x52, 0x49, 0x46, 0x46]) }, // RIFF
+          { offset: 8, bytes: Buffer.from([0x57, 0x45, 0x42, 0x50]) }, // WEBP
+        ],
       ],
     },
     // Videos
@@ -61,7 +75,10 @@ export class FileValidationService {
       extensions: ['.avi'],
       maxSize: 100 * 1024 * 1024, // 100MB
       magicNumbers: [
-        Buffer.from([0x52, 0x49, 0x46, 0x46]), // RIFF
+        [
+          { offset: 0, bytes: Buffer.from([0x52, 0x49, 0x46, 0x46]) }, // RIFF
+          { offset: 8, bytes: Buffer.from([0x41, 0x56, 0x49, 0x20]) }, // AVI
+        ],
       ],
     },
     'video/webm': {
@@ -118,9 +135,7 @@ export class FileValidationService {
     }
 
     // 4. Verify magic numbers (prevent MIME type spoofing)
-    const validMagicNumber = typeConfig.magicNumbers.some((magic) => {
-      return file.slice(0, magic.length).equals(magic);
-    });
+    const validMagicNumber = this.hasValidMagicNumber(file, typeConfig);
 
     if (!validMagicNumber) {
       throw new BadRequestException(
@@ -129,7 +144,7 @@ export class FileValidationService {
     }
 
     // 5. Scan for suspicious content (basic checks)
-    const suspicious = this.detectSuspiciousContent(file);
+    const suspicious = this.detectSuspiciousContent(file, mimeType);
     if (suspicious) {
       throw new BadRequestException(
         'File contains suspicious content and has been rejected',
@@ -146,13 +161,145 @@ export class FileValidationService {
     };
   }
 
+  async validateFileAtPath(
+    filePath: string,
+    filename: string,
+    mimeType: string,
+    expectedSize?: number,
+  ): Promise<{ valid: boolean; actualType?: string; hash: string }> {
+    if (!this.allowedTypes[mimeType]) {
+      throw new BadRequestException(
+        `File type not allowed. Allowed: ${Object.keys(this.allowedTypes).join(', ')}`,
+      );
+    }
+
+    const typeConfig = this.allowedTypes[mimeType];
+    const extension = filename.toLowerCase().substring(filename.lastIndexOf('.'));
+    if (!typeConfig.extensions.includes(extension)) {
+      throw new BadRequestException(
+        `Invalid file extension. Expected: ${typeConfig.extensions.join(', ')}`,
+      );
+    }
+
+    const stat = await fs.promises.stat(filePath);
+    if (expectedSize !== undefined && stat.size !== expectedSize) {
+      throw new BadRequestException('Uploaded file size changed during validation');
+    }
+
+    if (stat.size > typeConfig.maxSize) {
+      throw new BadRequestException(
+        `File too large. Max size: ${typeConfig.maxSize / (1024 * 1024)}MB`,
+      );
+    }
+
+    const head = await this.readFileHead(filePath, this.getHeadReadSize(typeConfig));
+    if (!this.hasValidMagicNumber(head, typeConfig)) {
+      throw new BadRequestException(
+        'File content does not match declared type (possible spoofing attempt)',
+      );
+    }
+
+    const { hash, suspicious } = await this.hashFileAndDetectSuspicious(filePath, mimeType);
+    if (suspicious) {
+      throw new BadRequestException(
+        'File contains suspicious content and has been rejected',
+      );
+    }
+
+    return {
+      valid: true,
+      actualType: mimeType,
+      hash,
+    };
+  }
+
+  private hasValidMagicNumber(file: Buffer, typeConfig: AllowedFileType): boolean {
+    return typeConfig.magicNumbers.some((signature) => {
+      if (Array.isArray(signature)) {
+        return signature.every(({ offset, bytes }) =>
+          file.length >= offset + bytes.length &&
+          file.subarray(offset, offset + bytes.length).equals(bytes),
+        );
+      }
+
+      return file.subarray(0, signature.length).equals(signature);
+    });
+  }
+
+  private getHeadReadSize(typeConfig: AllowedFileType): number {
+    const magicBytes = typeConfig.magicNumbers.reduce((max, signature) => {
+      if (Array.isArray(signature)) {
+        return Math.max(
+          max,
+          ...signature.map(({ offset, bytes }) => offset + bytes.length),
+        );
+      }
+
+      return Math.max(max, signature.length);
+    }, 0);
+
+    return Math.max(magicBytes, this.SUSPICIOUS_SCAN_BYTES);
+  }
+
+  private async readFileHead(filePath: string, bytesToRead: number): Promise<Buffer> {
+    const handle = await fs.promises.open(filePath, 'r');
+    try {
+      const buffer = Buffer.alloc(bytesToRead);
+      const { bytesRead } = await handle.read(buffer, 0, bytesToRead, 0);
+      return buffer.subarray(0, bytesRead);
+    } finally {
+      await handle.close();
+    }
+  }
+
+  private async hashFileAndDetectSuspicious(
+    filePath: string,
+    mimeType: string,
+  ): Promise<{ hash: string; suspicious: boolean }> {
+    const hash = crypto.createHash('sha256');
+    const stream = fs.createReadStream(filePath);
+    const scanFullFile = mimeType === 'application/pdf';
+    let suspicious = false;
+    let scannedBytes = 0;
+    let rollingText = '';
+
+    for await (const chunk of stream) {
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      hash.update(buffer);
+
+      if (!suspicious && scanFullFile) {
+        rollingText = `${rollingText}${buffer.toString('utf-8')}`;
+        suspicious = this.detectSuspiciousText(rollingText, mimeType);
+        rollingText = rollingText.slice(-256);
+      } else if (!suspicious && scannedBytes < this.SUSPICIOUS_SCAN_BYTES) {
+        const remaining = this.SUSPICIOUS_SCAN_BYTES - scannedBytes;
+        const scanBuffer = buffer.subarray(0, remaining);
+        scannedBytes += scanBuffer.length;
+        rollingText = `${rollingText}${scanBuffer.toString('utf-8')}`;
+        suspicious = this.detectSuspiciousText(rollingText, mimeType);
+      }
+    }
+
+    return {
+      hash: hash.digest('hex'),
+      suspicious,
+    };
+  }
+
   /**
    * Basic malware/script detection
    * Checks for embedded scripts, suspicious strings
    */
-  private detectSuspiciousContent(file: Buffer): boolean {
-    const content = file.toString('utf-8', 0, Math.min(file.length, 10000)); // Check first 10KB
+  private detectSuspiciousContent(file: Buffer, mimeType: string): boolean {
+    const bytesToScan = mimeType === 'application/pdf'
+      ? file.length
+      : Math.min(file.length, this.SUSPICIOUS_SCAN_BYTES);
+    const content = file.toString('utf-8', 0, bytesToScan);
 
+    return this.detectSuspiciousText(content, mimeType);
+  }
+
+  private detectSuspiciousText(content: string, mimeType: string): boolean {
     // Suspicious patterns that shouldn't be in media files
     const suspiciousPatterns = [
       /<script/i,
@@ -165,6 +312,10 @@ export class FileValidationService {
       /\/EmbeddedFile/i, // PDF with embedded files
     ];
 
+    if (mimeType === 'application/pdf') {
+      suspiciousPatterns.push(/\/JS\b/i, /\/JavaScript\b/i);
+    }
+
     return suspiciousPatterns.some((pattern) => pattern.test(content));
   }
 
@@ -174,7 +325,7 @@ export class FileValidationService {
   sanitizeFilename(filename: string): string {
     // Remove path separators and dangerous characters
     return filename
-      .replace(/[\/\\]/g, '')
+      .replace(/[/\\]/g, '')
       .replace(/[^\w.-]/g, '_')
       .substring(0, 255); // Max filename length
   }

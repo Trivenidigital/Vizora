@@ -16,6 +16,9 @@ import { StorageService } from '../storage/storage.service';
 import { StorageQuotaService } from '../storage/storage-quota.service';
 import { SubscriptionActiveGuard } from '../billing/guards/subscription-active.guard';
 import { DatabaseService } from '../database/database.service';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 
 describe('ContentController', () => {
   let controller: ContentController;
@@ -60,18 +63,21 @@ describe('ContentController', () => {
 
     mockThumbnailService = {
       generateThumbnail: jest.fn().mockResolvedValue('/static/thumbnails/thumb-123.jpg'),
+      generateThumbnailFromPath: jest.fn().mockResolvedValue('/static/thumbnails/thumb-123.jpg'),
       generateThumbnailFromUrl: jest.fn().mockResolvedValue('/static/thumbnails/thumb-url-123.jpg'),
     } as any;
 
     mockFileValidationService = {
       validateUrl: jest.fn(),
       validateFile: jest.fn(),
+      validateFileAtPath: jest.fn(),
       sanitizeFilename: jest.fn(),
     } as any;
 
     mockStorageService = {
       isMinioAvailable: jest.fn().mockReturnValue(false),
       uploadFile: jest.fn(),
+      uploadFileFromPath: jest.fn(),
       getPresignedUrl: jest.fn(),
       deleteFile: jest.fn(),
       generateObjectKey: jest.fn(),
@@ -170,6 +176,10 @@ describe('ContentController', () => {
         hash: 'abc123hash',
         mimeType: 'image/jpeg',
       });
+      (mockFileValidationService as any).validateFileAtPath.mockResolvedValue({
+        hash: 'abc123hash',
+        mimeType: 'image/jpeg',
+      });
       mockFileValidationService.sanitizeFilename.mockReturnValue('test-image.jpg');
       mockContentService.create.mockResolvedValue({
         id: 'content-123',
@@ -252,6 +262,57 @@ describe('ContentController', () => {
       );
     });
 
+    it('should validate and upload disk-backed files without using file.buffer', async () => {
+      const diskFile = {
+        path: path.join(os.tmpdir(), 'vizora-content-uploads', 'upload-disk.jpg'),
+        originalname: 'disk-image.jpg',
+        mimetype: 'image/jpeg',
+        size: 4096,
+      } as Express.Multer.File;
+      mockStorageService.isMinioAvailable.mockReturnValueOnce(true);
+      mockStorageService.generateObjectKey.mockReturnValueOnce('org-123/uploads/disk-image.jpg');
+      const unlinkSpy = jest.spyOn(fs.promises, 'unlink').mockResolvedValue(undefined);
+
+      await controller.uploadFile(organizationId, diskFile);
+
+      expect((mockFileValidationService as any).validateFileAtPath).toHaveBeenCalledWith(
+        diskFile.path,
+        diskFile.originalname,
+        diskFile.mimetype,
+        diskFile.size,
+      );
+      expect(mockFileValidationService.validateFile).not.toHaveBeenCalled();
+      expect((mockStorageService as any).uploadFileFromPath).toHaveBeenCalledWith(
+        diskFile.path,
+        'org-123/uploads/disk-image.jpg',
+        diskFile.mimetype,
+        diskFile.size,
+      );
+      expect(mockStorageService.uploadFile).not.toHaveBeenCalled();
+      await new Promise(resolve => setImmediate(resolve));
+      expect(unlinkSpy).toHaveBeenCalledWith(diskFile.path);
+      unlinkSpy.mockRestore();
+    });
+
+    it('should clean disk-backed upload temp files when validation fails before quota reservation', async () => {
+      const diskFile = {
+        path: path.join(os.tmpdir(), 'vizora-content-uploads', 'invalid-disk.jpg'),
+        originalname: 'invalid-disk.jpg',
+        mimetype: 'image/jpeg',
+        size: 4096,
+      } as Express.Multer.File;
+      (mockFileValidationService as any).validateFileAtPath.mockRejectedValueOnce(
+        new BadRequestException('Invalid file'),
+      );
+      const unlinkSpy = jest.spyOn(fs.promises, 'unlink').mockResolvedValue(undefined);
+
+      await expect(controller.uploadFile(organizationId, diskFile)).rejects.toThrow('Invalid file');
+
+      expect(mockStorageQuotaService.reserveQuota).not.toHaveBeenCalled();
+      expect(unlinkSpy).toHaveBeenCalledWith(diskFile.path);
+      unlinkSpy.mockRestore();
+    });
+
     it('should sanitize filename', async () => {
       await controller.uploadFile(organizationId, mockFile);
 
@@ -327,6 +388,44 @@ describe('ContentController', () => {
           thumbnail: expect.any(String),
         }),
       );
+    });
+
+    it('should keep disk-backed image temp files until thumbnail generation settles', async () => {
+      const diskFile = {
+        path: path.join(os.tmpdir(), 'vizora-content-uploads', 'thumbnail-owned.jpg'),
+        originalname: 'thumbnail-owned.jpg',
+        mimetype: 'image/jpeg',
+        size: 4096,
+      } as Express.Multer.File;
+      mockStorageService.isMinioAvailable.mockReturnValueOnce(true);
+      mockStorageService.generateObjectKey.mockReturnValueOnce('org-123/uploads/thumbnail-owned.jpg');
+      let resolveThumbnail: (thumbnail: string) => void = () => {};
+      (mockThumbnailService as any).generateThumbnailFromPath.mockReturnValueOnce(
+        new Promise<string>((resolve) => {
+          resolveThumbnail = resolve;
+        }),
+      );
+      const unlinkSpy = jest.spyOn(fs.promises, 'unlink').mockResolvedValue(undefined);
+
+      await controller.uploadFile(organizationId, diskFile);
+
+      expect((mockThumbnailService as any).generateThumbnailFromPath).toHaveBeenCalledWith(
+        'content-123',
+        diskFile.path,
+        diskFile.mimetype,
+      );
+      expect(unlinkSpy).not.toHaveBeenCalled();
+
+      resolveThumbnail('/static/thumbnails/thumb-path.jpg');
+      await new Promise(resolve => setImmediate(resolve));
+
+      expect(mockContentService.update).toHaveBeenCalledWith(
+        organizationId,
+        'content-123',
+        expect.objectContaining({ thumbnail: '/static/thumbnails/thumb-path.jpg' }),
+      );
+      expect(unlinkSpy).toHaveBeenCalledWith(diskFile.path);
+      unlinkSpy.mockRestore();
     });
   });
 
@@ -458,6 +557,10 @@ describe('ContentController', () => {
         hash: 'newHash123',
         mimeType: 'image/jpeg',
       });
+      (mockFileValidationService as any).validateFileAtPath.mockResolvedValue({
+        hash: 'newHash123',
+        mimeType: 'image/jpeg',
+      });
       mockFileValidationService.sanitizeFilename.mockReturnValue('new-image.jpg');
       mockContentService.findOne.mockResolvedValue({
         id: 'content-123',
@@ -506,6 +609,58 @@ describe('ContentController', () => {
         mockFile.originalname,
         mockFile.mimetype,
       );
+    });
+
+    it('should validate and upload disk-backed replacement files without using file.buffer', async () => {
+      const diskFile = {
+        path: path.join(os.tmpdir(), 'vizora-content-uploads', 'replacement-disk.jpg'),
+        originalname: 'replacement-disk.jpg',
+        mimetype: 'image/jpeg',
+        size: 2048,
+      } as Express.Multer.File;
+      mockStorageService.isMinioAvailable.mockReturnValueOnce(true);
+      mockStorageService.generateObjectKey.mockReturnValueOnce('org-123/uploads/replacement-disk.jpg');
+      const unlinkSpy = jest.spyOn(fs.promises, 'unlink').mockResolvedValue(undefined);
+
+      await controller.replaceFile(organizationId, 'content-123', diskFile, {});
+
+      expect((mockFileValidationService as any).validateFileAtPath).toHaveBeenCalledWith(
+        diskFile.path,
+        diskFile.originalname,
+        diskFile.mimetype,
+        diskFile.size,
+      );
+      expect(mockFileValidationService.validateFile).not.toHaveBeenCalled();
+      expect((mockStorageService as any).uploadFileFromPath).toHaveBeenCalledWith(
+        diskFile.path,
+        'org-123/uploads/replacement-disk.jpg',
+        diskFile.mimetype,
+        diskFile.size,
+      );
+      expect(mockStorageService.uploadFile).not.toHaveBeenCalled();
+      await new Promise(resolve => setImmediate(resolve));
+      expect(unlinkSpy).toHaveBeenCalledWith(diskFile.path);
+      unlinkSpy.mockRestore();
+    });
+
+    it('should clean disk-backed replacement temp files when validation fails before quota reservation', async () => {
+      const diskFile = {
+        path: path.join(os.tmpdir(), 'vizora-content-uploads', 'invalid-replacement.jpg'),
+        originalname: 'invalid-replacement.jpg',
+        mimetype: 'image/jpeg',
+        size: 2048,
+      } as Express.Multer.File;
+      (mockFileValidationService as any).validateFileAtPath.mockRejectedValueOnce(
+        new BadRequestException('Invalid file'),
+      );
+      const unlinkSpy = jest.spyOn(fs.promises, 'unlink').mockResolvedValue(undefined);
+
+      await expect(controller.replaceFile(organizationId, 'content-123', diskFile, {}))
+        .rejects.toThrow('Invalid file');
+
+      expect(mockStorageQuotaService.reserveQuota).not.toHaveBeenCalled();
+      expect(unlinkSpy).toHaveBeenCalledWith(diskFile.path);
+      unlinkSpy.mockRestore();
     });
 
     it('should not reserve additional quota when replacement validation fails', async () => {

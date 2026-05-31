@@ -19,6 +19,7 @@ import {
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
 import { ParseIdPipe } from '../common/pipes/parse-id.pipe';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -43,9 +44,32 @@ import { ReviewContentDto } from './dto/review-content.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
+import { randomUUID } from 'crypto';
 
 // Prefix used to identify MinIO-stored content
 const MINIO_URL_PREFIX = 'minio://';
+const MAX_CONTENT_UPLOAD_SIZE = 100 * 1024 * 1024;
+const CONTENT_UPLOAD_TMP_ROOT = path.join(os.tmpdir(), 'vizora-content-uploads');
+
+const contentUploadStorage = diskStorage({
+  destination: (_req, _file, callback) => {
+    fs.mkdir(CONTENT_UPLOAD_TMP_ROOT, { recursive: true }, (error) => {
+      callback(error, CONTENT_UPLOAD_TMP_ROOT);
+    });
+  },
+  filename: (_req, file, callback) => {
+    const extension = path.extname(file.originalname)
+      .toLowerCase()
+      .replace(/[^.\w-]/g, '');
+    callback(null, `${Date.now()}-${randomUUID()}${extension}`);
+  },
+});
+
+const CONTENT_UPLOAD_INTERCEPTOR_OPTIONS = {
+  storage: contentUploadStorage,
+  limits: { fileSize: MAX_CONTENT_UPLOAD_SIZE },
+};
 
 @UseGuards(RolesGuard)
 @RequiresSubscription()
@@ -79,7 +103,7 @@ export class ContentController {
   @Post('upload')
   @Roles('admin', 'manager')
   @HttpCode(HttpStatus.CREATED)
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 100 * 1024 * 1024 } }))
+  @UseInterceptors(FileInterceptor('file', CONTENT_UPLOAD_INTERCEPTOR_OPTIONS))
   async uploadFile(
     @CurrentUser('organizationId') organizationId: string,
     @UploadedFile() file: Express.Multer.File,
@@ -90,24 +114,22 @@ export class ContentController {
       throw new BadRequestException('No file provided');
     }
 
-    // Validate file using magic numbers, size, etc.
-    const validation = await this.fileValidationService.validateFile(
-      file.buffer,
-      file.originalname,
-      file.mimetype,
-    );
-
-    // Sanitize filename
-    const safeFilename = this.fileValidationService.sanitizeFilename(
-      file.originalname,
-    );
-
-    let fileUrl: string;
-    const filename = `${validation.hash}-${safeFilename}`;
+    const tempPath = this.getUploadedTempPath(file);
+    let tempPathOwnedByThumbnail = false;
     let uploadedObjectKey: string | null = null;
+    let quotaReserved = false;
 
-    await this.storageQuotaService.reserveQuota(organizationId, file.size);
     try {
+      const validation = await this.validateUploadedFile(file, tempPath);
+      const safeFilename = this.fileValidationService.sanitizeFilename(
+        file.originalname,
+      );
+      const filename = `${validation.hash}-${safeFilename}`;
+      let fileUrl: string;
+
+      await this.storageQuotaService.reserveQuota(organizationId, file.size);
+      quotaReserved = true;
+
       // Try MinIO first. In production, fail closed instead of creating
       // unreachable /uploads content when object storage is unhealthy.
       if (this.storageService.isMinioAvailable()) {
@@ -116,7 +138,7 @@ export class ContentController {
           validation.hash,
           safeFilename,
         );
-        await this.storageService.uploadFile(file.buffer, objectKey, file.mimetype);
+        await this.uploadToMinio(file, tempPath, objectKey);
         uploadedObjectKey = objectKey;
         // Store with minio:// prefix to identify MinIO-stored content
         fileUrl = `${MINIO_URL_PREFIX}${objectKey}`;
@@ -126,7 +148,7 @@ export class ContentController {
       } else {
         // Development fallback only; production middleware no longer serves
         // /uploads, so accepting this path there would create dead content.
-        fileUrl = await this.saveFileLocally(organizationId, filename, file.buffer);
+        fileUrl = await this.saveFileLocallyFromUpload(organizationId, filename, file, tempPath);
       }
 
       // Determine the content type from the file mimetype
@@ -146,16 +168,14 @@ export class ContentController {
 
       // Generate thumbnail in background (fire-and-forget to avoid blocking upload response)
       if (contentType === 'image') {
-        this.thumbnailService.generateThumbnail(
+        tempPathOwnedByThumbnail = this.scheduleThumbnailGeneration(
+          organizationId,
           content.id,
-          file.buffer,
-          file.mimetype,
-        ).then(async (thumbnailUrl) => {
-          await this.contentService.update(organizationId, content.id, { thumbnail: thumbnailUrl });
-          this.logger.debug(`Thumbnail generated in background: ${thumbnailUrl}`);
-        }).catch((error) => {
-          this.logger.warn(`Background thumbnail generation failed: ${error}`);
-        });
+          file,
+          tempPath,
+          'Background thumbnail generation failed',
+          'Thumbnail generated in background',
+        );
       }
 
       return {
@@ -172,10 +192,14 @@ export class ContentController {
           this.logger.warn(`Failed to clean up uploaded object after upload failure: ${deleteError}`);
         }
       }
-      if (canReleaseQuota) {
+      if (canReleaseQuota && quotaReserved) {
         await this.releaseQuotaReservation(organizationId, file.size);
       }
       throw error;
+    } finally {
+      if (tempPath && !tempPathOwnedByThumbnail) {
+        await this.cleanupTempUpload(tempPath);
+      }
     }
   }
 
@@ -196,6 +220,148 @@ export class ContentController {
     const baseUrl = process.env.API_BASE_URL
       || (process.env.NODE_ENV === 'production' ? (() => { throw new Error('API_BASE_URL must be set in production'); })() : 'http://localhost:3000');
     return `${baseUrl}/uploads/${organizationId}/${filename}`;
+  }
+
+  private async saveFileLocallyFromPath(
+    organizationId: string,
+    filename: string,
+    filePath: string,
+  ): Promise<string> {
+    const uploadsDir = path.join(process.cwd(), 'uploads', organizationId);
+    await fs.promises.mkdir(uploadsDir, { recursive: true });
+
+    const destination = path.join(uploadsDir, filename);
+    await fs.promises.copyFile(filePath, destination);
+
+    const baseUrl = process.env.API_BASE_URL
+      || (process.env.NODE_ENV === 'production' ? (() => { throw new Error('API_BASE_URL must be set in production'); })() : 'http://localhost:3000');
+    return `${baseUrl}/uploads/${organizationId}/${filename}`;
+  }
+
+  private async saveFileLocallyFromUpload(
+    organizationId: string,
+    filename: string,
+    file: Express.Multer.File,
+    tempPath?: string,
+  ): Promise<string> {
+    if (tempPath) {
+      return this.saveFileLocallyFromPath(organizationId, filename, tempPath);
+    }
+
+    if (!file.buffer) {
+      throw new BadRequestException('Uploaded file is missing content');
+    }
+
+    return this.saveFileLocally(organizationId, filename, file.buffer);
+  }
+
+  private getUploadedTempPath(file: Express.Multer.File): string | undefined {
+    const uploadPath = (file as Express.Multer.File & { path?: string }).path;
+    if (!uploadPath) {
+      return undefined;
+    }
+
+    const resolvedPath = path.resolve(uploadPath);
+    if (!this.isPathInsideUploadTempRoot(resolvedPath)) {
+      throw new BadRequestException('Invalid upload temp file');
+    }
+
+    return resolvedPath;
+  }
+
+  private isPathInsideUploadTempRoot(filePath: string): boolean {
+    const root = path.resolve(CONTENT_UPLOAD_TMP_ROOT);
+    const resolvedPath = path.resolve(filePath);
+    return resolvedPath === root || resolvedPath.startsWith(`${root}${path.sep}`);
+  }
+
+  private async validateUploadedFile(
+    file: Express.Multer.File,
+    tempPath?: string,
+  ): Promise<{ valid: boolean; actualType?: string; hash: string }> {
+    if (tempPath) {
+      return this.fileValidationService.validateFileAtPath(
+        tempPath,
+        file.originalname,
+        file.mimetype,
+        file.size,
+      );
+    }
+
+    if (!file.buffer) {
+      throw new BadRequestException('Uploaded file is missing content');
+    }
+
+    return this.fileValidationService.validateFile(
+      file.buffer,
+      file.originalname,
+      file.mimetype,
+    );
+  }
+
+  private async uploadToMinio(
+    file: Express.Multer.File,
+    tempPath: string | undefined,
+    objectKey: string,
+  ): Promise<string> {
+    if (tempPath) {
+      return this.storageService.uploadFileFromPath(
+        tempPath,
+        objectKey,
+        file.mimetype,
+        file.size,
+      );
+    }
+
+    if (!file.buffer) {
+      throw new BadRequestException('Uploaded file is missing content');
+    }
+
+    return this.storageService.uploadFile(file.buffer, objectKey, file.mimetype);
+  }
+
+  private scheduleThumbnailGeneration(
+    organizationId: string,
+    contentId: string,
+    file: Express.Multer.File,
+    tempPath: string | undefined,
+    failureMessage: string,
+    successMessage: string,
+  ): boolean {
+    const thumbnailPromise = tempPath
+      ? this.thumbnailService.generateThumbnailFromPath(contentId, tempPath, file.mimetype)
+      : this.thumbnailService.generateThumbnail(contentId, file.buffer, file.mimetype);
+
+    thumbnailPromise
+      .then(async (thumbnailUrl) => {
+        await this.contentService.update(organizationId, contentId, { thumbnail: thumbnailUrl });
+        this.logger.debug(`${successMessage}: ${thumbnailUrl}`);
+      })
+      .catch((error) => {
+        this.logger.warn(`${failureMessage}: ${error}`);
+      })
+      .finally(() => {
+        if (tempPath) {
+          void this.cleanupTempUpload(tempPath);
+        }
+      });
+
+    return Boolean(tempPath);
+  }
+
+  private async cleanupTempUpload(tempPath: string): Promise<void> {
+    if (!this.isPathInsideUploadTempRoot(tempPath)) {
+      this.logger.warn(`Refusing to clean upload temp file outside temp root: ${tempPath}`);
+      return;
+    }
+
+    try {
+      await fs.promises.unlink(tempPath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        this.logger.warn(`Failed to clean upload temp file ${tempPath}: ${error}`);
+      }
+    }
   }
 
   @Get()
@@ -429,7 +595,7 @@ export class ContentController {
   @Post(':id/replace')
   @Roles('admin', 'manager')
   @HttpCode(HttpStatus.OK)
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 100 * 1024 * 1024 } }))
+  @UseInterceptors(FileInterceptor('file', CONTENT_UPLOAD_INTERCEPTOR_OPTIONS))
   async replaceFile(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id', ParseIdPipe) id: string,
@@ -440,37 +606,35 @@ export class ContentController {
       throw new BadRequestException('No file provided');
     }
 
-    // Get existing content to determine net storage change
-    const existingContent = await this.contentService.findOne(organizationId, id);
-    const oldFileSize = existingContent.fileSize || 0;
-    const netIncrease = file.size - oldFileSize;
-    const keepBackup = replaceFileDto.keepBackup === true;
-
-    // Validate file
-    const validation = await this.fileValidationService.validateFile(
-      file.buffer,
-      file.originalname,
-      file.mimetype,
-    );
-
-    // Sanitize filename
-    const safeFilename = this.fileValidationService.sanitizeFilename(
-      file.originalname,
-    );
-
-    let fileUrl: string;
-    const filename = `${validation.hash}-${safeFilename}`;
+    const tempPath = this.getUploadedTempPath(file);
+    let tempPathOwnedByThumbnail = false;
     let uploadedObjectKey: string | null = null;
-
-    // Reserve quota only after validation succeeds so rejected files cannot
-    // leave behind accounting reservations. Backup replacements retain the
-    // previous file, so the quota increase is the full new file size.
-    const quotaReservation = keepBackup ? file.size : Math.max(0, netIncrease);
-    if (quotaReservation > 0) {
-      await this.storageQuotaService.reserveQuota(organizationId, quotaReservation);
-    }
+    let quotaReservation = 0;
+    let quotaReserved = false;
 
     try {
+      // Get existing content to determine net storage change
+      const existingContent = await this.contentService.findOne(organizationId, id);
+      const oldFileSize = existingContent.fileSize || 0;
+      const netIncrease = file.size - oldFileSize;
+      const keepBackup = replaceFileDto.keepBackup === true;
+
+      const validation = await this.validateUploadedFile(file, tempPath);
+      const safeFilename = this.fileValidationService.sanitizeFilename(
+        file.originalname,
+      );
+      const filename = `${validation.hash}-${safeFilename}`;
+      let fileUrl: string;
+
+      // Reserve quota only after validation succeeds so rejected files cannot
+      // leave behind accounting reservations. Backup replacements retain the
+      // previous file, so the quota increase is the full new file size.
+      quotaReservation = keepBackup ? file.size : Math.max(0, netIncrease);
+      if (quotaReservation > 0) {
+        await this.storageQuotaService.reserveQuota(organizationId, quotaReservation);
+        quotaReserved = true;
+      }
+
       // Try MinIO first. In production, fail closed instead of creating
       // unreachable /uploads content when object storage is unhealthy.
       if (this.storageService.isMinioAvailable()) {
@@ -479,14 +643,14 @@ export class ContentController {
           validation.hash,
           safeFilename,
         );
-        await this.storageService.uploadFile(file.buffer, objectKey, file.mimetype);
+        await this.uploadToMinio(file, tempPath, objectKey);
         uploadedObjectKey = objectKey;
         fileUrl = `${MINIO_URL_PREFIX}${objectKey}`;
         this.logger.debug(`Replacement file uploaded to MinIO: ${objectKey}`);
       } else if (process.env.NODE_ENV === 'production') {
         throw new ServiceUnavailableException('Storage service is currently unavailable');
       } else {
-        fileUrl = await this.saveFileLocally(organizationId, filename, file.buffer);
+        fileUrl = await this.saveFileLocallyFromUpload(organizationId, filename, file, tempPath);
       }
 
       // Determine thumbnail for images
@@ -513,16 +677,14 @@ export class ContentController {
 
       // Generate thumbnail in background (fire-and-forget)
       if (contentType === 'image') {
-        this.thumbnailService.generateThumbnail(
+        tempPathOwnedByThumbnail = this.scheduleThumbnailGeneration(
+          organizationId,
           id,
-          file.buffer,
-          file.mimetype,
-        ).then(async (thumbnailUrl) => {
-          await this.contentService.update(organizationId, id, { thumbnail: thumbnailUrl });
-          this.logger.debug(`Replacement thumbnail generated in background: ${thumbnailUrl}`);
-        }).catch((error) => {
-          this.logger.warn(`Background thumbnail generation failed during replace: ${error}`);
-        });
+          file,
+          tempPath,
+          'Background thumbnail generation failed during replace',
+          'Replacement thumbnail generated in background',
+        );
       }
 
       return {
@@ -539,10 +701,14 @@ export class ContentController {
           this.logger.warn(`Failed to clean up replacement object after failure: ${deleteError}`);
         }
       }
-      if (canReleaseQuota && quotaReservation > 0) {
+      if (canReleaseQuota && quotaReserved && quotaReservation > 0) {
         await this.releaseQuotaReservation(organizationId, quotaReservation);
       }
       throw error;
+    } finally {
+      if (tempPath && !tempPathOwnedByThumbnail) {
+        await this.cleanupTempUpload(tempPath);
+      }
     }
   }
 

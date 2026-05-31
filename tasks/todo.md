@@ -1,8 +1,126 @@
 # Vizora - Task Tracker
 
-## In Progress: Performance Readiness Review Pass 9 (2026-05-31)
+## In Progress: Upload Pressure Readiness Pass 10 (2026-05-31)
+
+**Branch:** `feat/performance-readiness-pass-10`
+
+**Why now:** Pass 9 hardened content streaming and display recovery, but the
+largest remaining customer-critical upload bottleneck is still the middleware
+and dashboard accepting large files in ways that can drive avoidable memory and
+concurrency pressure. This pass stays repo-side and does not require secrets,
+live hardware, production env edits, or production state mutation.
+
+**New primitives introduced:** small helpers in existing modules only:
+`FileValidationService.validateFileAtPath`, `StorageService.uploadFileFromPath`,
+and private `ContentController` upload-temp cleanup helpers.
+
+**Hermes-first analysis:** not applicable. This pass does not add business
+agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
+
+**Plan**
+- [x] Start fresh branch from merged `origin/main`.
+- [x] Re-check pass-9 deploy gate and keep production deployment blocked until
+  `/opt/vizora/app` is reconciled.
+- [x] Write plan/design for disk-backed upload and dashboard backpressure fixes.
+- [x] Run multi-subagent design review before tests.
+- [x] Add focused failing tests for file-path validation, upload-from-path, temp
+  cleanup, and dashboard upload backpressure.
+- [x] Implement bounded middleware/dashboard upload-pressure fixes.
+- [x] Run focused red/green tests.
+- [x] Run multi-subagent code review before broader tests.
+- [x] Run broader affected tests/builds/typecheck.
+- [ ] PR, CI, merge.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Deployment gate inherited from pass 9**
+- [x] PR #132 merged at `4383c09b75f3cdbba0d0965ce477fe135d6439d6`; CI green
+  for audit, lint, security, build, test, and e2e.
+- [x] Prod deploy blocked after merge: `/opt/vizora/app` is still dirty and now
+  `ahead 17, behind 70` from `origin/main=4383c09b75f3cdbba0d0965ce477fe135d6439d6`.
+- [x] Prod core services health check is OK; no deploy, pull, reset, stash, or
+  service restart performed.
+
+**Plan/design:** `docs/plans/2026-05-31-upload-pressure-readiness-pass-10.md`
+
+**Selected fix bundle**
+- [x] Switch content upload and replace-file interceptors to disk-backed temp
+  storage while preserving the 100MB HTTP limit.
+- [x] Add file-path validation that hashes by stream, checks offset-aware RIFF
+  signatures, scans full PDFs for active-content markers, and scans the first
+  suspicious-content window for other media.
+- [x] Add MinIO upload-from-path using a read stream and known size.
+- [x] Preserve buffer-backed direct controller tests and local-dev fallback behavior.
+- [x] Clean temp files on upload success/failure and after image thumbnail
+  background generation.
+- [x] Add dashboard upload guards: per-type max-size enforcement, bounded queue,
+  and single-concurrency large uploads.
+
+**Focused verification**
+- [x] Red run:
+  `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="file-validation.service|storage.service|content.controller"` -
+  failed on missing `validateFileAtPath`, `uploadFileFromPath`, path-based
+  thumbnailing, RIFF subtype checks, and late-PDF scanning.
+- [x] Red run:
+  `pnpm --filter @vizora/web test -- --runInBand --testPathPattern="dashboard/content"` -
+  failed on video concurrency, cumulative queue cap, rejected-file reporting,
+  and partial-failure retry labels.
+- [x] Green run:
+  `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="file-validation.service|storage.service|content.controller"` -
+  pass, 8 suites / 293 tests.
+- [x] Green run:
+  `pnpm --filter @vizora/web test -- --runInBand --testPathPattern="dashboard/content"` -
+  pass, 1 suite / 25 tests.
+
+**Review gate**
+- [x] Design review found thumbnail temp-file ownership, local fallback, temp
+  root/cleanup, RIFF subtype, PDF full-scan, and dashboard backpressure gaps;
+  all selected implementation gaps fixed except durable orphan-cleanup retry,
+  which remains deferred.
+- [x] Code review found web typecheck failure from `onDropRejected` typing;
+  fixed by using `FileRejection`.
+- [x] Code review found `react-dropzone` `maxFiles` rejected over-limit drops
+  before manual queue truncation; fixed by removing `maxFiles` and asserting
+  the manual queue cap owns truncation.
+- [x] Final delta review after all fixes: middleware/upload and dashboard/upload
+  reviewers both CLEAN.
+
+**Broader verification**
+- [x] `pnpm --filter @vizora/middleware exec tsc --noEmit --pretty false` - pass.
+- [x] `pnpm --filter @vizora/web exec tsc --noEmit --pretty false` - pass.
+- [x] `git diff --check` - pass with expected LF-to-CRLF warnings only.
+- [x] `pnpm --filter @vizora/middleware test -- --runInBand` - pass, 143 suites / 2842 tests.
+- [x] `pnpm --filter @vizora/web test -- --runInBand` - pass, 94 suites / 960 tests
+  with pre-existing React `act(...)` and jsdom navigation warnings only.
+- [x] `npx nx build @vizora/middleware` - pass with existing webpack warnings.
+- [x] `npx nx build @vizora/web` with local API/socket env and 4096MB heap - pass
+  with existing Next middleware/proxy and TS project-reference warnings.
+- [x] `pnpm --filter @vizora/realtime test -- --runInBand` - pass, 12 suites / 273 tests.
+- [x] `npx nx build @vizora/realtime` - pass when run serially; earlier parallel
+  run failed on a Windows file lock in `@vizora/database:build`.
+- [x] `pnpm test:ops` - pass, 5 tests.
+- [x] Lint equivalent on Windows:
+  `$env:ESLINT_USE_FLAT_CONFIG='false'; pnpm exec eslint --no-error-on-unmatched-pattern --ext .ts,.tsx "middleware/src/**/*.ts" "middleware/src/**/*.tsx" "realtime/src/**/*.ts" "realtime/src/**/*.tsx"` -
+  pass with warnings only. The literal `pnpm lint` script is POSIX-env syntax
+  and fails under PowerShell before ESLint starts.
+- [x] `pnpm --dir display test:ci` - pass, 6 suites / 126 tests.
+- [x] `pnpm --dir display typecheck` - pass.
+- [x] `pnpm --dir display build` - pass.
+- [x] `NODE_OPTIONS=--use-system-ca pnpm audit --audit-level=high` - fails with
+  150 dependency advisories (1 critical, 56 high). CI marks audit
+  continue-on-error; dependency upgrades are deferred to a dedicated security pass.
+
+**Deferred follow-ups**
+- [ ] True multipart/chunked resumable uploads with server-side session state.
+- [ ] Background thumbnail queue instead of in-process fire-and-forget work.
+- [ ] Server-backed content-library pagination/search plus thumbnail lazy/virtualized rendering.
+- [ ] Shared dashboard realtime socket provider for status, notifications, and route events.
+
+---
+
+## Completed: Performance Readiness Review Pass 9 (2026-05-31)
 
 **Branch:** `feat/performance-readiness-pass-9`
+**PR / merge commit:** #132 / `4383c09b75f3cdbba0d0965ce477fe135d6439d6`
 
 **Why now:** PR #131 merged the bounded dashboard contract fixes. The next
 autonomous slice is a comprehensive repo-side performance/code-review pass over
@@ -27,8 +145,8 @@ business agents, MCP tools, Hermes skills, or AI/provider spend paths.
 - [x] Implement bounded performance/readiness fixes.
 - [x] Run multi-subagent code review before broader tests.
 - [x] Run focused and broader tests/builds/browser checks.
-- [ ] PR, CI, merge.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe.
 
 **Deployment gate after PR #131**
 - [x] PR #131 merged at `58df1a276b8252dba7145c75705ae4deabde431f` with CI green.
@@ -36,6 +154,14 @@ business agents, MCP tools, Hermes skills, or AI/provider spend paths.
   many modified/untracked prod-local files, and prod `origin/main` is stale while
   remote `main` is `58df1a276b8252dba7145c75705ae4deabde431f`.
 - [x] Prod core services health check is OK; no deploy/restart performed.
+
+**PR / CI / deployment**
+- [x] PR #132 opened from `105f081ba8acb0b1f298d93dd53bdf9d68df74f3`.
+- [x] GitHub CI green: audit, lint, security, build, test, and e2e.
+- [x] PR #132 merged at `4383c09b75f3cdbba0d0965ce477fe135d6439d6`.
+- [x] Deployment gate checked after merge: production health OK, core PM2
+  services online, but `/opt/vizora/app` is dirty/diverged (`ahead 17, behind 70`),
+  so deploy was not attempted.
 
 **Analysis feed**
 - [x] Middleware/storage reviewer prioritized streaming-upload memory pressure,
@@ -105,7 +231,8 @@ business agents, MCP tools, Hermes skills, or AI/provider spend paths.
 - [x] Middleware/realtime re-review after fixes: both CLEAN.
 
 **Deferred follow-ups**
-- [ ] Disk-backed/streaming upload pipeline and per-type frontend upload caps.
+- [ ] Disk-backed/streaming upload pipeline and per-type frontend upload caps
+  (selected for pass 10).
 - [ ] Server-backed content-library pagination/search plus thumbnail lazy/virtualized rendering.
 - [ ] Shared dashboard realtime socket provider for status, notifications, and route events.
 - [ ] Playlist index summary payload and removal of dead builder-modal code.

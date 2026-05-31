@@ -640,4 +640,145 @@ describe('ContentClient', () => {
       await Promise.all(deferredUploads.slice(1).map((deferred) => deferred.promise));
     });
   });
+
+  it('limits queued video uploads to one concurrent file', async () => {
+    mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
+    const deferredUploads: Array<{ resolve: (content: any) => void; promise: Promise<any> }> = [];
+    mockUploadContentWithProgress.mockImplementation((_data, onProgress) => {
+      onProgress?.(10);
+      let resolveUpload: (content: any) => void = () => {};
+      const promise = new Promise((resolve) => {
+        resolveUpload = resolve;
+      });
+      deferredUploads.push({ resolve: resolveUpload, promise });
+      return promise;
+    });
+
+    render(<ContentClient />);
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+
+    fireEvent.click(screen.getAllByText('Upload Content')[0]);
+    fireEvent.change(screen.getByDisplayValue('Image'), { target: { value: 'video' } });
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Video')).toBeInTheDocument();
+    });
+
+    const files = [
+      new File(['1'], 'video-1.mp4', { type: 'video/mp4' }),
+      new File(['2'], 'video-2.mp4', { type: 'video/mp4' }),
+    ];
+
+    await act(async () => {
+      lastDropzoneOptions.onDrop(files);
+    });
+
+    fireEvent.click(screen.getByText('Upload 2 Files'));
+
+    await waitFor(() => {
+      expect(mockUploadContentWithProgress).toHaveBeenCalledTimes(1);
+    });
+    expect(mockUploadContentWithProgress.mock.calls[0][0].title).toBe('video-1');
+
+    await act(async () => {
+      deferredUploads[0].resolve({ id: 'video-1', title: 'Video 1' });
+      await deferredUploads[0].promise;
+    });
+
+    await waitFor(() => {
+      expect(mockUploadContentWithProgress).toHaveBeenCalledTimes(2);
+    });
+    expect(mockUploadContentWithProgress.mock.calls[1][0].title).toBe('video-2');
+  });
+
+  it('enforces the upload queue cap across repeated drops', async () => {
+    mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
+    render(<ContentClient />);
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+
+    fireEvent.click(screen.getAllByText('Upload Content')[0]);
+    expect(lastDropzoneOptions.maxFiles).toBeUndefined();
+
+    await act(async () => {
+      lastDropzoneOptions.onDrop(
+        Array.from({ length: 8 }, (_, index) =>
+          new File([String(index)], `queue-${index + 1}.png`, { type: 'image/png' }),
+        ),
+      );
+    });
+    await act(async () => {
+      lastDropzoneOptions.onDrop(
+        Array.from({ length: 5 }, (_, index) =>
+          new File([String(index)], `queue-${index + 9}.png`, { type: 'image/png' }),
+        ),
+      );
+    });
+
+    expect(screen.getByText('Upload Queue (10 files)')).toBeInTheDocument();
+    expect(screen.getByText('queue-10.png')).toBeInTheDocument();
+    expect(screen.queryByText('queue-11.png')).not.toBeInTheDocument();
+    expect(screen.queryByText('queue-13.png')).not.toBeInTheDocument();
+    expect(mockToast.warning).toHaveBeenCalledWith(expect.stringContaining('upload queue'));
+  });
+
+  it('shows rejected upload files inline with the rejection reason', async () => {
+    mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
+    render(<ContentClient />);
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+
+    fireEvent.click(screen.getAllByText('Upload Content')[0]);
+    expect(lastDropzoneOptions.onDropRejected).toEqual(expect.any(Function));
+
+    await act(async () => {
+      lastDropzoneOptions.onDropRejected([
+        {
+          file: new File(['too-large'], 'huge.mp4', { type: 'video/mp4' }),
+          errors: [{ code: 'file-too-large', message: 'File is larger than 100MB' }],
+        },
+      ]);
+    });
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('huge.mp4');
+    expect(alert).toHaveTextContent('File is larger than 100MB');
+  });
+
+  it('labels partial-failure retries with the remaining retryable count and visible row error', async () => {
+    mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
+    mockUploadContentWithProgress
+      .mockResolvedValueOnce({ id: 'ok', title: 'OK' })
+      .mockRejectedValueOnce(new Error('Network timeout'));
+
+    render(<ContentClient />);
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+
+    fireEvent.click(screen.getAllByText('Upload Content')[0]);
+    const files = [
+      new File(['1'], 'ok.png', { type: 'image/png' }),
+      new File(['2'], 'failed.png', { type: 'image/png' }),
+    ];
+
+    await act(async () => {
+      lastDropzoneOptions.onDrop(files);
+    });
+
+    fireEvent.click(screen.getByText('Upload 2 Files'));
+
+    await waitFor(() => {
+      expect(mockToast.error).toHaveBeenCalledWith('1 file(s) uploaded, 1 failed');
+    });
+    expect(screen.getByText('Retry 1 Failed')).toBeInTheDocument();
+    expect(screen.getByText('Network timeout')).toBeInTheDocument();
+  });
 });

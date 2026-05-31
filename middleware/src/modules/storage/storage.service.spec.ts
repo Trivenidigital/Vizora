@@ -1,6 +1,9 @@
 import { ConfigService } from '@nestjs/config';
 import { CircuitBreakerService } from '../common/services/circuit-breaker.service';
 import { StorageService } from './storage.service';
+import * as fs from 'fs/promises';
+import * as os from 'os';
+import * as path from 'path';
 
 // Mock the minio module
 jest.mock('minio', () => {
@@ -26,6 +29,7 @@ describe('StorageService', () => {
   let mockConfigService: jest.Mocked<ConfigService>;
   let mockCircuitBreaker: jest.Mocked<CircuitBreakerService>;
   let mockMinioClient: any;
+  let tempFiles: string[] = [];
 
   const defaultConfig = {
     MINIO_ENDPOINT: 'localhost',
@@ -38,6 +42,7 @@ describe('StorageService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    tempFiles = [];
 
     mockConfigService = {
       get: jest.fn((key: string) => defaultConfig[key]),
@@ -74,6 +79,24 @@ describe('StorageService', () => {
 
     service = new StorageService(mockConfigService, mockCircuitBreaker);
   });
+
+  afterEach(async () => {
+    await Promise.all(
+      tempFiles.map((filePath) =>
+        fs.unlink(filePath).catch((error: NodeJS.ErrnoException) => {
+          if (error.code !== 'ENOENT') throw error;
+        }),
+      ),
+    );
+  });
+
+  const writeTempFile = async (filename: string, data: Buffer): Promise<string> => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vizora-storage-test-'));
+    const filePath = path.join(tempDir, filename);
+    await fs.writeFile(filePath, data);
+    tempFiles.push(filePath);
+    return filePath;
+  };
 
   describe('initialization', () => {
     it('should be defined', () => {
@@ -348,6 +371,36 @@ describe('StorageService', () => {
         10 * 1024 * 1024,
         expect.anything(),
       );
+    });
+
+    it('should upload a file from disk using a stream and known size', async () => {
+      const buffer = Buffer.from('disk upload content');
+      const filePath = await writeTempFile('upload.jpg', buffer);
+      const objectKey = 'org-123/disk-upload.jpg';
+      mockMinioClient.putObject.mockImplementationOnce(
+        (_bucket, _objectKey, stream) =>
+          new Promise((resolve, reject) => {
+            stream.on('error', reject);
+            stream.on('end', () => resolve({ etag: 'test-etag' }));
+            stream.resume();
+          }),
+      );
+
+      const result = await (service as any).uploadFileFromPath(
+        filePath,
+        objectKey,
+        'image/jpeg',
+        buffer.length,
+      );
+      const putObjectCall = mockMinioClient.putObject.mock.calls[0];
+
+      expect(result).toBe(objectKey);
+      expect(putObjectCall[0]).toBe('vizora-content');
+      expect(putObjectCall[1]).toBe(objectKey);
+      expect(putObjectCall[2]).toEqual(expect.objectContaining({ path: filePath }));
+      expect(typeof putObjectCall[2].pipe).toBe('function');
+      expect(putObjectCall[3]).toBe(buffer.length);
+      expect(putObjectCall[4]).toEqual({ 'Content-Type': 'image/jpeg' });
     });
   });
 

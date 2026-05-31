@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useDropzone } from 'react-dropzone';
+import { useDropzone, type FileRejection } from 'react-dropzone';
 import { apiClient } from '@/lib/api';
 import { fetchAllPaginated } from '@/lib/api/pagination';
 import { Content, Display, Playlist, ContentFolder } from '@/lib/types';
@@ -43,8 +43,18 @@ type UploadQueueItem = {
  progress: number;
  error?: string;
 };
+type UploadRejectedItem = {
+ fileName: string;
+ reason: string;
+};
 
 const BULK_UPLOAD_CONCURRENCY = 3;
+const MAX_UPLOAD_QUEUE_ITEMS = 10;
+const FILE_UPLOAD_LIMITS: Record<FileUploadType, number> = {
+ image: 10 * 1024 * 1024,
+ video: 100 * 1024 * 1024,
+ pdf: 50 * 1024 * 1024,
+};
 const FILE_UPLOAD_TYPES = new Set<UploadFormType>(['image', 'video', 'pdf']);
 
 const isFileUploadType = (type: UploadFormType): type is FileUploadType => FILE_UPLOAD_TYPES.has(type);
@@ -52,6 +62,19 @@ const isFileUploadType = (type: UploadFormType): type is FileUploadType => FILE_
 const formatUploadType = (type: FileUploadType): string => {
  if (type === 'pdf') return 'PDF';
  return type.charAt(0).toUpperCase() + type.slice(1);
+};
+
+const getBulkUploadConcurrency = (items: UploadQueueItem[]): number => (
+ items.some(item => item.type === 'video' || item.type === 'pdf') ? 1 : BULK_UPLOAD_CONCURRENCY
+);
+
+const getUploadButtonLabel = (queue: UploadQueueItem[]): string => {
+ const retryableCount = queue.filter(item => item.status !== 'success').length;
+ const failedCount = queue.filter(item => item.status === 'error').length;
+ if (failedCount > 0 && retryableCount === failedCount) {
+ return `Retry ${failedCount} Failed`;
+ }
+ return `Upload ${retryableCount} File${retryableCount === 1 ? '' : 's'}`;
 };
 
 export default function ContentClient() {
@@ -88,6 +111,7 @@ export default function ContentClient() {
  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
  const [uploadProgress, setUploadProgress] = useState<number>(0);
  const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([]);
+ const [uploadRejections, setUploadRejections] = useState<UploadRejectedItem[]>([]);
  const [tags] = useState<ContentTag[]>([
  { id: '1', name: 'Marketing', color: 'blue' },
  { id: '2', name: 'Seasonal', color: 'green' },
@@ -357,7 +381,10 @@ export default function ContentClient() {
  };
 
  try {
- const workerCount = Math.min(BULK_UPLOAD_CONCURRENCY, uploadTargets.length);
+ const workerCount = Math.min(
+ getBulkUploadConcurrency(uploadTargets.map(({ item }) => item)),
+ uploadTargets.length,
+ );
  await Promise.all(Array.from({ length: workerCount }, () => worker()));
  } finally {
  setActionLoading(false);
@@ -398,6 +425,7 @@ export default function ContentClient() {
 
  const clearUploadQueue = () => {
  setUploadQueue([]);
+ setUploadRejections([]);
  clearSelectedUploadFile();
  };
 
@@ -765,13 +793,22 @@ export default function ContentClient() {
  const { getRootProps, getInputProps, isDragActive } = useDropzone({
  accept: getAcceptedFileTypes() as any,
  multiple: true, // Enable multiple file selection
+ maxSize: isFileUploadType(uploadForm.type) ? FILE_UPLOAD_LIMITS[uploadForm.type] : undefined,
  disabled: actionLoading || !isFileUploadType(uploadForm.type),
  useFsAccessApi: false,
  onDrop: (acceptedFiles) => {
  if (!isFileUploadType(uploadForm.type)) return;
  const queuedType = uploadForm.type;
+ const remainingSlots = Math.max(0, MAX_UPLOAD_QUEUE_ITEMS - uploadQueue.length);
+ const filesToQueue = acceptedFiles.slice(0, remainingSlots);
+ const overflowCount = acceptedFiles.length - filesToQueue.length;
+ if (overflowCount > 0) {
+ toast.warning(`Upload queue limit is ${MAX_UPLOAD_QUEUE_ITEMS} files. ${overflowCount} file(s) were not added to the upload queue.`);
+ }
+ if (filesToQueue.length === 0) return;
+ setUploadRejections([]);
  // Add files to upload queue
- const newQueueItems = acceptedFiles.map(file => ({
+ const newQueueItems = filesToQueue.map(file => ({
  file,
  type: queuedType,
  status: 'pending' as const,
@@ -780,8 +817,8 @@ export default function ContentClient() {
  setUploadQueue(prev => [...prev, ...newQueueItems]);
  
  // For backward compatibility, set first file to uploadForm
- if (acceptedFiles.length > 0 && !uploadForm.file) {
- const file = acceptedFiles[0];
+ if (filesToQueue.length > 0 && !uploadForm.file) {
+ const file = filesToQueue[0];
  if (uploadForm.url && uploadForm.url.startsWith('blob:')) {
  URL.revokeObjectURL(uploadForm.url);
  }
@@ -797,6 +834,13 @@ export default function ContentClient() {
  }));
  }
  }
+ },
+ onDropRejected: (fileRejections: FileRejection[]) => {
+ const rejected = fileRejections.map(({ file, errors }) => ({
+ fileName: file.name,
+ reason: errors[0]?.message || 'File rejected',
+ }));
+ setUploadRejections(rejected);
  },
  });
 
@@ -846,6 +890,7 @@ export default function ContentClient() {
  };
 
  const hasActiveFilters = filterType !== 'all' || filterStatus !== 'all' || filterDateRange !== 'all' || searchQuery !== '' || selectedTags.length > 0;
+ const retryableUploadCount = uploadQueue.filter(item => item.status !== 'success').length;
 
  return (
  <div className="flex h-full">
@@ -1433,6 +1478,21 @@ export default function ContentClient() {
  )}
  </div>
  
+ {uploadRejections.length > 0 && (
+ <div className="mt-4 space-y-2" aria-live="polite">
+ {uploadRejections.map((rejection) => (
+ <div
+ key={`${rejection.fileName}-${rejection.reason}`}
+ role="alert"
+ className="rounded border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-600 dark:text-red-300"
+ >
+ <p className="font-medium">{rejection.fileName}</p>
+ <p className="text-xs">{rejection.reason}</p>
+ </div>
+ ))}
+ </div>
+ )}
+
  {/* Upload Queue */}
  {uploadQueue.length > 0 && (
  <div className="mt-4 space-y-2">
@@ -1468,6 +1528,9 @@ export default function ContentClient() {
  style={{ width: `${item.progress}%` }}
  />
  </div>
+ )}
+ {item.status === 'error' && item.error && (
+ <p className="mt-1 text-xs text-red-600 dark:text-red-400">{item.error}</p>
  )}
  </div>
  <div className="ml-4 flex items-center gap-2">
@@ -1571,11 +1634,11 @@ export default function ContentClient() {
  <button
  onClick={handleUpload}
  className="px-4 py-2 text-sm font-medium bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
- disabled={actionLoading || (uploadQueue.length === 0 && (!uploadForm.title || !uploadForm.url))}
+ disabled={actionLoading || (uploadQueue.length > 0 ? retryableUploadCount === 0 : (!uploadForm.title || !uploadForm.url))}
  >
  {actionLoading && <LoadingSpinner size="sm" />}
  {uploadQueue.length > 0
- ? `Upload ${uploadQueue.length} File${uploadQueue.length > 1 ? 's' : ''}`
+ ? getUploadButtonLabel(uploadQueue)
  : 'Upload Content'
  }
  </button>

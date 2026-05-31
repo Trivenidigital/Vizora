@@ -1,5 +1,8 @@
 import { BadRequestException } from '@nestjs/common';
 import { FileValidationService } from './file-validation.service';
+import * as fs from 'fs/promises';
+import * as os from 'os';
+import * as path from 'path';
 
 // Mock dns/promises to avoid real DNS lookups in tests
 jest.mock('dns/promises', () => ({
@@ -25,10 +28,30 @@ jest.mock('dns/promises', () => ({
 
 describe('FileValidationService', () => {
   let service: FileValidationService;
+  let tempFiles: string[] = [];
 
   beforeEach(() => {
     service = new FileValidationService();
+    tempFiles = [];
   });
+
+  afterEach(async () => {
+    await Promise.all(
+      tempFiles.map((filePath) =>
+        fs.unlink(filePath).catch((error: NodeJS.ErrnoException) => {
+          if (error.code !== 'ENOENT') throw error;
+        }),
+      ),
+    );
+  });
+
+  const writeTempUpload = async (filename: string, data: Buffer): Promise<string> => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vizora-validation-test-'));
+    const filePath = path.join(tempDir, filename);
+    await fs.writeFile(filePath, data);
+    tempFiles.push(filePath);
+    return filePath;
+  };
 
   it('should be defined', () => {
     expect(service).toBeDefined();
@@ -191,6 +214,32 @@ describe('FileValidationService', () => {
 
         expect(result.valid).toBe(true);
       });
+
+      it('should reject spoofed WebP files that only contain a RIFF header', async () => {
+        const spoofedWebp = Buffer.concat([
+          Buffer.from('RIFF'),
+          Buffer.alloc(4),
+          Buffer.from('WAVE'),
+          Buffer.alloc(100),
+        ]);
+
+        await expect(
+          service.validateFile(spoofedWebp, 'fake.webp', 'image/webp'),
+        ).rejects.toThrow('File content does not match declared type');
+      });
+
+      it('should reject spoofed AVI files that only contain a RIFF header', async () => {
+        const spoofedAvi = Buffer.concat([
+          Buffer.from('RIFF'),
+          Buffer.alloc(4),
+          Buffer.from('WAVE'),
+          Buffer.alloc(100),
+        ]);
+
+        await expect(
+          service.validateFile(spoofedAvi, 'fake.avi', 'video/x-msvideo'),
+        ).rejects.toThrow('File content does not match declared type');
+      });
     });
 
     describe('Suspicious Content Detection', () => {
@@ -264,6 +313,18 @@ describe('FileValidationService', () => {
           service.validateFile(maliciousPdf, 'evil.pdf', 'application/pdf'),
         ).rejects.toThrow('suspicious content');
       });
+
+      it('should reject PDFs with JavaScript markers after the first 10KB', async () => {
+        const maliciousPdf = Buffer.concat([
+          Buffer.from([0x25, 0x50, 0x44, 0x46]),
+          Buffer.alloc(12 * 1024, 0x20),
+          Buffer.from('/JS (alert)'),
+        ]);
+
+        await expect(
+          service.validateFile(maliciousPdf, 'late-js.pdf', 'application/pdf'),
+        ).rejects.toThrow('suspicious content');
+      });
     });
 
     describe('Hash Generation', () => {
@@ -305,6 +366,100 @@ describe('FileValidationService', () => {
         );
 
         expect(result1.hash).toBe(result2.hash);
+      });
+
+      it('should validate file paths with the same hash as buffer validation', async () => {
+        const file = Buffer.concat([
+          Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+          Buffer.from('same content'),
+        ]);
+        const filePath = await writeTempUpload('same.png', file);
+
+        const bufferResult = await service.validateFile(file, 'same.png', 'image/png');
+        const pathResult = await (service as any).validateFileAtPath(
+          filePath,
+          'same.png',
+          'image/png',
+        );
+
+        expect(pathResult.valid).toBe(true);
+        expect(pathResult.actualType).toBe('image/png');
+        expect(pathResult.hash).toBe(bufferResult.hash);
+      });
+
+      it('should reject path validation when the expected upload size changed', async () => {
+        const file = Buffer.concat([
+          Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+          Buffer.from('same content'),
+        ]);
+        const filePath = await writeTempUpload('size-changed.png', file);
+
+        await expect(
+          (service as any).validateFileAtPath(
+            filePath,
+            'size-changed.png',
+            'image/png',
+            file.length + 1,
+          ),
+        ).rejects.toThrow('Uploaded file size changed during validation');
+      });
+
+      it('should reject spoofed WebP paths that only contain a RIFF header', async () => {
+        const spoofedWebp = Buffer.concat([
+          Buffer.from('RIFF'),
+          Buffer.alloc(4),
+          Buffer.from('WAVE'),
+          Buffer.alloc(100),
+        ]);
+        const filePath = await writeTempUpload('fake.webp', spoofedWebp);
+
+        await expect(
+          (service as any).validateFileAtPath(filePath, 'fake.webp', 'image/webp'),
+        ).rejects.toThrow('File content does not match declared type');
+      });
+
+      it('should reject spoofed AVI paths that only contain a RIFF header', async () => {
+        const spoofedAvi = Buffer.concat([
+          Buffer.from('RIFF'),
+          Buffer.alloc(4),
+          Buffer.from('WAVE'),
+          Buffer.alloc(100),
+        ]);
+        const filePath = await writeTempUpload('fake.avi', spoofedAvi);
+
+        await expect(
+          (service as any).validateFileAtPath(filePath, 'fake.avi', 'video/x-msvideo'),
+        ).rejects.toThrow('File content does not match declared type');
+      });
+
+      it('should stream-scan PDF paths for JavaScript markers beyond the first 10KB', async () => {
+        const maliciousPdf = Buffer.concat([
+          Buffer.from([0x25, 0x50, 0x44, 0x46]),
+          Buffer.alloc(12 * 1024, 0x20),
+          Buffer.from('/EmbeddedFile'),
+        ]);
+        const filePath = await writeTempUpload('late-embedded.pdf', maliciousPdf);
+
+        await expect(
+          (service as any).validateFileAtPath(filePath, 'late-embedded.pdf', 'application/pdf'),
+        ).rejects.toThrow('suspicious content');
+      });
+
+      it('should detect PDF JavaScript markers split across stream chunks', async () => {
+        const chunkBoundaryPrefix = Buffer.concat([
+          Buffer.from([0x25, 0x50, 0x44, 0x46]),
+          Buffer.alloc(64 * 1024 - 4 - 3, 0x20),
+          Buffer.from('/Ja'),
+        ]);
+        const maliciousPdf = Buffer.concat([
+          chunkBoundaryPrefix,
+          Buffer.from('vaScript (alert)'),
+        ]);
+        const filePath = await writeTempUpload('split-js.pdf', maliciousPdf);
+
+        await expect(
+          (service as any).validateFileAtPath(filePath, 'split-js.pdf', 'application/pdf'),
+        ).rejects.toThrow('suspicious content');
       });
     });
   });
