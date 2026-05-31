@@ -11,8 +11,8 @@ describe('StatusBadge', () => {
     expect(screen.getByText('Active')).toHaveClass('bg-green-500/10');
   });
 
-  it('renders trialing status correctly', () => {
-    render(<StatusBadge status="trialing" />);
+  it('renders trial status correctly', () => {
+    render(<StatusBadge status="trial" />);
     expect(screen.getByText('Trial')).toBeInTheDocument();
     expect(screen.getByText('Trial')).toHaveClass('bg-[#00B4D8]/10');
   });
@@ -107,7 +107,7 @@ describe('PlanCard', () => {
     id: 'pro',
     name: 'Pro',
     screenQuota: 25,
-    price: 99,
+    price: 9900,
     currency: 'USD',
     interval: 'monthly',
     features: ['25 screens', 'Priority support', 'API access'],
@@ -131,7 +131,7 @@ describe('PlanCard', () => {
   });
 
   it('formats INR price correctly', () => {
-    const inrPlan = { ...mockPlan, price: 7999, currency: 'INR' };
+    const inrPlan = { ...mockPlan, price: 799900, currency: 'INR' };
     render(<PlanCard plan={inrPlan} onSelect={mockOnSelect} isCurrentPlan={false} />);
     expect(screen.getByText(/7,999/)).toBeInTheDocument();
   });

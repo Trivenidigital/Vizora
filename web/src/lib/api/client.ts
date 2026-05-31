@@ -2,6 +2,7 @@
 // Uses httpOnly cookies for secure JWT token storage
 
 import { devLog, devWarn } from '../logger';
+import { ApiError } from '../error-handler';
 
 // Use relative URL '/api' so requests go through the Next.js rewrite proxy,
 // keeping cookies same-origin. Only fall back to absolute URL for SSR or
@@ -83,6 +84,44 @@ export interface ScheduleData {
 
 // CSRF cookie name (must match backend)
 const CSRF_COOKIE_NAME = 'vizora_csrf_token';
+
+function getUserMessageForStatus(statusCode: number, errorMessage: string): string {
+  switch (statusCode) {
+    case 400:
+      return 'Invalid request. Please check your input.';
+    case 401:
+      return 'Your session has expired. Please log in again.';
+    case 403:
+      return 'You do not have permission to access this resource.';
+    case 404:
+      return 'The requested resource was not found.';
+    case 409:
+      return errorMessage;
+    case 422:
+      return 'Please check your input and try again.';
+    case 429:
+      return 'Too many requests. Please wait a moment and try again.';
+    case 500:
+      return 'A server error occurred. Please try again later.';
+    case 502:
+    case 503:
+      return 'The service is temporarily unavailable. Please try again later.';
+    default:
+      return errorMessage;
+  }
+}
+
+async function buildApiError(response: Response, fallbackMessage: string): Promise<ApiError> {
+  const errorData = await response.json().catch(() => ({ message: fallbackMessage }));
+  const message = Array.isArray(errorData?.message)
+    ? errorData.message.join(', ')
+    : errorData?.message || `HTTP ${response.status}`;
+  return new ApiError(
+    response.status,
+    message,
+    getUserMessageForStatus(response.status, message),
+  );
+}
 
 /**
  * Get CSRF token from cookie
@@ -211,8 +250,9 @@ export class ApiClient {
         if (process.env.NODE_ENV === 'development') {
           console.error(`[API] Request failed with status ${response.status}`);
         }
-        // Handle authentication errors
-        if (response.status === 401 || response.status === 403) {
+        // Handle expired/invalid sessions. A 403 is a permission boundary,
+        // not proof that the user's auth cookie is invalid.
+        if (response.status === 401) {
           this.isAuthenticated = false;
           if (typeof window !== 'undefined') {
             // Only redirect from protected routes (dashboard, admin), not public pages
@@ -223,8 +263,7 @@ export class ApiClient {
           }
         }
 
-        const error = await response.json().catch(() => ({ message: 'Request failed' }));
-        throw new Error(error.message || `HTTP ${response.status}`);
+        throw await buildApiError(response, 'Request failed');
       }
 
       const data = await response.json();
@@ -286,11 +325,10 @@ export class ApiClient {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
+        if (response.status === 401) {
           this.isAuthenticated = false;
         }
-        const error = await response.json().catch(() => ({ message: 'Upload failed' }));
-        throw new Error(error.message || `HTTP ${response.status}`);
+        throw await buildApiError(response, 'Upload failed');
       }
 
       const data = await response.json();

@@ -142,9 +142,15 @@ ApiClient.prototype.updateContent = async function (
   id: string,
   data: Partial<{ title: string; metadata?: Record<string, unknown> }>
 ): Promise<Content> {
+  const { title, ...rest } = data;
+  const payload = {
+    ...rest,
+    ...(title !== undefined ? { name: title } : {}),
+  };
+
   return this.request<Content>(`/content/${id}`, {
     method: 'PATCH',
-    body: JSON.stringify(data),
+    body: JSON.stringify(payload),
   });
 };
 

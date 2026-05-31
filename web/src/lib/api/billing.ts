@@ -15,7 +15,7 @@ declare module './client' {
     revokeApiKey(id: string): Promise<void>;
     // Billing
     getSubscriptionStatus(): Promise<SubscriptionStatus>;
-    getPlans(country?: string): Promise<Plan[]>;
+    getPlans(country?: string, interval?: 'monthly' | 'yearly'): Promise<Plan[]>;
     getQuotaUsage(): Promise<QuotaUsage>;
     createCheckout(planId: string, interval: 'monthly' | 'yearly'): Promise<CheckoutResponse>;
     cancelSubscription(immediately?: boolean): Promise<void>;
@@ -48,9 +48,15 @@ ApiClient.prototype.getSubscriptionStatus = async function (): Promise<Subscript
   return this.request<SubscriptionStatus>('/billing/subscription');
 };
 
-ApiClient.prototype.getPlans = async function (country?: string): Promise<Plan[]> {
-  const params = country ? `?country=${country}` : '';
-  return this.request<Plan[]>(`/billing/plans${params}`);
+ApiClient.prototype.getPlans = async function (
+  country?: string,
+  interval?: 'monthly' | 'yearly',
+): Promise<Plan[]> {
+  const params = new URLSearchParams();
+  if (country) params.set('country', country);
+  if (interval) params.set('interval', interval);
+  const query = params.toString();
+  return this.request<Plan[]>(`/billing/plans${query ? `?${query}` : ''}`);
 };
 
 ApiClient.prototype.getQuotaUsage = async function (): Promise<QuotaUsage> {

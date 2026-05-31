@@ -1,8 +1,88 @@
 # Vizora - Task Tracker
 
-## In Progress: Device Content Streaming Performance Pass 7 (2026-05-31)
+## In Progress: Dashboard Contract Readiness Pass 8 (2026-05-31)
+
+**Branch:** `feat/customer-dashboard-improvements-8`
+
+**Why now:** After PR #130 merged, the next highest-value repo-side customer
+readiness work is a bounded set of dashboard contract defects found by the
+customer UX, performance, and reliability reviews. These affect billing accuracy,
+auth behavior, content rename, schedule load failure visibility, and dashboard
+activity freshness without requiring secrets, live hardware, or production state
+mutation.
+
+**New primitives introduced:** none. Reuse the existing web `ApiClient`,
+billing module, content API wrapper, schedules page, and dashboard overview.
+
+**Hermes-first analysis:** not applicable; this pass does not add business-agent
+behavior, MCP tools, Hermes skills, AI provider calls, or spend paths.
+
+**Plan/design:** `docs/plans/2026-05-31-dashboard-contract-readiness-pass-8.md`
+
+**Plan**
+- [x] Reconcile post-PR #130 tracker state and create fresh branch from `origin/main`.
+- [x] Run multi-subagent customer UX, performance, and reliability analysis.
+- [x] Write plan/design and customer-dashboard improvement list.
+- [x] Add failing focused tests for the selected contract defects.
+- [x] Implement bounded fixes.
+- [x] Run focused web/middleware tests.
+- [x] Run multi-subagent code review before broader tests.
+- [x] Run broader affected tests/builds/typecheck.
+- [ ] PR, CI, merge.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Analysis feed**
+- [x] Customer UX review prioritized billing display/trial correctness, pairing guidance,
+  first-run checklist, schedule prerequisites, advanced control exposure, filter-empty states,
+  and overloaded settings.
+- [x] Performance review prioritized duplicate dashboard sockets, full-list overview fetches,
+  detail-sized list payloads, unbounded content library rendering, playlist/schedule reference
+  fetch fan-out, and upload-memory pressure.
+- [x] Reliability review prioritized 403 logout behavior, billing interval drift, trial status
+  naming, content rename payload drift, schedule partial-load silence, and stale dashboard
+  recent activity.
+
+**Selected fix bundle**
+- [x] Keep auth on `403`, redirect only on `401`, and throw status-bearing `ApiError` objects.
+- [x] Pass billing interval through plans API and render backend minor-unit prices correctly.
+- [x] Use `trial` consistently in billing page/status UI.
+- [x] Map content rename payloads from web `title` to middleware `name`.
+- [x] Surface schedule partial-load failures with an error banner.
+- [x] Rebuild dashboard recent activity when device-status context initializes.
+
+**Review / verification**
+- [x] API/security reviewer initially found `GET /billing/plans?interval=` still bypassed validation;
+  fixed by rejecting present-but-empty interval query values and adding controller coverage.
+- [x] Customer/runtime reviewer: CLEAN after yearly-fetch failure, recent activity, and interval
+  validation fixes.
+- [x] API/security re-review: CLEAN after empty-interval fix.
+- [x] Focused web suite:
+  `pnpm --filter @vizora/web test -- --runInBand --testPathPattern="api/__tests__/(client|billing|content)|billing|schedules-page|dashboard-page"` -
+  pass, 9 suites / 113 tests.
+- [x] Focused middleware billing controller:
+  `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern=billing.controller` -
+  pass, 1 suite / 24 tests.
+- [x] Full web Jest:
+  `pnpm --filter @vizora/web test -- --runInBand` - pass, 94 suites / 953 tests
+  (pre-existing React `act(...)` warnings still appear in several suites).
+- [x] Full middleware Jest:
+  `pnpm --filter @vizora/middleware test -- --runInBand` - pass, 143 suites / 2824 tests.
+- [x] Type checks:
+  `pnpm --filter @vizora/middleware exec tsc --noEmit --pretty false` and
+  `pnpm --filter @vizora/web exec tsc --noEmit --pretty false` - pass.
+- [x] Builds:
+  `npx nx build @vizora/middleware` - pass with existing webpack warnings;
+  `$env:NEXT_PUBLIC_SOCKET_URL='http://localhost:3002'; $env:NEXT_PUBLIC_API_URL='http://localhost:3000'; $env:BACKEND_URL='http://localhost:3000'; npx nx build @vizora/web` - pass.
+- [x] Browser smoke: local production `next start` plus Playwright-mocked API verified desktop/mobile
+  billing plan pricing, yearly refetch, no stale monthly cards after yearly failure, and schedules
+  partial-load permission banner. Screenshots saved under `test-results/pass8-browser/`.
+
+---
+
+## Completed: Device Content Streaming Performance Pass 7 (2026-05-31)
 
 **Branch:** `feat/content-streaming-performance-7`
+**PR / merge commit:** #130 / `c617cef6cc6b44e29bb8ef19c04f3a7071532809`
 
 **Why now:** Customer display playback is a hot path and the middleware device-content route repeats
 device-token DB validation, content DB lookup, and MinIO metadata lookup for every video byte-range
@@ -26,8 +106,8 @@ Hermes skills, AI provider calls, or spend paths.
 - [x] Run focused middleware tests.
 - [x] Run multi-subagent code review before broader tests.
 - [x] Run broader affected tests/builds/typecheck.
-- [ ] PR, CI, merge.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe.
 
 **Baseline evidence**
 - [x] Code inspection: `DeviceContentController.serveFile` calls `verifyCurrentDeviceToken`,
@@ -81,6 +161,10 @@ Hermes skills, AI provider calls, or spend paths.
 - [x] Branch commit created: `perf(middleware): cache device content streaming lookups`.
 - [x] PR #130 opened and mergeable.
 - [x] GitHub CI green at first pushed head: audit, lint, test, build, security, and e2e passed.
+- [x] PR #130 merged after final CI green at head `7846dafa0c91ca9f804f4d62613127f67626ab9c`;
+  merge commit `c617cef6cc6b44e29bb8ef19c04f3a7071532809`.
+- [x] Deployment gate checked after merge: production health OK, core PM2 services online, but
+  `/opt/vizora/app` is dirty and diverged (`ahead 17, behind 66`), so deploy was not attempted.
 
 ---
 

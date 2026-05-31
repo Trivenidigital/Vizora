@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Get,
   Post,
@@ -16,6 +17,8 @@ import { BillingService } from './billing.service';
 import { CreateCheckoutDto } from './dto/create-checkout.dto';
 import { UpdateSubscriptionDto } from './dto/update-subscription.dto';
 
+type BillingInterval = 'monthly' | 'yearly';
+
 @Controller('billing')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class BillingController {
@@ -30,8 +33,16 @@ export class BillingController {
   async getPlans(
     @CurrentUser('organizationId') organizationId: string,
     @Query('country') country?: string,
+    @Query('interval') interval?: string,
   ) {
-    return this.billingService.getPlans(organizationId, country);
+    if (interval !== undefined && interval !== 'monthly' && interval !== 'yearly') {
+      throw new BadRequestException('Invalid billing interval');
+    }
+    return this.billingService.getPlans(
+      organizationId,
+      country,
+      interval as BillingInterval | undefined,
+    );
   }
 
   @Post('checkout')

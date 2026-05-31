@@ -82,4 +82,42 @@ describe('billing api methods', () => {
       'Billing portal response did not include a redirect URL',
     );
   });
+
+  it('passes country and interval query params when fetching plans', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: [],
+      }),
+    });
+
+    const client = new ApiClient('/api/v1');
+
+    await client.getPlans('IN', 'yearly');
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/v1/billing/plans?country=IN&interval=yearly',
+      expect.objectContaining({ credentials: 'include' }),
+    );
+  });
+
+  it('passes interval without country when fetching plans', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: [],
+      }),
+    });
+
+    const client = new ApiClient('/api/v1');
+
+    await client.getPlans(undefined, 'yearly');
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/v1/billing/plans?interval=yearly',
+      expect.objectContaining({ credentials: 'include' }),
+    );
+  });
 });

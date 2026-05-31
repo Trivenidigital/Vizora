@@ -14,20 +14,21 @@ interface PlanCardProps {
 
 export function PlanCard({ plan, onSelect, onContactSales, isCurrentPlan, isLoading }: PlanCardProps) {
   const formatPrice = (price: number, currency: string) => {
+    const majorUnits = price / 100;
     if (currency === 'INR' || currency === 'inr') {
       return new Intl.NumberFormat('en-IN', {
         style: 'currency',
         currency: 'INR',
         minimumFractionDigits: 0,
         maximumFractionDigits: 0,
-      }).format(price);
+      }).format(majorUnits);
     }
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: currency.toUpperCase(),
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    }).format(price);
+    }).format(majorUnits);
   };
 
   const isEnterprise = plan.name.toLowerCase() === 'enterprise';
