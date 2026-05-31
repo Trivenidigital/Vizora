@@ -8,6 +8,7 @@ import { NotificationService } from '../services/notification.service';
 import { MetricsService } from '../metrics/metrics.service';
 import { DatabaseService } from '../database/database.service';
 import { StorageService } from '../storage/storage.service';
+import { createHash } from 'node:crypto';
 
 // Mock Sentry
 jest.mock('@sentry/nestjs', () => ({
@@ -25,7 +26,11 @@ describe('DeviceGateway', () => {
 
   const mockJwtService = {
     verify: jest.fn(),
+    sign: jest.fn(),
   };
+
+  const hashToken = (token: string) =>
+    createHash('sha256').update(token).digest('hex');
 
   const mockRedisService = {
     setDeviceStatus: jest.fn().mockResolvedValue(undefined),
@@ -70,7 +75,14 @@ describe('DeviceGateway', () => {
     display: {
       update: jest.fn().mockResolvedValue({ nickname: 'Test Device', deviceIdentifier: 'test-id' }),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-      findUnique: jest.fn().mockResolvedValue({ nickname: 'Test Device', deviceIdentifier: 'test-id' }),
+      findUnique: jest.fn().mockResolvedValue({
+        id: 'device-1',
+        organizationId: 'org-1',
+        isDisabled: false,
+        nickname: 'Test Device',
+        deviceIdentifier: 'test-id',
+        jwtToken: hashToken('valid-token'),
+      }),
       findMany: jest.fn().mockResolvedValue([]),
     },
     playlist: {
@@ -344,7 +356,12 @@ describe('DeviceGateway', () => {
         organizationId: 'org-1',
         deviceIdentifier: 'test-id',
       });
-      mockDatabaseService.display.findUnique.mockResolvedValue({ id: 'device-1', organizationId: 'org-1' });
+      mockDatabaseService.display.findUnique.mockResolvedValue({
+        id: 'device-1',
+        organizationId: 'org-1',
+        isDisabled: false,
+        jwtToken: hashToken('valid-token'),
+      });
 
       const client = createMockSocket();
 
@@ -366,6 +383,7 @@ describe('DeviceGateway', () => {
         id: 'device-1',
         organizationId: 'org-1',
         isDisabled: true,
+        jwtToken: hashToken('valid-token'),
       });
 
       const client = createMockSocket();
@@ -375,6 +393,121 @@ describe('DeviceGateway', () => {
       expect(client.emit).toHaveBeenCalledWith('error', { message: 'device_disabled' });
       expect(client.disconnect).toHaveBeenCalled();
       expect(client.join).not.toHaveBeenCalledWith('device:device-1');
+    });
+
+    it('should reject a signed device token that is not the current stored token', async () => {
+      mockJwtService.verify.mockReturnValue({
+        sub: 'device-1',
+        type: 'device',
+        organizationId: 'org-1',
+        deviceIdentifier: 'test-id',
+      });
+      mockDatabaseService.display.findUnique.mockResolvedValue({
+        id: 'device-1',
+        organizationId: 'org-1',
+        isDisabled: false,
+        jwtToken: hashToken('current-device-token'),
+      });
+
+      const client = createMockSocket({
+        handshake: { auth: { token: 'stale-device-token' }, address: '127.0.0.1' },
+      });
+
+      await gateway.handleConnection(client as any);
+
+      expect(client.emit).toHaveBeenCalledWith('error', { message: 'device_token_stale' });
+      expect(client.disconnect).toHaveBeenCalled();
+      expect(client.join).not.toHaveBeenCalledWith('device:device-1');
+      expect(mockRedisService.setDeviceStatus).not.toHaveBeenCalled();
+    });
+
+    it('should reject a signed device token when the display has no stored token hash', async () => {
+      mockJwtService.verify.mockReturnValue({
+        sub: 'device-1',
+        type: 'device',
+        organizationId: 'org-1',
+        deviceIdentifier: 'test-id',
+      });
+      mockDatabaseService.display.findUnique.mockResolvedValue({
+        id: 'device-1',
+        organizationId: 'org-1',
+        isDisabled: false,
+        jwtToken: null,
+      });
+
+      const client = createMockSocket();
+
+      await gateway.handleConnection(client as any);
+
+      expect(client.emit).toHaveBeenCalledWith('error', { message: 'device_token_stale' });
+      expect(client.disconnect).toHaveBeenCalled();
+      expect(client.join).not.toHaveBeenCalledWith('device:device-1');
+    });
+
+    it('should persist a rotated device token hash before emitting token refresh', async () => {
+      const oldToken = 'valid-token';
+      const newToken = 'rotated-device-token';
+      mockJwtService.verify.mockReturnValue({
+        sub: 'device-1',
+        type: 'device',
+        organizationId: 'org-1',
+        deviceIdentifier: 'test-id',
+        exp: Math.floor(Date.now() / 1000) + 3 * 86400,
+      });
+      mockJwtService.sign.mockReturnValue(newToken);
+      mockDatabaseService.display.findUnique.mockResolvedValue({
+        id: 'device-1',
+        organizationId: 'org-1',
+        isDisabled: false,
+        jwtToken: hashToken(oldToken),
+      });
+      mockDatabaseService.display.updateMany.mockResolvedValue({ count: 1 });
+
+      const client = createMockSocket({
+        handshake: { auth: { token: oldToken }, address: '127.0.0.1' },
+      });
+
+      await gateway.handleConnection(client as any);
+
+      expect(mockDatabaseService.display.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'device-1',
+          organizationId: 'org-1',
+          isDisabled: false,
+          jwtToken: hashToken(oldToken),
+        },
+        data: { jwtToken: hashToken(newToken) },
+      });
+      expect(client.emit).toHaveBeenCalledWith('token:refresh', { token: newToken });
+    });
+
+    it('should not emit a rotated token when persisting the new hash races or fails', async () => {
+      const oldToken = 'valid-token';
+      const newToken = 'rotated-device-token';
+      mockJwtService.verify.mockReturnValue({
+        sub: 'device-1',
+        type: 'device',
+        organizationId: 'org-1',
+        deviceIdentifier: 'test-id',
+        exp: Math.floor(Date.now() / 1000) + 3 * 86400,
+      });
+      mockJwtService.sign.mockReturnValue(newToken);
+      mockDatabaseService.display.findUnique.mockResolvedValue({
+        id: 'device-1',
+        organizationId: 'org-1',
+        isDisabled: false,
+        jwtToken: hashToken(oldToken),
+      });
+      mockDatabaseService.display.updateMany.mockResolvedValue({ count: 0 });
+
+      const client = createMockSocket({
+        handshake: { auth: { token: oldToken }, address: '127.0.0.1' },
+      });
+
+      await gateway.handleConnection(client as any);
+
+      expect(client.disconnect).not.toHaveBeenCalled();
+      expect(client.emit).not.toHaveBeenCalledWith('token:refresh', { token: newToken });
     });
 
     it('should reject connections with a revoked token', async () => {
@@ -485,7 +618,12 @@ describe('DeviceGateway', () => {
         organizationId: 'org-1',
         deviceIdentifier: 'test-id',
       });
-      mockDatabaseService.display.findUnique.mockResolvedValue({ id: 'device-1', organizationId: 'org-1' });
+      mockDatabaseService.display.findUnique.mockResolvedValue({
+        id: 'device-1',
+        organizationId: 'org-1',
+        isDisabled: false,
+        jwtToken: hashToken('valid-token'),
+      });
 
       // Exhaust the rate limit (11 connections from same IP)
       for (let i = 0; i < 11; i++) {
@@ -513,7 +651,12 @@ describe('DeviceGateway', () => {
         deviceIdentifier: token,
       }));
       mockDatabaseService.display.findUnique.mockImplementation(({ where }: any) =>
-        Promise.resolve({ id: where.id, organizationId: 'org-1', isDisabled: false }),
+        Promise.resolve({
+          id: where.id,
+          organizationId: 'org-1',
+          isDisabled: false,
+          jwtToken: hashToken(where.id),
+        }),
       );
 
       const clients = [];

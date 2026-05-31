@@ -37,7 +37,7 @@ import {
   BroadcastData,
 } from '../types';
 import * as Sentry from '@sentry/nestjs';
-import { createHash } from 'node:crypto';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { WsAllExceptionsFilter } from './filters/ws-exception.filter';
 import { WsAuthGuard, WsDeviceGuard } from './guards/ws-auth.guard';
 import { redactSensitiveTokens } from '../utils/redact-sensitive-url';
@@ -58,6 +58,8 @@ interface UserPayload {
   jti?: string;
   iat?: number; // issued-at (epoch seconds), set by jsonwebtoken — used for password-change session invalidation
 }
+
+const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/i;
 
 type AuthPayload =
   | { kind: 'device'; payload: DevicePayload }
@@ -637,6 +639,28 @@ export class DeviceGateway
     return null;
   }
 
+  private hashDeviceToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
+  }
+
+  private isCurrentDeviceToken(
+    storedHash: string | null | undefined,
+    presentedHash: string,
+  ): boolean {
+    if (
+      !storedHash ||
+      !SHA256_HEX_PATTERN.test(storedHash) ||
+      !SHA256_HEX_PATTERN.test(presentedHash)
+    ) {
+      return false;
+    }
+
+    return timingSafeEqual(
+      Buffer.from(storedHash, 'hex'),
+      Buffer.from(presentedHash, 'hex'),
+    );
+  }
+
   /**
    * Authenticate the connection: verify JWT (device or user), check revocation, deduplicate sockets.
    * Returns a discriminated union on success, or null if connection was rejected.
@@ -669,9 +693,10 @@ export class DeviceGateway
         }
 
         const deviceId = payload.sub;
+        const presentedTokenHash = this.hashDeviceToken(token);
         const device = await this.databaseService.display.findUnique({
           where: { id: deviceId },
-          select: { id: true, organizationId: true, isDisabled: true },
+          select: { id: true, organizationId: true, isDisabled: true, jwtToken: true },
         });
         if (!device || device.organizationId !== payload.organizationId) {
           this.logger.warn(
@@ -684,6 +709,12 @@ export class DeviceGateway
         if (device.isDisabled) {
           this.logger.warn(`Connection rejected: Device is disabled (id: ${deviceId})`);
           client.emit('error', { message: 'device_disabled' });
+          client.disconnect();
+          return null;
+        }
+        if (!this.isCurrentDeviceToken(device.jwtToken, presentedTokenHash)) {
+          this.logger.warn(`Connection rejected: Device token is not current (id: ${deviceId})`);
+          client.emit('error', { message: 'device_token_stale' });
           client.disconnect();
           return null;
         }
@@ -706,9 +737,8 @@ export class DeviceGateway
         client.data.capabilities = client.handshake.auth?.capabilities;
         client.data.deliveryAckCapable = this.supportsDeliveryAck(client);
 
-        // Auto-rotate device token if it expires within 14 days.
-        // NOTE: The old token remains valid until natural expiry (stateless JWT limitation).
-        // TODO: For high-security deployments, consider a token blacklist in Redis.
+        // Auto-rotate device token if it expires within 14 days. Persist the
+        // new current-token hash before instructing the device to use it.
         // TODO: Rate-limit rotation to once per 24h per device via Redis key 'token_rotated:{deviceId}'
         if (payload.exp) {
           const daysUntilExpiry = (payload.exp - Math.floor(Date.now() / 1000)) / 86400;
@@ -722,10 +752,33 @@ export class DeviceGateway
               },
               { secret: process.env.DEVICE_JWT_SECRET, expiresIn: '90d' },
             );
-            client.emit('token:refresh', { token: newToken });
-            this.logger.log(
-              `Rotated token for device ${payload.deviceIdentifier} (${Math.floor(daysUntilExpiry)} days remaining)`,
-            );
+            try {
+              const rotation = await this.databaseService.display.updateMany({
+                where: {
+                  id: deviceId,
+                  organizationId: payload.organizationId,
+                  isDisabled: false,
+                  jwtToken: presentedTokenHash,
+                },
+                data: { jwtToken: this.hashDeviceToken(newToken) },
+              });
+
+              if (rotation.count === 1) {
+                client.emit('token:refresh', { token: newToken });
+                this.logger.log(
+                  `Rotated token for device ${payload.deviceIdentifier} (${Math.floor(daysUntilExpiry)} days remaining)`,
+                );
+              } else {
+                this.logger.warn(
+                  `Skipped token refresh for device ${payload.deviceIdentifier}: current token hash changed before rotation persisted`,
+                );
+              }
+            } catch (error) {
+              const message = error instanceof Error ? error.message : 'unknown error';
+              this.logger.warn(
+                `Skipped token refresh for device ${payload.deviceIdentifier}: failed to persist rotated token hash (${message})`,
+              );
+            }
           }
         }
 

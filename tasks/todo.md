@@ -22,11 +22,11 @@
 - [x] Record PR #127 merge/CI/deploy evidence.
 - [x] Drift-check device token storage and validation paths.
 - [x] Write plan/design and checklist.
-- [ ] Add failing middleware tests for stale/missing `Display.jwtToken` rejection in device-content streaming.
-- [ ] Add failing realtime tests for stale/missing `Display.jwtToken` rejection and rotation persistence.
-- [ ] Implement current-hash validation in middleware and realtime.
-- [ ] Persist new token hash before realtime emits `token:refresh`.
-- [ ] Run focused verification.
+- [x] Add failing middleware tests for stale/missing `Display.jwtToken` rejection in device-content streaming.
+- [x] Add failing realtime tests for stale/missing `Display.jwtToken` rejection and rotation persistence.
+- [x] Implement current-hash validation in middleware and realtime.
+- [x] Persist new token hash before realtime emits `token:refresh`.
+- [x] Run focused verification.
 - [ ] Run multi-subagent review before broad verification.
 - [ ] Run broader affected tests/builds.
 - [ ] PR, CI, merge.
@@ -36,6 +36,10 @@
 - [x] Query prod display token-hash coverage: 15 displays total, 15 with `jwtToken`, 0 missing `jwtToken`, 15 active non-pairing, 0 active non-pairing missing `jwtToken`.
 - [x] Reconcile any legacy displays without a current hash before deploying fail-closed enforcement: no legacy missing-token displays found in the read-only prod count.
 - [ ] Reconcile prod `/opt/vizora/app` dirty/diverged checkout before any pull/restart/deploy.
+
+**Focused verification**
+- [x] `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern=device-content.controller` - red first on stale/missing token-hash acceptance, then pass, 26 tests.
+- [x] `pnpm --filter @vizora/realtime test -- --runInBand --testPathPattern=device.gateway` - red first on stale-token acceptance and rotation-without-persist, then pass, 2 suites / 100 tests.
 
 ---
 
