@@ -16,6 +16,7 @@ import { useToast } from '@/lib/hooks/useToast';
 import { useRealtimeEvents } from '@/lib/hooks';
 import { Icon } from '@/theme/icons';
 import { format } from 'date-fns';
+import { isApiError } from '@/lib/error-handler';
 
 interface Schedule {
  id: string;
@@ -82,6 +83,16 @@ const calculateDuration = (startTime?: number | string, endTime?: number | strin
  return duration;
 };
 
+const getLoadFailureMessage = (reason: unknown): string => {
+ if (isApiError(reason)) {
+ return reason.userMessage;
+ }
+ if (reason instanceof Error) {
+ return reason.message;
+ }
+ return 'Request failed';
+};
+
 export default function SchedulesClient() {
  const toast = useToast();
  const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -95,6 +106,7 @@ export default function SchedulesClient() {
  const [displayGroups, setDisplayGroups] = useState<any[]>([]);
  const [conflictWarnings, setConflictWarnings] = useState<any[]>([]);
  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+ const [loadError, setLoadError] = useState<string | null>(null);
 
  // Modal states
  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -130,6 +142,7 @@ export default function SchedulesClient() {
  const loadData = async () => {
  try {
  setLoading(true);
+ setLoadError(null);
  const [schedulesRes, devicesRes, playlistsRes, groupsRes] = await Promise.allSettled([
  fetchAllPaginated((params) => apiClient.getSchedules(params)),
  fetchAllPaginated((params) => apiClient.getDisplays(params)),
@@ -168,7 +181,23 @@ export default function SchedulesClient() {
  if (groupsRes?.status === 'fulfilled') {
  setDisplayGroups(groupsRes.value || []);
  }
+ const failedResults = [
+ schedulesRes.status === 'rejected' ? { source: 'schedules', reason: schedulesRes.reason } : null,
+ devicesRes.status === 'rejected' ? { source: 'devices', reason: devicesRes.reason } : null,
+ playlistsRes.status === 'rejected' ? { source: 'playlists', reason: playlistsRes.reason } : null,
+ groupsRes.status === 'rejected' ? { source: 'device groups', reason: groupsRes.reason } : null,
+ ].filter(Boolean) as Array<{ source: string; reason: unknown }>;
+ const failedSources = failedResults.map((failure) => failure.source);
+ if (failedSources.length > 0) {
+ const messages = Array.from(
+ new Set(failedResults.map((failure) => getLoadFailureMessage(failure.reason))),
+ );
+ setLoadError(
+ `Some schedule data could not load (${failedSources.join(', ')}): ${messages.join('; ')}`,
+ );
+ }
  } catch (error: any) {
+ setLoadError(error.message || 'Failed to load schedule data');
  toast.error(error.message || 'Failed to load data');
  } finally {
  setLoading(false);
@@ -473,6 +502,18 @@ export default function SchedulesClient() {
  </div>
  </div>
 
+ {loadError && (
+ <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
+ <Icon name="error" size="lg" className="text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+ <div>
+ <h3 className="text-sm font-semibold text-red-900 dark:text-red-100">
+ Some schedule data could not load
+ </h3>
+ <p className="text-sm text-red-700 dark:text-red-300 mt-1">{loadError}</p>
+ </div>
+ </div>
+ )}
+
  {/* Content Area */}
  {viewMode === 'calendar' ? (
  <ScheduleCalendar
@@ -491,7 +532,7 @@ export default function SchedulesClient() {
  setIsCreateModalOpen(true);
  }}
  />
- ) : schedules.length === 0 ? (
+ ) : schedules.length === 0 && !loadError ? (
  <EmptyState
  icon="schedules"
  title="No schedules yet"

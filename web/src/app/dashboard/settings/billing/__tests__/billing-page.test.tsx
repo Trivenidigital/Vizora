@@ -151,10 +151,10 @@ describe('BillingPage', () => {
     });
   });
 
-  it('shows trial end date for trialing subscriptions', async () => {
+  it('shows trial end date for trial subscriptions', async () => {
     (apiClient.getSubscriptionStatus as jest.Mock).mockResolvedValue({
       ...mockSubscription,
-      subscriptionStatus: 'trialing',
+      subscriptionStatus: 'trial',
       trialEndsAt: '2026-02-20T00:00:00.000Z',
     });
 

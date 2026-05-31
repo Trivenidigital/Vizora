@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { BadRequestException } from '@nestjs/common';
 import { BillingController } from './billing.controller';
 import { BillingService } from './billing.service';
 
@@ -116,7 +117,11 @@ describe('BillingController', () => {
       const result = await controller.getPlans(organizationId);
 
       expect(result).toEqual(mockPlans);
-      expect(mockBillingService.getPlans).toHaveBeenCalledWith(organizationId, undefined);
+      expect(mockBillingService.getPlans).toHaveBeenCalledWith(
+        organizationId,
+        undefined,
+        undefined,
+      );
     });
 
     it('should pass country parameter to service', async () => {
@@ -124,7 +129,35 @@ describe('BillingController', () => {
 
       await controller.getPlans(organizationId, 'IN');
 
-      expect(mockBillingService.getPlans).toHaveBeenCalledWith(organizationId, 'IN');
+      expect(mockBillingService.getPlans).toHaveBeenCalledWith(organizationId, 'IN', undefined);
+    });
+
+    it('should pass interval parameter to service', async () => {
+      mockBillingService.getPlans.mockResolvedValue([
+        { ...mockPlans[0], interval: 'yearly', price: 29000 },
+      ]);
+
+      await (controller.getPlans as any)(organizationId, undefined, 'yearly');
+
+      expect(mockBillingService.getPlans).toHaveBeenCalledWith(
+        organizationId,
+        undefined,
+        'yearly',
+      );
+    });
+
+    it('should reject invalid interval values', async () => {
+      await expect((controller.getPlans as any)(organizationId, undefined, 'weekly')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockBillingService.getPlans).not.toHaveBeenCalled();
+    });
+
+    it('should reject empty interval query values', async () => {
+      await expect((controller.getPlans as any)(organizationId, undefined, '')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockBillingService.getPlans).not.toHaveBeenCalled();
     });
 
     it('should return India-specific plans when country is IN', async () => {

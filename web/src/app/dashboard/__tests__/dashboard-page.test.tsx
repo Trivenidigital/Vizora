@@ -25,11 +25,14 @@ jest.mock('@/lib/api', () => ({
   },
 }));
 
-const stableDeviceStatuses = {};
+let mockDeviceStatusContext = {
+  deviceStatuses: {},
+  isInitialized: true,
+};
 jest.mock('@/lib/context/DeviceStatusContext', () => ({
   useDeviceStatus: () => ({
-    deviceStatuses: stableDeviceStatuses,
-    isInitialized: true,
+    deviceStatuses: mockDeviceStatusContext.deviceStatuses,
+    isInitialized: mockDeviceStatusContext.isInitialized,
   }),
 }));
 
@@ -49,6 +52,10 @@ jest.mock('@/components/Tooltip', () => ({
 describe('DashboardClient', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockDeviceStatusContext = {
+      deviceStatuses: {},
+      isInitialized: true,
+    };
   });
 
   it('renders dashboard overview heading', () => {
@@ -130,5 +137,60 @@ describe('DashboardClient', () => {
     });
     expect(screen.getByText('Content Items').parentElement?.parentElement).toHaveTextContent('2');
     expect(screen.getByText('Playlists').parentElement?.parentElement).toHaveTextContent('1');
+  });
+
+  it('refreshes recent activity after a partial content refresh succeeds', async () => {
+    (apiClient.getContent as jest.Mock).mockResolvedValueOnce({
+      data: [{
+        id: 'c-new',
+        title: 'Updated Menu',
+        type: 'image',
+        status: 'ready',
+        createdAt: '2026-05-31T12:00:00.000Z',
+      }],
+      meta: { page: 1, limit: 100, total: 1, totalPages: 1 },
+    });
+    (apiClient.getPlaylists as jest.Mock).mockRejectedValueOnce(new Error('playlists unavailable'));
+
+    render(<DashboardClient initialContent={[]} initialPlaylists={[]} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Some dashboard data could not refresh')).toBeInTheDocument();
+      expect(screen.getByText('Updated Menu')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Content Items').parentElement?.parentElement).toHaveTextContent('1');
+  });
+
+  it('adds device status entries to recent activity after device context initializes', async () => {
+    mockDeviceStatusContext = {
+      deviceStatuses: {},
+      isInitialized: false,
+    };
+
+    const { rerender } = render(<DashboardClient initialContent={[]} initialPlaylists={[]} />);
+
+    expect(screen.getByText('No recent activity yet')).toBeInTheDocument();
+
+    mockDeviceStatusContext = {
+      isInitialized: true,
+      deviceStatuses: {
+        'device-1': {
+          id: 'device-1',
+          status: 'online',
+          metadata: {
+            nickname: 'Lobby Display',
+            location: 'Front Desk',
+            lastSeen: '2026-05-31T12:00:00.000Z',
+          },
+        },
+      },
+    };
+
+    rerender(<DashboardClient initialContent={[]} initialPlaylists={[]} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Lobby Display')).toBeInTheDocument();
+      expect(screen.getByText(/online.*Front Desk/)).toBeInTheDocument();
+    });
   });
 });

@@ -1,4 +1,5 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { ApiError } from '@/lib/error-handler';
 import SchedulesClient from '../page-client';
 
 const mockGetSchedules = jest.fn();
@@ -46,7 +47,14 @@ jest.mock('@/components/LoadingSpinner', () => {
 });
 
 jest.mock('@/components/EmptyState', () => {
-  return function MockEmpty({ title }: any) { return <div data-testid="empty-state">{title || 'No items'}</div>; };
+  return function MockEmpty({ title, description }: any) {
+    return (
+      <div data-testid="empty-state">
+        <span>{title || 'No items'}</span>
+        {description && <span>{description}</span>}
+      </div>
+    );
+  };
 });
 
 jest.mock('@/components/Modal', () => {
@@ -196,6 +204,22 @@ describe('SchedulesClient', () => {
     await waitFor(() => {
       expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
     });
+    expect(screen.getByText('Some schedule data could not load')).toBeInTheDocument();
+    expect(screen.queryByTestId('empty-state')).not.toBeInTheDocument();
+  });
+
+  it('surfaces permission-specific messages for partial schedule load failures', async () => {
+    mockGetDisplays.mockRejectedValue(
+      new ApiError(403, 'Forbidden', 'You do not have permission to access this resource.'),
+    );
+
+    render(<SchedulesClient />);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
+    });
+    expect(screen.getByText('Some schedule data could not load')).toBeInTheDocument();
+    expect(screen.getByText(/do not have permission/i)).toBeInTheDocument();
   });
 
   it('fetches playlists for schedule form', async () => {

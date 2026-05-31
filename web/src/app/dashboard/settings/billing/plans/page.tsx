@@ -17,17 +17,21 @@ export default function PlansPage() {
  const [loading, setLoading] = useState(true);
  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
  const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly');
+ const [plansError, setPlansError] = useState<string | null>(null);
 
  useEffect(() => {
- loadPlans();
- }, []);
+ loadPlans(billingInterval);
+ }, [billingInterval]);
 
- const loadPlans = async () => {
+ const loadPlans = async (interval: 'monthly' | 'yearly') => {
  try {
  setLoading(true);
- const planData = await apiClient.getPlans();
+ setPlansError(null);
+ setPlans([]);
+ const planData = await apiClient.getPlans(undefined, interval);
  setPlans(planData);
  } catch (error: any) {
+ setPlansError(error.message || `Unable to load ${interval} plans`);
  toast.error(error.message || 'Failed to load plans');
  } finally {
  setLoading(false);
@@ -41,7 +45,8 @@ export default function PlansPage() {
 
  try {
  setCheckoutLoading(plan.id);
- const { url } = await apiClient.createCheckout(plan.id, billingInterval);
+ const checkoutInterval = plan.interval === 'yearly' ? 'yearly' : 'monthly';
+ const { url } = await apiClient.createCheckout(plan.id, checkoutInterval);
  window.location.href = url;
  } catch (error: any) {
  toast.error(error.message || 'Failed to start checkout');
@@ -59,13 +64,6 @@ export default function PlansPage() {
      // Clipboard failed, show modal as fallback
    }
    setShowContactModal(true);
- };
-
- // Calculate yearly savings
- const getYearlySavings = (plan: Plan) => {
- if (plan.interval !== 'monthly' || plan.price === 0) return 0;
- // Assuming 20% discount for yearly
- return Math.round(plan.price * 12 * 0.2);
  };
 
  if (loading) {
@@ -134,36 +132,29 @@ export default function PlansPage() {
  >
  Yearly
  <span className="bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 text-xs px-2 py-0.5 rounded-full">
- Save 20%
+ Annual pricing
  </span>
  </button>
  </div>
  </div>
 
  {/* Plans Grid */}
+ {plansError && (
+ <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
+ Unable to load {billingInterval} plans. Please try again.
+ </div>
+ )}
  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
- {plans.map((plan) => {
- // Adjust price for yearly billing
- const displayPlan = {
- ...plan,
- price:
- billingInterval === 'yearly' && plan.price > 0
- ? Math.round(plan.price * 12 * 0.8) // 20% discount
- : plan.price,
- interval: billingInterval,
- };
-
- return (
+ {plans.map((plan) => (
  <PlanCard
  key={plan.id}
- plan={displayPlan}
+ plan={plan}
  onSelect={() => handleSelectPlan(plan)}
  onContactSales={handleContactSales}
  isCurrentPlan={plan.isCurrent}
  isLoading={checkoutLoading === plan.id}
  />
- );
- })}
+ ))}
  </div>
 
  {/* FAQ Section */}

@@ -45,7 +45,7 @@ describe('PlansPage', () => {
       id: 'basic',
       name: 'Basic',
       screenQuota: 5,
-      price: 29,
+      price: 2900,
       currency: 'USD',
       interval: 'monthly',
       features: ['5 screens', 'Email support', 'Basic analytics'],
@@ -55,7 +55,7 @@ describe('PlansPage', () => {
       id: 'pro',
       name: 'Pro',
       screenQuota: 25,
-      price: 99,
+      price: 9900,
       currency: 'USD',
       interval: 'monthly',
       features: ['25 screens', 'Priority support', 'Advanced analytics', 'API access'],
@@ -191,15 +191,24 @@ describe('PlansPage', () => {
     });
   });
 
-  it('shows save 20% badge on yearly toggle', async () => {
+  it('shows annual pricing badge on yearly toggle', async () => {
     render(<PlansPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('Save 20%')).toBeInTheDocument();
+      expect(screen.getByText('Annual pricing')).toBeInTheDocument();
     });
   });
 
   it('updates prices when switching to yearly billing', async () => {
+    (apiClient.getPlans as jest.Mock)
+      .mockResolvedValueOnce(mockPlans)
+      .mockResolvedValueOnce([
+        { ...mockPlans[0], interval: 'yearly' },
+        { ...mockPlans[1], price: 29000, interval: 'yearly' },
+        { ...mockPlans[2], price: 99000, interval: 'yearly' },
+        { ...mockPlans[3], interval: 'yearly' },
+      ]);
+
     render(<PlansPage />);
 
     await waitFor(() => {
@@ -210,8 +219,36 @@ describe('PlansPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Yearly/ }));
 
     await waitFor(() => {
-      // 29 * 12 * 0.8 = 278.4 rounded to 278
-      expect(screen.getByText('$278.00')).toBeInTheDocument();
+      expect(apiClient.getPlans).toHaveBeenLastCalledWith(undefined, 'yearly');
+      expect(screen.getByText('$290.00')).toBeInTheDocument();
+    });
+  });
+
+  it('does not show stale monthly cards after yearly plans fail to load', async () => {
+    (apiClient.getPlans as jest.Mock)
+      .mockResolvedValueOnce(mockPlans)
+      .mockRejectedValueOnce(new Error('yearly unavailable'));
+
+    render(<PlansPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('$29.00')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Yearly/ }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Unable to load\s+yearly\s+plans/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText('$29.00')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Select Plan' })).not.toBeInTheDocument();
+  });
+
+  it('requests monthly plans on first load', async () => {
+    render(<PlansPage />);
+
+    await waitFor(() => {
+      expect(apiClient.getPlans).toHaveBeenCalledWith(undefined, 'monthly');
     });
   });
 

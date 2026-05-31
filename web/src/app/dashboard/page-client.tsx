@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { fetchAllPaginated } from '@/lib/api/pagination';
@@ -34,11 +34,17 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  const [recentActivity, setRecentActivity] = useState<any[]>([]);
  const [loading, setLoading] = useState(false);
  const [error, setError] = useState<string | null>(null);
+ const activityContentRef = useRef(initialContent);
+ const activityPlaylistsRef = useRef(initialPlaylists);
+ const deviceStatusesRef = useRef(deviceStatuses);
+ deviceStatusesRef.current = deviceStatuses;
 
  // Initialize stats from server-fetched data
  useEffect(() => {
  const content = initialContent;
  const playlists = initialPlaylists;
+ activityContentRef.current = content;
+ activityPlaylistsRef.current = playlists;
 
  setStats(prev => ({
  ...prev,
@@ -52,7 +58,7 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  },
  }));
 
- buildRecentActivity(content, playlists);
+ buildRecentActivity(content, playlists, deviceStatusesRef.current);
  }, [initialContent, initialPlaylists]);
 
  useEffect(() => {
@@ -71,10 +77,11 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  online: devicesList.filter(d => d.status === 'online').length,
  },
  }));
+ buildRecentActivity(activityContentRef.current, activityPlaylistsRef.current, deviceStatuses);
  }, [deviceStatuses, isInitialized]);
 
- const buildRecentActivity = (content: any[], playlists: any[]) => {
- const devicesList = Object.values(deviceStatuses);
+ const buildRecentActivity = (content: any[], playlists: any[], statuses = deviceStatuses) => {
+ const devicesList = Object.values(statuses);
  const activity = [
  ...devicesList.slice(0, 3).map((d: any) => ({
  type: 'device',
@@ -121,6 +128,8 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
 
  const content = results[0].status === 'fulfilled' ? results[0].value : null;
  const playlists = results[1].status === 'fulfilled' ? results[1].value : null;
+ if (content) activityContentRef.current = content;
+ if (playlists) activityPlaylistsRef.current = playlists;
 
  results.forEach((result, index) => {
  if (result.status === 'rejected') {
@@ -150,8 +159,15 @@ export default function DashboardClient({ initialContent, initialPlaylists }: Da
  : {}),
  }));
 
+ if (content || playlists) {
+ buildRecentActivity(
+ activityContentRef.current,
+ activityPlaylistsRef.current,
+ deviceStatusesRef.current,
+ );
+ }
+
  if (content && playlists) {
- buildRecentActivity(content, playlists);
  setError(null);
  } else {
  setError('Some dashboard data could not refresh');

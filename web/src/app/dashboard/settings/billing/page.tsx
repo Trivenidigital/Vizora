@@ -115,7 +115,7 @@ export default function BillingPage() {
  });
  };
 
- const isTrialing = subscription?.subscriptionStatus === 'trialing';
+ const isTrialing = subscription?.subscriptionStatus === 'trial';
  const isCanceled = subscription?.cancelAtPeriodEnd;
  const isPaidPlan = subscription?.subscriptionTier !== 'free' && subscription?.subscriptionTier !== 'Free';
 
