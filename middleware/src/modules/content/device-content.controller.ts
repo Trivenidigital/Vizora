@@ -10,6 +10,7 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { ParseIdPipe } from '../common/pipes/parse-id.pipe';
 import type { Request, Response } from 'express';
 import { JwtService } from '@nestjs/jwt';
@@ -35,7 +36,7 @@ const DEVICE_OBJECT_METADATA_CACHE_TTL_MS = 10_000;
 const DEVICE_TOKEN_AUTH_CACHE_MAX_ENTRIES = 1_000;
 const DEVICE_CONTENT_CACHE_MAX_ENTRIES = 1_000;
 const DEVICE_OBJECT_METADATA_CACHE_MAX_ENTRIES = 1_000;
-const SUCCESSFUL_MEDIA_CACHE_CONTROL = 'private, no-store';
+const SUCCESSFUL_MEDIA_CACHE_CONTROL = 'private, no-cache';
 
 type DeviceContentRecord = NonNullable<
   Awaited<ReturnType<ContentService['findByIdForDevice']>>
@@ -119,7 +120,7 @@ export class DeviceContentController {
     }
 
     if (rangeHeader.includes(',')) {
-      return { kind: 'none' };
+      return { kind: 'unsatisfiable' };
     }
 
     const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader.trim());
@@ -543,6 +544,7 @@ export class DeviceContentController {
     }
 
     if (resolved.range.kind === 'range') {
+      const validators = this.getMediaValidators(resolved);
       const length = resolved.range.range.end - resolved.range.range.start + 1;
       res.status(206);
       res.set({
@@ -551,20 +553,83 @@ export class DeviceContentController {
         'Content-Length': String(length),
         'Content-Range': `bytes ${resolved.range.range.start}-${resolved.range.range.end}/${resolved.metadata.size}`,
         'Cache-Control': SUCCESSFUL_MEDIA_CACHE_CONTROL,
+        'Last-Modified': validators.lastModified,
         'Cross-Origin-Resource-Policy': 'cross-origin',
       });
       await this.streamToResponse(stream, res);
       return;
     }
 
+    const validators = this.getMediaValidators(resolved);
     res.set({
       'Content-Type': resolved.mimeType,
       'Accept-Ranges': 'bytes',
       'Content-Length': String(resolved.metadata.size),
       'Cache-Control': SUCCESSFUL_MEDIA_CACHE_CONTROL,
+      ETag: validators.etag,
+      'Last-Modified': validators.lastModified,
       'Cross-Origin-Resource-Policy': 'cross-origin',
     });
     await this.streamToResponse(stream, res);
+  }
+
+  private getMediaValidators(resolved: ResolvedMinioContent): {
+    etag: string;
+    lastModified: string;
+    lastModifiedTime: number;
+  } {
+    const lastModifiedTime = resolved.metadata.lastModified.getTime();
+    const digest = createHash('sha256')
+      .update(`${resolved.objectKey}:${resolved.metadata.size}:${lastModifiedTime}`)
+      .digest('base64url');
+
+    return {
+      etag: `W/"${digest}"`,
+      lastModified: resolved.metadata.lastModified.toUTCString(),
+      lastModifiedTime,
+    };
+  }
+
+  private getHeaderValue(req: Request, name: string): string | undefined {
+    const value = req.headers[name.toLowerCase()];
+    if (Array.isArray(value)) {
+      return value.join(',');
+    }
+    return typeof value === 'string' ? value : undefined;
+  }
+
+  private isClientCacheFresh(req: Request, resolved: ResolvedMinioContent): boolean {
+    const validators = this.getMediaValidators(resolved);
+    const ifNoneMatch = this.getHeaderValue(req, 'if-none-match');
+    if (ifNoneMatch) {
+      const requestedEtags = ifNoneMatch.split(',').map((tag) => tag.trim());
+      return requestedEtags.includes('*') || requestedEtags.includes(validators.etag);
+    }
+
+    const ifModifiedSince = this.getHeaderValue(req, 'if-modified-since');
+    if (!ifModifiedSince) {
+      return false;
+    }
+
+    const sinceTime = Date.parse(ifModifiedSince);
+    if (!Number.isFinite(sinceTime)) {
+      return false;
+    }
+
+    return Math.floor(validators.lastModifiedTime / 1000) * 1000 <= sinceTime;
+  }
+
+  private writeNotModified(resolved: ResolvedMinioContent, res: Response): void {
+    const validators = this.getMediaValidators(resolved);
+    res.status(304);
+    res.set({
+      'Accept-Ranges': 'bytes',
+      'Cache-Control': SUCCESSFUL_MEDIA_CACHE_CONTROL,
+      ETag: validators.etag,
+      'Last-Modified': validators.lastModified,
+      'Cross-Origin-Resource-Policy': 'cross-origin',
+    });
+    res.end();
   }
 
   private async streamToResponse(stream: NodeJS.ReadableStream, res: Response): Promise<void> {
@@ -580,6 +645,8 @@ export class DeviceContentController {
         res.removeHeader('Content-Range');
         res.removeHeader('Accept-Ranges');
         res.removeHeader('Cache-Control');
+        res.removeHeader('ETag');
+        res.removeHeader('Last-Modified');
         res.removeHeader('Cross-Origin-Resource-Policy');
         throw new InternalServerErrorException('Failed to stream content file');
       }
@@ -611,6 +678,17 @@ export class DeviceContentController {
       req,
     );
     let stream: NodeJS.ReadableStream | null = null;
+
+    if (
+      resolved.kind === 'minio' &&
+      resolved.range.kind !== 'unsatisfiable' &&
+      !resolved.contentCacheHit &&
+      !resolved.metadataCacheHit &&
+      this.isClientCacheFresh(req, resolved)
+    ) {
+      this.writeNotModified(resolved, res);
+      return;
+    }
 
     if (resolved.kind === 'minio' && resolved.range.kind !== 'unsatisfiable') {
       const opened = await this.openMinioStreamWithStaleRecovery(

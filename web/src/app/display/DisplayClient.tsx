@@ -46,7 +46,7 @@ export function DisplayClient() {
   const impressionRef = useRef<((...args: any[]) => void) | null>(null);
 
   const { isFullscreen, toggleFullscreen } = useFullscreen();
-  const { preloadItems } = useBrowserCache();
+  const { preloadItems, clearCache } = useBrowserCache();
 
   const {
     pairingCode,
@@ -91,8 +91,7 @@ export function DisplayClient() {
         window.location.reload();
         break;
       case 'clear_cache':
-        clearCredentials();
-        window.location.reload();
+        void clearCache().finally(() => window.location.reload());
         break;
       case 'unpair':
         clearCredentials();
@@ -101,7 +100,7 @@ export function DisplayClient() {
       default:
         console.log('[Vizora Display] Unknown command:', command.type);
     }
-  }, []);
+  }, [clearCache]);
 
   const handleConfig = useCallback((_config: DeviceConfig) => {
     // Config received (heartbeat interval, cache settings, etc.)

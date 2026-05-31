@@ -743,6 +743,32 @@ describe('DeviceClient', () => {
       expect(mockSocket.disconnect).toHaveBeenCalled();
       expect(mockConfig.onPairingRequired).toHaveBeenCalled();
     });
+
+    it('should clear token and re-enter pairing when connect_error reports missing device', () => {
+      client.connect('stale-token');
+
+      const errorCall = mockSocket.on.mock.calls.find((call: any[]) => call[0] === 'connect_error');
+      expect(errorCall).toBeDefined();
+
+      errorCall![1]({ message: 'device_not_found' });
+
+      expect(mockStore.delete).toHaveBeenCalledWith('deviceToken');
+      expect(mockSocket.disconnect).toHaveBeenCalled();
+      expect(mockConfig.onPairingRequired).toHaveBeenCalled();
+    });
+
+    it('should clear token and re-enter pairing when socket error reports stale token', () => {
+      client.connect('stale-token');
+
+      const errorCall = mockSocket.on.mock.calls.find((call: any[]) => call[0] === 'error');
+      expect(errorCall).toBeDefined();
+
+      errorCall![1]({ message: 'device_token_stale' });
+
+      expect(mockStore.delete).toHaveBeenCalledWith('deviceToken');
+      expect(mockSocket.disconnect).toHaveBeenCalled();
+      expect(mockConfig.onPairingRequired).toHaveBeenCalled();
+    });
   });
 
   describe('disconnect', () => {

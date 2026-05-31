@@ -122,6 +122,7 @@ describe('DeviceGateway', () => {
     emit: options.emit ?? jest.fn((_event: string, _data: any, ackCb?: () => void) => {
       if (ackCb) ackCb();
     }),
+    disconnect: jest.fn(),
   });
 
   // Mock socket that auto-invokes ack callbacks on emit
@@ -180,6 +181,7 @@ describe('DeviceGateway', () => {
     mockServer.in.mockReturnValue({
       fetchSockets: jest.fn().mockResolvedValue([mockRemoteSocket]),
     });
+    mockServer.sockets.sockets.clear();
     // Use fake timers to prevent setInterval leaks
     jest.useFakeTimers();
 
@@ -206,6 +208,7 @@ describe('DeviceGateway', () => {
 
     // Assign mock server
     (gateway as any).server = mockServer;
+    mockServer.sockets.sockets.set('remote-socket-1', mockRemoteSocket);
     (gateway as any).deviceSockets.set('device-1', 'remote-socket-1');
   });
 
@@ -748,6 +751,11 @@ describe('DeviceGateway', () => {
   });
 
   describe('handleHeartbeat', () => {
+    beforeEach(() => {
+      mockServer.sockets.sockets.set('socket-1', {});
+      (gateway as any).deviceSockets.set('device-1', 'socket-1');
+    });
+
     it('should process heartbeat and return success', async () => {
       const client = createMockSocket();
       const data = {
@@ -825,6 +833,9 @@ describe('DeviceGateway', () => {
 
       expect(result.success).toBe(true);
       expect(result.data.commands).toEqual([]);
+      expect(mockRedisService.setDeviceStatus).not.toHaveBeenCalled();
+      expect(mockDatabaseService.display.updateMany).not.toHaveBeenCalled();
+      expect(mockHeartbeatService.processHeartbeat).not.toHaveBeenCalled();
       expect(mockRedisService.getPendingPlaylist).not.toHaveBeenCalled();
       expect(mockRedisService.getDeviceCommands).not.toHaveBeenCalled();
     });
@@ -893,17 +904,25 @@ describe('DeviceGateway', () => {
       expect(mockRedisService.getPendingPlaylist).not.toHaveBeenCalled();
     });
 
-    it('should not write to DB when status has not changed', async () => {
-      // Pre-set the status cache to 'online'
-      (gateway as any).deviceStatusCache.set('device-1', 'online');
+    it('should throttle PostgreSQL heartbeat refreshes while status remains online', async () => {
+      (gateway as any).deviceStatusCache.set('device-1', 'offline');
 
       const client = createMockSocket();
       const data = {};
 
       await gateway.handleHeartbeat(client as any, data as any);
 
-      // DB update should NOT be called since status hasn't changed
+      expect(mockDatabaseService.display.updateMany).toHaveBeenCalledTimes(1);
+
+      mockDatabaseService.display.updateMany.mockClear();
+      await gateway.handleHeartbeat(client as any, data as any);
+
       expect(mockDatabaseService.display.updateMany).not.toHaveBeenCalled();
+
+      jest.advanceTimersByTime(61_000);
+      await gateway.handleHeartbeat(client as any, data as any);
+
+      expect(mockDatabaseService.display.updateMany).toHaveBeenCalledTimes(1);
     });
 
     it('should write to DB when status transitions from offline to online', async () => {
@@ -917,6 +936,32 @@ describe('DeviceGateway', () => {
 
       // DB update SHOULD be called because status changed
       expect(mockDatabaseService.display.updateMany).toHaveBeenCalled();
+    });
+
+    it('should keep active device status cache entries when cleaning stale sockets', () => {
+      (gateway as any).deviceSockets.clear();
+      (gateway as any).deviceSockets.set('device-1', 'socket-1');
+      mockServer.sockets.sockets.set('socket-1', {});
+      (gateway as any).deviceStatusCache.set('device-1', 'online');
+      (gateway as any).deviceStatusCache.set('device-stale', 'online');
+
+      (gateway as any).cleanupStaleEntries();
+
+      expect((gateway as any).deviceStatusCache.get('device-1')).toBe('online');
+      expect((gateway as any).deviceStatusCache.has('device-stale')).toBe(false);
+    });
+
+    it('should remove status cache entries whose socket map entry is gone', () => {
+      (gateway as any).deviceSockets.clear();
+      (gateway as any).deviceSockets.set('device-1', 'missing-socket');
+      (gateway as any).deviceStatusCache.set('device-1', 'online');
+      (gateway as any).lastHeartbeatDbWrites.set('device-1', Date.now());
+
+      (gateway as any).cleanupStaleEntries();
+
+      expect((gateway as any).deviceSockets.has('device-1')).toBe(false);
+      expect((gateway as any).deviceStatusCache.has('device-1')).toBe(false);
+      expect((gateway as any).lastHeartbeatDbWrites.has('device-1')).toBe(false);
     });
 
     it('should return error response on failure', async () => {
