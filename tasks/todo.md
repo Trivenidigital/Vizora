@@ -6,7 +6,7 @@
 
 **Why now:** PR #127 merged and CI is green, but deployment remains blocked by dirty/diverged prod-local work. A fresh realtime/display/code review found a P0 auth-boundary gap: signed display JWTs remain accepted after re-pairing or token rotation because middleware and realtime verify signature claims but do not compare the presented token to the current token hash stored on `Display.jwtToken`.
 
-**New primitives introduced:** none. Reuse the existing display `jwtToken` hash column, pairing token hash behavior, device JWT model, middleware device-content controller, and realtime gateway.
+**New primitives introduced:** one shared middleware device-token helper and one realtime hash helper. Reuse the existing display `jwtToken` hash column, pairing token hash behavior, device JWT model, middleware controllers, realtime gateway, and WebSocket guards.
 
 **Hermes-first analysis:** not applicable; this pass does not add business-agent behavior, MCP tools, Hermes skills, AI provider calls, or spend paths.
 
@@ -25,7 +25,8 @@
 - [x] Add failing middleware tests for stale/missing `Display.jwtToken` rejection in device-content streaming.
 - [x] Add failing realtime tests for stale/missing `Display.jwtToken` rejection and rotation persistence.
 - [x] Implement current-hash validation in middleware and realtime.
-- [x] Persist new token hash before realtime emits `token:refresh`.
+- [x] Add connected-socket current-hash revalidation in `WsDeviceGuard`.
+- [x] Disable unsafe realtime auto-rotation until a grace/ACK-backed rotation design exists.
 - [x] Run focused verification.
 - [ ] Run multi-subagent review before broad verification.
 - [ ] Run broader affected tests/builds.
@@ -34,12 +35,16 @@
 
 **Runtime-state gate before deploy**
 - [x] Query prod display token-hash coverage: 15 displays total, 15 with `jwtToken`, 0 missing `jwtToken`, 15 active non-pairing, 0 active non-pairing missing `jwtToken`.
-- [x] Reconcile any legacy displays without a current hash before deploying fail-closed enforcement: no legacy missing-token displays found in the read-only prod count.
+- [x] Query prod malformed hash coverage: 0 malformed `jwtToken` hashes, 0 active non-pairing malformed hashes.
+- [x] Reconcile any legacy displays without a current hash before deploying fail-closed enforcement: no legacy missing-token or malformed-token displays found in the read-only prod counts.
 - [ ] Reconcile prod `/opt/vizora/app` dirty/diverged checkout before any pull/restart/deploy.
 
 **Focused verification**
 - [x] `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern=device-content.controller` - red first on stale/missing token-hash acceptance, then pass, 26 tests.
 - [x] `pnpm --filter @vizora/realtime test -- --runInBand --testPathPattern=device.gateway` - red first on stale-token acceptance and rotation-without-persist, then pass, 2 suites / 100 tests.
+- [x] Review-fix red run: middleware heartbeat/active schedules and realtime guard tests failed before widening the implementation.
+- [x] `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="displays.controller|schedules.controller|device-content.controller"` - pass, 3 suites / 65 tests.
+- [x] `pnpm --filter @vizora/realtime test -- --runInBand --testPathPattern="device.gateway|ws-auth.guard"` - pass, 3 suites / 102 tests.
 
 ---
 

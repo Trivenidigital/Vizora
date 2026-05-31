@@ -5,13 +5,18 @@ import { SchedulesController } from './schedules.controller';
 import { SchedulesService } from './schedules.service';
 import { SubscriptionActiveGuard } from '../billing/guards/subscription-active.guard';
 import { DatabaseService } from '../database/database.service';
+import { UnauthorizedException } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 
 describe('SchedulesController', () => {
   let controller: SchedulesController;
   let mockSchedulesService: jest.Mocked<SchedulesService>;
   let mockJwtService: any;
+  let mockDatabaseService: any;
 
   const organizationId = 'org-123';
+  const hashToken = (token: string) =>
+    createHash('sha256').update(token).digest('hex');
 
   const createMockRequest = (token?: string) => ({
     headers: {
@@ -32,8 +37,29 @@ describe('SchedulesController', () => {
     } as any;
 
     mockJwtService = {
-      verify: jest.fn().mockReturnValue({ type: 'device', sub: 'display-123', organizationId }),
-      verifyAsync: jest.fn().mockResolvedValue({ type: 'device', sub: 'display-123', organizationId }),
+      verify: jest.fn().mockReturnValue({
+        type: 'device',
+        sub: 'display-123',
+        deviceIdentifier: 'DEVICE-123',
+        organizationId,
+      }),
+      verifyAsync: jest.fn().mockResolvedValue({
+        type: 'device',
+        sub: 'display-123',
+        deviceIdentifier: 'DEVICE-123',
+        organizationId,
+      }),
+    };
+
+    mockDatabaseService = {
+      display: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'display-123',
+          organizationId,
+          isDisabled: false,
+          jwtToken: hashToken('valid-device-token'),
+        }),
+      },
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -42,7 +68,7 @@ describe('SchedulesController', () => {
         { provide: SchedulesService, useValue: mockSchedulesService },
         { provide: JwtService, useValue: mockJwtService },
         { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('test-secret') } },
-        { provide: DatabaseService, useValue: {} },
+        { provide: DatabaseService, useValue: mockDatabaseService },
         SubscriptionActiveGuard,
       ],
     }).compile();
@@ -201,11 +227,23 @@ describe('SchedulesController', () => {
       expect(mockSchedulesService.findActiveSchedules).toHaveBeenCalledWith('display-123', organizationId);
       expect(mockJwtService.verify).toHaveBeenCalledWith('valid-device-token', {
         secret: process.env.DEVICE_JWT_SECRET,
+        algorithms: ['HS256'],
       });
     });
 
     it('should work with valid device JWT (public endpoint)', async () => {
-      mockJwtService.verify.mockReturnValueOnce({ type: 'device', sub: 'display-456', organizationId });
+      mockJwtService.verify.mockReturnValueOnce({
+        type: 'device',
+        sub: 'display-456',
+        deviceIdentifier: 'DEVICE-456',
+        organizationId,
+      });
+      mockDatabaseService.display.findUnique.mockResolvedValueOnce({
+        id: 'display-456',
+        organizationId,
+        isDisabled: false,
+        jwtToken: hashToken('valid-device-token'),
+      });
       mockSchedulesService.findActiveSchedules.mockResolvedValue([]);
 
       const mockReq = createMockRequest('valid-device-token');
@@ -214,13 +252,34 @@ describe('SchedulesController', () => {
       expect(result).toEqual([]);
     });
 
+    it('should reject a signed schedule token that is not the current stored token', async () => {
+      mockDatabaseService.display.findUnique.mockResolvedValueOnce({
+        id: 'display-123',
+        organizationId,
+        isDisabled: false,
+        jwtToken: hashToken('current-device-token'),
+      });
+
+      const mockReq = createMockRequest('stale-device-token');
+
+      await expect(controller.findActiveSchedules('display-123', mockReq as any)).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(mockSchedulesService.findActiveSchedules).not.toHaveBeenCalled();
+    });
+
     it('should reject a device JWT for a different display', async () => {
-      mockJwtService.verify.mockReturnValueOnce({ type: 'device', sub: 'display-999', organizationId });
+      mockJwtService.verify.mockReturnValueOnce({
+        type: 'device',
+        sub: 'display-999',
+        deviceIdentifier: 'DEVICE-999',
+        organizationId,
+      });
 
       const mockReq = createMockRequest('valid-device-token');
 
-      expect(() => controller.findActiveSchedules('display-456', mockReq as any))
-        .toThrow('Device token does not match requested display');
+      await expect(controller.findActiveSchedules('display-456', mockReq as any))
+        .rejects.toThrow('Device token does not match requested display');
       expect(mockSchedulesService.findActiveSchedules).not.toHaveBeenCalled();
     });
   });

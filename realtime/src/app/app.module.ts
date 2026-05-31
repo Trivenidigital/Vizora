@@ -16,6 +16,7 @@ import { MetricsModule } from '../metrics/metrics.module';
 import { SentryInterceptor } from '../interceptors/sentry.interceptor';
 import { MetricsInterceptor } from '../interceptors/metrics.interceptor';
 import { MetricsAuthMiddleware } from '../metrics/metrics-auth.middleware';
+import { WsAuthGuard, WsDeviceGuard } from '../gateways/guards/ws-auth.guard';
 
 @Module({
   imports: [
@@ -40,6 +41,8 @@ import { MetricsAuthMiddleware } from '../metrics/metrics-auth.middleware';
     HeartbeatService,
     PlaylistService,
     NotificationService,
+    WsAuthGuard,
+    WsDeviceGuard,
     {
       provide: APP_INTERCEPTOR,
       useClass: SentryInterceptor,
