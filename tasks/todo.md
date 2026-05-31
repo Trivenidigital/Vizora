@@ -31,8 +31,8 @@
 - [x] Exempt public device endpoints from subscription guard pre-emption before device JWT validation.
 - [x] Disable unsafe realtime auto-rotation until a grace/ACK-backed rotation design exists.
 - [x] Run focused verification.
-- [ ] Run multi-subagent review before broad verification.
-- [ ] Run broader affected tests/builds.
+- [x] Run multi-subagent review before broad verification.
+- [x] Run broader affected tests/builds.
 - [ ] PR, CI, merge.
 - [ ] Re-check deployment gate; deploy only if prod checkout and runtime token state are safe.
 
@@ -52,6 +52,19 @@
 - [x] `pnpm --filter @vizora/realtime test -- --runInBand --testPathPattern="device.gateway|ws-auth.guard"` - pass after server-push revalidation, 3 suites / 106 tests.
 - [x] Final review-fix run: malformed-hash tests added, `WsDeviceGuard` cache removed, org-room broadcasts filtered. `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="subscription-active.guard|displays.controller|schedules.controller|device-content.controller"` - pass, 4 suites / 89 tests.
 - [x] `pnpm --filter @vizora/realtime test -- --runInBand --testPathPattern="device.gateway|ws-auth.guard|app.controller"` - pass, 4 suites / 117 tests.
+
+**Review gate**
+- [x] Subagent code-path review: CLEAN for stale device-token enforcement across middleware REST routes, realtime handshakes, guarded socket messages, direct server-push delivery, and org-room broadcasts. Residual risk documented: guarded realtime messages and server-push fanout now hit the DB for current-hash checks.
+- [x] Subagent verification/deploy review: initial gate was not clean until full suites/builds were run; requested broad verification completed below. Deployment remains blocked by prod-local dirty/diverged checkout.
+
+**Broader verification**
+- [x] `pnpm --filter @vizora/middleware test -- --runInBand` - pass, 143 suites / 2796 tests.
+- [x] `pnpm --filter @vizora/realtime test -- --runInBand` - pass, 12 suites / 271 tests.
+- [x] `pnpm --filter @vizora/middleware exec tsc --noEmit --pretty false` - pass.
+- [x] `npx nx build @vizora/realtime` - pass with existing webpack/source-map/optional `ws` warnings.
+- [x] Initial parallel `npx nx build @vizora/middleware` collided with simultaneous `@vizora/database:build` copying into `packages/database/dist/generated` on Windows (`EPIPE`, file in use). Serial rerun completed successfully.
+- [x] `npx nx build @vizora/middleware` - pass with existing webpack warnings.
+- [x] `git diff --check origin/main...HEAD` - pass.
 
 ---
 
