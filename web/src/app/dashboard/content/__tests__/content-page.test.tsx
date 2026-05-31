@@ -8,7 +8,10 @@ const mockGetDisplays = jest.fn();
 const mockGetPlaylists = jest.fn();
 const mockDeleteContent = jest.fn();
 const mockUploadContent = jest.fn();
+const mockCreateContent = jest.fn();
+const mockUploadContentWithProgress = jest.fn();
 const mockGenerateThumbnail = jest.fn();
+let lastDropzoneOptions: any;
 
 jest.mock('@/lib/api', () => ({
   apiClient: {
@@ -19,6 +22,8 @@ jest.mock('@/lib/api', () => ({
     getPlaylists: (...args: any[]) => mockGetPlaylists(...args),
     deleteContent: (...args: any[]) => mockDeleteContent(...args),
     uploadContent: (...args: any[]) => mockUploadContent(...args),
+    createContent: (...args: any[]) => mockCreateContent(...args),
+    uploadContentWithProgress: (...args: any[]) => mockUploadContentWithProgress(...args),
     generateThumbnail: (...args: any[]) => mockGenerateThumbnail(...args),
   },
 }));
@@ -75,8 +80,14 @@ jest.mock('@/components/EmptyState', () => {
 });
 
 jest.mock('@/components/Modal', () => {
-  return function MockModal({ isOpen, children, title }: any) {
-    return isOpen ? <div data-testid="modal"><h2>{title}</h2>{children}</div> : null;
+  return function MockModal({ isOpen, children, title, onClose }: any) {
+    return isOpen ? (
+      <div data-testid="modal">
+        <h2>{title}</h2>
+        <button type="button" aria-label="Close modal" onClick={onClose}>Close</button>
+        {children}
+      </div>
+    ) : null;
   };
 });
 
@@ -134,11 +145,14 @@ jest.mock('@/components/ViewToggle', () => ({
 }));
 
 jest.mock('react-dropzone', () => ({
-  useDropzone: () => ({
+  useDropzone: (options: any) => {
+    lastDropzoneOptions = options;
+    return ({
     getRootProps: () => ({}),
     getInputProps: () => ({}),
     isDragActive: false,
-  }),
+    });
+  },
 }));
 
 const sampleContent = [
@@ -186,7 +200,18 @@ describe('ContentClient', () => {
     mockGetPlaylists.mockResolvedValue({ data: [] });
     mockDeleteContent.mockResolvedValue({});
     mockUploadContent.mockResolvedValue({ id: 'new-1', title: 'New Content' });
+    mockCreateContent.mockResolvedValue({ id: 'new-1', title: 'New Content' });
+    mockUploadContentWithProgress.mockResolvedValue({ id: 'new-1', title: 'New Content' });
     mockGenerateThumbnail.mockResolvedValue({});
+    lastDropzoneOptions = undefined;
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: jest.fn(() => 'blob:mock-url'),
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      configurable: true,
+      value: jest.fn(),
+    });
   });
 
   const waitForInitialRequestsToSettle = async () => {
@@ -390,5 +415,229 @@ describe('ContentClient', () => {
   it('also fetches displays and playlists for push/add features', async () => {
     render(<ContentClient />);
     await waitForInitialRequestsToSettle();
+  });
+
+  it('bulk upload preserves each queued file type after the selector changes', async () => {
+    mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
+    render(<ContentClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+
+    fireEvent.click(screen.getAllByText('Upload Content')[0]);
+    const imageFile = new File(['image-bytes'], 'lobby.png', { type: 'image/png' });
+
+    await act(async () => {
+      lastDropzoneOptions.onDrop([imageFile]);
+    });
+
+    fireEvent.change(screen.getByDisplayValue('Image'), { target: { value: 'video' } });
+    fireEvent.click(screen.getByText('Upload 1 File'));
+
+    await waitFor(() => {
+      expect(mockUploadContentWithProgress).toHaveBeenCalled();
+    });
+    expect(mockUploadContentWithProgress.mock.calls[0][0].title).toBe('lobby');
+    expect(mockUploadContentWithProgress.mock.calls[0][0].type).toBe('image');
+    expect(mockUploadContentWithProgress.mock.calls[0][0].file).toBe(imageFile);
+    expect(mockCreateContent).not.toHaveBeenCalledWith(expect.objectContaining({ file: imageFile }));
+  });
+
+  it('keeps queued files visible by blocking URL mode until the queue is cleared', async () => {
+    mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
+    render(<ContentClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+
+    fireEvent.click(screen.getAllByText('Upload Content')[0]);
+    const imageFile = new File(['image-bytes'], 'queued.png', { type: 'image/png' });
+
+    await act(async () => {
+      lastDropzoneOptions.onDrop([imageFile]);
+    });
+
+    expect(screen.getByText('queued.png')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'URL/Web Page' })).toBeDisabled();
+
+    fireEvent.change(screen.getByDisplayValue('Image'), { target: { value: 'url' } });
+
+    expect(screen.getByDisplayValue('Image')).toBeInTheDocument();
+    expect(screen.getByText('queued.png')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('https://example.com/page')).not.toBeInTheDocument();
+  });
+
+  it('does not upload a removed queued file when switching to URL content', async () => {
+    mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
+    render(<ContentClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+
+    fireEvent.click(screen.getAllByText('Upload Content')[0]);
+    const removedFile = new File(['image-bytes'], 'removed.png', { type: 'image/png' });
+
+    await act(async () => {
+      lastDropzoneOptions.onDrop([removedFile]);
+    });
+
+    fireEvent.click(screen.getByLabelText(/remove removed.png from upload queue/i));
+    fireEvent.change(screen.getByDisplayValue('Image'), { target: { value: 'url' } });
+    fireEvent.change(screen.getByPlaceholderText('https://example.com/page'), {
+      target: { value: 'https://example.com/menu' },
+    });
+
+    const submitButtons = screen.getAllByRole('button', { name: 'Upload Content' });
+    fireEvent.click(submitButtons[submitButtons.length - 1]);
+
+    await waitFor(() => {
+      expect(mockCreateContent).toHaveBeenCalledWith({
+        title: 'removed',
+        type: 'url',
+        url: 'https://example.com/menu',
+      });
+    });
+    expect(mockUploadContentWithProgress).not.toHaveBeenCalled();
+  });
+
+  it('locks queued bulk upload controls while files are uploading', async () => {
+    mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
+    let resolveUpload: (content: any) => void = () => {};
+    mockUploadContentWithProgress.mockImplementation((_data, onProgress) => {
+      onProgress?.(42);
+      return new Promise((resolve) => {
+        resolveUpload = resolve;
+      });
+    });
+
+    render(<ContentClient />);
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+
+    fireEvent.click(screen.getAllByText('Upload Content')[0]);
+    const imageFile = new File(['image-bytes'], 'locked.png', { type: 'image/png' });
+
+    await act(async () => {
+      lastDropzoneOptions.onDrop([imageFile]);
+    });
+
+    fireEvent.click(screen.getByText('Upload 1 File'));
+
+    await waitFor(() => {
+      expect(mockUploadContentWithProgress).toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: /clear all/i })).toBeDisabled();
+      expect(screen.getByLabelText(/remove locked.png from upload queue/i)).toBeDisabled();
+    });
+
+    await act(async () => {
+      resolveUpload({ id: 'new-1', title: 'Locked' });
+    });
+  });
+
+  it('does not close or clear queued upload progress while files are uploading', async () => {
+    mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
+    let resolveUpload: (content: any) => void = () => {};
+    mockUploadContentWithProgress.mockImplementation((_data, onProgress) => {
+      onProgress?.(42);
+      return new Promise((resolve) => {
+        resolveUpload = resolve;
+      });
+    });
+
+    render(<ContentClient />);
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+
+    fireEvent.click(screen.getAllByText('Upload Content')[0]);
+    const imageFile = new File(['image-bytes'], 'in-flight.png', { type: 'image/png' });
+
+    await act(async () => {
+      lastDropzoneOptions.onDrop([imageFile]);
+    });
+
+    fireEvent.click(screen.getByText('Upload 1 File'));
+
+    await waitFor(() => {
+      expect(screen.getByText('in-flight.png')).toBeInTheDocument();
+      expect(screen.getByText('42%')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByLabelText('Close modal'));
+
+    expect(screen.getByText('in-flight.png')).toBeInTheDocument();
+    expect(screen.getByText('42%')).toBeInTheDocument();
+
+    await act(async () => {
+      resolveUpload({ id: 'new-1', title: 'In Flight' });
+    });
+  });
+
+  it('limits queued bulk uploads to three concurrent files', async () => {
+    mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
+    const deferredUploads: Array<{ resolve: (content: any) => void; promise: Promise<any> }> = [];
+    mockUploadContentWithProgress.mockImplementation((_data, onProgress) => {
+      onProgress?.(10);
+      let resolveUpload: (content: any) => void = () => {};
+      const promise = new Promise((resolve) => {
+        resolveUpload = resolve;
+      });
+      deferredUploads.push({ resolve: resolveUpload, promise });
+      return promise;
+    });
+
+    render(<ContentClient />);
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+
+    fireEvent.click(screen.getAllByText('Upload Content')[0]);
+    const files = [
+      new File(['1'], 'file-1.png', { type: 'image/png' }),
+      new File(['2'], 'file-2.png', { type: 'image/png' }),
+      new File(['3'], 'file-3.png', { type: 'image/png' }),
+      new File(['4'], 'file-4.png', { type: 'image/png' }),
+    ];
+
+    await act(async () => {
+      lastDropzoneOptions.onDrop(files);
+    });
+
+    fireEvent.click(screen.getByText('Upload 4 Files'));
+
+    await waitFor(() => {
+      expect(mockUploadContentWithProgress).toHaveBeenCalledTimes(3);
+    });
+    expect(mockUploadContentWithProgress.mock.calls[0][0].title).toBe('file-1');
+    expect(mockUploadContentWithProgress.mock.calls[1][0].title).toBe('file-2');
+    expect(mockUploadContentWithProgress.mock.calls[2][0].title).toBe('file-3');
+    expect(screen.getAllByText('10%')).toHaveLength(3);
+
+    await act(async () => {
+      deferredUploads[0].resolve({ id: 'new-1', title: 'File 1' });
+      await deferredUploads[0].promise;
+    });
+
+    await waitFor(() => {
+      expect(mockUploadContentWithProgress).toHaveBeenCalledTimes(4);
+    });
+    expect(mockUploadContentWithProgress.mock.calls[3][0].title).toBe('file-4');
+
+    await act(async () => {
+      for (const deferred of deferredUploads.slice(1)) {
+        deferred.resolve({ id: 'new-rest', title: 'Rest' });
+      }
+      await Promise.all(deferredUploads.slice(1).map((deferred) => deferred.promise));
+    });
   });
 });

@@ -42,6 +42,7 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  const [isPairingModalOpen, setIsPairingModalOpen] = useState(false);
  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
  const [pairingCode, setPairingCode] = useState('');
+ const [pairingExpiresIn, setPairingExpiresIn] = useState('');
  const [editForm, setEditForm] = useState({ nickname: '', location: '' });
  const [actionLoading, setActionLoading] = useState(false);
  const [searchQuery, setSearchQuery] = useState('');
@@ -267,7 +268,8 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  try {
  setActionLoading(true);
  const response = await apiClient.generatePairingToken(device.id);
- setPairingCode(response.pairingCode || 'N/A');
+ setPairingCode(response.pairingToken);
+ setPairingExpiresIn(response.expiresIn || '5 minutes');
  setSelectedDevice(device);
  setIsPairingModalOpen(true);
  } catch (error: any) {
@@ -634,13 +636,13 @@ export default function DevicesClient({ initialDevices, initialPlaylists }: Devi
  </div>
  </Modal>
 
- <Modal isOpen={isPairingModalOpen} onClose={() => setIsPairingModalOpen(false)} title="Pairing Code">
+ <Modal isOpen={isPairingModalOpen} onClose={() => setIsPairingModalOpen(false)} title="Pairing Token">
  <div className="text-center space-y-5">
- <p className="text-[var(--foreground-secondary)]">Enter this code on your display device to pair it:</p>
+ <p className="text-[var(--foreground-secondary)]">Use this token on your display device to pair it:</p>
  <div className="bg-[var(--background-secondary)] rounded-lg p-6">
- <div className="text-4xl font-bold font-mono text-[#00E5A0] tracking-widest">{pairingCode}</div>
+ <div className="break-all text-lg font-bold font-mono text-[#00E5A0] tracking-wide">{pairingCode}</div>
  </div>
- <p className="text-sm text-[var(--foreground-tertiary)]">This code will expire in 5 minutes</p>
+ <p className="text-sm text-[var(--foreground-tertiary)]">This token expires in {pairingExpiresIn}</p>
  <button onClick={() => setIsPairingModalOpen(false)} className="eh-btn-neon rounded-xl w-full px-4 py-2 text-sm font-medium">Done</button>
  </div>
  </Modal>
