@@ -9,6 +9,7 @@
     "start": "electron .",
     "dev": "webpack-dev-server --mode development",
     "build": "webpack --mode production && tsc -p tsconfig.electron.json",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
     "package": "npm run build && electron-builder --publish never",
     "package:win": "npm run build && electron-builder --win --publish never",
     "package:mac": "npm run build && electron-builder --mac --publish never",

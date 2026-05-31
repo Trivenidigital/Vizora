@@ -238,7 +238,7 @@ backlog.md                 # P0-P4 active backlog with status + effort estimates
 
 ## Display Clients
 
-**Electron** (`display/`): Desktop app for Windows/macOS/Linux. Webpack + TypeScript. Packages via electron-builder.
+**Electron** (`display/`): Desktop app for Windows/macOS/Linux. Webpack + TypeScript. Packages via electron-builder. Packaged display clients configure OS auto-start and use Electron `powerSaveBlocker` to prevent display sleep.
 
 **Android TV**: Extracted to standalone repo (`vizora-tv`). Capacitor 6 + Vite + TypeScript. See [github.com/Trivenidigital/vizora-tv](https://github.com/Trivenidigital/vizora-tv).
 
@@ -262,8 +262,8 @@ Available at `http://localhost:3000/api/v1/docs` in development mode only.
 - **Aggregate**: 3411 unit/integration tests passing, **ZERO failures** across all 3 services.
 - **TypeScript**: middleware `tsc --noEmit` exit 0; realtime + web pass via ts-jest (no separate type-check needed).
 - **Playwright (E2E)**: 24 spec files in `e2e-tests/`. Post-2026-05-09 fix (mass `/api/` → `/api/v1/` + h1 copy regex updates), estimated >90% pass rate. ~26 remaining failures concentrated in 9 specs (heaviest: 16-billing); see `docs/plans/2026-05-09-playwright-results.md`. Critical-path flows verified.
-- **Display**: No test coverage yet (Electron testing framework not wired). Rely on real-device walkthrough per release.
-- **Builds**: All 3 services compile via `npx nx build @vizora/{middleware,web,realtime}`. `web` may need `NODE_OPTIONS="--max-old-space-size=4096"` on memory-constrained dev machines.
+- **Display**: Jest unit coverage exists for Electron main/preload/device/cache/renderer helpers and is CI-gated via `pnpm --filter @vizora/display test -- --runInBand`; display typecheck/build are gated via `pnpm --filter @vizora/display typecheck` and `pnpm --filter @vizora/display build`. Real-device walkthrough is still required per release.
+- **Builds**: All 3 services compile via `npx nx build @vizora/{middleware,web,realtime}`; Electron display compiles via `pnpm --filter @vizora/display build`. `web` may need `NODE_OPTIONS="--max-old-space-size=4096"` on memory-constrained dev machines.
 
 **API smoke test**: `bash scripts/smoke/api-critical-path.sh` probes 12 critical endpoints in <30 seconds; verified 12/12 pass against local stack 2026-05-09.
 

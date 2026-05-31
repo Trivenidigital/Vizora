@@ -98,6 +98,14 @@ jobs:
         working-directory: realtime
         run: pnpm test --passWithNoTests
 
+      - name: Run display unit tests
+        working-directory: display
+        run: pnpm test -- --runInBand
+
+      - name: Typecheck display client
+        working-directory: display
+        run: pnpm typecheck
+
       - name: Run ops unit tests
         run: pnpm test:ops
 
@@ -199,6 +207,10 @@ jobs:
 
       - name: Build realtime
         run: npx nx build @vizora/realtime
+
+      - name: Build display client
+        working-directory: display
+        run: pnpm build
 
   security:
     runs-on: ubuntu-latest

@@ -35,6 +35,14 @@ jest.mock('./device-client', () => ({
   DeviceClient: jest.fn().mockImplementation(() => mockDeviceClient),
 }));
 
+const mockMkdirSync = jest.fn();
+const mockWriteFileSync = jest.fn();
+
+jest.mock('fs', () => ({
+  mkdirSync: (...args: any[]) => mockMkdirSync(...args),
+  writeFileSync: (...args: any[]) => mockWriteFileSync(...args),
+}));
+
 // Capture handlers registered via ipcMain.handle and app event listeners
 const ipcHandlers: Record<string, Function> = {};
 const ipcListeners: Record<string, Function[]> = {};
@@ -71,8 +79,16 @@ const mockMainWindow = {
   reload: jest.fn(),
 };
 
+const mockSetLoginItemSettings = jest.fn();
+const mockPowerSaveBlocker = {
+  start: jest.fn().mockReturnValue(42),
+  stop: jest.fn(),
+  isStarted: jest.fn().mockReturnValue(true),
+};
+
 jest.mock('electron', () => ({
   app: {
+    isPackaged: false,
     whenReady: jest.fn().mockReturnValue({ then: jest.fn() }),
     on: jest.fn().mockImplementation((event: string, cb: Function) => {
       if (!appEventListeners[event]) appEventListeners[event] = [];
@@ -80,6 +96,7 @@ jest.mock('electron', () => ({
     }),
     getVersion: jest.fn().mockReturnValue('1.0.0'),
     getPath: jest.fn().mockReturnValue('/tmp/test'),
+    setLoginItemSettings: (...args: any[]) => mockSetLoginItemSettings(...args),
     quit: jest.fn(),
   },
   BrowserWindow: jest.fn().mockImplementation(() => mockMainWindow),
@@ -95,6 +112,7 @@ jest.mock('electron', () => ({
       ipcListeners[channel] = (ipcListeners[channel] || []).filter((l) => l !== listener);
     }),
   },
+  powerSaveBlocker: mockPowerSaveBlocker,
   screen: {
     getPrimaryDisplay: jest.fn().mockReturnValue({
       workAreaSize: { width: 1920, height: 1080 },
@@ -112,10 +130,14 @@ jest.mock('path', () => ({
 }));
 
 // Clear module cache to force fresh require of main.ts
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockStoreGet.mockReturnValue(null);
-    Object.keys(ipcHandlers).forEach((k) => delete ipcHandlers[k]);
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockStoreGet.mockReturnValue(null);
+  Object.defineProperty(app, 'isPackaged', { value: false, configurable: true });
+  delete process.env.APPIMAGE;
+  mockPowerSaveBlocker.start.mockReturnValue(42);
+  mockPowerSaveBlocker.isStarted.mockReturnValue(true);
+  Object.keys(ipcHandlers).forEach((k) => delete ipcHandlers[k]);
   Object.keys(ipcListeners).forEach((k) => delete ipcListeners[k]);
   Object.keys(appEventListeners).forEach((k) => delete appEventListeners[k]);
   Object.keys(webContentsListeners).forEach((k) => delete webContentsListeners[k]);
@@ -123,7 +145,7 @@ jest.mock('path', () => ({
 });
 
 // Import after mocks are set up
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, powerSaveBlocker } from 'electron';
 
 describe('main.ts - Electron main process', () => {
   describe('IPC handler registration', () => {
@@ -207,6 +229,97 @@ describe('main.ts - Electron main process', () => {
     it('should register before-quit handler', () => {
       expect(appEventListeners['before-quit']).toBeDefined();
       expect(appEventListeners['before-quit'].length).toBeGreaterThan(0);
+    });
+
+    it('does not configure production runtime guards for unpackaged test runs', () => {
+      const thenMock = (app.whenReady as jest.Mock).mock.results[0].value.then;
+      const createWindowCallback = thenMock.mock.calls[0][0];
+      createWindowCallback();
+
+      expect(mockSetLoginItemSettings).not.toHaveBeenCalled();
+      expect(powerSaveBlocker.start).not.toHaveBeenCalled();
+      expect(mockMkdirSync).not.toHaveBeenCalled();
+      expect(mockWriteFileSync).not.toHaveBeenCalled();
+    });
+
+    it('does not configure runtime guards for unpackaged NODE_ENV production runs', () => {
+      const originalNodeEnv = process.env.NODE_ENV;
+      try {
+        process.env.NODE_ENV = 'production';
+
+        const thenMock = (app.whenReady as jest.Mock).mock.results[0].value.then;
+        const createWindowCallback = thenMock.mock.calls[0][0];
+        createWindowCallback();
+
+        expect(mockSetLoginItemSettings).not.toHaveBeenCalled();
+        expect(powerSaveBlocker.start).not.toHaveBeenCalled();
+        expect(mockMkdirSync).not.toHaveBeenCalled();
+        expect(mockWriteFileSync).not.toHaveBeenCalled();
+      } finally {
+        if (originalNodeEnv === undefined) {
+          delete process.env.NODE_ENV;
+        } else {
+          process.env.NODE_ENV = originalNodeEnv;
+        }
+      }
+    });
+
+    it('enables login item auto-start and display sleep prevention for packaged Windows displays', () => {
+      const originalPlatform = process.platform;
+      Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
+      Object.defineProperty(app, 'isPackaged', { value: true, configurable: true });
+
+      const thenMock = (app.whenReady as jest.Mock).mock.results[0].value.then;
+      const createWindowCallback = thenMock.mock.calls[0][0];
+      createWindowCallback();
+
+      expect(mockSetLoginItemSettings).toHaveBeenCalledWith({
+        openAtLogin: true,
+        openAsHidden: false,
+        path: process.execPath,
+      });
+      expect(powerSaveBlocker.start).toHaveBeenCalledWith('prevent-display-sleep');
+
+      Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true });
+    });
+
+    it('writes a Linux desktop autostart entry for packaged Linux displays', () => {
+      const originalPlatform = process.platform;
+      process.env.APPIMAGE = '/opt/Vizora Display.AppImage';
+      Object.defineProperty(process, 'platform', { value: 'linux', configurable: true });
+      Object.defineProperty(app, 'isPackaged', { value: true, configurable: true });
+
+      const thenMock = (app.whenReady as jest.Mock).mock.results[0].value.then;
+      const createWindowCallback = thenMock.mock.calls[0][0];
+      createWindowCallback();
+
+      expect(mockMkdirSync).toHaveBeenCalledWith('/tmp/test/.config/autostart', { recursive: true });
+      expect(mockWriteFileSync).toHaveBeenCalledWith(
+        '/tmp/test/.config/autostart/vizora-display.desktop',
+        expect.stringContaining('Exec="/opt/Vizora Display.AppImage"'),
+        'utf8',
+      );
+      expect(mockWriteFileSync).toHaveBeenCalledWith(
+        '/tmp/test/.config/autostart/vizora-display.desktop',
+        expect.stringContaining('X-GNOME-Autostart-enabled=true'),
+        'utf8',
+      );
+      expect(mockSetLoginItemSettings).not.toHaveBeenCalled();
+
+      Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true });
+    });
+
+    it('stops display sleep prevention before quitting', () => {
+      Object.defineProperty(app, 'isPackaged', { value: true, configurable: true });
+
+      const thenMock = (app.whenReady as jest.Mock).mock.results[0].value.then;
+      const createWindowCallback = thenMock.mock.calls[0][0];
+      createWindowCallback();
+
+      const handler = appEventListeners['before-quit'][0];
+      handler();
+
+      expect(powerSaveBlocker.stop).toHaveBeenCalledWith(42);
     });
 
     it('disconnects an existing device client before reinitializing after renderer reload', () => {
