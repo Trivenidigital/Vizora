@@ -5,10 +5,13 @@ import * as http from 'http';
 interface DeviceClientConfig {
   onPairingRequired: () => void;
   onPaired: (token: string) => void;
-  onPlaylistUpdate: (playlist: any) => void;
-  onCommand: (command: any) => void;
+  onPlaylistUpdate: (playlist: any) => void | Promise<void>;
+  onCommand: (command: any) => void | Promise<void>;
   onError: (error: any) => void;
 }
+
+type SocketAck = (response?: { ok: boolean; error?: string }) => void;
+const SELF_TERMINATING_COMMAND_ACK_FLUSH_MS = 500;
 
 export class DeviceClient {
   private socket: Socket | null = null;
@@ -248,6 +251,9 @@ export class DeviceClient {
     this.socket = io(realtimeUrl, {
       auth: {
         token,
+        capabilities: {
+          deliveryAck: true,
+        },
       },
       transports: ['websocket', 'polling'],
       reconnection: true,
@@ -280,15 +286,47 @@ export class DeviceClient {
       console.log('Received configuration:', config);
     });
 
-    this.socket.on('playlist:update', (data) => {
+    this.socket.on('playlist:update', async (data, ack?: SocketAck) => {
       console.log('Received playlist update:', data);
-      this.config.onPlaylistUpdate(data.playlist);
+      try {
+        await this.config.onPlaylistUpdate(data.playlist);
+        ack?.({ ok: true });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to apply playlist';
+        console.error('[DeviceClient] Failed to apply playlist update:', message);
+        ack?.({ ok: false, error: message });
+        this.reconnectForPendingDelivery();
+      }
     });
 
-    this.socket.on('command', (data) => {
+    this.socket.on('command', async (data, ack?: SocketAck) => {
       console.log('Received command:', data);
-      this.config.onCommand(data);
-      this.handleCommand(data);
+      let ackSent = false;
+      const sendAck = (response: { ok: boolean; error?: string }) => {
+        ack?.(response);
+        ackSent = true;
+      };
+
+      try {
+        if (this.shouldAckBeforeCommandExecution(data)) {
+          sendAck({ ok: true });
+          await this.waitForSelfTerminatingCommandAckFlush();
+          await this.handleCommand(data);
+          return;
+        }
+
+        await this.config.onCommand(data);
+        await this.handleCommand(data);
+        if (!ackSent) {
+          sendAck({ ok: true });
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to apply command';
+        console.error('[DeviceClient] Failed to apply command:', message);
+        if (!ackSent) {
+          sendAck({ ok: false, error: message });
+        }
+      }
     });
 
     this.socket.on('error', (error) => {
@@ -304,6 +342,17 @@ export class DeviceClient {
       this.socket.disconnect();
       this.socket = null;
     }
+  }
+
+  private reconnectForPendingDelivery() {
+    if (!this.socket?.connected) {
+      return;
+    }
+
+    this.socket.disconnect();
+    setTimeout(() => {
+      this.socket?.connect();
+    }, 250);
   }
 
   private startHeartbeat() {
@@ -343,11 +392,7 @@ export class DeviceClient {
         status: 'online',
       };
 
-      this.socket.emit('heartbeat', heartbeatData, (response: any) => {
-        if (response && response.commands) {
-          response.commands.forEach((cmd: any) => this.handleCommand(cmd));
-        }
-      });
+      this.socket.emit('heartbeat', heartbeatData, () => {});
     } catch (error) {
       console.error('[DeviceClient] Error sending heartbeat:', error);
       // Socket will auto-reconnect due to reconnection: true setting
@@ -384,7 +429,15 @@ export class DeviceClient {
     }
   }
 
-  private handleCommand(command: any) {
+  private shouldAckBeforeCommandExecution(command: any): boolean {
+    return command?.type === 'restart' || command?.type === 'reboot';
+  }
+
+  private async waitForSelfTerminatingCommandAckFlush(): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, SELF_TERMINATING_COMMAND_ACK_FLUSH_MS));
+  }
+
+  private async handleCommand(command: any): Promise<void> {
     switch (command.type) {
       case 'reload':
         console.log('[DeviceClient] Executing reload command');
@@ -395,24 +448,18 @@ export class DeviceClient {
             mainWindow.reload();
             console.log('[DeviceClient] Reload complete');
           } else {
-            console.warn('[DeviceClient] No window found for reload');
+            throw new Error('No window found for reload');
           }
         } catch (err) {
           console.error('[DeviceClient] Reload failed:', err);
+          throw err;
         }
         break;
       case 'clear_cache':
         console.log('[DeviceClient] Executing clear_cache command');
-        try {
-          const { session } = require('electron');
-          session.defaultSession.clearCache().then(() => {
-            console.log('[DeviceClient] Cache cleared successfully');
-          }).catch((err: any) => {
-            console.error('[DeviceClient] Cache clear failed:', err);
-          });
-        } catch (err) {
-          console.error('[DeviceClient] clear_cache failed:', err);
-        }
+        const { session } = require('electron');
+        await session.defaultSession.clearCache();
+        console.log('[DeviceClient] Cache cleared successfully');
         break;
       case 'restart':
         console.log('[DeviceClient] Restart command received — relaunching app');
@@ -422,6 +469,7 @@ export class DeviceClient {
           appRestart.exit(0);
         } catch (err) {
           console.error('[DeviceClient] Restart failed:', err);
+          throw err;
         }
         break;
       case 'reboot':
@@ -432,6 +480,7 @@ export class DeviceClient {
           appReboot.exit(0);
         } catch (err) {
           console.error('[DeviceClient] Reboot/restart failed:', err);
+          throw err;
         }
         break;
       case 'push_content':
@@ -439,20 +488,20 @@ export class DeviceClient {
         try {
           const { content, duration, commandId } = command.payload || {};
           if (!content?.url) {
-            console.warn('[DeviceClient] push_content: no content URL provided');
-            break;
+            throw new Error('push_content missing content URL');
           }
 
           // Validate URL protocol — only allow http:, https:
           try {
             const urlObj = new URL(content.url);
             if (!['http:', 'https:'].includes(urlObj.protocol)) {
-              console.error('[DeviceClient] push_content: rejected unsafe URL protocol:', urlObj.protocol);
-              break;
+              throw new Error(`push_content rejected unsafe URL protocol: ${urlObj.protocol}`);
             }
           } catch (urlErr) {
-            console.error('[DeviceClient] push_content: invalid URL:', content.url);
-            break;
+            if (urlErr instanceof Error && urlErr.message.includes('unsafe URL protocol')) {
+              throw urlErr;
+            }
+            throw new Error(`push_content invalid URL: ${content.url}`);
           }
 
           // Clear any existing override timer (last-writer-wins)
@@ -463,15 +512,14 @@ export class DeviceClient {
           const { BrowserWindow: BWPush } = require('electron');
           const pushWindow = BWPush.getAllWindows()[0];
           if (!pushWindow) {
-            console.warn('[DeviceClient] push_content: no window found');
-            break;
+            throw new Error('push_content no window found');
           }
 
           // Save current URL for revert (only if not already in an override)
           const previousUrl = this.overrideState?.previousUrl || pushWindow.webContents.getURL();
 
           // Load the pushed content
-          pushWindow.loadURL(content.url);
+          await pushWindow.loadURL(content.url);
           console.log(`[DeviceClient] Override active: loading ${content.url} (commandId: ${commandId})`);
 
           // Set auto-revert timer (duration is in minutes)
@@ -511,6 +559,7 @@ export class DeviceClient {
           this.overrideState = { previousUrl, revertTimer, commandId };
         } catch (err) {
           console.error('[DeviceClient] push_content failed:', err);
+          throw err;
         }
         break;
       case 'clear_override':
@@ -527,8 +576,10 @@ export class DeviceClient {
               const { BrowserWindow: BWClear } = require('electron');
               const clearWindow = BWClear.getAllWindows()[0];
               if (clearWindow) {
-                clearWindow.loadURL(this.overrideState.previousUrl);
+                await clearWindow.loadURL(this.overrideState.previousUrl);
                 console.log(`[DeviceClient] Override cleared, restored ${this.overrideState.previousUrl}`);
+              } else {
+                throw new Error('clear_override no window found');
               }
             }
 
@@ -546,6 +597,7 @@ export class DeviceClient {
           }
         } catch (err) {
           console.error('[DeviceClient] clear_override failed:', err);
+          throw err;
         }
         break;
       case 'update':

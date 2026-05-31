@@ -188,6 +188,35 @@ describe('AllExceptionsFilter', () => {
     });
   });
 
+  describe('headers already sent', () => {
+    it('should destroy an in-flight response so clients do not hang', () => {
+      const exception = new Error('stream failed');
+      mockResponse.headersSent = true;
+      mockResponse.writableEnded = false;
+      mockResponse.destroy = jest.fn();
+      mockResponse.end = jest.fn();
+
+      filter.catch(exception, mockHost);
+
+      expect(mockResponse.destroy).toHaveBeenCalledWith(exception);
+      expect(mockResponse.end).not.toHaveBeenCalled();
+      expect(mockResponse.status).not.toHaveBeenCalled();
+      expect(mockResponse.json).not.toHaveBeenCalled();
+    });
+
+    it('should not destroy a response that already ended', () => {
+      mockResponse.headersSent = true;
+      mockResponse.writableEnded = true;
+      mockResponse.destroy = jest.fn();
+
+      filter.catch(new Error('late failure'), mockHost);
+
+      expect(mockResponse.destroy).not.toHaveBeenCalled();
+      expect(mockResponse.status).not.toHaveBeenCalled();
+      expect(mockResponse.json).not.toHaveBeenCalled();
+    });
+  });
+
   describe('Non-HttpException handling', () => {
     it('should handle standard Error with 500 status', () => {
       const exception = new Error('Something broke');

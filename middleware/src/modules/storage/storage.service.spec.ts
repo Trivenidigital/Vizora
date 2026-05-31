@@ -12,6 +12,8 @@ jest.mock('minio', () => {
       presignedGetObject: jest.fn(),
       removeObject: jest.fn(),
       statObject: jest.fn(),
+      getObject: jest.fn(),
+      getPartialObject: jest.fn(),
       listObjects: jest.fn(),
       copyObject: jest.fn(),
     })),
@@ -54,6 +56,8 @@ describe('StorageService', () => {
         lastModified: new Date('2024-01-01'),
         metaData: { 'content-type': 'image/png' },
       }),
+      getObject: jest.fn().mockResolvedValue('object-stream'),
+      getPartialObject: jest.fn().mockResolvedValue('range-stream'),
       listObjects: jest.fn(),
       copyObject: jest.fn().mockResolvedValue(undefined),
     };
@@ -552,6 +556,68 @@ describe('StorageService', () => {
       const result = await service.getFileMetadata('test-key');
 
       expect(result?.contentType).toBe('application/octet-stream');
+    });
+
+    it('should throw unexpected metadata errors instead of hiding them as missing files', async () => {
+      mockMinioClient.statObject.mockRejectedValue(new Error('Connection reset'));
+
+      await expect(service.getFileMetadata('test-key')).rejects.toThrow(
+        'Connection reset',
+      );
+    });
+  });
+
+  describe('getObject', () => {
+    beforeEach(async () => {
+      await service.onModuleInit();
+    });
+
+    it('should get an object stream', async () => {
+      const result = await service.getObject('test-key');
+
+      expect(result).toBe('object-stream');
+      expect(mockMinioClient.getObject).toHaveBeenCalledWith(
+        'vizora-content',
+        'test-key',
+      );
+    });
+
+    it('should throw error when MinIO is not available', async () => {
+      mockMinioClient.bucketExists.mockRejectedValue(new Error('Connection failed'));
+      const serviceUnavailable = new StorageService(mockConfigService, mockCircuitBreaker);
+      await serviceUnavailable.onModuleInit();
+
+      await expect(serviceUnavailable.getObject('test-key')).rejects.toThrow(
+        'MinIO is not available',
+      );
+    });
+  });
+
+  describe('getObjectRange', () => {
+    beforeEach(async () => {
+      await service.onModuleInit();
+    });
+
+    it('should get a partial object stream', async () => {
+      const result = await service.getObjectRange('test-key', 10, 25);
+
+      expect(result).toBe('range-stream');
+      expect(mockMinioClient.getPartialObject).toHaveBeenCalledWith(
+        'vizora-content',
+        'test-key',
+        10,
+        25,
+      );
+    });
+
+    it('should throw error when MinIO is not available', async () => {
+      mockMinioClient.bucketExists.mockRejectedValue(new Error('Connection failed'));
+      const serviceUnavailable = new StorageService(mockConfigService, mockCircuitBreaker);
+      await serviceUnavailable.onModuleInit();
+
+      await expect(
+        serviceUnavailable.getObjectRange('test-key', 0, 10),
+      ).rejects.toThrow('MinIO is not available');
     });
   });
 

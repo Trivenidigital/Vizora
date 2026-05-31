@@ -12,6 +12,7 @@ import type {
 } from '../lib/types';
 
 type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
+type SocketAck = (response?: { ok: boolean; error?: string }) => void;
 
 interface UseDeviceConnectionOptions {
   credentials: DeviceCredentials;
@@ -65,12 +66,8 @@ export function useDeviceConnection({
       status: 'online',
     };
 
-    socket.emit('heartbeat', data, (response: { commands?: DeviceCommand[] }) => {
-      if (response?.commands) {
-        response.commands.forEach((cmd) => onCommand(cmd));
-      }
-    });
-  }, [onCommand]);
+    socket.emit('heartbeat', data, () => {});
+  }, []);
 
   const startHeartbeat = useCallback(() => {
     if (heartbeatRef.current) return;
@@ -111,7 +108,12 @@ export function useDeviceConnection({
     setStatus('connecting');
 
     const socket = io(SOCKET_URL, {
-      auth: { token: credentials.deviceToken },
+      auth: {
+        token: credentials.deviceToken,
+        capabilities: {
+          deliveryAck: true,
+        },
+      },
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: Infinity,
@@ -145,17 +147,31 @@ export function useDeviceConnection({
       onConfig(config);
     });
 
-    socket.on('playlist:update', (data: { playlist: Playlist }) => {
-      onPlaylistUpdate(data.playlist);
+    socket.on('playlist:update', (data: { playlist: Playlist }, ack?: SocketAck) => {
+      try {
+        onPlaylistUpdate(data.playlist);
+        ack?.({ ok: true });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to apply playlist';
+        console.error('[Vizora Display] Failed to apply playlist update:', message);
+        ack?.({ ok: false, error: message });
+      }
     });
 
-    socket.on('command', (command: DeviceCommand) => {
-      if (command.type === 'push_content' && command.payload && onContentPush) {
-        const content = command.payload.content as unknown as PushContent;
-        const duration = (command.payload.duration as number) || 30;
-        onContentPush(content, duration);
-      } else {
-        onCommand(command);
+    socket.on('command', (command: DeviceCommand, ack?: SocketAck) => {
+      try {
+        if (command.type === 'push_content' && command.payload && onContentPush) {
+          const content = command.payload.content as unknown as PushContent;
+          const duration = (command.payload.duration as number) || 30;
+          onContentPush(content, duration);
+        } else {
+          onCommand(command);
+        }
+        ack?.({ ok: true });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to apply command';
+        console.error('[Vizora Display] Failed to apply command:', message);
+        ack?.({ ok: false, error: message });
       }
     });
 

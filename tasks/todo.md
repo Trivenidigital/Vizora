@@ -1,5 +1,70 @@
 # Vizora - Task Tracker
 
+## In Progress: Customer Dashboard + Playback Performance Push (2026-05-31)
+
+**Branch:** `feat/customer-dashboard-performance-push`
+
+**Plan/design:** `docs/plans/2026-05-31-customer-dashboard-performance-push.md`
+
+**Why now:** Multiple read-only subagents found customer-visible playback and troubleshooting gaps. The first buildable slice focuses on production hot paths that are repo-side, testable, and do not require secrets, live payment setup, DNS, SMTP, or real hardware.
+
+**New primitives introduced:** none. Use existing StorageService, `device-content` controller, Socket.IO display event path, and dashboard component patterns.
+
+**Hermes-first analysis:** not applicable. This is runtime media delivery, display-client ACK handling, and dashboard UI reliability; it does not introduce business agents, MCP tools, AI provider calls, or spend paths.
+
+**Plan**
+- [x] Run parallel customer, middleware-performance, frontend-performance, and readiness analyses.
+- [x] Stream MinIO-backed device media with Content-Length and Range support instead of buffering whole files in middleware memory.
+- [x] Preserve device JWT org scoping before storage access.
+- [x] ACK `playlist:update` and display commands in web and Electron display clients.
+- [x] Remove content-library page-load thumbnail fanout.
+- [x] Fix screenshot refresh timeout state.
+- [x] Run multi-subagent review before tests.
+- [x] Run focused tests, service builds, and broader regression checks.
+- [ ] Open PR, wait for CI, merge if clean, then deploy approved main.
+
+**Implemented slice**
+- Device media playback now streams from storage with single-range/suffix-range support, `Content-Range`, `Accept-Ranges`, bounded object size, and device-JWT/org-prefix checks before object access.
+- Storage metadata/range reads now use the existing MinIO circuit-breaker path and distinguish not-found from unexpected storage errors.
+- The global exception filter no longer hangs requests whose stream has already sent headers.
+- Realtime display delivery now uses capability-aware ACKs for playlist updates and commands, preserving legacy best-effort behavior for older clients.
+- Electron and browser display clients advertise `deliveryAck`, ACK only after local application succeeds, negative-ACK on failures, and avoid heartbeat command drains.
+- Electron restart/reboot commands ACK before self-termination and wait a short flush window before relaunch/exit.
+- Content library no longer triggers thumbnail generation for every item on initial page load.
+- Device screenshot modal now guards stale request responses and cleans timeout state on close/device changes.
+- Web Tailwind config now shares CJS theme tokens for Next build compatibility and has a drift test against TS theme exports.
+
+**Review gates**
+- Middleware/storage reviewer found early streaming/header/org-scope issues; fixed before full tests.
+- Frontend reviewer found screenshot stale-request and build config drift risks; fixed with request epochs and theme drift test.
+- Realtime/display reviewers found ACK capability, pending-command replay, renderer command ACK, duplicate Electron client, heartbeat-drain, and self-terminating command risks; fixed with regression tests.
+- Final self-terminating command reviewer result: CLEAN. Residual note: the 500ms ACK flush is a pragmatic timing guard, not a transport-level receipt.
+
+**Verification plan**
+- [x] `git diff --check` — pass; line-ending warnings only.
+- [x] `pnpm --filter @vizora/middleware test -- --runInBand` — pass, 141 suites / 2757 tests.
+- [x] `pnpm --filter @vizora/realtime test -- --runInBand` — pass, 11 suites / 235 tests.
+- [x] `pnpm --filter @vizora/display test -- --runInBand` — pass, 5 suites / 109 tests.
+- [x] `pnpm --filter @vizora/web test -- --runInBand` — pass, 82 suites / 881 tests. Existing unrelated React `act(...)` warnings remain in older test files; touched modal/content tests now run clean on focused paths.
+- [x] `npx nx build @vizora/middleware` — pass with existing webpack warnings.
+- [x] `npx nx build @vizora/realtime` — pass with existing source-map/optional `ws` warnings.
+- [x] `pnpm --filter @vizora/display build` — pass.
+- [x] `NODE_OPTIONS=--max-old-space-size=4096 npx nx build @vizora/web` — pass with existing Next middleware/prod URL warnings.
+
+**Customer improvement backlog from analysis**
+- [ ] Replace fake random health metrics with real status-derived health.
+- [ ] Fix schedule multi-device selection mismatch.
+- [ ] Wire device-group filter.
+- [ ] Replace misleading playlist publish action with assignment/push workflow.
+- [ ] Use real storage quota in dashboard.
+- [ ] Replace fake content tag filters with real tag data or hide them.
+- [ ] Use backend bulk content operations from the UI.
+- [ ] Convert getting-started panel into a real onboarding checklist.
+- [ ] Consolidate dashboard auth/socket fetches.
+- [ ] Add real multipart upload to smoke/E2E coverage.
+
+---
+
 ## Completed: M12 Unrecognized Login Alert (2026-05-31)
 
 **Branch:** `feat/m12-unrecognized-login-alert`

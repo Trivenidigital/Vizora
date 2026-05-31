@@ -8,6 +8,7 @@ const mockGetDisplays = jest.fn();
 const mockGetPlaylists = jest.fn();
 const mockDeleteContent = jest.fn();
 const mockUploadContent = jest.fn();
+const mockGenerateThumbnail = jest.fn();
 
 jest.mock('@/lib/api', () => ({
   apiClient: {
@@ -18,6 +19,7 @@ jest.mock('@/lib/api', () => ({
     getPlaylists: (...args: any[]) => mockGetPlaylists(...args),
     deleteContent: (...args: any[]) => mockDeleteContent(...args),
     uploadContent: (...args: any[]) => mockUploadContent(...args),
+    generateThumbnail: (...args: any[]) => mockGenerateThumbnail(...args),
   },
 }));
 
@@ -104,7 +106,13 @@ jest.mock('@/components/ContentTagger', () => {
 });
 
 jest.mock('@/components/FolderTree', () => {
-  return function MockFolderTree() { return null; };
+  return function MockFolderTree({ onSelectFolder }: any) {
+    return (
+      <button data-testid="select-folder" onClick={() => onSelectFolder('folder-1')}>
+        Select Folder
+      </button>
+    );
+  };
 });
 
 jest.mock('@/components/FolderBreadcrumb', () => {
@@ -168,33 +176,89 @@ describe('ContentClient', () => {
     mockGetPlaylists.mockResolvedValue({ data: [] });
     mockDeleteContent.mockResolvedValue({});
     mockUploadContent.mockResolvedValue({ id: 'new-1', title: 'New Content' });
+    mockGenerateThumbnail.mockResolvedValue({});
   });
 
-  it('renders loading spinner initially', () => {
+  const waitForInitialRequestsToSettle = async () => {
+    await waitFor(() => {
+      expect(mockGetContent).toHaveBeenCalled();
+      expect(mockGetFolders).toHaveBeenCalled();
+      expect(mockGetDisplays).toHaveBeenCalled();
+      expect(mockGetPlaylists).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+  };
+
+  const waitForAuxiliaryRequestsToSettle = async () => {
+    await waitFor(() => {
+      expect(mockGetFolders).toHaveBeenCalled();
+      expect(mockGetDisplays).toHaveBeenCalled();
+      expect(mockGetPlaylists).toHaveBeenCalled();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+  };
+
+  it('renders loading spinner initially', async () => {
     render(<ContentClient />);
     expect(screen.getByTestId('spinner')).toBeInTheDocument();
+    await waitForInitialRequestsToSettle();
   });
 
   it('renders content management after load', async () => {
     render(<ContentClient />);
-    await waitFor(() => {
-      expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
-    });
+    await waitForInitialRequestsToSettle();
   });
 
   it('fetches content data on mount', async () => {
     render(<ContentClient />);
-    await waitFor(() => {
-      expect(mockGetContent).toHaveBeenCalled();
+    await waitForInitialRequestsToSettle();
+  });
+
+  it('does not duplicate the initial content fetch on mount', async () => {
+    render(<ContentClient />);
+    await waitForInitialRequestsToSettle();
+
+    expect(mockGetContent).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores stale root content responses after switching folders', async () => {
+    let resolveRoot: (value: any) => void = () => {};
+    mockGetContent.mockImplementation(
+      () => new Promise((resolve) => {
+        resolveRoot = resolve;
+      }),
+    );
+    mockGetFolderContent.mockResolvedValue({
+      data: [{ ...sampleContent[1], id: 'folder-video', title: 'Folder Video' }],
     });
+
+    render(<ContentClient />);
+    fireEvent.click(screen.getByTestId('select-folder'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Folder Video')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+
+    await act(async () => {
+      resolveRoot({ data: [{ ...sampleContent[0], title: 'Late Root Banner' }] });
+    });
+
+    expect(screen.getByText('Folder Video')).toBeInTheDocument();
+    expect(screen.queryByText('Late Root Banner')).not.toBeInTheDocument();
   });
 
   it('renders empty state when no content', async () => {
     mockGetContent.mockResolvedValue({ data: [], meta: { total: 0 } });
     render(<ContentClient />);
-    await waitFor(() => {
-      expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
-    });
+    await waitForInitialRequestsToSettle();
   });
 
   it('renders content items after successful fetch', async () => {
@@ -203,6 +267,7 @@ describe('ContentClient', () => {
     await waitFor(() => {
       expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
     });
+    await waitForAuxiliaryRequestsToSettle();
     expect(screen.getByText('Promo Video')).toBeInTheDocument();
     expect(screen.getByText('Menu PDF')).toBeInTheDocument();
   });
@@ -213,6 +278,7 @@ describe('ContentClient', () => {
     await waitFor(() => {
       expect(mockToast.error).toHaveBeenCalled();
     });
+    await waitForAuxiliaryRequestsToSettle();
   });
 
   it('renders content page header', async () => {
@@ -221,14 +287,13 @@ describe('ContentClient', () => {
     await waitFor(() => {
       expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
     });
+    await waitForAuxiliaryRequestsToSettle();
     expect(screen.getAllByText(/content/i).length).toBeGreaterThan(0);
   });
 
   it('fetches folders on mount', async () => {
     render(<ContentClient />);
-    await waitFor(() => {
-      expect(mockGetFolders).toHaveBeenCalled();
-    });
+    await waitForInitialRequestsToSettle();
   });
 
   it('handles multiple content types', async () => {
@@ -237,16 +302,34 @@ describe('ContentClient', () => {
     await waitFor(() => {
       expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
     });
+    await waitForAuxiliaryRequestsToSettle();
     // All 3 items rendered
     expect(screen.getByText('Promo Video')).toBeInTheDocument();
     expect(screen.getByText('Menu PDF')).toBeInTheDocument();
   });
 
-  it('also fetches displays and playlists for push/add features', async () => {
+  it('does not fan out thumbnail generation on page load', async () => {
+    mockGetContent.mockResolvedValue({
+      data: [
+        {
+          ...sampleContent[0],
+          thumbnailUrl: undefined,
+        },
+      ],
+      meta: { total: 1 },
+    });
+
     render(<ContentClient />);
     await waitFor(() => {
-      expect(mockGetDisplays).toHaveBeenCalled();
-      expect(mockGetPlaylists).toHaveBeenCalled();
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
     });
+    await waitForAuxiliaryRequestsToSettle();
+
+    expect(mockGenerateThumbnail).not.toHaveBeenCalled();
+  });
+
+  it('also fetches displays and playlists for push/add features', async () => {
+    render(<ContentClient />);
+    await waitForInitialRequestsToSettle();
   });
 });

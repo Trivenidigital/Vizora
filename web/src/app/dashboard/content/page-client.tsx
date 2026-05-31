@@ -98,6 +98,8 @@ export default function ContentClient() {
 
  // Real-time event handling
  const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
+ const hasHandledInitialFolderLoadRef = useRef(false);
+ const loadContentRequestRef = useRef(0);
  useEffect(() => {
    return () => {
      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
@@ -156,6 +158,10 @@ export default function ContentClient() {
 
  // Reload content when folder selection changes
  useEffect(() => {
+ if (!hasHandledInitialFolderLoadRef.current) {
+ hasHandledInitialFolderLoadRef.current = true;
+ return;
+ }
  loadContent();
  }, [selectedFolderId]);
 
@@ -172,36 +178,30 @@ export default function ContentClient() {
  }, [isPreviewModalOpen]);
 
  const loadContent = async () => {
+ const requestId = ++loadContentRequestRef.current;
+ const folderId = selectedFolderId;
  try {
  setLoading(true);
  let response;
- if (selectedFolderId) {
- response = await apiClient.getFolderContent(selectedFolderId);
+ if (folderId) {
+ response = await apiClient.getFolderContent(folderId);
  } else {
  response = await apiClient.getContent();
  }
+ if (requestId !== loadContentRequestRef.current) {
+ return;
+ }
  const items = response.data || response || [];
  setContent(items);
-
- // Auto-generate missing thumbnails for image content in the background
- const imageMissingThumbnails = items.filter(
-   (item: Content) => item.type === 'image' && !item.thumbnailUrl && item.id
- );
- if (imageMissingThumbnails.length > 0) {
-   Promise.allSettled(
-     imageMissingThumbnails.map((item: Content) =>
-       apiClient.generateThumbnail(item.id).catch(() => {})
-     )
-   ).then(() => {
-     // Reload to pick up newly generated thumbnails
-     apiClient.getContent().then(refreshed => {
-       setContent(refreshed.data || refreshed || []);
-     }).catch(() => {});
-   });
- }
  } catch (error: any) {
+ if (requestId !== loadContentRequestRef.current) {
+ return;
+ }
  toast.error(error.message || 'Failed to load content');
  } finally {
+ if (requestId !== loadContentRequestRef.current) {
+ return;
+ }
  setLoading(false);
  }
  };

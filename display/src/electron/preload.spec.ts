@@ -1,6 +1,7 @@
 // Mock electron before imports
 const mockInvoke = jest.fn().mockResolvedValue({});
 const mockOn = jest.fn().mockReturnValue(undefined);
+const mockSend = jest.fn();
 const mockRemoveListener = jest.fn();
 let exposedApi: Record<string, Function> = {};
 
@@ -13,6 +14,7 @@ jest.mock('electron', () => ({
   ipcRenderer: {
     invoke: mockInvoke,
     on: mockOn,
+    send: mockSend,
     removeListener: mockRemoveListener,
   },
 }), { virtual: true });
@@ -156,13 +158,56 @@ describe('preload.ts', () => {
     it('onPlaylistUpdate should register listener on playlist-update channel', () => {
       const callback = jest.fn();
       exposedApi.onPlaylistUpdate(callback);
-      expect(mockOn).toHaveBeenCalledWith('playlist-update', callback);
+      expect(mockOn).toHaveBeenCalledWith('playlist-update', expect.any(Function));
+    });
+
+    it('onPlaylistUpdate should unwrap playlist payload and acknowledge application', () => {
+      const callback = jest.fn((_event, _playlist, ack) => ack({ ok: true }));
+      exposedApi.onPlaylistUpdate(callback);
+
+      const listener = mockOn.mock.calls.find((call) => call[0] === 'playlist-update')?.[1];
+      listener({}, {
+        requestId: 'request-1',
+        playlist: { id: 'playlist-1' },
+      });
+
+      expect(callback).toHaveBeenCalledWith(
+        {},
+        { id: 'playlist-1' },
+        expect.any(Function),
+      );
+      expect(mockSend).toHaveBeenCalledWith('playlist-update-applied', {
+        requestId: 'request-1',
+        ok: true,
+      });
     });
 
     it('onCommand should register listener on command channel', () => {
       const callback = jest.fn();
       exposedApi.onCommand(callback);
-      expect(mockOn).toHaveBeenCalledWith('command', callback);
+      expect(mockOn).toHaveBeenCalledWith('command', expect.any(Function));
+    });
+
+    it('onCommand should unwrap command payload and acknowledge application', () => {
+      const callback = jest.fn((_event, _command, ack) => ack({ ok: false, error: 'failed' }));
+      exposedApi.onCommand(callback);
+
+      const listener = mockOn.mock.calls.find((call) => call[0] === 'command')?.[1];
+      listener({}, {
+        requestId: 'command-1',
+        command: { type: 'reload' },
+      });
+
+      expect(callback).toHaveBeenCalledWith(
+        {},
+        { type: 'reload' },
+        expect.any(Function),
+      );
+      expect(mockSend).toHaveBeenCalledWith('command-applied', {
+        requestId: 'command-1',
+        ok: false,
+        error: 'failed',
+      });
     });
 
     it('onError should register listener on error channel', () => {

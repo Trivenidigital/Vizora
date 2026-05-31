@@ -16,8 +16,16 @@ declare global {
       cacheClear: () => Promise<{ success: boolean }>;
       onPairingRequired: (callback: () => void) => void;
       onPaired: (callback: (event: any, token: string) => void) => void;
-      onPlaylistUpdate: (callback: (event: any, playlist: any) => void) => void;
-      onCommand: (callback: (event: any, command: any) => void) => void;
+      onPlaylistUpdate: (callback: (
+        event: any,
+        playlist: any,
+        ack?: (response?: { ok: boolean; error?: string }) => void,
+      ) => void) => void;
+      onCommand: (callback: (
+        event: any,
+        command: any,
+        ack?: (response?: { ok: boolean; error?: string }) => void,
+      ) => void) => void;
       onError: (callback: (event: any, error: any) => void) => void;
       removeListener: (channel: string, callback: any) => void;
     };
@@ -75,20 +83,34 @@ class DisplayApp {
       }
     });
 
-    window.electronAPI.onPlaylistUpdate((_, playlist) => {
+    window.electronAPI.onPlaylistUpdate((_, playlist, ack) => {
       console.log('[App] Received playlist update:', playlist);
-      // If we receive a playlist update, we're connected - hide pairing if shown, show content
-      if (this.isPairingScreenShown) {
-        console.log('[App] Hiding pairing screen due to playlist update');
-        this.hidePairingScreen();
+      try {
+        // If we receive a playlist update, we're connected - hide pairing if shown, show content
+        if (this.isPairingScreenShown) {
+          console.log('[App] Hiding pairing screen due to playlist update');
+          this.hidePairingScreen();
+        }
+        this.showContentScreen();
+        this.updatePlaylist(playlist);
+        ack?.({ ok: true });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to apply playlist';
+        console.error('[App] Failed to apply playlist update:', message);
+        ack?.({ ok: false, error: message });
       }
-      this.showContentScreen();
-      this.updatePlaylist(playlist);
     });
 
-    window.electronAPI.onCommand((_, command) => {
+    window.electronAPI.onCommand((_, command, ack) => {
       console.log('Received command:', command);
-      this.handleCommand(command);
+      try {
+        this.handleCommand(command);
+        ack?.({ ok: true });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to apply command';
+        console.error('[App] Failed to apply command:', message);
+        ack?.({ ok: false, error: message });
+      }
     });
 
     window.electronAPI.onError((_, error) => {

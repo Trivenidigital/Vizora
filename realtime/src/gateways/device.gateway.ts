@@ -61,6 +61,17 @@ type AuthPayload =
   | { kind: 'device'; payload: DevicePayload }
   | { kind: 'user'; payload: UserPayload };
 
+interface DeliveryAck {
+  ok?: boolean;
+  error?: string;
+}
+
+interface DeliveryResult {
+  delivered: boolean;
+  reason?: string;
+  legacy?: boolean;
+}
+
 @WebSocketGateway({
   cors: {
     origin: process.env.CORS_ORIGIN?.split(',').map(s => s.trim()) || ['http://localhost:3001'],
@@ -104,6 +115,56 @@ export class DeviceGateway
 
   // Interval handles for cleanup (stored for proper teardown)
   private cleanupIntervals: ReturnType<typeof setInterval>[] = [];
+
+  private getAckError(ack?: DeliveryAck): string | null {
+    return ack?.ok === false ? ack.error || 'negative_ack' : null;
+  }
+
+  private supportsDeliveryAck(client: { data?: Record<string, any>; handshake?: { auth?: any } }): boolean {
+    if (client.data?.deliveryAckCapable === true) {
+      return true;
+    }
+
+    const capabilities = client.data?.capabilities ?? client.handshake?.auth?.capabilities;
+    if (Array.isArray(capabilities)) {
+      return capabilities.includes('deliveryAck');
+    }
+
+    return capabilities?.deliveryAck === true;
+  }
+
+  private async emitWithDeliveryAck(
+    socket: { id?: string; data?: Record<string, any>; emit: Function },
+    event: 'playlist:update' | 'command',
+    payload: unknown,
+  ): Promise<DeliveryResult> {
+    if (!this.supportsDeliveryAck(socket)) {
+      socket.emit(event, payload);
+      return { delivered: true, legacy: true };
+    }
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('ack_timeout')), 10000);
+        socket.emit(event, payload, (ack?: DeliveryAck) => {
+          clearTimeout(timeout);
+          const ackError = this.getAckError(ack);
+          if (ackError) {
+            reject(new Error(ackError));
+            return;
+          }
+          resolve();
+        });
+      });
+      return { delivered: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'ack_timeout';
+      return {
+        delivered: false,
+        reason: message === 'ack_timeout' ? 'ack_timeout' : 'negative_ack',
+      };
+    }
+  }
 
   constructor(
     private jwtService: JwtService,
@@ -491,6 +552,8 @@ export class DeviceGateway
         client.data.deviceId = deviceId;
         client.data.organizationId = payload.organizationId;
         client.data.deviceIdentifier = payload.deviceIdentifier;
+        client.data.capabilities = client.handshake.auth?.capabilities;
+        client.data.deliveryAckCapable = this.supportsDeliveryAck(client);
 
         // Auto-rotate device token if it expires within 14 days.
         // NOTE: The old token remains valid until natural expiry (stateless JWT limitation).
@@ -737,13 +800,7 @@ export class DeviceGateway
 
     // Deliver any commands that were queued while the device was offline
     try {
-      const pendingCommands = await this.redisService.getDeviceCommands(deviceId);
-      if (pendingCommands.length > 0) {
-        this.logger.log(`Delivering ${pendingCommands.length} pending command(s) to device ${deviceId}`);
-        for (const cmd of pendingCommands) {
-          client.emit('command', cmd);
-        }
-      }
+      await this.deliverPendingCommands(client, deviceId);
     } catch (cmdError: unknown) {
       const cmdErrorMsg = cmdError instanceof Error ? cmdError.message : 'Unknown error';
       this.logger.error(`Failed to deliver pending commands to device ${deviceId}: ${cmdErrorMsg}`);
@@ -1005,16 +1062,13 @@ export class DeviceGateway
         );
       }
 
-      // Check for pending commands
-      const commands = await this.redisService.getDeviceCommands(deviceId);
-
       // Record successful heartbeat with duration
       const duration = (Date.now() - startTime) / 1000;
       this.metricsService.recordHeartbeat(deviceId, true, duration);
 
       return createSuccessResponse({
         nextHeartbeatIn: 15000,
-        commands: commands || [],
+        commands: [],
       });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -1162,23 +1216,38 @@ export class DeviceGateway
       qrOverlay: configMetadata.qrOverlay || null,
     });
 
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('ack_timeout')), 10000);
-        client.emit('playlist:update', {
-          playlist: pendingPlaylist,
-          timestamp: new Date().toISOString(),
-        }, () => {
-          clearTimeout(timeout);
-          resolve();
-        });
-      });
-      this.logger.log(`Pending playlist delivered to device ${deviceId} (acknowledged)`);
-    } catch {
-      this.logger.warn(`Pending playlist ack timeout for device ${deviceId} — re-queuing`);
+    const result = await this.emitWithDeliveryAck(client, 'playlist:update', {
+      playlist: pendingPlaylist,
+      timestamp: new Date().toISOString(),
+    });
+
+    if (result.delivered) {
+      this.logger.log(
+        result.legacy
+          ? `Pending playlist delivered to legacy device ${deviceId} (best-effort)`
+          : `Pending playlist delivered to device ${deviceId} (acknowledged)`,
+      );
+    } else {
+      this.logger.warn(`Pending playlist ${result.reason || 'delivery failure'} for device ${deviceId} - re-queuing`);
       await this.redisService.setPendingPlaylist(deviceId, pendingPlaylist);
     }
     return true;
+  }
+
+  private async deliverPendingCommands(client: Socket, deviceId: string): Promise<void> {
+    const pendingCommands = await this.redisService.getDeviceCommands(deviceId);
+    if (pendingCommands.length === 0) {
+      return;
+    }
+
+    this.logger.log(`Delivering ${pendingCommands.length} pending command(s) to device ${deviceId}`);
+    for (const cmd of pendingCommands) {
+      const result = await this.emitWithDeliveryAck(client, 'command', cmd);
+      if (!result.delivered) {
+        this.logger.warn(`Pending command ${cmd.type} ${result.reason || 'delivery failure'} for device ${deviceId} - re-queuing`);
+        await this.redisService.addDeviceCommand(deviceId, cmd);
+      }
+    }
   }
 
   // Admin methods (called from API)
@@ -1212,28 +1281,25 @@ export class DeviceGateway
     // Use Socket.IO acknowledgment with 10s timeout — try all sockets,
     // succeed if at least one acknowledges
     let anyAcknowledged = false;
+    let failureReason = 'ack_timeout';
     for (const socket of sockets) {
-      try {
-        await new Promise<void>((resolve, reject) => {
-          const timeout = setTimeout(() => reject(new Error('ack_timeout')), 10000);
-          socket.emit('playlist:update', {
-            playlist: resolvedPlaylist,
-            timestamp: new Date().toISOString(),
-          }, () => {
-            clearTimeout(timeout);
-            resolve();
-          });
-        });
+      const result = await this.emitWithDeliveryAck(socket as any, 'playlist:update', {
+        playlist: resolvedPlaylist,
+        timestamp: new Date().toISOString(),
+      });
+      if (result.delivered) {
         anyAcknowledged = true;
-      } catch {
-        this.logger.warn(`pushPlaylist: ack timeout for socket ${socket.id} on device ${deviceId}`);
+        continue;
       }
+
+      failureReason = result.reason || 'ack_timeout';
+      this.logger.warn(`pushPlaylist: ${failureReason} for socket ${socket.id} on device ${deviceId}`);
     }
 
     if (!anyAcknowledged) {
       this.logger.warn(`pushPlaylist: all sockets timed out for device ${deviceId} — queuing for reconnect`);
       await this.redisService.setPendingPlaylist(deviceId, resolvedPlaylist);
-      return { delivered: false, reason: 'ack_timeout' };
+      return { delivered: false, reason: failureReason };
     }
 
     this.logger.log(`Sent playlist update to device: ${deviceId} (acknowledged)`);
@@ -1252,25 +1318,22 @@ export class DeviceGateway
     }
 
     let anyAcknowledged = false;
+    let failureReason = 'ack_timeout';
     for (const socket of sockets) {
-      try {
-        await new Promise<void>((resolve, reject) => {
-          const timeout = setTimeout(() => reject(new Error('ack_timeout')), 10000);
-          socket.emit('command', commandWithTimestamp, () => {
-            clearTimeout(timeout);
-            resolve();
-          });
-        });
+      const result = await this.emitWithDeliveryAck(socket as any, 'command', commandWithTimestamp);
+      if (result.delivered) {
         anyAcknowledged = true;
-      } catch {
-        this.logger.warn(`sendCommand: ack timeout for socket ${socket.id} on device ${deviceId}`);
+        continue;
       }
+
+      failureReason = result.reason || 'ack_timeout';
+      this.logger.warn(`sendCommand: ${failureReason} for socket ${socket.id} on device ${deviceId}`);
     }
 
     if (!anyAcknowledged) {
       this.logger.warn(`sendCommand: all sockets timed out for device ${deviceId} — queuing`);
       await this.redisService.addDeviceCommand(deviceId, commandWithTimestamp);
-      return { delivered: false, reason: 'ack_timeout' };
+      return { delivered: false, reason: failureReason };
     }
 
     this.logger.log(`Sent command ${command.type} to device: ${deviceId} (acknowledged)`);

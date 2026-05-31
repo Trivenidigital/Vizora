@@ -89,6 +89,8 @@ describe('DeviceGateway', () => {
 
   // Mock socket that auto-invokes ack callbacks on emit
   const mockRemoteSocket = {
+    id: 'remote-socket-1',
+    data: { deliveryAckCapable: true },
     emit: jest.fn((_event: string, _data: any, ackCb?: () => void) => {
       if (ackCb) ackCb();
     }),
@@ -422,6 +424,16 @@ describe('DeviceGateway', () => {
       expect(mockHeartbeatService.processHeartbeat).toHaveBeenCalled();
     });
 
+    it('should not drain queued commands through heartbeat responses', async () => {
+      const client = createMockSocket();
+
+      const result = await gateway.handleHeartbeat(client as any, {} as any);
+
+      expect(result.success).toBe(true);
+      expect(result.data.commands).toEqual([]);
+      expect(mockRedisService.getDeviceCommands).not.toHaveBeenCalled();
+    });
+
     it('should not write to DB when status has not changed', async () => {
       // Pre-set the status cache to 'online'
       (gateway as any).deviceStatusCache.set('device-1', 'online');
@@ -728,6 +740,46 @@ describe('DeviceGateway', () => {
 
       expect(result).toEqual({ delivered: false, reason: 'no_sockets' });
     });
+
+    it('should requeue playlist when the device sends a negative ack', async () => {
+      mockRemoteSocket.emit.mockImplementationOnce(
+        (_event: string, _data: any, ackCb?: (ack?: { ok: boolean; error?: string }) => void) => {
+          ackCb?.({ ok: false, error: 'renderer failed' });
+        },
+      );
+      const playlist = { id: 'p-1', name: 'Test', items: [] };
+
+      const result = await gateway.sendPlaylistUpdate('device-1', playlist as any);
+
+      expect(result).toEqual({ delivered: false, reason: 'negative_ack' });
+      expect(mockRedisService.setPendingPlaylist).toHaveBeenCalledWith(
+        'device-1',
+        expect.objectContaining({ id: 'p-1' }),
+      );
+    });
+
+    it('should treat no-ack legacy sockets as best-effort delivered', async () => {
+      const legacySocket = {
+        id: 'legacy-socket',
+        data: { deliveryAckCapable: false },
+        emit: jest.fn(),
+      };
+      mockServer.in.mockReturnValueOnce({
+        fetchSockets: jest.fn().mockResolvedValue([legacySocket]),
+      });
+      const playlist = { id: 'p-legacy', name: 'Legacy', items: [] };
+
+      const result = await gateway.sendPlaylistUpdate('device-1', playlist as any);
+
+      expect(result).toEqual({ delivered: true });
+      expect(legacySocket.emit).toHaveBeenCalledWith(
+        'playlist:update',
+        expect.objectContaining({
+          playlist: expect.objectContaining({ id: 'p-legacy' }),
+        }),
+      );
+      expect(mockRedisService.setPendingPlaylist).not.toHaveBeenCalled();
+    });
   });
 
   describe('sendCommand', () => {
@@ -758,6 +810,44 @@ describe('DeviceGateway', () => {
         'device-99',
         expect.objectContaining({ type: 'clear_cache', timestamp: expect.any(String) }),
       );
+    });
+
+    it('should queue command when the device sends a negative ack', async () => {
+      mockRemoteSocket.emit.mockImplementationOnce(
+        (_event: string, _data: any, ackCb?: (ack?: { ok: boolean; error?: string }) => void) => {
+          ackCb?.({ ok: false, error: 'command failed' });
+        },
+      );
+      const command = { type: 'reload' as any };
+
+      const result = await gateway.sendCommand('device-1', command);
+
+      expect(result).toEqual({ delivered: false, reason: 'negative_ack' });
+      expect(mockRedisService.addDeviceCommand).toHaveBeenCalledWith(
+        'device-1',
+        expect.objectContaining({ type: 'reload', timestamp: expect.any(String) }),
+      );
+    });
+
+    it('should treat no-ack legacy sockets as best-effort delivered for commands', async () => {
+      const legacySocket = {
+        id: 'legacy-socket',
+        data: { deliveryAckCapable: false },
+        emit: jest.fn(),
+      };
+      mockServer.in.mockReturnValueOnce({
+        fetchSockets: jest.fn().mockResolvedValue([legacySocket]),
+      });
+      const command = { type: 'reload' as any };
+
+      const result = await gateway.sendCommand('device-1', command);
+
+      expect(result).toEqual({ delivered: true });
+      expect(legacySocket.emit).toHaveBeenCalledWith(
+        'command',
+        expect.objectContaining({ type: 'reload', timestamp: expect.any(String) }),
+      );
+      expect(mockRedisService.addDeviceCommand).not.toHaveBeenCalled();
     });
   });
 
