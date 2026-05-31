@@ -59,6 +59,31 @@ describe('WebSocket auth guards', () => {
       expect(client.disconnect).toHaveBeenCalledWith(true);
     });
 
+    it('should reject device sockets when the stored token hash is malformed', async () => {
+      databaseService.display.findUnique.mockResolvedValueOnce({
+        id: 'device-1',
+        organizationId: 'org-1',
+        isDisabled: false,
+        jwtToken: 'legacy-plaintext-token',
+      } as any);
+      const guard = new WsDeviceGuard(databaseService);
+      const client = {
+        id: 'socket-1',
+        data: {
+          deviceId: 'device-1',
+          organizationId: 'org-1',
+          deviceTokenHash: hashToken('valid-token'),
+        },
+        emit: jest.fn(),
+        disconnect: jest.fn(),
+      };
+
+      await expect(guard.canActivate(createContext(client))).rejects.toThrow(WsException);
+
+      expect(client.emit).toHaveBeenCalledWith('error', { message: 'device_token_stale' });
+      expect(client.disconnect).toHaveBeenCalledWith(true);
+    });
+
     it('should allow device sockets whose token hash is still current', async () => {
       const guard = new WsDeviceGuard(databaseService);
       const client = {
@@ -76,8 +101,7 @@ describe('WebSocket auth guards', () => {
       expect(client.disconnect).not.toHaveBeenCalled();
     });
 
-    it('should reuse a fresh token validation within the short guard cache window', async () => {
-      jest.spyOn(Date, 'now').mockReturnValue(1_000);
+    it('should revalidate every guarded device message so re-pair invalidates immediately', async () => {
       const guard = new WsDeviceGuard(databaseService);
       const client = {
         id: 'socket-1',
@@ -91,10 +115,17 @@ describe('WebSocket auth guards', () => {
       };
 
       await expect(guard.canActivate(createContext(client))).resolves.toBe(true);
-      await expect(guard.canActivate(createContext(client))).resolves.toBe(true);
+      databaseService.display.findUnique.mockResolvedValueOnce({
+        id: 'device-1',
+        organizationId: 'org-1',
+        isDisabled: false,
+        jwtToken: hashToken('new-current-token'),
+      } as any);
+      await expect(guard.canActivate(createContext(client))).rejects.toThrow(WsException);
 
-      expect(databaseService.display.findUnique).toHaveBeenCalledTimes(1);
-      jest.restoreAllMocks();
+      expect(databaseService.display.findUnique).toHaveBeenCalledTimes(2);
+      expect(client.emit).toHaveBeenCalledWith('error', { message: 'device_token_stale' });
+      expect(client.disconnect).toHaveBeenCalledWith(true);
     });
   });
 });

@@ -1514,12 +1514,19 @@ describe('DeviceGateway', () => {
   describe('broadcastToOrganization', () => {
     it('should broadcast event to org room', async () => {
       const data = { message: 'hello' };
+      const dashboardSocket = {
+        id: 'dashboard-1',
+        data: { isDashboard: true, userId: 'user-1', organizationId: 'org-1' },
+        emit: jest.fn(),
+      };
+      mockServer.in.mockReturnValueOnce({
+        fetchSockets: jest.fn().mockResolvedValue([dashboardSocket]),
+      });
 
       await gateway.broadcastToOrganization('org-1', 'announcement', data);
 
-      expect(mockServer.to).toHaveBeenCalledWith('org:org-1');
-      const emitFn = mockServer.to('org:org-1').emit;
-      expect(emitFn).toHaveBeenCalledWith(
+      expect(mockServer.in).toHaveBeenCalledWith('org:org-1');
+      expect(dashboardSocket.emit).toHaveBeenCalledWith(
         'announcement',
         expect.objectContaining({ message: 'hello' }),
       );
@@ -1527,12 +1534,19 @@ describe('DeviceGateway', () => {
 
     it('should pass through event name and include timestamp', async () => {
       const data = { key: 'value' };
+      const dashboardSocket = {
+        id: 'dashboard-2',
+        data: { isDashboard: true, userId: 'user-2', organizationId: 'org-2' },
+        emit: jest.fn(),
+      };
+      mockServer.in.mockReturnValueOnce({
+        fetchSockets: jest.fn().mockResolvedValue([dashboardSocket]),
+      });
 
       await gateway.broadcastToOrganization('org-2', 'custom:event', data);
 
-      expect(mockServer.to).toHaveBeenCalledWith('org:org-2');
-      const emitFn = mockServer.to('org:org-2').emit;
-      expect(emitFn).toHaveBeenCalledWith(
+      expect(mockServer.in).toHaveBeenCalledWith('org:org-2');
+      expect(dashboardSocket.emit).toHaveBeenCalledWith(
         'custom:event',
         expect.objectContaining({
           key: 'value',
@@ -1748,9 +1762,8 @@ describe('DeviceGateway', () => {
 
       await gateway.handleScreenshotResponse(client as any, data as any);
 
-      expect(mockServer.to).toHaveBeenCalledWith('org:org-1');
-      const emitFn = mockServer.to('org:org-1').emit;
-      expect(emitFn).toHaveBeenCalledWith(
+      expect(mockServer.in).toHaveBeenCalledWith('org:org-1');
+      expect(mockRemoteSocket.emit).toHaveBeenCalledWith(
         'screenshot:ready',
         expect.objectContaining({
           deviceId: 'device-1',
@@ -1823,6 +1836,39 @@ describe('DeviceGateway', () => {
       expect(staleSocket.emit).not.toHaveBeenCalledWith(
         'qr-overlay:update',
         expect.objectContaining({ qrOverlay }),
+      );
+    });
+
+    it('should skip stale device sockets in org-room broadcasts', async () => {
+      const dashboardSocket = {
+        id: 'dashboard-1',
+        data: { isDashboard: true, userId: 'user-1', organizationId: 'org-1' },
+        emit: jest.fn(),
+      };
+      const staleDeviceSocket = createDeliverySocket('stale-socket', { token: 'stale-device-token' });
+      staleDeviceSocket.disconnect = jest.fn();
+      mockDatabaseService.display.findUnique.mockResolvedValueOnce({
+        id: 'device-1',
+        organizationId: 'org-1',
+        isDisabled: false,
+        jwtToken: hashToken('current-device-token'),
+      });
+      (gateway as any).deviceSockets.set('device-1', 'stale-socket');
+      mockServer.in.mockReturnValueOnce({
+        fetchSockets: jest.fn().mockResolvedValue([dashboardSocket, staleDeviceSocket]),
+      });
+
+      await gateway.broadcastToOrganization('org-1', 'announcement', { message: 'hello' });
+
+      expect(dashboardSocket.emit).toHaveBeenCalledWith(
+        'announcement',
+        expect.objectContaining({ message: 'hello' }),
+      );
+      expect(staleDeviceSocket.emit).toHaveBeenCalledWith('error', { message: 'device_token_stale' });
+      expect(staleDeviceSocket.disconnect).toHaveBeenCalledWith(true);
+      expect(staleDeviceSocket.emit).not.toHaveBeenCalledWith(
+        'announcement',
+        expect.objectContaining({ message: 'hello' }),
       );
     });
   });

@@ -229,6 +229,25 @@ describe('DeviceContentController', () => {
       expect(mockStorageService.getObject).not.toHaveBeenCalled();
     });
 
+    it('should reject a signed device JWT when the stored token hash is malformed', async () => {
+      const req = createMockRequest('valid-device-token');
+      const res = createMockResponse();
+      mockJwtService.verify.mockReturnValue(validDevicePayload);
+      mockDatabaseService.display.findUnique.mockResolvedValueOnce({
+        id: deviceId,
+        organizationId,
+        isDisabled: false,
+        jwtToken: 'legacy-plaintext-token',
+      });
+
+      await expect(controller.serveFile(contentId, req, res)).rejects.toThrow(
+        UnauthorizedException,
+      );
+
+      expect(mockContentService.findByIdForDevice).not.toHaveBeenCalled();
+      expect(mockStorageService.getObject).not.toHaveBeenCalled();
+    });
+
     it('should serve content file with valid device JWT from query parameter', async () => {
       const req = createMockRequest(undefined, 'valid-query-token');
       const res = createMockResponse();

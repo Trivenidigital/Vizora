@@ -4,8 +4,6 @@ import { Socket } from 'socket.io';
 import { DatabaseService } from '../../database/database.service';
 import { isCurrentDeviceToken } from '../device-token-hash';
 
-const DEVICE_TOKEN_REVALIDATION_CACHE_MS = 1000;
-
 /**
  * Defense-in-depth guard for WebSocket message handlers.
  * Verifies that client.data was populated during connection authentication.
@@ -47,16 +45,6 @@ export class WsDeviceGuard implements CanActivate {
       throw new WsException('Device-only endpoint');
     }
 
-    const validatedAt = client.data.deviceTokenValidatedAt;
-    const validatedHash = client.data.deviceTokenValidatedHash;
-    if (
-      typeof validatedAt === 'number' &&
-      validatedHash === client.data.deviceTokenHash &&
-      Date.now() - validatedAt <= DEVICE_TOKEN_REVALIDATION_CACHE_MS
-    ) {
-      return true;
-    }
-
     const display = await this.databaseService.display.findUnique({
       where: { id: client.data.deviceId },
       select: { organizationId: true, isDisabled: true, jwtToken: true },
@@ -73,9 +61,6 @@ export class WsDeviceGuard implements CanActivate {
       client.disconnect(true);
       throw new WsException('Device token stale');
     }
-
-    client.data.deviceTokenValidatedAt = Date.now();
-    client.data.deviceTokenValidatedHash = client.data.deviceTokenHash;
 
     return true;
   }

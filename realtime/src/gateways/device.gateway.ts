@@ -245,6 +245,47 @@ export class DeviceGateway
     return currentSockets;
   }
 
+  private isDashboardSocket(client: { data?: Record<string, any> }): boolean {
+    return client.data?.isDashboard === true || Boolean(client.data?.userId);
+  }
+
+  private async emitToOrganization(
+    organizationId: string,
+    event: string,
+    data: Record<string, any>,
+  ): Promise<number> {
+    const allSockets = await this.server.in(`org:${organizationId}`).fetchSockets();
+    let emitted = 0;
+
+    for (const socket of allSockets as Array<{
+      id?: string;
+      data?: Record<string, any>;
+      emit?: (...args: any[]) => void;
+      disconnect?: (close?: boolean) => void;
+    }>) {
+      if (socket.data?.organizationId !== organizationId) {
+        continue;
+      }
+
+      if (this.isDashboardSocket(socket)) {
+        socket.emit?.(event, data);
+        emitted += 1;
+        continue;
+      }
+
+      const socketDeviceId = socket.data?.deviceId;
+      if (
+        typeof socketDeviceId === 'string' &&
+        await this.isCurrentDeliveryDeviceSocket(socket, socketDeviceId)
+      ) {
+        socket.emit?.(event, data);
+        emitted += 1;
+      }
+    }
+
+    return emitted;
+  }
+
   hasActiveDeviceSocket(deviceId: string): boolean {
     const socketId = this.deviceSockets.get(deviceId);
     return Boolean(socketId && this.server?.sockets?.sockets?.has(socketId));
@@ -1007,8 +1048,9 @@ export class DeviceGateway
           deviceName,
           orgId,
         );
-        // Emit notification to dashboard
-        this.server.to(`org:${orgId}`).emit('notification:new', {
+        // Emit notification to current org-room sockets. Stale device
+        // sockets are filtered/disconnected before any payload is sent.
+        await this.emitToOrganization(orgId, 'notification:new', {
           type: 'device_online',
           deviceId,
           deviceName,
@@ -1025,7 +1067,7 @@ export class DeviceGateway
 
     // Notify dashboard about device online status
     const now = new Date().toISOString();
-    this.server.to(`org:${orgId}`).emit('device:status', {
+    await this.emitToOrganization(orgId, 'device:status', {
       deviceId,
       status: 'online',
       lastSeen: now,
@@ -1171,14 +1213,12 @@ export class DeviceGateway
           this.metricsService.updateDeviceStatus(deviceId, orgId, 'offline');
 
           const now = new Date().toISOString();
-          this.server
-            .to(`org:${orgId}`)
-            .emit('device:status', {
-              deviceId,
-              status: 'offline',
-              lastSeen: now,
-              timestamp: now,
-            });
+          await this.emitToOrganization(orgId, 'device:status', {
+            deviceId,
+            status: 'offline',
+            lastSeen: now,
+            timestamp: now,
+          });
         }
       }
     } catch (error: unknown) {
@@ -1620,12 +1660,12 @@ export class DeviceGateway
   }
 
   async broadcastToOrganization(organizationId: string, event: string, data: BroadcastData): Promise<void> {
-    this.server.to(`org:${organizationId}`).emit(event, {
+    const emitted = await this.emitToOrganization(organizationId, event, {
       ...data,
       timestamp: new Date().toISOString(),
     });
 
-    this.logger.log(`Broadcast ${event} to organization: ${organizationId}`);
+    this.logger.log(`Broadcast ${event} to ${emitted} socket(s) in organization: ${organizationId}`);
   }
 
   /**
@@ -1837,7 +1877,7 @@ export class DeviceGateway
       this.logger.log(`Screenshot saved for device ${deviceId}: ${objectKey}`);
 
       // Emit screenshot:ready event to organization room so dashboard can update
-      this.server.to(`org:${organizationId}`).emit('screenshot:ready', {
+      await this.emitToOrganization(organizationId, 'screenshot:ready', {
         deviceId,
         requestId: data.requestId,
         url: presignedUrl,

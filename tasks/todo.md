@@ -27,6 +27,7 @@
 - [x] Implement current-hash validation in middleware and realtime.
 - [x] Add connected-socket current-hash revalidation in `WsDeviceGuard`.
 - [x] Add server-push current-hash revalidation for playlist, command, and QR-overlay delivery.
+- [x] Add organization-room broadcast current-hash filtering for stale device sockets.
 - [x] Exempt public device endpoints from subscription guard pre-emption before device JWT validation.
 - [x] Disable unsafe realtime auto-rotation until a grace/ACK-backed rotation design exists.
 - [x] Run focused verification.
@@ -49,6 +50,8 @@
 - [x] `pnpm --filter @vizora/realtime test -- --runInBand --testPathPattern="device.gateway|ws-auth.guard"` - pass, 3 suites / 102 tests.
 - [x] Second review-fix run: realtime server-push stale-socket tests and subscription public-endpoint test added; `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="subscription-active.guard|displays.controller|schedules.controller|device-content.controller"` - pass, 4 suites / 88 tests.
 - [x] `pnpm --filter @vizora/realtime test -- --runInBand --testPathPattern="device.gateway|ws-auth.guard"` - pass after server-push revalidation, 3 suites / 106 tests.
+- [x] Final review-fix run: malformed-hash tests added, `WsDeviceGuard` cache removed, org-room broadcasts filtered. `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="subscription-active.guard|displays.controller|schedules.controller|device-content.controller"` - pass, 4 suites / 89 tests.
+- [x] `pnpm --filter @vizora/realtime test -- --runInBand --testPathPattern="device.gateway|ws-auth.guard|app.controller"` - pass, 4 suites / 117 tests.
 
 ---
 
