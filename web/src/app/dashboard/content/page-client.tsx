@@ -99,6 +99,7 @@ export default function ContentClient() {
  const [contentPage, setContentPage] = useState(1);
  const [loading, setLoading] = useState(true);
  const [selectedContent, setSelectedContent] = useState<Content | null>(null);
+ const [contentDetailLoadingId, setContentDetailLoadingId] = useState<string | null>(null);
  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -161,6 +162,12 @@ export default function ContentClient() {
  // Real-time event handling
  const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
  const loadContentRequestRef = useRef(0);
+ const contentDetailRequestRef = useRef(0);
+ const contentDetailPromiseRef = useRef<{
+ id: string;
+ requestId: number;
+ promise: Promise<Content | null>;
+ } | null>(null);
  const devicesLoadedRef = useRef(false);
  const playlistsLoadedRef = useRef(false);
  const devicesLoadPromiseRef = useRef<Promise<void> | null>(null);
@@ -278,6 +285,57 @@ export default function ContentClient() {
   }
   }
   }, [buildContentListParams, contentFilterKey, contentPage, selectedFolderId, showToast]);
+
+ const invalidateContentDetailRequest = useCallback(() => {
+ contentDetailRequestRef.current += 1;
+ contentDetailPromiseRef.current = null;
+ setContentDetailLoadingId(null);
+ }, []);
+
+  const loadContentDetail = useCallback(async (item: Content) => {
+ const existingRequest = contentDetailPromiseRef.current;
+ if (existingRequest?.id === item.id) {
+ setSelectedContent(item);
+ return existingRequest.promise;
+ }
+ const requestId = ++contentDetailRequestRef.current;
+ setSelectedContent(item);
+ setContentDetailLoadingId(item.id);
+ const promise = (async () => {
+ try {
+ const detail = await apiClient.getContentItem(item.id);
+ if (requestId !== contentDetailRequestRef.current) {
+ return null;
+ }
+ setSelectedContent(detail);
+ return detail;
+ } catch (error) {
+ if (requestId === contentDetailRequestRef.current) {
+ toast.error(error instanceof Error ? error.message : 'Failed to load content details');
+ }
+ return null;
+ } finally {
+ if (contentDetailPromiseRef.current?.requestId === requestId) {
+ contentDetailPromiseRef.current = null;
+ }
+ if (requestId === contentDetailRequestRef.current) {
+ setContentDetailLoadingId(null);
+ }
+  }
+ })();
+ contentDetailPromiseRef.current = {
+ id: item.id,
+ requestId,
+ promise,
+ };
+ return promise;
+ }, [toast]);
+
+ useEffect(() => {
+ invalidateContentDetailRequest();
+ setIsPreviewModalOpen(false);
+ setIsReviewModalOpen(false);
+ }, [contentFilterKey, contentPage, invalidateContentDetailRequest]);
 
  const loadFolders = useCallback(async () => {
  try {
@@ -570,20 +628,38 @@ export default function ContentClient() {
  };
 
  const handlePreview = (item: Content) => {
- setSelectedContent(item);
+ if (hasPendingDetailLoad(item.id)) {
+ return;
+ }
+ setIsPreviewModalOpen(false);
+ void (async () => {
+ const detail = await loadContentDetail(item);
+ if (detail) {
  setIsPreviewModalOpen(true);
+ }
+ })();
  };
 
  const handleEdit = (item: Content) => {
- setSelectedContent(item);
+ if (hasPendingDetailLoad(item.id)) {
+ return;
+ }
+ setIsEditModalOpen(false);
+ void (async () => {
+ const detail = await loadContentDetail(item);
+ if (!detail) {
+ return;
+ }
+ setSelectedContent(detail);
  setUploadForm({
- title: item.title,
- type: item.type as 'image' | 'video' | 'pdf' | 'url',
- url: item.url || '',
+ title: detail.title,
+ type: detail.type as UploadFormType,
+ url: detail.url || '',
  file: null,
  });
  setFormErrors({});
  setIsEditModalOpen(true);
+ })();
  };
 
  const handleSaveEdit = async () => {
@@ -644,6 +720,7 @@ export default function ContentClient() {
  };
 
  const handleDelete = (item: Content) => {
+ invalidateContentDetailRequest();
  setSelectedContent(item);
  setIsDeleteModalOpen(true);
  };
@@ -698,6 +775,7 @@ export default function ContentClient() {
  };
 
  const handlePushToDevice = (item: Content) => {
+ invalidateContentDetailRequest();
  setSelectedContent(item);
  setSelectedDevices([]);
  setPushDuration(5);
@@ -727,6 +805,7 @@ export default function ContentClient() {
  };
 
  const handleAddToPlaylist = (item: Content) => {
+ invalidateContentDetailRequest();
  setSelectedContent(item);
  setSelectedPlaylist('');
  setIsAddToPlaylistModalOpen(true);
@@ -751,6 +830,7 @@ export default function ContentClient() {
 
  // Moderation handlers
  const handleFlag = (item: Content) => {
+ invalidateContentDetailRequest();
  setSelectedContent(item);
  setFlagReason('');
  setIsFlagModalOpen(true);
@@ -774,9 +854,17 @@ export default function ContentClient() {
  };
 
  const handleReview = (item: Content) => {
- setSelectedContent(item);
+ if (hasPendingDetailLoad(item.id)) {
+ return;
+ }
  setReviewReason('');
+ setIsReviewModalOpen(false);
+ void (async () => {
+ const detail = await loadContentDetail(item);
+ if (detail) {
  setIsReviewModalOpen(true);
+ }
+ })();
  };
 
  const confirmReview = async (action: 'approve' | 'reject') => {
@@ -934,8 +1022,18 @@ export default function ContentClient() {
  });
 
  const filteredContent = content;
+ const isContentDetailLoading = (itemId: string) => contentDetailLoadingId === itemId;
+
+ const resetPendingDetailForListChange = () => {
+ invalidateContentDetailRequest();
+ setIsPreviewModalOpen(false);
+ setIsReviewModalOpen(false);
+ };
+
+ const hasPendingDetailLoad = (itemId: string) => contentDetailPromiseRef.current?.id === itemId;
 
  const clearAllFilters = () => {
+ resetPendingDetailForListChange();
  setFilterType('all');
  setFilterStatus('all');
  setFilterDateRange('all');
@@ -959,10 +1057,16 @@ export default function ContentClient() {
  const canGoToPreviousPage = contentMeta.page > 1;
  const canGoToNextPage = contentMeta.page < contentMeta.totalPages;
  const goToPreviousPage = () => {
- if (canGoToPreviousPage) setContentPage(page => Math.max(1, page - 1));
+ if (canGoToPreviousPage) {
+ resetPendingDetailForListChange();
+ setContentPage(page => Math.max(1, page - 1));
+ }
  };
  const goToNextPage = () => {
- if (canGoToNextPage) setContentPage(page => page + 1);
+ if (canGoToNextPage) {
+ resetPendingDetailForListChange();
+ setContentPage(page => page + 1);
+ }
  };
 
  return (
@@ -973,6 +1077,7 @@ export default function ContentClient() {
  folders={folders}
  selectedFolderId={selectedFolderId}
  onSelectFolder={(folderId) => {
+ resetPendingDetailForListChange();
  setSelectedFolderId(folderId);
  setSelectedItems(new Set());
  setContentPage(1);
@@ -1028,6 +1133,7 @@ export default function ContentClient() {
  <SearchFilter
  value={searchQuery}
  onChange={(value) => {
+ resetPendingDetailForListChange();
  setSearchQuery(value);
  setSelectedItems(new Set());
  }}
@@ -1041,6 +1147,7 @@ export default function ContentClient() {
  <button
  key={type}
  onClick={() => {
+ resetPendingDetailForListChange();
  setFilterType(type);
  setSelectedItems(new Set());
  setContentPage(1);
@@ -1089,6 +1196,7 @@ export default function ContentClient() {
  tags={tags}
  selectedTags={selectedTags}
  onChange={(tagIds) => {
+ resetPendingDetailForListChange();
  setSelectedTags(tagIds);
  setSelectedItems(new Set());
  setContentPage(1);
@@ -1097,6 +1205,7 @@ export default function ContentClient() {
  {selectedTags.length > 0 && (
  <button
  onClick={() => {
+ resetPendingDetailForListChange();
  setSelectedTags([]);
  setSelectedItems(new Set());
  setContentPage(1);
@@ -1116,6 +1225,7 @@ export default function ContentClient() {
  <div>
  <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">Status</label>
  <select value={filterStatus} onChange={(e) => {
+ resetPendingDetailForListChange();
  setFilterStatus(e.target.value);
  setSelectedItems(new Set());
  setContentPage(1);
@@ -1136,6 +1246,7 @@ export default function ContentClient() {
  <div>
  <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">Upload Date</label>
  <select value={filterDateRange} onChange={(e) => {
+ resetPendingDetailForListChange();
  setFilterDateRange(e.target.value as 'all' | '7days' | '30days' | '90days');
  setSelectedItems(new Set());
  setContentPage(1);
@@ -1173,6 +1284,7 @@ export default function ContentClient() {
  folders={folders}
  currentFolderId={selectedFolderId}
  onNavigate={(folderId) => {
+ resetPendingDetailForListChange();
  setSelectedFolderId(folderId);
  setSelectedItems(new Set());
  setContentPage(1);
@@ -1301,6 +1413,8 @@ export default function ContentClient() {
  tabIndex={0}
  aria-label={`Preview ${item.title}`}
  className="flex items-center gap-3 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--primary)] rounded"
+ aria-busy={isContentDetailLoading(item.id)}
+ aria-disabled={isContentDetailLoading(item.id)}
  onClick={() => handlePreview(item)}
  onKeyDown={(e) => {
  if (e.key === 'Enter' || e.key === ' ') {
@@ -1344,6 +1458,7 @@ export default function ContentClient() {
  {item.status === 'flagged' ? (
  <button
  onClick={() => handleReview(item)}
+ disabled={isContentDetailLoading(item.id)}
  className="eh-icon-btn text-amber-400"
  title="Review flagged content"
  >
@@ -1374,6 +1489,7 @@ export default function ContentClient() {
  </button>
  <button
  onClick={() => handleEdit(item)}
+ disabled={isContentDetailLoading(item.id)}
  className="eh-icon-btn"
  title="Edit"
  >
@@ -1402,6 +1518,8 @@ export default function ContentClient() {
  >
  <div
  className="aspect-video bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] flex items-center justify-center relative overflow-hidden cursor-pointer"
+ aria-busy={isContentDetailLoading(item.id)}
+ aria-disabled={isContentDetailLoading(item.id)}
  onClick={() => handlePreview(item)}
  title="Click to preview"
  >
@@ -1452,6 +1570,7 @@ export default function ContentClient() {
  {item.status === 'flagged' ? (
  <button
  onClick={() => handleReview(item)}
+ disabled={isContentDetailLoading(item.id)}
  className="eh-icon-btn text-sm py-2 rounded-lg font-medium flex items-center justify-center gap-1 text-amber-400 col-span-2"
  >
  <Icon name="shield" size="sm" />
@@ -1484,6 +1603,7 @@ export default function ContentClient() {
  </button>
  <button
  onClick={() => handleEdit(item)}
+ disabled={isContentDetailLoading(item.id)}
  className="eh-icon-btn text-sm py-2 rounded-lg font-medium flex items-center justify-center gap-1"
  >
  <Icon name="edit" size="sm" />

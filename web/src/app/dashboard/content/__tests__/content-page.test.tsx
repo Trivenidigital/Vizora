@@ -2,26 +2,31 @@ import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
 import ContentClient from '../page-client';
 
 const mockGetContent = jest.fn();
+const mockGetContentItem = jest.fn();
 const mockGetFolderContent = jest.fn();
 const mockGetFolders = jest.fn();
 const mockGetDisplays = jest.fn();
 const mockGetPlaylists = jest.fn();
 const mockDeleteContent = jest.fn();
+const mockUpdateContent = jest.fn();
 const mockUploadContent = jest.fn();
 const mockCreateContent = jest.fn();
 const mockUploadContentWithProgress = jest.fn();
 const mockGenerateThumbnail = jest.fn();
 const mockAddPlaylistItem = jest.fn();
+const mockValidateForm = jest.fn<Record<string, string>, [unknown, unknown]>(() => ({}));
 let lastDropzoneOptions: any;
 
 jest.mock('@/lib/api', () => ({
   apiClient: {
     getContent: (...args: any[]) => mockGetContent(...args),
+    getContentItem: (...args: any[]) => mockGetContentItem(...args),
     getFolderContent: (...args: any[]) => mockGetFolderContent(...args),
     getFolders: (...args: any[]) => mockGetFolders(...args),
     getDisplays: (...args: any[]) => mockGetDisplays(...args),
     getPlaylists: (...args: any[]) => mockGetPlaylists(...args),
     deleteContent: (...args: any[]) => mockDeleteContent(...args),
+    updateContent: (...args: any[]) => mockUpdateContent(...args),
     uploadContent: (...args: any[]) => mockUploadContent(...args),
     createContent: (...args: any[]) => mockCreateContent(...args),
     uploadContentWithProgress: (...args: any[]) => mockUploadContentWithProgress(...args),
@@ -76,7 +81,7 @@ jest.mock('@/lib/hooks', () => ({
 
 jest.mock('@/lib/validation', () => ({
   contentUploadSchema: { parse: jest.fn() },
-  validateForm: jest.fn(() => ({})),
+  validateForm: (schema: unknown, values: unknown) => mockValidateForm(schema, values),
 }));
 
 jest.mock('@/theme/icons', () => ({
@@ -111,7 +116,14 @@ jest.mock('@/components/Modal', () => {
 });
 
 jest.mock('@/components/PreviewModal', () => {
-  return function MockPreviewModal() { return null; };
+  return function MockPreviewModal({ isOpen, content }: any) {
+    return isOpen ? (
+      <div data-testid="preview-modal">
+        <span>{content?.title}</span>
+        <span data-testid="preview-url">{content?.url || ''}</span>
+      </div>
+    ) : null;
+  };
 });
 
 jest.mock('@/components/ConfirmDialog', () => {
@@ -209,20 +221,33 @@ const sampleContent = [
   },
 ];
 
+const createDeferred = <T,>() => {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, resolve, reject };
+};
+
 describe('ContentClient', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetContent.mockResolvedValue({ data: [], meta: { page: 1, limit: 50, total: 0, totalPages: 0 } });
+    mockGetContentItem.mockResolvedValue(sampleContent[0]);
     mockGetFolderContent.mockResolvedValue({ data: [], meta: { page: 1, limit: 50, total: 0, totalPages: 0 } });
     mockGetFolders.mockResolvedValue([]);
     mockGetDisplays.mockResolvedValue({ data: [] });
     mockGetPlaylists.mockResolvedValue({ data: [] });
     mockDeleteContent.mockResolvedValue({});
+    mockUpdateContent.mockResolvedValue(sampleContent[0]);
     mockUploadContent.mockResolvedValue({ id: 'new-1', title: 'New Content' });
     mockCreateContent.mockResolvedValue({ id: 'new-1', title: 'New Content' });
     mockUploadContentWithProgress.mockResolvedValue({ id: 'new-1', title: 'New Content' });
     mockGenerateThumbnail.mockResolvedValue({});
     mockAddPlaylistItem.mockResolvedValue({});
+    mockValidateForm.mockReturnValue({});
     lastDropzoneOptions = undefined;
     Object.defineProperty(URL, 'createObjectURL', {
       configurable: true,
@@ -321,6 +346,249 @@ describe('ContentClient', () => {
     await waitForAuxiliaryRequestsToSettle();
     expect(screen.getByText('Promo Video')).toBeInTheDocument();
     expect(screen.getByText('Menu PDF')).toBeInTheDocument();
+  });
+
+  it('renders content list cards from summary payloads without url or metadata', async () => {
+    const summaryContent = { ...sampleContent[0] };
+    delete (summaryContent as any).url;
+    delete (summaryContent as any).metadata;
+    mockGetContent.mockResolvedValue({
+      data: [summaryContent],
+      meta: { page: 1, limit: 50, total: 1, totalPages: 1 },
+    });
+
+    render(<ContentClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+    expect(mockGetContentItem).not.toHaveBeenCalled();
+  });
+
+  it('hydrates full content before opening preview from a summary payload', async () => {
+    const summaryContent = { ...sampleContent[0] };
+    delete (summaryContent as any).url;
+    delete (summaryContent as any).metadata;
+    mockGetContent.mockResolvedValue({
+      data: [summaryContent],
+      meta: { page: 1, limit: 50, total: 1, totalPages: 1 },
+    });
+    mockGetContentItem.mockResolvedValue({
+      ...sampleContent[0],
+      url: '/uploads/banner.png',
+      metadata: { tags: ['Marketing'] },
+    });
+
+    render(<ContentClient />);
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+
+    fireEvent.click(screen.getByTitle('Click to preview'));
+
+    await waitFor(() => {
+      expect(mockGetContentItem).toHaveBeenCalledWith('c1');
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('preview-url')).toHaveTextContent('/uploads/banner.png');
+    });
+  });
+
+  it('does not open stale preview detail after the list context changes', async () => {
+    const summaryContent = { ...sampleContent[0] };
+    delete (summaryContent as any).url;
+    delete (summaryContent as any).metadata;
+    const deferredDetail = createDeferred<any>();
+    mockGetContent
+      .mockResolvedValueOnce({
+        data: [summaryContent],
+        meta: { page: 1, limit: 50, total: 1, totalPages: 1 },
+      })
+      .mockResolvedValue({
+        data: [],
+        meta: { page: 1, limit: 50, total: 0, totalPages: 0 },
+      });
+    mockGetContentItem.mockReturnValueOnce(deferredDetail.promise);
+
+    render(<ContentClient />);
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+
+    fireEvent.click(screen.getByTitle('Click to preview'));
+    await waitFor(() => {
+      expect(mockGetContentItem).toHaveBeenCalledWith('c1');
+    });
+
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'menu' } });
+    await waitFor(() => {
+      expect(mockGetContent).toHaveBeenLastCalledWith(expect.objectContaining({ search: 'menu' }));
+    });
+
+    await act(async () => {
+      deferredDetail.resolve({
+        ...sampleContent[0],
+        url: '/uploads/banner.png',
+      });
+      await deferredDetail.promise;
+    });
+
+    expect(screen.queryByTestId('preview-modal')).not.toBeInTheDocument();
+  });
+
+  it('dedupes repeated preview detail loads for the same item', async () => {
+    const summaryContent = { ...sampleContent[0] };
+    delete (summaryContent as any).url;
+    delete (summaryContent as any).metadata;
+    const deferredDetail = createDeferred<any>();
+    mockGetContent.mockResolvedValue({
+      data: [summaryContent],
+      meta: { page: 1, limit: 50, total: 1, totalPages: 1 },
+    });
+    mockGetContentItem.mockReturnValueOnce(deferredDetail.promise);
+
+    render(<ContentClient />);
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+
+    const previewTarget = screen.getByTitle('Click to preview');
+    fireEvent.click(previewTarget);
+    fireEvent.click(previewTarget);
+
+    expect(mockGetContentItem).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      deferredDetail.resolve({
+        ...sampleContent[0],
+        url: '/uploads/banner.png',
+      });
+      await deferredDetail.promise;
+    });
+
+    expect(screen.getByTestId('preview-url')).toHaveTextContent('/uploads/banner.png');
+  });
+
+  it('does not open a second modal from mixed actions while detail is loading', async () => {
+    const flaggedSummary = {
+      ...sampleContent[0],
+      status: 'flagged',
+    };
+    delete (flaggedSummary as any).url;
+    delete (flaggedSummary as any).metadata;
+    const deferredDetail = createDeferred<any>();
+    mockGetContent.mockResolvedValue({
+      data: [flaggedSummary],
+      meta: { page: 1, limit: 50, total: 1, totalPages: 1 },
+    });
+    mockGetContentItem.mockReturnValueOnce(deferredDetail.promise);
+
+    render(<ContentClient />);
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+
+    fireEvent.click(screen.getByTitle('Click to preview'));
+    fireEvent.click(screen.getByRole('button', { name: /review/i }));
+
+    expect(mockGetContentItem).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      deferredDetail.resolve({
+        ...flaggedSummary,
+        url: '/uploads/banner.png',
+        metadata: {
+          moderation: {
+            flagReason: 'Wrong location',
+          },
+        },
+      });
+      await deferredDetail.promise;
+    });
+
+    expect(screen.getByTestId('preview-url')).toHaveTextContent('/uploads/banner.png');
+    expect(screen.queryByText('Review Flagged Content')).not.toBeInTheDocument();
+  });
+
+  it('hydrates detail before edit validation when the list row is only a summary', async () => {
+    const summaryContent = { ...sampleContent[0] };
+    delete (summaryContent as any).url;
+    delete (summaryContent as any).metadata;
+    mockGetContent.mockResolvedValue({
+      data: [summaryContent],
+      meta: { page: 1, limit: 50, total: 1, totalPages: 1 },
+    });
+    mockGetContentItem.mockResolvedValue({
+      ...sampleContent[0],
+      url: '/uploads/banner.png',
+    });
+
+    render(<ContentClient />);
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+
+    fireEvent.click(screen.getByText('Edit'));
+
+    await waitFor(() => {
+      expect(mockGetContentItem).toHaveBeenCalledWith('c1');
+    });
+    await waitFor(() => {
+      expect(screen.getByText('Edit Content')).toBeInTheDocument();
+    });
+
+    mockValidateForm.mockClear();
+    fireEvent.click(screen.getByText('Save Changes'));
+
+    await waitFor(() => {
+      expect(mockValidateForm).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ url: '/uploads/banner.png' }),
+      );
+    });
+  });
+
+  it('hydrates flagged content detail before showing moderation metadata', async () => {
+    const flaggedSummary = {
+      ...sampleContent[0],
+      status: 'flagged',
+    };
+    delete (flaggedSummary as any).url;
+    delete (flaggedSummary as any).metadata;
+    mockGetContent.mockResolvedValue({
+      data: [flaggedSummary],
+      meta: { page: 1, limit: 50, total: 1, totalPages: 1 },
+    });
+    mockGetContentItem.mockResolvedValue({
+      ...flaggedSummary,
+      url: '/uploads/banner.png',
+      metadata: {
+        moderation: {
+          flagReason: 'Wrong location',
+        },
+      },
+    });
+
+    render(<ContentClient />);
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+
+    fireEvent.click(screen.getByRole('button', { name: /review/i }));
+
+    await waitFor(() => {
+      expect(mockGetContentItem).toHaveBeenCalledWith('c1');
+    });
+    await waitFor(() => {
+      expect(screen.getByText(/Reason: Wrong location/)).toBeInTheDocument();
+    });
   });
 
   it('renders one content page at a time and fetches the next page on demand', async () => {

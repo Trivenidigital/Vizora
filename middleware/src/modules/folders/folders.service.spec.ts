@@ -459,6 +459,39 @@ describe('FoldersService', () => {
       expect(result.meta.total).toBe(1);
     });
 
+    it('should use a bounded list projection without modal-only fields', async () => {
+      mockDatabaseService.contentFolder.findFirst.mockResolvedValue({
+        ...mockFolder,
+        parent: null,
+        children: [],
+        _count: { content: 1 },
+      });
+      mockDatabaseService.content.findMany.mockResolvedValue([mockContent]);
+      mockDatabaseService.content.count.mockResolvedValue(1);
+
+      await service.getContents('org-123', 'folder-123', { page: 1, limit: 10 });
+
+      const call = mockDatabaseService.content.findMany.mock.calls[0][0];
+      expect(call).not.toHaveProperty('include');
+      expect(call.select).toEqual(expect.objectContaining({
+        id: true,
+        organizationId: true,
+        name: true,
+        type: true,
+        thumbnail: true,
+        duration: true,
+        fileSize: true,
+        status: true,
+        folderId: true,
+        createdAt: true,
+        updatedAt: true,
+      }));
+      expect(call.select).not.toHaveProperty('url');
+      expect(call.select).not.toHaveProperty('metadata');
+      expect(call.select).not.toHaveProperty('mimeType');
+      expect(call.select).not.toHaveProperty('playlistItems');
+    });
+
     it('should throw NotFoundException if folder not found', async () => {
       mockDatabaseService.contentFolder.findFirst.mockResolvedValue(null);
 
