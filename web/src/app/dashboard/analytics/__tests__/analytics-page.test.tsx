@@ -1,5 +1,13 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import AnalyticsClient from '../page-client';
+import { apiClient } from '@/lib/api';
+
+const mockUseDeviceMetrics = jest.fn();
+const mockUseContentPerformance = jest.fn();
+const mockUseUsageTrends = jest.fn();
+const mockUseDeviceDistribution = jest.fn();
+const mockUseBandwidthUsage = jest.fn();
+const mockUsePlaylistPerformance = jest.fn();
 
 jest.mock('@/components/charts', () => ({
   LineChart: () => <div data-testid="line-chart">LineChart</div>,
@@ -60,55 +68,111 @@ jest.mock('@/lib/hooks/useToast', () => ({
 }));
 
 jest.mock('@/lib/hooks/useAnalyticsData', () => ({
-  useDeviceMetrics: () => ({ data: [], loading: false, error: null, isMockData: true }),
-  useContentPerformance: () => ({ data: [], loading: false, error: null, isMockData: true }),
-  useUsageTrends: () => ({ data: [], loading: false, error: null, isMockData: true }),
-  useDeviceDistribution: () => ({ data: [], loading: false, error: null, isMockData: true }),
-  useBandwidthUsage: () => ({ data: [], loading: false, error: null, isMockData: true }),
-  usePlaylistPerformance: () => ({ data: [], loading: false, error: null, isMockData: true }),
+  useDeviceMetrics: (...args: unknown[]) => mockUseDeviceMetrics(...args),
+  useContentPerformance: (...args: unknown[]) => mockUseContentPerformance(...args),
+  useUsageTrends: (...args: unknown[]) => mockUseUsageTrends(...args),
+  useDeviceDistribution: (...args: unknown[]) => mockUseDeviceDistribution(...args),
+  useBandwidthUsage: (...args: unknown[]) => mockUseBandwidthUsage(...args),
+  usePlaylistPerformance: (...args: unknown[]) => mockUsePlaylistPerformance(...args),
 }));
 
 describe('AnalyticsClient', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (apiClient.getAnalyticsSummary as jest.Mock).mockResolvedValue({
+      totalDevices: 10,
+      onlineDevices: 8,
+      totalContent: 50,
+      totalPlaylists: 5,
+      totalContentSize: 1073741824,
+      uptimePercent: 98,
+    });
+
+    const emptyState = { data: [], loading: false, error: null, isMockData: true };
+    mockUseDeviceMetrics.mockReturnValue(emptyState);
+    mockUseContentPerformance.mockReturnValue(emptyState);
+    mockUseUsageTrends.mockReturnValue(emptyState);
+    mockUseDeviceDistribution.mockReturnValue(emptyState);
+    mockUseBandwidthUsage.mockReturnValue(emptyState);
+    mockUsePlaylistPerformance.mockReturnValue(emptyState);
   });
 
-  it('renders analytics heading', () => {
+  const renderLoadedAnalytics = async () => {
     render(<AnalyticsClient />);
+    await screen.findByText('10');
+  };
+
+  it('renders analytics heading', async () => {
+    await renderLoadedAnalytics();
     expect(screen.getByText('Analytics')).toBeInTheDocument();
   });
 
-  it('renders date range buttons', () => {
-    render(<AnalyticsClient />);
+  it('renders date range buttons', async () => {
+    await renderLoadedAnalytics();
     expect(screen.getByText('week')).toBeInTheDocument();
     expect(screen.getByText('month')).toBeInTheDocument();
     expect(screen.getByText('year')).toBeInTheDocument();
   });
 
-  it('renders Export CSV button', () => {
-    render(<AnalyticsClient />);
+  it('renders Export CSV button', async () => {
+    await renderLoadedAnalytics();
     expect(screen.getByText('Export CSV')).toBeInTheDocument();
   });
 
   it('renders KPI cards', async () => {
-    render(<AnalyticsClient />);
-    await waitFor(() => {
-      expect(screen.getByText('Total Devices')).toBeInTheDocument();
-      expect(screen.getByText('Content Items')).toBeInTheDocument();
-      expect(screen.getByText('System Uptime')).toBeInTheDocument();
-    });
+    await renderLoadedAnalytics();
+    expect(screen.getByText('Total Devices')).toBeInTheDocument();
+    expect(screen.getByText('Content Items')).toBeInTheDocument();
+    expect(screen.getByText('System Uptime')).toBeInTheDocument();
   });
 
-  it('renders chart section titles', () => {
-    render(<AnalyticsClient />);
+  it('renders chart section titles', async () => {
+    await renderLoadedAnalytics();
     expect(screen.getByText('Device Uptime Timeline')).toBeInTheDocument();
     expect(screen.getByText('Content Performance')).toBeInTheDocument();
     expect(screen.getByText('Device Distribution')).toBeInTheDocument();
   });
 
-  it('changes date range when button clicked', () => {
-    render(<AnalyticsClient />);
+  it('changes date range when button clicked', async () => {
+    await renderLoadedAnalytics();
     fireEvent.click(screen.getByText('week'));
     expect(screen.getByText('week')).toBeInTheDocument();
+  });
+
+  it('shows true empty analytics states when API calls succeed with no rows', async () => {
+    await renderLoadedAnalytics();
+
+    expect(screen.getByText('No Data Yet')).toBeInTheDocument();
+    expect(screen.getByText('No device uptime data available yet.')).toBeInTheDocument();
+    expect(screen.getByText('No content performance data yet. Upload content to track views.')).toBeInTheDocument();
+    expect(screen.queryByRole('alert', { name: /analytics data unavailable/i })).not.toBeInTheDocument();
+  });
+
+  it('surfaces chart load failures instead of empty chart states', async () => {
+    mockUseDeviceMetrics.mockReturnValue({
+      data: [],
+      loading: false,
+      error: 'Network unavailable',
+      isMockData: false,
+    });
+
+    await renderLoadedAnalytics();
+
+    expect(screen.getByRole('alert', { name: /analytics data unavailable/i })).toHaveTextContent(
+      'Device uptime timeline'
+    );
+    expect(screen.getByText('Unable to load device uptime data.').closest('[role="alert"]')).toBeInTheDocument();
+    expect(screen.queryByText('No Data Yet')).not.toBeInTheDocument();
+    expect(screen.queryByText('No device uptime data available yet.')).not.toBeInTheDocument();
+  });
+
+  it('surfaces summary load failures instead of only showing no data notice', async () => {
+    (apiClient.getAnalyticsSummary as jest.Mock).mockRejectedValueOnce(new Error('Summary down'));
+
+    render(<AnalyticsClient />);
+
+    const alert = await screen.findByRole('alert', { name: /analytics data unavailable/i });
+    expect(alert).toHaveTextContent('Analytics summary');
+    expect(screen.queryByText('No Data Yet')).not.toBeInTheDocument();
   });
 });

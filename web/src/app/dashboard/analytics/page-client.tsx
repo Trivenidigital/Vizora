@@ -4,10 +4,11 @@ import React, { useState, useEffect } from 'react';
 import { LineChart, BarChart, PieChart, AreaChart, ComposedChart } from '@/components/charts';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { Icon } from '@/theme/icons';
+import { Icon, type IconName } from '@/theme/icons';
 import { useRealtimeEvents } from '@/lib/hooks';
 import { apiClient } from '@/lib/api';
 import { useToast } from '@/lib/hooks/useToast';
+import type { AnalyticsSummary } from '@/lib/types';
 import {
  useDeviceMetrics,
  useContentPerformance,
@@ -24,12 +25,34 @@ const EmptyChartState: React.FC<{ message?: string }> = ({ message }) => (
  </div>
 );
 
+const ChartErrorState: React.FC<{ message: string; detail?: string | null }> = ({ message, detail }) => (
+ <div
+ role="alert"
+ className="h-80 flex flex-col items-center justify-center text-center text-[var(--foreground-secondary)] px-6"
+ >
+ <Icon name="error" size="lg" className="mb-3 text-[var(--error)]" />
+ <p className="text-sm font-medium text-[var(--foreground)]">{message}</p>
+ {detail && (
+ <p className="mt-2 text-xs text-[var(--foreground-tertiary)] max-w-md">
+ {detail}
+ </p>
+ )}
+ </div>
+);
+
 interface KPICardProps {
  label: string;
  value: string;
  change?: string;
  changeType?: 'positive' | 'negative' | 'neutral';
- icon?: string;
+ icon?: IconName;
+}
+
+interface AnalyticsCsvExport {
+ summary?: Partial<AnalyticsSummary>;
+ deviceMetrics?: Array<{ date: string; mobile?: number; tablet?: number; desktop?: number }>;
+ contentPerformance?: Array<{ title?: string; name?: string; views?: number; engagement?: number; shares?: number }>;
+ playlistPerformance?: Array<{ name: string; plays?: number; engagement?: number; uniqueDevices?: number; completion?: number }>;
 }
 
 const KPICard: React.FC<KPICardProps> = ({
@@ -67,7 +90,7 @@ const KPICard: React.FC<KPICardProps> = ({
  </div>
  {icon && (
  <Icon
- name={icon as any}
+ name={icon}
  size="lg"
  className="text-[var(--foreground-tertiary)]"
  />
@@ -85,18 +108,37 @@ const formatBytes = (bytes: number) => {
  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 };
 
+const csvCell = (value: unknown): string => `"${String(value ?? '').replace(/"/g, '""')}"`;
+const fixedCell = (value: number | undefined): string => typeof value === 'number' ? value.toFixed(1) : '';
+
 export default function AnalyticsClient() {
  const toast = useToast();
  const [dateRange, setDateRange] = useState<'week' | 'month' | 'year'>('month');
  const [exporting, setExporting] = useState(false);
  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline'>('offline');
  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
- const [summary, setSummary] = useState<any>(null);
+ const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
+ const [summaryError, setSummaryError] = useState<string | null>(null);
 
  useEffect(() => {
+ let cancelled = false;
  apiClient.getAnalyticsSummary()
- .then(data => setSummary(data))
- .catch(() => {/* fall back to defaults */});
+ .then(data => {
+ if (!cancelled) {
+ setSummary(data);
+ setSummaryError(null);
+ }
+ })
+ .catch(() => {
+ if (!cancelled) {
+ setSummary(null);
+ setSummaryError('Unable to load analytics summary.');
+ }
+ });
+
+ return () => {
+ cancelled = true;
+ };
  }, []);
 
  const deviceMetrics = useDeviceMetrics(dateRange);
@@ -106,7 +148,20 @@ export default function AnalyticsClient() {
  const bandwidthUsage = useBandwidthUsage(dateRange);
  const playlistPerformance = usePlaylistPerformance(dateRange);
 
- const allMockData = deviceMetrics.isMockData && contentPerformance.isMockData &&
+ const analyticsErrorSections = [
+ { label: 'Analytics summary', error: summaryError },
+ { label: 'Device uptime timeline', error: deviceMetrics.error },
+ { label: 'Content performance', error: contentPerformance.error },
+ { label: 'Device distribution', error: deviceDistribution.error },
+ { label: 'Usage trends', error: usageTrends.error },
+ { label: 'Bandwidth usage', error: bandwidthUsage.error },
+ { label: 'Playlist performance', error: playlistPerformance.error },
+ ].filter((section) => Boolean(section.error));
+
+ const hasAnalyticsErrors = analyticsErrorSections.length > 0;
+
+ const allMockData = !hasAnalyticsErrors &&
+   deviceMetrics.isMockData && contentPerformance.isMockData &&
    usageTrends.isMockData && deviceDistribution.isMockData &&
    bandwidthUsage.isMockData && playlistPerformance.isMockData;
 
@@ -125,7 +180,7 @@ export default function AnalyticsClient() {
  const handleExportCSV = async () => {
  try {
  setExporting(true);
- const data = await apiClient.exportAnalytics(dateRange) as any;
+ const data = await apiClient.exportAnalytics(dateRange) as unknown as AnalyticsCsvExport;
 
  // Build CSV sections
  const sections: string[] = [];
@@ -146,8 +201,8 @@ export default function AnalyticsClient() {
  if (data.deviceMetrics?.length) {
  sections.push('DEVICE METRICS');
  sections.push(['Date', 'Mobile', 'Tablet', 'Desktop'].join(','));
- data.deviceMetrics.forEach((d: any) => {
- sections.push([`"${d.date}"`, d.mobile?.toFixed(1), d.tablet?.toFixed(1), d.desktop?.toFixed(1)].join(','));
+ data.deviceMetrics.forEach((d) => {
+ sections.push([csvCell(d.date), fixedCell(d.mobile), fixedCell(d.tablet), fixedCell(d.desktop)].join(','));
  });
  sections.push('');
  }
@@ -156,8 +211,8 @@ export default function AnalyticsClient() {
  if (data.contentPerformance?.length) {
  sections.push('CONTENT PERFORMANCE');
  sections.push(['Title', 'Views', 'Engagement', 'Shares'].join(','));
- data.contentPerformance.forEach((c: any) => {
- sections.push([`"${String(c.title).replace(/"/g, '""')}"`, c.views, c.engagement, c.shares].join(','));
+ data.contentPerformance.forEach((c) => {
+ sections.push([csvCell(c.title ?? c.name), c.views ?? '', c.engagement ?? '', c.shares ?? ''].join(','));
  });
  sections.push('');
  }
@@ -166,8 +221,8 @@ export default function AnalyticsClient() {
  if (data.playlistPerformance?.length) {
  sections.push('PLAYLIST PERFORMANCE');
  sections.push(['Name', 'Plays', 'Engagement', 'Unique Devices', 'Completion'].join(','));
- data.playlistPerformance.forEach((p: any) => {
- sections.push([`"${String(p.name).replace(/"/g, '""')}"`, p.plays, p.engagement, p.uniqueDevices, p.completion].join(','));
+ data.playlistPerformance.forEach((p) => {
+ sections.push([csvCell(p.name), p.plays ?? '', p.engagement ?? '', p.uniqueDevices ?? '', p.completion ?? ''].join(','));
  });
  sections.push('');
  }
@@ -181,8 +236,8 @@ export default function AnalyticsClient() {
  URL.revokeObjectURL(link.href);
 
  toast.success('Analytics exported successfully');
- } catch (error: any) {
- toast.error(error.message || 'Export failed');
+ } catch (error: unknown) {
+ toast.error(error instanceof Error && error.message ? error.message : 'Export failed');
  } finally {
  setExporting(false);
  }
@@ -263,11 +318,32 @@ export default function AnalyticsClient() {
  <KPICard
  label="System Uptime"
  value={summary ? `${summary.uptimePercent}%` : '---'}
- change={summary?.uptimePercent >= 95 ? 'Above target' : 'Below target'}
- changeType={summary?.uptimePercent >= 95 ? 'positive' : 'negative'}
+ change={summary ? (summary.uptimePercent >= 95 ? 'Above target' : 'Below target') : summaryError ? 'Unavailable' : ''}
+ changeType={summary ? (summary.uptimePercent >= 95 ? 'positive' : 'negative') : 'neutral'}
  icon="overview"
  />
  </div>
+
+ {hasAnalyticsErrors && (
+ <div
+ role="alert"
+ aria-label="Analytics data unavailable"
+ className="bg-[var(--error)]/10 border border-[var(--error)]/30 rounded-lg px-4 py-3 flex flex-col gap-2"
+ >
+ <div className="flex items-center gap-2">
+ <Icon name="error" size="sm" className="text-[var(--error)]" />
+ <span className="text-sm font-medium text-[var(--foreground)]">
+ Analytics data unavailable
+ </span>
+ </div>
+ <p className="text-sm text-[var(--foreground-secondary)]">
+ Some analytics could not be loaded. Showing any available sections, but do not treat missing charts as no data.
+ </p>
+ <p className="text-xs text-[var(--foreground-tertiary)]">
+ Unavailable: {analyticsErrorSections.map((section) => section.label).join(', ')}
+ </p>
+ </div>
+ )}
 
  {/* Empty data notice */}
  {allMockData && (
@@ -300,6 +376,8 @@ export default function AnalyticsClient() {
  <div className="w-8 h-8 border-4 border-[var(--border)] border-t-primary-600 dark:border-t-primary-400 rounded-full" />
  </div>
  </div>
+ ) : deviceMetrics.error ? (
+ <ChartErrorState message="Unable to load device uptime data." detail={deviceMetrics.error} />
  ) : deviceMetrics.data.length === 0 ? (
  <EmptyChartState message="No device uptime data available yet." />
  ) : (
@@ -332,6 +410,8 @@ export default function AnalyticsClient() {
  <div className="w-8 h-8 border-4 border-[var(--border)] border-t-primary-600 dark:border-t-primary-400 rounded-full" />
  </div>
  </div>
+ ) : contentPerformance.error ? (
+ <ChartErrorState message="Unable to load content performance data." detail={contentPerformance.error} />
  ) : contentPerformance.data.length === 0 ? (
  <EmptyChartState message="No content performance data yet. Upload content to track views." />
  ) : (
@@ -360,6 +440,8 @@ export default function AnalyticsClient() {
  <div className="w-8 h-8 border-4 border-[var(--border)] border-t-primary-600 dark:border-t-primary-400 rounded-full" />
  </div>
  </div>
+ ) : deviceDistribution.error ? (
+ <ChartErrorState message="Unable to load device distribution data." detail={deviceDistribution.error} />
  ) : deviceDistribution.data.length === 0 ? (
  <EmptyChartState message="No devices registered yet. Pair devices to see distribution." />
  ) : (
@@ -388,6 +470,8 @@ export default function AnalyticsClient() {
  <div className="w-8 h-8 border-4 border-[var(--border)] border-t-primary-600 dark:border-t-primary-400 rounded-full" />
  </div>
  </div>
+ ) : usageTrends.error ? (
+ <ChartErrorState message="Unable to load usage trends." detail={usageTrends.error} />
  ) : usageTrends.data.length === 0 ? (
  <EmptyChartState message="No usage data yet. Trends will appear as content is played on devices." />
  ) : (
@@ -422,6 +506,8 @@ export default function AnalyticsClient() {
  <div className="w-8 h-8 border-4 border-[var(--border)] border-t-primary-600 dark:border-t-primary-400 rounded-full" />
  </div>
  </div>
+ ) : bandwidthUsage.error ? (
+ <ChartErrorState message="Unable to load bandwidth usage." detail={bandwidthUsage.error} />
  ) : bandwidthUsage.data.length === 0 ? (
  <EmptyChartState message="No bandwidth data yet. Usage will be tracked as devices stream content." />
  ) : (
@@ -454,6 +540,8 @@ export default function AnalyticsClient() {
  <div className="w-8 h-8 border-4 border-[var(--border)] border-t-primary-600 dark:border-t-primary-400 rounded-full" />
  </div>
  </div>
+ ) : playlistPerformance.error ? (
+ <ChartErrorState message="Unable to load playlist performance data." detail={playlistPerformance.error} />
  ) : playlistPerformance.data.length === 0 ? (
  <EmptyChartState message="No playlist data yet. Create playlists and assign them to devices." />
  ) : (

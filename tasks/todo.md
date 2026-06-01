@@ -1,5 +1,54 @@
 # Vizora - Task Tracker
 
+## In Progress: Analytics Empty-State Trust Pass 24 (2026-06-01)
+
+**Branch:** `feat/analytics-empty-state-trust-pass-24`
+
+**Why now:** Pass 23 is merged and `main` CI is green, but production deploy
+remains blocked by dirty/diverged prod-local state. The next bounded
+customer-dashboard trust issue is analytics failures being presented as "No
+Data Yet."
+
+**New primitives introduced:** none. This uses the existing analytics API
+client hooks and dashboard page.
+
+**Hermes-first analysis:** not applicable. This pass does not add or modify
+business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
+
+**Plan**
+- [x] Start fresh branch from `origin/main`.
+- [x] Drift-check analytics dashboard hooks, page states, and tests.
+- [x] Write focused failing tests for analytics API failures vs true empty
+  responses.
+- [x] Implement explicit section/global analytics failure states.
+- [x] Run reviewer pass before broader verification.
+- [x] Run focused and broader verification.
+- [ ] PR, CI, merge.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Local evidence:**
+- TDD red: analytics hook/page tests failed before implementation because rejected
+  API calls were treated as empty/mock states and summary failure rendered "No
+  Data Yet."
+- Implementation: `useAnalyticsData` now preserves successful empty arrays as
+  true empty state, reports rejected calls as errors, uses user-safe error
+  messages, and ignores stale date-range responses. The analytics page now shows
+  global and section-level unavailable states and suppresses "No Data Yet" on
+  failed loads.
+- Review: UX/accessibility/test reviewer CLEAN; hook/API-state reviewer CLEAN.
+- Verification: focused hook tests 15/15 pass; focused analytics page tests 9/9
+  pass; analytics sweep 34/34 pass; full web Jest 1016/1016 pass; web
+  production build pass; changed-file ESLint pass; repo security JWT guard pass;
+  `git diff --check` pass with CRLF warnings only.
+- Known unrelated verification noise: existing React `act(...)` warnings in
+  broader web suites; stale package lint scripts still fail on Next 16/Windows,
+  so equivalent ESLint commands were run directly.
+
+**Plan/design:**
+`docs/plans/2026-06-01-analytics-empty-state-trust-pass-24.md`
+
+---
+
 ## Completed: Schedule Trust Polish Pass 23 (2026-06-01)
 
 **Branch:** `feat/customer-dashboard-improvements-pass-23`
