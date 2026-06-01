@@ -1,5 +1,40 @@
 # Vizora - Task Tracker
 
+## Active: Realtime Widget Secret Boundary Pass 30 (2026-06-01)
+
+**Branch:** `feat/customer-readiness-pass-30`
+
+**Why now:** Pass 29 fixed widget truthfulness and HTTP response redaction, but security review found the realtime/device path still builds playlist payloads from raw content metadata. A generic API widget can therefore leak saved API headers to display clients even though dashboard/API responses are redacted.
+
+**New primitives introduced:** one realtime-local device payload sanitizer. No new database model, migration, route, queue, realtime room model, MCP tool, Hermes skill, provider spend path, or production process.
+
+**Hermes-first analysis:** not applicable to runtime delivery code. Official Hermes bundled skills and the current awesome-Hermes ecosystem do not provide a reusable NestJS/Socket.IO payload sanitizer; this is an in-process Vizora secret-boundary concern and must stay in the realtime service.
+
+**Plan/design:** `docs/plans/2026-06-01-realtime-widget-secret-boundary-pass-30.md`
+
+**Plan**
+- [x] Start fresh branch from `origin/main`.
+- [x] Dispatch customer, performance, and architecture/security reviewers for the next pass.
+- [x] Select the highest-risk bounded target from review: generic API widget header leakage through realtime/device payloads.
+- [x] Add failing realtime tests for cached, primary, fallback, update, initial-state, and layout metadata redaction.
+- [x] Implement realtime-side payload sanitizer and wire existing delivery paths.
+- [x] Run focused tests.
+- [x] Run multi-subagent review before broader verification.
+- [x] Run broader verification.
+- [ ] PR, CI, merge if green.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Evidence so far:**
+- Drift evidence: middleware HTTP responses redact generic API widget headers, but `realtime/src/services/playlist.service.ts` and `realtime/src/gateways/device.gateway.ts` still copy raw `item.content.metadata` into device-bound payloads.
+- TDD red: focused realtime specs failed on raw `Bearer live-secret` / `live-api-key` values in cached playlists, DB playlists, fallback playlists, admin-updated playlists, initial-state payloads, direct `playlist:update` emissions, and layout metadata.
+- Focused green after implementation: `pnpm --filter @vizora/realtime test -- --runInBand --runTestsByPath src/services/playlist.service.spec.ts src/gateways/device.gateway.spec.ts` passed 128/128.
+- Review findings fixed: stale pending playlist replay now sanitizes Redis payloads on read/requeue, and generic API widget `widgetConfig` is stripped entirely from device-bound metadata so query-string secrets do not survive. Focused specs now pass 129/129.
+- Final follow-up review: security and realtime/display reviewers both returned CLEAN.
+- Broader local verification: full realtime Jest passed 12 suites / 285 tests; `npx nx build @vizora/realtime --skip-nx-cache` passed with existing third-party webpack warnings; `pnpm security:no-hardcoded-jwts` passed; changed-file ESLint exited 0 with existing warnings; `git diff --check` passed with CRLF warnings only.
+- Deploy gate is still expected blocked by dirty/diverged prod checkout; no prod state changes are authorized for this pass.
+
+---
+
 ## Completed: Widget Truthfulness Pass 29 (2026-06-01)
 
 **Branch:** `feat/widget-truthfulness-pass-29`

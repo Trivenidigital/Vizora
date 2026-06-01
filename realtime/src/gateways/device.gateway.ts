@@ -42,6 +42,11 @@ import { WsAllExceptionsFilter } from './filters/ws-exception.filter';
 import { WsAuthGuard, WsDeviceGuard } from './guards/ws-auth.guard';
 import { redactSensitiveTokens } from '../utils/redact-sensitive-url';
 import { hashDeviceToken, isCurrentDeviceToken } from './device-token-hash';
+import {
+  redactDeviceContentMetadata,
+  redactDevicePayload,
+  redactDevicePlaylist,
+} from '../services/device-content-payload';
 
 interface DevicePayload {
   sub: string; // device ID
@@ -384,7 +389,7 @@ export class DeviceGateway
       return 'skipped';
     }
 
-    await this.redisService.setPendingPlaylist(deviceId, playlist);
+    await this.redisService.setPendingPlaylist(deviceId, redactDevicePlaylist(playlist));
     return status;
   }
 
@@ -989,7 +994,7 @@ export class DeviceGateway
                 thumbnail: item.content.thumbnail,
                 mimeType: item.content.mimeType,
                 duration: item.content.duration,
-                metadata: item.content.metadata,
+                metadata: redactDeviceContentMetadata(item.content.metadata),
               } : null,
             };
 
@@ -1002,7 +1007,7 @@ export class DeviceGateway
           }),
         );
 
-        const playlist = {
+        const playlist = redactDevicePlaylist({
           id: display.currentPlaylist.id,
           name: display.currentPlaylist.name,
           items: resolvedItems,
@@ -1011,7 +1016,7 @@ export class DeviceGateway
             0
           ),
           loopPlaylist: true,
-        };
+        });
 
         client.emit('playlist:update', {
           playlist,
@@ -1456,13 +1461,14 @@ export class DeviceGateway
     const replayVersion = this.pendingPlaylistReplayVersions.get(deviceId) ?? 0;
     const pendingPlaylist = await this.redisService.getPendingPlaylist(deviceId);
     if (!pendingPlaylist) return 'none';
+    const safePendingPlaylist = redactDevicePlaylist(pendingPlaylist);
 
     this.logger.log(`Delivering pending playlist to device ${deviceId} (queued while offline)`);
 
     // Re-queue if the active client changed or disconnected after the atomic Redis consume.
     if (!this.isActiveDeviceSocket(client, deviceId) || !client.connected) {
       this.logger.warn(`Device ${deviceId} disconnected before pending playlist delivery - re-queuing`);
-      return this.requeuePendingPlaylistIfCurrent(deviceId, pendingPlaylist, replayVersion, 'deferred');
+      return this.requeuePendingPlaylistIfCurrent(deviceId, safePendingPlaylist, replayVersion, 'deferred');
     }
 
     // Fetch display metadata for config (qrOverlay etc.)
@@ -1478,7 +1484,7 @@ export class DeviceGateway
 
     if (!this.isActiveDeviceSocket(client, deviceId) || !client.connected) {
       this.logger.warn(`Device ${deviceId} disconnected before pending playlist delivery - re-queuing`);
-      return this.requeuePendingPlaylistIfCurrent(deviceId, pendingPlaylist, replayVersion, 'deferred');
+      return this.requeuePendingPlaylistIfCurrent(deviceId, safePendingPlaylist, replayVersion, 'deferred');
     }
 
     const configMetadata = (displayForConfig?.metadata as Record<string, any>) || {};
@@ -1495,7 +1501,7 @@ export class DeviceGateway
     }
 
     const result = await this.emitWithDeliveryAck(client, 'playlist:update', {
-      playlist: pendingPlaylist,
+      playlist: safePendingPlaylist,
       timestamp: new Date().toISOString(),
     });
 
@@ -1506,7 +1512,7 @@ export class DeviceGateway
 
     if (!this.isActiveDeviceSocket(client, deviceId) || !client.connected) {
       this.logger.warn(`Device ${deviceId} changed sockets during pending playlist delivery - re-queuing`);
-      return this.requeuePendingPlaylistIfCurrent(deviceId, pendingPlaylist, replayVersion, 'deferred');
+      return this.requeuePendingPlaylistIfCurrent(deviceId, safePendingPlaylist, replayVersion, 'deferred');
     }
 
     if (result.delivered) {
@@ -1517,7 +1523,7 @@ export class DeviceGateway
       );
     } else {
       this.logger.warn(`Pending playlist ${result.reason || 'delivery failure'} for device ${deviceId} - re-queuing`);
-      return this.requeuePendingPlaylistIfCurrent(deviceId, pendingPlaylist, replayVersion);
+      return this.requeuePendingPlaylistIfCurrent(deviceId, safePendingPlaylist, replayVersion);
     }
     return 'delivered';
   }
@@ -1598,7 +1604,7 @@ export class DeviceGateway
   async sendPlaylistUpdate(deviceId: string, playlist: Playlist): Promise<{ delivered: boolean; reason?: string }> {
     // Resolve minio:// URLs to API-served URLs before sending to device
     // Devices authenticate content requests via Authorization header with their stored JWT
-    const resolvedPlaylist = {
+    const resolvedPlaylist = redactDevicePlaylist({
       ...playlist,
       items: (playlist.items || []).map((item: PlaylistContentItem) => {
         const resolvedUrl = this.resolveContentUrl(item);
@@ -1610,7 +1616,7 @@ export class DeviceGateway
           } : item.content,
         };
       }),
-    };
+    });
 
     // Get all sockets in the device room
     const roomName = `device:${deviceId}`;
@@ -1953,7 +1959,7 @@ export class DeviceGateway
    * additional API calls.
    */
   private async resolveLayoutContent(content: any, organizationId: string): Promise<any> {
-    const metadata = (content.metadata as Record<string, any>) || {};
+    const metadata = (redactDeviceContentMetadata(content.metadata) as Record<string, any>) || {};
     const zones = metadata.zones || [];
 
     const resolvedZones = await Promise.all(
@@ -2037,12 +2043,12 @@ export class DeviceGateway
       }),
     );
 
-    return {
+    return redactDevicePayload({
       ...content,
       metadata: {
         ...metadata,
         zones: resolvedZones,
       },
-    };
+    });
   }
 }
