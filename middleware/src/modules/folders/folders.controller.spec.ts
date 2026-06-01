@@ -224,6 +224,7 @@ describe('FoldersController', () => {
           search: undefined,
           dateRange: undefined,
           tagNames: undefined,
+          tagIds: undefined,
         },
       );
     });
@@ -237,6 +238,7 @@ describe('FoldersController', () => {
         status: 'active',
         dateRange: '30days',
         tagNames: ['Marketing'],
+        tagIds: ['tag-menu'],
       };
       mockFoldersService.getContents.mockResolvedValue({
         data: [],
@@ -255,6 +257,7 @@ describe('FoldersController', () => {
           status: 'active',
           dateRange: '30days',
           tagNames: ['Marketing'],
+          tagIds: ['tag-menu'],
           templateOrientation: undefined,
         },
       );

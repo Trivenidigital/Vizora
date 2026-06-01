@@ -3,6 +3,7 @@ import ContentClient from '../page-client';
 
 const mockGetContent = jest.fn();
 const mockGetContentItem = jest.fn();
+const mockGetContentTags = jest.fn();
 const mockGetFolderContent = jest.fn();
 const mockGetFolders = jest.fn();
 const mockGetDisplays = jest.fn();
@@ -21,6 +22,7 @@ jest.mock('@/lib/api', () => ({
   apiClient: {
     getContent: (...args: any[]) => mockGetContent(...args),
     getContentItem: (...args: any[]) => mockGetContentItem(...args),
+    getContentTags: (...args: any[]) => mockGetContentTags(...args),
     getFolderContent: (...args: any[]) => mockGetFolderContent(...args),
     getFolders: (...args: any[]) => mockGetFolders(...args),
     getDisplays: (...args: any[]) => mockGetDisplays(...args),
@@ -144,12 +146,14 @@ jest.mock('@/components/SearchFilter', () => {
 });
 
 jest.mock('@/components/ContentTagger', () => {
-  return function MockTagger({ selectedTags, onChange }: any) {
+  return function MockTagger({ tags, selectedTags, onChange }: any) {
     return (
       <div data-testid="content-tagger">
-        <button type="button" onClick={() => onChange(['1'])}>
-          Select Marketing Tag
-        </button>
+        {tags.map((tag: any) => (
+          <button key={tag.id} type="button" onClick={() => onChange([tag.id])}>
+            Select {tag.name} Tag
+          </button>
+        ))}
         <span data-testid="selected-tags">{selectedTags.join(',')}</span>
       </div>
     );
@@ -236,6 +240,9 @@ describe('ContentClient', () => {
     jest.clearAllMocks();
     mockGetContent.mockResolvedValue({ data: [], meta: { page: 1, limit: 50, total: 0, totalPages: 0 } });
     mockGetContentItem.mockResolvedValue(sampleContent[0]);
+    mockGetContentTags.mockResolvedValue([
+      { id: '1', name: 'Marketing', color: 'blue', contentCount: 1 },
+    ]);
     mockGetFolderContent.mockResolvedValue({ data: [], meta: { page: 1, limit: 50, total: 0, totalPages: 0 } });
     mockGetFolders.mockResolvedValue([]);
     mockGetDisplays.mockResolvedValue({ data: [] });
@@ -688,9 +695,44 @@ describe('ContentClient', () => {
       expect(mockGetFolderContent).toHaveBeenCalledWith('folder-1', expect.objectContaining({
         page: 1,
         limit: 50,
-        tagNames: ['Marketing'],
+        tagIds: ['1'],
       }));
     });
+  });
+
+  it('renders tenant content tags instead of hardcoded filter tags', async () => {
+    mockGetContentTags.mockResolvedValue([
+      { id: 'tag-menu', name: 'Lunch, Dinner', color: 'green', contentCount: 2 },
+    ]);
+    mockGetContent.mockResolvedValue({
+      data: sampleContent,
+      meta: { page: 1, limit: 50, total: 3, totalPages: 1 },
+    });
+
+    render(<ContentClient />);
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(mockGetContentTags).toHaveBeenCalled();
+    });
+
+    fireEvent.click(screen.getByText(/Tags/));
+
+    expect(screen.getByText('Select Lunch, Dinner Tag')).toBeInTheDocument();
+    expect(screen.queryByText('Select Marketing Tag')).not.toBeInTheDocument();
+
+    mockGetContent.mockClear();
+    fireEvent.click(screen.getByText('Select Lunch, Dinner Tag'));
+
+    await waitFor(() => {
+      expect(mockGetContent).toHaveBeenCalledWith(expect.objectContaining({
+        page: 1,
+        limit: 50,
+        tagIds: ['tag-menu'],
+      }));
+    });
+    expect(screen.getByText('Tag: Lunch, Dinner')).toBeInTheDocument();
   });
 
   it('moves back to a valid page after deleting the only item on a later page', async () => {
@@ -805,7 +847,7 @@ describe('ContentClient', () => {
       expect(mockGetContent).toHaveBeenCalledWith(expect.objectContaining({
         page: 1,
         limit: 50,
-        tagNames: ['Marketing'],
+        tagIds: ['1'],
       }));
     });
     expect(screen.getByTestId('selected-tags')).toHaveTextContent('1');
@@ -815,7 +857,7 @@ describe('ContentClient', () => {
 
     await waitFor(() => {
       expect(mockGetContent).toHaveBeenCalledWith(expect.not.objectContaining({
-        tagNames: expect.anything(),
+        tagIds: expect.anything(),
       }));
     });
     expect(screen.getByTestId('selected-tags')).toHaveTextContent('');

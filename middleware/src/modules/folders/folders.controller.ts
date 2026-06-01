@@ -90,7 +90,7 @@ export class FoldersController {
     @Param('id', ParseIdPipe) id: string,
     @Query() query: ContentQueryDto,
   ) {
-    const { type, status, templateOrientation, search, dateRange, tagNames, ...pagination } = query;
+    const { type, status, templateOrientation, search, dateRange, tagNames, tagIds, ...pagination } = query;
     return this.foldersService.getContents(organizationId, id, pagination, {
       type,
       status,
@@ -98,6 +98,7 @@ export class FoldersController {
       search,
       dateRange,
       tagNames,
+      tagIds,
     });
   }
 }

@@ -1,5 +1,75 @@
 # Vizora - Task Tracker
 
+## Active: Content Tag Filter Trust Pass 28 (2026-06-01)
+
+**Branch:** `feat/customer-readiness-pass-28`
+
+**Why now:** Pass 27 is merged with green post-merge `main` CI, but production
+deploy remains blocked by dirty/diverged prod-local state. The next bounded
+customer-dashboard trust gap still present in current code is the content
+library's tag filter: it shows hardcoded `Marketing`, `Seasonal`, `Featured`,
+and `Archive` choices even though Vizora has tenant-scoped `Tag`/`ContentTag`
+data and server-side `tagNames` filtering.
+
+**New primitives introduced:** one content-module read endpoint,
+`GET /api/v1/content/tags`, one web API client method, and a `tagIds`
+content-list query filter. No new database model, migration, process, queue,
+realtime path, MCP tool, Hermes skill, provider spend path, or deployment
+primitive.
+
+**Hermes-first analysis:** not applicable. This pass does not add or modify
+business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
+
+**Plan/design:**
+`docs/plans/2026-06-01-content-tag-filter-trust-pass-28.md`
+
+**Plan**
+- [x] Start fresh branch from `origin/main`.
+- [x] Reconcile backlog/current state after Pass 27.
+- [x] Add failing middleware tests for tenant-scoped content tag listing.
+- [x] Add failing web tests for real content-tag filter options.
+- [x] Implement the content tag list endpoint and web API client method.
+- [x] Replace hardcoded dashboard tag filters with fetched real tags.
+- [x] Run multi-subagent review before broader verification.
+- [x] Run focused and broader verification.
+- [ ] PR, CI, merge if green.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Local evidence so far:**
+- TDD red: middleware content tests failed on missing
+  `ContentService.listContentTags` / `ContentController.listContentTags`; web
+  content test failed because `apiClient.getContentTags` was never called.
+- Implementation: added tenant-scoped `GET /api/v1/content/tags`, web API
+  client support, and content-library tag filter loading/error/empty states.
+  Removed the hardcoded `Marketing` / `Seasonal` / `Featured` / `Archive`
+  filter source.
+- Regression fix: initial tag metadata loading now keeps the empty selected
+  tag-name value stable, so mounting the content page does not duplicate the
+  first content fetch.
+- Focused web evidence:
+  `pnpm --filter @vizora/web test -- --runInBand --runTestsByPath src/app/dashboard/content/__tests__/content-page.test.tsx`
+  passed 43/43.
+- Review findings fixed: content tag usage counts now filter the counted
+  content relation by `organizationId`; dashboard tag filtering now sends
+  `tagIds` so comma-bearing tenant tag names keep working; folder content
+  queries now forward `tagIds` as well.
+- Focused post-review evidence:
+  `pnpm --filter @vizora/middleware test -- --runInBand --runTestsByPath src/modules/content/content.service.spec.ts src/modules/content/content.controller.spec.ts src/modules/content/dto/content-query.dto.spec.ts src/modules/folders/folders.controller.spec.ts`
+  passed 196/196.
+- Focused post-review web evidence:
+  `pnpm --filter @vizora/web test -- --runInBand --runTestsByPath src/app/dashboard/content/__tests__/content-page.test.tsx src/lib/api/__tests__/content.test.ts`
+  passed 45/45.
+- Broader evidence: `pnpm --filter @vizora/web test -- --runInBand` passed
+  96 suites / 1035 tests; `pnpm --filter @vizora/middleware test -- --runInBand`
+  passed 143 suites / 2892 tests. `tsc --noEmit` passed for middleware and
+  web. Changed-file ESLint exited 0 with existing warnings in touched files.
+  `npx nx build @vizora/middleware --skip-nx-cache` passed with existing
+  webpack warnings; `npx nx build @vizora/web --skip-nx-cache` passed with the
+  existing Next middleware/proxy warning. `git diff --check` and
+  `pnpm security:no-hardcoded-jwts` passed.
+
+---
+
 ## Completed: Playlist Publish Trust Pass 27 (2026-06-01)
 
 **Branch:** `feat/playlist-publish-trust-pass-27` -> PR #154 -> `main`

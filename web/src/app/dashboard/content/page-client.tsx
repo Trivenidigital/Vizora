@@ -70,6 +70,7 @@ const FILE_UPLOAD_LIMITS: Record<FileUploadType, number> = {
  pdf: 50 * 1024 * 1024,
 };
 const FILE_UPLOAD_TYPES = new Set<UploadFormType>(['image', 'video', 'pdf']);
+const EMPTY_SELECTED_TAG_NAMES: string[] = [];
 
 const isFileUploadType = (type: UploadFormType): type is FileUploadType => FILE_UPLOAD_TYPES.has(type);
 
@@ -134,12 +135,9 @@ export default function ContentClient() {
  const [uploadProgress, setUploadProgress] = useState<number>(0);
  const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([]);
  const [uploadRejections, setUploadRejections] = useState<UploadRejectedItem[]>([]);
- const [tags] = useState<ContentTag[]>([
- { id: '1', name: 'Marketing', color: 'blue' },
- { id: '2', name: 'Seasonal', color: 'green' },
- { id: '3', name: 'Featured', color: 'red' },
- { id: '4', name: 'Archive', color: 'gray' },
- ]);
+ const [tags, setTags] = useState<ContentTag[]>([]);
+ const [tagsLoading, setTagsLoading] = useState(false);
+ const [tagsLoadError, setTagsLoadError] = useState<string | null>(null);
  const [selectedTags, setSelectedTags] = useState<string[]>([]);
  const [showTagFilter, setShowTagFilter] = useState(false);
  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'reconnecting' | 'offline'>('offline');
@@ -222,9 +220,14 @@ export default function ContentClient() {
  },
  });
 
- const selectedTagNames = useMemo(() => tags
+ const selectedTagNames = useMemo(() => {
+ if (selectedTags.length === 0) {
+ return EMPTY_SELECTED_TAG_NAMES;
+ }
+ return tags
  .filter(tag => selectedTags.includes(tag.id))
- .map(tag => tag.name), [tags, selectedTags]);
+ .map(tag => tag.name);
+ }, [tags, selectedTags]);
 
  const buildContentListParams = useCallback((): ContentListParams => ({
  page: contentPage,
@@ -233,9 +236,9 @@ export default function ContentClient() {
  ...(filterStatus !== 'all' ? { status: filterStatus } : {}),
  ...(filterDateRange !== 'all' ? { dateRange: filterDateRange } : {}),
  ...(debouncedSearch.trim() ? { search: debouncedSearch.trim() } : {}),
- ...(selectedTagNames.length > 0 ? { tagNames: selectedTagNames } : {}),
- }), [contentPage, debouncedSearch, filterDateRange, filterStatus, filterType, selectedTagNames]);
- const contentFilterKey = `${selectedFolderId ?? 'root'}|${filterType}|${filterStatus}|${filterDateRange}|${debouncedSearch.trim()}|${selectedTagNames.join(',')}`;
+ ...(selectedTags.length > 0 ? { tagIds: selectedTags } : {}),
+ }), [contentPage, debouncedSearch, filterDateRange, filterStatus, filterType, selectedTags]);
+ const contentFilterKey = `${selectedFolderId ?? 'root'}|${filterType}|${filterStatus}|${filterDateRange}|${debouncedSearch.trim()}|${selectedTags.join(',')}`;
 
  const loadContent = useCallback(async () => {
  if (lastContentFilterKeyRef.current && lastContentFilterKeyRef.current !== contentFilterKey && contentPage !== 1) {
@@ -348,6 +351,38 @@ export default function ContentClient() {
  }
  }, []);
 
+ const loadContentTags = useCallback(async () => {
+ try {
+ setTagsLoading(true);
+ setTagsLoadError(null);
+ const tagList = await apiClient.getContentTags();
+ const nextTags = tagList.map((tag) => ({
+ id: tag.id,
+ name: tag.name,
+ color: tag.color || 'blue',
+ }));
+ setTags(nextTags);
+ setSelectedTags(prev => {
+ const nextSelected = prev.filter(id => nextTags.some(tag => tag.id === id));
+ if (
+ nextSelected.length === prev.length &&
+ nextSelected.every((id, index) => id === prev[index])
+ ) {
+ return prev;
+ }
+ return nextSelected;
+ });
+ } catch (error: any) {
+ const message = error.message || 'Could not load content tags';
+ setTagsLoadError(message);
+ if (process.env.NODE_ENV === 'development') {
+  console.error('[ContentPage] Failed to load content tags:', error);
+ }
+ } finally {
+ setTagsLoading(false);
+ }
+ }, []);
+
  const handleCreateFolder = async () => {
  if (!newFolderName.trim()) {
  toast.error('Folder name is required');
@@ -413,6 +448,10 @@ export default function ContentClient() {
  useEffect(() => {
  loadFolders();
  }, [loadFolders]);
+
+ useEffect(() => {
+ loadContentTags();
+ }, [loadContentTags]);
 
  useEffect(() => {
  loadContent();
@@ -1192,6 +1231,24 @@ export default function ContentClient() {
  {/* Tag filter panel - expands below toolbar */}
  {showTagFilter && (
  <div className="eh-dash-card p-4">
+ {tagsLoading ? (
+ <div className="text-sm text-[var(--foreground-secondary)]">Loading tags...</div>
+ ) : tagsLoadError ? (
+ <div className="flex items-center justify-between gap-3">
+ <p className="text-sm text-red-600 dark:text-red-400">{tagsLoadError}</p>
+ <button
+ type="button"
+ onClick={loadContentTags}
+ className="text-sm text-[var(--primary)] hover:underline"
+ >
+ Retry
+ </button>
+ </div>
+ ) : tags.length === 0 ? (
+ <div className="text-sm text-[var(--foreground-secondary)]">
+ No content tags yet. Add tags to content before using tag filters.
+ </div>
+ ) : (
  <ContentTagger
  tags={tags}
  selectedTags={selectedTags}
@@ -1202,6 +1259,7 @@ export default function ContentClient() {
  setContentPage(1);
  }}
  />
+ )}
  {selectedTags.length > 0 && (
  <button
  onClick={() => {
@@ -1269,6 +1327,7 @@ export default function ContentClient() {
  {filterStatus !== 'all' && <span className="eh-filter-chip">Status: {filterStatus}</span>}
  {filterDateRange !== 'all' && <span className="eh-filter-chip">Date: {filterDateRange}</span>}
  {searchQuery && <span className="eh-filter-chip">Search: &quot;{searchQuery}&quot;</span>}
+ {selectedTagNames.map(tagName => <span key={tagName} className="eh-filter-chip">Tag: {tagName}</span>)}
  </div>
  )}
 

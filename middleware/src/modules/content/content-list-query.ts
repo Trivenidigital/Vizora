@@ -36,6 +36,7 @@ export interface ContentListFilters {
   search?: string;
   dateRange?: ContentDateRange;
   tagNames?: string[];
+  tagIds?: string[];
   folderId?: string;
 }
 
@@ -56,6 +57,15 @@ function normalizeTagNames(tagNames: string[] | undefined): string[] {
   return Array.from(new Set(
     tagNames
       .map((tagName) => tagName.trim())
+      .filter(Boolean),
+  ));
+}
+
+function normalizeTagIds(tagIds: string[] | undefined): string[] {
+  if (!tagIds) return [];
+  return Array.from(new Set(
+    tagIds
+      .map((tagId) => tagId.trim())
       .filter(Boolean),
   ));
 }
@@ -120,6 +130,20 @@ export function buildContentListWhere(
           },
         },
       ]),
+    });
+  }
+
+  const tagIds = normalizeTagIds(filters.tagIds);
+  if (tagIds.length > 0) {
+    andFilters.push({
+      tags: {
+        some: {
+          tag: {
+            organizationId,
+            id: { in: tagIds },
+          },
+        },
+      },
     });
   }
 

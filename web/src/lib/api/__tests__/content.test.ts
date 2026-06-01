@@ -20,4 +20,23 @@ describe('content api methods', () => {
       metadata: { section: 'front' },
     });
   });
+
+  it('serializes array content filters as repeated query params', async () => {
+    const client = new ApiClient('/api/v1');
+    const requestSpy = jest.spyOn(client, 'request').mockResolvedValue({
+      data: [],
+      meta: { page: 1, limit: 50, total: 0, totalPages: 0 },
+    } as any);
+
+    await client.getContent({
+      page: 1,
+      limit: 50,
+      tagNames: ['Lunch, Dinner', 'Marketing'],
+      tagIds: ['tag-menu', 'tag-promo'],
+    });
+
+    expect(requestSpy).toHaveBeenCalledWith(
+      '/content?page=1&limit=50&tagNames=Lunch%2C+Dinner&tagNames=Marketing&tagIds=tag-menu&tagIds=tag-promo',
+    );
+  });
 });

@@ -13,11 +13,20 @@ export interface ContentListParams {
   search?: string;
   dateRange?: '7days' | '30days' | '90days';
   tagNames?: string[];
+  tagIds?: string[];
+}
+
+export interface ContentTagSummary {
+  id: string;
+  name: string;
+  color: string | null;
+  contentCount: number;
 }
 
 declare module './client' {
   interface ApiClient {
     getContent(params?: ContentListParams): Promise<PaginatedResponse<Content>>;
+    getContentTags(): Promise<ContentTagSummary[]>;
     getContentItem(id: string): Promise<Content>;
     createContent(data: { title: string; type: string; url?: string; file?: File; metadata?: Record<string, unknown> }): Promise<Content>;
     updateContent(id: string, data: Partial<{ title: string; metadata?: Record<string, unknown> }>): Promise<Content>;
@@ -48,7 +57,7 @@ const buildContentListQuery = (params?: ContentListParams): string => {
     if (value === undefined || value === null) return;
     if (Array.isArray(value)) {
       if (value.length > 0) {
-        query.set(key, value.join(','));
+        value.forEach((item) => query.append(key, String(item)));
       }
       return;
     }
@@ -61,6 +70,10 @@ const buildContentListQuery = (params?: ContentListParams): string => {
 ApiClient.prototype.getContent = async function (params?: ContentListParams): Promise<PaginatedResponse<Content>> {
   const query = buildContentListQuery(params);
   return this.request<PaginatedResponse<Content>>(`/content${query ? `?${query}` : ''}`);
+};
+
+ApiClient.prototype.getContentTags = async function (): Promise<ContentTagSummary[]> {
+  return this.request<ContentTagSummary[]>('/content/tags');
 };
 
 ApiClient.prototype.getContentItem = async function (id: string): Promise<Content> {
