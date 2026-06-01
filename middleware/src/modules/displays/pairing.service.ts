@@ -433,8 +433,10 @@ export class PairingService implements OnModuleDestroy {
     for (const request of unclaimedRequests) {
       const displayOrganizationId = displayOrganizationsByDevice.get(request.deviceIdentifier);
 
-      // Show if device belongs to this org, or is brand new (no org yet)
-      if (!displayOrganizationId || displayOrganizationId === organizationId) {
+      // Show unclaimed requests only when the device is already owned by
+      // this org. Brand-new unclaimed requests are visible only to the
+      // physical display polling its own code, not to every tenant dashboard.
+      if (displayOrganizationId === organizationId) {
         activePairings.push({
           code: request.code,
           nickname: request.nickname,

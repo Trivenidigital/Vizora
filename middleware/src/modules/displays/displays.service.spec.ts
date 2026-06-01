@@ -61,6 +61,16 @@ describe('DisplaysService', () => {
     }
   }
 
+  function expectDisplayTagSelectScopedToOrganization(
+    select: Record<string, any> | undefined,
+    organizationId: string,
+  ) {
+    expect(select?.tags).toEqual(expect.objectContaining({
+      where: { tag: { organizationId } },
+      select: expect.any(Object),
+    }));
+  }
+
   beforeEach(async () => {
     process.env.INTERNAL_API_SECRET = 'test-internal-secret';
 
@@ -78,6 +88,14 @@ describe('DisplaysService', () => {
       },
       content: {
         findFirst: jest.fn(),
+      },
+      displayTag: {
+        upsert: jest.fn(),
+        findMany: jest.fn(),
+        deleteMany: jest.fn(),
+      },
+      tag: {
+        findMany: jest.fn(),
       },
     };
 
@@ -169,6 +187,7 @@ describe('DisplaysService', () => {
       });
       const query = databaseService.display.create.mock.calls[0][0] as any;
       expectSafeDisplaySelect(query.select);
+      expectDisplayTagSelectScopedToOrganization(query.select, mockOrganizationId);
       expect(result).toEqual(mockDisplay);
     });
 
@@ -205,6 +224,7 @@ describe('DisplaysService', () => {
       const query = databaseService.display.findMany.mock.calls[0][0] as any;
       expect(query).not.toHaveProperty('include');
       expectSafeDisplaySelect(query.select);
+      expectDisplayTagSelectScopedToOrganization(query.select, mockOrganizationId);
       expect(databaseService.display.count).toHaveBeenCalledWith({
         where: { organizationId: mockOrganizationId },
       });
@@ -263,6 +283,7 @@ describe('DisplaysService', () => {
       const query = databaseService.display.findFirst.mock.calls[0][0] as any;
       expect(query).not.toHaveProperty('include');
       expectSafeDisplaySelect(query.select);
+      expectDisplayTagSelectScopedToOrganization(query.select, mockOrganizationId);
       expect(query.select).toEqual(expect.objectContaining({
         metadata: true,
         lastScreenshot: true,
@@ -331,6 +352,7 @@ describe('DisplaysService', () => {
         select: expect.any(Object),
       });
       expectSafeDisplaySelect(findUniqueQuery.select);
+      expectDisplayTagSelectScopedToOrganization(findUniqueQuery.select, mockOrganizationId);
       expect(result.nickname).toBe('Updated Display');
     });
 
@@ -732,6 +754,85 @@ describe('DisplaysService', () => {
           lastScreenshotAt: expect.any(Date),
         },
       });
+    });
+  });
+
+  describe('addTags', () => {
+    it('should filter getTags by tag organization to avoid leaking polluted display tag rows', async () => {
+      databaseService.display.findFirst.mockResolvedValue(mockDisplay as any);
+      (databaseService as any).displayTag.findMany.mockResolvedValue([
+        { tag: { id: 'tag-owned', organizationId: mockOrganizationId, name: 'Lobby' } },
+      ]);
+
+      const result = await service.getTags(mockOrganizationId, mockDisplayId);
+
+      expect((databaseService as any).displayTag.findMany).toHaveBeenCalledWith({
+        where: {
+          displayId: mockDisplayId,
+          tag: { organizationId: mockOrganizationId },
+        },
+        include: { tag: true },
+      });
+      expect(result).toEqual([
+        { id: 'tag-owned', organizationId: mockOrganizationId, name: 'Lobby' },
+      ]);
+    });
+
+    it('should reject tag ids outside the display organization before writing display tags', async () => {
+      databaseService.display.findFirst.mockResolvedValue(mockDisplay as any);
+      (databaseService as any).tag.findMany.mockResolvedValue([
+        { id: 'tag-owned' },
+      ]);
+      (databaseService as any).displayTag.upsert.mockResolvedValue({
+        tag: { id: 'tag-owned', name: 'Lobby' },
+      });
+
+      await expect(
+        service.addTags(mockOrganizationId, mockDisplayId, ['tag-owned', 'tag-other-org']),
+      ).rejects.toThrow(NotFoundException);
+
+      expect((databaseService as any).tag.findMany).toHaveBeenCalledWith({
+        where: {
+          id: { in: ['tag-owned', 'tag-other-org'] },
+          organizationId: mockOrganizationId,
+        },
+        select: { id: true },
+      });
+      expect((databaseService as any).displayTag.upsert).not.toHaveBeenCalled();
+      expect((service as any).eventEmitter.emit).not.toHaveBeenCalledWith(
+        'display.tags.changed',
+        expect.anything(),
+      );
+    });
+
+    it('should validate tags by organization and create display tags for unique ids', async () => {
+      databaseService.display.findFirst.mockResolvedValue(mockDisplay as any);
+      (databaseService as any).tag.findMany.mockResolvedValue([
+        { id: 'tag-1' },
+        { id: 'tag-2' },
+      ]);
+      (databaseService as any).displayTag.upsert
+        .mockResolvedValueOnce({ tag: { id: 'tag-1', name: 'Lobby' } })
+        .mockResolvedValueOnce({ tag: { id: 'tag-2', name: 'Window' } });
+
+      const result = await service.addTags(mockOrganizationId, mockDisplayId, [
+        'tag-1',
+        'tag-1',
+        'tag-2',
+      ]);
+
+      expect((databaseService as any).tag.findMany).toHaveBeenCalledWith({
+        where: {
+          id: { in: ['tag-1', 'tag-2'] },
+          organizationId: mockOrganizationId,
+        },
+        select: { id: true },
+      });
+      expect((databaseService as any).displayTag.upsert).toHaveBeenCalledTimes(2);
+      expect(result).toEqual([
+        { id: 'tag-1', name: 'Lobby' },
+        { id: 'tag-2', name: 'Window' },
+      ]);
     });
   });
 

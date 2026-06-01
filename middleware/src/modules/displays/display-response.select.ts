@@ -90,15 +90,16 @@ export const DISPLAY_EMBEDDED_SELECT = {
   unpairedAt: true,
 } satisfies Prisma.DisplaySelect;
 
-export const DISPLAY_LIST_SELECT = {
+export const getDisplayListSelect = (organizationId: string) => ({
   ...DISPLAY_EMBEDDED_SELECT,
   tags: {
+    where: { tag: { organizationId } },
     select: DISPLAY_TAG_SELECT,
   },
-} satisfies Prisma.DisplaySelect;
+}) satisfies Prisma.DisplaySelect;
 
-export const DISPLAY_DETAIL_SELECT = {
-  ...DISPLAY_LIST_SELECT,
+export const getDisplayDetailSelect = (organizationId: string) => ({
+  ...getDisplayListSelect(organizationId),
   metadata: true,
   lastScreenshot: true,
   lastScreenshotAt: true,
@@ -109,7 +110,7 @@ export const DISPLAY_DETAIL_SELECT = {
     where: { isActive: true },
     select: ACTIVE_SCHEDULE_SELECT,
   },
-} satisfies Prisma.DisplaySelect;
+}) satisfies Prisma.DisplaySelect;
 
 export const DISPLAY_GROUP_MEMBER_WITH_DISPLAY_SELECT = {
   id: true,

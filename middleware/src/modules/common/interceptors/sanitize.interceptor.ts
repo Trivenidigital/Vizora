@@ -189,6 +189,12 @@ export class SanitizeInterceptor implements NestInterceptor {
 
 
   private sanitizeString(str: string, decodeEntities = false): string {
+    const trimmed = str.trim();
+
+    if (!this.needsSanitizeHtml(trimmed)) {
+      return trimmed;
+    }
+
     // First strip HTML tags
     let sanitized = sanitizeHtml(str, this.sanitizeOptions);
 
@@ -203,6 +209,10 @@ export class SanitizeInterceptor implements NestInterceptor {
     }
 
     return sanitized;
+  }
+
+  private needsSanitizeHtml(str: string): boolean {
+    return str.includes('<') || str.includes('>') || str.includes('&');
   }
 
   private decodeHtmlEntities(str: string): string {

@@ -21,6 +21,11 @@ describe('DisplaysService — display.tags.changed emission (O4)', () => {
         upsert: jest.fn().mockResolvedValue({ tag: { id: 'tag-1', name: 'lobby' } }),
         deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
+      tag: {
+        findMany: jest.fn().mockImplementation(({ where }: any) =>
+          Promise.resolve(where.id.in.map((id: string) => ({ id }))),
+        ),
+      },
     };
     eventEmitter = { emit: jest.fn() };
 
