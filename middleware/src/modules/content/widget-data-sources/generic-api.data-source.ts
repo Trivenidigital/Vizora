@@ -1,7 +1,7 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
-import { CircuitBreakerService } from '../../common/services/circuit-breaker.service';
+import { Injectable, Logger, BadRequestException, BadGatewayException, ServiceUnavailableException } from '@nestjs/common';
+import { CircuitBreakerService, CircuitOpenError } from '../../common/services/circuit-breaker.service';
 import { assertUrlIsPublic, SsrfError } from '../../common/utils/ssrf-guard';
-import { WidgetDataSource } from './widget-data-source.interface';
+import { WidgetDataSource, WidgetFetchOptions } from './widget-data-source.interface';
 import { readJsonResponseBodyWithLimit } from '../utils/bounded-json-response';
 
 /**
@@ -31,9 +31,13 @@ export class GenericApiDataSource implements WidgetDataSource {
   private readonly REQUEST_TIMEOUT = 15_000;
   constructor(private readonly circuitBreaker: CircuitBreakerService) {}
 
-  async fetchData(config: Record<string, unknown>): Promise<Record<string, unknown>> {
-    const url = config.url as string | undefined;
+  async fetchData(config: Record<string, unknown>, options: WidgetFetchOptions = {}): Promise<Record<string, unknown>> {
+    const strict = options.strict === true;
+    const url = typeof config.url === 'string' ? config.url.trim() : '';
     if (!url) {
+      if (strict) {
+        throw new BadRequestException('API URL is required');
+      }
       this.logger.warn('No url provided, returning sample data');
       return this.getSampleData();
     }
@@ -64,9 +68,7 @@ export class GenericApiDataSource implements WidgetDataSource {
     const headers = (config.headers as Record<string, string> | undefined) ?? {};
     const responseRoot = config.responseRoot as string | undefined;
 
-    return this.circuitBreaker.executeWithFallback(
-      'generic-api',
-      async () => {
+    const fetchLiveData = async () => {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), this.REQUEST_TIMEOUT);
 
@@ -115,12 +117,33 @@ export class GenericApiDataSource implements WidgetDataSource {
         } finally {
           clearTimeout(timeoutId);
         }
-      },
+    };
+
+    if (strict) {
+      try {
+        return await this.circuitBreaker.execute('generic-api', fetchLiveData);
+      } catch (error) {
+        throw this.toStrictFetchException(error, 'Generic API');
+      }
+    }
+
+    return this.circuitBreaker.executeWithFallback(
+      'generic-api',
+      fetchLiveData,
       () => {
         this.logger.warn('generic-api circuit open or failed, returning sample data');
         return this.getSampleData();
       },
     );
+  }
+
+  private toStrictFetchException(error: unknown, providerName: string): Error {
+    if (error instanceof BadRequestException) return error;
+    if (error instanceof CircuitOpenError) {
+      return new ServiceUnavailableException(`${providerName} provider is temporarily unavailable`);
+    }
+    const message = error instanceof Error ? error.message : 'Unknown provider error';
+    return new BadGatewayException(`${providerName} provider failed: ${message}`);
   }
 
   /**

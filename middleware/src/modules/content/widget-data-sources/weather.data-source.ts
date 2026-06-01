@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { CircuitBreakerService } from '../../common/services/circuit-breaker.service';
-import { WidgetDataSource } from './widget-data-source.interface';
+import { Injectable, Logger, BadRequestException, BadGatewayException, ServiceUnavailableException } from '@nestjs/common';
+import { CircuitBreakerService, CircuitOpenError } from '../../common/services/circuit-breaker.service';
+import { WidgetDataSource, WidgetFetchOptions } from './widget-data-source.interface';
 
 /** OpenWeatherMap API response shape (partial) */
 interface WeatherApiResponse {
@@ -47,24 +47,36 @@ export class WeatherDataSource implements WidgetDataSource {
    * @param config - Must contain at least `location`; optionally `units`,
    *   `showForecast`, and `forecastDays`.
    */
-  async fetchData(config: Record<string, unknown>): Promise<Record<string, unknown>> {
+  async fetchData(config: Record<string, unknown>, options: WidgetFetchOptions = {}): Promise<Record<string, unknown>> {
+    const strict = options.strict === true;
     const apiKey = process.env.OPENWEATHER_API_KEY;
     if (!apiKey) {
+      if (strict) {
+        throw new ServiceUnavailableException('Weather provider is not configured');
+      }
       this.logger.warn('OPENWEATHER_API_KEY not set, returning sample data');
       return this.getSampleData();
     }
 
-    const location = config.location || 'New York';
-    const units = config.units || 'metric';
+    const location = typeof config.location === 'string' ? config.location.trim() : '';
+    if (!location && strict) {
+      throw new BadRequestException('Weather location is required');
+    }
+    const resolvedLocation = location || 'New York';
+    const requestedUnits = typeof config.units === 'string' ? config.units : 'metric';
+    if (!['metric', 'imperial', 'standard'].includes(requestedUnits)) {
+      if (strict) {
+        throw new BadRequestException('Weather units must be metric, imperial, or standard');
+      }
+    }
+    const units = ['metric', 'imperial', 'standard'].includes(requestedUnits) ? requestedUnits : 'metric';
     const showForecast = config.showForecast ?? true;
     const forecastDays = config.forecastDays ?? 5;
 
-    return this.circuitBreaker.executeWithFallback(
-      'openweathermap-api',
-      async () => {
+    const fetchLiveData = async () => {
         // --- current weather ---
         const currentUrl =
-          `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(location)}&units=${units}&appid=${apiKey}`;
+          `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(resolvedLocation)}&units=${units}&appid=${apiKey}`;
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), this.REQUEST_TIMEOUT);
@@ -104,7 +116,7 @@ export class WeatherDataSource implements WidgetDataSource {
         if (showForecast) {
           try {
             const forecastUrl =
-              `https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(location)}&units=${units}&cnt=${forecastDays * 8}&appid=${apiKey}`;
+              `https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(resolvedLocation)}&units=${units}&cnt=${forecastDays * 8}&appid=${apiKey}`;
 
             const fc = new AbortController();
             const fcTimeout = setTimeout(() => fc.abort(), this.REQUEST_TIMEOUT);
@@ -145,13 +157,34 @@ export class WeatherDataSource implements WidgetDataSource {
         }
 
         return result;
-      },
+    };
+
+    if (strict) {
+      try {
+        return await this.circuitBreaker.execute('openweathermap-api', fetchLiveData, WEATHER_CIRCUIT_CONFIG);
+      } catch (error) {
+        throw this.toStrictFetchException(error, 'Weather');
+      }
+    }
+
+    return this.circuitBreaker.executeWithFallback(
+      'openweathermap-api',
+      fetchLiveData,
       () => {
         this.logger.warn('Weather API circuit open or failed, returning sample data');
         return this.getSampleData();
       },
       WEATHER_CIRCUIT_CONFIG,
     );
+  }
+
+  private toStrictFetchException(error: unknown, providerName: string): Error {
+    if (error instanceof BadRequestException || error instanceof ServiceUnavailableException) return error;
+    if (error instanceof CircuitOpenError) {
+      return new ServiceUnavailableException(`${providerName} provider is temporarily unavailable`);
+    }
+    const message = error instanceof Error ? error.message : 'Unknown provider error';
+    return new BadGatewayException(`${providerName} provider failed: ${message}`);
   }
 
   getConfigSchema(): Record<string, unknown> {

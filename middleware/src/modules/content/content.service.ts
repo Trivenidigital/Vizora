@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger, ServiceUnavailableException, BadGatewayException, HttpException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma } from '@vizora/database';
 import { DatabaseService } from '../database/database.service';
@@ -62,6 +62,8 @@ export interface WidgetMetadata {
   lastError?: string;
 }
 
+const REDACTED_WIDGET_SECRET = '********';
+
 @Injectable()
 export class ContentService {
   private readonly logger = new Logger(ContentService.name);
@@ -81,8 +83,65 @@ export class ContentService {
     if (!content) return content;
     return {
       ...content,
+      metadata: this.redactWidgetMetadataForResponse(content.metadata),
       title: content.name, // Map name to title for frontend compatibility
       thumbnailUrl: content.thumbnail, // Map thumbnail to thumbnailUrl for frontend
+    };
+  }
+
+  private isRecord(value: unknown): value is Record<string, unknown> {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  private redactWidgetMetadataForResponse(metadata: unknown): unknown {
+    if (!this.isRecord(metadata) || metadata.isWidget !== true) return metadata;
+
+    return {
+      ...metadata,
+      widgetConfig: this.redactWidgetConfigForResponse(
+        typeof metadata.widgetType === 'string' ? metadata.widgetType : '',
+        metadata.widgetConfig,
+      ),
+    };
+  }
+
+  private redactWidgetConfigForResponse(widgetType: string, config: unknown): unknown {
+    if (widgetType !== 'generic-api' || !this.isRecord(config) || !this.isRecord(config.headers)) {
+      return config;
+    }
+
+    return {
+      ...config,
+      headers: Object.fromEntries(
+        Object.keys(config.headers).map((key) => [key, REDACTED_WIDGET_SECRET]),
+      ),
+    };
+  }
+
+  private restoreRedactedWidgetConfig(
+    widgetType: string,
+    nextConfig: Record<string, unknown>,
+    previousConfig: unknown,
+  ): Record<string, unknown> {
+    if (
+      widgetType !== 'generic-api'
+      || !this.isRecord(nextConfig.headers)
+      || !this.isRecord(previousConfig)
+      || !this.isRecord(previousConfig.headers)
+    ) {
+      return nextConfig;
+    }
+
+    return {
+      ...nextConfig,
+      headers: Object.fromEntries(
+        Object.entries(nextConfig.headers).map(([key, value]) => [
+          key,
+          value === REDACTED_WIDGET_SECRET
+            ? previousConfig.headers[key]
+            : value,
+        ]),
+      ),
     };
   }
 
@@ -1584,6 +1643,31 @@ export class ContentService {
     return types;
   }
 
+  private toWidgetPersistenceException(error: unknown, fallbackMessage: string): Error {
+    if (error instanceof HttpException) {
+      return error;
+    }
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return new BadGatewayException(`${fallbackMessage}: ${message}`);
+  }
+
+  private async findWidgetForMutation(organizationId: string, id: string) {
+    const content = await this.db.content.findFirst({
+      where: { id, organizationId },
+    });
+
+    if (!content) {
+      throw new NotFoundException('Content not found');
+    }
+
+    const metadata = (content.metadata || {}) as Record<string, unknown>;
+    if (metadata.isWidget !== true) {
+      throw new BadRequestException('Content is not a widget');
+    }
+
+    return content;
+  }
+
   /**
    * Fetch live weather data for preview purposes.
    * Uses the weather data source to get current conditions without creating a widget.
@@ -1614,21 +1698,21 @@ export class ContentService {
     const templateName = source.getDefaultTemplate();
     const templateHtml = this.loadWidgetTemplate(templateName);
 
-    // Fetch initial data from the data source (falls back to sample data on failure)
+    // Fetch initial data from the data source. Persisted widgets are strict:
+    // sample fallback data is allowed for previews only, never for saved screens.
     let data: Record<string, unknown>;
     try {
-      data = await source.fetchData(dto.widgetConfig);
+      data = await source.fetchData(dto.widgetConfig, { strict: true });
     } catch (error) {
-      this.logger.warn(`Widget initial data fetch failed, using sample data: ${error}`);
-      data = source.getSampleData();
+      throw this.toWidgetPersistenceException(error, 'Widget initial data fetch failed');
     }
 
     // Render the template with data
-    let renderedHtml = '';
+    let renderedHtml: string;
     try {
       renderedHtml = this.templateRendering.renderTemplate(templateHtml, data);
     } catch (error) {
-      this.logger.warn(`Widget initial render failed: ${error}`);
+      throw this.toWidgetPersistenceException(error, 'Widget initial render failed');
     }
 
     const widgetMeta: WidgetMetadata = {
@@ -1660,15 +1744,16 @@ export class ContentService {
    * Update widget configuration and re-render.
    */
   async updateWidget(organizationId: string, id: string, dto: Partial<CreateWidgetDto>) {
-    const existing = await this.findOne(organizationId, id);
+    const existing = await this.findWidgetForMutation(organizationId, id);
 
     const existingMeta = (existing.metadata || {}) as Record<string, unknown>;
-    if (!existingMeta.isWidget) {
-      throw new BadRequestException('Content is not a widget');
-    }
 
-    const widgetType = dto.widgetType || existingMeta.widgetType;
-    const widgetConfig = dto.widgetConfig || existingMeta.widgetConfig;
+    const widgetType = (dto.widgetType || existingMeta.widgetType) as string;
+    const widgetConfig = this.restoreRedactedWidgetConfig(
+      widgetType,
+      (dto.widgetConfig || existingMeta.widgetConfig || {}) as Record<string, unknown>,
+      existingMeta.widgetConfig,
+    );
 
     let source: WidgetDataSource;
     try {
@@ -1678,25 +1763,27 @@ export class ContentService {
     }
 
     // If the widget type changed, load the new default template
-    let templateName = existingMeta.templateName;
-    let templateHtml = existingMeta.templateHtml;
+    let templateName = existingMeta.templateName as string;
+    let templateHtml = existingMeta.templateHtml as string;
     if (dto.widgetType && dto.widgetType !== existingMeta.widgetType) {
       templateName = source.getDefaultTemplate();
       templateHtml = this.loadWidgetTemplate(templateName);
     }
 
-    // Re-fetch data and re-render
+    // Re-fetch data and re-render. Configuration changes are only persisted
+    // after live data and template rendering both succeed.
     let data: Record<string, unknown>;
-    let renderedHtml = existingMeta.renderedHtml || '';
-    let lastError: string | undefined;
+    let renderedHtml: string;
+    try {
+      data = await source.fetchData(widgetConfig, { strict: true });
+    } catch (error) {
+      throw this.toWidgetPersistenceException(error, 'Widget data fetch failed');
+    }
 
     try {
-      data = await source.fetchData(widgetConfig);
       renderedHtml = this.templateRendering.renderTemplate(templateHtml, data);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.warn(`Widget re-render failed: ${message}`);
-      lastError = message;
+      throw this.toWidgetPersistenceException(error, 'Widget render failed');
     }
 
     const widgetMeta: WidgetMetadata = {
@@ -1707,11 +1794,11 @@ export class ContentService {
       templateHtml,
       renderedHtml,
       renderedAt: new Date().toISOString(),
-      lastError,
+      lastError: undefined,
     };
 
-    const content = await this.db.content.update({
-      where: { id },
+    const updated = await this.db.content.updateMany({
+      where: { id, organizationId },
       data: {
         name: dto.name ?? existing.name,
         description: dto.description ?? existing.description,
@@ -1720,6 +1807,11 @@ export class ContentService {
       },
     });
 
+    if (updated.count === 0) {
+      throw new NotFoundException('Content not found');
+    }
+
+    const content = await this.db.content.findFirst({ where: { id, organizationId } });
     return this.mapContentResponse(content);
   }
 
@@ -1727,12 +1819,9 @@ export class ContentService {
    * Force refresh a widget: re-fetch data from the data source and re-render.
    */
   async refreshWidget(organizationId: string, id: string) {
-    const existing = await this.findOne(organizationId, id);
+    const existing = await this.findWidgetForMutation(organizationId, id);
 
     const existingMeta = (existing.metadata || {}) as Record<string, unknown>;
-    if (!existingMeta.isWidget) {
-      throw new BadRequestException('Content is not a widget');
-    }
 
     let source: WidgetDataSource;
     try {
@@ -1741,10 +1830,11 @@ export class ContentService {
       throw new BadRequestException(`Unknown widget type: ${existingMeta.widgetType}`);
     }
 
-    const templateHtml = existingMeta.templateHtml;
+    const templateHtml = existingMeta.templateHtml as string;
+    const widgetConfig = (existingMeta.widgetConfig || {}) as Record<string, unknown>;
 
     try {
-      const data = await source.fetchData(existingMeta.widgetConfig);
+      const data = await source.fetchData(widgetConfig, { strict: true });
       const renderedHtml = this.templateRendering.renderTemplate(templateHtml, data);
 
       const widgetMeta: WidgetMetadata = {
@@ -1754,13 +1844,18 @@ export class ContentService {
         lastError: undefined,
       };
 
-      const content = await this.db.content.update({
-        where: { id },
+      const updated = await this.db.content.updateMany({
+        where: { id, organizationId },
         data: {
           metadata: widgetMeta as Prisma.InputJsonValue,
         },
       });
 
+      if (updated.count === 0) {
+        throw new NotFoundException('Content not found');
+      }
+
+      const content = await this.db.content.findFirst({ where: { id, organizationId } });
       return this.mapContentResponse(content);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -1770,14 +1865,14 @@ export class ContentService {
         lastError: message,
       };
 
-      await this.db.content.update({
-        where: { id },
+      await this.db.content.updateMany({
+        where: { id, organizationId },
         data: {
           metadata: widgetMeta as Prisma.InputJsonValue,
         },
       });
 
-      throw new BadRequestException(`Widget refresh failed: ${message}`);
+      throw this.toWidgetPersistenceException(error, 'Widget refresh failed');
     }
   }
 
