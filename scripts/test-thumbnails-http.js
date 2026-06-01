@@ -1,4 +1,39 @@
 const http = require('http');
+const DEVICE_TOKEN = requiredEnv('VIZORA_TEST_DEVICE_TOKEN');
+const API_PREFIX = '/api/v1';
+let failures = 0;
+
+function requiredEnv(name) {
+  const value = process.env[name];
+  if (!value) {
+    console.error(`${name} is required. Generate a fresh local device token and pass it through the environment.`);
+    process.exit(1);
+  }
+  return value;
+}
+
+function recordFailure(message) {
+  failures += 1;
+  console.log(message);
+}
+
+function extractCollection(payload) {
+  const queue = [payload];
+  const seen = new Set();
+
+  while (queue.length > 0) {
+    const value = queue.shift();
+    if (Array.isArray(value)) return value;
+    if (!value || typeof value !== 'object' || seen.has(value)) continue;
+
+    seen.add(value);
+    for (const key of ['data', 'items', 'content', 'results']) {
+      if (key in value) queue.push(value[key]);
+    }
+  }
+
+  return [];
+}
 
 function makeRequest(options) {
   return new Promise((resolve, reject) => {
@@ -24,7 +59,7 @@ async function run() {
   const loginData = JSON.stringify({ email: 'admin@vizora.test', password: 'Test1234!' });
   const loginRes = await new Promise((resolve, reject) => {
     const req = http.request({
-      hostname: 'localhost', port: 3000, path: '/api/auth/login', method: 'POST',
+      hostname: 'localhost', port: 3000, path: `${API_PREFIX}/auth/login`, method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Content-Length': loginData.length }
     }, (res) => {
       let body = '';
@@ -45,7 +80,7 @@ async function run() {
   // Get content list
   const contentRes = await new Promise((resolve, reject) => {
     const req = http.request({
-      hostname: 'localhost', port: 3000, path: '/api/content', method: 'GET',
+      hostname: 'localhost', port: 3000, path: `${API_PREFIX}/content`, method: 'GET',
       headers: { 'Cookie': cookieHeader }
     }, (res) => {
       let body = '';
@@ -56,13 +91,13 @@ async function run() {
     req.end();
   });
 
-  const items = contentRes.data || contentRes;
+  const items = extractCollection(contentRes);
   console.log(`\n=== Thumbnail HTTP Verification (${items.length} items) ===\n`);
 
   for (const item of items) {
     const thumbnailPath = item.thumbnail || item.thumbnailUrl;
     if (!thumbnailPath) {
-      console.log(`[FAIL] ${item.name} - No thumbnail path set`);
+      recordFailure(`[FAIL] ${item.name} - No thumbnail path set`);
       continue;
     }
 
@@ -77,41 +112,47 @@ async function run() {
       });
 
       const status = thumbRes.status === 200 ? 'PASS' : 'FAIL';
+      if (status === 'FAIL') failures += 1;
       console.log(`[${status}] ${item.name}`);
       console.log(`   Path: ${thumbnailPath}`);
       console.log(`   HTTP Status: ${thumbRes.status}`);
       console.log(`   Content-Type: ${thumbRes.contentType}`);
       console.log(`   Size: ${thumbRes.bodyLength} bytes`);
     } catch (e) {
-      console.log(`[FAIL] ${item.name} - Error: ${e.message}`);
+      recordFailure(`[FAIL] ${item.name} - Error: ${e.message}`);
     }
   }
 
   // Also test content file serving via device endpoint
   console.log('\n=== Device Content File Access Verification ===\n');
 
-  // Use the device token from the pairing flow
-  const deviceToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJlZDc3NmU5Zi1hNWI3LTQ1OTQtYjI1NS1kMDYzMjFhMTUwNmUiLCJkZXZpY2VJZGVudGlmaWVyIjoiYW5kcm9pZC0xMDgweDE5MjAtMTc3MDU1ODQ5NzMzMiIsIm9yZ2FuaXphdGlvbklkIjoiNjJhNTVmZTItMzIyNC00MDQ0LTgxODctNzQ3MWVkZDUyOWIyIiwidHlwZSI6ImRldmljZSIsImlhdCI6MTc3MDU1ODQ5NywiZXhwIjoxODAyMDk0NDk3fQ.oOuTGNqWbapKhR3fYHbiZY1mzzJUn2Xo2okFMOH4Gc4';
-
   for (const item of items.slice(0, 2)) {  // Test first 2
     try {
       const fileRes = await makeRequest({
         hostname: 'localhost',
         port: 3000,
-        path: `/api/device-content/${item.id}/file?token=${deviceToken}`,
+        path: `${API_PREFIX}/device-content/${item.id}/file?token=${DEVICE_TOKEN}`,
         method: 'GET',
         headers: {}
       });
 
       const status = fileRes.status === 200 ? 'PASS' : 'FAIL';
+      if (status === 'FAIL') failures += 1;
       console.log(`[${status}] ${item.name}`);
       console.log(`   HTTP Status: ${fileRes.status}`);
       console.log(`   Content-Type: ${fileRes.contentType}`);
       console.log(`   Size: ${fileRes.bodyLength} bytes`);
     } catch (e) {
-      console.log(`[FAIL] ${item.name} - Error: ${e.message}`);
+      recordFailure(`[FAIL] ${item.name} - Error: ${e.message}`);
     }
+  }
+
+  if (failures > 0) {
+    throw new Error(`${failures} thumbnail/content verification checks failed`);
   }
 }
 
-run().catch(console.error);
+run().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

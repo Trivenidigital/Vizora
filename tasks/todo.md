@@ -1,6 +1,104 @@
 # Vizora - Task Tracker
 
-## In Progress: Display Response Projection Pass 21 (2026-06-01)
+## In Progress: Security Token Guard Pass 22 (2026-06-01)
+
+**Branch:** `feat/customer-dashboard-improvements-pass-22`
+
+**Why now:** PR #144 merged with green PR checks and green post-merge `main`
+CI, but production deployment remains blocked by a dirty/diverged checkout. The
+next read-only customer/performance/release review found several valid targets;
+the smallest high-severity repo-side gap is committed long-lived JWT-looking
+tokens in manual verification scripts plus no blocking CI guard for that class.
+
+**New primitives introduced:** one repository-local security scan script,
+`scripts/security/check-no-hardcoded-jwts.js`. No new runtime service, route,
+database model, migration, agent, MCP tool, Hermes skill, provider, or
+infrastructure primitive.
+
+**Hermes-first analysis:** not applicable. This pass does not add or modify
+business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
+
+**Plan**
+- [x] Dispatch read-only customer UX, backend/performance, and release/security
+  reviewers after PR #144.
+- [x] Select highest-value bounded target.
+- [x] Add red hardcoded-JWT guard and confirm it catches existing committed
+  tokens.
+- [x] Replace manual-script committed JWTs with required environment variables.
+- [x] Wire the guard into CI security workflows before advisory dependency
+  audit.
+- [x] Address first review pass: stage/include the new guard script at commit
+  time, derive `test-content-delivery` playlist data from local API state or
+  env, and make thumbnail device-token validation fail fast/nonzero.
+- [x] Address re-review pass: support nested playlist list envelopes and
+  document `VIZORA_TEST_*` variables in `.env.example` and `CLAUDE.md` (no
+  tracked `AGENTS.md` exists in this worktree).
+- [x] Address final manual-script review: use direct `/api/v1` middleware
+  paths and make thumbnail/content verification failures exit nonzero.
+- [x] Address final response-shape review: unwrap current response envelopes in
+  older manual scripts and use the actual `/api/v1/displays` status source.
+- [x] Run multi-subagent code review before broader tests.
+- [x] Run focused and broader verification.
+- [ ] PR, CI, merge.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Plan/design:**
+`docs/plans/2026-06-01-security-token-guard-pass-22.md`
+
+**Reviewer target synthesis**
+- [x] Customer UX reviewer found valid current dashboard issues: inactive
+  schedules shown as active, dead schedule conflict warning UI, fictional
+  schedule timezone selector, hardcoded content tag filters, synthetic
+  analytics labels, and AI Designer CTA prominence while backend capability is
+  unavailable.
+- [x] Backend/performance reviewer found valid performance targets: dashboard
+  org broadcasts still inspect device sockets, playlist fan-out can send
+  unbounded per-display internal requests, content impressions write
+  synchronously, dashboard status fetches up to 1000 displays, response
+  sanitization is CPU-heavy, upload does multiple full-file passes, and pairing
+  active-list scans Redis keyspace.
+- [x] Release/security reviewer found valid launch-readiness targets: CI E2E is
+  still thin for customer-1, dependency audit is advisory, long-lived JWTs were
+  committed in manual scripts, prod deploy is unsafe until prod checkout is
+  reconciled, and customer-1 operator gates remain open.
+- [x] Selected first bounded target for this pass: committed JWT cleanup plus a
+  blocking CI guard, because it is high-severity, repo-side, testable, and does
+  not require operator credentials.
+
+**Operator-only residual**
+- [ ] If any removed token was ever valid in shared, staging, or production-like
+  environments, revoke/rotate it outside the repo. This pass prevents future
+  commits but cannot invalidate already-issued tokens.
+
+**Review gate**
+- [x] Security/CI reviewer CLEAN after staging follow-up. Confirmed the guard
+  script is staged, package script is wired, both CI security workflows run it
+  before advisory audit, `.env.example` / `CLAUDE.md` document the
+  `VIZORA_TEST_*` inputs, no full JWT-shaped tracked tokens remain, and diff
+  check passes.
+- [x] Manual-script/runtime reviewer CLEAN after follow-ups. Confirmed direct
+  middleware paths use `/api/v1`, `test-content-delivery` uses
+  `/api/v1/displays` and nested playlist envelopes, `test-end-to-end-streaming`
+  unwraps current auth/content/playlist response shapes, and
+  `test-thumbnails-http` unwraps paginated content and exits nonzero on check
+  failures.
+
+**Verification**
+- [x] Hardcoded JWT guard passed:
+  `pnpm security:no-hardcoded-jwts`.
+- [x] Syntax checks passed:
+  `node --check scripts/security/check-no-hardcoded-jwts.js`,
+  `node --check realtime/test-content-delivery.js`,
+  `node --check realtime/test-device-realtime.js`,
+  `node --check realtime/test-end-to-end-streaming.js`,
+  `node --check scripts/test-thumbnails-http.js`.
+- [x] Diff hygiene passed: `git diff --check` and `git diff --cached --check`.
+- [x] Realtime unit suite passed:
+  `pnpm --filter @vizora/realtime test -- --runInBand` - 12 suites / 275 tests.
+
+---
+
+## Completed: Display Response Projection Pass 21 (2026-06-01)
 
 **Branch:** `feat/customer-dashboard-improvements-pass-21`
 
@@ -92,6 +190,15 @@ agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
   `pnpm --filter @vizora/middleware test -- --runInBand` - 143 suites /
   2,884 tests.
 - [x] `git diff --check` passed with Windows CRLF warnings only.
+- [x] PR #144 merged at
+  `929b95764a96dcca2786a5e36606be457207f47b`; PR checks green for audit,
+  build, e2e, lint, security, and test.
+- [x] Post-merge `main` CI run `26735439846` completed successfully: audit,
+  build, e2e, lint, security, and test all green.
+- [x] Post-merge prod deploy gate re-checked and remains blocked:
+  `/opt/vizora/app` is dirty/diverged (`ahead 17, behind 77`) with many tracked
+  edits and untracked files. No production pull, reset, stash, env edit, service
+  restart, DB mutation, or deploy performed.
 
 **Reviewer target synthesis**
 - [x] Customer UX reviewer found valid current dashboard issues: inactive

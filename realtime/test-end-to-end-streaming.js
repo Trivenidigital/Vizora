@@ -2,12 +2,22 @@ const { io } = require('socket.io-client');
 const http = require('http');
 
 const API_URL = 'http://127.0.0.1:3000';
+const API_PREFIX = '/api/v1';
 const REALTIME_URL = 'ws://127.0.0.1:3002';
 const DEVICE_IDENTIFIER = '00:15:5d:05:a2:cb';
-const DEVICE_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmYzVmZjk4Mi1hNmUxLTRmNDYtYjQyNS01MjJjMWQ3NThjOTkiLCJkZXZpY2VJZGVudGlmaWVyIjoiMDA6MTU6NWQ6MDU6YTI6Y2IiLCJvcmdhbml6YXRpb25JZCI6IjJmZDY4OTY4LTAyYjAtNGM0MC05ZmM4LWU2MmE2MWRkNWVkYyIsInR5cGUiOiJkZXZpY2UiLCJpYXQiOjE3Njk3ODIzOTcsImV4cCI6MTgwMTMxODM5N30.F6LRyNtGTBCS3gsMUaHBMSezW6VSpHaxBtuGsaousp8';
+const DEVICE_TOKEN = requiredEnv('VIZORA_TEST_DEVICE_TOKEN');
 
 const results = [];
 let userToken = null;
+
+function requiredEnv(name) {
+  const value = process.env[name];
+  if (!value) {
+    console.error(`${name} is required. Generate a fresh local device token and pass it through the environment.`);
+    process.exit(1);
+  }
+  return value;
+}
 
 function httpRequest(method, path, body, headers = {}, useAuth = true) {
   return new Promise((resolve, reject) => {
@@ -57,6 +67,12 @@ function httpRequest(method, path, body, headers = {}, useAuth = true) {
   });
 }
 
+function unwrapResponseData(responseData) {
+  return responseData && typeof responseData === 'object' && 'data' in responseData
+    ? responseData.data
+    : responseData;
+}
+
 async function testRegisterUser() {
   console.log('\n👤 STEP 1: Register Test User');
   console.log('=====================================');
@@ -64,7 +80,7 @@ async function testRegisterUser() {
   try {
     const uniqueId = Date.now();
     const email = `test-streaming-${uniqueId}@example.com`;
-    const response = await httpRequest('POST', '/api/auth/register', {
+    const response = await httpRequest('POST', `${API_PREFIX}/auth/register`, {
       email: email,
       password: 'Test123!@#',
       firstName: 'Test',
@@ -73,7 +89,8 @@ async function testRegisterUser() {
     }, {}, false);
 
     if (response.status === 201) {
-      userToken = response.data.data?.token || response.data.token;
+      const authData = unwrapResponseData(response.data);
+      userToken = authData.access_token || authData.token;
       console.log('✓ User registered');
       console.log(`  Email: ${email}`);
       console.log(`  Token: ${userToken?.substring(0, 30)}...`);
@@ -93,7 +110,7 @@ async function testCreateContent() {
   console.log('=====================================');
 
   try {
-    const response = await httpRequest('POST', '/api/content', {
+    const response = await httpRequest('POST', `${API_PREFIX}/content`, {
       name: 'Streaming Test Image',
       description: 'Image for realtime streaming test',
       type: 'image',
@@ -103,11 +120,12 @@ async function testCreateContent() {
     });
 
     if (response.status === 200 || response.status === 201) {
-      const contentId = response.data.id || response.data.contentId;
+      const content = unwrapResponseData(response.data);
+      const contentId = content.id || content.contentId;
       console.log('✓ Content created');
       console.log(`  Content ID: ${contentId}`);
-      console.log(`  Name: ${response.data.name}`);
-      console.log(`  Duration: ${response.data.duration}ms`);
+      console.log(`  Name: ${content.name}`);
+      console.log(`  Duration: ${content.duration}ms`);
       return contentId;
     } else {
       throw new Error(`HTTP ${response.status}: ${response.data?.message}`);
@@ -124,7 +142,7 @@ async function testCreatePlaylist(contentId) {
   console.log('=====================================');
 
   try {
-    const response = await httpRequest('POST', '/api/playlists', {
+    const response = await httpRequest('POST', `${API_PREFIX}/playlists`, {
       name: 'Streaming Test Playlist',
       description: 'Playlist for realtime delivery test',
       isDefault: false,
@@ -138,11 +156,12 @@ async function testCreatePlaylist(contentId) {
     });
 
     if (response.status === 200 || response.status === 201) {
-      const playlistId = response.data.id || response.data.playlistId;
+      const playlist = unwrapResponseData(response.data);
+      const playlistId = playlist.id || playlist.playlistId;
       console.log('✓ Playlist created');
       console.log(`  Playlist ID: ${playlistId}`);
-      console.log(`  Name: ${response.data.name}`);
-      console.log(`  Items: ${response.data.items?.length || 1}`);
+      console.log(`  Name: ${playlist.name}`);
+      console.log(`  Items: ${playlist.items?.length || 1}`);
       return playlistId;
     } else {
       throw new Error(`HTTP ${response.status}: ${response.data?.message}`);
@@ -240,13 +259,13 @@ async function testPlaylistDelivery(playlistId) {
 
   try {
     // Fetch the playlist
-    const playlistResp = await httpRequest('GET', `/api/playlists/${playlistId}`);
+    const playlistResp = await httpRequest('GET', `${API_PREFIX}/playlists/${playlistId}`);
 
     if (playlistResp.status !== 200) {
       throw new Error(`Could not fetch playlist: HTTP ${playlistResp.status}`);
     }
 
-    const playlist = playlistResp.data;
+    const playlist = unwrapResponseData(playlistResp.data);
     console.log('✓ Playlist fetched from API');
     console.log(`  Playlist ID: ${playlist.id}`);
     console.log(`  Items: ${playlist.items?.length || 0}`);
