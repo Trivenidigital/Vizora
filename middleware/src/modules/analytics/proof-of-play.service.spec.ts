@@ -38,8 +38,8 @@ describe('AnalyticsService — Proof of play (O2)', () => {
           playlistId: 'pl1',
           duration: 30,
           completionPercentage: 100,
-          content: { id: 'c1', name: 'Promo' },
-          display: { id: 'd1', nickname: 'Lobby', deviceIdentifier: 'mac-1' },
+          content: { id: 'c1', name: 'Promo', organizationId: orgId },
+          display: { id: 'd1', nickname: 'Lobby', deviceIdentifier: 'mac-1', organizationId: orgId },
         },
       ]);
       db.contentImpression.count.mockResolvedValue(1);
@@ -76,7 +76,10 @@ describe('AnalyticsService — Proof of play (O2)', () => {
       expect(where.contentId).toBe('c1');
       expect(where.displayId).toBe('d1');
       expect(where.playlistId).toBe('pl1');
-      expect(where.display).toEqual({ tags: { some: { tagId: 'tag-lobby' } } });
+      expect(where.display).toEqual({
+        organizationId: orgId,
+        tags: { some: { tagId: 'tag-lobby' } },
+      });
     });
 
     it('applies date-range filter only when at least one bound is provided', async () => {
@@ -103,6 +106,65 @@ describe('AnalyticsService — Proof of play (O2)', () => {
       expect(result.data).toEqual([]);
       expect(result.meta.total).toBe(0);
       expect(result.meta.totalPages).toBe(0);
+    });
+
+    it('redacts cross-tenant related names from malformed impression rows', async () => {
+      db.contentImpression.findMany.mockResolvedValue([
+        {
+          id: 'i1',
+          timestamp: new Date(),
+          organizationId: orgId,
+          contentId: 'foreign-content',
+          displayId: 'foreign-display',
+          playlistId: null,
+          duration: 30,
+          completionPercentage: 100,
+          content: { id: 'foreign-content', name: 'Other Tenant Promo', organizationId: 'org-other' },
+          display: {
+            id: 'foreign-display',
+            nickname: 'Other Tenant Lobby',
+            deviceIdentifier: 'other-device',
+            organizationId: 'org-other',
+          },
+        },
+      ]);
+      db.contentImpression.count.mockResolvedValue(1);
+
+      const result = await service.getProofOfPlay(orgId, { page: 1, limit: 50 });
+
+      expect(result.data[0].content).toEqual({ id: 'foreign-content', name: 'Unknown' });
+      expect(result.data[0].display).toEqual({
+        id: 'foreign-display',
+        nickname: null,
+        deviceIdentifier: 'Unknown',
+      });
+    });
+
+    it('fails closed when relation organization ids are missing', async () => {
+      db.contentImpression.findMany.mockResolvedValue([
+        {
+          id: 'i1',
+          timestamp: new Date(),
+          organizationId: orgId,
+          contentId: 'c1',
+          displayId: 'd1',
+          playlistId: null,
+          duration: 30,
+          completionPercentage: 100,
+          content: { id: 'c1', name: 'Promo' },
+          display: { id: 'd1', nickname: 'Lobby', deviceIdentifier: 'mac-1' },
+        },
+      ]);
+      db.contentImpression.count.mockResolvedValue(1);
+
+      const result = await service.getProofOfPlay(orgId, { page: 1, limit: 50 });
+
+      expect(result.data[0].content).toEqual({ id: 'c1', name: 'Unknown' });
+      expect(result.data[0].display).toEqual({
+        id: 'd1',
+        nickname: null,
+        deviceIdentifier: 'Unknown',
+      });
     });
   });
 
@@ -133,8 +195,8 @@ describe('AnalyticsService — Proof of play (O2)', () => {
         playlistId: 'pl1',
         duration: 30,
         completionPercentage: 100,
-        content: { id: 'c1', name: 'Promo' },
-        display: { id: 'd1', nickname: 'Lobby', deviceIdentifier: 'mac-1' },
+        content: { id: 'c1', name: 'Promo', organizationId: orgId },
+        display: { id: 'd1', nickname: 'Lobby', deviceIdentifier: 'mac-1', organizationId: orgId },
       };
       db.contentImpression.findMany
         .mockResolvedValueOnce([row])
@@ -154,8 +216,8 @@ describe('AnalyticsService — Proof of play (O2)', () => {
         playlistId: null,
         duration: null,
         completionPercentage: null,
-        content: { id: 'c1', name: '=SUM(A1:A2)' }, // attacker-controlled content name
-        display: { id: 'd1', nickname: '+CMD|calc.exe', deviceIdentifier: 'mac-1' },
+        content: { id: 'c1', name: '=SUM(A1:A2)', organizationId: orgId }, // attacker-controlled content name
+        display: { id: 'd1', nickname: '+CMD|calc.exe', deviceIdentifier: 'mac-1', organizationId: orgId },
       };
       db.contentImpression.findMany.mockResolvedValueOnce([row]).mockResolvedValueOnce([]);
 
@@ -176,8 +238,8 @@ describe('AnalyticsService — Proof of play (O2)', () => {
         playlistId: null,
         duration: 30,
         completionPercentage: 100,
-        content: { id: 'c1', name: 'Promo' },
-        display: { id: 'd1', nickname: 'NY Lobby', deviceIdentifier: 'mac-1' },
+        content: { id: 'c1', name: 'Promo', organizationId: orgId },
+        display: { id: 'd1', nickname: 'NY Lobby', deviceIdentifier: 'mac-1', organizationId: orgId },
       };
       db.contentImpression.findMany
         .mockResolvedValueOnce([row])
@@ -203,8 +265,8 @@ describe('AnalyticsService — Proof of play (O2)', () => {
         playlistId: null,
         duration: null,
         completionPercentage: null,
-        content: { id: 'c1', name: 'Promo' },
-        display: { id: 'd1', nickname: 'Foo', deviceIdentifier: 'mac-1' },
+        content: { id: 'c1', name: 'Promo', organizationId: orgId },
+        display: { id: 'd1', nickname: 'Foo', deviceIdentifier: 'mac-1', organizationId: orgId },
       };
       db.contentImpression.findMany
         .mockResolvedValueOnce([row])
@@ -226,8 +288,8 @@ describe('AnalyticsService — Proof of play (O2)', () => {
         playlistId: null,
         duration: null,
         completionPercentage: null,
-        content: { id: 'c1', name: 'Promo, "Awesome" Edition' },
-        display: { id: 'd1', nickname: 'Lobby\nTV', deviceIdentifier: 'mac-1' },
+        content: { id: 'c1', name: 'Promo, "Awesome" Edition', organizationId: orgId },
+        display: { id: 'd1', nickname: 'Lobby\nTV', deviceIdentifier: 'mac-1', organizationId: orgId },
       };
       db.contentImpression.findMany.mockResolvedValueOnce([row]).mockResolvedValueOnce([]);
 
@@ -236,6 +298,31 @@ describe('AnalyticsService — Proof of play (O2)', () => {
       expect(out).toContain('"Promo, ""Awesome"" Edition"');
       // Newline cell gets quoted
       expect(out).toContain('"Lobby\nTV"');
+    });
+
+    it('does not emit cross-tenant related names from malformed impression rows', async () => {
+      const row = {
+        timestamp: new Date('2026-05-19T10:00:00Z'),
+        contentId: 'foreign-content',
+        displayId: 'foreign-display',
+        playlistId: null,
+        duration: 30,
+        completionPercentage: 100,
+        content: { id: 'foreign-content', name: 'Other Tenant Promo', organizationId: 'org-other' },
+        display: {
+          id: 'foreign-display',
+          nickname: 'Other Tenant Lobby',
+          deviceIdentifier: 'other-device',
+          organizationId: 'org-other',
+        },
+      };
+      db.contentImpression.findMany.mockResolvedValueOnce([row]).mockResolvedValueOnce([]);
+
+      const out = await collect(service.streamProofOfPlayCsv(orgId, {}));
+
+      expect(out).not.toContain('Other Tenant Promo');
+      expect(out).not.toContain('Other Tenant Lobby');
+      expect(out).toContain('foreign-content,Unknown,foreign-display,Unknown');
     });
 
     it('respects the 100k row safety cap', async () => {
@@ -247,15 +334,16 @@ describe('AnalyticsService — Proof of play (O2)', () => {
         playlistId: null,
         duration: 1,
         completionPercentage: 100,
-        content: { id: 'c', name: 'x' },
-        display: { id: 'd', nickname: 'y', deviceIdentifier: 'z' },
+        content: { id: 'c', name: 'x', organizationId: orgId },
+        display: { id: 'd', nickname: 'y', deviceIdentifier: 'z', organizationId: orgId },
       };
       const fullBatch = Array(1000).fill(fakeRow);
       db.contentImpression.findMany.mockResolvedValue(fullBatch);
 
       const gen = service.streamProofOfPlayCsv(orgId, {});
       let count = 0;
-      for await (const _ of gen) {
+      for await (const chunk of gen) {
+        expect(typeof chunk).toBe('string');
         count++;
         if (count > 100_002) break; // safety break for the test itself
       }

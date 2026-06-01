@@ -15,6 +15,7 @@ describe('AnalyticsService', () => {
       },
       content: {
         findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn().mockResolvedValue(null),
         groupBy: jest.fn().mockResolvedValue([]),
         aggregate: jest.fn().mockResolvedValue({ _sum: { fileSize: 0 }, _count: { id: 0 } }),
         count: jest.fn().mockResolvedValue(0),
@@ -57,6 +58,20 @@ describe('AnalyticsService', () => {
       expect(result[0]).toHaveProperty('mobile');
     });
 
+    it('marks inventory-derived device metrics as estimated availability', async () => {
+      mockDb.display.findMany.mockResolvedValue([
+        { id: '1', status: 'online', lastHeartbeat: new Date(), createdAt: new Date('2025-01-01') },
+      ]);
+
+      const result = await service.getDeviceMetrics('org-123', 'week');
+
+      expect(result[0]).toEqual(expect.objectContaining({
+        isEstimated: true,
+        metricSource: 'display_inventory_estimate',
+        unit: 'percent',
+      }));
+    });
+
     it('should respect range parameter', async () => {
       mockDb.display.findMany.mockResolvedValue([
         { id: '1', status: 'online', lastHeartbeat: new Date(), createdAt: new Date('2025-01-01') },
@@ -92,7 +107,50 @@ describe('AnalyticsService', () => {
       expect(result).toHaveLength(1);
       expect(result[0].title).toBe('Test Content');
       expect(result[0].views).toBe(15);
+      expect(result[0].impressions).toBe(15);
       expect(result[0].engagement).toBe(85);
+      expect(result[0].averageCompletion).toBe(85);
+    });
+
+    it('does not resolve content names from another organization', async () => {
+      mockDb.contentImpression.groupBy.mockResolvedValue([
+        {
+          contentId: 'foreign-content',
+          _count: { id: 4 },
+          _avg: { duration: 10, completionPercentage: 50 },
+        },
+      ]);
+      mockDb.content.findMany.mockImplementation((args: any) => {
+        if (args.where?.organizationId === 'org-123') return Promise.resolve([]);
+        return Promise.resolve([{ id: 'foreign-content', name: 'Other Tenant Menu' }]);
+      });
+
+      const result = await service.getContentPerformance('org-123', 'month');
+
+      expect(result[0].title).toBe('Unknown');
+      expect(mockDb.content.findMany).toHaveBeenCalledWith({
+        where: { id: { in: ['foreign-content'] }, organizationId: 'org-123' },
+        select: { id: true, name: true },
+      });
+    });
+
+    it('marks untracked shares and measured proof-of-play fields', async () => {
+      mockDb.contentImpression.groupBy.mockResolvedValue([
+        {
+          contentId: 'content-1',
+          _count: { id: 15 },
+          _avg: { duration: 30, completionPercentage: 85 },
+        },
+      ]);
+      mockDb.content.findMany.mockResolvedValue([{ id: 'content-1', name: 'Promo' }]);
+
+      const result = await service.getContentPerformance('org-123', 'month');
+
+      expect(result[0]).toEqual(expect.objectContaining({
+        impressionsSource: 'content_impressions',
+        engagementSource: 'content_impressions',
+        sharesTracked: false,
+      }));
     });
   });
 
@@ -110,6 +168,15 @@ describe('AnalyticsService', () => {
       expect(result[0]).toHaveProperty('date');
       expect(result[0]).toHaveProperty('video');
       expect(result[0]).toHaveProperty('image');
+      expect(result[0]).toHaveProperty('other');
+    });
+
+    it('joins content by organization as well as content id', async () => {
+      await service.getUsageTrends('org-123', 'week');
+
+      const queryArg = mockDb.$queryRaw.mock.calls[0][0];
+      const queryText = Array.isArray(queryArg) ? queryArg.join('') : String(queryArg);
+      expect(queryText).toContain('c."organizationId" = ci."organizationId"');
     });
   });
 
@@ -160,6 +227,19 @@ describe('AnalyticsService', () => {
       expect(result[0]).toHaveProperty('peak');
     });
 
+    it('marks bandwidth as estimated daily transfer volume', async () => {
+      mockDb.content.aggregate.mockResolvedValue({ _sum: { fileSize: 1048576 }, _count: { id: 1 } });
+      mockDb.display.count.mockResolvedValue(5);
+
+      const result = await service.getBandwidthUsage('org-123', 'week');
+
+      expect(result[0]).toEqual(expect.objectContaining({
+        isEstimated: true,
+        metricSource: 'content_size_device_count_estimate',
+        unit: 'MB/day',
+      }));
+    });
+
     it('should return zero bandwidth when no devices', async () => {
       mockDb.content.aggregate.mockResolvedValue({ _sum: { fileSize: 1048576 }, _count: { id: 1 } });
       mockDb.display.count.mockResolvedValue(0);
@@ -196,7 +276,57 @@ describe('AnalyticsService', () => {
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('Test Playlist');
       expect(result[0].plays).toBe(20);
+      expect(result[0].proofOfPlayImpressions).toBe(20);
       expect(result[0].uniqueDevices).toBe(3);
+      expect(result[0].assignedScreens).toBe(3);
+    });
+
+    it('does not resolve playlist names from another organization', async () => {
+      mockDb.contentImpression.groupBy.mockResolvedValue([
+        {
+          playlistId: 'foreign-playlist',
+          _count: { id: 7 },
+          _avg: { completionPercentage: 80 },
+        },
+      ]);
+      mockDb.playlist.findMany.mockImplementation((args: any) => {
+        if (args.where?.organizationId === 'org-123') return Promise.resolve([]);
+        return Promise.resolve([
+          { id: 'foreign-playlist', name: 'Other Tenant Loop', _count: { assignedDisplays: 9 } },
+        ]);
+      });
+
+      const result = await service.getPlaylistPerformance('org-123', 'month');
+
+      expect(result[0].name).toBe('Unknown');
+      expect(result[0].uniqueDevices).toBe(0);
+      expect(result[0].assignedScreens).toBe(0);
+      expect(mockDb.playlist.findMany).toHaveBeenCalledWith({
+        where: { id: { in: ['foreign-playlist'] }, organizationId: 'org-123' },
+        include: { _count: { select: { assignedDisplays: true } } },
+      });
+    });
+
+    it('marks assigned displays separately from unique playback devices', async () => {
+      mockDb.contentImpression.groupBy.mockResolvedValue([
+        {
+          playlistId: 'playlist-1',
+          _count: { id: 20 },
+          _avg: { completionPercentage: 75 },
+        },
+      ]);
+      mockDb.playlist.findMany.mockResolvedValue([
+        { id: 'playlist-1', name: 'Test Playlist', _count: { assignedDisplays: 3 } },
+      ]);
+
+      const result = await service.getPlaylistPerformance('org-123', 'month');
+
+      expect(result[0]).toEqual(expect.objectContaining({
+        playsSource: 'content_impressions',
+        completionSource: 'content_impressions',
+        uniqueDevicesSource: 'assigned_displays',
+        uniquePlaybackDevicesTracked: false,
+      }));
     });
   });
 
@@ -232,6 +362,9 @@ describe('AnalyticsService', () => {
       expect(result.totalDevices).toBe(10);
       expect(result.onlineDevices).toBe(8);
       expect(result.uptimePercent).toBe(80);
+      expect(result.onlineNowPercent).toBe(80);
+      expect(result.uptimePercentSource).toBe('current_online_ratio');
+      expect(result.uptimePercentIsHistorical).toBe(false);
       expect(result.totalContent).toBe(50);
       expect(result.processingContent).toBe(4);
       expect(result.totalPlaylists).toBe(5);
@@ -323,6 +456,8 @@ describe('AnalyticsService', () => {
 
       expect(result.deviceId).toBe('device-123');
       expect(result.uptimePercent).toBe(95); // Online device gets 95%
+      expect(result.isEstimated).toBe(true);
+      expect(result.metricSource).toBe('heartbeat_status_heuristic');
       expect(result.totalOnlineMinutes).toBeGreaterThan(0);
       expect(result.totalOfflineMinutes).toBeGreaterThan(0);
       expect(result.lastHeartbeat).toEqual(now);
@@ -395,6 +530,8 @@ describe('AnalyticsService', () => {
       expect(result.deviceCount).toBe(2);
       expect(result.onlineCount).toBe(1);
       expect(result.offlineCount).toBe(1);
+      expect(result.isEstimated).toBe(true);
+      expect(result.metricSource).toBe('heartbeat_status_heuristic');
       expect(result.devices).toHaveLength(2);
     });
 
@@ -476,6 +613,8 @@ describe('AnalyticsService', () => {
       expect(result).toHaveProperty('deviceDistribution');
       expect(result).toHaveProperty('bandwidthUsage');
       expect(result).toHaveProperty('playlistPerformance');
+      expect(result.summary.uptimePercentSource).toBe('current_online_ratio');
+      expect(result.bandwidthUsage[0]?.metricSource).toBe('content_size_device_count_estimate');
     });
 
     it('should respect range parameter', async () => {
