@@ -104,6 +104,7 @@ export default function ContentClient() {
  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+ const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
  const [isPushModalOpen, setIsPushModalOpen] = useState(false);
  const [isAddToPlaylistModalOpen, setIsAddToPlaylistModalOpen] = useState(false);
  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
@@ -944,17 +945,30 @@ export default function ContentClient() {
 
  const handleBulkDelete = async () => {
  if (selectedItems.size === 0) return;
- 
+
+ setIsBulkDeleteModalOpen(true);
+ };
+
+ const confirmBulkDelete = async () => {
+ if (selectedItems.size === 0) {
+ setIsBulkDeleteModalOpen(false);
+ return;
+ }
+
+ const selectedIds = Array.from(selectedItems);
+
  try {
  setActionLoading(true);
  await Promise.all(
- Array.from(selectedItems).map(id => apiClient.deleteContent(id))
+ selectedIds.map(id => apiClient.deleteContent(id))
  );
- toast.success(`${selectedItems.size} items deleted`);
+ toast.success(`${selectedIds.length} items deleted`);
  setSelectedItems(new Set());
- loadContent();
+ setIsBulkDeleteModalOpen(false);
+ void loadContent();
  } catch (error: any) {
  toast.error(error.message || 'Failed to delete some items');
+ throw error;
  } finally {
  setActionLoading(false);
  }
@@ -2239,6 +2253,18 @@ export default function ContentClient() {
  title="Delete Content"
  message={`Are you sure you want to delete "${selectedContent?.title || 'Untitled'}"? This action cannot be undone.`}
  confirmText="Delete"
+ type="danger"
+ />
+
+ <ConfirmDialog
+ isOpen={isBulkDeleteModalOpen}
+ onClose={() => {
+ if (!actionLoading) setIsBulkDeleteModalOpen(false);
+ }}
+ onConfirm={confirmBulkDelete}
+ title="Delete Selected Content"
+ message={`Are you sure you want to delete ${selectedItems.size} selected content item${selectedItems.size === 1 ? '' : 's'}? This action cannot be undone.`}
+ confirmText={`Delete ${selectedItems.size} Item${selectedItems.size === 1 ? '' : 's'}`}
  type="danger"
  />
 

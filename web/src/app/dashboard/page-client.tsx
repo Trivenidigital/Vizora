@@ -271,7 +271,7 @@ export default function DashboardClient({
  type: 'device',
  iconName: getValidIconName('devices'),
  title: d.metadata?.nickname || 'Unnamed Device',
- subtitle: `${d.status || 'unknown'} • ${d.metadata?.location || 'No location'}`,
+ subtitle: `${d.status || 'unknown'} - ${d.metadata?.location || 'No location'}`,
  time: d.metadata?.lastSeen || new Date().toISOString(),
  })),
  ...content.slice(0, 3).map((c: any) => {
@@ -283,7 +283,7 @@ export default function DashboardClient({
  type: 'content',
  iconName: getValidIconName(iconName),
  title: c.title || 'Untitled',
- subtitle: `${c.type || 'file'} • ${c.status || 'ready'}`,
+ subtitle: `${c.type || 'file'} - ${c.status || 'ready'}`,
  time: c.createdAt || new Date().toISOString(),
  };
  }),
@@ -681,7 +681,7 @@ export default function DashboardClient({
  4
  </div>
  <div>
- <div className="font-semibold mb-1">Publish & Schedule</div>
+ <div className="font-semibold mb-1">Assign & Schedule</div>
  <div className="text-sm text-primary-100">
  Assign playlists to devices and set schedules
  </div>
