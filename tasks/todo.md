@@ -1,6 +1,78 @@
 # Vizora - Task Tracker
 
-## Active: Analytics Truthfulness Pass 31 (2026-06-01)
+## Active: Middleware Guardrail + Sanitize Fast Path Pass 32 (2026-06-01)
+
+**Branch:** `feat/customer-experience-pass-32`
+
+**Why now:** PR #161/#162 are merged with green CI, while production deploy
+remains blocked by dirty/diverged prod-local state. A remaining middleware
+performance hot path is the global `SanitizeInterceptor`, which recursively
+passes every ordinary response string through `sanitize-html` even when the
+string contains no HTML/entity trigger characters. A synthetic 20k-row safe
+payload benchmark of the current call pattern took about 190 ms locally.
+Parallel security review also found two bounded tenant guardrail gaps worth
+fixing in the same middleware pass: brand-new unclaimed pairing codes were
+visible in every tenant dashboard's active pairing list, and display tag
+assignment could write cross-org tag join rows. Diff review then identified the
+read-side residual: existing polluted display-tag rows also needed org-scoped
+filters on display tag reads.
+
+**New primitives introduced:** none. This pass only tightens existing
+middleware service/interceptor behavior and tests. No route, module, middleware
+order, schema, response envelope, realtime path, notification path, MCP tool,
+Hermes skill, provider spend path, or production process changes.
+
+**Hermes-first analysis:** not applicable. This pass does not add or modify
+business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
+
+**Plan/design:**
+`docs/plans/2026-06-01-sanitize-fast-path-performance-pass-32.md`
+
+**Plan**
+- [x] Start fresh branch from `origin/main`.
+- [x] Dispatch customer UX/trust, performance, and security/tenant reviewers.
+- [x] Drift-check sanitizer behavior and existing tests.
+- [x] Add failing sanitizer tests for safe-string fast path.
+- [x] Implement conservative sanitizer trigger check.
+- [x] Add failing pairing/tag tenant-boundary tests.
+- [x] Implement bounded pairing visibility and display tag ownership fixes.
+- [x] Add and fix display-tag read-side tenant filters for historical polluted
+  rows.
+- [x] Run multi-subagent review before broader verification.
+- [x] Run focused and broader verification.
+- [ ] PR, CI, merge if green.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Evidence so far:**
+- Sanitizer TDD red: focused interceptor spec failed because safe plain strings
+  still called `sanitize-html` 9 times.
+- Sanitizer focused green: `pnpm --filter @vizora/middleware test -- --runInBand --runTestsByPath src/modules/common/interceptors/sanitize.interceptor.spec.ts`
+  passed 52/52 after the fast path.
+- Synthetic sanitizer benchmark: old safe-string call pattern ~190 ms for
+  20,000 safe rows locally; new helper path ~28.6 ms locally. Independent
+  performance reviewer measured old avg 134.2 ms vs new avg 13.1 ms.
+- Tenant TDD red: focused display/pairing suite failed on brand-new unclaimed
+  pairing visibility and cross-org display tag assignment behavior.
+- Tenant focused green: `pnpm --filter @vizora/middleware test -- --runInBand --runTestsByPath src/modules/displays/pairing.service.spec.ts src/modules/displays/displays.service.spec.ts src/modules/displays/displays.service.tag-events.spec.ts`
+  passed 80/80 after the guardrail fixes.
+- Review finding fixed: display list/detail/update/create selects and `getTags`
+  now scope tag relation reads by tag organization, so existing polluted
+  display-tag rows are filtered before response serialization.
+- Multi-vector diff review: security/tenant reviewer found the display-tag
+  read-side residual above; follow-up reviewer returned CLEAN after the scoped
+  select builders and `getTags` filter. Compatibility/performance reviewer
+  returned CLEAN, with residual note that pairing Redis scan scalability remains
+  a separate backlog item.
+- Verification: focused sanitizer tests passed 52/52; focused display/pairing
+  tests passed 81/81; TypeScript `tsc --noEmit` passed; changed-file ESLint
+  passed with only the repo's existing ESLintRC deprecation warning; JWT secret
+  scan passed; `git diff --check` passed; full middleware Jest passed 146/146
+  suites and 2935/2935 tests; `npx nx build @vizora/middleware --skip-nx-cache`
+  succeeded with existing webpack dependency warnings.
+
+---
+
+## Completed: Analytics Truthfulness Pass 31 (2026-06-01)
 
 **Branch:** `feat/analytics-truthfulness-pass-31`
 

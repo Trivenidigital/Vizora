@@ -1,16 +1,28 @@
+jest.mock('sanitize-html', () => {
+  const actual = jest.requireActual('sanitize-html');
+  const mockSanitizeHtml = jest.fn((dirty: string, options: unknown) =>
+    actual(dirty, options),
+  );
+  Object.assign(mockSanitizeHtml, actual);
+  return mockSanitizeHtml;
+});
+
 import { SanitizeInterceptor, SKIP_OUTPUT_SANITIZE_KEY } from './sanitize.interceptor';
 import { ExecutionContext, CallHandler } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { of } from 'rxjs';
+import { lastValueFrom, of } from 'rxjs';
+import sanitizeHtml from 'sanitize-html';
 
 describe('SanitizeInterceptor', () => {
   let interceptor: SanitizeInterceptor;
   let mockExecutionContext: ExecutionContext;
   let mockCallHandler: CallHandler;
   let mockRequest: { body: unknown; query: unknown; params: unknown };
+  const sanitizeHtmlMock = sanitizeHtml as unknown as jest.Mock;
 
   beforeEach(() => {
     interceptor = new SanitizeInterceptor();
+    sanitizeHtmlMock.mockClear();
 
     mockRequest = { body: {}, query: {}, params: {} };
 
@@ -258,6 +270,82 @@ describe('SanitizeInterceptor', () => {
         name: 'John',
         middleName: null,
       });
+    });
+
+    it('should skip sanitize-html for safe plain request and response strings', async () => {
+      mockRequest.body = {
+        name: '  Lobby Menu  ',
+        nested: {
+          status: 'active',
+          location: 'Main Entrance',
+        },
+      };
+      mockRequest.query = {
+        search: 'Breakfast Specials',
+      };
+      mockRequest.params = {
+        id: 'content-123',
+      };
+      mockCallHandler.handle = jest.fn().mockReturnValue(
+        of({
+          data: [
+            {
+              id: 'content-123',
+              name: 'Lobby Menu',
+              type: 'image',
+              status: 'active',
+            },
+          ],
+        }),
+      );
+
+      const response = await lastValueFrom(
+        interceptor.intercept(mockExecutionContext, mockCallHandler),
+      );
+
+      expect(mockRequest.body).toEqual({
+        name: 'Lobby Menu',
+        nested: {
+          status: 'active',
+          location: 'Main Entrance',
+        },
+      });
+      expect(response).toEqual({
+        data: [
+          {
+            id: 'content-123',
+            name: 'Lobby Menu',
+            type: 'image',
+            status: 'active',
+          },
+        ],
+      });
+      expect(sanitizeHtmlMock).not.toHaveBeenCalled();
+    });
+
+    it('should still use sanitize-html for strings with HTML or entity trigger characters', async () => {
+      mockRequest.body = {
+        name: '<b>Lobby Menu</b>',
+        encoded: 'Fish &amp; Chips',
+      };
+      mockCallHandler.handle = jest.fn().mockReturnValue(
+        of({
+          name: '<script>alert(1)</script>Clean',
+        }),
+      );
+
+      const response = await lastValueFrom(
+        interceptor.intercept(mockExecutionContext, mockCallHandler),
+      );
+
+      expect(mockRequest.body).toEqual({
+        name: 'Lobby Menu',
+        encoded: 'Fish &amp; Chips',
+      });
+      expect(response).toEqual({
+        name: 'Clean',
+      });
+      expect(sanitizeHtmlMock).toHaveBeenCalled();
     });
   });
 

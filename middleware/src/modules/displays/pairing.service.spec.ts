@@ -662,7 +662,7 @@ describe('PairingService', () => {
       expect(result).toEqual([]);
     });
 
-    it('should return active pairings', async () => {
+    it('should not return brand-new unclaimed pairing requests to org dashboards', async () => {
       mockDatabaseService.display.findUnique.mockResolvedValue(null);
       mockDatabaseService.display.findMany.mockResolvedValue([]);
 
@@ -680,13 +680,7 @@ describe('PairingService', () => {
 
       const result = await service.getActivePairings('org-123');
 
-      expect(result).toHaveLength(2);
-      result.forEach((pairing: any) => {
-        expect(pairing).toHaveProperty('code');
-        expect(pairing).toHaveProperty('nickname');
-        expect(pairing).toHaveProperty('createdAt');
-        expect(pairing).toHaveProperty('expiresAt');
-      });
+      expect(result).toEqual([]);
     });
 
     it('should not return expired pairings', async () => {
@@ -707,7 +701,7 @@ describe('PairingService', () => {
       expect(result).toHaveLength(0);
     });
 
-    it('should batch Redis reads and display ownership lookup for active pairings', async () => {
+    it('should batch Redis reads and only show unclaimed active pairings for displays owned by the org', async () => {
       const orgId = 'org-123';
       mockDatabaseService.display.findUnique.mockResolvedValue(null);
       mockDatabaseService.display.findMany.mockResolvedValue([
@@ -752,16 +746,18 @@ describe('PairingService', () => {
         select: { deviceIdentifier: true, organizationId: true },
       });
       expect(mockDatabaseService.display.findUnique).not.toHaveBeenCalled();
-      expect(result).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ nickname: 'Owned Display' }),
-          expect.objectContaining({ nickname: 'Brand New Display' }),
-        ]),
-      );
-      expect(result).toHaveLength(2);
+      expect(result).toEqual([
+        expect.objectContaining({
+          nickname: 'Owned Display',
+          code: expect.any(String),
+          createdAt: expect.any(String),
+          expiresAt: expect.any(String),
+        }),
+      ]);
       expect(result).not.toEqual(
         expect.arrayContaining([
           expect.objectContaining({ nickname: 'Other Org Display' }),
+          expect.objectContaining({ nickname: 'Brand New Display' }),
         ]),
       );
     });

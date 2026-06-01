@@ -20,7 +20,7 @@ import { CreateDisplayDto } from './dto/create-display.dto';
 import { UpdateDisplayDto } from './dto/update-display.dto';
 import { UpdateQrOverlayDto } from './dto/update-qr-overlay.dto';
 import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
-import { DISPLAY_DETAIL_SELECT, DISPLAY_LIST_SELECT } from './display-response.select';
+import { getDisplayDetailSelect, getDisplayListSelect } from './display-response.select';
 
 /**
  * Hash a token using SHA-256 for secure storage
@@ -76,7 +76,7 @@ export class DisplaysService {
           nickname: name,
           organizationId,
         },
-        select: DISPLAY_DETAIL_SELECT,
+        select: getDisplayDetailSelect(organizationId),
       });
       this.emitDisplayEvent('created', display.id, organizationId);
       return display;
@@ -117,7 +117,7 @@ export class DisplaysService {
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
-        select: DISPLAY_LIST_SELECT,
+        select: getDisplayListSelect(organizationId),
       }),
       this.db.display.count({ where }),
     ]);
@@ -128,7 +128,7 @@ export class DisplaysService {
   async findOne(organizationId: string, id: string) {
     const display = await this.db.display.findFirst({
       where: { id, organizationId },
-      select: DISPLAY_DETAIL_SELECT,
+      select: getDisplayDetailSelect(organizationId),
     });
 
     if (!display) {
@@ -196,7 +196,7 @@ export class DisplaysService {
     }
     const updatedDisplay = await this.db.display.findUnique({
       where: { id },
-      select: DISPLAY_DETAIL_SELECT,
+      select: getDisplayDetailSelect(organizationId),
     });
 
     // If playlist was updated, notify the realtime service to push update to device
@@ -433,7 +433,7 @@ export class DisplaysService {
     await this.findOne(organizationId, displayId);
 
     const displayTags = await this.db.displayTag.findMany({
-      where: { displayId },
+      where: { displayId, tag: { organizationId } },
       include: { tag: true },
     });
 
@@ -443,8 +443,23 @@ export class DisplaysService {
   async addTags(organizationId: string, displayId: string, tagIds: string[]) {
     await this.findOne(organizationId, displayId);
 
+    const uniqueTagIds = [...new Set(tagIds)];
+    if (uniqueTagIds.length > 0) {
+      const tags = await this.db.tag.findMany({
+        where: {
+          id: { in: uniqueTagIds },
+          organizationId,
+        },
+        select: { id: true },
+      });
+
+      if (tags.length !== uniqueTagIds.length) {
+        throw new NotFoundException('One or more tags not found');
+      }
+    }
+
     // Create DisplayTag entries for each tag, skipping duplicates
-    const createPromises = tagIds.map((tagId) =>
+    const createPromises = uniqueTagIds.map((tagId) =>
       this.db.displayTag.upsert({
         where: {
           displayId_tagId: { displayId, tagId },
