@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import ConfirmDialog from '../ConfirmDialog';
 
 jest.mock('@/theme/icons', () => ({
@@ -36,13 +36,74 @@ describe('ConfirmDialog', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('calls onConfirm and onClose when Confirm button is clicked', () => {
+  it('calls onConfirm and onClose when Confirm button is clicked', async () => {
     const onConfirm = jest.fn();
     const onClose = jest.fn();
     render(<ConfirmDialog {...defaultProps} onConfirm={onConfirm} onClose={onClose} />);
-    fireEvent.click(screen.getByText('Confirm'));
+    await act(async () => {
+      fireEvent.click(screen.getByText('Confirm'));
+    });
     expect(onConfirm).toHaveBeenCalledTimes(1);
-    expect(onClose).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('keeps the dialog open while async confirmation is pending', async () => {
+    let resolveConfirm!: () => void;
+    const onConfirm = jest.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveConfirm = resolve;
+        }),
+    );
+    const onClose = jest.fn();
+
+    render(<ConfirmDialog {...defaultProps} onConfirm={onConfirm} onClose={onClose} />);
+
+    fireEvent.click(screen.getByText('Confirm'));
+
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByText('Confirm')).toBeDisabled();
+
+    await act(async () => {
+      resolveConfirm();
+    });
+
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('reopens with enabled actions after a successful async confirmation', async () => {
+    const onConfirm = jest.fn().mockResolvedValue(undefined);
+    const onClose = jest.fn();
+    const { rerender } = render(
+      <ConfirmDialog {...defaultProps} onConfirm={onConfirm} onClose={onClose} />,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Confirm'));
+    });
+
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    rerender(<ConfirmDialog {...defaultProps} isOpen={false} onConfirm={onConfirm} onClose={onClose} />);
+    rerender(<ConfirmDialog {...defaultProps} onConfirm={onConfirm} onClose={onClose} />);
+
+    expect(screen.getByText('Cancel')).toBeEnabled();
+    expect(screen.getByText('Confirm')).toBeEnabled();
+  });
+
+  it('exposes modal dialog semantics to assistive technology', () => {
+    render(<ConfirmDialog {...defaultProps} />);
+
+    const dialog = screen.getByRole('dialog', { name: 'Delete Item' });
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(dialog).toHaveAccessibleDescription('Are you sure you want to delete this item?');
   });
 
   it('renders custom button text', () => {
