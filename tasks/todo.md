@@ -1,5 +1,91 @@
 # Vizora - Task Tracker
 
+## In Progress: Content List Payload Performance Pass 19 (2026-06-01)
+
+**Branch:** `feat/content-list-payload-pass-19`
+
+**Why now:** PR #141 merged playlist-builder server-side content search and CI
+is green, but production deployment remains blocked by dirty/diverged prod
+state. The next customer-visible performance gap is list payload size: root and
+folder content-list endpoints still fetch full content rows even though the
+dashboard cards need only summary fields.
+
+**New primitives introduced:** no new runtime primitives. This pass adds a
+shared content-list projection and uses the existing `GET /content/:id` detail
+endpoint for modal-only dashboard hydration.
+
+**Hermes-first analysis:** not applicable. This pass does not add business
+agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
+
+**Plan**
+- [x] Merge PR #141 after full CI green.
+- [x] Re-check production deploy gate after merge.
+- [x] Start fresh branch from `origin/main`.
+- [x] Write scoped plan/design for content-list payload slimming.
+- [x] Add focused failing middleware and web tests.
+- [x] Implement backend list projection and frontend detail hydration.
+- [x] Run multi-subagent code review before broader tests.
+- [x] Run focused and broader affected verification.
+- [ ] PR, CI, merge.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Current merge/deploy state**
+- [x] PR #141 merged at
+  `6fcc39deb60634037be37758843aa638dcf1cb3d`; CI green for audit, build, e2e,
+  lint, security, and test.
+- [x] Prod deploy remains blocked: `/opt/vizora/app` is dirty and
+  ahead/behind stale prod `origin/main`; no production pull, reset, stash, env
+  edit, service restart, DB mutation, or deploy performed.
+
+**Plan/design:**
+`docs/plans/2026-06-01-content-list-payload-performance-pass-19.md`
+
+**Review**
+- [x] Backend/API/data-contract reviewer CLEAN: list projection keeps tenant
+  scoping, valid Prisma select shape, envelope-compatible paginated response,
+  and full-detail paths still use `findOne` / device-specific fetches.
+- [x] Frontend reviewer found stale detail races, edit hydration gap, and
+  repeated-detail request fanout. Fixed with request invalidation, pending
+  request dedupe, edit detail hydration, pagination invalidation, and regression
+  tests. Follow-up frontend re-review CLEAN.
+- [x] Test/CI reviewer found the untracked helper risk and stale tracker counts.
+  The helper will be staged with the commit; verification counts below are
+  updated after final focused/broad runs.
+
+**Verification**
+- [x] Focused middleware tests passed:
+  `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="content.service|folders.service"`
+  (2 suites / 140 tests).
+- [x] Focused web content dashboard tests passed:
+  `pnpm --filter @vizora/web test -- --runInBand --runTestsByPath src/app/dashboard/content/__tests__/content-page.test.tsx`
+  (1 suite / 42 tests).
+- [x] Full middleware tests passed:
+  `pnpm --filter @vizora/middleware test -- --runInBand`
+  (143 suites / 2879 tests).
+- [x] Full web tests passed:
+  `pnpm --filter @vizora/web test -- --runInBand`
+  (95 suites / 994 tests; existing unrelated React `act(...)` and jsdom
+  navigation warnings remain).
+- [x] TypeScript checks passed:
+  `pnpm --filter @vizora/middleware exec tsc --noEmit --pretty false` and
+  `pnpm --filter @vizora/web exec tsc --noEmit --pretty false`.
+- [x] Changed-file ESLint passed with warnings only:
+  `npx eslint middleware/src/modules/content/content.service.ts middleware/src/modules/content/content-list-select.ts middleware/src/modules/folders/folders.service.ts web/src/app/dashboard/content/page-client.tsx web/src/app/dashboard/content/__tests__/content-page.test.tsx`
+  (legacy explicit-`any` warnings remain in `page-client.tsx`).
+- [x] Builds passed:
+  `npx nx build @vizora/middleware`,
+  `npx nx build @vizora/realtime`, and
+  `npx nx build @vizora/web` with local public URL env vars.
+- [x] `git diff --check` passed with CRLF warnings only.
+- [x] Targeted Playwright content/folder E2E attempted:
+  `npx playwright test e2e-tests/04-content.spec.ts e2e-tests/20-content-folders.spec.ts --reporter=list`
+  failed 14/14 at auth fixture setup with `ECONNREFUSED ::1:3000`
+  (`POST http://localhost:3000/api/v1/auth/register`). Docker Desktop is not
+  available and no services are listening on ports 3000/3001/3002, so this is
+  an environment failure before the changed content flows are exercised.
+
+---
+
 ## In Progress: Dashboard Summary Performance Pass 15 (2026-05-31)
 
 **Branch:** `feat/customer-dashboard-pass-15`

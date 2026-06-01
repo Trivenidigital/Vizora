@@ -5,6 +5,7 @@ import { UpdateFolderDto } from './dto/update-folder.dto';
 import { MoveContentDto } from './dto/move-content.dto';
 import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
 import { buildContentListWhere, type ContentListFilters } from '../content/content-list-query';
+import { CONTENT_LIST_SELECT, mapContentListResponse } from '../content/content-list-select';
 
 export interface FolderWithChildren {
   id: string;
@@ -230,21 +231,13 @@ export class FoldersService {
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
-        include: {
-          tags: {
-            include: { tag: true },
-          },
-        },
+        select: CONTENT_LIST_SELECT,
       }),
       this.db.content.count({ where }),
     ]);
 
     // Map content response for frontend compatibility
-    const mappedData = data.map((content) => ({
-      ...content,
-      title: content.name,
-      thumbnailUrl: content.thumbnail,
-    }));
+    const mappedData = data.map(mapContentListResponse);
 
     return new PaginatedResponse(mappedData, total, page, limit);
   }

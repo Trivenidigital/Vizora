@@ -20,6 +20,7 @@ import { StorageQuotaService } from '../storage/storage-quota.service';
 import { StorageService } from '../storage/storage.service';
 import type { WidgetDataSource } from './widget-data-sources';
 import { buildContentListWhere, type ContentListFilters } from './content-list-query';
+import { CONTENT_LIST_SELECT, mapContentListResponse } from './content-list-select';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -112,19 +113,13 @@ export class ContentService {
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
-        include: {
-          tags: {
-            include: {
-              tag: true,
-            },
-          },
-        },
+        select: CONTENT_LIST_SELECT,
       }),
       this.db.content.count({ where }),
     ]);
 
     // Map each content item to include thumbnailUrl
-    const mappedData = data.map(item => this.mapContentResponse(item));
+    const mappedData = data.map(mapContentListResponse);
     return new PaginatedResponse(mappedData, total, page, limit);
   }
 
