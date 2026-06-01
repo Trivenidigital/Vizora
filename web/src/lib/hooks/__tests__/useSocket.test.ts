@@ -1,5 +1,6 @@
 import { renderHook, act } from '@testing-library/react';
-import { useSocket } from '../useSocket';
+import React from 'react';
+import { useSocket, SocketProvider } from '../useSocket';
 
 // Create mock socket instance
 const mockSocket = {
@@ -72,5 +73,117 @@ describe('useSocket', () => {
     const { unmount } = renderHook(() => useSocket({ url: 'http://localhost:3002' }));
     unmount();
     expect(mockSocket.close).toHaveBeenCalled();
+  });
+
+  it('shares one dashboard socket across provider consumers', () => {
+    const io = require('socket.io-client').default;
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      React.createElement(SocketProvider, { user: { organizationId: 'org-1' } }, children)
+    );
+
+    const { result, unmount } = renderHook(
+      () => [
+        useSocket(),
+        useSocket({ auth: { organizationId: 'org-1' } }),
+      ] as const,
+      { wrapper },
+    );
+
+    expect(io).toHaveBeenCalledTimes(1);
+    const connectHandler = mockSocket.on.mock.calls.find(([event]) => event === 'connect')?.[1];
+    act(() => {
+      connectHandler?.();
+    });
+
+    expect(result.current[0].socket).toBe(mockSocket);
+    expect(result.current[1].socket).toBe(mockSocket);
+    expect(mockSocket.emit).toHaveBeenCalledWith('join:organization', { organizationId: 'org-1' });
+
+    const firstListener = jest.fn();
+    const secondListener = jest.fn();
+    const firstUnsubscribe = result.current[0].on('device:status', firstListener);
+    const secondUnsubscribe = result.current[1].on('device:status', secondListener);
+
+    expect(mockSocket.on).toHaveBeenCalledWith('device:status', firstListener);
+    expect(mockSocket.on).toHaveBeenCalledWith('device:status', secondListener);
+
+    firstUnsubscribe();
+    expect(mockSocket.off).toHaveBeenCalledWith('device:status', firstListener);
+    expect(mockSocket.off).not.toHaveBeenCalledWith('device:status', secondListener);
+
+    secondUnsubscribe();
+    expect(mockSocket.off).toHaveBeenCalledWith('device:status', secondListener);
+
+    unmount();
+    expect(mockSocket.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses a standalone socket when the caller opts out of auto connect inside a provider', () => {
+    const io = require('socket.io-client').default;
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      React.createElement(SocketProvider, { user: { organizationId: 'org-1' } }, children)
+    );
+
+    const { result } = renderHook(() => useSocket({ autoConnect: false }), { wrapper });
+
+    expect(io).toHaveBeenCalledTimes(1);
+    expect(result.current.socket).toBeNull();
+  });
+
+  it('does not create a temporary standalone socket while provider auth is still loading', () => {
+    const io = require('socket.io-client').default;
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      React.createElement(SocketProvider, { user: null }, children)
+    );
+
+    const { result } = renderHook(() => useSocket({ auth: { organizationId: 'org-1' } }), { wrapper });
+
+    expect(io).not.toHaveBeenCalled();
+    expect(result.current.socket).toBeNull();
+  });
+
+  it('uses a standalone socket when the caller requests a different organization', () => {
+    const io = require('socket.io-client').default;
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      React.createElement(SocketProvider, { user: { organizationId: 'org-1' } }, children)
+    );
+
+    renderHook(() => useSocket({ auth: { organizationId: 'org-2' } }), { wrapper });
+
+    expect(io).toHaveBeenCalledTimes(2);
+    expect(io).toHaveBeenCalledWith(
+      'http://localhost:3002',
+      expect.objectContaining({ auth: { organizationId: 'org-2' } }),
+    );
+  });
+
+  it('uses a standalone socket when the caller requests a custom URL', () => {
+    const io = require('socket.io-client').default;
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      React.createElement(SocketProvider, { user: { organizationId: 'org-1' } }, children)
+    );
+
+    renderHook(() => useSocket({ url: 'http://localhost:3999' }), { wrapper });
+
+    expect(io).toHaveBeenCalledTimes(2);
+    expect(io).toHaveBeenCalledWith(
+      'http://localhost:3999',
+      expect.objectContaining({ auth: {} }),
+    );
+  });
+
+  it('uses a standalone socket when the caller customizes reconnection options', () => {
+    const io = require('socket.io-client').default;
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      React.createElement(SocketProvider, { user: { organizationId: 'org-1' } }, children)
+    );
+
+    renderHook(() => useSocket({ reconnectionAttempts: 1 }), { wrapper });
+
+    expect(io).toHaveBeenCalledTimes(2);
+    expect(io).toHaveBeenCalledWith(
+      'http://localhost:3002',
+      expect.objectContaining({ reconnectionAttempts: 1 }),
+    );
   });
 });

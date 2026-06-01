@@ -1,8 +1,8 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { createContext, createElement, useContext, useEffect, useMemo, useState, useCallback, useRef, type ReactNode } from 'react';
 import io, { Socket } from 'socket.io-client';
 import { devLog, devWarn } from '@/lib/logger';
 
-interface UseSocketOptions {
+export interface UseSocketOptions {
   url?: string;
   autoConnect?: boolean;
   reconnection?: boolean;
@@ -34,7 +34,7 @@ function markReconnectExhausted(url: string): void {
   reconnectExhaustedFor.set(url, Date.now());
 }
 
-interface UseSocketReturn {
+export interface UseSocketReturn {
   socket: Socket | null;
   isConnected: boolean;
   connectionError: string | null;
@@ -46,9 +46,75 @@ interface UseSocketReturn {
   leaveRoom: (room: string) => void;
 }
 
-export function useSocket(options: UseSocketOptions = {}): UseSocketReturn {
+interface SocketContextValue extends UseSocketReturn {
+  url: string;
+  organizationId?: string;
+}
+
+const SocketContext = createContext<SocketContextValue | null>(null);
+
+function getDefaultSocketUrl(): string {
+  return process.env.NEXT_PUBLIC_SOCKET_URL || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3002');
+}
+
+function canUseSharedSocket(options: UseSocketOptions, shared: SocketContextValue | null): shared is SocketContextValue {
+  if (!shared || options.autoConnect === false) return false;
+
+  const requestedUrl = options.url ?? getDefaultSocketUrl();
+  if (requestedUrl !== shared.url) return false;
+
+  const requestedOrgId = options.auth?.organizationId;
+  if (requestedOrgId && shared.organizationId && requestedOrgId !== shared.organizationId) return false;
+
+  return (
+    options.reconnection === undefined &&
+    options.reconnectionDelay === undefined &&
+    options.reconnectionDelayMax === undefined &&
+    options.reconnectionAttempts === undefined
+  );
+}
+
+export function SocketProvider({
+  children,
+  user,
+}: {
+  children: ReactNode;
+  user?: { organizationId?: string | null } | null;
+}) {
+  const organizationId = user?.organizationId || undefined;
+  const url = getDefaultSocketUrl();
+  const socket = useStandaloneSocket({
+    url,
+    autoConnect: !!organizationId,
+    auth: organizationId ? { organizationId } : undefined,
+  });
+  const value = useMemo<SocketContextValue>(
+    () => ({
+      ...socket,
+      url,
+      organizationId,
+    }),
+    [
+      socket.socket,
+      socket.isConnected,
+      socket.connectionError,
+      socket.lastMessage,
+      socket.emit,
+      socket.on,
+      socket.once,
+      socket.joinRoom,
+      socket.leaveRoom,
+      url,
+      organizationId,
+    ],
+  );
+
+  return createElement(SocketContext.Provider, { value }, children);
+}
+
+function useStandaloneSocket(options: UseSocketOptions = {}): UseSocketReturn {
   const {
-    url = process.env.NEXT_PUBLIC_SOCKET_URL || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3002'),
+    url = getDefaultSocketUrl(),
     autoConnect = true,
     reconnection = true,
     reconnectionDelay = 1000,
@@ -212,4 +278,12 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketReturn {
     joinRoom,
     leaveRoom,
   };
+}
+
+export function useSocket(options: UseSocketOptions = {}): UseSocketReturn {
+  const shared = useContext(SocketContext);
+  const shouldUseShared = canUseSharedSocket(options, shared);
+  const standalone = useStandaloneSocket(shouldUseShared ? { ...options, autoConnect: false } : options);
+
+  return shouldUseShared ? shared : standalone;
 }
