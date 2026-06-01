@@ -1,6 +1,6 @@
 # Vizora - Task Tracker
 
-## In Progress: Dashboard Bulk-Action Safety Pass 26 (2026-06-01)
+## Completed: Dashboard Bulk-Action Safety Pass 26 (2026-06-01)
 
 **Branch:** `feat/customer-dashboard-pass-26`
 
@@ -27,8 +27,8 @@ business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
 - [x] Run focused tests.
 - [x] Run multi-vector review before broader verification.
 - [x] Run broader verification.
-- [ ] PR, CI, merge.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe.
 
 **Plan/design:**
 `docs/plans/2026-06-01-dashboard-bulk-action-safety-pass-26.md`
@@ -55,6 +55,15 @@ business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
   web production build pass with explicit local `NEXT_PUBLIC_SOCKET_URL`,
   `NEXT_PUBLIC_API_URL`, `BACKEND_URL`, and memory env; repo JWT secret guard
   pass; `git diff --check` pass with CRLF warnings only.
+- PR #152 merged as `84e572f2ee0c86230ef42b0817266a1a8a1f2e43`. PR CI passed
+  audit, build, lint, security, test, and e2e. Post-merge `main` CI run
+  `26749346574` passed build, security, test, lint, and e2e.
+- Deployment was not performed. Read-only prod gate still blocks deploy:
+  `/opt/vizora/app` is on `bb76aa1838740bff5b58623dfef7a906d44f46a6`,
+  `origin/main` is `84e572f2ee0c86230ef42b0817266a1a8a1f2e43`, and the
+  checkout is 17 commits ahead / 96 behind with many tracked and untracked
+  local changes. Core prod probes remain up: middleware 200, web 200; realtime
+  `/health` returns the known 404.
 
 ---
 
