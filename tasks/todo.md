@@ -1,5 +1,86 @@
 # Vizora - Task Tracker
 
+## Active: Customer Critical Path E2E Gate Pass 37 (2026-06-01)
+
+**Branch:** `feat/customer-experience-pass-37`
+
+**Why now:** Recent smoke-script work now exercises the customer path from
+register/login through pairing, content, playlist, schedule, uploaded-content
+streaming, and device active-schedule reads. CI still only gates the agents E2E
+suite, so this customer-critical path can regress without blocking a merge.
+
+**New primitives introduced:** none. This pass adds automated E2E coverage and
+CI wiring only. It reuses existing NestJS modules/controllers/services/DTOs,
+Prisma models, Redis pairing flow, device JWT verification, response envelope,
+and `/api/v1` routing. No route, schema, runtime process, env var, realtime
+substrate, notification substrate, MCP tool, Hermes skill, or provider spend
+path changes.
+
+**Hermes-first analysis:** not applicable. This is a repo-local middleware E2E
+gate for existing customer-critical API paths, not a business-agent, MCP,
+Hermes, or AI/provider workflow.
+
+**Plan/design:**
+`docs/plans/2026-06-01-customer-critical-path-e2e-pass-37.md`
+
+**Plan**
+- [x] Start fresh isolated branch from updated `origin/main`.
+- [x] Drift-check smoke, runbook, and CI coverage against current repo truth.
+- [x] Document pass 37 design and verification plan.
+- [x] Add middleware E2E coverage for register/login, pairing, content,
+  playlist, schedule, and device active-schedule read through `/api/v1`.
+- [x] Wire GitHub Actions E2E job to run the customer-critical-path spec
+  alongside the existing agents suite.
+- [x] Run multi-vector subagent review before broader verification.
+- [x] Run focused and broader verification.
+- [ ] PR, CI, merge if green.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Evidence so far:**
+- Drift-check: `scripts/smoke/api-critical-path.sh` already covers full pairing
+  completion, URL content, multipart PDF upload, authenticated device-content
+  range streaming, playlist creation, schedule creation, and device
+  `/schedules/active/:displayId` reads. The current CI E2E job still runs only
+  `--testPathPattern=agents`.
+- Customer UX reviewer findings queued for follow-up after this gate:
+  dashboard server fetch cookie mismatch, 401/403 client handling, viewer action
+  gating, misleading playlist Publish, multi-device schedule mismatch, bulk
+  delete safeguards, content/template performance hotspots, mobile fit, and trust
+  copy drift.
+- Performance reviewer findings queued for follow-up after this gate: device
+  media buffering, memory-backed uploads/replacements, thumbnail generation
+  stampede, playlist realtime fan-out, playlist list overfetch, missing list
+  sort indexes, first-page-only dashboard assumptions, global response sanitize
+  overhead, proof-of-play write path, reorder scaling, and pairing Redis scans.
+- Implementation: added `customer-critical-path.e2e-spec.ts` covering
+  register + login, public pairing request/status, authenticated pairing
+  completion, URL content creation, playlist creation, active schedule creation,
+  device-token active schedule read, no-token rejection, user-JWT rejection,
+  foreign-device-token rejection, cross-org playlist-content rejection, and
+  cross-org display-schedule rejection. The schedule uses all seven days to
+  avoid midnight flakes and cleanup deletes any leftover `pairing:{code}` Redis
+  keys.
+- CI wiring: GitHub Actions middleware E2E job now runs
+  `--testPathPattern="(agents|customer-critical-path)"`.
+- Test cleanup: `agents.e2e-spec.ts` now deletes its user before deleting the
+  org so the gated suite does not emit a Prisma not-found cleanup error.
+- Review: CI/release-safety reviewer CLEAN. API/security reviewer initially
+  found missing negative device-token and tenant-isolation assertions; after
+  follow-up assertions, re-review CLEAN.
+- Verification:
+  `pnpm --filter @vizora/middleware exec jest --config=jest.e2e.config.js --runInBand --testPathPattern=customer-critical-path --detectOpenHandles`
+  passed 1 suite / 1 test. `pnpm --filter @vizora/middleware exec jest --config=jest.e2e.config.js --runInBand --testPathPattern="(agents|customer-critical-path)"`
+  passed 2 suites / 2 tests. `pnpm --filter @vizora/middleware test -- --runInBand`
+  passed 146 suites / 2942 tests. `npx nx build @vizora/middleware --skip-nx-cache`
+  passed with existing webpack warnings. `git diff --check` passed with only
+  Windows CRLF conversion warnings. `pnpm security:no-hardcoded-jwts` passed.
+  Direct `tsc --project tsconfig.spec.json` is not a valid
+  repo check because the spec tsconfig has a pre-existing
+  `moduleResolution: NodeNext` / `module` mismatch; Jest/ts-jest is the E2E
+  compile path and passed.
+
+---
+
 ## Completed: Template Action Truthfulness Pass 36 (2026-06-01)
 
 **Branch:** `feat/customer-experience-pass-36`

@@ -59,14 +59,14 @@ describe('Agents onboarding pipeline (e2e)', () => {
   });
 
   afterAll(async () => {
+    if (userId) {
+      await db.user.delete({ where: { id: userId } }).catch(() => {});
+    }
     if (organizationId) {
       // Onboarding row cascade-deletes with the org (onDelete: Cascade).
       await db.organization
         .delete({ where: { id: organizationId } })
         .catch(() => {});
-    }
-    if (userId) {
-      await db.user.delete({ where: { id: userId } }).catch(() => {});
     }
     await db.$disconnect();
     await app.close();
