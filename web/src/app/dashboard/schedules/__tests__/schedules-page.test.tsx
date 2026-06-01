@@ -9,6 +9,7 @@ const mockGetDisplayGroups = jest.fn();
 const mockCreateSchedule = jest.fn();
 const mockUpdateSchedule = jest.fn();
 const mockDeleteSchedule = jest.fn();
+const mockCheckScheduleConflicts = jest.fn();
 
 jest.mock('@/lib/api', () => ({
   apiClient: {
@@ -19,6 +20,7 @@ jest.mock('@/lib/api', () => ({
     createSchedule: (...args: any[]) => mockCreateSchedule(...args),
     updateSchedule: (...args: any[]) => mockUpdateSchedule(...args),
     deleteSchedule: (...args: any[]) => mockDeleteSchedule(...args),
+    checkScheduleConflicts: (...args: any[]) => mockCheckScheduleConflicts(...args),
   },
 }));
 
@@ -167,9 +169,16 @@ describe('SchedulesClient', () => {
     mockCreateSchedule.mockResolvedValue({ id: 'new-1' });
     mockUpdateSchedule.mockImplementation((id, payload) => Promise.resolve({ id, ...payload, isActive: true }));
     mockDeleteSchedule.mockResolvedValue({});
+    mockCheckScheduleConflicts.mockResolvedValue({ hasConflicts: false, conflicts: [] });
   });
 
   it('renders loading spinner initially', () => {
+    const pending = new Promise<never>(() => {});
+    mockGetSchedules.mockReturnValue(pending);
+    mockGetPlaylists.mockReturnValue(pending);
+    mockGetDisplays.mockReturnValue(pending);
+    mockGetDisplayGroups.mockReturnValue(pending);
+
     render(<SchedulesClient />);
     expect(screen.getByTestId('spinner')).toBeInTheDocument();
   });
@@ -250,6 +259,125 @@ describe('SchedulesClient', () => {
     await waitFor(() => {
       expect(screen.getByText('Holiday Schedule')).toBeInTheDocument();
     });
+    expect(screen.getAllByText('Active')).toHaveLength(2);
+    expect(screen.getByText('Inactive')).toBeInTheDocument();
+  });
+
+  it('checks candidate schedules for conflicts and displays warnings', async () => {
+    mockGetPlaylists.mockResolvedValue({ data: samplePlaylists });
+    mockGetDisplays.mockResolvedValue({ data: sampleDisplays });
+    mockCheckScheduleConflicts.mockResolvedValue({
+      hasConflicts: true,
+      conflicts: [
+        {
+          id: 's1',
+          name: 'Morning Announcements',
+          startTime: 480,
+          endTime: 720,
+        },
+      ],
+    });
+
+    render(<SchedulesClient />);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByText('Create Schedule')[0]);
+    fireEvent.change(screen.getByPlaceholderText('e.g., Morning Content, Holiday Special'), {
+      target: { value: 'Lobby Morning' },
+    });
+    fireEvent.change(screen.getByDisplayValue('Select a playlist...'), {
+      target: { value: 'p1' },
+    });
+    fireEvent.click(screen.getByLabelText('Lobby Display'));
+
+    await waitFor(() => {
+      expect(mockCheckScheduleConflicts).toHaveBeenCalledWith(expect.objectContaining({
+        displayId: 'd1',
+        daysOfWeek: [1, 2, 3, 4, 5],
+        startTime: 540,
+        endTime: 600,
+        startDate: expect.any(String),
+      }));
+    });
+    await waitFor(() => {
+      expect(screen.getByText('Schedule Conflicts Detected')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('status')).toHaveTextContent('Schedule Conflicts Detected');
+    expect(screen.getByText(/Morning Announcements/)).toBeInTheDocument();
+    expect(screen.getByText(/08:00 - 12:00/)).toBeInTheDocument();
+    expect(screen.queryByText(/480 - 720/)).not.toBeInTheDocument();
+  });
+
+  it('does not re-check already verified device targets when adding another device', async () => {
+    mockGetPlaylists.mockResolvedValue({ data: samplePlaylists });
+    mockGetDisplays.mockResolvedValue({ data: sampleDisplays });
+    mockCheckScheduleConflicts.mockResolvedValue({ hasConflicts: false, conflicts: [] });
+
+    render(<SchedulesClient />);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByText('Create Schedule')[0]);
+    fireEvent.change(screen.getByDisplayValue('Select a playlist...'), {
+      target: { value: 'p1' },
+    });
+    fireEvent.click(screen.getByLabelText('Lobby Display'));
+
+    await waitFor(() => {
+      expect(mockCheckScheduleConflicts).toHaveBeenCalledWith(expect.objectContaining({ displayId: 'd1' }));
+    });
+
+    fireEvent.click(screen.getByLabelText('Conference Room'));
+
+    await waitFor(() => {
+      expect(mockCheckScheduleConflicts).toHaveBeenCalledWith(expect.objectContaining({ displayId: 'd2' }));
+    });
+
+    const callsByDisplay = mockCheckScheduleConflicts.mock.calls.map(([payload]) => payload.displayId);
+    expect(callsByDisplay.filter((displayId) => displayId === 'd1')).toHaveLength(1);
+    expect(callsByDisplay.filter((displayId) => displayId === 'd2')).toHaveLength(1);
+  });
+
+  it('warns when candidate schedule conflicts cannot be verified', async () => {
+    mockGetPlaylists.mockResolvedValue({ data: samplePlaylists });
+    mockGetDisplays.mockResolvedValue({ data: sampleDisplays });
+    mockCheckScheduleConflicts.mockRejectedValue(new Error('network down'));
+
+    render(<SchedulesClient />);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByText('Create Schedule')[0]);
+    fireEvent.change(screen.getByDisplayValue('Select a playlist...'), {
+      target: { value: 'p1' },
+    });
+    fireEvent.click(screen.getByLabelText('Lobby Display'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Unable to verify schedule conflicts');
+    });
+  });
+
+  it('shows that schedules run in the target display timezone instead of a persisted schedule timezone', async () => {
+    render(<SchedulesClient />);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByText('Create Schedule')[0]);
+
+    expect(screen.getByText('Target display timezone')).toBeInTheDocument();
+    expect(screen.getByText(/Each target display applies its own configured timezone/)).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: /timezone/i })).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue('Eastern (America/New_York)')).not.toBeInTheDocument();
   });
 
   it('renders page heading', async () => {
@@ -282,8 +410,7 @@ describe('SchedulesClient', () => {
     });
     fireEvent.click(screen.getByText('Select Weekdays'));
 
-    const selects = screen.getAllByRole('combobox');
-    fireEvent.change(selects[1], { target: { value: 'p1' } });
+    fireEvent.change(screen.getByDisplayValue('Select a playlist...'), { target: { value: 'p1' } });
     fireEvent.click(screen.getByLabelText('Lobby Display'));
     fireEvent.click(screen.getByLabelText('Conference Room'));
     fireEvent.click(screen.getByText('Create'));
@@ -315,8 +442,7 @@ describe('SchedulesClient', () => {
     });
     fireEvent.click(screen.getByText('Select Weekdays'));
 
-    const selects = screen.getAllByRole('combobox');
-    fireEvent.change(selects[1], { target: { value: 'p1' } });
+    fireEvent.change(screen.getByDisplayValue('Select a playlist...'), { target: { value: 'p1' } });
     fireEvent.click(screen.getByLabelText('Lobby Display'));
     fireEvent.click(screen.getByLabelText('Conference Room'));
     fireEvent.click(screen.getByText('Create'));

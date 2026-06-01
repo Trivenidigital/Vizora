@@ -1,6 +1,135 @@
 # Vizora - Task Tracker
 
-## In Progress: Security Token Guard Pass 22 (2026-06-01)
+## In Progress: Schedule Trust Polish Pass 23 (2026-06-01)
+
+**Branch:** `feat/customer-dashboard-improvements-pass-23`
+
+**Why now:** PR #145 merged with green post-merge `main` CI, but production
+deployment remains blocked by dirty/diverged prod-local state. The next
+customer-dashboard analysis found the schedules page is the highest-value
+bounded customer-facing target: inactive schedules are shown as active and the
+conflict-warning UI is never populated.
+
+**New primitives introduced:** none. This uses the existing schedules page and
+existing `apiClient.checkScheduleConflicts` endpoint.
+
+**Hermes-first analysis:** not applicable. This pass does not add or modify
+business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
+
+**Plan**
+- [x] Merge PR #145 after PR CI green and confirm post-merge `main` CI.
+- [x] Re-check production deploy gate after merge.
+- [x] Start fresh branch from `origin/main`.
+- [x] Review current schedule UI/API/runtime evidence.
+- [x] Write focused failing tests for inactive status badges and conflict
+  warnings.
+- [x] Implement schedule status and conflict-warning fixes.
+- [x] Address first review pass: group-target conflict false negatives, missing
+  candidate date range, overnight schedule conflict/active math, raw conflict
+  times, silent conflict-check failures, and timezone test underfit.
+- [x] Address second review pass: adjacent-day all-day false positives,
+  duplicate already-verified device conflict checks, and missing live-region
+  semantics for dynamic conflict states.
+- [x] Run final multi-subagent code review before broader tests.
+- [x] Run focused and broader verification.
+- [ ] PR, CI, merge.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Plan/design:**
+`docs/plans/2026-06-01-schedule-trust-polish-pass-23.md`
+
+**Implementation notes**
+- [x] Schedule list badges now render `Active`/`Inactive` from actual
+  `isActive`/`active` state.
+- [x] Create/edit modal now calls the existing conflict endpoint when target,
+  days, and time are present; preview calls include candidate `startDate` and
+  edit `endDate` when available.
+- [x] Conflict warnings now format backend minute values as `HH:MM`, expose
+  `role="status"`, and show `role="alert"` when conflicts cannot be verified.
+- [x] Device-target conflict preview caches request/results per candidate so
+  adding another selected device does not re-check already verified devices.
+- [x] Middleware conflict detection now checks display-group schedules against
+  direct-display and overlapping-group schedules under the same organization.
+- [x] Middleware weekly time-window math now handles schedules crossing
+  midnight and avoids adjacent-day all-day false positives.
+
+**Focused verification**
+- [x] Web schedule page test passed:
+  `pnpm --filter @vizora/web test -- --runInBand --runTestsByPath src/app/dashboard/schedules/__tests__/schedules-page.test.tsx`
+  - 20 tests / 1 suite.
+- [x] Middleware schedule service test passed:
+  `pnpm --filter @vizora/middleware test -- --runInBand --runTestsByPath src/modules/schedules/schedules.service.spec.ts`
+  - 37 tests / 1 suite.
+
+**Review gate**
+- [x] Schedule/runtime reviewer final pass: clean after group overlap,
+  overnight, and all-day-adjacency fixes.
+- [x] Dashboard UX/test reviewer final pass: clean after formatted conflict
+  times, explicit verification failure state, device-preview dedupe, and
+  live-region semantics.
+
+**Broader verification**
+- [x] Middleware schedules sweep passed:
+  `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern=schedules`
+  - 2 suites / 55 tests.
+- [x] Web schedules sweep passed:
+  `pnpm --filter @vizora/web test -- --runInBand --testPathPattern=schedules`
+  - 1 suite / 20 tests.
+- [x] Full web Jest suite passed:
+  `pnpm --filter @vizora/web test -- --runInBand`
+  - 96 suites / 1005 tests. Existing unrelated React `act(...)` warnings
+    remain in other dashboard suites.
+- [x] Full middleware Jest suite passed:
+  `pnpm --filter @vizora/middleware test -- --runInBand`
+  - 143 suites / 2887 tests / 1 snapshot.
+- [x] Middleware build passed:
+  `npx nx build @vizora/middleware --skip-nx-cache`
+  - Build completed with known webpack optional-dependency warnings.
+- [x] Web production build passed with required local build env:
+  `NODE_OPTIONS=--max-old-space-size=4096 NEXT_PUBLIC_SOCKET_URL=http://localhost:3002 NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1 BACKEND_URL=http://localhost:3000 npx nx build @vizora/web --skip-nx-cache`
+  - Initial run without `NEXT_PUBLIC_SOCKET_URL` failed at the expected
+    production CSP env precondition; rerun with env passed.
+- [x] ESLint completed with no errors:
+  `ESLINT_USE_FLAT_CONFIG=false npx eslint --ext .ts,.tsx middleware/src realtime/src`
+  - 0 errors / 195 warnings. Warnings are pre-existing broad repo warnings.
+- [x] JWT secret guard passed:
+  `pnpm security:no-hardcoded-jwts`
+  - No hardcoded JWT-looking tokens found.
+- [x] Whitespace check passed:
+  `git diff --check`
+  - Exit 0; Windows CRLF conversion warnings only.
+
+**Current merge/deploy state**
+- [x] PR #145 merged at
+  `89a33b99d15abe82d99d1f767e6d5475f320c155`; PR checks green for audit,
+  build, e2e, lint, security, and test.
+- [x] Post-merge `main` CI run `26737775963` completed successfully: security,
+  lint, build, test, and e2e all green.
+- [x] Prod deploy remains blocked: `/opt/vizora/app` is at
+  `bb76aa1838740bff5b58623dfef7a906d44f46a6`, remote `main` is
+  `89a33b99d15abe82d99d1f767e6d5475f320c155`, and prod is
+  `ahead 17, behind 77` with many tracked edits and untracked files. No
+  production pull, reset, stash, env edit, service restart, DB mutation, or
+  deploy performed.
+
+**Customer dashboard analysis**
+- [x] Schedules page trust: inactive schedules shown as active.
+- [x] Schedules page trust: conflict warning panel is dead.
+- [x] Schedules page trust: timezone selector implies schedule timezone support,
+  while runtime uses display timezone.
+- [x] Analytics empty states can make fetch errors look like "No Data Yet".
+- [x] Analytics labels need more signage-specific wording.
+- [x] Content tag filters are hardcoded instead of metadata-driven.
+- [x] AI Designer CTA can overpromise when backend capability is unavailable.
+- [x] Performance backlog: dashboard org broadcasts inspect device sockets,
+  playlist fan-out is unbounded, content impressions write synchronously,
+  dashboard status fetches up to 1000 displays, response sanitization is
+  CPU-heavy, upload has multiple full-file passes, and pairing active-list scans
+  Redis keyspace.
+
+---
+
+## Completed: Security Token Guard Pass 22 (2026-06-01)
 
 **Branch:** `feat/customer-dashboard-improvements-pass-22`
 

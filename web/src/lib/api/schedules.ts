@@ -10,7 +10,7 @@ declare module './client' {
     updateSchedule(id: string, data: Partial<ScheduleData>): Promise<Schedule>;
     deleteSchedule(id: string): Promise<void>;
     duplicateSchedule(id: string): Promise<Schedule>;
-    checkScheduleConflicts(data: { displayId?: string; displayGroupId?: string; daysOfWeek: number[]; startTime?: string; endTime?: string; excludeScheduleId?: string }): Promise<{ hasConflicts: boolean; conflicts: any[] }>;
+    checkScheduleConflicts(data: { displayId?: string; displayGroupId?: string; daysOfWeek: number[]; startTime?: number; endTime?: number; startDate?: string; endDate?: string; excludeScheduleId?: string }): Promise<{ hasConflicts: boolean; conflicts: any[] }>;
   }
 }
 
@@ -49,8 +49,10 @@ ApiClient.prototype.checkScheduleConflicts = async function (data: {
   displayId?: string;
   displayGroupId?: string;
   daysOfWeek: number[];
-  startTime?: string;
-  endTime?: string;
+  startTime?: number;
+  endTime?: number;
+  startDate?: string;
+  endDate?: string;
   excludeScheduleId?: string;
 }): Promise<{ hasConflicts: boolean; conflicts: any[] }> {
   return this.request<{ hasConflicts: boolean; conflicts: any[] }>('/schedules/check-conflicts', {
