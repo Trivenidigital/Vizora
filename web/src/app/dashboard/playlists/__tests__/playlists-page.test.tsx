@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
 const mockPush = jest.fn();
@@ -22,6 +22,7 @@ jest.mock('@/lib/api', () => ({
     deletePlaylist: jest.fn(),
     updatePlaylist: jest.fn(),
     duplicatePlaylist: jest.fn(),
+    bulkAssignPlaylist: jest.fn(),
   },
 }));
 
@@ -76,8 +77,14 @@ jest.mock('@/components/SearchFilter', () => {
 
 jest.mock('@/components/Modal', () => ({
   __esModule: true,
-  default: ({ isOpen, children, title }: any) =>
-    isOpen ? <div data-testid="modal"><span>{title}</span>{children}</div> : null,
+  default: ({ isOpen, children, title, onClose }: any) =>
+    isOpen ? (
+      <div data-testid="modal">
+        <span>{title}</span>
+        <button onClick={onClose} aria-label="Close modal">Close</button>
+        {children}
+      </div>
+    ) : null,
 }));
 
 jest.mock('@/components/ConfirmDialog', () => ({
@@ -156,12 +163,31 @@ const mockPlaylists = [
   },
 ];
 
+const mockDevices = [
+  {
+    id: 'display-1',
+    nickname: 'Lobby Screen',
+    status: 'online',
+    location: 'Lobby',
+    currentPlaylistId: null,
+  },
+  {
+    id: 'display-2',
+    nickname: 'Cafe Screen',
+    status: 'offline',
+    location: 'Cafe',
+    currentPlaylistId: 'playlist-2',
+  },
+];
+
 describe('PlaylistsClient', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (apiClient.getPlaylists as jest.Mock).mockResolvedValue({ data: mockPlaylists });
     (apiClient.getContent as jest.Mock).mockResolvedValue({ data: [] });
     (apiClient.getDisplays as jest.Mock).mockResolvedValue({ data: [] });
+    (apiClient.updatePlaylist as jest.Mock).mockResolvedValue({});
+    (apiClient.bulkAssignPlaylist as jest.Mock).mockResolvedValue({ updated: 0 });
   });
 
   it('renders playlists heading', async () => {
@@ -211,6 +237,197 @@ describe('PlaylistsClient', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Active')).toBeInTheDocument();
+    });
+  });
+
+  it('opens a device assignment modal instead of fake-updating the playlist name', async () => {
+    (apiClient.getDisplays as jest.Mock).mockResolvedValue({ data: mockDevices });
+
+    render(<PlaylistsClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Morning Promo')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByText('Assign')[0]);
+
+    expect(apiClient.updatePlaylist).not.toHaveBeenCalled();
+    expect(screen.getByTestId('modal')).toHaveTextContent('Assign Morning Promo to Devices');
+    expect(screen.getByLabelText('Lobby Screen')).toBeInTheDocument();
+    expect(screen.getByLabelText('Cafe Screen')).toBeInTheDocument();
+    expect(screen.getByText('Updates when online')).toBeInTheDocument();
+  });
+
+  it('assigns a playlist to selected devices and reports the backend count', async () => {
+    (apiClient.getDisplays as jest.Mock).mockResolvedValue({ data: mockDevices });
+    (apiClient.bulkAssignPlaylist as jest.Mock).mockResolvedValue({ updated: 1 });
+
+    render(<PlaylistsClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Morning Promo')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByText('Assign')[0]);
+    fireEvent.click(screen.getByLabelText('Lobby Screen'));
+    fireEvent.click(screen.getByRole('button', { name: 'Assign to 1 device' }));
+
+    await waitFor(() => {
+      expect(apiClient.bulkAssignPlaylist).toHaveBeenCalledWith(['display-1'], 'playlist-1');
+    });
+    expect(mockToast.success).toHaveBeenCalledWith('Playlist assigned to 1 device');
+    expect(apiClient.updatePlaylist).not.toHaveBeenCalled();
+  });
+
+  it('states non-online assignment correctly instead of promising live delivery', async () => {
+    (apiClient.getDisplays as jest.Mock).mockResolvedValue({
+      data: [{ ...mockDevices[1], status: 'pairing' }],
+    });
+    (apiClient.bulkAssignPlaylist as jest.Mock).mockResolvedValue({ updated: 1 });
+
+    render(<PlaylistsClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Morning Promo')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByText('Assign')[0]);
+    expect(screen.getByText('Updates when online')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText('Cafe Screen'));
+    fireEvent.click(screen.getByRole('button', { name: 'Assign to 1 device' }));
+
+    await waitFor(() => {
+      expect(apiClient.bulkAssignPlaylist).toHaveBeenCalledWith(['display-2'], 'playlist-1');
+    });
+    expect(mockToast.success).toHaveBeenCalledWith(
+      'Playlist assigned to 1 device. Non-online devices will update when they come online.',
+    );
+  });
+
+  it('shows already assigned devices as read-only instead of unpublish targets', async () => {
+    (apiClient.getDisplays as jest.Mock).mockResolvedValue({
+      data: [{ ...mockDevices[0], currentPlaylistId: 'playlist-1' }],
+    });
+
+    render(<PlaylistsClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Morning Promo')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByText('Assign')[0]);
+
+    expect(screen.getByText('Already assigned')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Lobby Screen')).not.toBeInTheDocument();
+    expect(screen.getByText('Lobby Screen')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Assign to 0 devices' })).toBeDisabled();
+    expect(apiClient.bulkAssignPlaylist).not.toHaveBeenCalled();
+  });
+
+  it('blocks assigning an empty playlist before opening the device modal', async () => {
+    (apiClient.getDisplays as jest.Mock).mockResolvedValue({ data: mockDevices });
+
+    render(<PlaylistsClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Evening Loop')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByText('Assign')[1]);
+
+    expect(mockToast.warning).toHaveBeenCalledWith('Add content to this playlist before assigning it');
+    expect(apiClient.bulkAssignPlaylist).not.toHaveBeenCalled();
+    expect(apiClient.updatePlaylist).not.toHaveBeenCalled();
+  });
+
+  it('blocks assignment when there are no paired devices', async () => {
+    render(<PlaylistsClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Morning Promo')).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(apiClient.getDisplays).toHaveBeenCalled();
+    });
+
+    fireEvent.click(screen.getAllByText('Assign')[0]);
+
+    expect(mockToast.warning).toHaveBeenCalledWith('Pair a device before assigning playlists to screens');
+    expect(apiClient.bulkAssignPlaylist).not.toHaveBeenCalled();
+    expect(apiClient.updatePlaylist).not.toHaveBeenCalled();
+  });
+
+  it('defers assignment while the device list is still loading', async () => {
+    (apiClient.getDisplays as jest.Mock).mockImplementation(() => new Promise(() => {}));
+
+    render(<PlaylistsClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Morning Promo')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByText('Assign')[0]);
+
+    expect(mockToast.info).toHaveBeenCalledWith('Devices are still loading. Try again in a moment.');
+    expect(apiClient.bulkAssignPlaylist).not.toHaveBeenCalled();
+  });
+
+  it('blocks assignment after device list load failure', async () => {
+    (apiClient.getDisplays as jest.Mock).mockRejectedValue(new Error('failed'));
+
+    render(<PlaylistsClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Morning Promo')).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(mockToast.error).toHaveBeenCalledWith('Failed to load devices');
+    });
+
+    mockToast.error.mockClear();
+    fireEvent.click(screen.getAllByText('Assign')[0]);
+
+    expect(mockToast.error).toHaveBeenCalledWith(
+      'Device list failed to load. Refresh the page before assigning playlists.',
+    );
+    expect(apiClient.bulkAssignPlaylist).not.toHaveBeenCalled();
+  });
+
+  it('keeps the assignment modal open if close is requested during an in-flight assignment', async () => {
+    (apiClient.getDisplays as jest.Mock).mockResolvedValue({ data: mockDevices });
+    let resolveAssignment: (value: { updated: number }) => void = () => {};
+    (apiClient.bulkAssignPlaylist as jest.Mock).mockImplementation(
+      () => new Promise((resolve) => {
+        resolveAssignment = resolve;
+      }),
+    );
+
+    render(<PlaylistsClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Morning Promo')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByText('Assign')[0]);
+    fireEvent.click(screen.getByLabelText('Lobby Screen'));
+    fireEvent.click(screen.getByRole('button', { name: 'Assign to 1 device' }));
+    await waitFor(() => {
+      expect(screen.getByLabelText('Cafe Screen')).toBeDisabled();
+    });
+    fireEvent.click(screen.getByLabelText('Cafe Screen'));
+    expect(screen.getByRole('button', { name: /Assign to 1 device/ })).toBeDisabled();
+    fireEvent.click(screen.getByLabelText('Close modal'));
+
+    expect(screen.getByTestId('modal')).toBeInTheDocument();
+
+    await act(async () => {
+      resolveAssignment({ updated: 1 });
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('modal')).not.toBeInTheDocument();
     });
   });
 

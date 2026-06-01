@@ -1,5 +1,73 @@
 # Vizora - Task Tracker
 
+## In Progress: Playlist Publish Trust Pass 27 (2026-06-01)
+
+**Branch:** `feat/playlist-publish-trust-pass-27`
+
+**Why now:** Pass 26 is merged with green post-merge `main` CI, but production
+deploy remains blocked by dirty/diverged prod-local state. The next
+customer-trust blocker from the Pass 26 dashboard review is the playlist card's
+`Publish` action claiming success even though it only PATCHes the playlist name
+and does not put anything on a screen.
+
+**New primitives introduced:** none. This pass reuses the playlists dashboard,
+existing loaded display list, `apiClient.bulkAssignPlaylist`, middleware display
+bulk assignment endpoint, and realtime display notification path.
+
+**Hermes-first analysis:** not applicable. This pass does not add or modify
+business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
+
+**Plan**
+- [x] Start fresh branch from `origin/main`.
+- [x] Drift-check playlist publish action and existing display assignment path.
+- [x] Write failing tests for fake publish removal and real device assignment.
+- [x] Implement assignment modal and bulk assignment through existing APIs.
+- [x] Run focused playlist tests.
+- [x] Run multi-vector review before broader verification.
+- [x] Run broader verification.
+- [ ] PR, CI, merge.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Plan/design:**
+`docs/plans/2026-06-01-playlist-publish-trust-pass-27.md`
+
+**Local evidence:**
+- TDD red: playlist tests failed because the card's `Publish` action called
+  `updatePlaylist(playlist.id, { name: playlist.name })` immediately, never
+  opened a device-targeting flow, and still claimed publish success when no
+  display assignment happened.
+- Implementation: playlist cards now use `Assign`; the modal selects target
+  devices and calls `apiClient.bulkAssignPlaylist`. It blocks empty playlists,
+  device-list loading, device-list load failure, and zero paired devices. The
+  success toast reports the backend `{ updated }` assignment count and adds
+  non-online device copy instead of implying live delivery. Already-assigned
+  devices render read-only, and close/selection changes are guarded while an
+  assignment is in flight.
+- Status-model follow-up: frontend `DisplayStatus` now matches backend reality
+  (`online | offline | pairing | error`), realtime event/device page types
+  propagate it, and `DeviceStatusIndicator` renders `Pairing` explicitly.
+- Review: customer-trust/UX reviewers initially found over-promising delivery
+  copy, misleading already-assigned checkboxes, false no-device messaging while
+  devices load/fail, in-flight close ambiguity, non-online status gaps, and
+  in-flight selection drift. All were fixed and final UX review was CLEAN.
+  Runtime/API reviewers were CLEAN throughout: assignment uses the existing
+  `bulkAssignPlaylist` API, backend auth/tenant checks remain unchanged, and no
+  parallel realtime/delivery path was added.
+- Verification: focused playlist suite 22/22 pass; focused playlist +
+  realtime-events + status-indicator suites 47/47 pass; status propagation
+  reviewer also ran 4 focused suites / 64 tests pass; web `tsc --noEmit` pass;
+  changed-file ESLint exits 0 with existing warnings only; full web Jest suite
+  96 suites / 1033 tests pass; web production build pass with explicit local
+  API/socket env and memory env; repo JWT secret guard pass; `git diff --check`
+  pass with CRLF warnings only.
+- Browser evidence: local Next production server on port 3001 with browser-
+  mocked `/api/v1` responses opened `/dashboard/playlists`, showed the
+  assignment modal and non-online copy, submitted `{ displayIds: ['display-2'],
+  playlistId: 'playlist-1' }`, displayed the non-online assignment toast, and
+  recorded zero page errors. Scratch screenshots were not committed.
+
+---
+
 ## Completed: Dashboard Bulk-Action Safety Pass 26 (2026-06-01)
 
 **Branch:** `feat/customer-dashboard-pass-26`

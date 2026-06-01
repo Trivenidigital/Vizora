@@ -4,12 +4,12 @@
 import { useEffect, useCallback, useRef, useState } from 'react';
 import { useSocket } from './useSocket';
 import { devLog, devWarn } from '@/lib/logger';
-import type { Playlist } from '../types';
+import type { DisplayStatus, Playlist } from '../types';
 
 // Event types
 export type DeviceStatusUpdate = {
   deviceId: string;
-  status: 'online' | 'offline';
+  status: DisplayStatus;
   lastSeen: string;
   currentPlaylistId?: string;
 };

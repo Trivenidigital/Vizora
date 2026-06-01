@@ -1,13 +1,14 @@
 // Type definitions for Vizora
 
 export type DisplayOrientation = 'landscape' | 'portrait' | 'landscape_flipped' | 'portrait_flipped';
+export type DisplayStatus = 'online' | 'offline' | 'pairing' | 'error';
 
 export interface Display {
   id: string;
   nickname: string;
   deviceId: string;
   location?: string;
-  status: 'online' | 'offline';
+  status: DisplayStatus;
   lastSeen?: Date | string;
   lastHeartbeat?: Date | string;
   currentPlaylistId?: string;
