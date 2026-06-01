@@ -1,6 +1,6 @@
 # Vizora - Task Tracker
 
-## Active: Realtime Widget Secret Boundary Pass 30 (2026-06-01)
+## Completed: Realtime Widget Secret Boundary Pass 30 (2026-06-01)
 
 **Branch:** `feat/customer-readiness-pass-30`
 
@@ -21,8 +21,8 @@
 - [x] Run focused tests.
 - [x] Run multi-subagent review before broader verification.
 - [x] Run broader verification.
-- [ ] PR, CI, merge if green.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge if green.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe.
 
 **Evidence so far:**
 - Drift evidence: middleware HTTP responses redact generic API widget headers, but `realtime/src/services/playlist.service.ts` and `realtime/src/gateways/device.gateway.ts` still copy raw `item.content.metadata` into device-bound payloads.
@@ -31,7 +31,8 @@
 - Review findings fixed: stale pending playlist replay now sanitizes Redis payloads on read/requeue, and generic API widget `widgetConfig` is stripped entirely from device-bound metadata so query-string secrets do not survive. Focused specs now pass 129/129.
 - Final follow-up review: security and realtime/display reviewers both returned CLEAN.
 - Broader local verification: full realtime Jest passed 12 suites / 285 tests; `npx nx build @vizora/realtime --skip-nx-cache` passed with existing third-party webpack warnings; `pnpm security:no-hardcoded-jwts` passed; changed-file ESLint exited 0 with existing warnings; `git diff --check` passed with CRLF warnings only.
-- Deploy gate is still expected blocked by dirty/diverged prod checkout; no prod state changes are authorized for this pass.
+- PR #159 merged as `47af00d11dfe026a701386215059d6b8a86dbe0f`. PR CI passed audit, build, lint, security, test, and e2e. Post-merge `main` CI run `26764596096` also passed build, test, security, lint, and e2e.
+- Deployment was not performed. Read-only prod gate still blocks deploy: `/opt/vizora/app` is on `bb76aa1838740bff5b58623dfef7a906d44f46a6`, `origin/main` is `47af00d11dfe026a701386215059d6b8a86dbe0f`, the checkout is 17 commits ahead / 109 behind with 72 dirty/untracked entries, and many ops/Hermes PM2 jobs are stopped. Core probes: middleware 200, web 200, realtime `/health` 404.
 
 ---
 
