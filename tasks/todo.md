@@ -1621,7 +1621,7 @@ Plan: `docs/plans/2026-06-01-playlist-list-payload-performance-pass-17.md`
 - [x] Run multiple subagent reviews before broader tests.
 - [x] Run focused playlist middleware tests.
 - [x] Run broader middleware verification and build.
-- [ ] Open PR, wait for CI, merge if green.
+- [x] Open PR, wait for CI, merge if green. PR #140 merged to `origin/main` at `a3b4380ebbb5a6196ac66db8971060120471b663`.
 - [ ] Deploy status: blocked unless production dirty/diverged state is resolved or explicitly approved with a reviewed runbook.
 
 **Pass 17 verification**
@@ -1646,3 +1646,39 @@ Plan: `docs/plans/2026-06-01-playlist-list-payload-performance-pass-17.md`
   - `git diff --check` — passed with CRLF warnings only.
 - Local e2e status:
   - `pnpm --filter @vizora/middleware test:e2e -- --runInBand --testPathPattern=playlists` timed out locally because Docker Desktop is unavailable and test DB/Redis ports `5433`/`6380` are closed. CI e2e must verify the added playlist list contract test.
+- CI verification:
+  - PR #140 passed audit, lint, security, build, test, and e2e before merge.
+
+## Active Workstream: Content Library Search Performance Pass 18 (2026-06-01)
+
+Branch: `feat/content-library-search-pass-18`
+Plan: `docs/plans/2026-06-01-content-library-search-performance-pass-18.md`
+
+- [x] Drift-check content API search and dashboard content consumers.
+- [x] Document pass 18 design and test plan.
+- [x] Add failing ContentLibraryPanel test for server-side search.
+- [x] Implement debounced server-side search and pagination reset.
+- [x] Run multiple subagent reviews before broader tests.
+- [x] Run focused playlist-builder web tests.
+- [x] Run broader web verification and build.
+- [ ] Open PR, wait for CI, merge if green.
+- [ ] Deploy status: blocked unless production dirty/diverged state is resolved or explicitly approved with a reviewed runbook.
+
+**Pass 18 verification**
+- Red/green TDD:
+  - Initial `pnpm --filter @vizora/web test -- --runInBand --testPathPattern=PlaylistBuilder` failed on the new server-search assertion while `ContentLibraryPanel` only filtered the current page locally.
+  - Reviewer-driven red cases reproduced stale response ordering, debounce-window stale response, whitespace-only page reset/refetch, and stale pagination during pending search before the final fixes.
+  - Post-fix focused run passed: `PlaylistBuilder` suite 29 tests.
+- Reviewer gate:
+  - Initial API/performance reviewer: NOT CLEAN; found stale response race and whitespace-only excess fetch.
+  - Initial React/UX/test reviewer: NOT CLEAN; found stale response race and missing pagination/filter coverage.
+  - Follow-up API reviewer: NOT CLEAN; found whitespace-only edit reset/refetch from page 2.
+  - Follow-up React reviewer: NOT CLEAN; found debounce-window stale response.
+  - Final clean-gate reviewers after request invalidation and pagination guard: CLEAN / CLEAN.
+- Local verification:
+  - `pnpm --filter @vizora/web test -- --runInBand --testPathPattern=PlaylistBuilder` - 1 suite / 29 tests passed, with existing React `act()` warnings.
+  - `pnpm --filter @vizora/web test -- --runInBand` - 95 suites / 987 tests passed, with existing React `act()`/console warnings.
+  - `pnpm --filter @vizora/web exec tsc --noEmit --pretty false` - passed.
+  - `$env:ESLINT_USE_FLAT_CONFIG='false'; npx eslint web/src/components/playlist/ContentLibraryPanel.tsx web/src/components/__tests__/PlaylistBuilder.test.tsx` - 0 errors, 0 warnings in touched files.
+  - `NODE_OPTIONS=--max-old-space-size=4096 NEXT_PUBLIC_SOCKET_URL=http://localhost:3002 NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1 BACKEND_URL=http://localhost:3000 pnpm --filter @vizora/web build` - passed with existing Next middleware/proxy and TS project-reference warnings.
+  - `git diff --check` - passed with CRLF warnings only.

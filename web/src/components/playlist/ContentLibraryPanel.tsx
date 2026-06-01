@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Content } from '@/lib/types';
 import { apiClient } from '@/lib/api';
+import type { ContentListParams } from '@/lib/api/content';
+import { useDebounce } from '@/lib/hooks/useDebounce';
 import { Icon } from '@/theme/icons';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import DraggableContentItem from './DraggableContentItem';
@@ -11,45 +13,77 @@ interface ContentLibraryPanelProps {
   organizationId: string;
 }
 
-export default function ContentLibraryPanel({ organizationId }: ContentLibraryPanelProps) {
+export default function ContentLibraryPanel({ organizationId: _organizationId }: ContentLibraryPanelProps) {
   const [content, setContent] = useState<Content[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const debouncedSearch = useDebounce(searchQuery, 300);
+  const normalizedSearchQuery = searchQuery.trim();
+  const normalizedDebouncedSearch = debouncedSearch.trim();
+  const searchSettled = normalizedSearchQuery === normalizedDebouncedSearch;
+  const loadContentRequestRef = useRef(0);
 
-  useEffect(() => {
-    loadContent();
-  }, [page, typeFilter]);
-
-  const loadContent = async () => {
+  const loadContent = useCallback(async () => {
+    const requestId = ++loadContentRequestRef.current;
     try {
       setLoading(true);
-      const params: any = { page, limit: 20 };
+      const params: ContentListParams = { page, limit: 20 };
       if (typeFilter !== 'all') {
         params.type = typeFilter;
       }
+      if (normalizedDebouncedSearch) {
+        params.search = normalizedDebouncedSearch;
+      }
       const response = await apiClient.getContent(params);
+      if (requestId !== loadContentRequestRef.current) {
+        return;
+      }
       setContent(response.data || []);
       if (response.meta) {
         setTotalPages(response.meta.totalPages);
       }
     } catch (error) {
+      if (requestId !== loadContentRequestRef.current) {
+        return;
+      }
       if (process.env.NODE_ENV === 'development') {
         console.error('Failed to load content:', error);
       }
     } finally {
-      setLoading(false);
+      if (requestId === loadContentRequestRef.current) {
+        setLoading(false);
+      }
+    }
+  }, [page, typeFilter, normalizedDebouncedSearch]);
+
+  useEffect(() => {
+    if (!searchSettled) return;
+    void loadContent();
+  }, [loadContent, searchSettled]);
+
+  const invalidatePendingContentLoads = () => {
+    loadContentRequestRef.current += 1;
+    setLoading(true);
+  };
+
+  const handleSearchChange = (value: string) => {
+    const nextNormalizedSearch = value.trim();
+    setSearchQuery(value);
+    if (nextNormalizedSearch !== normalizedSearchQuery) {
+      invalidatePendingContentLoads();
+      setPage(1);
     }
   };
 
-  const filteredContent = content.filter((item) => {
-    if (searchQuery) {
-      return item.title.toLowerCase().includes(searchQuery.toLowerCase());
-    }
-    return true;
-  });
+  const handleTypeFilterChange = (type: string) => {
+    if (type === typeFilter) return;
+    invalidatePendingContentLoads();
+    setTypeFilter(type);
+    setPage(1);
+  };
 
   return (
     <div className="flex flex-col h-full bg-[var(--background)] border-r border-[var(--border)]">
@@ -63,7 +97,7 @@ export default function ContentLibraryPanel({ organizationId }: ContentLibraryPa
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             placeholder="Search content..."
             className="w-full pl-9 pr-3 py-2 text-sm border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
           />
@@ -74,7 +108,7 @@ export default function ContentLibraryPanel({ organizationId }: ContentLibraryPa
           {['all', 'image', 'video', 'url', 'pdf'].map((type) => (
             <button
               key={type}
-              onClick={() => setTypeFilter(type)}
+              onClick={() => handleTypeFilterChange(type)}
               className={`
                 px-3 py-1 text-xs font-medium rounded-full transition
                 ${typeFilter === type
@@ -95,7 +129,7 @@ export default function ContentLibraryPanel({ organizationId }: ContentLibraryPa
           <div className="flex items-center justify-center py-12">
             <LoadingSpinner size="lg" />
           </div>
-        ) : filteredContent.length === 0 ? (
+        ) : content.length === 0 ? (
           <div className="text-center py-12">
             <div className="text-[var(--foreground-tertiary)] mb-2">
               <Icon name="content" size="2xl" className="text-[var(--foreground-tertiary)] mx-auto" />
@@ -105,7 +139,7 @@ export default function ContentLibraryPanel({ organizationId }: ContentLibraryPa
             </p>
             {searchQuery && (
               <button
-                onClick={() => setSearchQuery('')}
+                onClick={() => handleSearchChange('')}
                 className="text-xs text-[#00E5A0] hover:text-[#00CC8E] mt-2"
               >
                 Clear search
@@ -114,7 +148,7 @@ export default function ContentLibraryPanel({ organizationId }: ContentLibraryPa
           </div>
         ) : (
           <>
-            {filteredContent.map((item) => (
+            {content.map((item) => (
               <DraggableContentItem key={item.id} content={item} />
             ))}
           </>
@@ -122,7 +156,7 @@ export default function ContentLibraryPanel({ organizationId }: ContentLibraryPa
       </div>
 
       {/* Pagination */}
-      {totalPages > 1 && (
+      {!loading && searchSettled && totalPages > 1 && (
         <div className="p-4 border-t border-[var(--border)] bg-[var(--surface)]">
           <div className="flex items-center justify-between text-sm">
             <button

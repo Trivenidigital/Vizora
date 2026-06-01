@@ -1,5 +1,5 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { useRouter, useParams } from 'next/navigation';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { useParams } from 'next/navigation';
 import PlaylistBuilderPage from '@/app/dashboard/playlists/[id]/page';
 import ContentLibraryPanel from '@/components/playlist/ContentLibraryPanel';
 import PlaylistEditorPanel from '@/components/playlist/PlaylistEditorPanel';
@@ -130,6 +130,22 @@ const mockPlaylist: Playlist = {
   updatedAt: '2024-01-01',
 };
 
+type MockContentResponse = {
+  data: Content[];
+  meta: { total: number; page: number; limit: number; totalPages: number };
+};
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+
+  return { promise, resolve, reject };
+}
+
 describe('PlaylistBuilder Components', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -181,7 +197,17 @@ describe('PlaylistBuilder Components', () => {
       });
     });
 
-    it('filters content by search query', async () => {
+    it('sends search query to the server instead of filtering only the current page', async () => {
+      (apiClient.getContent as jest.Mock)
+        .mockResolvedValueOnce({
+          data: mockContent,
+          meta: { total: 2, page: 1, limit: 20, totalPages: 1 },
+        })
+        .mockResolvedValueOnce({
+          data: [mockContent[1]],
+          meta: { total: 1, page: 1, limit: 20, totalPages: 1 },
+        });
+
       render(<ContentLibraryPanel organizationId="org-1" />);
 
       await waitFor(() => {
@@ -191,8 +217,17 @@ describe('PlaylistBuilder Components', () => {
       const searchInput = screen.getByPlaceholderText('Search content...');
       fireEvent.change(searchInput, { target: { value: 'Video' } });
 
-      expect(screen.queryByText('Test Image')).not.toBeInTheDocument();
-      expect(screen.getByText('Test Video')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(apiClient.getContent).toHaveBeenLastCalledWith({
+          page: 1,
+          limit: 20,
+          search: 'Video',
+        });
+      });
+      await waitFor(() => {
+        expect(screen.queryByText('Test Image')).not.toBeInTheDocument();
+        expect(screen.getByText('Test Video')).toBeInTheDocument();
+      });
     });
 
     it('filters content by type', async () => {
@@ -209,6 +244,217 @@ describe('PlaylistBuilder Components', () => {
         expect(apiClient.getContent).toHaveBeenCalledWith(
           expect.objectContaining({ type: 'image' })
         );
+      });
+    });
+
+    it('ignores stale content responses after a newer search response wins', async () => {
+      const initialRequest = createDeferred<MockContentResponse>();
+      const searchRequest = createDeferred<MockContentResponse>();
+      (apiClient.getContent as jest.Mock)
+        .mockReturnValueOnce(initialRequest.promise)
+        .mockReturnValueOnce(searchRequest.promise);
+
+      render(<ContentLibraryPanel organizationId="org-1" />);
+
+      await waitFor(() => {
+        expect(apiClient.getContent).toHaveBeenCalledTimes(1);
+      });
+
+      fireEvent.change(screen.getByPlaceholderText('Search content...'), {
+        target: { value: 'Video' },
+      });
+
+      await waitFor(() => {
+        expect(apiClient.getContent).toHaveBeenCalledTimes(2);
+      });
+
+      await act(async () => {
+        searchRequest.resolve({
+          data: [mockContent[1]],
+          meta: { total: 1, page: 1, limit: 20, totalPages: 1 },
+        });
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText('Test Image')).not.toBeInTheDocument();
+        expect(screen.getByText('Test Video')).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        initialRequest.resolve({
+          data: mockContent,
+          meta: { total: 2, page: 1, limit: 20, totalPages: 1 },
+        });
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText('Test Image')).not.toBeInTheDocument();
+        expect(screen.getByText('Test Video')).toBeInTheDocument();
+      });
+    });
+
+    it('ignores stale responses that resolve before the debounced search request starts', async () => {
+      const initialRequest = createDeferred<MockContentResponse>();
+      const searchRequest = createDeferred<MockContentResponse>();
+      (apiClient.getContent as jest.Mock)
+        .mockReturnValueOnce(initialRequest.promise)
+        .mockReturnValueOnce(searchRequest.promise);
+
+      render(<ContentLibraryPanel organizationId="org-1" />);
+
+      await waitFor(() => {
+        expect(apiClient.getContent).toHaveBeenCalledTimes(1);
+      });
+
+      fireEvent.change(screen.getByPlaceholderText('Search content...'), {
+        target: { value: 'Video' },
+      });
+
+      await act(async () => {
+        initialRequest.resolve({
+          data: mockContent,
+          meta: { total: 2, page: 1, limit: 20, totalPages: 1 },
+        });
+      });
+
+      expect(screen.queryByText('Test Image')).not.toBeInTheDocument();
+
+      await waitFor(() => {
+        expect(apiClient.getContent).toHaveBeenCalledTimes(2);
+      });
+
+      await act(async () => {
+        searchRequest.resolve({
+          data: [mockContent[1]],
+          meta: { total: 1, page: 1, limit: 20, totalPages: 1 },
+        });
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText('Test Image')).not.toBeInTheDocument();
+        expect(screen.getByText('Test Video')).toBeInTheDocument();
+      });
+    });
+
+    it('resets to page one and preserves search when type filter changes', async () => {
+      (apiClient.getContent as jest.Mock)
+        .mockResolvedValueOnce({
+          data: mockContent,
+          meta: { total: 40, page: 1, limit: 20, totalPages: 2 },
+        })
+        .mockResolvedValue({
+          data: [mockContent[1]],
+          meta: { total: 1, page: 1, limit: 20, totalPages: 1 },
+        });
+
+      render(<ContentLibraryPanel organizationId="org-1" />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Page 1 of 2')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Next'));
+
+      await waitFor(() => {
+        expect(apiClient.getContent).toHaveBeenLastCalledWith({
+          page: 2,
+          limit: 20,
+        });
+      });
+
+      fireEvent.change(screen.getByPlaceholderText('Search content...'), {
+        target: { value: 'Video' },
+      });
+
+      await waitFor(() => {
+        expect(apiClient.getContent).toHaveBeenLastCalledWith({
+          page: 1,
+          limit: 20,
+          search: 'Video',
+        });
+      });
+
+      fireEvent.click(screen.getByText('Video'));
+
+      await waitFor(() => {
+        expect(apiClient.getContent).toHaveBeenLastCalledWith({
+          page: 1,
+          limit: 20,
+          type: 'video',
+          search: 'Video',
+        });
+      });
+    });
+
+    it('does not refetch when only search whitespace changes', async () => {
+      (apiClient.getContent as jest.Mock).mockResolvedValue({
+        data: mockContent,
+        meta: { total: 40, page: 1, limit: 20, totalPages: 2 },
+      });
+
+      render(<ContentLibraryPanel organizationId="org-1" />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Page 1 of 2')).toBeInTheDocument();
+      });
+
+      fireEvent.change(screen.getByPlaceholderText('Search content...'), {
+        target: { value: 'Video' },
+      });
+
+      await waitFor(() => {
+        expect(apiClient.getContent).toHaveBeenCalledTimes(2);
+      });
+
+      fireEvent.click(screen.getByText('Next'));
+
+      await waitFor(() => {
+        expect(apiClient.getContent).toHaveBeenCalledTimes(3);
+      });
+      await waitFor(() => {
+        expect(apiClient.getContent).toHaveBeenLastCalledWith({
+          page: 2,
+          limit: 20,
+          search: 'Video',
+        });
+      });
+
+      fireEvent.change(screen.getByPlaceholderText('Search content...'), {
+        target: { value: 'Video ' },
+      });
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 350));
+      });
+
+      expect(apiClient.getContent).toHaveBeenCalledTimes(3);
+      expect(screen.getByText('Page 2 of 2')).toBeInTheDocument();
+    });
+
+    it('does not let stale pagination advance a pending search request', async () => {
+      (apiClient.getContent as jest.Mock).mockResolvedValue({
+        data: mockContent,
+        meta: { total: 40, page: 1, limit: 20, totalPages: 2 },
+      });
+
+      render(<ContentLibraryPanel organizationId="org-1" />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Page 1 of 2')).toBeInTheDocument();
+      });
+
+      fireEvent.change(screen.getByPlaceholderText('Search content...'), {
+        target: { value: 'Video' },
+      });
+
+      expect(screen.queryByText('Next')).not.toBeInTheDocument();
+
+      await waitFor(() => {
+        expect(apiClient.getContent).toHaveBeenLastCalledWith({
+          page: 1,
+          limit: 20,
+          search: 'Video',
+        });
       });
     });
 
