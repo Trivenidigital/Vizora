@@ -120,6 +120,20 @@ NEXT_PUBLIC_GOOGLE_CLIENT_ID  # Same value, exposed to frontend for GSI button (
 NEXT_SERVER_ACTIONS_ENCRYPTION_KEY  # Stable Next.js Server-Action key — KEEP CONSTANT across deploys
 ```
 
+### Manual verification scripts
+
+```
+VIZORA_TEST_USER_TOKEN          # Fresh local user JWT for manual helper scripts; never commit real values
+VIZORA_TEST_DEVICE_TOKEN        # Fresh local device JWT for realtime/device-content manual helper scripts
+VIZORA_TEST_DEVICE_IDENTIFIER   # Optional device identifier override for manual realtime scripts
+VIZORA_TEST_PLAYLIST_ID         # Optional playlist id override for manual content-delivery script
+VIZORA_TEST_CONTENT_ID          # Optional content id override for manual heartbeat/impression payloads
+```
+
+These variables are for local manual verification only. Generate tokens through
+the local login/pairing flow; user and device tokens must belong to the same
+local organization and test data set.
+
 ### Web frontend (NEXT_PUBLIC_*)
 
 ```

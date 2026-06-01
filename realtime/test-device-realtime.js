@@ -1,7 +1,16 @@
 const { io } = require('socket.io-client');
 
 const REALTIME_URL = 'ws://127.0.0.1:3002';
-const DEVICE_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmYzVmZjk4Mi1hNmUxLTRmNDYtYjQyNS01MjJjMWQ3NThjOTkiLCJkZXZpY2VJZGVudGlmaWVyIjoiMDA6MTU6NWQ6MDU6YTI6Y2IiLCJvcmdhbml6YXRpb25JZCI6IjJmZDY4OTY4LTAyYjAtNGM0MC05ZmM4LWU2MmE2MWRkNWVkYyIsInR5cGUiOiJkZXZpY2UiLCJpYXQiOjE3Njk3ODIzOTcsImV4cCI6MTgwMTMxODM5N30.F6LRyNtGTBCS3gsMUaHBMSezW6VSpHaxBtuGsaousp8';
+const DEVICE_TOKEN = requiredEnv('VIZORA_TEST_DEVICE_TOKEN');
+
+function requiredEnv(name) {
+  const value = process.env[name];
+  if (!value) {
+    console.error(`${name} is required. Generate a fresh local device token and pass it through the environment.`);
+    process.exit(1);
+  }
+  return value;
+}
 
 console.log('╔════════════════════════════════════════════════════════╗');
 console.log('║      TEST DEVICE REALTIME GATEWAY CONNECTION           ║');

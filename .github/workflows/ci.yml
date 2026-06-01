@@ -222,6 +222,8 @@ jobs:
           node-version: '22'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
+      - name: Check for hardcoded JWTs
+        run: pnpm security:no-hardcoded-jwts
       - name: Security audit
         continue-on-error: true
         run: pnpm audit --audit-level=high

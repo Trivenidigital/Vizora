@@ -2,12 +2,24 @@ const { io } = require('socket.io-client');
 const http = require('http');
 
 const API_URL = 'http://127.0.0.1:3000';
+const API_PREFIX = '/api/v1';
 const REALTIME_URL = 'ws://127.0.0.1:3002';
-const DEVICE_IDENTIFIER = '00:15:5d:05:a2:cb';
-const DEVICE_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmYzVmZjk4Mi1hNmUxLTRmNDYtYjQyNS01MjJjMWQ3NThjOTkiLCJkZXZpY2VJZGVudGlmaWVyIjoiMDA6MTU6NWQ6MDU6YTI6Y2IiLCJvcmdhbml6YXRpb25JZCI6IjJmZDY4OTY4LTAyYjAtNGM0MC05ZmM4LWU2MmE2MWRkNWVkYyIsInR5cGUiOiJkZXZpY2UiLCJpYXQiOjE3Njk3ODIzOTcsImV4cCI6MTgwMTMxODM5N30.F6LRyNtGTBCS3gsMUaHBMSezW6VSpHaxBtuGsaousp8';
-const USER_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmNGQwOWFjMy04MmMwLTQ3ODAtOGVhMi03MWZmYjU4YzgzYWEiLCJlbWFpbCI6InRlc3QtMTc2OTc4MzI1OTc2NUBleGFtcGxlLmNvbSIsIm9yZ2FuaXphdGlvbklkIjoiMzVhMTBjMmYtODZiZS00MjkzLTk5ODgtNmM2NDBhM2ExZTYzIiwicm9sZSI6ImFkbWluIiwidHlwZSI6InVzZXIiLCJpYXQiOjE3Njk3ODMyNjAsImV4cCI6MTc3MDM4ODA2MH0.MEP4Kiy09Z_n-Ln_6BTxPp4lIELnNNJiAVCMI60_kHQ';
+const DEVICE_IDENTIFIER = process.env.VIZORA_TEST_DEVICE_IDENTIFIER || '00:15:5d:05:a2:cb';
+const DEVICE_TOKEN = requiredEnv('VIZORA_TEST_DEVICE_TOKEN');
+const USER_TOKEN = requiredEnv('VIZORA_TEST_USER_TOKEN');
+const TEST_PLAYLIST_ID = process.env.VIZORA_TEST_PLAYLIST_ID;
+const TEST_CONTENT_ID = process.env.VIZORA_TEST_CONTENT_ID;
 
 const results = [];
+
+function requiredEnv(name) {
+  const value = process.env[name];
+  if (!value) {
+    console.error(`${name} is required. Generate a fresh local token and pass it through the environment.`);
+    process.exit(1);
+  }
+  return value;
+}
 
 function httpRequest(method, path, body, headers = {}, useAuth = true) {
   return new Promise((resolve, reject) => {
@@ -57,15 +69,66 @@ function httpRequest(method, path, body, headers = {}, useAuth = true) {
   });
 }
 
+function unwrapResponseData(responseData) {
+  return responseData && typeof responseData === 'object' && 'data' in responseData
+    ? responseData.data
+    : responseData;
+}
+
+function extractCollection(payload) {
+  const queue = [payload];
+  const seen = new Set();
+
+  while (queue.length > 0) {
+    const value = queue.shift();
+    if (Array.isArray(value)) return value;
+    if (!value || typeof value !== 'object' || seen.has(value)) continue;
+
+    seen.add(value);
+    for (const key of ['data', 'items', 'playlists', 'results']) {
+      if (key in value) queue.push(value[key]);
+    }
+  }
+
+  return [];
+}
+
+async function fetchPlaylistDetail(playlistId) {
+  const playlistResp = await httpRequest('GET', `${API_PREFIX}/playlists/${playlistId}`);
+  if (playlistResp.status !== 200) {
+    throw new Error(`Could not fetch playlist ${playlistId}: HTTP ${playlistResp.status}`);
+  }
+  return unwrapResponseData(playlistResp.data);
+}
+
+async function loadTestPlaylist() {
+  if (TEST_PLAYLIST_ID) {
+    return fetchPlaylistDetail(TEST_PLAYLIST_ID);
+  }
+
+  const listResp = await httpRequest('GET', `${API_PREFIX}/playlists`);
+  if (listResp.status !== 200) {
+    throw new Error(`Could not list playlists: HTTP ${listResp.status}`);
+  }
+
+  const playlists = extractCollection(listResp.data);
+  const playlist = playlists.find((candidate) => candidate?.id);
+  if (!playlist) {
+    throw new Error('No playlist found. Create a local playlist or set VIZORA_TEST_PLAYLIST_ID.');
+  }
+
+  return fetchPlaylistDetail(playlist.id);
+}
+
 async function testDeviceStatus() {
   console.log('\n💻 TEST 1: Check Device Status Before Playlist Push');
   console.log('=====================================');
 
   try {
-    const response = await httpRequest('GET', '/api/devices/status');
+    const response = await httpRequest('GET', `${API_PREFIX}/displays`);
 
     if (response.status === 200) {
-      const devices = response.data.devices || response.data || [];
+      const devices = extractCollection(response.data);
       const testDevice = devices.find((d) => d.deviceIdentifier === DEVICE_IDENTIFIER);
 
       if (testDevice) {
@@ -91,6 +154,8 @@ async function testDeviceStatus() {
         });
         return null;
       }
+    } else {
+      console.log(`âš  Could not check device status: HTTP ${response.status}`);
     }
   } catch (error) {
     console.log('⚠ Could not check device status');
@@ -102,17 +167,9 @@ async function testPushPlaylist() {
   console.log('\n📡 TEST 2: Push Playlist to Device via Realtime');
   console.log('=====================================');
 
-  const PLAYLIST_ID = 'cml0z5rvu000nqji6s9o6m3gu';
-
   try {
-    // First, fetch the playlist from the API
-    const playlistResp = await httpRequest('GET', `/api/playlists/${PLAYLIST_ID}`);
-
-    if (playlistResp.status !== 200) {
-      throw new Error(`Could not fetch playlist: HTTP ${playlistResp.status}`);
-    }
-
-    const playlist = playlistResp.data;
+    // First, fetch the playlist from the API.
+    const playlist = await loadTestPlaylist();
     console.log('✓ Playlist fetched from API');
     console.log(`  Playlist ID: ${playlist.id}`);
     console.log(`  Name: ${playlist.name}`);
@@ -183,7 +240,7 @@ async function testPushPlaylist() {
             name: 'Playlist Push via Realtime',
             status: 'PENDING',
             message: 'Playlist structure verified, delivery flow ready',
-            details: { playlistId: PLAYLIST_ID },
+            details: { playlistId: playlist.id },
           });
           socket.disconnect();
           resolve();
@@ -240,8 +297,8 @@ async function testDeviceHeartbeat() {
         console.log('\n📤 Sending device heartbeat with content impression...');
         socket.emit('heartbeat', {
           timestamp: Date.now(),
-          contentId: 'cml0z5rvu000nqji6s9o6m3gu',
-          playlistId: 'cml0z5rvu000nqji6s9o6m3gu',
+          contentId: TEST_CONTENT_ID || TEST_PLAYLIST_ID || 'manual-test-content',
+          playlistId: TEST_PLAYLIST_ID || 'manual-test-playlist',
           currentItem: 0,
           totalItems: 1,
           metrics: {
