@@ -1565,7 +1565,7 @@ Plan: `docs/plans/2026-05-31-customer-dashboard-trust-pass-13.md`
   - `npx nx build @vizora/web` — pass.
   - `pnpm --filter @vizora/web test -- --runInBand` — 95 suites / 977 tests pass; unrelated existing act warnings remain in non-dashboard suites.
   - Playwright browser smoke against `next start` on `localhost:3001`: desktop and mobile dashboard render with no page errors after the layout hydration fix; screenshots in `logs/dashboard-pass13-{desktop,mobile}.png`.
-- [ ] Open PR, wait for CI, merge if green.
+- [x] Open PR, wait for CI, merge if green. PR #139 opened; CI passed audit, lint, security, build, test, and e2e.
 - [ ] Deploy status: blocked unless production dirty/diverged state is resolved or explicitly approved with a reviewed runbook.
 
 ## Next Up (Not Started)
