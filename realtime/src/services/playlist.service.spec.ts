@@ -6,6 +6,20 @@ import { DatabaseService } from '../database/database.service';
 describe('PlaylistService', () => {
   let service: PlaylistService;
 
+  const genericApiWidgetMetadata = {
+    isWidget: true,
+    widgetType: 'generic-api',
+    widgetConfig: {
+      endpoint: 'https://api.example.com/menu?api_key=live-query-key',
+      headers: {
+        Authorization: 'Bearer live-secret',
+        'X-Api-Key': 'live-api-key',
+      },
+      method: 'GET',
+    },
+    renderedHtml: '<div>Menu</div>',
+  };
+
   const mockRedisService = {
     getCachedPlaylist: jest.fn().mockResolvedValue(null),
     cachePlaylist: jest.fn().mockResolvedValue(undefined),
@@ -59,6 +73,37 @@ describe('PlaylistService', () => {
       expect(mockDatabaseService.display.findUnique).not.toHaveBeenCalled();
     });
 
+    it('should redact generic API widget headers from cached playlists before returning them', async () => {
+      const cachedPlaylist = {
+        id: 'p-1',
+        name: 'Cached',
+        items: [
+          {
+            id: 'item-1',
+            contentId: 'c-1',
+            order: 0,
+            duration: 10,
+            content: {
+              id: 'c-1',
+              name: 'API Menu',
+              type: 'template',
+              url: '/api/v1/device-content/c-1/file',
+              metadata: genericApiWidgetMetadata,
+            },
+          },
+        ],
+      };
+      mockRedisService.getCachedPlaylist.mockResolvedValueOnce(cachedPlaylist);
+
+      const result = await service.getDevicePlaylist('device-1');
+
+      expect(result!.items[0].content.metadata!.widgetConfig).toBeUndefined();
+      expect(JSON.stringify(result)).not.toContain('live-secret');
+      expect(JSON.stringify(result)).not.toContain('live-api-key');
+      expect(JSON.stringify(result)).not.toContain('live-query-key');
+      expect(mockDatabaseService.display.findUnique).not.toHaveBeenCalled();
+    });
+
     it('should bypass cache when forceRefresh is true', async () => {
       mockDatabaseService.display.findUnique.mockResolvedValueOnce(null);
 
@@ -104,6 +149,45 @@ describe('PlaylistService', () => {
       expect(result!.items).toHaveLength(1);
       expect(result!.items[0].duration).toBe(15);
       expect(mockRedisService.cachePlaylist).toHaveBeenCalled();
+    });
+
+    it('should redact generic API widget headers from assigned DB playlists before returning and caching them', async () => {
+      const dbDisplay = {
+        organizationId: 'org-1',
+        currentPlaylist: {
+          id: 'p-1',
+          name: 'DB Playlist',
+          createdAt: new Date('2024-01-01'),
+          updatedAt: new Date('2024-01-02'),
+          items: [
+            {
+              id: 'item-1',
+              contentId: 'c-1',
+              order: 1,
+              duration: 15,
+              content: {
+                id: 'c-1',
+                name: 'API Menu',
+                type: 'template',
+                url: 'https://cdn.example.com/widget.html',
+                thumbnail: 'thumb.jpg',
+                metadata: genericApiWidgetMetadata,
+              },
+            },
+          ],
+        },
+      };
+      mockDatabaseService.display.findUnique.mockResolvedValueOnce(dbDisplay);
+
+      const result = await service.getDevicePlaylist('device-1');
+
+      expect(result!.items[0].content.metadata!.widgetConfig).toBeUndefined();
+      expect(JSON.stringify(result)).not.toContain('live-secret');
+      expect(JSON.stringify(result)).not.toContain('live-query-key');
+      const cached = mockRedisService.cachePlaylist.mock.calls[0][1];
+      expect(cached.items[0].content.metadata.widgetConfig).toBeUndefined();
+      expect(JSON.stringify(cached)).not.toContain('live-secret');
+      expect(JSON.stringify(cached)).not.toContain('live-query-key');
     });
 
     it('should default item duration to 10 when not set', async () => {
@@ -158,6 +242,47 @@ describe('PlaylistService', () => {
           where: { organizationId: 'org-1' },
         }),
       );
+    });
+
+    it('should redact generic API widget headers from organization fallback playlists', async () => {
+      mockDatabaseService.display.findUnique.mockResolvedValueOnce({
+        organizationId: 'org-1',
+        currentPlaylist: null,
+      });
+
+      const orgPlaylist = {
+        id: 'org-p-1',
+        name: 'Org Default',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        items: [
+          {
+            id: 'item-1',
+            contentId: 'c-1',
+            order: 0,
+            duration: 10,
+            content: {
+              id: 'c-1',
+              name: 'API Menu',
+              type: 'template',
+              url: 'https://cdn.example.com/widget.html',
+              thumbnail: null,
+              metadata: genericApiWidgetMetadata,
+            },
+          },
+        ],
+      };
+      mockDatabaseService.playlist.findFirst.mockResolvedValueOnce(orgPlaylist);
+
+      const result = await service.getDevicePlaylist('device-1');
+
+      expect(result!.items[0].content!.metadata!.widgetConfig).toBeUndefined();
+      expect(JSON.stringify(result)).not.toContain('live-secret');
+      expect(JSON.stringify(result)).not.toContain('live-query-key');
+      const cached = mockRedisService.cachePlaylist.mock.calls[0][1];
+      expect(cached.items[0].content.metadata.widgetConfig).toBeUndefined();
+      expect(JSON.stringify(cached)).not.toContain('live-secret');
+      expect(JSON.stringify(cached)).not.toContain('live-query-key');
     });
 
     it('should return null when no playlist found anywhere', async () => {
@@ -232,6 +357,35 @@ describe('PlaylistService', () => {
       await service.updateDevicePlaylist('device-1', playlist);
 
       expect(mockRedisService.cachePlaylist).toHaveBeenCalledWith('device-1', playlist);
+    });
+
+    it('should redact generic API widget headers before caching admin-updated playlists', async () => {
+      const playlist = {
+        id: 'p-1',
+        name: 'Updated',
+        items: [
+          {
+            id: 'item-1',
+            contentId: 'c-1',
+            order: 0,
+            duration: 10,
+            content: {
+              id: 'c-1',
+              name: 'API Menu',
+              type: 'template',
+              url: '/api/v1/device-content/c-1/file',
+              metadata: genericApiWidgetMetadata,
+            },
+          },
+        ],
+      } as any;
+
+      await service.updateDevicePlaylist('device-1', playlist);
+
+      const cached = mockRedisService.cachePlaylist.mock.calls[0][1];
+      expect(cached.items[0].content.metadata.widgetConfig).toBeUndefined();
+      expect(JSON.stringify(cached)).not.toContain('live-secret');
+      expect(JSON.stringify(cached)).not.toContain('live-query-key');
     });
 
     it('should throw on Redis error', async () => {

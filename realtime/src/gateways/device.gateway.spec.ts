@@ -32,6 +32,20 @@ describe('DeviceGateway', () => {
   const hashToken = (token: string) =>
     createHash('sha256').update(token).digest('hex');
 
+  const genericApiWidgetMetadata = {
+    isWidget: true,
+    widgetType: 'generic-api',
+    widgetConfig: {
+      endpoint: 'https://api.example.com/menu?api_key=live-query-key',
+      headers: {
+        Authorization: 'Bearer live-secret',
+        'X-Api-Key': 'live-api-key',
+      },
+      method: 'GET',
+    },
+    renderedHtml: '<div>Menu</div>',
+  };
+
   const mockRedisService = {
     setDeviceStatus: jest.fn().mockResolvedValue(undefined),
     getDeviceCommands: jest.fn().mockResolvedValue([]),
@@ -322,6 +336,102 @@ describe('DeviceGateway', () => {
           where: { id: 'other-org-content', organizationId: 'org-1' },
         }),
       );
+    });
+
+    it('redacts generic API widget headers from layout metadata before returning device payloads', async () => {
+      const result = await (gateway as any).resolveLayoutContent({
+        id: 'layout-1',
+        type: 'layout',
+        metadata: {
+          ...genericApiWidgetMetadata,
+          zones: [
+            {
+              id: 'zone-content',
+              gridArea: 'main',
+              resolvedContent: {
+                id: 'content-1',
+                name: 'API Menu',
+                type: 'template',
+                url: '/api/v1/device-content/content-1/file',
+                metadata: genericApiWidgetMetadata,
+              },
+            },
+            {
+              id: 'zone-playlist',
+              gridArea: 'side',
+              resolvedPlaylist: {
+                id: 'playlist-1',
+                name: 'Widget Loop',
+                items: [
+                  {
+                    id: 'item-1',
+                    contentId: 'content-2',
+                    duration: 10,
+                    content: {
+                      id: 'content-2',
+                      name: 'API Menu 2',
+                      type: 'template',
+                      url: '/api/v1/device-content/content-2/file',
+                      metadata: genericApiWidgetMetadata,
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      }, 'org-1');
+
+      expect(result.metadata.widgetConfig).toBeUndefined();
+      expect(result.metadata.zones[0].resolvedContent.metadata.widgetConfig).toBeUndefined();
+      expect(result.metadata.zones[1].resolvedPlaylist.items[0].content.metadata.widgetConfig).toBeUndefined();
+      expect(JSON.stringify(result)).not.toContain('live-secret');
+      expect(JSON.stringify(result)).not.toContain('live-api-key');
+      expect(JSON.stringify(result)).not.toContain('live-query-key');
+    });
+  });
+
+  describe('sendInitialState', () => {
+    it('redacts generic API widget headers from the initial playlist payload', async () => {
+      mockDatabaseService.display.findUnique.mockResolvedValueOnce({
+        id: 'device-1',
+        organizationId: 'org-1',
+        metadata: {},
+        currentPlaylistId: 'p-1',
+        currentPlaylist: {
+          id: 'p-1',
+          name: 'Current Playlist',
+          items: [
+            {
+              id: 'item-1',
+              contentId: 'content-1',
+              duration: 10,
+              order: 0,
+              content: {
+                id: 'content-1',
+                name: 'API Menu',
+                type: 'template',
+                url: '/api/v1/device-content/content-1/file',
+                thumbnail: null,
+                mimeType: 'text/html',
+                duration: 10,
+                metadata: genericApiWidgetMetadata,
+              },
+            },
+          ],
+        },
+      });
+      const client = createMockSocket();
+
+      await (gateway as any).sendInitialState(client, 'device-1', 'org-1');
+
+      const playlistCall = client.emit.mock.calls.find(([event]) => event === 'playlist:update');
+      expect(playlistCall).toBeDefined();
+      const payload = playlistCall![1];
+      expect(payload.playlist.items[0].content.metadata.widgetConfig).toBeUndefined();
+      expect(JSON.stringify(payload)).not.toContain('live-secret');
+      expect(JSON.stringify(payload)).not.toContain('live-api-key');
+      expect(JSON.stringify(payload)).not.toContain('live-query-key');
     });
   });
 
@@ -813,6 +923,51 @@ describe('DeviceGateway', () => {
       expect(mockRedisService.addDeviceCommand).not.toHaveBeenCalledWith('device-1', pendingCommand);
     });
 
+    it('should redact stale pending playlist metadata before heartbeat replay emits it', async () => {
+      const emit = jest.fn((_event: string, _payload: any, ackCb?: (ack?: { ok: boolean }) => void) => {
+        ackCb?.({ ok: true });
+      });
+      const client = createMockSocket({
+        connected: true,
+        data: {
+          deviceId: 'device-1',
+          organizationId: 'org-1',
+          deviceTokenHash: hashToken('valid-token'),
+          deliveryAckCapable: true,
+        },
+        emit,
+      });
+      const pendingPlaylist = {
+        id: 'playlist-pending',
+        items: [
+          {
+            id: 'item-1',
+            contentId: 'content-1',
+            duration: 10,
+            content: {
+              id: 'content-1',
+              name: 'API Menu',
+              type: 'template',
+              url: '/api/v1/device-content/content-1/file',
+              metadata: genericApiWidgetMetadata,
+            },
+          },
+        ],
+      };
+      mockRedisService.getPendingPlaylist.mockResolvedValueOnce(pendingPlaylist);
+      (gateway as any).deviceSockets.set('device-1', 'socket-1');
+
+      const result = await (gateway as any).deliverPendingPlaylist(client, 'device-1');
+
+      expect(result).toBe('delivered');
+      const playlistCall = emit.mock.calls.find(([event]) => event === 'playlist:update');
+      expect(playlistCall).toBeDefined();
+      const payload = playlistCall![1];
+      expect(payload.playlist.items[0].content.metadata.widgetConfig).toBeUndefined();
+      expect(JSON.stringify(payload)).not.toContain('live-secret');
+      expect(JSON.stringify(payload)).not.toContain('live-query-key');
+    });
+
     it('should not drain pending deliveries from stale socket heartbeats', async () => {
       const client = createMockSocket({
         id: 'socket-old',
@@ -884,16 +1039,33 @@ describe('DeviceGateway', () => {
         emit,
       });
       (gateway as any).deviceSockets.set('device-1', 'socket-1');
-      mockRedisService.getPendingPlaylist.mockResolvedValueOnce({ id: 'playlist-pending', items: [] });
+      mockRedisService.getPendingPlaylist.mockResolvedValueOnce({
+        id: 'playlist-pending',
+        items: [
+          {
+            id: 'item-1',
+            contentId: 'content-1',
+            duration: 10,
+            content: {
+              id: 'content-1',
+              name: 'API Menu',
+              type: 'template',
+              url: '/api/v1/device-content/content-1/file',
+              metadata: genericApiWidgetMetadata,
+            },
+          },
+        ],
+      });
 
       await gateway.handleHeartbeat(client as any, {} as any);
       for (let i = 0; i < 8; i += 1) {
         await Promise.resolve();
       }
-      expect(mockRedisService.setPendingPlaylist).toHaveBeenCalledWith(
-        'device-1',
-        expect.objectContaining({ id: 'playlist-pending' }),
-      );
+      const requeued = mockRedisService.setPendingPlaylist.mock.calls[0][1];
+      expect(requeued.id).toBe('playlist-pending');
+      expect(requeued.items[0].content.metadata.widgetConfig).toBeUndefined();
+      expect(JSON.stringify(requeued)).not.toContain('live-secret');
+      expect(JSON.stringify(requeued)).not.toContain('live-query-key');
 
       mockRedisService.getPendingPlaylist.mockClear();
       await gateway.handleHeartbeat(client as any, {} as any);
@@ -1250,6 +1422,43 @@ describe('DeviceGateway', () => {
         }),
         expect.any(Function),
       );
+    });
+
+    it('should redact generic API widget headers before emitting playlist updates', async () => {
+      const playlist = {
+        id: 'p-1',
+        name: 'Test',
+        organizationId: 'org-1',
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        items: [
+          {
+            id: 'item-1',
+            contentId: 'c-1',
+            order: 0,
+            duration: 10,
+            content: {
+              id: 'c-1',
+              name: 'API Menu',
+              type: 'template',
+              url: '/api/v1/device-content/c-1/file',
+              metadata: genericApiWidgetMetadata,
+            },
+          },
+        ],
+      };
+
+      const result = await gateway.sendPlaylistUpdate('device-1', playlist as any);
+
+      expect(result).toEqual({ delivered: true });
+      const playlistCall = mockRemoteSocket.emit.mock.calls.find(([event]) => event === 'playlist:update');
+      expect(playlistCall).toBeDefined();
+      const payload = playlistCall![1];
+      expect(payload.playlist.items[0].content.metadata.widgetConfig).toBeUndefined();
+      expect(JSON.stringify(payload)).not.toContain('live-secret');
+      expect(JSON.stringify(payload)).not.toContain('live-api-key');
+      expect(JSON.stringify(payload)).not.toContain('live-query-key');
     });
 
     it('should emit playlist:update to device room', async () => {

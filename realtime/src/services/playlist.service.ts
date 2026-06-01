@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { RedisService } from './redis.service';
 import { DatabaseService } from '../database/database.service';
 import { Playlist } from '../types';
+import { redactDevicePlaylist } from './device-content-payload';
 
 interface InstantPublish {
   playlistId: string;
@@ -32,7 +33,7 @@ export class PlaylistService {
 
         if (cached) {
           this.logger.debug(`Returning cached playlist for device: ${deviceId}`);
-          return cached;
+          return redactDevicePlaylist(cached);
         }
       }
 
@@ -79,11 +80,13 @@ export class PlaylistService {
           updatedAt: display.currentPlaylist.updatedAt?.toISOString?.() || new Date().toISOString(),
         };
 
+        const safePlaylist = redactDevicePlaylist(playlist);
+
         // Cache the playlist
-        await this.redisService.cachePlaylist(deviceId, playlist);
+        await this.redisService.cachePlaylist(deviceId, safePlaylist);
 
         this.logger.debug(`Returning DB playlist for device: ${deviceId} (playlist: ${playlist.name})`);
-        return playlist;
+        return safePlaylist;
       }
 
       // Fallback: try the organization's default playlist
@@ -131,11 +134,13 @@ export class PlaylistService {
             updatedAt: orgPlaylist.updatedAt?.toISOString?.() || new Date().toISOString(),
           };
 
+          const safePlaylist = redactDevicePlaylist(playlist);
+
           // Cache the fallback playlist
-          await this.redisService.cachePlaylist(deviceId, playlist);
+          await this.redisService.cachePlaylist(deviceId, safePlaylist);
 
           this.logger.debug(`Returning org fallback playlist for device: ${deviceId} (playlist: ${playlist.name})`);
-          return playlist;
+          return safePlaylist;
         }
       }
 
@@ -154,7 +159,7 @@ export class PlaylistService {
   async updateDevicePlaylist(deviceId: string, playlist: Playlist): Promise<void> {
     try {
       // Cache the playlist
-      await this.redisService.cachePlaylist(deviceId, playlist);
+      await this.redisService.cachePlaylist(deviceId, redactDevicePlaylist(playlist));
 
       this.logger.log(`Updated playlist for device: ${deviceId}`);
     } catch (error: unknown) {
