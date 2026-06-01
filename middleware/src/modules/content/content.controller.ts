@@ -369,7 +369,7 @@ export class ContentController {
     @CurrentUser('organizationId') organizationId: string,
     @Query() query: ContentQueryDto,
   ) {
-    const { type, status, templateOrientation, search, dateRange, tagNames, ...pagination } = query;
+    const { type, status, templateOrientation, search, dateRange, tagNames, tagIds, ...pagination } = query;
     return this.contentService.findAll(organizationId, pagination, {
       type,
       status,
@@ -377,7 +377,13 @@ export class ContentController {
       search,
       dateRange,
       tagNames,
+      tagIds,
     });
+  }
+
+  @Get('tags')
+  listContentTags(@CurrentUser('organizationId') organizationId: string) {
+    return this.contentService.listContentTags(organizationId);
   }
 
   @Get(':id')

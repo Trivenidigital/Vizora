@@ -24,6 +24,15 @@ const normalizeTagNames = ({ value }: { value: unknown }) => {
   return normalized.length > 0 ? normalized : undefined;
 };
 
+const normalizeRepeatedStrings = ({ value }: { value: unknown }) => {
+  if (value === undefined || value === null) return undefined;
+  const raw = Array.isArray(value) ? value : [value];
+  const normalized = raw
+    .map((item) => String(item).trim())
+    .filter(Boolean);
+  return normalized.length > 0 ? normalized : undefined;
+};
+
 export class ContentQueryDto extends PaginationDto {
   @IsOptional()
   @IsString()
@@ -58,4 +67,12 @@ export class ContentQueryDto extends PaginationDto {
   @IsString({ each: true })
   @MaxLength(64, { each: true })
   tagNames?: string[];
+
+  @IsOptional()
+  @Transform(normalizeRepeatedStrings)
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  @MaxLength(64, { each: true })
+  tagIds?: string[];
 }

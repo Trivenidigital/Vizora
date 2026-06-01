@@ -82,4 +82,25 @@ describe('ContentQueryDto', () => {
 
     expect(errors.some((error) => error.property === 'tagNames')).toBe(true);
   });
+
+  it('normalizes repeated tag ids without splitting comma-bearing values', async () => {
+    const dto = plainToInstance(ContentQueryDto, {
+      tagIds: ['tag-menu', 'tag-lunch,dinner', ' '],
+    });
+
+    const errors = await validate(dto);
+
+    expect(errors).toEqual([]);
+    expect(dto.tagIds).toEqual(['tag-menu', 'tag-lunch,dinner']);
+  });
+
+  it('rejects too many tag ids', async () => {
+    const dto = plainToInstance(ContentQueryDto, {
+      tagIds: Array.from({ length: 21 }, (_, index) => `tag-${index}`),
+    });
+
+    const errors = await validate(dto);
+
+    expect(errors.some((error) => error.property === 'tagIds')).toBe(true);
+  });
 });

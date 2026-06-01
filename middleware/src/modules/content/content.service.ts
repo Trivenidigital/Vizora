@@ -123,6 +123,47 @@ export class ContentService {
     return new PaginatedResponse(mappedData, total, page, limit);
   }
 
+  async listContentTags(organizationId: string) {
+    const tags = await this.db.tag.findMany({
+      where: {
+        organizationId,
+        content: {
+          some: {
+            content: {
+              organizationId,
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        color: true,
+        _count: {
+          select: {
+            content: {
+              where: {
+                content: {
+                  organizationId,
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        name: 'asc',
+      },
+    });
+
+    return tags.map((tag) => ({
+      id: tag.id,
+      name: tag.name,
+      color: tag.color,
+      contentCount: tag._count.content,
+    }));
+  }
+
   /**
    * Find all widgets (content with type 'template' and metadata.isWidget = true)
    */

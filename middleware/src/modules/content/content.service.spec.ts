@@ -83,6 +83,7 @@ describe('ContentService', () => {
       },
       tag: {
         count: jest.fn(),
+        findMany: jest.fn(),
       },
       contentTag: {
         createMany: jest.fn(),
@@ -304,6 +305,35 @@ describe('ContentService', () => {
         jest.useRealTimers();
       }
     });
+
+    it('should filter by tenant-scoped tag ids', async () => {
+      mockDatabaseService.content.findMany.mockResolvedValue([]);
+      mockDatabaseService.content.count.mockResolvedValue(0);
+
+      await service.findAll('org-123', { page: 1, limit: 10 }, {
+        tagIds: ['tag-menu', 'tag-lunch,dinner'],
+      } as any);
+
+      expect(mockDatabaseService.content.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            organizationId: 'org-123',
+            AND: expect.arrayContaining([
+              {
+                tags: {
+                  some: {
+                    tag: {
+                      organizationId: 'org-123',
+                      id: { in: ['tag-menu', 'tag-lunch,dinner'] },
+                    },
+                  },
+                },
+              },
+            ]),
+          }),
+        }),
+      );
+    });
   });
 
   describe('findOne', () => {
@@ -444,6 +474,63 @@ describe('ContentService', () => {
         }),
       );
       expect(zones[1].content).toBeUndefined();
+    });
+  });
+
+  describe('listContentTags', () => {
+    it('should return tenant-scoped content tags with tenant-scoped usage counts', async () => {
+      mockDatabaseService.tag.findMany.mockResolvedValue([
+        {
+          id: 'tag-menu',
+          name: 'Menu',
+          color: 'green',
+          _count: { content: 2 },
+        },
+        {
+          id: 'tag-promo',
+          name: 'Promo',
+          color: null,
+          _count: { content: 1 },
+        },
+      ]);
+
+      const result = await service.listContentTags('org-123');
+
+      expect(mockDatabaseService.tag.findMany).toHaveBeenCalledWith({
+        where: {
+          organizationId: 'org-123',
+          content: {
+            some: {
+              content: {
+                organizationId: 'org-123',
+              },
+            },
+          },
+        },
+        select: {
+          id: true,
+          name: true,
+          color: true,
+          _count: {
+            select: {
+              content: {
+                where: {
+                  content: {
+                    organizationId: 'org-123',
+                  },
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          name: 'asc',
+        },
+      });
+      expect(result).toEqual([
+        { id: 'tag-menu', name: 'Menu', color: 'green', contentCount: 2 },
+        { id: 'tag-promo', name: 'Promo', color: null, contentCount: 1 },
+      ]);
     });
   });
 

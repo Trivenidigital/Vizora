@@ -34,6 +34,7 @@ describe('ContentController', () => {
     mockContentService = {
       create: jest.fn(),
       findAll: jest.fn(),
+      listContentTags: jest.fn(),
       findOne: jest.fn(),
       update: jest.fn(),
       archive: jest.fn(),
@@ -466,6 +467,7 @@ describe('ContentController', () => {
         search: 'menu',
         dateRange: '7days',
         tagNames: ['Marketing', 'Seasonal'],
+        tagIds: ['tag-menu', 'tag-seasonal'],
       } as any);
 
       expect(mockContentService.findAll).toHaveBeenCalledWith(
@@ -478,8 +480,23 @@ describe('ContentController', () => {
           search: 'menu',
           dateRange: '7days',
           tagNames: ['Marketing', 'Seasonal'],
+          tagIds: ['tag-menu', 'tag-seasonal'],
         },
       );
+    });
+  });
+
+  describe('listContentTags', () => {
+    it('should return tenant-scoped content tags for filters', async () => {
+      const expectedTags = [
+        { id: 'tag-menu', name: 'Menu', color: 'green', contentCount: 3 },
+      ];
+      mockContentService.listContentTags.mockResolvedValue(expectedTags as any);
+
+      const result = await controller.listContentTags(organizationId);
+
+      expect(result).toEqual(expectedTags);
+      expect(mockContentService.listContentTags).toHaveBeenCalledWith(organizationId);
     });
   });
 
