@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { fetchAllPaginated } from '@/lib/api/pagination';
-import { Playlist, Content, Display } from '@/lib/types';
+import { PlaylistSummary, Content, Display } from '@/lib/types';
 import Modal from '@/components/Modal';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import LoadingSpinner from '@/components/LoadingSpinner';
@@ -107,11 +107,11 @@ function SortablePlaylistItem({ item, idx, onRemove, onDurationChange }: {
 export default function PlaylistsClient() {
  const router = useRouter();
  const toast = useToast();
- const [playlists, setPlaylists] = useState<Playlist[]>([]);
+ const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
  const [content, setContent] = useState<Content[]>([]);
  const [devices, setDevices] = useState<Display[]>([]);
  const [loading, setLoading] = useState(true);
- const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
+ const [selectedPlaylist, setSelectedPlaylist] = useState<PlaylistSummary | null>(null);
  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -122,7 +122,7 @@ export default function PlaylistsClient() {
  const [searchQuery, setSearchQuery] = useState('');
  const debouncedSearch = useDebounce(searchQuery, 300);
  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline' | 'error'>('offline');
- const [previewPlaylist, setPreviewPlaylist] = useState<Playlist | null>(null);
+ const [previewPlaylist, setPreviewPlaylist] = useState<PlaylistSummary | null>(null);
 
  // Real-time event handling
  const { isConnected, isOffline, emitPlaylistUpdate } = useRealtimeEvents({
@@ -255,11 +255,11 @@ export default function PlaylistsClient() {
  }
  };
 
- const handleEdit = async (playlist: Playlist) => {
+ const handleEdit = async (playlist: PlaylistSummary) => {
  router.push(`/dashboard/playlists/${playlist.id}`);
  };
 
- const handleDelete = (playlist: Playlist) => {
+ const handleDelete = (playlist: PlaylistSummary) => {
  setSelectedPlaylist(playlist);
  setIsDeleteModalOpen(true);
  };
@@ -277,7 +277,14 @@ export default function PlaylistsClient() {
  emitPlaylistUpdate({
  playlistId: deletedPlaylistId,
  action: 'deleted',
- payload: selectedPlaylist,
+ payload: {
+ id: selectedPlaylist.id,
+ name: selectedPlaylist.name,
+ description: selectedPlaylist.description,
+ isActive: selectedPlaylist.isActive,
+ createdAt: selectedPlaylist.createdAt,
+ updatedAt: selectedPlaylist.updatedAt,
+ },
  });
 
  loadPlaylists();
@@ -288,7 +295,7 @@ export default function PlaylistsClient() {
  }
  };
 
- const handlePublish = async (playlist: Playlist) => {
+ const handlePublish = async (playlist: PlaylistSummary) => {
  try {
  await apiClient.updatePlaylist(playlist.id, { name: playlist.name });
  toast.success('Playlist published successfully');
@@ -306,7 +313,7 @@ export default function PlaylistsClient() {
  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
  };
 
- const getTotalDuration = (playlist: Playlist) => {
+ const getTotalDuration = (playlist: PlaylistSummary) => {
  const total = (playlist as any).totalDuration ||
  (playlist.items?.reduce((sum, item) => sum + (item.duration || 30), 0) || 0);
  if (total === 0) return '0s';

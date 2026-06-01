@@ -24,6 +24,7 @@ export interface Content {
   thumbnailUrl?: string;
   status: 'ready' | 'processing' | 'error' | 'active' | 'archived' | 'flagged' | 'rejected';
   duration?: number;
+  fileSize?: number | null;
   metadata?: Record<string, any>;
   folderId?: string;
   createdAt: Date | string;
@@ -50,6 +51,24 @@ export interface Playlist {
   isActive: boolean;
   createdAt: Date | string;
   updatedAt: Date | string;
+}
+
+export interface PlaylistContentSummary {
+  id: string;
+  title: string;
+  type: Content['type'];
+  thumbnailUrl?: string | null;
+  status: Content['status'];
+  duration?: number;
+  fileSize?: number | null;
+}
+
+export interface PlaylistItemSummary extends Omit<PlaylistItem, 'content'> {
+  content?: PlaylistContentSummary | null;
+}
+
+export interface PlaylistSummary extends Omit<Playlist, 'items'> {
+  items: PlaylistItemSummary[];
 }
 
 export interface Schedule {

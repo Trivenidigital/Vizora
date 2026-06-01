@@ -5,7 +5,7 @@ import { useDropzone, type FileRejection } from 'react-dropzone';
 import { apiClient } from '@/lib/api';
 import type { ContentListParams } from '@/lib/api/content';
 import { fetchAllPaginated } from '@/lib/api/pagination';
-import { Content, Display, Playlist, ContentFolder } from '@/lib/types';
+import { Content, Display, PlaylistSummary, ContentFolder } from '@/lib/types';
 import FolderTree from '@/components/FolderTree';
 import FolderBreadcrumb from '@/components/FolderBreadcrumb';
 import Modal from '@/components/Modal';
@@ -106,7 +106,7 @@ export default function ContentClient() {
  const [isAddToPlaylistModalOpen, setIsAddToPlaylistModalOpen] = useState(false);
  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
  const [devices, setDevices] = useState<Display[]>([]);
- const [playlists, setPlaylists] = useState<Playlist[]>([]);
+ const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
  const [devicesLoading, setDevicesLoading] = useState(false);
  const [playlistsLoading, setPlaylistsLoading] = useState(false);
  const [devicesLoadError, setDevicesLoadError] = useState<string | null>(null);

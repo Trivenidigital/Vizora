@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { PlaylistItem } from '@/lib/types';
+import { PlaylistItemSummary } from '@/lib/types';
 import { Icon } from '@/theme/icons';
 
 interface PlaylistPreviewProps {
-  items: PlaylistItem[];
+  items: PlaylistItemSummary[];
   autoPlay?: boolean;
   onClose?: () => void;
 }

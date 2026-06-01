@@ -13,6 +13,7 @@ describe('Playlists (e2e)', () => {
   let userId: string;
   let organizationId: string;
   let playlistId: string;
+  let listPayloadPlaylistId: string;
   let contentId1: string;
   let contentId2: string;
   let secondUserToken: string;
@@ -95,6 +96,20 @@ describe('Playlists (e2e)', () => {
       });
     contentId2 = content2Res.body.data?.id ?? content2Res.body.id;
 
+    const listPayloadPlaylist = await db.playlist.create({
+      data: {
+        name: 'List Payload Playlist',
+        organizationId,
+        items: {
+          create: [
+            { contentId: contentId1, order: 0, duration: 10 },
+            { contentId: contentId2, order: 1, duration: 30 },
+          ],
+        },
+      },
+    });
+    listPayloadPlaylistId = listPayloadPlaylist.id;
+
     // Create second user for multi-tenant testing
     const timestamp2 = Date.now() + 1;
     const secondUser = {
@@ -119,6 +134,9 @@ describe('Playlists (e2e)', () => {
     // Cleanup
     if (playlistId) {
       await db.playlist.delete({ where: { id: playlistId } }).catch(() => {});
+    }
+    if (listPayloadPlaylistId) {
+      await db.playlist.delete({ where: { id: listPayloadPlaylistId } }).catch(() => {});
     }
     if (contentId1) {
       await db.content.delete({ where: { id: contentId1 } }).catch(() => {});
@@ -231,6 +249,32 @@ describe('Playlists (e2e)', () => {
           
           const found = res.body.data.find((p: any) => p.id === playlistId);
           expect(found).toBeDefined();
+        });
+    });
+
+    it('should return summary content fields for playlist list items', () => {
+      return request(app.getHttpServer())
+        .get('/api/playlists')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200)
+        .expect((res) => {
+          const found = res.body.data.find((p: any) => p.id === listPayloadPlaylistId);
+          expect(found).toBeDefined();
+          expect(found.items).toHaveLength(2);
+          expect(found.itemCount).toBe(2);
+          expect(found.totalDuration).toBe(40);
+
+          const content = found.items[0].content;
+          expect(content).toEqual(
+            expect.objectContaining({
+              id: contentId1,
+              title: 'Test Content 1',
+              type: 'image',
+              status: 'active',
+            }),
+          );
+          expect(content).not.toHaveProperty('url');
+          expect(content).not.toHaveProperty('metadata');
         });
     });
 

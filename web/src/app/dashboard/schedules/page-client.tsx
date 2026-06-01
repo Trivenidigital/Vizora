@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
 import { fetchAllPaginated } from '@/lib/api/pagination';
-import { Display, Playlist } from '@/lib/types';
+import { Display, PlaylistSummary } from '@/lib/types';
 import Modal from '@/components/Modal';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import LoadingSpinner from '@/components/LoadingSpinner';
@@ -97,7 +97,7 @@ export default function SchedulesClient() {
  const toast = useToast();
  const [schedules, setSchedules] = useState<Schedule[]>([]);
  const [devices, setDevices] = useState<Display[]>([]);
- const [playlists, setPlaylists] = useState<Playlist[]>([]);
+ const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
  const [loading, setLoading] = useState(true);
  const [actionLoading, setActionLoading] = useState(false);
  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline'>('offline');
@@ -176,7 +176,7 @@ export default function SchedulesClient() {
  }
  if (playlistsRes.status === 'fulfilled') {
  const playlistData = playlistsRes.value || [];
- setPlaylists(playlistData as unknown as Playlist[]);
+ setPlaylists(playlistData as unknown as PlaylistSummary[]);
  }
  if (groupsRes?.status === 'fulfilled') {
  setDisplayGroups(groupsRes.value || []);

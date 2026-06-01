@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { fetchAllPaginated } from '@/lib/api/pagination';
-import { Display, Playlist, DisplayGroup } from '@/lib/types';
+import { Display, PlaylistSummary, DisplayGroup } from '@/lib/types';
 import Modal from '@/components/Modal';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import LoadingSpinner from '@/components/LoadingSpinner';
@@ -23,7 +23,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 
 interface DevicesClientProps {
  initialDevices: Display[];
- initialPlaylists: Playlist[];
+ initialPlaylists: PlaylistSummary[];
  initialDevicesComplete?: boolean;
  initialPlaylistsComplete?: boolean;
 }
@@ -39,7 +39,7 @@ export default function DevicesClient({
  const { user } = useAuth();
  const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false);
  const [devices, setDevices] = useState<Display[]>(initialDevices);
- const [playlists, setPlaylists] = useState<Playlist[]>(initialPlaylists);
+ const [playlists, setPlaylists] = useState<PlaylistSummary[]>(initialPlaylists);
  const [deviceGroups, setDeviceGroups] = useState<any[]>([]);
  const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
  const [loading, setLoading] = useState(!initialDevices.length && initialDevices.length === 0 ? false : false);
